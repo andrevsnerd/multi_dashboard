@@ -227,6 +227,8 @@ app.post('/transfer', authenticate, async (req, res) => {
       tipoRomaneio = 'TRANSFERENCIA',
       responsavel = 'LOGISTICA',
       observacao = null,
+      idempotencyKey = null,
+      permitirDuplicado = false,
     } = body;
 
     if (!produto || !filialOrigem || !filialDestino || qtdeSaida <= 0 || qtdeEntrada <= 0) {
@@ -245,6 +247,8 @@ app.post('/transfer', authenticate, async (req, res) => {
       tipoRomaneio,
       responsavel,
       observacao: observacao || null,
+      idempotencyKey,
+      permitirDuplicado,
     });
 
     res.json({
@@ -252,9 +256,20 @@ app.post('/transfer', authenticate, async (req, res) => {
       romaneioSaida: result.romaneioSaida,
       romaneioEntrada: result.romaneioEntrada,
       message: result.message,
+      deduplicado: result.deduplicado || false,
     });
   } catch (error) {
     console.error('[Transfer] Erro:', error);
+    // Trava anti-duplicação: repassa código/romaneio para o Vercel devolver 409 ao cliente.
+    if (error && error.code === 'TRANSFERENCIA_DUPLICADA') {
+      return res.status(409).json({
+        success: false,
+        error: error.message,
+        code: 'TRANSFERENCIA_DUPLICADA',
+        romaneioExistente: error.romaneioExistente,
+        segundosAtras: error.segundosAtras,
+      });
+    }
     res.status(500).json({
       success: false,
       error: error.message || 'Erro ao executar transferência',

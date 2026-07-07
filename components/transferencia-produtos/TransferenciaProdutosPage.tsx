@@ -211,7 +211,9 @@ async function executarTransferencia(
   responsavel: string,
   username?: string,
   observacao?: string,
-  companyKey?: string
+  companyKey?: string,
+  idempotencyKey?: string,
+  permitirDuplicado?: boolean
 ): Promise<{ success: boolean; message: string; romaneioSaida?: string; romaneioEntrada?: string }> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (username) headers["x-auth-username"] = username;
@@ -229,12 +231,27 @@ async function executarTransferencia(
       responsavel,
       observacao: observacao || null,
       companyKey,
+      idempotencyKey: idempotencyKey || null,
+      permitirDuplicado: permitirDuplicado || false,
     }),
   });
 
   if (!response.ok) {
-    const error = (await response.json()) as { error: string };
-    throw new Error(error.error || "Erro ao executar transferência");
+    const error = (await response.json().catch(() => ({}))) as {
+      error?: string;
+      code?: string;
+      romaneioExistente?: string;
+      segundosAtras?: number;
+    };
+    const err = new Error(error.error || "Erro ao executar transferência") as Error & {
+      code?: string;
+      romaneioExistente?: string;
+      segundosAtras?: number;
+    };
+    if (error.code) err.code = error.code;
+    if (error.romaneioExistente) err.romaneioExistente = error.romaneioExistente;
+    if (typeof error.segundosAtras === "number") err.segundosAtras = error.segundosAtras;
+    throw err;
   }
 
   const json = (await response.json()) as {
@@ -692,6 +709,26 @@ export default function TransferenciaProdutosPage({
       return;
     }
 
+    // Camada C: dedup no carrinho. Bipar o mesmo produto+cor duas vezes gerava
+    // duas linhas e, na fila, dois romaneios separados (causa raiz das duplicatas
+    // consecutivas de ~7s). Se já está na lista, avisa e não adiciona de novo —
+    // para enviar mais de uma peça, usar o stepper (+) da linha.
+    const jaExiste = produtosSelecionados.some(
+      p =>
+        p.produto === produto.produto &&
+        (p.corProduto || "") === (produto.corProduto || "") &&
+        p.filialOrigem === filialOrigem.codFilial
+    );
+    if (jaExiste) {
+      mostrarNotificacao(
+        `${produto.descProduto} já está na lista. Ajuste a quantidade pelo botão + em vez de bipar de novo.`,
+        "error"
+      );
+      setSearchTerm("");
+      setProdutos([]);
+      return;
+    }
+
     const produtoSelecionado: ProdutoSelecionado = {
       produto: produto.produto,
       descProduto: produto.descProduto,
@@ -705,11 +742,11 @@ export default function TransferenciaProdutosPage({
 
     setProdutosSelecionados(prev => [...prev, produtoSelecionado]);
     mostrarNotificacao(`${produto.descProduto} adicionado à transferência`);
-    
+
     // Limpar busca mas manter modal aberto
     setSearchTerm("");
     setProdutos([]);
-  }, [filialOrigem, mostrarNotificacao]);
+  }, [filialOrigem, produtosSelecionados, mostrarNotificacao]);
 
   const removerProduto = useCallback((index: number) => {
     setProdutosSelecionados(prev => prev.filter((_, i) => i !== index));
@@ -738,6 +775,17 @@ export default function TransferenciaProdutosPage({
     setProcessandoTransferencia(true);
     const produto = filaTransferencias[0];
 
+    const novaChave = () =>
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `tk-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+    // Chave de idempotência estável para ESTE item: reusada em todos os retries
+    // automáticos, para que um reenvio jamais gere um segundo romaneio (Camada A).
+    // Só troca quando o operador confirma um reenvio proposital de item idêntico.
+    let idempotencyKey = novaChave();
+    let permitirDuplicado = false;
+
     // Retry automático se romaneio duplicado (igual ao script)
     let tentativas = 0;
     const maxTentativas = 5;
@@ -756,7 +804,9 @@ export default function TransferenciaProdutosPage({
           responsavelFinal || 'LOGISTICA',
           user?.username,
           observacao.trim() || undefined,
-          companyKey
+          companyKey,
+          idempotencyKey,
+          permitirDuplicado
         );
 
         sucesso = true;
@@ -780,7 +830,34 @@ export default function TransferenciaProdutosPage({
         mostrarNotificacao(`Transferência de ${produto.descProduto} concluída com sucesso!`);
       } catch (error: any) {
         const errorMessage = error.message || "Erro ao processar transferência";
-        
+
+        // Camada B: o servidor detectou uma transferência idêntica recente.
+        // Confirma com o operador antes de criar outra igual (evita duplo-scan e
+        // "achou que falhou e refez"). Se confirmar, reenvia liberando a trava.
+        if (error?.code === 'TRANSFERENCIA_DUPLICADA') {
+          const seg = typeof error.segundosAtras === 'number' ? error.segundosAtras : null;
+          const rom = error.romaneioExistente ? ` (romaneio ${error.romaneioExistente})` : '';
+          const querRepetir =
+            typeof window !== 'undefined' &&
+            window.confirm(
+              `Já existe uma transferência idêntica de ${produto.descProduto} para ${filialDestino.filial}${rom}` +
+                `${seg != null ? ` feita há ${seg}s` : ''}.\n\nEnviar OUTRA igual mesmo assim?`
+            );
+          if (querRepetir) {
+            permitirDuplicado = true;
+            idempotencyKey = novaChave();
+            continue; // reenvio proposital — não conta como tentativa de colisão
+          }
+          mostrarNotificacao(`Transferência de ${produto.descProduto} ignorada (duplicada).`, "success");
+          setFilaTransferencias(prev => prev.slice(1));
+          setProdutosSelecionados(prev => prev.filter(p =>
+            p.produto !== produto.produto ||
+            p.corProduto !== produto.corProduto ||
+            p.filialOrigem !== produto.filialOrigem
+          ));
+          break;
+        }
+
         // Se falhou por PRIMARY KEY ou romaneio duplicado, tentar novamente
         if (
           errorMessage.includes('PRIMARY KEY') ||

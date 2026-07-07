@@ -19,6 +19,8 @@ interface TransferenciaRequest {
   responsavel?: string;
   observacao?: string | null;
   companyKey?: string;
+  idempotencyKey?: string | null;
+  permitirDuplicado?: boolean;
 }
 
 // Resolve a filial informada para a CANÔNICA ATIVA detectada ao vivo (venda mais recente
@@ -56,6 +58,8 @@ export async function POST(request: Request) {
       responsavel = 'LOGISTICA',
       observacao = null,
       companyKey,
+      idempotencyKey = null,
+      permitirDuplicado = false,
     } = body;
 
     if (!produto || !filialOrigem || !filialDestino || qtdeSaida <= 0 || qtdeEntrada <= 0) {
@@ -121,13 +125,30 @@ export async function POST(request: Request) {
           tipoRomaneio,
           responsavel,
           observacao,
+          idempotencyKey,
+          permitirDuplicado,
         },
         request.headers
       );
 
       const proxyJson = await proxyResponse.json().catch(() => ({}));
+      if (proxyJson.success) {
+        return NextResponse.json(proxyJson, { status: 200 });
+      }
+      // Propaga a trava de duplicação como 409 estruturado (o proxy repassa code/romaneioExistente).
+      if (proxyJson.code === 'TRANSFERENCIA_DUPLICADA') {
+        return NextResponse.json(
+          {
+            error: proxyJson.error,
+            code: 'TRANSFERENCIA_DUPLICADA',
+            romaneioExistente: proxyJson.romaneioExistente,
+            segundosAtras: proxyJson.segundosAtras,
+          },
+          { status: 409 }
+        );
+      }
       return NextResponse.json(
-        proxyJson.success ? proxyJson : { error: proxyJson.error || 'Erro ao executar transferencia via proxy' },
+        { error: proxyJson.error || 'Erro ao executar transferencia via proxy' },
         { status: proxyResponse.ok ? 200 : proxyResponse.status }
       );
     }
@@ -143,6 +164,8 @@ export async function POST(request: Request) {
       tipoRomaneio,
       responsavel,
       observacao,
+      idempotencyKey,
+      permitirDuplicado,
     });
 
     return NextResponse.json({
@@ -150,8 +173,22 @@ export async function POST(request: Request) {
       romaneioSaida: result.romaneioSaida,
       romaneioEntrada: result.romaneioEntrada,
       message: result.message,
+      deduplicado: result.deduplicado || false,
     });
   } catch (error: unknown) {
+    // Trava anti-duplicação: devolve 409 estruturado para o cliente decidir (confirmar reenvio).
+    if (error && typeof error === 'object' && (error as { code?: string }).code === 'TRANSFERENCIA_DUPLICADA') {
+      const e = error as { message?: string; romaneioExistente?: string; segundosAtras?: number };
+      return NextResponse.json(
+        {
+          error: e.message,
+          code: 'TRANSFERENCIA_DUPLICADA',
+          romaneioExistente: e.romaneioExistente,
+          segundosAtras: e.segundosAtras,
+        },
+        { status: 409 }
+      );
+    }
     console.error('Erro ao executar transferencia', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Erro ao executar transferencia' },
