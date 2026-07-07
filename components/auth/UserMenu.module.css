@@ -1,0 +1,61 @@
+.container {
+  position: relative;
+  display: inline-flex;
+}
+
+.gearBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  color: var(--t-500);
+  background: none;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: color 0.15s, background-color 0.15s;
+}
+
+.gearBtn:hover {
+  color: var(--t-900);
+  background: var(--s-100);
+}
+
+.panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 180px;
+  background: var(--s-white);
+  border: 1px solid var(--b-200);
+  border-radius: 14px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.16);
+  z-index: 200;
+  overflow: hidden;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--t-700);
+  background: none;
+  border: none;
+  border-radius: 8px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.12s, color 0.12s;
+}
+
+.item:hover {
+  color: var(--t-900);
+  background: var(--s-100);
+}

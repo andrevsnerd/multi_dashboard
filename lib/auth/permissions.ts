@@ -43,6 +43,7 @@ export function canAccessCompany(user: UserSession | null, companyKey: string): 
  */
 export function pathnameToPermission(pathname: string | null): PermissionKey | "admin" | null {
   if (!pathname || pathname === "/" || pathname === "/login") return null;
+  if (pathname === "/alterar-senha") return null;
   if (pathname === "/admin") return "admin";
 
   const parts = pathname.split("/").filter(Boolean);

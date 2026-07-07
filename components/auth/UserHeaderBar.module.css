@@ -35,27 +35,9 @@
   background-color: var(--s-100);
 }
 
-.adminLink svg {
-  flex-shrink: 0;
-}
-
 .userName {
   font-size: 14px;
   font-weight: 500;
   color: var(--t-600);
 }
 
-.logoutBtn {
-  font-size: 14px;
-  color: var(--t-500);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 6px 12px;
-  border-radius: 8px;
-}
-
-.logoutBtn:hover {
-  color: var(--t-900);
-  background: var(--s-100);
-}
