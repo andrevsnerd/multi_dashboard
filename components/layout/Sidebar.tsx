@@ -111,6 +111,8 @@ export default function Sidebar({ companyName }: SidebarProps) {
     basePath && basePath !== "/" ? `${basePath}/produtos-parados` : "/produtos-parados";
   const controlePerformanceHref =
     basePath && basePath !== "/" ? `${basePath}/controle-performance` : "/controle-performance";
+  const lojaRaioXHref =
+    basePath && basePath !== "/" ? `${basePath}/loja-raio-x` : "/loja-raio-x";
   const curvaAbcHref = basePath && basePath !== "/" ? `${basePath}/curva-abc` : "/curva-abc";
   const curvaPorProdutoHref =
     basePath && basePath !== "/" ? `${basePath}/curva-por-produto` : "/curva-por-produto";
@@ -208,6 +210,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     "/controle-giro",
     "/produtos-parados",
     "/controle-performance",
+    "/loja-raio-x",
     "/curva-abc",
     "/curva-por-produto",
     "/controle-transferencias",
@@ -368,6 +371,14 @@ export default function Sidebar({ companyName }: SidebarProps) {
           permission: "controle-performance",
           isActive: (currentPathname) =>
             matchesSegment(currentPathname, "/controle-performance", controlePerformanceHref),
+        },
+        {
+          key: "loja-raio-x",
+          label: "Loja Raio X",
+          href: lojaRaioXHref,
+          permission: "loja-raio-x",
+          isActive: (currentPathname) =>
+            matchesSegment(currentPathname, "/loja-raio-x", lojaRaioXHref),
         },
         {
           key: "curva-abc",

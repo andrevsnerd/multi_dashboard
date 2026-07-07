@@ -25,6 +25,7 @@ export const PAGE_PERMISSION_DEFINITIONS = [
   { key: "controle-giro", label: "Controle de Giro", routeSegments: ["controle-giro"] },
   { key: "produtos-parados", label: "Produtos Parados", routeSegments: ["produtos-parados"] },
   { key: "controle-performance", label: "Controle de Performance", routeSegments: ["controle-performance"] },
+  { key: "loja-raio-x", label: "Loja Raio X", routeSegments: ["loja-raio-x"] },
   { key: "controle-movimento", label: "Controle de Movimento", routeSegments: ["controle-movimento"] },
   { key: "curva-abc", label: "Curva A, B, C", routeSegments: ["curva-abc"] },
   { key: "curva-por-produto", label: "Curva por Produto", routeSegments: ["curva-por-produto"] },

@@ -7757,7 +7757,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_romaneio_confirmar_entrada_route",
-      "community": 146,
+      "community": 75,
       "norm_label": "route.ts"
     },
     {
@@ -7767,7 +7767,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "app_api_romaneio_confirmar_entrada_route_get",
-      "community": 146,
+      "community": 75,
       "norm_label": "get()"
     },
     {
@@ -7777,7 +7777,7 @@
       "source_location": "L57",
       "_origin": "ast",
       "id": "app_api_romaneio_confirmar_entrada_route_post",
-      "community": 146,
+      "community": 75,
       "norm_label": "post()"
     },
     {
@@ -7867,7 +7867,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_romaneios_renomear_romaneio_route",
-      "community": 18,
+      "community": 73,
       "norm_label": "route.ts"
     },
     {
@@ -7877,7 +7877,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "app_api_romaneios_renomear_romaneio_route_podechamar",
-      "community": 18,
+      "community": 73,
       "norm_label": "podechamar()"
     },
     {
@@ -7887,7 +7887,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "app_api_romaneios_renomear_romaneio_route_post",
-      "community": 18,
+      "community": 73,
       "norm_label": "post()"
     },
     {
@@ -8047,7 +8047,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_historico_route",
-      "community": 75,
+      "community": 127,
       "norm_label": "route.ts"
     },
     {
@@ -8057,7 +8057,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_historico_route_tipooperacao",
-      "community": 75,
+      "community": 127,
       "norm_label": "tipooperacao"
     },
     {
@@ -8067,7 +8067,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_historico_route_normalizefilialvalue",
-      "community": 75,
+      "community": 127,
       "norm_label": "normalizefilialvalue()"
     },
     {
@@ -8077,7 +8077,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_historico_route_normalizedigits",
-      "community": 75,
+      "community": 127,
       "norm_label": "normalizedigits()"
     },
     {
@@ -8087,7 +8087,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_historico_route_matchfilial",
-      "community": 75,
+      "community": 127,
       "norm_label": "matchfilial()"
     },
     {
@@ -8097,7 +8097,7 @@
       "source_location": "L42",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_historico_route_cleandestino",
-      "community": 75,
+      "community": 127,
       "norm_label": "cleandestino()"
     },
     {
@@ -8107,7 +8107,7 @@
       "source_location": "L48",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_historico_route_getdestinosalvo",
-      "community": 75,
+      "community": 127,
       "norm_label": "getdestinosalvo()"
     },
     {
@@ -8117,7 +8117,7 @@
       "source_location": "L69",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_historico_route_get",
-      "community": 75,
+      "community": 127,
       "norm_label": "get()"
     },
     {
@@ -8467,7 +8467,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_log_saidas_route",
-      "community": 75,
+      "community": 127,
       "norm_label": "route.ts"
     },
     {
@@ -8477,7 +8477,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_log_saidas_route_get",
-      "community": 75,
+      "community": 127,
       "norm_label": "get()"
     },
     {
@@ -8547,7 +8547,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_produtos_route",
-      "community": 251,
+      "community": 73,
       "norm_label": "route.ts"
     },
     {
@@ -8557,7 +8557,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_produtos_route_normalizebarcode",
-      "community": 251,
+      "community": 73,
       "norm_label": "normalizebarcode()"
     },
     {
@@ -8567,7 +8567,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_produtos_route_comparebarcodepreference",
-      "community": 251,
+      "community": 73,
       "norm_label": "comparebarcodepreference()"
     },
     {
@@ -8577,7 +8577,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_produtos_route_choosepreferredbarcode",
-      "community": 251,
+      "community": 73,
       "norm_label": "choosepreferredbarcode()"
     },
     {
@@ -8587,7 +8587,7 @@
       "source_location": "L47",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_produtos_route_get",
-      "community": 251,
+      "community": 73,
       "norm_label": "get()"
     },
     {
@@ -14096,7 +14096,7 @@
       "label": "VendedorLinha",
       "file_type": "code",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L49",
+      "source_location": "L48",
       "_origin": "ast",
       "id": "components_loja_raio_x_lojaraioxpage_vendedorlinha",
       "community": 97,
@@ -14106,7 +14106,7 @@
       "label": "VendedoresData",
       "file_type": "code",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L55",
+      "source_location": "L54",
       "_origin": "ast",
       "id": "components_loja_raio_x_lojaraioxpage_vendedoresdata",
       "community": 97,
@@ -14116,7 +14116,7 @@
       "label": "RupturaItem",
       "file_type": "code",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L60",
+      "source_location": "L59",
       "_origin": "ast",
       "id": "components_loja_raio_x_lojaraioxpage_rupturaitem",
       "community": 97,
@@ -14126,7 +14126,7 @@
       "label": "Tab",
       "file_type": "code",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L72",
+      "source_location": "L71",
       "_origin": "ast",
       "id": "components_loja_raio_x_lojaraioxpage_tab",
       "community": 97,
@@ -14136,7 +14136,7 @@
       "label": "MESES_ABREV",
       "file_type": "code",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L76",
+      "source_location": "L75",
       "_origin": "ast",
       "id": "components_loja_raio_x_lojaraioxpage_meses_abrev",
       "community": 97,
@@ -14146,7 +14146,7 @@
       "label": "fmtCurrency()",
       "file_type": "code",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L78",
+      "source_location": "L77",
       "_origin": "ast",
       "id": "components_loja_raio_x_lojaraioxpage_fmtcurrency",
       "community": 97,
@@ -14156,7 +14156,7 @@
       "label": "fmtNum()",
       "file_type": "code",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L81",
+      "source_location": "L80",
       "_origin": "ast",
       "id": "components_loja_raio_x_lojaraioxpage_fmtnum",
       "community": 97,
@@ -14166,7 +14166,7 @@
       "label": "ymLabel()",
       "file_type": "code",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L84",
+      "source_location": "L83",
       "_origin": "ast",
       "id": "components_loja_raio_x_lojaraioxpage_ymlabel",
       "community": 97,
@@ -14176,7 +14176,7 @@
       "label": "ultimosMesesClient()",
       "file_type": "code",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L90",
+      "source_location": "L89",
       "_origin": "ast",
       "id": "components_loja_raio_x_lojaraioxpage_ultimosmesesclient",
       "community": 97,
@@ -14186,7 +14186,7 @@
       "label": "Props",
       "file_type": "code",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L106",
+      "source_location": "L105",
       "_origin": "ast",
       "id": "components_loja_raio_x_lojaraioxpage_props",
       "community": 97,
@@ -14196,7 +14196,7 @@
       "label": "LojaRaioXPage()",
       "file_type": "code",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L111",
+      "source_location": "L110",
       "_origin": "ast",
       "id": "components_loja_raio_x_lojaraioxpage_lojaraioxpage",
       "community": 97,
@@ -14206,7 +14206,7 @@
       "label": "Timeline()",
       "file_type": "code",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L303",
+      "source_location": "L286",
       "_origin": "ast",
       "id": "components_loja_raio_x_lojaraioxpage_timeline",
       "community": 97,
@@ -14216,7 +14216,7 @@
       "label": "PrincipalTab()",
       "file_type": "code",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L417",
+      "source_location": "L363",
       "_origin": "ast",
       "id": "components_loja_raio_x_lojaraioxpage_principaltab",
       "community": 97,
@@ -14226,7 +14226,7 @@
       "label": "Kpi()",
       "file_type": "code",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L541",
+      "source_location": "L481",
       "_origin": "ast",
       "id": "components_loja_raio_x_lojaraioxpage_kpi",
       "community": 97,
@@ -14236,7 +14236,7 @@
       "label": "GapFactor()",
       "file_type": "code",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L551",
+      "source_location": "L491",
       "_origin": "ast",
       "id": "components_loja_raio_x_lojaraioxpage_gapfactor",
       "community": 97,
@@ -14246,7 +14246,7 @@
       "label": "VendedoresTab()",
       "file_type": "code",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L581",
+      "source_location": "L521",
       "_origin": "ast",
       "id": "components_loja_raio_x_lojaraioxpage_vendedorestab",
       "community": 97,
@@ -14256,7 +14256,7 @@
       "label": "RupturasTab()",
       "file_type": "code",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L654",
+      "source_location": "L594",
       "_origin": "ast",
       "id": "components_loja_raio_x_lojaraioxpage_rupturastab",
       "community": 97,
@@ -19839,7 +19839,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_stock_comprassalvaslistpanel",
-      "community": 38,
+      "community": 146,
       "norm_label": "comprassalvaslistpanel.tsx"
     },
     {
@@ -19849,7 +19849,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "components_stock_comprassalvaslistpanel_fmt",
-      "community": 38,
+      "community": 146,
       "norm_label": "fmt()"
     },
     {
@@ -19859,7 +19859,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "components_stock_comprassalvaslistpanel_fmtbrl",
-      "community": 38,
+      "community": 146,
       "norm_label": "fmtbrl()"
     },
     {
@@ -19869,7 +19869,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "components_stock_comprassalvaslistpanel_fmtdata",
-      "community": 38,
+      "community": 146,
       "norm_label": "fmtdata()"
     },
     {
@@ -19879,7 +19879,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "components_stock_comprassalvaslistpanel_fmthora",
-      "community": 38,
+      "community": 146,
       "norm_label": "fmthora()"
     },
     {
@@ -19889,7 +19889,7 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "components_stock_comprassalvaslistpanel_comprassalvaslistpanel",
-      "community": 38,
+      "community": 146,
       "norm_label": "comprassalvaslistpanel()"
     },
     {
@@ -29569,7 +29569,7 @@
       "source_location": "L68",
       "_origin": "ast",
       "id": "lib_db_connection_geterrorcodes",
-      "community": 251,
+      "community": 73,
       "norm_label": "geterrorcodes()"
     },
     {
@@ -29579,7 +29579,7 @@
       "source_location": "L88",
       "_origin": "ast",
       "id": "lib_db_connection_isdatabaseconnectionerror",
-      "community": 251,
+      "community": 73,
       "norm_label": "isdatabaseconnectionerror()"
     },
     {
@@ -29589,7 +29589,7 @@
       "source_location": "L109",
       "_origin": "ast",
       "id": "lib_db_connection_getpublicdatabaseerrormessage",
-      "community": 251,
+      "community": 73,
       "norm_label": "getpublicdatabaseerrormessage()"
     },
     {
@@ -36219,7 +36219,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_logsaidas",
-      "community": 75,
+      "community": 127,
       "norm_label": "logsaidas.ts"
     },
     {
@@ -36229,7 +36229,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "lib_repositories_logsaidas_logsaidarow",
-      "community": 75,
+      "community": 127,
       "norm_label": "logsaidarow"
     },
     {
@@ -36239,7 +36239,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "lib_repositories_logsaidas_buildsearchconfig",
-      "community": 75,
+      "community": 127,
       "norm_label": "buildsearchconfig()"
     },
     {
@@ -36249,7 +36249,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "lib_repositories_logsaidas_fetchlogsaidas",
-      "community": 75,
+      "community": 127,
       "norm_label": "fetchlogsaidas()"
     },
     {
@@ -36259,7 +36259,7 @@
       "source_location": "L246",
       "_origin": "ast",
       "id": "lib_repositories_logsaidas_defeitoitem",
-      "community": 75,
+      "community": 127,
       "norm_label": "defeitoitem"
     },
     {
@@ -36269,7 +36269,7 @@
       "source_location": "L259",
       "_origin": "ast",
       "id": "lib_repositories_logsaidas_defeitosresult",
-      "community": 75,
+      "community": 127,
       "norm_label": "defeitosresult"
     },
     {
@@ -36279,7 +36279,7 @@
       "source_location": "L268",
       "_origin": "ast",
       "id": "lib_repositories_logsaidas_defeitosparams",
-      "community": 75,
+      "community": 127,
       "norm_label": "defeitosparams"
     },
     {
@@ -45589,7 +45589,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_utils_romaneio_confirmacao_store",
-      "community": 146,
+      "community": 75,
       "norm_label": "romaneio-confirmacao-store.ts"
     },
     {
@@ -45599,7 +45599,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "lib_utils_romaneio_confirmacao_store_data_file",
-      "community": 146,
+      "community": 75,
       "norm_label": "data_file"
     },
     {
@@ -45609,7 +45609,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "lib_utils_romaneio_confirmacao_store_confirmacaoitem",
-      "community": 146,
+      "community": 75,
       "norm_label": "confirmacaoitem"
     },
     {
@@ -45619,7 +45619,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "lib_utils_romaneio_confirmacao_store_confirmadosmap",
-      "community": 146,
+      "community": 75,
       "norm_label": "confirmadosmap"
     },
     {
@@ -45629,7 +45629,7 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "lib_utils_romaneio_confirmacao_store_itemkey",
-      "community": 146,
+      "community": 75,
       "norm_label": "itemkey()"
     },
     {
@@ -45639,7 +45639,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "lib_utils_romaneio_confirmacao_store_ensuredatadir",
-      "community": 146,
+      "community": 75,
       "norm_label": "ensuredatadir()"
     },
     {
@@ -45649,7 +45649,7 @@
       "source_location": "L42",
       "_origin": "ast",
       "id": "lib_utils_romaneio_confirmacao_store_readfile",
-      "community": 146,
+      "community": 75,
       "norm_label": "readfile()"
     },
     {
@@ -45659,7 +45659,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "lib_utils_romaneio_confirmacao_store_writefile",
-      "community": 146,
+      "community": 75,
       "norm_label": "writefile()"
     },
     {
@@ -45669,7 +45669,7 @@
       "source_location": "L58",
       "_origin": "ast",
       "id": "lib_utils_romaneio_confirmacao_store_ensuretable",
-      "community": 146,
+      "community": 75,
       "norm_label": "ensuretable()"
     },
     {
@@ -45679,7 +45679,7 @@
       "source_location": "L82",
       "_origin": "ast",
       "id": "lib_utils_romaneio_confirmacao_store_getcontadorconfirmadosbycompany",
-      "community": 146,
+      "community": 75,
       "norm_label": "getcontadorconfirmadosbycompany()"
     },
     {
@@ -45689,7 +45689,7 @@
       "source_location": "L118",
       "_origin": "ast",
       "id": "lib_utils_romaneio_confirmacao_store_getconfirmados",
-      "community": 146,
+      "community": 75,
       "norm_label": "getconfirmados()"
     },
     {
@@ -45699,7 +45699,7 @@
       "source_location": "L160",
       "_origin": "ast",
       "id": "lib_utils_romaneio_confirmacao_store_confirmaritem",
-      "community": 146,
+      "community": 75,
       "norm_label": "confirmaritem()"
     },
     {
@@ -45709,7 +45709,7 @@
       "source_location": "L220",
       "_origin": "ast",
       "id": "lib_utils_romaneio_confirmacao_store_desconfirmaritem",
-      "community": 146,
+      "community": 75,
       "norm_label": "desconfirmaritem()"
     },
     {
@@ -75330,7 +75330,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "app/api/loja-raio-x/route.ts",
-      "source_location": "L88",
+      "source_location": "L81",
       "weight": 1.0,
       "source": "app_api_loja_raio_x_route_get",
       "target": "app_api_loja_raio_x_route_melhormesdosultimos",
@@ -75341,7 +75341,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "app/api/loja-raio-x/route.ts",
-      "source_location": "L125",
+      "source_location": "L117",
       "weight": 1.0,
       "source": "app_api_loja_raio_x_route_get",
       "target": "app_api_loja_raio_x_route_resumovendedores",
@@ -75386,7 +75386,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/api/loja-raio-x/route.ts",
-      "source_location": "L112",
+      "source_location": "L104",
       "weight": 1.0,
       "source": "app_api_loja_raio_x_route_get",
       "target": "lib_repositories_lojaraiox_fetchvendedoresmesresumo"
@@ -99887,7 +99887,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L78",
+      "source_location": "L77",
       "weight": 1.0,
       "source": "components_loja_raio_x_lojaraioxpage",
       "target": "components_loja_raio_x_lojaraioxpage_fmtcurrency",
@@ -99897,7 +99897,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L81",
+      "source_location": "L80",
       "weight": 1.0,
       "source": "components_loja_raio_x_lojaraioxpage",
       "target": "components_loja_raio_x_lojaraioxpage_fmtnum",
@@ -99907,7 +99907,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L551",
+      "source_location": "L491",
       "weight": 1.0,
       "source": "components_loja_raio_x_lojaraioxpage",
       "target": "components_loja_raio_x_lojaraioxpage_gapfactor",
@@ -99917,7 +99917,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L541",
+      "source_location": "L481",
       "weight": 1.0,
       "source": "components_loja_raio_x_lojaraioxpage",
       "target": "components_loja_raio_x_lojaraioxpage_kpi",
@@ -99927,7 +99927,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L111",
+      "source_location": "L110",
       "weight": 1.0,
       "source": "components_loja_raio_x_lojaraioxpage",
       "target": "components_loja_raio_x_lojaraioxpage_lojaraioxpage",
@@ -99937,7 +99937,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L76",
+      "source_location": "L75",
       "weight": 1.0,
       "source": "components_loja_raio_x_lojaraioxpage",
       "target": "components_loja_raio_x_lojaraioxpage_meses_abrev",
@@ -99967,7 +99967,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L417",
+      "source_location": "L363",
       "weight": 1.0,
       "source": "components_loja_raio_x_lojaraioxpage",
       "target": "components_loja_raio_x_lojaraioxpage_principaltab",
@@ -99977,7 +99977,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L106",
+      "source_location": "L105",
       "weight": 1.0,
       "source": "components_loja_raio_x_lojaraioxpage",
       "target": "components_loja_raio_x_lojaraioxpage_props",
@@ -99987,7 +99987,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L60",
+      "source_location": "L59",
       "weight": 1.0,
       "source": "components_loja_raio_x_lojaraioxpage",
       "target": "components_loja_raio_x_lojaraioxpage_rupturaitem",
@@ -99997,7 +99997,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L654",
+      "source_location": "L594",
       "weight": 1.0,
       "source": "components_loja_raio_x_lojaraioxpage",
       "target": "components_loja_raio_x_lojaraioxpage_rupturastab",
@@ -100007,7 +100007,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L72",
+      "source_location": "L71",
       "weight": 1.0,
       "source": "components_loja_raio_x_lojaraioxpage",
       "target": "components_loja_raio_x_lojaraioxpage_tab",
@@ -100017,7 +100017,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L303",
+      "source_location": "L286",
       "weight": 1.0,
       "source": "components_loja_raio_x_lojaraioxpage",
       "target": "components_loja_raio_x_lojaraioxpage_timeline",
@@ -100027,7 +100027,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L90",
+      "source_location": "L89",
       "weight": 1.0,
       "source": "components_loja_raio_x_lojaraioxpage",
       "target": "components_loja_raio_x_lojaraioxpage_ultimosmesesclient",
@@ -100037,7 +100037,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L55",
+      "source_location": "L54",
       "weight": 1.0,
       "source": "components_loja_raio_x_lojaraioxpage",
       "target": "components_loja_raio_x_lojaraioxpage_vendedoresdata",
@@ -100047,7 +100047,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L581",
+      "source_location": "L521",
       "weight": 1.0,
       "source": "components_loja_raio_x_lojaraioxpage",
       "target": "components_loja_raio_x_lojaraioxpage_vendedorestab",
@@ -100057,7 +100057,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L49",
+      "source_location": "L48",
       "weight": 1.0,
       "source": "components_loja_raio_x_lojaraioxpage",
       "target": "components_loja_raio_x_lojaraioxpage_vendedorlinha",
@@ -100067,7 +100067,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L84",
+      "source_location": "L83",
       "weight": 1.0,
       "source": "components_loja_raio_x_lojaraioxpage",
       "target": "components_loja_raio_x_lojaraioxpage_ymlabel",
@@ -100122,7 +100122,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L569",
+      "source_location": "L509",
       "weight": 1.0,
       "source": "components_loja_raio_x_lojaraioxpage_gapfactor",
       "target": "components_loja_raio_x_lojaraioxpage_fmtcurrency",
@@ -100133,7 +100133,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L447",
+      "source_location": "L387",
       "weight": 1.0,
       "source": "components_loja_raio_x_lojaraioxpage_principaltab",
       "target": "components_loja_raio_x_lojaraioxpage_fmtcurrency",
@@ -100144,7 +100144,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L694",
+      "source_location": "L634",
       "weight": 1.0,
       "source": "components_loja_raio_x_lojaraioxpage_rupturastab",
       "target": "components_loja_raio_x_lojaraioxpage_fmtcurrency",
@@ -100155,7 +100155,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L359",
+      "source_location": "L335",
       "weight": 1.0,
       "source": "components_loja_raio_x_lojaraioxpage_timeline",
       "target": "components_loja_raio_x_lojaraioxpage_fmtcurrency",
@@ -100166,7 +100166,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L629",
+      "source_location": "L569",
       "weight": 1.0,
       "source": "components_loja_raio_x_lojaraioxpage_vendedorestab",
       "target": "components_loja_raio_x_lojaraioxpage_fmtcurrency",
@@ -100177,7 +100177,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L466",
+      "source_location": "L388",
       "weight": 1.0,
       "source": "components_loja_raio_x_lojaraioxpage_principaltab",
       "target": "components_loja_raio_x_lojaraioxpage_fmtnum",
@@ -100188,7 +100188,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L693",
+      "source_location": "L633",
       "weight": 1.0,
       "source": "components_loja_raio_x_lojaraioxpage_rupturastab",
       "target": "components_loja_raio_x_lojaraioxpage_fmtnum",
@@ -100199,7 +100199,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L359",
+      "source_location": "L335",
       "weight": 1.0,
       "source": "components_loja_raio_x_lojaraioxpage_timeline",
       "target": "components_loja_raio_x_lojaraioxpage_fmtnum",
@@ -100210,7 +100210,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L629",
+      "source_location": "L569",
       "weight": 1.0,
       "source": "components_loja_raio_x_lojaraioxpage_vendedorestab",
       "target": "components_loja_raio_x_lojaraioxpage_fmtnum",
@@ -100221,7 +100221,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L293",
+      "source_location": "L276",
       "weight": 1.0,
       "source": "components_loja_raio_x_lojaraioxpage_lojaraioxpage",
       "target": "components_loja_raio_x_lojaraioxpage_ymlabel",
@@ -100232,7 +100232,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L611",
+      "source_location": "L551",
       "weight": 1.0,
       "source": "components_loja_raio_x_lojaraioxpage_vendedorestab",
       "target": "components_loja_raio_x_lojaraioxpage_ymlabel",
@@ -100243,7 +100243,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L112",
+      "source_location": "L111",
       "weight": 1.0,
       "source": "components_loja_raio_x_lojaraioxpage_lojaraioxpage",
       "target": "components_loja_raio_x_lojaraioxpage_ultimosmesesclient",
@@ -100254,7 +100254,7 @@
       "context": "field",
       "confidence": "EXTRACTED",
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L107",
+      "source_location": "L106",
       "weight": 1.0,
       "source": "components_loja_raio_x_lojaraioxpage_props",
       "target": "lib_config_company_companykey",
@@ -100266,7 +100266,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/loja-raio-x/LojaRaioXPage.tsx",
-      "source_location": "L320",
+      "source_location": "L299",
       "weight": 1.0,
       "source": "components_loja_raio_x_lojaraioxpage_timeline",
       "target": "components_theme_themecontext_usetheme"

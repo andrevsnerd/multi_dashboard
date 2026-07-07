@@ -1,0 +1,506 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+}
+
+/* Header */
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+.title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--t-900);
+  margin: 0;
+}
+.subtitle {
+  font-size: 13px;
+  color: var(--t-500);
+  margin: 4px 0 0;
+  max-width: 620px;
+}
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+.mesField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.mesLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--t-600);
+}
+.select {
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--b-200);
+  background: var(--s-white);
+  color: var(--t-900);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+/* Cards */
+.card {
+  background: var(--s-white);
+  border: 1px solid var(--b-200);
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+.cardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.cardTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--t-800);
+  margin: 0 0 10px;
+}
+.cardHead .cardTitle {
+  margin: 0;
+}
+.legend {
+  display: flex;
+  gap: 14px;
+  font-size: 12px;
+  color: var(--t-500);
+}
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+/* Empty / error / skeleton */
+.empty {
+  padding: 28px;
+  text-align: center;
+  color: var(--t-500);
+  font-size: 14px;
+  background: var(--s-50);
+  border: 1px dashed var(--b-200);
+  border-radius: 12px;
+}
+.errorBox {
+  padding: 16px;
+  color: #b91c1c;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 10px;
+  font-size: 14px;
+}
+.skeleton {
+  width: 100%;
+  border-radius: 12px;
+  background: linear-gradient(90deg, var(--s-50) 25%, var(--s-100) 37%, var(--s-50) 63%);
+  background-size: 400% 100%;
+  animation: shimmer 1.3s ease infinite;
+}
+@keyframes shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: 0 0; }
+}
+
+/* Menu de clique na barra da timeline */
+.menuOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+.barMenu {
+  position: fixed;
+  z-index: 41;
+  min-width: 210px;
+  background: var(--s-white);
+  border: 1px solid var(--b-200);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.16);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.barMenuHead {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--t-500);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 6px 8px 2px;
+}
+.barMenuItem {
+  appearance: none;
+  border: none;
+  background: none;
+  text-align: left;
+  padding: 8px 8px;
+  border-radius: 7px;
+  font-size: 13px;
+  color: var(--t-800);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.barMenuItem:hover {
+  background: var(--s-100);
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 6px;
+  border-bottom: 1px solid var(--b-200);
+}
+.tabBtn {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--t-500);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.tabBtn:hover {
+  color: var(--t-800);
+}
+.tabBtnActive {
+  color: #2563eb;
+  border-bottom-color: #2563eb;
+}
+
+.tabBody {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Banner */
+.banner {
+  padding: 14px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.bannerInfo {
+  background: var(--s-blue50);
+  border: 1px solid rgba(37, 99, 235, 0.25);
+  color: var(--t-800);
+}
+.bannerAlert {
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: var(--t-800);
+}
+.bannerGood {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: var(--t-800);
+}
+
+/* KPIs */
+.kpiRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+.kpi {
+  background: var(--s-white);
+  border: 1px solid var(--b-200);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.kpiLabel {
+  font-size: 12px;
+  color: var(--t-500);
+}
+.kpiValue {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--t-900);
+}
+.kpiSub {
+  font-size: 11px;
+  color: var(--t-400);
+}
+
+/* Gap decomposition */
+.gapGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+.gapFactor {
+  border: 1px solid var(--b-200);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.gapFactorHi {
+  border-color: rgba(37, 99, 235, 0.5);
+  background: var(--s-blue50);
+}
+.gapFactorTop {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--t-700);
+}
+.gapFactorTop strong {
+  color: var(--t-900);
+}
+.gapBar {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--s-100);
+  overflow: hidden;
+}
+.gapBarFill {
+  height: 100%;
+  background: #2563eb;
+  border-radius: 4px;
+}
+.gapDica {
+  font-size: 11px;
+  color: var(--t-500);
+}
+
+/* Diagnostic cards */
+.diagGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+}
+.diagCard {
+  text-align: left;
+  appearance: none;
+  cursor: pointer;
+  background: var(--s-white);
+  border: 1px solid var(--b-200);
+  border-radius: 12px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: border-color 0.15s, transform 0.1s;
+}
+.diagCard:hover {
+  border-color: var(--b-300);
+  transform: translateY(-1px);
+}
+.diagCardWarn {
+  border-color: rgba(245, 158, 11, 0.5);
+  background: rgba(245, 158, 11, 0.06);
+}
+.diagHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.diagIcon {
+  font-size: 18px;
+}
+.diagTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--t-800);
+}
+.diagBig {
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--t-900);
+  line-height: 1;
+}
+.diagBigSub {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--t-400);
+}
+.diagText {
+  font-size: 12px;
+  color: var(--t-500);
+}
+.diagLink {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #2563eb;
+}
+.quedaList {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.quedaList li {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--t-700);
+}
+.quedaVal {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+/* Matriz vendedores */
+.matrizScroll {
+  overflow-x: auto;
+  border: 1px solid var(--b-200);
+  border-radius: 12px;
+}
+.matriz {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12px;
+}
+.matriz th,
+.matriz td {
+  padding: 8px 10px;
+  text-align: right;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--b-200);
+}
+.matriz thead th {
+  background: var(--s-50);
+  color: var(--t-600);
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+}
+.matrizNome {
+  text-align: left !important;
+  position: sticky;
+  left: 0;
+  background: var(--s-white);
+  color: var(--t-900);
+  font-weight: 600;
+  z-index: 1;
+}
+.matriz thead .matrizNome {
+  z-index: 2;
+  background: var(--s-50);
+}
+.matrizColHi {
+  outline: 2px solid rgba(37, 99, 235, 0.35);
+  outline-offset: -2px;
+}
+.matrizTotal {
+  font-weight: 700;
+  color: var(--t-900);
+  background: var(--s-50);
+}
+.matrizCell {
+  vertical-align: middle;
+}
+.cellVal {
+  display: block;
+  color: var(--t-900);
+  font-weight: 600;
+}
+.cellQtd {
+  display: block;
+  font-size: 10px;
+  color: var(--t-500);
+}
+.cellZero {
+  color: var(--t-400);
+}
+
+/* Rupturas */
+.rupturaHint {
+  font-size: 13px;
+  color: var(--t-600);
+  margin: 0;
+}
+.rupturaTable {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+.rupturaTable th,
+.rupturaTable td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--b-200);
+  vertical-align: top;
+}
+.rupturaTable thead th {
+  background: var(--s-50);
+  color: var(--t-600);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.rupturaTable .num {
+  text-align: right;
+  white-space: nowrap;
+}
+.fat {
+  font-weight: 700;
+  color: var(--t-900);
+}
+.zero {
+  color: #dc2626;
+  font-weight: 600;
+}
+.prodDesc {
+  color: var(--t-900);
+  font-weight: 600;
+}
+.prodId {
+  font-size: 11px;
+  color: var(--t-400);
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.chip {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--s-100);
+  color: var(--t-700);
+  white-space: nowrap;
+}
+.chip strong {
+  color: #16a34a;
+}
+.semRede {
+  font-size: 12px;
+  color: #dc2626;
+  font-weight: 600;
+}
