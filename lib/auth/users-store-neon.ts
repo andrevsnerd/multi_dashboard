@@ -20,6 +20,7 @@ async function ensureTable(sql: ReturnType<typeof getNeonSql>) {
   await sql`ALTER TABLE dashboard_users ADD COLUMN IF NOT EXISTS allowed_companies JSONB`;
   await sql`ALTER TABLE dashboard_users ADD COLUMN IF NOT EXISTS nome_exibicao TEXT`;
   await sql`ALTER TABLE dashboard_users ADD COLUMN IF NOT EXISTS somente_varejo BOOLEAN DEFAULT FALSE`;
+  await sql`ALTER TABLE dashboard_users ADD COLUMN IF NOT EXISTS cliente_codigo TEXT`;
   // Atualiza o CHECK constraint para incluir o role 'logistica'
   await sql`
     DO $$
@@ -59,6 +60,7 @@ function rowToUser(row: {
   allowed_companies?: string[] | null;
   nome_exibicao?: string | null;
   somente_varejo?: boolean | null;
+  cliente_codigo?: string | null;
 }): UserRecord {
   const perms = normalizePermissionKeys(row.permissions);
   const raw = row.allowed_companies;
@@ -75,6 +77,7 @@ function rowToUser(row: {
     allowedCompanies,
     nomeExibicao: row.nome_exibicao ?? undefined,
     somenteVarejo: row.somente_varejo === true ? true : undefined,
+    clienteCodigo: row.cliente_codigo?.trim() || undefined,
   };
 }
 
@@ -83,7 +86,7 @@ export async function findUserByUsername(username: string): Promise<UserRecord |
   await ensureTable(sql);
   const normalized = username.trim().toLowerCase();
   const rows = await sql`
-    SELECT id, username, password_hash, role, permissions, allowed_companies, nome_exibicao, somente_varejo
+    SELECT id, username, password_hash, role, permissions, allowed_companies, nome_exibicao, somente_varejo, cliente_codigo
     FROM dashboard_users
     WHERE LOWER(username) = ${normalized}
     LIMIT 1
@@ -96,7 +99,7 @@ export async function findUserById(id: string): Promise<UserRecord | null> {
   const sql = getNeonSql();
   await ensureTable(sql);
   const rows = await sql`
-    SELECT id, username, password_hash, role, permissions, allowed_companies, nome_exibicao, somente_varejo
+    SELECT id, username, password_hash, role, permissions, allowed_companies, nome_exibicao, somente_varejo, cliente_codigo
     FROM dashboard_users
     WHERE id = ${id}
     LIMIT 1
@@ -121,7 +124,8 @@ export async function createUser(
   permissions: PermissionKey[],
   allowedCompanies?: CompanyKey[],
   nomeExibicao?: string,
-  somenteVarejo?: boolean
+  somenteVarejo?: boolean,
+  clienteCodigo?: string
 ): Promise<UserRecord> {
   const sql = getNeonSql();
   await ensureTable(sql);
@@ -140,9 +144,10 @@ export async function createUser(
     allowedCompanies?.length ? JSON.stringify(allowedCompanies) : null;
   const nomeEx = nomeExibicao?.trim() || null;
   const somenteVarejoVal = somenteVarejo === true;
+  const clienteCod = clienteCodigo?.trim() || null;
   await sql`
-    INSERT INTO dashboard_users (id, username, password_hash, role, permissions, allowed_companies, nome_exibicao, somente_varejo)
-    VALUES (${id}, ${normalized}, ${passwordHash}, ${role}, ${JSON.stringify(perms)}::jsonb, ${allowedJson}::jsonb, ${nomeEx}, ${somenteVarejoVal})
+    INSERT INTO dashboard_users (id, username, password_hash, role, permissions, allowed_companies, nome_exibicao, somente_varejo, cliente_codigo)
+    VALUES (${id}, ${normalized}, ${passwordHash}, ${role}, ${JSON.stringify(perms)}::jsonb, ${allowedJson}::jsonb, ${nomeEx}, ${somenteVarejoVal}, ${clienteCod})
   `;
   return {
     id,
@@ -153,6 +158,7 @@ export async function createUser(
     allowedCompanies: allowedCompanies?.length ? allowedCompanies : undefined,
     nomeExibicao: nomeEx ?? undefined,
     somenteVarejo: somenteVarejoVal || undefined,
+    clienteCodigo: clienteCod ?? undefined,
   };
 }
 
@@ -166,12 +172,13 @@ export async function updateUser(
     allowedCompanies?: CompanyKey[] | null;
     nomeExibicao?: string | null;
     somenteVarejo?: boolean | null;
+    clienteCodigo?: string | null;
   }
 ): Promise<UserRecord> {
   const sql = getNeonSql();
   await ensureTable(sql);
   const rows = await sql`
-    SELECT id, username, password_hash, role, permissions, allowed_companies, nome_exibicao, somente_varejo
+    SELECT id, username, password_hash, role, permissions, allowed_companies, nome_exibicao, somente_varejo, cliente_codigo
     FROM dashboard_users WHERE id = ${id} LIMIT 1
   `;
   if (rows.length === 0) throw new Error("Usuário não encontrado");
@@ -183,6 +190,7 @@ export async function updateUser(
   let allowedCompanies = current.allowedCompanies;
   let nomeExibicao = current.nomeExibicao;
   let somenteVarejo = current.somenteVarejo;
+  let clienteCodigo = current.clienteCodigo;
   if (updates.username !== undefined) {
     const normalized = updates.username.trim().toLowerCase();
     const existing = await sql`
@@ -212,20 +220,25 @@ export async function updateUser(
   if (updates.somenteVarejo !== undefined) {
     somenteVarejo = updates.somenteVarejo === true ? true : undefined;
   }
+  if (updates.clienteCodigo !== undefined) {
+    clienteCodigo = updates.clienteCodigo?.trim() || undefined;
+  }
   const allowedJson =
     allowedCompanies?.length ? JSON.stringify(allowedCompanies) : null;
   const nomeEx = nomeExibicao?.trim() || null;
   const somenteVarejoVal = somenteVarejo === true;
+  const clienteCod = clienteCodigo?.trim() || null;
   await sql`
     UPDATE dashboard_users
     SET username = ${username}, password_hash = ${passwordHash}, role = ${role},
         permissions = ${JSON.stringify(permissions)}::jsonb,
         allowed_companies = ${allowedJson}::jsonb,
         nome_exibicao = ${nomeEx},
-        somente_varejo = ${somenteVarejoVal}
+        somente_varejo = ${somenteVarejoVal},
+        cliente_codigo = ${clienteCod}
     WHERE id = ${id}
   `;
-  return { id: current.id, username, passwordHash, role, permissions, allowedCompanies, nomeExibicao, somenteVarejo };
+  return { id: current.id, username, passwordHash, role, permissions, allowedCompanies, nomeExibicao, somenteVarejo, clienteCodigo };
 }
 
 export async function deleteUser(id: string): Promise<void> {
@@ -240,7 +253,7 @@ export async function listUsers(): Promise<UserRecord[]> {
   const sql = getNeonSql();
   await ensureTable(sql);
   const rows = await sql`
-    SELECT id, username, password_hash, role, permissions, allowed_companies, nome_exibicao, somente_varejo
+    SELECT id, username, password_hash, role, permissions, allowed_companies, nome_exibicao, somente_varejo, cliente_codigo
     FROM dashboard_users
     ORDER BY username
   `;

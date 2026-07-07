@@ -96,6 +96,15 @@ export function canAccessPath(user: UserSession | null, pathname: string | null)
     if (user.role !== "admin" && !canAccessCompany(user, companySegment)) return false;
   }
 
+  // Área CORPORATIVO tem dois mundos:
+  //  - /corporativo/loja/**  → a LOJA (vitrine/carrinho/checkout): admin + cliente_corporativo.
+  //  - resto (/corporativo, /novo, /[codigo], /catalogo, /pedidos) → gestão: SÓ admin.
+  if (companySegment === "corporativo") {
+    if (user.role === "admin") return true;
+    if (user.role === "cliente_corporativo") return parts[1] === "loja";
+    return false;
+  }
+
   if (user.role === "admin") return true;
   return userHasPagePermission(user, perm as PermissionKey);
 }
@@ -103,9 +112,9 @@ export function canAccessPath(user: UserSession | null, pathname: string | null)
 /** Primeira rota permitida para o usuario em uma empresa (ex: /nerd/controle-transferencias). */
 export function getFirstAllowedPath(user: UserSession | null, company: string): string {
   if (!user) return `/${company}`;
-  // Área corporativo tem rota própria (fora do dashboard [company]).
+  // Cliente corporativo entra direto na LOJA; admin cai na gestão do corporativo.
+  if (user.role === "cliente_corporativo") return "/corporativo/loja";
   if (company === "corporativo") return "/corporativo";
-  if (user.role === "cliente_corporativo") return "/corporativo";
   if (user.role === "admin") return `/${company}`;
   if ((user.role === "gestor" || user.role === "logistica") && !user.permissions?.length) return `/${company}`;
   if (user.permissions.includes("controle-transferencias")) return `/${company}/controle-transferencias`;

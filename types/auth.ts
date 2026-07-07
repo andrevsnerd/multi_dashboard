@@ -24,6 +24,8 @@ export interface UserRecord {
   nomeExibicao?: string;
   /** Se true: dashboard SCARF ME inicializa sempre em modo Varejo (ignora e-commerce). */
   somenteVarejo?: boolean;
+  /** Codigo (CLIFOR) do cliente atacado no Linx vinculado a este usuario (role cliente_corporativo). */
+  clienteCodigo?: string;
 }
 
 export interface UserSession {
@@ -37,6 +39,8 @@ export interface UserSession {
   nomeExibicao?: string;
   /** Se true: dashboard SCARF ME inicializa sempre em modo Varejo (ignora e-commerce). */
   somenteVarejo?: boolean;
+  /** Codigo (CLIFOR) do cliente atacado no Linx vinculado a este usuario (role cliente_corporativo). */
+  clienteCodigo?: string;
 }
 
 /** Lista de todas as permissoes para o painel admin. */

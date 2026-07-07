@@ -40,10 +40,10 @@ export default function Home() {
           </Link>
         )}
         {canCorporativo && (
-          <Link href="/corporativo" className={styles.companyCard}>
+          <Link href="/corporativo/loja" className={styles.companyCard}>
             <span className={styles.companyLabel}>CORPORATIVO</span>
-            <strong className={styles.companyTitle}>Clientes Corporativos</strong>
-            <span className={styles.companyHint}>Cadastro de clientes atacado (PF e PJ)</span>
+            <strong className={styles.companyTitle}>Corporativo</strong>
+            <span className={styles.companyHint}>Loja de atacado, catálogo e pedidos</span>
           </Link>
         )}
       </div>

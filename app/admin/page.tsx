@@ -80,6 +80,16 @@ interface UserRow {
   permissions: PermissionKey[];
   allowedCompanies?: CompanyKey[];
   somenteVarejo?: boolean;
+  clienteCodigo?: string;
+}
+
+interface ClienteBusca {
+  codigo: string;
+  nomeClifor: string;
+  razaoSocial: string;
+  cpfCnpj: string;
+  cidade: string;
+  uf: string;
 }
 
 interface TransfPerm {
@@ -165,6 +175,13 @@ export default function AdminPage() {
 
   // Dashboard
   const [formSomenteVarejo, setFormSomenteVarejo] = useState(false);
+
+  // Cliente corporativo — vínculo com cliente atacado do Linx
+  const [formClienteCodigo, setFormClienteCodigo] = useState("");
+  const [formClienteNome, setFormClienteNome] = useState("");
+  const [clienteSearch, setClienteSearch] = useState("");
+  const [clienteResults, setClienteResults] = useState<ClienteBusca[]>([]);
+  const [clienteSearching, setClienteSearching] = useState(false);
 
   // Grupos de páginas recolhidos (vazio = todos expandidos)
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
@@ -255,7 +272,38 @@ export default function AdminPage() {
     setFormTipoRomaneioFixo(false);
     setFormPodeVerOutras(false);
     setFormSomenteVarejo(false);
+    setFormClienteCodigo("");
+    setFormClienteNome("");
+    setClienteSearch("");
+    setClienteResults([]);
     setFormError("");
+  }
+
+  /** Busca clientes atacado do Linx para vincular a um usuário cliente_corporativo. */
+  async function buscarClientesLinx() {
+    const term = clienteSearch.trim();
+    if (term.length < 2) return;
+    setClienteSearching(true);
+    try {
+      const res = await fetch(`/api/corporativo/clientes?limit=20&search=${encodeURIComponent(term)}`);
+      const json = await res.json();
+      if (res.ok) setClienteResults((json.data as ClienteBusca[]) ?? []);
+    } finally {
+      setClienteSearching(false);
+    }
+  }
+
+  function vincularCliente(c: ClienteBusca) {
+    setFormClienteCodigo(c.codigo);
+    setFormClienteNome(c.razaoSocial || c.nomeClifor);
+    setClienteResults([]);
+    setClienteSearch("");
+  }
+
+  /** Ao escolher cliente_corporativo, a empresa é sempre CORPORATIVO. */
+  function handleRoleChange(role: RoleKey) {
+    setFormRole(role);
+    if (role === "cliente_corporativo") setFormEmpresa("corporativo");
   }
 
   function openAdd() {
@@ -279,6 +327,20 @@ export default function AdminPage() {
     setFormEmpresa(!ac?.length || ac.length === 2 ? "" : (ac[0] as "" | CompanyKey));
     setFormPermissions(u.permissions ?? []);
     setFormSomenteVarejo(u.somenteVarejo ?? false);
+    setFormClienteCodigo(u.clienteCodigo ?? "");
+    setFormClienteNome("");
+    setClienteSearch("");
+    setClienteResults([]);
+    // Resolve o nome do cliente vinculado (só exibição).
+    if (u.clienteCodigo) {
+      fetch(`/api/corporativo/clientes?limit=1&search=${encodeURIComponent(u.clienteCodigo)}`)
+        .then((r) => r.json())
+        .then((j) => {
+          const c = (j.data as ClienteBusca[])?.find((x) => x.codigo === u.clienteCodigo) ?? (j.data as ClienteBusca[])?.[0];
+          if (c) setFormClienteNome(c.razaoSocial || c.nomeClifor);
+        })
+        .catch(() => {});
+    }
 
     // Preencher dados de transferência a partir do próprio usuário.
     applyTransfConfigFromUser(u.username);
@@ -424,6 +486,7 @@ export default function AdminPage() {
         allowedCompanies: formEmpresa ? [formEmpresa] : [],
         nomeExibicao: formNome || null,
         somenteVarejo: formSomenteVarejo || null,
+        clienteCodigo: formRole === "cliente_corporativo" ? formClienteCodigo || null : null,
         ...(formPassword ? { password: formPassword } : {}),
       };
 
@@ -872,7 +935,7 @@ export default function AdminPage() {
                       Função
                       <select
                         value={formRole}
-                        onChange={(e) => setFormRole(e.target.value as RoleKey)}
+                        onChange={(e) => handleRoleChange(e.target.value as RoleKey)}
                         className={styles.select}
                         disabled={saving}
                       >
@@ -913,8 +976,72 @@ export default function AdminPage() {
                 </div>
               </div>
 
+              {/* ── Seção: Cliente atacado vinculado (cliente_corporativo) ── */}
+              {formRole === "cliente_corporativo" && (
+                <div className={styles.section}>
+                  <p className={styles.sectionTitle}>Cliente atacado vinculado (Linx)</p>
+                  <p className={styles.hint} style={{ marginTop: -4, marginBottom: 8 }}>
+                    Vincule este login a uma empresa já cadastrada no Linx — assim a loja reconhece o
+                    endereço e a tabela de preço automaticamente. Se a empresa ainda não existe,{" "}
+                    <a href="/corporativo/novo" target="_blank" rel="noreferrer" style={{ color: "var(--brand-scarfme)" }}>
+                      cadastre-a primeiro
+                    </a>{" "}
+                    e depois volte para vincular.
+                  </p>
+
+                  {formClienteCodigo ? (
+                    <div className={styles.infoNote} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                      <span>
+                        Vinculado: <strong>{formClienteNome || "(cliente)"}</strong> · código {formClienteCodigo}
+                      </span>
+                      <button
+                        type="button"
+                        className={styles.editBtn}
+                        onClick={() => { setFormClienteCodigo(""); setFormClienteNome(""); }}
+                      >
+                        Trocar
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <input
+                          type="text"
+                          className={styles.input}
+                          placeholder="Buscar por nome, CNPJ/CPF ou código…"
+                          value={clienteSearch}
+                          onChange={(e) => setClienteSearch(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); buscarClientesLinx(); } }}
+                          disabled={saving}
+                        />
+                        <button type="button" className={styles.editBtn} onClick={buscarClientesLinx} disabled={clienteSearching}>
+                          {clienteSearching ? "Buscando…" : "Buscar"}
+                        </button>
+                      </div>
+                      {clienteResults.length > 0 && (
+                        <div style={{ marginTop: 8, border: "1px solid var(--border, #334155)", borderRadius: 8, overflow: "hidden" }}>
+                          {clienteResults.map((c) => (
+                            <button
+                              key={c.codigo}
+                              type="button"
+                              onClick={() => vincularCliente(c)}
+                              style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", width: "100%", padding: "8px 10px", background: "transparent", border: "none", borderBottom: "1px solid var(--border, #1e293b)", cursor: "pointer", textAlign: "left", color: "var(--text, #e2e8f0)" }}
+                            >
+                              <span style={{ fontSize: 13, fontWeight: 600 }}>{c.razaoSocial || c.nomeClifor}</span>
+                              <span style={{ fontSize: 11, color: "var(--text-muted, #94a3b8)" }}>
+                                cód {c.codigo} · {c.cpfCnpj} · {[c.cidade, c.uf].filter(Boolean).join("/")}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+
               {/* ── Seção: Páginas (agrupadas e recolhíveis) ── */}
-              {formRole !== "admin" && (
+              {formRole !== "admin" && formRole !== "cliente_corporativo" && (
                 <div className={styles.section}>
                   <div
                     style={{
@@ -993,6 +1120,7 @@ export default function AdminPage() {
               )}
 
               {/* ── Seção: Filial e operações ── */}
+              {formRole !== "cliente_corporativo" && (
               <div className={styles.section}>
                 <p className={styles.sectionTitle}>Filial e operações</p>
                 <div className={styles.fieldGroup}>
@@ -1276,6 +1404,7 @@ export default function AdminPage() {
                   )}
                 </div>
               </div>
+              )}
 
               {formError && <p className={styles.formError}>{formError}</p>}
 

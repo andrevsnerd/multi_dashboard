@@ -28,7 +28,12 @@ export function AuthGuard({ children }: { children: ReactNode }) {
       return;
     }
     if (user && pathname === "/login") {
-      router.replace("/");
+      router.replace(user.role === "cliente_corporativo" ? "/corporativo/loja" : "/");
+      return;
+    }
+    // Cliente corporativo não vê a seleção de empresas: vai direto para a loja.
+    if (user && user.role === "cliente_corporativo" && pathname === "/") {
+      router.replace("/corporativo/loja");
       return;
     }
     if (user && pathname === "/admin" && user.role !== "admin") {
