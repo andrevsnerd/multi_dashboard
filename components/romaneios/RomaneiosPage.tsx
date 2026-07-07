@@ -9,6 +9,7 @@ import {
   parseRomaneioDateTime,
 } from "@/lib/utils/romaneios-date";
 import RomaneioDeleteModal from "./RomaneioDeleteModal";
+import RomaneiosDuplicadosPanel from "./RomaneiosDuplicadosPanel";
 import styles from "./RomaneiosPage.module.css";
 
 export interface RomaneioListItem {
@@ -90,7 +91,7 @@ async function fetchLogTransito(
   return (json.data || []).map((row) => ({ ...row, tipo: "transito" as const }));
 }
 
-type TabType = "saida" | "entrada" | "transito";
+type TabType = "saida" | "entrada" | "transito" | "duplicados";
 
 export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
   const { user, isLoading: authLoading } = useAuth();
@@ -274,35 +275,52 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
             >
               Transito
             </button>
+            {isAdmin && (
+              <button
+                type="button"
+                className={`${styles.tab} ${activeTab === "duplicados" ? styles.tabActiveDuplicados : ""}`}
+                onClick={() => setActiveTab("duplicados")}
+              >
+                Duplicados
+              </button>
+            )}
           </div>
         )}
-        <div className={styles.searchBox}>
-          <svg viewBox="0 0 24 24" fill="none" className={styles.searchIcon} aria-hidden="true">
-            <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
-            <path d="M16.5 16.5 21 21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-          </svg>
-          <input
-            type="text"
-            className={styles.searchInput}
-            placeholder="Buscar por romaneio, responsavel, filial destino, tipo..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          {searchTerm && (
-            <button
-              type="button"
-              className={styles.searchClear}
-              onClick={() => setSearchTerm("")}
-              aria-label="Limpar"
-            >
-              x
-            </button>
-          )}
-        </div>
-        <p className={styles.subtitle}>{loading ? "Carregando..." : `${romaneios.length} registros`}</p>
+        {activeTab !== "duplicados" && (
+          <>
+            <div className={styles.searchBox}>
+              <svg viewBox="0 0 24 24" fill="none" className={styles.searchIcon} aria-hidden="true">
+                <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
+                <path d="M16.5 16.5 21 21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+              <input
+                type="text"
+                className={styles.searchInput}
+                placeholder="Buscar por romaneio, responsavel, filial destino, tipo..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  className={styles.searchClear}
+                  onClick={() => setSearchTerm("")}
+                  aria-label="Limpar"
+                >
+                  x
+                </button>
+              )}
+            </div>
+            <p className={styles.subtitle}>{loading ? "Carregando..." : `${romaneios.length} registros`}</p>
+          </>
+        )}
       </div>
 
-      {loading ? (
+      {activeTab === "duplicados" ? (
+        isAdmin ? (
+          <RomaneiosDuplicadosPanel companySlug={companySlug} />
+        ) : null
+      ) : loading ? (
         <div className={styles.emptyState}>
           <div>Carregando romaneios...</div>
         </div>

@@ -61,6 +61,17 @@
   color: #fff;
 }
 
+.tabActiveDuplicados {
+  background: #dc2626;
+  color: #fff;
+  border-color: #dc2626;
+}
+
+.tabActiveDuplicados:hover {
+  background: #b91c1c;
+  color: #fff;
+}
+
 .searchBox {
   display: flex;
   align-items: center;
