@@ -15,7 +15,6 @@ interface TransferItemExport {
   destino: string;
   quantidade: number;
   estoqueOrigem?: number;
-  quantidadeReal?: number;
 }
 
 interface TransferByOriginAndDestination {
@@ -37,8 +36,7 @@ export function exportTransfersToPDF(
   transfers: TransferByOriginAndDestination[],
   companyKey: CompanyKey,
   dateRange?: { startDate: Date; endDate: Date },
-  markedKeys?: Set<string>,
-  quantidadesReais?: Record<string, number>
+  markedKeys?: Set<string>
 ): void {
   const doc = new jsPDF({
     orientation: 'landscape',
@@ -153,16 +151,14 @@ export function exportTransfersToPDF(
         ? destGroup.items.map(item => markedKeys.has(getItemKey(item)))
         : [];
 
-      // Preparar dados da tabela (incluindo Estoque real e Realizada)
+      // Preparar dados da tabela (incluindo Realizada)
       const tableData = destGroup.items.map(item => {
         const estoqueOrigem = item.estoqueOrigem ?? 0;
         const itemKey = getItemKey(item);
-        const qtdReal = quantidadesReais?.[itemKey];
         const row: any[] = [
           item.codigo,
           item.codigoBarra || '-',
           estoqueOrigem.toString(),
-          qtdReal !== undefined ? qtdReal.toString() : '-',
         ];
 
         // Adicionar subgrupo e grade se for scarfme
@@ -182,12 +178,11 @@ export function exportTransfersToPDF(
         return row;
       });
 
-      // Cabeçalhos da tabela (incluindo Estoque real e Realizada)
+      // Cabeçalhos da tabela (incluindo Realizada)
       const headers: string[] = [
         'Produto',
         'Código de Barras',
         `Estoque ${group.origem}`,
-        'Estoque real',
       ];
 
       if (companyKey === 'scarfme') {
@@ -198,19 +193,17 @@ export function exportTransfersToPDF(
 
       const numCols = headers.length;
       const quantidadeColIndex = numCols - 2;
-      const estoqueRealColIndex = 3; // Estoque real está na posição 3 (após Estoque)
       const realizadaColIndex = numCols - 1;
       // Larguras fixas que somam contentWidth (277mm)
       const colStylesScarfme: Record<number, { cellWidth: number; halign: string; overflow?: 'ellipsize' }> = {
         0: { cellWidth: 20, halign: 'left' },           // Produto
         1: { cellWidth: 26, halign: 'center' },         // Código de Barras
         2: { cellWidth: 18, halign: 'center' },         // Estoque
-        3: { cellWidth: 18, halign: 'center' },         // Estoque real
-        4: { cellWidth: 18, halign: 'center' },         // Subgrupo
-        5: { cellWidth: 16, halign: 'center' },         // Grade
-        6: { cellWidth: 82, halign: 'left', overflow: 'ellipsize' },  // Descrição
-        7: { cellWidth: 20, halign: 'left' },          // Cor
-        8: { cellWidth: 30, halign: 'left' },          // Destino
+        3: { cellWidth: 18, halign: 'center' },         // Subgrupo
+        4: { cellWidth: 16, halign: 'center' },         // Grade
+        5: { cellWidth: 100, halign: 'left', overflow: 'ellipsize' },  // Descrição
+        6: { cellWidth: 20, halign: 'left' },          // Cor
+        7: { cellWidth: 30, halign: 'left' },          // Destino
         [quantidadeColIndex]: { cellWidth: 18, halign: 'center' },
         [realizadaColIndex]: { cellWidth: 15, halign: 'center' },
       };
@@ -218,17 +211,14 @@ export function exportTransfersToPDF(
         0: { cellWidth: 24, halign: 'left' },          // Produto
         1: { cellWidth: 28, halign: 'center' },         // Código de Barras
         2: { cellWidth: 22, halign: 'center' },         // Estoque
-        3: { cellWidth: 18, halign: 'center' },         // Estoque real
-        4: { cellWidth: 96, halign: 'left', overflow: 'ellipsize' }, // Descrição
-        5: { cellWidth: 22, halign: 'left' },           // Cor
-        6: { cellWidth: 36, halign: 'left' },           // Destino
+        3: { cellWidth: 114, halign: 'left', overflow: 'ellipsize' }, // Descrição
+        4: { cellWidth: 22, halign: 'left' },           // Cor
+        5: { cellWidth: 36, halign: 'left' },           // Destino
         [quantidadeColIndex]: { cellWidth: 20, halign: 'center' },
         [realizadaColIndex]: { cellWidth: 15, halign: 'center' },
       };
       const columnStyles = companyKey === 'scarfme' ? colStylesScarfme : colStylesNerd;
       (columnStyles[quantidadeColIndex] as { cellWidth: number; halign: string; fontStyle?: string }).fontStyle = 'bold';
-      // Células com valor em "Estoque real" terão fundo verde no didParseCell
-      const colorEstoqueReal = [16, 185, 129]; // #10b981
 
       // Criar tabela
       autoTable(doc, {
@@ -260,12 +250,6 @@ export function exportTransfersToPDF(
           if (data.section === 'body') {
             if (realizadaRows[data.row.index]) {
               data.cell.styles.fillColor = colorRowRealizada as [number, number, number];
-            }
-            // Estoque real: fundo verde só quando tem valor (não é '-')
-            if (data.column.index === estoqueRealColIndex && data.cell.raw !== '-') {
-              data.cell.styles.fillColor = colorEstoqueReal as [number, number, number];
-              data.cell.styles.textColor = [255, 255, 255] as [number, number, number];
-              data.cell.styles.fontStyle = 'bold';
             }
           }
         },

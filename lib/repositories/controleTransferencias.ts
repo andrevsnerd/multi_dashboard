@@ -391,28 +391,43 @@ export async function fetchControleTransferencias({
     `;
 
     // Query para buscar códigos de barras — limitada aos produtos desta empresa/filial
-    // para evitar scan total de PRODUTOS_BARRA
+    // para evitar scan total de PRODUTOS_BARRA.
+    // Retorna APENAS o código preferencial (o MENOR/interno, não o EAN grande) por
+    // produto×cor, replicando o ranking canônico do export oficial (fetchMenorCodigoBarra):
+    // TIPO_COD_BAR=3 → códigos curtos (<=8) → TIPO_COD_BAR=1 → resto; desempate por data e código.
     const codigoBarraQuery = `
-      SELECT DISTINCT
-        pb.PRODUTO AS produto,
-        pb.COR_PRODUTO AS corProduto,
-        ISNULL(COALESCE(c.DESC_COR, ''), '') AS corBanco,
-        pb.CODIGO_BARRA AS codigoBarra
-      FROM PRODUTOS_BARRA pb WITH (NOLOCK)
-      LEFT JOIN (
-        SELECT PRODUTO, COR_PRODUTO, MAX(DESC_COR_PRODUTO) AS DESC_COR
-        FROM PRODUTO_CORES WITH (NOLOCK)
-        GROUP BY PRODUTO, COR_PRODUTO
-      ) c ON RTRIM(LTRIM(c.PRODUTO)) = RTRIM(LTRIM(pb.PRODUTO))
-         AND (RTRIM(LTRIM(CAST(c.COR_PRODUTO AS VARCHAR(20)))) = RTRIM(LTRIM(CAST(pb.COR_PRODUTO AS VARCHAR(20)))) OR TRY_CONVERT(INT, c.COR_PRODUTO) = TRY_CONVERT(INT, pb.COR_PRODUTO))
-      WHERE pb.CODIGO_BARRA IS NOT NULL
-        AND pb.CODIGO_BARRA <> ''
-        AND pb.PRODUTO IN (
-          SELECT DISTINCT e.PRODUTO
-          FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
-          WHERE 1=1
-          ${estoqueFilialFilter}
-        )
+      ;WITH Ranked AS (
+        SELECT
+          pb.PRODUTO AS produto,
+          pb.COR_PRODUTO AS corProduto,
+          '' AS corBanco,
+          LTRIM(RTRIM(pb.CODIGO_BARRA)) AS codigoBarra,
+          ROW_NUMBER() OVER (
+            PARTITION BY pb.PRODUTO, ISNULL(pb.COR_PRODUTO, '')
+            ORDER BY
+              CASE
+                WHEN LTRIM(RTRIM(CAST(pb.TIPO_COD_BAR AS VARCHAR(10)))) = '3' THEN 0
+                WHEN LEN(LTRIM(RTRIM(pb.CODIGO_BARRA))) <= 8 THEN 1
+                WHEN LTRIM(RTRIM(CAST(pb.TIPO_COD_BAR AS VARCHAR(10)))) = '1' THEN 2
+                ELSE 3
+              END,
+              pb.DATA_PARA_TRANSFERENCIA DESC,
+              pb.CODIGO_BARRA
+          ) AS rn
+        FROM PRODUTOS_BARRA pb WITH (NOLOCK)
+        WHERE ISNULL(pb.INATIVO, 0) = 0
+          AND pb.CODIGO_BARRA IS NOT NULL
+          AND LTRIM(RTRIM(pb.CODIGO_BARRA)) <> ''
+          AND pb.PRODUTO IN (
+            SELECT DISTINCT e.PRODUTO
+            FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+            WHERE 1=1
+            ${estoqueFilialFilter}
+          )
+      )
+      SELECT produto, corProduto, corBanco, codigoBarra
+      FROM Ranked
+      WHERE rn = 1
     `;
 
     // Executar todas as queries em paralelo (reduzido de 8 para 6 queries)

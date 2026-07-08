@@ -1,11 +1,11 @@
 # Graph Report - multi_dashboard  (2026-07-08)
 
 ## Corpus Check
-- 700 files · ~727,182 words
+- 700 files · ~727,195 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 5544 nodes · 13523 edges · 456 communities (285 shown, 171 thin omitted)
+- 5544 nodes · 13523 edges · 457 communities (286 shown, 171 thin omitted)
 - Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 287 edges (avg confidence: 0.74)
 - Token cost: 0 input · 0 output
 
@@ -451,6 +451,7 @@
 - page.tsx
 - page.tsx
 - page.tsx
+- compra-transito-analytics.ts
 
 ## God Nodes (most connected - your core abstractions)
 1. `resolveCompany()` - 263 edges
@@ -482,7 +483,7 @@
 ## Hyperedges (group relationships)
 - **Narrativa diagnóstica do relatório Poliéster** — tmp_scarfme_poliester_pages_curva_abc, tmp_scarfme_poliester_pages_ruptura_estoque, tmp_scarfme_poliester_pages_gargalos_reposicao, tmp_scarfme_poliester_pages_drift_curva [EXTRACTED 0.85]
 
-## Communities (456 total, 171 thin omitted)
+## Communities (457 total, 171 thin omitted)
 
 ### Community 0 - "Dashboard Page Routes"
 Cohesion: 0.04
@@ -513,12 +514,12 @@ Cohesion: 0.06
 Nodes (57): GET(), GET(), GET(), GET(), GET(), GET(), POST(), runFetchDetalhes() (+49 more)
 
 ### Community 7 - "Projeção de Estoque & Compra em Trânsito"
-Cohesion: 0.10
-Nodes (33): applyTransitToProjectionSuggestion(), buildProdutoCorKey(), calcDiasAteAcabar(), computeReposicaoScope(), ExcelJSCell, fetchProjecao(), fmt(), fmtBRL() (+25 more)
+Cohesion: 0.08
+Nodes (50): applyTransitToProjectionSuggestion(), buildProdutoCorKey(), calcDiasAteAcabar(), computeReposicaoScope(), ExcelJSCell, fetchProjecao(), fmt(), fmtBRL() (+42 more)
 
 ### Community 8 - "Controle Estoque Métricas Cache"
-Cohesion: 0.06
-Nodes (66): GET(), POST(), GET(), buildCompraTransitoIndex(), buildDescTransitoKey(), buildLooseCompraTransitoKey(), buildProdutoTransitoKey(), CacheEntry (+58 more)
+Cohesion: 0.09
+Nodes (39): GET(), POST(), GET(), buildItemCacheKey(), buildScopeKey(), CacheEntry, clearControleEstoqueMetricasClientCache(), clientCache (+31 more)
 
 ### Community 9 - "Corporativo Products & Orders"
 Cohesion: 0.08
@@ -1543,6 +1544,10 @@ Nodes (3): generateMetadata(), RelatorioColecaoPageProps, RelatorioColecaoRoute(
 ### Community 455 - "page.tsx"
 Cohesion: 0.50
 Nodes (3): generateMetadata(), SaidasEntradasProdutosPageProps, SaidasEntradasProdutosPageRoute()
+
+### Community 456 - "compra-transito-analytics.ts"
+Cohesion: 0.33
+Nodes (10): applyTransitToSuggestion(), computeCoverageDeficit(), daysUntil(), groupEntriesByDay(), normalizeDate(), startOfLocalDay(), summarizeTransitAdjustment(), TransitAdjustmentResult (+2 more)
 
 ## Knowledge Gaps
 - **1278 isolated node(s):** `AjusteEstoquePageProps`, `BlackFridayPageProps`, `Props`, `ClientesPageProps`, `Props` (+1273 more)

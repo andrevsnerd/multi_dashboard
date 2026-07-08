@@ -1222,11 +1222,6 @@ export default function ControleTransferenciasTable({
     return transferGroups;
   }, [transfersAllOrigins, selectedFilial, company]);
 
-  // Quantidades reais (Neon): item_key -> quantidade
-  const [quantidadesReais, setQuantidadesReais] = useState<Record<string, number>>({});
-  const [savingQuantidadeReal, setSavingQuantidadeReal] = useState(false);
-  const [editingQuantidadeRealKey, setEditingQuantidadeRealKey] = useState<string | null>(null);
-  const [inputQuantidadeReal, setInputQuantidadeReal] = useState("");
   const [hoveredCorTooltip, setHoveredCorTooltip] = useState<{ itemKey: string; codigoCor: string } | null>(null);
   const [quantidadeTooltip, setQuantidadeTooltip] = useState<{
     chunks: QuantidadeExplicacaoChunk[] | undefined;
@@ -1350,45 +1345,6 @@ export default function ControleTransferenciasTable({
     permissaoMatchFilial,
     filiaisApi.length,
   ]);
-
-  // Carregar quantidades reais da API (Neon)
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      try {
-        const res = await fetch(`/api/transferencias-quantidade-real?company=${encodeURIComponent(companyKey)}`);
-        if (!active) return;
-        if (!res.ok) return;
-        const json = await res.json();
-        const stored = json.quantidadesReais && typeof json.quantidadesReais === "object" ? json.quantidadesReais : {};
-        setQuantidadesReais(stored);
-      } catch {
-        if (active) setQuantidadesReais({});
-      }
-    })();
-    return () => { active = false; };
-  }, [companyKey]);
-
-  const saveQuantidadeReal = async (itemKey: string, value: number | null) => {
-    setSavingQuantidadeReal(true);
-    try {
-      await fetch("/api/transferencias-quantidade-real", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ companyKey, updates: { [itemKey]: value } }),
-      });
-      setQuantidadesReais((prev) => {
-        const next = { ...prev };
-        if (value === null) delete next[itemKey];
-        else next[itemKey] = value;
-        return next;
-      });
-      setEditingQuantidadeRealKey(null);
-      setInputQuantidadeReal("");
-    } finally {
-      setSavingQuantidadeReal(false);
-    }
-  };
 
   // Estado do modal de confirmação de transferência (lote — mesmo origem/destino).
   // `transferTarget` é o snapshot dos itens que vão para o modal, junto com a
@@ -1641,7 +1597,7 @@ export default function ControleTransferenciasTable({
       })),
     }));
 
-    exportTransfersToPDF(dataForExport, companyKey, dateRange, new Set(), quantidadesReais);
+    exportTransfersToPDF(dataForExport, companyKey, dateRange, new Set());
   };
 
   return (
@@ -1689,44 +1645,10 @@ export default function ControleTransferenciasTable({
             const destinoCanonicoDoGrupo = destGroup.items[0]?.destinoCanonico ?? "";
             const podeOperarOrigem = canExecuteSaidaFromOrigem(origemCanonicoDoGrupo);
 
-            // Para cada item do grupo: chave + se é selecionável + quantidade ajustada
+            // Para cada item do grupo: chave + se é selecionável + quantidade
             const itemSelecaoInfo = destGroup.items.map((it) => {
               const key = getTransferItemKey(it);
-              const realFila = quantidadesReais[key];
-              const temReal = realFila !== undefined && realFila !== null;
-              const filialOrigemData = getFilialData(
-                it.itemOriginal,
-                company,
-                it.origemCanonico,
-                it.origem
-              );
-              // Espelha a lógica usada na renderização para calcular a quantidade ajustada.
-              const isMatriz =
-                isMainMatrizFilial(companyKey, it.origemCanonico) ||
-                isMainMatrizFilial(companyKey, filialOrigemData?.filial ?? "") ||
-                isMainMatrizFilial(companyKey, it.origem);
-              let isParada = false;
-              if (filialOrigemData) {
-                const estoquePositivo = Math.max(0, filialOrigemData.stock);
-                if (estoquePositivo >= 1 && filialOrigemData.sales === 0 && filialOrigemData.salesLast30Days === 0) {
-                  if (filialOrigemData.ultimaEntrada) {
-                    const hoje = new Date();
-                    const dataUltimaEntrada = new Date(filialOrigemData.ultimaEntrada);
-                    const dias = Math.floor((hoje.getTime() - dataUltimaEntrada.getTime()) / (1000 * 60 * 60 * 24));
-                    if (dias >= 14) isParada = true;
-                  } else {
-                    isParada = true;
-                  }
-                }
-              }
-              const podeEnviarTudo = isMatriz || (isParada && filialOrigemData?.sales === 0);
-              let qtdAjustada = it.quantidade;
-              if (temReal) {
-                if (realFila === 0) qtdAjustada = 0;
-                else if (realFila === 1) qtdAjustada = podeEnviarTudo ? 1 : 0;
-                else if (realFila < it.quantidade) qtdAjustada = realFila;
-              }
-
+              const qtdAjustada = it.quantidade;
               const isSelectable = podeOperarOrigem && qtdAjustada > 0;
               return { key, isSelectable, qtdAjustada, item: it };
             });
@@ -1868,7 +1790,6 @@ export default function ControleTransferenciasTable({
                     <th className={styles.produtoHeader}>Produto</th>
                     <th className={styles.codigoBarraHeader}>Código de Barras</th>
                     <th className={styles.estoqueHeader}>Estoque {group.origem}</th>
-                    <th className={styles.quantidadeRealHeader}>Estoque real</th>
                     {companyKey === 'scarfme' && (
                       <>
                         <th className={styles.subgrupoHeader}>Subgrupo</th>
@@ -1897,65 +1818,7 @@ export default function ControleTransferenciasTable({
                     const tooltipHeightEstimate = Math.min(700, 100 + (numFiliais * 28));
                     const itemKey = getTransferItemKey(item);
 
-                    // Calcular quantidade ajustada baseada no estoque real
-                    const estoqueReal = quantidadesReais[itemKey];
-                    const temEstoqueReal = estoqueReal !== undefined && estoqueReal !== null;
-                    
-                    // Apenas as matrizes principais (NERD e SCARF ME - MATRIZ) podem enviar tudo.
-                    const isMatriz =
-                      isMainMatrizFilial(companyKey, item.origemCanonico) ||
-                      isMainMatrizFilial(companyKey, filialOrigemData?.filial ?? "") ||
-                      isMainMatrizFilial(companyKey, item.origem);
-                    
-                    // Verificar se está parada há 14+ dias
-                    let isParada = false;
-                    if (filialOrigemData) {
-                      const estoquePositivo = Math.max(0, filialOrigemData.stock);
-                      if (estoquePositivo >= 1 && filialOrigemData.sales === 0 && filialOrigemData.salesLast30Days === 0) {
-                        if (filialOrigemData.ultimaEntrada) {
-                          const hoje = new Date();
-                          const dataUltimaEntrada = new Date(filialOrigemData.ultimaEntrada);
-                          const diasDesdeUltimaEntrada = Math.floor((hoje.getTime() - dataUltimaEntrada.getTime()) / (1000 * 60 * 60 * 24));
-                          if (diasDesdeUltimaEntrada >= 14) {
-                            isParada = true;
-                          }
-                        } else {
-                          // Se não há data de entrada, considerar parada (comportamento antigo)
-                          isParada = true;
-                        }
-                      }
-                    }
-                    
-                    // Verificar se pode enviar tudo (matriz ou loja parada há 14+ dias sem vendas)
-                    const podeEnviarTudo = isMatriz || (isParada && filialOrigemData?.sales === 0);
-                    
-                    // Calcular quantidade ajustada baseada no estoque real
-                    let quantidadeAjustada = item.quantidade;
-                    let quantidadeAfetada = false;
-                    
-                    if (temEstoqueReal) {
-                      if (estoqueReal === 0) {
-                        // Se estoque real = 0: quantidade = 0
-                        quantidadeAjustada = 0;
-                        quantidadeAfetada = true;
-                      } else if (estoqueReal === 1) {
-                        // Se estoque real = 1
-                        if (!podeEnviarTudo) {
-                          // Loja não pode enviar tudo: quantidade = 0
-                          quantidadeAjustada = 0;
-                          quantidadeAfetada = true;
-                        } else {
-                          // Se pode enviar tudo, quantidade = 1 (sempre limita ao estoque real disponível)
-                          quantidadeAjustada = 1;
-                          quantidadeAfetada = true; // Sempre afetada quando há estoque real
-                        }
-                      } else if (estoqueReal < item.quantidade) {
-                        // Se estoque real < quantidade original: quantidade = estoque real
-                        quantidadeAjustada = estoqueReal;
-                        quantidadeAfetada = true;
-                      }
-                      // Se estoque real >= quantidade original, quantidade mantém igual (não afetada)
-                    }
+                    const quantidadeAjustada = item.quantidade;
 
                     return (
                 <tr key={`${item.produto}-${item.cor}-${item.destino}-${index}`}>
@@ -1995,119 +1858,9 @@ export default function ControleTransferenciasTable({
                     )}
                   </td>
                   <td className={styles.estoqueCell}>
-                    <span 
-                      className={
-                        temEstoqueReal 
-                          ? `${styles.estoqueBadge} ${styles.estoqueIgnorado}` 
-                          : styles.estoqueBadge
-                      }
-                    >
+                    <span className={styles.estoqueBadge}>
                       {estoqueOrigem}
                     </span>
-                  </td>
-                  <td className={styles.quantidadeRealCell}>
-                    {editingQuantidadeRealKey === itemKey ? (
-                      <div className={styles.quantidadeRealEditWrap}>
-                        <input
-                          type="number"
-                          min={0}
-                          className={styles.quantidadeRealInput}
-                          value={inputQuantidadeReal}
-                          onChange={(e) => setInputQuantidadeReal(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              const n = parseInt(inputQuantidadeReal, 10);
-                              if (!isNaN(n) && n >= 0) saveQuantidadeReal(itemKey, n);
-                            }
-                            if (e.key === "Escape") {
-                              setEditingQuantidadeRealKey(null);
-                              setInputQuantidadeReal("");
-                            }
-                          }}
-                          autoFocus
-                        />
-                        <button
-                          type="button"
-                          className={styles.quantidadeRealSaveBtn}
-                          disabled={savingQuantidadeReal}
-                          onClick={() => {
-                            const n = parseInt(inputQuantidadeReal, 10);
-                            if (!isNaN(n) && n >= 0) saveQuantidadeReal(itemKey, n);
-                          }}
-                          title="Salvar"
-                        >
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="20 6 9 17 4 12" />
-                          </svg>
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.quantidadeRealCancelBtn}
-                          disabled={savingQuantidadeReal}
-                          onClick={() => {
-                            setEditingQuantidadeRealKey(null);
-                            setInputQuantidadeReal("");
-                          }}
-                          title="Cancelar"
-                        >
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <line x1="18" y1="6" x2="6" y2="18" />
-                            <line x1="6" y1="6" x2="18" y2="18" />
-                          </svg>
-                        </button>
-                      </div>
-                    ) : quantidadesReais[itemKey] !== undefined ? (
-                      <div className={styles.quantidadeRealRow}>
-                        <span className={styles.quantidadeRealBadge}>{quantidadesReais[itemKey]}</span>
-                        <div className={styles.quantidadeRealIcons}>
-                          <button
-                            type="button"
-                            className={styles.quantidadeRealIconBtn}
-                            disabled={savingQuantidadeReal}
-                            onClick={() => {
-                              setEditingQuantidadeRealKey(itemKey);
-                              setInputQuantidadeReal(String(quantidadesReais[itemKey]));
-                            }}
-                            title="Editar estoque real"
-                          >
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                            </svg>
-                          </button>
-                          <button
-                            type="button"
-                            className={styles.quantidadeRealIconBtn}
-                            disabled={savingQuantidadeReal}
-                            onClick={() => saveQuantidadeReal(itemKey, null)}
-                            title="Remover estoque real"
-                          >
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="3 6 5 6 21 6" />
-                              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                              <line x1="10" y1="11" x2="10" y2="17" />
-                              <line x1="14" y1="11" x2="14" y2="17" />
-                            </svg>
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        className={styles.quantidadeRealAddBtn}
-                        disabled={savingQuantidadeReal}
-                        onClick={() => {
-                          setEditingQuantidadeRealKey(itemKey);
-                          setInputQuantidadeReal(String(item.quantidade));
-                        }}
-                        title="Inserir estoque real"
-                      >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                        </svg>
-                      </button>
-                    )}
                   </td>
                   {companyKey === 'scarfme' && (
                     <>
@@ -2225,7 +1978,7 @@ export default function ControleTransferenciasTable({
                           chunks: item.quantidadeExplicacao,
                           quantidadeSugerida: item.quantidade,
                           quantidadeExibida: quantidadeAjustada,
-                          ajustadaPorEstoqueReal: quantidadeAfetada,
+                          ajustadaPorEstoqueReal: false,
                           destinoCanonicoAtual: item.destinoCanonico,
                           x: rect.left + rect.width / 2,
                           y: rect.top,
@@ -2237,15 +1990,7 @@ export default function ControleTransferenciasTable({
                         }, 180);
                       }}
                     >
-                      <span
-                        className={
-                          quantidadeAfetada && quantidadeAjustada === 0
-                            ? `${styles.quantidadeBadge} ${styles.quantidadeZero}`
-                            : quantidadeAfetada
-                            ? `${styles.quantidadeBadge} ${styles.quantidadeAjustada}`
-                            : styles.quantidadeBadge
-                        }
-                      >
+                      <span className={styles.quantidadeBadge}>
                         {quantidadeAjustada}
                       </span>
                     </span>

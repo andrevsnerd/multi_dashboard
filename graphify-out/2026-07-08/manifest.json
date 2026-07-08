@@ -2580,8 +2580,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/productDetail.ts": {
-    "mtime": 1783521294.5123954,
-    "ast_hash": "ccc6d67287075ea5e9e31f095849d6e0",
+    "mtime": 1783521444.7396393,
+    "ast_hash": "34ff227ed96fb7f9093de88971981dbc",
     "semantic_hash": ""
   },
   "lib/repositories/products.ts": {
