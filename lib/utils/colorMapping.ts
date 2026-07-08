@@ -12,20 +12,26 @@ export function getMappedColorDescription(
 }
 
 /**
- * Obtém a descrição da cor usando o mapeamento fixo como prioridade.
- * Se não encontrar no mapeamento, retorna a cor do banco de dados (fallback).
+ * Obtém a descrição da cor priorizando o CADASTRO DO PRÓPRIO PRODUTO (`corBanco`,
+ * vindo de PRODUTO_CORES / DESC_COR_PRODUTO da venda/estoque do produto).
+ *
+ * O código de cor (COR_PRODUTO) é escopado POR PRODUTO no Linx: o mesmo código
+ * (ex.: "I2") significa cores diferentes em produtos diferentes. Por isso o mapa
+ * global fixo (colorMapping.json), keyado só pelo código, NÃO pode ganhar do
+ * cadastro do produto — ele só entra como fallback quando o produto não traz
+ * descrição própria (corBanco vazio).
  */
 export function getColorDescription(
   corProduto: string | null | undefined,
   corBanco: string | null | undefined
 ): string {
-  const corMapeada = getMappedColorDescription(corProduto);
+  const doProduto = (corBanco || '').trim().toUpperCase();
 
-  if (corMapeada) {
-    return corMapeada;
+  if (doProduto) {
+    return doProduto;
   }
 
-  return (corBanco || '').trim().toUpperCase();
+  return getMappedColorDescription(corProduto);
 }
 
 export function normalizeColor(cor: string | null | undefined): string {

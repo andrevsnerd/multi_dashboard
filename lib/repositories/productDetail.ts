@@ -380,7 +380,10 @@ export async function fetchProductAvailableColors(
       )
       SELECT
         cp.COR,
-        ISNULL(MAX(NULLIF(LTRIM(RTRIM(c.DESC_COR)), '')), MAX(NULLIF(LTRIM(RTRIM(cp.DESC_ORIGEM)), ''))) AS DESC_COR
+        -- Descrição do CADASTRO DO PRODUTO (DESC_ORIGEM: PRODUTO_CORES / venda do
+        -- próprio produto) tem prioridade; CORES_BASICAS (global) só como fallback,
+        -- pois o mesmo código de cor descreve cores diferentes por produto.
+        ISNULL(MAX(NULLIF(LTRIM(RTRIM(cp.DESC_ORIGEM)), '')), MAX(NULLIF(LTRIM(RTRIM(c.DESC_COR)), ''))) AS DESC_COR
       FROM cores_produto cp
       LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON cp.COR = c.COR
       GROUP BY cp.COR
@@ -419,11 +422,15 @@ export async function resolveBarcode(codigoBarras: string): Promise<BarcodeResol
         LTRIM(RTRIM(pb.CODIGO_BARRA)) AS codigoBarras,
         pb.PRODUTO AS produto,
         ISNULL(pb.COR_PRODUTO, '') AS corCodigo,
-        ISNULL(c.DESC_COR, '') AS corDescricao,
+        -- Cor é escopada por PRODUTO: a descrição do cadastro do próprio produto
+        -- (PRODUTO_CORES) manda; CORES_BASICAS (global) só como fallback.
+        ISNULL(NULLIF(LTRIM(RTRIM(pc.DESC_COR_PRODUTO)), ''), ISNULL(c.DESC_COR, '')) AS corDescricao,
         ISNULL(CONVERT(VARCHAR, pb.TAMANHO), '') AS tamanho,
         ISNULL(p.DESC_PRODUTO, '') AS descricaoProduto
       FROM PRODUTOS_BARRA pb WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = pb.PRODUTO
+      LEFT JOIN PRODUTO_CORES pc WITH (NOLOCK)
+        ON pc.PRODUTO = pb.PRODUTO AND pc.COR_PRODUTO = pb.COR_PRODUTO
       LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON c.COR = pb.COR_PRODUTO
       WHERE LTRIM(RTRIM(pb.CODIGO_BARRA)) = @codigoBarras
     `;
@@ -1043,7 +1050,9 @@ export async function fetchProductDetail({
         SUM(TOTAL_QTDE_VENDA - QTDE_TROCA) AS totalQuantity,
         FILIAL,
         COR_PRODUTO,
-        ISNULL(DESC_COR, '') AS corBanco,
+        -- Descrição da cor do CADASTRO DO PRODUTO (DESC_COR_PRODUTO da venda) manda;
+        -- CORES_BASICAS (DESC_COR, global) só como fallback.
+        ISNULL(NULLIF(LTRIM(RTRIM(DESC_COR_PRODUTO)), ''), ISNULL(DESC_COR, '')) AS corBanco,
         AVG(
           CASE
             WHEN QTDE_CANCELADA > 0 THEN NULL
@@ -1051,7 +1060,7 @@ export async function fetchProductDetail({
           END
         ) AS cost
       FROM vendas_finais
-      GROUP BY FILIAL, COR_PRODUTO, DESC_COR
+      GROUP BY FILIAL, COR_PRODUTO, ISNULL(NULLIF(LTRIM(RTRIM(DESC_COR_PRODUTO)), ''), ISNULL(DESC_COR, ''))
     `;
 
     // Buscar vendas do período anterior
@@ -1855,10 +1864,14 @@ async function fetchProductSaleHistoryEcommerce({
         SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS revenue,
         NULL AS vendedor,
         fp.COR_PRODUTO AS color,
-        ISNULL(c.DESC_COR, '') AS corBanco
+        -- Cor escopada por PRODUTO: cadastro do produto (PRODUTO_CORES) manda;
+        -- CORES_BASICAS (global) só como fallback.
+        ISNULL(NULLIF(LTRIM(RTRIM(pc.DESC_COR_PRODUTO)), ''), ISNULL(c.DESC_COR, '')) AS corBanco
       FROM FATURAMENTO f WITH (NOLOCK)
       JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
         ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+      LEFT JOIN PRODUTO_CORES pc WITH (NOLOCK)
+        ON pc.PRODUTO = fp.PRODUTO AND pc.COR_PRODUTO = fp.COR_PRODUTO
       LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON fp.COR_PRODUTO = c.COR
       WHERE fp.PRODUTO = @productId
         AND CAST(f.EMISSAO AS DATE) >= CAST(@startDate AS DATE)
@@ -1872,7 +1885,7 @@ async function fetchProductSaleHistoryEcommerce({
         CAST(f.EMISSAO AS DATE),
         f.FILIAL,
         fp.COR_PRODUTO,
-        ISNULL(c.DESC_COR, '')
+        ISNULL(NULLIF(LTRIM(RTRIM(pc.DESC_COR_PRODUTO)), ''), ISNULL(c.DESC_COR, ''))
       ORDER BY
         CAST(f.EMISSAO AS DATE) DESC,
         f.FILIAL
@@ -2014,14 +2027,16 @@ export async function fetchProductSaleHistory({
         SUM(CASE WHEN vf.QTDE_CANCELADA > 0 THEN 0 ELSE ISNULL(vf.DESCONTO_VENDA, 0) END) AS desconto,
         vf.VENDEDOR AS vendedor,
         vf.COR_PRODUTO AS color,
-        ISNULL(vf.DESC_COR, '') AS corBanco
+        -- Descrição da cor do CADASTRO DO PRODUTO (DESC_COR_PRODUTO da venda) manda;
+        -- CORES_BASICAS (DESC_COR, global) só como fallback.
+        ISNULL(NULLIF(LTRIM(RTRIM(vf.DESC_COR_PRODUTO)), ''), ISNULL(vf.DESC_COR, '')) AS corBanco
       FROM vendas_finais vf
       GROUP BY
         CAST(vf.DATA_VENDA AS DATE),
         vf.FILIAL,
         vf.VENDEDOR,
         vf.COR_PRODUTO,
-        ISNULL(vf.DESC_COR, '')
+        ISNULL(NULLIF(LTRIM(RTRIM(vf.DESC_COR_PRODUTO)), ''), ISNULL(vf.DESC_COR, ''))
       HAVING
         SUM(vf.TOTAL_QTDE_VENDA - vf.QTDE_TROCA) <> 0
         OR SUM(vf.TOTAL_VENDA - vf.VALOR_TROCA) <> 0
