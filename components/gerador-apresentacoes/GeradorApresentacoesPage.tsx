@@ -425,6 +425,36 @@ export default function GeradorApresentacoesPage({
                 el.style.background = "transparent";
               }
             });
+
+            // html2canvas 1.x ignora `object-fit` em <img> e estica a imagem
+            // para preencher a caixa — logo, capa e o círculo saíam deformados
+            // no PDF. Converte cada imagem com object-fit num <div> equivalente
+            // usando background-image + background-size (que o html2canvas
+            // respeita), mantendo a MESMA caixa que aparece no HTML. Roda depois
+            // do resize do slide para 1280px, então as medidas computadas já
+            // refletem o layout final.
+            const view = cloneDoc.defaultView;
+            if (view) {
+              cloneDoc.querySelectorAll<HTMLImageElement>("img").forEach((img) => {
+                const cs = view.getComputedStyle(img);
+                const fit = cs.objectFit;
+                if (fit !== "contain" && fit !== "cover") return;
+                if (!img.src) return;
+                const div = cloneDoc.createElement("div");
+                div.style.width = cs.width;
+                div.style.height = cs.height;
+                div.style.backgroundImage = `url("${img.src}")`;
+                div.style.backgroundSize = fit;
+                div.style.backgroundPosition = cs.objectPosition || "center";
+                div.style.backgroundRepeat = "no-repeat";
+                div.style.borderRadius = cs.borderRadius;
+                div.style.border = cs.border;
+                div.style.display = cs.display === "inline" ? "block" : cs.display;
+                div.style.flexShrink = cs.flexShrink;
+                div.style.margin = cs.margin;
+                img.parentNode?.replaceChild(div, img);
+              });
+            }
           },
         });
         canvases.push(canvas);
