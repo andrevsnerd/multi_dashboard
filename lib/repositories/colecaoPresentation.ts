@@ -1,16 +1,27 @@
 import sql from "mssql";
 
-import { withRequest } from "@/lib/db/connection";
 import {
-  fetchCollectionReport,
-  type CollectionReportDetailRow,
-} from "@/lib/repositories/collectionReport";
+  getFilialLabelForDisplay,
+  VAREJO_VALUE,
+  type CompanyKey,
+} from "@/lib/config/company";
+import { resolveCompanyLive, liveNameForIncoming } from "@/lib/server/company-live";
+import { withRequest } from "@/lib/db/connection";
+import { canonicalKey } from "@/lib/reports/keys";
+import { normalizeRangeForQuery } from "@/lib/utils/date";
+import { fetchProductsWithDetails } from "@/lib/repositories/products";
+import { fetchProdutoQtdePorFilial } from "@/lib/repositories/performance";
 
 /**
  * Monta o payload do deck "Relatório Completo de Coleção" do Gerador de
- * Apresentações. Reaproveita `fetchCollectionReport` (mesma lógica de vendas /
- * faturamento / e-commerce usada no Relatório Claude e no Painel de Coleções) e
- * enriquece com estoque líquido por SKU (produto × cor) + tipo do produto.
+ * Apresentações.
+ *
+ * VENDAS/FATURAMENTO usam a MESMA lógica VALIDADA da tela de Produtos e do
+ * Gerador de Relatórios (`fetchProductsWithDetails` + `fetchProdutoQtdePorFilial`):
+ * base LOJA_VENDA_PRODUTO com FATOR_DESCONTO_VENDA e dedução de trocas
+ * (LOJA_VENDA_TROCA), mais e-commerce por faturamento (natureza 100.02/100.022).
+ * Antes usava `fetchCollectionReport` (tabela contábil W_CTB, desconto absoluto e
+ * SEM trocas), o que divergia do relatório de vendas/produtos por venda.
  *
  * Estoque aqui é o SALDO LÍQUIDO da rede (inclui negativos), espelhando o
  * protótipo aprovado (o PDF de referência mostra -8, -5 e total = soma bruta).
@@ -125,24 +136,11 @@ function fmtPct(value: number): string {
   return `${value.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
 }
 
-interface SkuAgg {
-  productId: string;
-  nome: string;
-  colorCode: string;
-  colorDescription: string;
-  grade: string;
-  qtd: number;
-  venda: number;
-}
-
-/** Estoque líquido (SUM ESTOQUE, com negativos) + tipo, por produto/cor. */
-async function fetchStockAndTipo(
-  productIds: string[]
-): Promise<{ stock: Map<string, number>; tipo: Map<string, string> }> {
+/** Estoque líquido da rede (SUM ESTOQUE, com negativos), por produto/cor. */
+async function fetchNetStock(productIds: string[]): Promise<Map<string, number>> {
   const uniqueIds = Array.from(new Set(productIds.map((id) => id.trim()).filter(Boolean)));
   const stock = new Map<string, number>();
-  const tipo = new Map<string, string>();
-  if (uniqueIds.length === 0) return { stock, tipo };
+  if (uniqueIds.length === 0) return stock;
 
   await withRequest(async (request) => {
     uniqueIds.forEach((id, index) => request.input(`pid${index}`, sql.VarChar, id));
@@ -160,51 +158,47 @@ async function fetchStockAndTipo(
     for (const row of stockRes.recordset) {
       stock.set(skuKey(row.PRODUTO ?? "", row.COR ?? ""), Math.round(Number(row.NET_STOCK ?? 0)));
     }
-
-    const tipoRes = await request.query<{ PRODUTO: string; TIPO: string }>(`
-      SELECT p.PRODUTO AS PRODUTO, UPPER(LTRIM(RTRIM(ISNULL(p.TIPO_PRODUTO, '')))) AS TIPO
-      FROM PRODUTOS p WITH (NOLOCK)
-      WHERE p.PRODUTO IN (${placeholders})
-    `);
-    for (const row of tipoRes.recordset) {
-      const t = (row.TIPO ?? "").trim();
-      if (t) tipo.set((row.PRODUTO ?? "").trim(), t);
-    }
   });
 
-  return { stock, tipo };
+  return stock;
 }
 
-/** Agrupa os details (produto×cor×loja×canal) em SKUs (produto×cor). */
-function aggregateSkus(details: CollectionReportDetailRow[]): Map<string, SkuAgg> {
-  const map = new Map<string, SkuAgg>();
-  for (const d of details) {
-    const key = skuKey(d.productId, d.colorCode);
-    let agg = map.get(key);
-    if (!agg) {
-      agg = {
-        productId: d.productId,
-        nome: d.productName,
-        colorCode: d.colorCode,
-        colorDescription: d.colorDescription && d.colorDescription !== "-" ? d.colorDescription : "",
-        grade: d.grade && d.grade !== "-" ? d.grade : "",
-        qtd: 0,
-        venda: 0,
-      };
-      map.set(key, agg);
+interface SkuAgg {
+  productId: string;
+  nome: string;
+  colorCode: string;
+  colorDescription: string;
+  grade: string;
+  tipo: string;
+  qtd: number;
+  venda: number;
+}
+
+/**
+ * Decide as listas de filiais POS/e-commerce a considerar no detalhamento por
+ * loja, respeitando o filtro de filial selecionado — mesma semântica de escopo
+ * que `fetchProductsWithDetails` aplica para os totais.
+ */
+function resolveFilialScope(
+  ecommerceFilials: Set<string>,
+  salesFiliais: string[],
+  specific: string | null | undefined
+): { posNames: string[]; ecomNames: string[] } {
+  const allPos = salesFiliais.filter((f) => !ecommerceFilials.has(f));
+  const allEcom = salesFiliais.filter((f) => ecommerceFilials.has(f));
+
+  if (specific && specific !== VAREJO_VALUE) {
+    if (ecommerceFilials.has(specific)) {
+      return { posNames: [], ecomNames: [specific] };
     }
-    agg.qtd += d.quantity;
-    agg.venda += d.revenue;
-    if (!agg.colorDescription && d.colorDescription && d.colorDescription !== "-") {
-      agg.colorDescription = d.colorDescription;
-    }
-    if (!agg.grade && d.grade && d.grade !== "-") agg.grade = d.grade;
+    return { posNames: [specific], ecomNames: [] };
   }
-  return map;
-}
 
-function buildProductMeta(color: string, grade: string, tipo: string, extra?: string): string {
-  return [color || "-", grade, tipo, extra].filter((p) => p && p.trim()).join(" · ");
+  if (specific === VAREJO_VALUE) {
+    return { posNames: allPos, ecomNames: [] };
+  }
+
+  return { posNames: allPos, ecomNames: allEcom };
 }
 
 export async function fetchColecaoPresentation({
@@ -214,28 +208,47 @@ export async function fetchColecaoPresentation({
   range,
   collectionLabel,
 }: ColecaoPresentationParams): Promise<ColecaoPresentationPayload> {
-  const report = await fetchCollectionReport({ company, filial, range, colecoes });
+  const rangeInput = { start: range?.start, end: range?.end };
 
-  const allDetails = report.products.flatMap((p) => p.details);
-  const skuMap = aggregateSkus(allDetails);
-  const skus = Array.from(skuMap.values());
+  // ---- Produtos × cor pela lógica VALIDADA (com trocas/descontos/cancelamentos) ----
+  const products = await fetchProductsWithDetails({
+    company,
+    filial: filial ?? null,
+    colecoes,
+    range: rangeInput,
+    groupByColor: true,
+  });
 
-  const { stock, tipo } = await fetchStockAndTipo(skus.map((s) => s.productId));
+  const skus: SkuAgg[] = products
+    .map((d) => ({
+      productId: String(d.productId ?? "").trim(),
+      nome: d.productName ?? "",
+      colorCode: d.corProduto ? String(d.corProduto).trim() : "",
+      colorDescription:
+        d.descCorProduto && d.descCorProduto !== "-" ? d.descCorProduto : "",
+      grade: d.grade && d.grade !== "-" ? d.grade : "",
+      tipo: (d.tipo ?? "").trim().toUpperCase(),
+      qtd: d.totalQuantity ?? 0,
+      venda: d.totalRevenue ?? 0,
+    }))
+    .filter((s) => s.productId && (s.venda !== 0 || s.qtd !== 0));
 
-  const totalRevenue = report.summary.totalRevenue;
+  const stock = await fetchNetStock(skus.map((s) => s.productId));
+
+  const totalRevenue = skus.reduce((s, r) => s + r.venda, 0);
+  const totalQuantity = skus.reduce((s, r) => s + r.qtd, 0);
   const maxRevenue = Math.max(...skus.map((s) => s.venda), 1);
 
   const sortedSkus = [...skus].sort((a, b) => b.venda - a.venda);
 
   const productRows: PresentationProductRow[] = sortedSkus.map((s, i) => {
     const estoque = stock.get(skuKey(s.productId, s.colorCode)) ?? 0;
-    const t = tipo.get(s.productId.trim()) ?? "";
     return {
       rank: i + 1,
       nome: s.nome,
       colorDescription: s.colorDescription,
       grade: s.grade,
-      tipo: t,
+      tipo: s.tipo,
       qtd: s.qtd,
       precoMedio: s.qtd > 0 ? s.venda / s.qtd : 0,
       venda: s.venda,
@@ -245,7 +258,7 @@ export async function fetchColecaoPresentation({
     };
   });
 
-  // Top 3 (destaques da capa/visão geral) com meta incluindo un + ticket.
+  // Top 3 (destaques da capa/visão geral).
   const topProducts: PresentationProductRow[] = productRows.slice(0, 3);
 
   // Tabela de produtos: até PRODUCTS_LIMIT linhas; o restante vira "Outros".
@@ -262,18 +275,58 @@ export async function fetchColecaoPresentation({
       : null;
 
   const estoqueRestante = productRows.reduce((s, r) => s + r.estoque, 0);
-  const pecasVendidas = report.summary.totalQuantity;
+  const pecasVendidas = totalQuantity;
   const precoMedio = pecasVendidas > 0 ? totalRevenue / pecasVendidas : 0;
 
-  // ---- Lojas / canais: e-commerce colapsa numa linha "E-COMMERCE" ----
+  // ---- Lojas / canais: detalhamento por filial pela MESMA lógica validada ----
+  // `fetchProdutoQtdePorFilial` traz a venda líquida (trocas/descontos abatidos)
+  // por produto×cor×filial (POS) e por faturamento (e-commerce). Restringimos aos
+  // SKUs desta coleção (já filtrados acima) via chave canônica produto×cor.
   const storeAgg = new Map<string, { venda: number; qtd: number }>();
-  for (const d of allDetails) {
-    const bucket = d.channel === "E-commerce" ? ECOMMERCE_BUCKET : (d.origin || "").toUpperCase().trim() || "OUTROS";
-    const cur = storeAgg.get(bucket) ?? { venda: 0, qtd: 0 };
-    cur.venda += d.revenue;
-    cur.qtd += d.quantity;
-    storeAgg.set(bucket, cur);
+  let ecommerceRevenue = 0;
+  let retailRevenue = 0;
+
+  const companyLive = await resolveCompanyLive(company);
+  if (companyLive && skus.length > 0) {
+    const ecommerceFilials = new Set(companyLive.ecommerceFilials ?? []);
+    const salesFiliais = companyLive.filialFilters.sales ?? [];
+    const specific =
+      filial && filial !== VAREJO_VALUE ? await liveNameForIncoming(filial) : filial ?? null;
+    const { posNames, ecomNames } = resolveFilialScope(
+      ecommerceFilials,
+      salesFiliais,
+      specific
+    );
+
+    const colecaoKeys = new Set(skus.map((s) => canonicalKey(s.productId, s.colorCode)));
+    const normalizedRange = normalizeRangeForQuery(rangeInput);
+
+    const rows = await fetchProdutoQtdePorFilial(
+      (company ?? "") as CompanyKey,
+      posNames,
+      ecomNames,
+      normalizedRange,
+      { groupByCor: true }
+    ).catch(() => []);
+
+    for (const r of rows) {
+      if (!colecaoKeys.has(canonicalKey(r.produto, r.cor || null))) continue;
+      const isEcom = ecommerceFilials.has(r.filial);
+      const bucket = isEcom
+        ? ECOMMERCE_BUCKET
+        : (getFilialLabelForDisplay(companyLive, r.filial) || "OUTROS").toUpperCase().trim();
+      const cur = storeAgg.get(bucket) ?? { venda: 0, qtd: 0 };
+      cur.venda += r.vendas;
+      cur.qtd += r.qtde;
+      storeAgg.set(bucket, cur);
+      if (isEcom) {
+        ecommerceRevenue += r.vendas;
+      } else {
+        retailRevenue += r.vendas;
+      }
+    }
   }
+
   const storesSortedDesc = Array.from(storeAgg.entries())
     .map(([nome, v]) => ({
       nome,
@@ -302,9 +355,10 @@ export async function fetchColecaoPresentation({
     });
 
   const topStore = storesSortedDesc[0];
-  const ecommerceShare = report.summary.ecommerceShare;
-  const retailShare = report.summary.retailShare;
-  const hasEcommerce = report.summary.ecommerceRevenue > 0;
+  const channelTotal = retailRevenue + ecommerceRevenue;
+  const ecommerceShare = channelTotal > 0 ? (ecommerceRevenue / channelTotal) * 100 : 0;
+  const retailShare = channelTotal > 0 ? (retailRevenue / channelTotal) * 100 : 0;
+  const hasEcommerce = ecommerceRevenue > 0;
   const storeChartSubtitle =
     topStore?.nome === ECOMMERCE_BUCKET
       ? `E-commerce concentra ${fmtPct(topStore.participacaoPct)} do faturamento da coleção`
@@ -350,10 +404,8 @@ export async function fetchColecaoPresentation({
     ],
   };
 
-  const startIso = report.summary.detectedStartDate?.slice(0, 10) ?? range?.start ?? "";
-  const endIso = report.summary.detectedEndDate?.slice(0, 10) ?? range?.end ?? "";
-  const startLabelIso = range?.start ?? startIso;
-  const endLabelIso = range?.end ?? endIso;
+  const startLabelIso = range?.start ?? "";
+  const endLabelIso = range?.end ?? "";
   const year = endLabelIso ? new Date(`${endLabelIso}T00:00:00`).getFullYear() : new Date().getFullYear();
   const periodLabel =
     startLabelIso && endLabelIso
@@ -380,8 +432,8 @@ export async function fetchColecaoPresentation({
       hasEcommerce,
       ecommerceShare,
       retailShare,
-      ecommerceRevenue: report.summary.ecommerceRevenue,
-      retailRevenue: report.summary.retailRevenue,
+      ecommerceRevenue,
+      retailRevenue,
     },
     topProducts,
     products: shown,
