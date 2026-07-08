@@ -56,6 +56,7 @@ const COLECOES: ColecaoConfig[] = [
   { key: "brasilidade", codes: ["P8"] },
   { key: "origem", codes: ["O8"] },
   { key: "seaside", codes: ["Y4"] },
+  { key: "pantanal", codes: ["V9"] },
 ];
 
 function round2(value: number): number {
