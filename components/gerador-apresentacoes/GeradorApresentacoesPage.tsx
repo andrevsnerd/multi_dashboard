@@ -386,15 +386,19 @@ export default function GeradorApresentacoesPage({
         import("html2canvas"),
         import("jspdf"),
       ]);
-      const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-      const pageWidthMm = doc.internal.pageSize.getWidth();
-      const pageHeightMm = doc.internal.pageSize.getHeight();
-      const marginMm = 8;
-      const usableWidthMm = pageWidthMm - marginMm * 2;
-      const usableHeightMm = pageHeightMm - marginMm * 2;
 
-      for (const [index, slideElement] of slideElements.entries()) {
-        if (index > 0) doc.addPage();
+      // Slides variam de altura conforme os dados (ex.: tabela de lojas/produtos
+      // sem limite de linhas). Forçar height fixo (720px) cortava esse conteúdo
+      // e cada página saía com uma proporção diferente. Aqui a altura fica livre
+      // (min-height 720 preserva o layout padrão) e cada página do PDF nasce com
+      // o tamanho exato do slide (full-bleed), então nada é cortado nem sai
+      // desproporcional entre os slides.
+      const marginMm = 8;
+      const pageWidthMm = 297;
+      const usableWidthMm = pageWidthMm - marginMm * 2;
+
+      const canvases: HTMLCanvasElement[] = [];
+      for (const slideElement of slideElements) {
         const canvas = await html2canvas(slideElement, {
           backgroundColor: "#fffdfc",
           scale: Math.min(window.devicePixelRatio || 1, 2),
@@ -408,7 +412,7 @@ export default function GeradorApresentacoesPage({
             cloneDoc.querySelectorAll<HTMLElement>("[data-pdf-slide]").forEach((element) => {
               element.style.width = "1280px";
               element.style.minHeight = "720px";
-              element.style.height = "720px";
+              element.style.height = "auto";
               element.style.margin = "0";
               element.style.boxShadow = "none";
               element.style.borderRadius = "0";
@@ -423,14 +427,22 @@ export default function GeradorApresentacoesPage({
             });
           },
         });
-        const widthRatio = usableWidthMm / canvas.width;
-        const heightRatio = usableHeightMm / canvas.height;
-        const drawRatio = Math.min(widthRatio, heightRatio);
-        const drawWidthMm = canvas.width * drawRatio;
-        const drawHeightMm = canvas.height * drawRatio;
-        const offsetXmm = (pageWidthMm - drawWidthMm) / 2;
-        const offsetYmm = (pageHeightMm - drawHeightMm) / 2;
-        doc.addImage(canvas.toDataURL("image/png"), "PNG", offsetXmm, offsetYmm, drawWidthMm, drawHeightMm, undefined, "FAST");
+        canvases.push(canvas);
+      }
+
+      const firstDrawHeightMm = usableWidthMm * (canvases[0].height / canvases[0].width);
+      const doc = new jsPDF({
+        orientation: "landscape",
+        unit: "mm",
+        format: [pageWidthMm, firstDrawHeightMm + marginMm * 2],
+      });
+
+      for (const [index, canvas] of canvases.entries()) {
+        const drawHeightMm = usableWidthMm * (canvas.height / canvas.width);
+        if (index > 0) {
+          doc.addPage([pageWidthMm, drawHeightMm + marginMm * 2]);
+        }
+        doc.addImage(canvas.toDataURL("image/png"), "PNG", marginMm, marginMm, usableWidthMm, drawHeightMm, undefined, "FAST");
         canvas.width = 0;
         canvas.height = 0;
       }
