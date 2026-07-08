@@ -14,6 +14,7 @@
  */
 
 import { hasPostgres, getNeonSql } from "@/lib/db/neon";
+import { confirmarItem } from "@/lib/utils/romaneio-confirmacao-store";
 
 let tableChecked = false;
 
@@ -136,6 +137,125 @@ export async function insertTransferenciasPendentes(
       )
     `;
   }
+}
+
+/** Uma transferência detectada FORA do app (direto no Linx), já canonizada. */
+export interface TransferenciaDetectadaRegistro {
+  romaneio: string;
+  origemCanonico: string;
+  destinoCanonico: string;
+  origemLabel: string | null;
+  destinoLabel: string | null;
+  produto: string;
+  corCodigo: string | null;
+  corDescricao: string | null;
+  descricao: string | null;
+  codigoBarra: string | null;
+  /** EMISSÃO da saída (ISO string) — usada como data_saida (janela de cooldown/histórico). */
+  emissao: string;
+  quantidade: number;
+  /** Quantidade já recebida no destino (perna de entrada no Linx). */
+  qtdEntrada: number;
+}
+
+/**
+ * Registra transferências detectadas fora do app na MESMA tabela usada por uma
+ * transferência executada pela tela (`transferencia_pendente`) — de modo que
+ * elas passam a: (a) alimentar o cooldown (param a sugestão de reaparecer) e
+ * (b) aparecer em "Realizadas". Quando a perna de entrada existe no Linx,
+ * grava também a confirmação (romaneio_item_confirmado) para o status derivar
+ * como "confirmada".
+ *
+ * Idempotência por ROMANEIO: se já existe qualquer linha em
+ * `transferencia_pendente` com aquele romaneio_saida (seja de execução pela
+ * tela, seja de uma detecção anterior), o romaneio inteiro é pulado. Isso evita
+ * duplicar tanto transferências que a própria tela criou quanto re-execuções
+ * desta detecção.
+ */
+export async function registrarTransferenciasDetectadas(
+  companyKey: string,
+  itens: TransferenciaDetectadaRegistro[]
+): Promise<{ romaneiosInseridos: number; itensInseridos: number; itensConfirmados: number }> {
+  const vazio = { romaneiosInseridos: 0, itensInseridos: 0, itensConfirmados: 0 };
+  if (!hasPostgres()) return vazio;
+  const c = normCompany(companyKey);
+  if (!c || itens.length === 0) return vazio;
+
+  const sql = getNeonSql();
+  await ensureTable(sql);
+
+  // Romaneios candidatos (dedup)
+  const romaneios = Array.from(
+    new Set(itens.map((it) => (it.romaneio || "").trim()).filter(Boolean))
+  );
+  if (romaneios.length === 0) return vazio;
+
+  // Quais desses romaneios já existem em transferencia_pendente (qualquer origem)?
+  const existentes = (await sql`
+    SELECT DISTINCT romaneio_saida
+    FROM transferencia_pendente
+    WHERE company_key = ${c}
+      AND romaneio_saida = ANY(${romaneios})
+  `) as Array<{ romaneio_saida: string }>;
+  const jaRegistrados = new Set(existentes.map((r) => (r.romaneio_saida || "").trim()));
+
+  const novos = itens.filter((it) => !jaRegistrados.has((it.romaneio || "").trim()));
+  if (novos.length === 0) return vazio;
+
+  let itensInseridos = 0;
+  let itensConfirmados = 0;
+  const romaneiosTocados = new Set<string>();
+
+  for (const it of novos) {
+    const rom = (it.romaneio || "").trim();
+    const qtd = Math.max(1, Math.floor(it.quantidade));
+    await sql`
+      INSERT INTO transferencia_pendente (
+        company_key, item_key, produto, cor_descricao, cor_codigo, descricao,
+        codigo_barra, origem_canonico, destino_canonico, origem_label, destino_label,
+        romaneio_saida, quantidade, data_saida, created_by
+      ) VALUES (
+        ${c},
+        ${`${it.produto}|${it.corCodigo ?? ""}|${it.origemCanonico}|${it.destinoCanonico}`},
+        ${it.produto},
+        ${it.corDescricao},
+        ${it.corCodigo},
+        ${it.descricao},
+        ${it.codigoBarra},
+        ${it.origemCanonico},
+        ${it.destinoCanonico},
+        ${it.origemLabel},
+        ${it.destinoLabel},
+        ${rom},
+        ${qtd},
+        COALESCE(${it.emissao || null}::timestamptz, NOW()),
+        ${"DETECÇÃO AUTOMÁTICA"}
+      )
+    `;
+    itensInseridos += 1;
+    romaneiosTocados.add(rom);
+
+    // Perna de entrada já recebida no Linx → grava confirmação (status "confirmada").
+    const recebido = Math.max(0, Math.floor(it.qtdEntrada));
+    if (recebido > 0) {
+      await confirmarItem(
+        c,
+        rom,
+        it.destinoCanonico,
+        it.produto,
+        it.corCodigo ?? "",
+        Math.min(recebido, qtd),
+        "DETECÇÃO AUTOMÁTICA"
+      );
+      itensConfirmados += 1;
+    }
+  }
+
+  return {
+    romaneiosInseridos: romaneiosTocados.size,
+    itensInseridos,
+    itensConfirmados,
+  };
 }
 
 /**

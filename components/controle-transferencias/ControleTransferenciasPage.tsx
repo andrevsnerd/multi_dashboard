@@ -12,6 +12,7 @@ import ControleTransferenciasTable, {
 import type { ProdutoTransferencia } from "@/lib/repositories/controleTransferencias";
 import { resolveCompany, type CompanyKey } from "@/lib/config/company";
 import { useAuth } from "@/components/auth/AuthContext";
+import { seesAllFiliais } from "@/lib/auth/permissions";
 
 import styles from "./ControleTransferenciasPage.module.css";
 
@@ -54,6 +55,24 @@ function getLast30DaysRange() {
     startDate: start,
     endDate: end,
   };
+}
+
+/**
+ * Detecta transferências entre lojas feitas fora do app (direto no Linx) e as
+ * grava no Neon como "realizadas". Fire-and-forget resiliente: qualquer falha é
+ * engolida (a tela continua funcionando com os dados que já tem).
+ */
+async function detectarTransferenciasExternas(company: string): Promise<void> {
+  try {
+    await fetch("/api/transferencias-pendentes/detectar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ company }),
+      cache: "no-store",
+    });
+  } catch {
+    // silencioso — detecção é best-effort
+  }
 }
 
 async function fetchCooldownKeys(company: string, days = 7): Promise<Set<string>> {
@@ -184,10 +203,16 @@ export default function ControleTransferenciasPage({
       setLoading(true);
       setError(null);
       try {
-        // Carrega os 3 datasets em paralelo: produtos (MSSQL pesado),
-        // cooldown (Neon leve) e contadores das tabs Realizadas (Neon leve).
+        // Detecta transferências feitas FORA do app (direto no Linx) e as grava
+        // como "realizadas" no Neon. Roda em paralelo com a query pesada de
+        // produtos; cooldown e contadores são buscados DEPOIS dela para já
+        // refletirem o que foi detectado nesta mesma carga.
+        const detectPromise = detectarTransferenciasExternas(companyKey);
+        const dataPromise = fetchControleTransferencias(companyKey, range, null);
+
+        await detectPromise;
         const [transferenciasData, cooldown, contadores] = await Promise.all([
-          fetchControleTransferencias(companyKey, range, null),
+          dataPromise,
           fetchCooldownKeys(companyKey, 7),
           fetchRealizadasContadores(companyKey, 30),
         ]);
@@ -279,7 +304,7 @@ export default function ControleTransferenciasPage({
   );
 
   const allowedFiliaisOrigem = useMemo(() => {
-    if (user?.role === "admin" || !permissoes || permissoes.podeVerOutrasFiliais) {
+    if (seesAllFiliais(user?.role) || !permissoes || permissoes.podeVerOutrasFiliais) {
       return visibleOriginFiliais;
     }
     // Origem no controle de transferências = apenas a filialAtribuida do usuário.

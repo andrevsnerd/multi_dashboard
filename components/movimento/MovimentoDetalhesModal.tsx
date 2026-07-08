@@ -5,6 +5,8 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 import type { CompanyKey } from "@/lib/config/company";
+import { useAuth } from "@/components/auth/AuthContext";
+import { canSeeCusto } from "@/lib/auth/permissions";
 
 import styles from "./MovimentoDetalhesModal.module.css";
 
@@ -102,6 +104,8 @@ export default function MovimentoDetalhesModal({
   subgrupos,
   grades,
 }: MovimentoDetalhesModalProps) {
+  const { user } = useAuth();
+  const podeVerCusto = canSeeCusto(user);
   const [detalhes, setDetalhes] = useState<ProdutoDetalhe[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -191,7 +195,7 @@ export default function MovimentoDetalhesModal({
                   <span className={styles.summaryLabel}>Quantidade Total:</span>
                   <span className={styles.summaryValue}>{formatNumber(totalQuantidade)}</span>
                 </div>
-                {tipo === "entradas" || tipo === "parados" ? (
+                {(tipo === "entradas" || tipo === "parados") && podeVerCusto ? (
                   <div className={styles.summaryItem}>
                     <span className={styles.summaryLabel}>Custo Total:</span>
                     <span className={styles.summaryValue}>{formatCurrency(totalCusto)}</span>
@@ -215,7 +219,7 @@ export default function MovimentoDetalhesModal({
                       {companyKey === "scarfme" && <th>LINHA</th>}
                       {companyKey === "nerd" && <th>GRUPO</th>}
                       <th>QUANTIDADE</th>
-                      {tipo === "entradas" || tipo === "parados" ? <th>CUSTO</th> : null}
+                      {(tipo === "entradas" || tipo === "parados") && podeVerCusto ? <th>CUSTO</th> : null}
                       {tipo === "vendidos" ? <th>VALOR</th> : null}
                     </tr>
                   </thead>
@@ -232,7 +236,7 @@ export default function MovimentoDetalhesModal({
                           <td className={styles.categoriaCell}>{item.grupo || "-"}</td>
                         )}
                         <td className={styles.numberCell}>{formatNumber(item.quantidade)}</td>
-                        {tipo === "entradas" || tipo === "parados" ? (
+                        {(tipo === "entradas" || tipo === "parados") && podeVerCusto ? (
                           <td className={styles.currencyCell}>
                             {item.custo ? formatCurrency(item.custo) : "-"}
                           </td>

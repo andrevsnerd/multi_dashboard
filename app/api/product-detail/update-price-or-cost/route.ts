@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
 import { updateProductPrecoOrCusto } from '@/lib/repositories/productDetail';
+import { readOnlyBlock } from '@/lib/auth/route-guards';
 
 export async function PATCH(request: Request) {
   try {
+    const readOnly = await readOnlyBlock(request.headers.get('x-auth-username'));
+    if (readOnly) return readOnly;
     const body = (await request.json()) as {
       productId?: string;
       company?: string;

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getConnectionPool } from "@/lib/db/connection";
 import { ProxyPool, shouldUseProxy } from "@/lib/db/proxy";
+import { readOnlyBlock } from "@/lib/auth/route-guards";
 
 interface LiberarTransitoRequest {
   romaneio: string;
@@ -10,6 +11,8 @@ interface LiberarTransitoRequest {
 
 export async function POST(request: Request) {
   try {
+    const readOnly = await readOnlyBlock(request.headers.get("x-auth-username"));
+    if (readOnly) return readOnly;
     const body = (await request.json()) as LiberarTransitoRequest;
     const romaneio = body.romaneio?.trim() || "";
     const filialDestino = body.filialDestino?.trim() || "";

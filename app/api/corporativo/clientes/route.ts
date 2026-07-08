@@ -6,6 +6,7 @@ import {
   listClientesCorporativos,
 } from "@/lib/repositories/clienteCorporativo";
 import type { ClienteCorporativoInput } from "@/lib/corporativo/types";
+import { readOnlyBlock } from "@/lib/auth/route-guards";
 
 export const maxDuration = 120;
 
@@ -23,6 +24,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const readOnly = await readOnlyBlock(request.headers.get("x-auth-username"));
+  if (readOnly) return readOnly;
+
   let body: ClienteCorporativoInput & { forcar?: boolean };
   try {
     body = (await request.json()) as ClienteCorporativoInput & { forcar?: boolean };

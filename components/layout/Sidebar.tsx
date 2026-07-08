@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSidebar } from "./SidebarContext";
 import { useAuth } from "@/components/auth/AuthContext";
-import { userHasPagePermission, roleAllowsPermission } from "@/lib/auth/permissions";
+import { userHasPagePermission, roleAllowsPermission, hasFullPageAccess } from "@/lib/auth/permissions";
 import type { PermissionKey } from "@/types/auth";
 
 import styles from "./Sidebar.module.css";
@@ -566,14 +566,11 @@ export default function Sidebar({ companyName }: SidebarProps) {
 
     if (permission === "admin") return user.role === "admin";
 
-    if (user.role === "admin") return true;
+    // admin e diretor veem tudo (menos o item Admin, tratado acima).
+    if (hasFullPageAccess(user.role)) return true;
 
-    // Permissoes restritas por funcao (ex: extrato-produto so para logistica/admin).
+    // Permissoes restritas por funcao (ex: extrato-produto so para logistica/admin/diretor).
     if (permission && !roleAllowsPermission(user.role, permission)) return false;
-
-    if ((user.role === "gestor" || user.role === "logistica") && !user.permissions?.length) {
-      return true;
-    }
 
     if (!permission) return false;
 

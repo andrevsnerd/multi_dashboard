@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { readGoals, writeGoals } from '@/lib/utils/goals-storage';
+import { readOnlyBlock } from '@/lib/auth/route-guards';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -90,6 +91,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const readOnly = await readOnlyBlock(request.headers.get('x-auth-username'));
+    if (readOnly) return readOnly;
     const body = await request.json();
     const { companyKey, month, year, goals } = body;
 

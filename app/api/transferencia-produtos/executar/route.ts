@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { findUserByUsername } from '@/lib/auth/users-store';
+import { readOnlyBlock } from '@/lib/auth/route-guards';
 import { getActiveFilial } from '@/lib/config/company';
 import { resolveCompanyDynamic } from '@/lib/config/company-server';
 import { getConnectionPool } from '@/lib/db/connection';
@@ -46,6 +47,8 @@ async function getActiveFilialForRequest(companyKey: string | undefined, filial:
 export async function POST(request: Request) {
   try {
     const username = request.headers.get('x-auth-username')?.trim();
+    const readOnly = await readOnlyBlock(username);
+    if (readOnly) return readOnly;
     const body = (await request.json()) as TransferenciaRequest;
     const {
       produto,

@@ -3,6 +3,7 @@ import { getPermissaoByUsername } from "@/lib/utils/transferencia-permissoes-sto
 import { getAllDestinosByCompany } from "@/lib/utils/destino-romaneio-store";
 import { fetchLogSaidas } from "@/lib/repositories/logSaidas";
 import { findUserByUsername } from "@/lib/auth/users-store";
+import { seesAllFiliais } from "@/lib/auth/permissions";
 import { getActiveFilial } from "@/lib/config/company";
 import { resolveCompanyDynamic } from "@/lib/config/company-server";
 import { getContadorConfirmadosByCompany } from "@/lib/utils/romaneio-confirmacao-store";
@@ -98,9 +99,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ data: saidasDaEmpresa });
     }
 
-    // Logística vê todos os romaneios da empresa, filtrado pelas filiais da empresa
+    // Admin/diretor/supervisor/logística veem todos os romaneios da empresa; só o gerente filtra pela filial atribuída.
     const userRecord = await findUserByUsername(username);
-    if (userRecord?.role === "logistica") {
+    if (seesAllFiliais(userRecord?.role)) {
       return NextResponse.json({ data: saidasDaEmpresa });
     }
 

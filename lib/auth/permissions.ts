@@ -5,19 +5,81 @@ import type { CompanyKey, PermissionKey, RoleKey, UserSession } from "@/types/au
 const ALL_COMPANIES: CompanyKey[] = ["nerd", "scarfme", "corporativo"];
 
 /**
+ * Normaliza roles legados para o conjunto atual. O antigo "gestor" virou "gerente".
+ * Usado na leitura de registros (banco/arquivo) para compatibilidade.
+ */
+export function normalizeRole(role: string | null | undefined): RoleKey {
+  if (role === "gestor") return "gerente";
+  return (role ?? "gerente") as RoleKey;
+}
+
+/**
+ * Funcoes que enxergam TODAS as paginas, como o admin (sem depender da lista de
+ * permissoes). O diretor entra aqui: ve literalmente tudo, so nao acessa /admin.
+ */
+export const FULL_ACCESS_ROLES: RoleKey[] = ["admin", "diretor"];
+
+/** True se a funcao ve todas as paginas (nao depende da lista de permissoes). */
+export function hasFullPageAccess(role: RoleKey | undefined | null): boolean {
+  return !!role && FULL_ACCESS_ROLES.includes(role);
+}
+
+/**
+ * Funcoes somente-leitura: veem tudo o que lhes cabe, mas nunca executam acoes
+ * operacionais (transferencias, ajustes, edicao de romaneios, cadastro corporativo).
+ */
+export const READ_ONLY_ROLES: RoleKey[] = ["diretor", "supervisor"];
+
+/** True se a funcao e somente-leitura (nao pode executar acoes que gravam dados). */
+export function isReadOnlyRole(role: RoleKey | undefined | null): boolean {
+  return !!role && READ_ONLY_ROLES.includes(role);
+}
+
+/** True se o usuario pode executar acoes de mutacao de dados de empresa. */
+export function canMutate(user: UserSession | null): boolean {
+  if (!user) return false;
+  return !isReadOnlyRole(user.role);
+}
+
+/**
+ * Funcoes que enxergam TODAS as filiais em transferencias/romaneios.
+ * So o gerente fica restrito a sua filial atribuida (filialAtribuida).
+ */
+export const ALL_FILIAIS_ROLES: RoleKey[] = ["admin", "diretor", "supervisor", "logistica"];
+
+/** True se a funcao ve todas as filiais em transferencias/romaneios. */
+export function seesAllFiliais(role: RoleKey | undefined | null): boolean {
+  return !!role && ALL_FILIAIS_ROLES.includes(role);
+}
+
+/**
+ * Funcoes que podem ver o CUSTO (KPIs, colunas, valores, exports).
+ * supervisor e gerente NUNCA veem custo.
+ */
+export const CUSTO_VISIBLE_ROLES: RoleKey[] = ["admin", "diretor", "logistica"];
+
+/** True se o usuario pode ver informacao de custo. */
+export function canSeeCusto(user: UserSession | null): boolean {
+  if (!user) return false;
+  return CUSTO_VISIBLE_ROLES.includes(user.role);
+}
+
+/**
  * Permissoes restritas por funcao: mesmo que concedidas a um usuario, so
  * funcionam para as funcoes listadas. Ex: o Extrato de Produto so e acessivel
- * para admin ou logistica (gestor nunca ve, mesmo com a pagina marcada).
+ * para admin, diretor ou logistica (gerente/supervisor nunca ve, mesmo com a pagina marcada).
  */
 export const ROLE_RESTRICTED_PERMISSIONS: Partial<Record<PermissionKey, RoleKey[]>> = {
-  "extrato-produto": ["admin", "logistica"],
-  // Área corporativo é exclusiva do admin e do cliente_corporativo. Gestor/logística
-  // (mesmo com "sem permissões = vê tudo") nunca acessam, pois roleAllowsPermission barra.
-  "clientes-corporativos": ["admin", "cliente_corporativo"],
+  "extrato-produto": ["admin", "diretor", "logistica"],
+  // Área corporativo é exclusiva do admin, diretor e do cliente_corporativo. Supervisor/gerente/logística
+  // nunca acessam, pois roleAllowsPermission barra.
+  "clientes-corporativos": ["admin", "diretor", "cliente_corporativo"],
 };
 
 /** True se a funcao do usuario pode, em tese, receber/usar essa permissao. */
 export function roleAllowsPermission(role: RoleKey, key: PermissionKey): boolean {
+  // admin e diretor veem tudo (inclusive paginas restritas por funcao).
+  if (hasFullPageAccess(role)) return true;
   const allowedRoles = ROLE_RESTRICTED_PERMISSIONS[key];
   return !allowedRoles || allowedRoles.includes(role);
 }
@@ -66,10 +128,10 @@ export function pathnameToPermission(pathname: string | null): PermissionKey | "
  */
 export function userHasPagePermission(user: UserSession | null, key: PermissionKey): boolean {
   if (!user) return false;
-  if (user.role === "admin") return true;
-  // Permissoes restritas por funcao: gestor nunca acessa, mesmo se marcada.
+  // admin e diretor veem todas as paginas (nao dependem da lista de permissoes).
+  if (hasFullPageAccess(user.role)) return true;
+  // Permissoes restritas por funcao: supervisor/gerente nunca acessam, mesmo se marcada.
   if (!roleAllowsPermission(user.role, key)) return false;
-  if ((user.role === "gestor" || user.role === "logistica") && !user.permissions?.length) return true;
 
   const perms = user.permissions ?? [];
   if (perms.includes(key)) return true;
@@ -92,20 +154,20 @@ export function canAccessPath(user: UserSession | null, pathname: string | null)
     companySegment &&
     (companySegment === "nerd" || companySegment === "scarfme" || companySegment === "corporativo")
   ) {
-    // Admin pode ver qualquer empresa; demais respeitam allowedCompanies.
-    if (user.role !== "admin" && !canAccessCompany(user, companySegment)) return false;
+    // Admin/diretor podem ver qualquer empresa; demais respeitam allowedCompanies.
+    if (!hasFullPageAccess(user.role) && !canAccessCompany(user, companySegment)) return false;
   }
 
   // Área CORPORATIVO tem dois mundos:
   //  - /corporativo/loja/**  → a LOJA (vitrine/carrinho/checkout): admin + cliente_corporativo.
-  //  - resto (/corporativo, /novo, /[codigo], /catalogo, /pedidos) → gestão: SÓ admin.
+  //  - resto (/corporativo, /novo, /[codigo], /catalogo, /pedidos) → gestão: admin + diretor (leitura).
   if (companySegment === "corporativo") {
-    if (user.role === "admin") return true;
+    if (hasFullPageAccess(user.role)) return true; // admin (gestão) e diretor (leitura)
     if (user.role === "cliente_corporativo") return parts[1] === "loja";
     return false;
   }
 
-  if (user.role === "admin") return true;
+  if (hasFullPageAccess(user.role)) return true;
   return userHasPagePermission(user, perm as PermissionKey);
 }
 
@@ -115,8 +177,8 @@ export function getFirstAllowedPath(user: UserSession | null, company: string): 
   // Cliente corporativo entra direto na LOJA; admin cai na gestão do corporativo.
   if (user.role === "cliente_corporativo") return "/corporativo/loja";
   if (company === "corporativo") return "/corporativo";
-  if (user.role === "admin") return `/${company}`;
-  if ((user.role === "gestor" || user.role === "logistica") && !user.permissions?.length) return `/${company}`;
+  // admin e diretor veem tudo → caem no dashboard da empresa.
+  if (hasFullPageAccess(user.role)) return `/${company}`;
   if (user.permissions.includes("controle-transferencias")) return `/${company}/controle-transferencias`;
   if (user.permissions.includes("saidas-entradas-produtos")) return `/${company}/saidas-entradas-produtos`;
   if (user.permissions.includes("transferencia-produtos")) return `/${company}/transferencia-produtos`;

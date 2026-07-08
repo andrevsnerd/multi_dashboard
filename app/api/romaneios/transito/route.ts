@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPermissaoByUsername } from "@/lib/utils/transferencia-permissoes-store";
 import { fetchLogTransito } from "@/lib/repositories/logTransito";
 import { findUserByUsername } from "@/lib/auth/users-store";
+import { seesAllFiliais } from "@/lib/auth/permissions";
 import { getActiveFilial } from "@/lib/config/company";
 import { resolveCompanyDynamic } from "@/lib/config/company-server";
 
@@ -33,8 +34,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ data: transitosDaEmpresa });
     }
 
+    // Admin/diretor/supervisor/logística veem todos os romaneios; só o gerente filtra pela filial atribuída.
     const userRecord = await findUserByUsername(username);
-    if (userRecord?.role === "logistica") {
+    if (seesAllFiliais(userRecord?.role)) {
       return NextResponse.json({ data: transitosDaEmpresa });
     }
 

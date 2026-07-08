@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findUserByUsername } from "@/lib/auth/users-store";
+import { isReadOnlyRole } from "@/lib/auth/permissions";
 import { getDestinoRomaneio, setDestinoRomaneio } from "@/lib/utils/destino-romaneio-store";
 import { getActiveFilial } from "@/lib/config/company";
 import { resolveCompanyDynamic } from "@/lib/config/company-server";
@@ -50,6 +51,12 @@ export async function PUT(request: NextRequest) {
     const user = await findUserByUsername(username);
     if (!user) {
       return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
+    }
+    if (isReadOnlyRole(user.role)) {
+      return NextResponse.json(
+        { error: "Acesso somente leitura: esta função não pode definir destino de romaneio." },
+        { status: 403 }
+      );
     }
 
     const body = await request.json();

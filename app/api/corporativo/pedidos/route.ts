@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { findUserByUsername } from "@/lib/auth/users-store";
+import { readOnlyBlock } from "@/lib/auth/route-guards";
 import { criarPedido, listPedidos, type PedidoItem } from "@/lib/repositories/corporativoStore";
 
 export const maxDuration = 60;
@@ -37,6 +38,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const readOnly = await readOnlyBlock(request.headers.get("x-auth-username"));
+    if (readOnly) return readOnly;
     const body = await request.json();
     const itens = Array.isArray(body.itens) ? (body.itens as PedidoItem[]) : [];
     if (itens.length === 0) {

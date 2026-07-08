@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthContext";
+import { canSeeCusto } from "@/lib/auth/permissions";
 import { calculateTransfers } from "@/components/controle-transferencias/ControleTransferenciasTable";
 import ComprasSalvasListPanel from "@/components/stock/ComprasSalvasListPanel";
 import {
@@ -1876,6 +1877,8 @@ function ListaLojaItensTable({
   onApplyColor,
   onCancelColorPicker,
 }: ListaLojaItensTableProps) {
+  const { user } = useAuth();
+  const podeVerCusto = canSeeCusto(user);
   const filialScopeKey = filialCod && filialCod.trim() ? filialCod.trim() : "__ALL__";
   // Catraca da data de compra (modo ciclo) — mesma lógica/persistência das demais telas.
   const { enabled: catracaEnabled, reconcile: catracaReconcile, persist: catracaPersist } =
@@ -2273,7 +2276,7 @@ function ListaLojaItensTable({
             <th className={styles.colNumeric}>Estoque chegada</th>
             <th className={styles.colNumeric}>Compra ideal</th>
             <th className={styles.colNumeric}>Status</th>
-            <th className={styles.colNumeric}>Custo Total</th>
+            {podeVerCusto && <th className={styles.colNumeric}>Custo Total</th>}
           </tr>
         </thead>
         <tbody>
@@ -2814,13 +2817,15 @@ function ListaLojaItensTable({
                   );
                 })()}
               </td>
-              <td className={styles.colNumeric}>
-                <span className={styles.cellMetric}>
-                  {custoUnit != null && custoUnit > 0 && item.quantidade > 0
-                    ? fmtBRL(item.quantidade * custoUnit)
-                    : "—"}
-                </span>
-              </td>
+              {podeVerCusto && (
+                <td className={styles.colNumeric}>
+                  <span className={styles.cellMetric}>
+                    {custoUnit != null && custoUnit > 0 && item.quantidade > 0
+                      ? fmtBRL(item.quantidade * custoUnit)
+                      : "—"}
+                  </span>
+                </td>
+              )}
                   </>
                 );
               })()}
@@ -3319,6 +3324,7 @@ function ListaLojaItensTable({
 
 export default function ListaLojaPage({ companyKey, companyName, companySlug }: ListaLojaPageProps) {
   const { user, isLoading: authLoading } = useAuth();
+  const podeVerCusto = canSeeCusto(user);
   const searchParams = useSearchParams();
   const initialMode: Mode = searchParams.get("view") === "compras-salvas" ? "saved-purchases" : "list";
 
@@ -5176,11 +5182,15 @@ export default function ListaLojaPage({ companyKey, companyName, companySlug }: 
                 <span className={styles.kpiLabel}>Total Qtd</span>
                 <strong className={styles.kpiValue}>{fmt(kpisLista.totalQtdSugerida)}</strong>
               </div>
-              <div className={styles.kpiDivider} />
-              <div className={styles.kpiItem}>
-                <span className={styles.kpiLabel}>Custo Total (Referência)</span>
-                <strong className={styles.kpiValue}>{fmtBRL(kpisLista.totalCustoReferencia)}</strong>
-              </div>
+              {podeVerCusto && (
+                <>
+                  <div className={styles.kpiDivider} />
+                  <div className={styles.kpiItem}>
+                    <span className={styles.kpiLabel}>Custo Total (Referência)</span>
+                    <strong className={styles.kpiValue}>{fmtBRL(kpisLista.totalCustoReferencia)}</strong>
+                  </div>
+                </>
+              )}
             </div>
           )}
           <div className={styles.filtroRow}>

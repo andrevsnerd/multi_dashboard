@@ -1,6 +1,7 @@
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import { getNeonSql } from "@/lib/db/neon";
 import { normalizePermissionKeys } from "./permission-normalizer";
+import { normalizeRole } from "./permissions";
 import type { CompanyKey, PermissionKey, RoleKey, UserRecord } from "@/types/auth";
 
 let tableChecked = false;
@@ -12,7 +13,7 @@ async function ensureTable(sql: ReturnType<typeof getNeonSql>) {
       id TEXT PRIMARY KEY,
       username TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
-      role TEXT NOT NULL CHECK (role IN ('admin', 'gestor', 'logistica')),
+      role TEXT NOT NULL CHECK (role IN ('admin', 'diretor', 'supervisor', 'logistica', 'gerente', 'cliente_corporativo')),
       permissions JSONB NOT NULL DEFAULT '[]'::jsonb,
       allowed_companies JSONB
     )
@@ -21,13 +22,16 @@ async function ensureTable(sql: ReturnType<typeof getNeonSql>) {
   await sql`ALTER TABLE dashboard_users ADD COLUMN IF NOT EXISTS nome_exibicao TEXT`;
   await sql`ALTER TABLE dashboard_users ADD COLUMN IF NOT EXISTS somente_varejo BOOLEAN DEFAULT FALSE`;
   await sql`ALTER TABLE dashboard_users ADD COLUMN IF NOT EXISTS cliente_codigo TEXT`;
-  // Atualiza o CHECK constraint para incluir o role 'logistica'
+  // Migra o antigo role 'gestor' para 'gerente' ANTES de recriar o CHECK,
+  // e atualiza o CHECK para o conjunto atual de funcoes.
   await sql`
     DO $$
     BEGIN
       ALTER TABLE dashboard_users DROP CONSTRAINT IF EXISTS dashboard_users_role_check;
+      UPDATE dashboard_users SET role = 'gerente' WHERE role = 'gestor';
       ALTER TABLE dashboard_users
-        ADD CONSTRAINT dashboard_users_role_check CHECK (role IN ('admin', 'gestor', 'logistica'));
+        ADD CONSTRAINT dashboard_users_role_check
+        CHECK (role IN ('admin', 'diretor', 'supervisor', 'logistica', 'gerente', 'cliente_corporativo'));
     EXCEPTION WHEN others THEN NULL;
     END$$
   `;
@@ -72,7 +76,7 @@ function rowToUser(row: {
     id: row.id,
     username: row.username,
     passwordHash: row.password_hash,
-    role: row.role as RoleKey,
+    role: normalizeRole(row.role),
     permissions: perms,
     allowedCompanies,
     nomeExibicao: row.nome_exibicao ?? undefined,
@@ -271,6 +275,6 @@ export async function seedInitialUsersIfEmpty(): Promise<void> {
     INSERT INTO dashboard_users (id, username, password_hash, role, permissions)
     VALUES
       (${adminId}, 'andre.sabetta', ${hashPassword("asabetta")}, 'admin', '[]'::jsonb),
-      (${logisticaId}, 'logistica', ${hashPassword("logistica123")}, 'gestor', ${JSON.stringify(["controle-transferencias"])}::jsonb)
+      (${logisticaId}, 'logistica', ${hashPassword("logistica123")}, 'logistica', ${JSON.stringify(["controle-transferencias"])}::jsonb)
   `;
 }

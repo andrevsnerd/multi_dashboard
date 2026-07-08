@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { CompanyKey } from "@/lib/config/company";
 import { exportDetalhadoToXlsx } from "@/lib/utils/exportDetalhadoXlsx";
+import { useAuth } from "@/components/auth/AuthContext";
+import { canSeeCusto } from "@/lib/auth/permissions";
 
 import styles from "./EstoqueDetalhado02Page.module.css";
 
@@ -119,6 +121,8 @@ export default function EstoqueDetalhado02Page({
   companyKey,
   companyName,
 }: EstoqueDetalhado02PageProps) {
+  const { user } = useAuth();
+  const podeVerCusto = canSeeCusto(user);
   const router = useRouter();
   const [detalhes, setDetalhes] = useState<ProdutoDetalhesCompletoPorFilial | null>(null);
   const [loading, setLoading] = useState(true);
@@ -340,15 +344,14 @@ export default function EstoqueDetalhado02Page({
         <button
           type="button"
           onClick={() => {
-            const columns = ["DESCRIÇÃO", "COR", "FILIAL", "ESTOQUE", "PREÇO", "CUSTO UNIT.", "CUSTO TOTAL", "VENDAS TOTAIS"];
+            const columns = ["DESCRIÇÃO", "COR", "FILIAL", "ESTOQUE", "PREÇO", ...(podeVerCusto ? ["CUSTO UNIT.", "CUSTO TOTAL"] : []), "VENDAS TOTAIS"];
             const rows = sortedVariacoes.map((v) => [
               v.descricao,
               v.cor,
               v.filial,
               v.estoque,
               v.preco ?? 0,
-              v.custoUnitario,
-              v.custoTotal,
+              ...(podeVerCusto ? [v.custoUnitario, v.custoTotal] : []),
               v.vendasTotais,
             ]);
             const safeName = (detalhes.nomeProduto || "por-filial").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 40);
@@ -399,12 +402,14 @@ export default function EstoqueDetalhado02Page({
             {formatNumber(detalhes.resumo.estoqueTotal)} unidades
           </div>
         </div>
-        <div className={styles.metricCard}>
-          <div className={styles.metricLabel}>CUSTO TOTAL</div>
-          <div className={styles.metricValue}>
-            {formatCurrency(detalhes.resumo.custoTotal)}
+        {podeVerCusto && (
+          <div className={styles.metricCard}>
+            <div className={styles.metricLabel}>CUSTO TOTAL</div>
+            <div className={styles.metricValue}>
+              {formatCurrency(detalhes.resumo.custoTotal)}
+            </div>
           </div>
-        </div>
+        )}
         <div className={styles.metricCard}>
           <div className={styles.metricLabel}>VENDAS TOTAIS</div>
           <div className={styles.metricValue}>
@@ -433,9 +438,9 @@ export default function EstoqueDetalhado02Page({
                 )}
               </th>
               <th>PREÇO</th>
-              <th>CUSTO UNIT.</th>
-              <th>CUSTO TOTAL</th>
-              <th 
+              {podeVerCusto && <th>CUSTO UNIT.</th>}
+              {podeVerCusto && <th>CUSTO TOTAL</th>}
+              <th
                 className={styles.sortableHeader}
                 onClick={() => handleSort('vendasTotais')}
               >
@@ -456,8 +461,8 @@ export default function EstoqueDetalhado02Page({
                 <td>{variacao.filial}</td>
                 <td>{formatNumber(variacao.estoque)}</td>
                 <td>{formatCurrency(variacao.preco ?? 0)}</td>
-                <td>{formatCurrency(variacao.custoUnitario)}</td>
-                <td>{formatCurrency(variacao.custoTotal)}</td>
+                {podeVerCusto && <td>{formatCurrency(variacao.custoUnitario)}</td>}
+                {podeVerCusto && <td>{formatCurrency(variacao.custoTotal)}</td>}
                 <td>{formatNumber(variacao.vendasTotais)}</td>
               </tr>
             ))}
@@ -467,8 +472,8 @@ export default function EstoqueDetalhado02Page({
               <td colSpan={3} className={styles.footerLabel}><strong>{totaisFromLinhas.totalItens} linhas</strong></td>
               <td className={styles.footerValue}>{formatNumber(totaisFromLinhas.estoqueTotal)}</td>
               <td>—</td>
-              <td>—</td>
-              <td className={styles.footerValue}>{formatCurrency(totaisFromLinhas.custoTotal)}</td>
+              {podeVerCusto && <td>—</td>}
+              {podeVerCusto && <td className={styles.footerValue}>{formatCurrency(totaisFromLinhas.custoTotal)}</td>}
               <td className={styles.footerValue}>{formatNumber(totaisFromLinhas.vendasTotais)}</td>
             </tr>
           </tfoot>

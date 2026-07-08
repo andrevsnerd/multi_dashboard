@@ -6,6 +6,8 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import * as XLSX from "xlsx";
 
 import { useSidebar } from "@/components/layout/SidebarContext";
+import { useAuth } from "@/components/auth/AuthContext";
+import { canSeeCusto } from "@/lib/auth/permissions";
 import {
   aggregateVendasPorFilialByDisplayLabel,
   compareFilialDisplayOrder,
@@ -469,7 +471,7 @@ function syncAbcStickyHeaderColumns(mainEl: HTMLTableElement | null, stickyEl: H
   });
 }
 
-function AbcAnalysisTableHead({ modoReposicao }: { modoReposicao: boolean }) {
+function AbcAnalysisTableHead({ modoReposicao, podeVerCusto }: { modoReposicao: boolean; podeVerCusto: boolean }) {
   return (
     <thead>
       <tr>
@@ -482,8 +484,8 @@ function AbcAnalysisTableHead({ modoReposicao }: { modoReposicao: boolean }) {
         <th className={styles.right}>Duração</th>
         <th className={styles.right}>Participação</th>
         <th className={styles.right}>{modoReposicao ? "Compra ideal" : "Qtd Proporcional"}</th>
-        <th className={styles.right}>Custo Unit.</th>
-        <th className={styles.right}>Custo Total</th>
+        {podeVerCusto && <th className={styles.right}>Custo Unit.</th>}
+        {podeVerCusto && <th className={styles.right}>Custo Total</th>}
       </tr>
     </thead>
   );
@@ -655,6 +657,8 @@ export default function ListaCompraSugeridaPage({
   companyKey: CompanyKey;
   companySlug?: string;
 }) {
+  const { user } = useAuth();
+  const podeVerCusto = canSeeCusto(user);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -1791,10 +1795,12 @@ export default function ListaCompraSugeridaPage({
                 <span className={styles.summaryValue}>{fmt(totalQtdReposicao)}</span>
               </div>
               <div className={styles.summaryDivider} />
-              <div className={styles.summaryItem}>
-                <span className={styles.summaryLabel}>Custo Total</span>
-                <span className={styles.summaryValue}>{fmtBRL(totalCustoReposicao)}</span>
-              </div>
+              {podeVerCusto && (
+                <div className={styles.summaryItem}>
+                  <span className={styles.summaryLabel}>Custo Total</span>
+                  <span className={styles.summaryValue}>{fmtBRL(totalCustoReposicao)}</span>
+                </div>
+              )}
               <div className={styles.summaryDivider} />
               <div className={styles.summaryItem}>
                 <span className={styles.summaryLabel}>Produtos em Reposição</span>
@@ -2007,12 +2013,16 @@ export default function ListaCompraSugeridaPage({
                           })()}
                         </span>
                       </td>
-                      <td className={`${styles.right} ${item.custoUnit > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}`}>
-                        {item.custoUnit > 0 ? fmtBRL2(item.custoUnit) : "—"}
-                      </td>
-                      <td className={`${styles.right} ${item.custoTotal > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}`}>
-                        {item.custoTotal > 0 ? fmtBRL(item.custoTotal) : "—"}
-                      </td>
+                      {podeVerCusto && (
+                        <td className={`${styles.right} ${item.custoUnit > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}`}>
+                          {item.custoUnit > 0 ? fmtBRL2(item.custoUnit) : "—"}
+                        </td>
+                      )}
+                      {podeVerCusto && (
+                        <td className={`${styles.right} ${item.custoTotal > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}`}>
+                          {item.custoTotal > 0 ? fmtBRL(item.custoTotal) : "—"}
+                        </td>
+                      )}
                     </tr>
                   ))}
                   {/* Linha de total */}
@@ -2020,10 +2030,12 @@ export default function ListaCompraSugeridaPage({
                     <tr className={styles.totalRow}>
                       <td colSpan={5} style={{ textAlign: "right", fontWeight: 700, color: "#374151" }}>TOTAL</td>
                       <td className={styles.qtdSugerida}>{fmt(totalQtdReposicao)}</td>
-                      <td />
-                      <td className={`${styles.right} ${styles.qtdSugerida}`}>
-                        {fmtBRL(totalCustoReposicao)}
-                      </td>
+                      {podeVerCusto && <td />}
+                      {podeVerCusto && (
+                        <td className={`${styles.right} ${styles.qtdSugerida}`}>
+                          {fmtBRL(totalCustoReposicao)}
+                        </td>
+                      )}
                     </tr>
                   )}
                 </tbody>
@@ -2215,13 +2227,13 @@ export default function ListaCompraSugeridaPage({
                       ref={abcStickyAbcTableRef}
                       className={`${styles.table} ${styles.tableAbc} ${styles.abcStickyHeaderTable}`}
                     >
-                      <AbcAnalysisTableHead modoReposicao={modoReposicao} />
+                      <AbcAnalysisTableHead modoReposicao={modoReposicao} podeVerCusto={podeVerCusto} />
                     </table>
                   </div>
                 )}
                 <div ref={abcStickySentinelRef} className={styles.abcStickySentinel} aria-hidden />
                 <table ref={abcMainAbcTableRef} className={`${styles.table} ${styles.tableAbc}`}>
-                  <AbcAnalysisTableHead modoReposicao={modoReposicao} />
+                  <AbcAnalysisTableHead modoReposicao={modoReposicao} podeVerCusto={podeVerCusto} />
                 <tbody>
                   {groups.map(curva => {
                     const grupo = produtosTabelaABC.filter(p => p.curva === curva);
@@ -2855,11 +2867,15 @@ export default function ListaCompraSugeridaPage({
               <span className={styles.summaryLabel}>Total Qtd Manual</span>
               <span className={styles.summaryValue}>{fmt(compraFinalTotals.totalQtdManual)}</span>
             </div>
-            <div className={styles.summaryDivider} />
-            <div className={styles.summaryItem}>
-              <span className={styles.summaryLabel}>Custo Total</span>
-              <span className={styles.summaryValue}>{fmtBRL(compraFinalTotals.totalCusto)}</span>
-            </div>
+            {podeVerCusto && (
+              <>
+                <div className={styles.summaryDivider} />
+                <div className={styles.summaryItem}>
+                  <span className={styles.summaryLabel}>Custo Total</span>
+                  <span className={styles.summaryValue}>{fmtBRL(compraFinalTotals.totalCusto)}</span>
+                </div>
+              </>
+            )}
             </div>
 
             <div className={styles.exportActions}>
@@ -2899,8 +2915,8 @@ export default function ListaCompraSugeridaPage({
                     <th className={styles.right}>Qtd</th>
                     <th>Destino</th>
                     <th className={styles.right}>Estoque</th>
-                    <th className={styles.right}>Custo Unit.</th>
-                    <th className={styles.right}>Custo Total</th>
+                    {podeVerCusto && <th className={styles.right}>Custo Unit.</th>}
+                    {podeVerCusto && <th className={styles.right}>Custo Total</th>}
                     <th style={{ width: 60 }} />
                   </tr>
                 </thead>
@@ -2985,12 +3001,16 @@ export default function ListaCompraSugeridaPage({
                         >
                           {estoque != null ? fmt(estoque) : "—"}
                         </td>
-                        <td className={`${styles.right} ${custoUnit > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}`}>
-                          {custoUnit > 0 ? fmtBRL2(custoUnit) : "—"}
-                        </td>
-                        <td className={`${styles.right} ${custoTotal > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}`}>
-                          {custoTotal > 0 ? fmtBRL(custoTotal) : "—"}
-                        </td>
+                        {podeVerCusto && (
+                          <td className={`${styles.right} ${custoUnit > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}`}>
+                            {custoUnit > 0 ? fmtBRL2(custoUnit) : "—"}
+                          </td>
+                        )}
+                        {podeVerCusto && (
+                          <td className={`${styles.right} ${custoTotal > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}`}>
+                            {custoTotal > 0 ? fmtBRL(custoTotal) : "—"}
+                          </td>
+                        )}
                         <td className={styles.right}>
                           <button
                             type="button"

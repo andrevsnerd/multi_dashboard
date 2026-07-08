@@ -2,6 +2,8 @@
 
 import { useMemo, useState, useCallback, type ReactNode } from "react";
 import type { ProductDetail } from "@/lib/repositories/products";
+import { useAuth } from "@/components/auth/AuthContext";
+import { canSeeCusto } from "@/lib/auth/permissions";
 
 import styles from "./ProductsTable.module.css";
 
@@ -193,6 +195,8 @@ export default function ProductsTable({
   acimaDoTicket = false,
   selectedFilial = null,
 }: ProductsTableProps) {
+  const { user } = useAuth();
+  const podeVerCusto = canSeeCusto(user);
   const [sortColumn, setSortColumn] = useState<SortableColumn>("totalRevenue");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [hoveredStockKey, setHoveredStockKey] = useState<string | null>(null);
@@ -514,17 +518,19 @@ export default function ProductsTable({
                   </th>
                 </>
               ) : null}
-              <th
-                className={`${styles.sortable} ${styles.currencyHeader}`}
-                onClick={() => handleSort("cost")}
-              >
-                CUSTO
-                {sortColumn === "cost" && (
-                  <span className={styles.sortIndicator}>
-                    {sortDirection === "asc" ? "^" : "v"}
-                  </span>
-                )}
-              </th>
+              {podeVerCusto && (
+                <th
+                  className={`${styles.sortable} ${styles.currencyHeader}`}
+                  onClick={() => handleSort("cost")}
+                >
+                  CUSTO
+                  {sortColumn === "cost" && (
+                    <span className={styles.sortIndicator}>
+                      {sortDirection === "asc" ? "^" : "v"}
+                    </span>
+                  )}
+                </th>
+              )}
               {!acimaDoTicket && (
                 <th
                   className={`${styles.sortable} ${styles.markupHeader}`}
@@ -701,17 +707,19 @@ export default function ProductsTable({
                       </td>
                     </>
                   ) : null}
-                  <td className={styles.currencyCell}>
-                    {renderGroupedMetricTooltip(
-                      product,
-                      "Custo por produto",
-                      formatCurrency(product.cost),
-                      formatCurrency,
-                      (member) => member.cost,
-                      undefined,
-                      true
-                    )}
-                  </td>
+                  {podeVerCusto && (
+                    <td className={styles.currencyCell}>
+                      {renderGroupedMetricTooltip(
+                        product,
+                        "Custo por produto",
+                        formatCurrency(product.cost),
+                        formatCurrency,
+                        (member) => member.cost,
+                        undefined,
+                        true
+                      )}
+                    </td>
+                  )}
                   {!acimaDoTicket && (
                     <td className={styles.markupCell}>
                       {renderGroupedMetricTooltip(
@@ -942,11 +950,11 @@ export default function ProductsTable({
                               <span className={styles.cardPriceLabel}>Diferenca:</span> {formatCurrency((product.averagePrice - product.suggestedPrice) * product.totalQuantity)}
                             </span>
                           </>
-                        ) : (
+                        ) : podeVerCusto ? (
                           <span className={styles.cardPriceItem}>
                             <span className={styles.cardPriceLabel}>Custo:</span> {formatCurrency(product.cost)}
                           </span>
-                        )}
+                        ) : null}
                       </div>
                     </div>
                   </div>

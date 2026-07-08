@@ -154,7 +154,7 @@ export default function AdminPage() {
   const [formNome, setFormNome] = useState("");
   const [formUsername, setFormUsername] = useState("");
   const [formPassword, setFormPassword] = useState("");
-  const [formRole, setFormRole] = useState<RoleKey>("gestor");
+  const [formRole, setFormRole] = useState<RoleKey>("gerente");
   const [formEmpresa, setFormEmpresa] = useState<"" | CompanyKey>("");
 
   // Campos — páginas
@@ -257,7 +257,7 @@ export default function AdminPage() {
     setFormNome("");
     setFormUsername("");
     setFormPassword("");
-    setFormRole("gestor");
+    setFormRole("gerente");
     setFormEmpresa("");
     setFormPermissions([]);
     setFormFilialPrincipal("");

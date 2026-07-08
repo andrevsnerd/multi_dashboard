@@ -3,6 +3,7 @@ import {
   readTransferenciasRealizadas,
   writeTransferenciasRealizadas,
 } from '@/lib/utils/transferencias-realizadas-storage';
+import { readOnlyBlock } from '@/lib/auth/route-guards';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -32,6 +33,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   console.log('[tr-realizadas] API POST: chamado');
   try {
+    const readOnly = await readOnlyBlock(request.headers.get('x-auth-username'));
+    if (readOnly) return readOnly;
     const body = await request.json();
     const companyKey = typeof body.companyKey === 'string' ? body.companyKey.trim() : '';
     const markedKeys = Array.isArray(body.markedKeys) ? body.markedKeys : null;

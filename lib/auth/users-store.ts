@@ -4,6 +4,7 @@ import path from "path";
 import { hasPostgres } from "@/lib/db/neon";
 import * as neonStore from "./users-store-neon";
 import { normalizePermissionKeys } from "./permission-normalizer";
+import { normalizeRole } from "./permissions";
 import type { CompanyKey, PermissionKey, RoleKey, UserRecord } from "@/types/auth";
 
 const USERS_FILE = path.join(process.cwd(), "data", "users.json");
@@ -41,6 +42,7 @@ function readUsersFile(): UserRecord[] {
     const parsed = JSON.parse(fs.readFileSync(USERS_FILE, "utf-8")) as UserRecord[];
     return parsed.map((user) => ({
       ...user,
+      role: normalizeRole(user.role),
       permissions: normalizePermissionKeys(user.permissions),
     }));
   } catch {
@@ -197,7 +199,7 @@ export async function seedInitialUsersIfEmpty(): Promise<void> {
     id: "logistica-initial",
     username: "logistica",
     passwordHash: hashPassword("logistica123"),
-    role: "gestor",
+    role: "logistica",
     permissions: ["controle-transferencias"],
   };
   writeUsersFile([admin, logistica]);

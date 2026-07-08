@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { findUserByUsername } from "@/lib/auth/users-store";
+import { isReadOnlyRole } from "@/lib/auth/permissions";
 import { getPermissaoByUsername } from "@/lib/utils/transferencia-permissoes-store";
 import {
   getConfirmados,
@@ -67,6 +68,12 @@ export async function POST(request: Request) {
     const user = await findUserByUsername(username);
     if (!user) {
       return NextResponse.json({ error: "Usuário não encontrado" }, { status: 403 });
+    }
+    if (isReadOnlyRole(user.role)) {
+      return NextResponse.json(
+        { error: "Acesso somente leitura: esta função não pode confirmar entradas." },
+        { status: 403 }
+      );
     }
 
     const body = (await request.json()) as {

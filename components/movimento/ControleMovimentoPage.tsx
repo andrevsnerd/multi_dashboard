@@ -12,6 +12,8 @@ import MultiSelectFilter from "@/components/filters/MultiSelectFilter";
 import type { CompanyKey } from "@/lib/config/company";
 import { resolveCompany } from "@/lib/config/company";
 import { getCurrentMonthRange } from "@/lib/utils/date";
+import { useAuth } from "@/components/auth/AuthContext";
+import { canSeeCusto } from "@/lib/auth/permissions";
 
 import MovimentoDetalhesModal from "./MovimentoDetalhesModal";
 
@@ -144,6 +146,8 @@ export default function ControleMovimentoPage({
   companyKey,
   companyName,
 }: ControleMovimentoPageProps) {
+  const { user } = useAuth();
+  const podeVerCusto = canSeeCusto(user);
   const initialRange = useMemo(() => {
     const range = getCurrentMonthRange();
     return {
@@ -328,9 +332,11 @@ export default function ControleMovimentoPage({
           <div className={styles.kpiValue}>
             {loading ? "—" : formatNumber(kpis?.entradasPeriodo.quantidade ?? 0)}
           </div>
-          <div className={styles.kpiSecondary}>
-            Custo: {loading ? "—" : formatCurrency(kpis?.entradasPeriodo.custo ?? 0)}
-          </div>
+          {podeVerCusto && (
+            <div className={styles.kpiSecondary}>
+              Custo: {loading ? "—" : formatCurrency(kpis?.entradasPeriodo.custo ?? 0)}
+            </div>
+          )}
           {entradasChange !== null && !loading && (
             <div className={`${styles.kpiChange} ${entradasChange >= 0 ? styles.positive : styles.negative}`}>
               {entradasChange >= 0 ? "+" : ""}{entradasChange.toFixed(1)}% vs período anterior

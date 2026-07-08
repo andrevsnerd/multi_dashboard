@@ -10,6 +10,7 @@ import MultiSelectFilter from "@/components/filters/MultiSelectFilter";
 import type { CompanyKey } from "@/lib/config/company";
 import { resolveCompany } from "@/lib/config/company";
 import { useAuth } from "@/components/auth/AuthContext";
+import { canSeeCusto } from "@/lib/auth/permissions";
 import {
   buildCompraTransitoIndex,
   fetchComprasTransitoClient,
@@ -481,6 +482,7 @@ export default function ProjecaoEstoquePage({
   const searchParams = useSearchParams();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
+  const podeVerCusto = canSeeCusto(user);
 
   const [filial, setFilial] = useState<string | null>(searchParams.get("filial") || null);
   const [grupos, setGrupos] = useState<string[]>([]);
@@ -2462,7 +2464,7 @@ export default function ProjecaoEstoquePage({
                         );
                       })}
                     </tr>
-                    {(() => {
+                    {podeVerCusto && (() => {
                       const custoValor = compraInfo != null ? custosCompra[rowKey] : undefined;
                       return (
                         <tr className={`${styles.compraRow} ${!isLast ? styles.categoryBlockEnd : ""}`}>

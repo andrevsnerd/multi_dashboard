@@ -5,6 +5,7 @@ import { getActiveFilial, resolveCompany, type CompanyKey } from "@/lib/config/c
 import type { ProdutoTransferencia, FilialData } from "@/lib/repositories/controleTransferencias";
 import type { DateRangeValue } from "@/components/filters/DateRangeFilter";
 import { useAuth } from "@/components/auth/AuthContext";
+import { seesAllFiliais } from "@/lib/auth/permissions";
 import { exportTransfersToPDF } from "./exportToPDF";
 import TransferenciaConfirmModal from "./TransferenciaConfirmModal";
 import RealizadasPanel from "./RealizadasPanel";
@@ -1310,7 +1311,8 @@ export default function ControleTransferenciasTable({
   );
 
   const filteredTransfersByOriginAndDestination = useMemo(() => {
-    if (user?.role === "admin") return transfersByOriginAndDestination;
+    // Admin/diretor/supervisor/logística veem todas as transferências.
+    if (seesAllFiliais(user?.role)) return transfersByOriginAndDestination;
     if (!permissoes || filiaisApi.length === 0) return [];
     if (permissoes.podeVerOutrasFiliais) return transfersByOriginAndDestination;
     // Destinos visíveis: usa filiaisDestinoControle (visualização no controle de transferências).

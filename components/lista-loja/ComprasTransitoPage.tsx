@@ -16,6 +16,7 @@ import type {
 } from "@/lib/types/compra-transito";
 import { getCompraTransitoItemStatus } from "@/lib/utils/compra-transito-status";
 import { useAuth } from "@/components/auth/AuthContext";
+import { canSeeCusto } from "@/lib/auth/permissions";
 
 import ComprasTransitoPickerModal from "./ComprasTransitoPickerModal";
 import styles from "./ComprasTransitoPage.module.css";
@@ -315,6 +316,7 @@ export default function ComprasTransitoPage({
   companySlug: string;
 }) {
   const { user } = useAuth();
+  const podeVerCusto = canSeeCusto(user);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -769,8 +771,10 @@ export default function ComprasTransitoPage({
         Faltou: itemRecon && itemRecon.faltou > 0 ? itemRecon.faltou : "",
         Excedeu: itemRecon && itemRecon.excedeu > 0 ? itemRecon.excedeu : "",
         "Chegou em": itemRecon?.recebidoEm ? fmtDate(itemRecon.recebidoEm) : "",
-        "Custo Unitário (R$)": custo > 0 ? custo : "",
-        "Custo Total (R$)": custo > 0 ? Math.round(custo * qtd) : "",
+        ...(podeVerCusto ? {
+          "Custo Unitário (R$)": custo > 0 ? custo : "",
+          "Custo Total (R$)": custo > 0 ? Math.round(custo * qtd) : "",
+        } : {}),
         "Estoque Atual": estoque,
         "Estoque Final": estoque + qtd,
       };
@@ -794,8 +798,8 @@ export default function ComprasTransitoPage({
             <th className={styles.right}>Pedido</th>
             {readOnly && <th className={styles.right}>Recebido</th>}
             <th>Grade</th>
-            <th className={styles.right}>Custo</th>
-            <th className={styles.right}>Custo Total</th>
+            {podeVerCusto && <th className={styles.right}>Custo</th>}
+            {podeVerCusto && <th className={styles.right}>Custo Total</th>}
             <th className={styles.right}>Estoque</th>
             <th className={styles.right}>Estoque Final</th>
             {!readOnly && <th aria-hidden="true" />}
@@ -957,8 +961,8 @@ export default function ComprasTransitoPage({
                   </td>
                 )}
                 <td>{item.grade || "-"}</td>
-                <td className={styles.right}>{custo > 0 ? fmtBRL2(custo) : "-"}</td>
-                <td className={styles.right}>{custoTotal > 0 ? fmtBRL(custoTotal) : "-"}</td>
+                {podeVerCusto && <td className={styles.right}>{custo > 0 ? fmtBRL2(custo) : "-"}</td>}
+                {podeVerCusto && <td className={styles.right}>{custoTotal > 0 ? fmtBRL(custoTotal) : "-"}</td>}
                 <td className={styles.right}>{fmt(estoque)}</td>
                 <td className={styles.right}>{fmt(estoqueFinal)}</td>
                 {!readOnly && (
@@ -1227,10 +1231,12 @@ export default function ComprasTransitoPage({
               <span className={styles.summaryLabel}>Quantidade total</span>
               <strong className={styles.summaryValue}>{fmt(totals.totalQuantidade)}</strong>
             </div>
-            <div className={styles.summaryItem}>
-              <span className={styles.summaryLabel}>Custo total</span>
-              <strong className={styles.summaryValue}>{fmtBRL(totals.totalValor)}</strong>
-            </div>
+            {podeVerCusto && (
+              <div className={styles.summaryItem}>
+                <span className={styles.summaryLabel}>Custo total</span>
+                <strong className={styles.summaryValue}>{fmtBRL(totals.totalValor)}</strong>
+              </div>
+            )}
           </div>
 
           {draftItems.length === 0 ? (

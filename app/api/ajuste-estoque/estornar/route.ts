@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { getConnectionPool } from '@/lib/db/connection';
 import { shouldUseProxy, ProxyPool } from '@/lib/db/proxy';
 import { findUserByUsername } from '@/lib/auth/users-store';
+import { isReadOnlyRole } from '@/lib/auth/permissions';
 import { estornarContagem } from '@/lib/ajuste-estoque-executor';
 
 export const dynamic = 'force-dynamic';
@@ -24,6 +25,12 @@ export async function POST(request: Request) {
     const user = await findUserByUsername(username);
     if (!user) {
       return NextResponse.json({ error: 'Usuário não encontrado.' }, { status: 403 });
+    }
+    if (isReadOnlyRole(user.role)) {
+      return NextResponse.json(
+        { error: 'Acesso somente leitura: esta função não pode estornar ajustes.' },
+        { status: 403 }
+      );
     }
 
     const body = (await request.json()) as EstornarRequest;

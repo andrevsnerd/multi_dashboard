@@ -7,7 +7,7 @@ type PagePermissionDefinition = {
 
 export const PAGE_PERMISSION_DEFINITIONS = [
   { key: "dashboard", label: "Dashboard", routeSegments: ["dashboard"] },
-  { key: "produtos", label: "Produtos", routeSegments: ["produtos"] },
+  { key: "produtos", label: "Produtos por Venda", routeSegments: ["produtos"] },
   { key: "produto-agrupado", label: "Produto Agrupado", routeSegments: ["produto-agrupado"] },
   { key: "produto-descontinuado", label: "Produto Descontinuado", routeSegments: ["produto-descontinuado"] },
   { key: "produto-detalhado", label: "Produto Detalhado", routeSegments: ["produto-detalhado"] },
@@ -66,20 +66,13 @@ export const PAGE_ROUTE_PERMISSION_MAP = Object.fromEntries(
   })
 ) as Record<string, PermissionKey>;
 
-export const LEGACY_PERMISSION_FALLBACKS: Partial<Record<PermissionKey, PermissionKey[]>> = {
-  "relatorio-colecao": ["produtos"],
-  "painel-colecoes": ["produtos"],
-  "produto-agrupado": ["produtos"],
-  "produto-descontinuado": ["produtos"],
-  "produtos-recentes": ["produtos"],
-  "produtos-novos": ["produtos"],
-  "produto-performance": ["produto-detalhado", "produtos"],
-  "relatorio-claude": ["produtos"],
-  "gerador-apresentacoes": ["gerador-relatorios", "produtos"],
-  "estoque-consulta": ["controle-estoque"],
-  "produtos-parados": ["controle-giro"],
-  "curva-por-produto": ["curva-abc"],
-  "nova-filial": ["curva-abc"],
-  "compras-transito": ["lista-loja"],
-  "compras-salvas": ["lista-loja"],
-};
+/**
+ * Fallbacks legados: uma chave herdava o acesso de outra página "guarda-chuva"
+ * (ex.: quem tinha "Produtos" ganhava todas as sub-páginas; "Produto Detalhado"
+ * arrastava "Produto Performance"). Isso fazia as atribuições NÃO serem respeitadas
+ * página a página. Removido de propósito: agora cada página só é liberada se sua
+ * própria permissão estiver marcada. Mantido como objeto vazio para não quebrar imports.
+ * Todas as chaves-fonte eram páginas ainda atribuíveis, então ninguém fica sem acesso
+ * a uma página que já tinha — apenas deixa de ganhar páginas extras não marcadas.
+ */
+export const LEGACY_PERMISSION_FALLBACKS: Partial<Record<PermissionKey, PermissionKey[]>> = {};

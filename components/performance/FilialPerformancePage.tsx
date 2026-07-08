@@ -2,6 +2,8 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/components/auth/AuthContext";
+import { canSeeCusto } from "@/lib/auth/permissions";
 import { startOfMonth, endOfMonth } from "date-fns";
 import type { CompanyKey } from "@/lib/config/company";
 import {
@@ -191,6 +193,8 @@ export default function FilialPerformancePage({
   initialStart,
   initialEnd,
 }: Props) {
+  const { user } = useAuth();
+  const podeVerCusto = canSeeCusto(user);
   const router = useRouter();
 
   const parseYmdToLocalDate = (value?: string): Date | null => {
@@ -425,10 +429,12 @@ export default function FilialPerformancePage({
                 <span className={styles.kpiLabel}>QTDE VENDAS</span>
                 <span className={styles.kpiValue}>{fmt(displayQtde)}</span>
               </div>
-              <div className={styles.kpiCard}>
-                <span className={styles.kpiLabel}>CMV</span>
-                <span className={styles.kpiValue}>{displayCMV > 0 ? fmtCurrency(displayCMV) : "—"}</span>
-              </div>
+              {podeVerCusto && (
+                <div className={styles.kpiCard}>
+                  <span className={styles.kpiLabel}>CMV</span>
+                  <span className={styles.kpiValue}>{displayCMV > 0 ? fmtCurrency(displayCMV) : "—"}</span>
+                </div>
+              )}
             </div>
           )}
 

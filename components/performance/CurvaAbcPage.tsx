@@ -2,6 +2,8 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useAuth } from "@/components/auth/AuthContext";
+import { canSeeCusto } from "@/lib/auth/permissions";
 import { startOfMonth, endOfMonth } from "date-fns";
 import {
   aggregateEstoquePorFilialByDisplayLabel,
@@ -1510,6 +1512,8 @@ interface Props {
 }
 
 export default function CurvaAbcPage({ companyKey, month, year, compare: initialCompare }: Props) {
+  const { user } = useAuth();
+  const podeVerCusto = canSeeCusto(user);
   const [range, setRange] = useState<DateRangeValue>(() => getInitialRange(month, year));
   const [comparisonMode, setComparisonMode] = useState<"month" | "year">(initialCompare);
   const [selectedFilial, setSelectedFilial] = useState<string | null>(null);
@@ -2592,12 +2596,12 @@ const handleBadgeClick = (cat: string) => {
       if (porCor) cols.push({ key: "COR_DESCRICAO", label: "Cor", role: "value", type: "text" });
       cols.push({ key: "DESCRICAO", label: "Descrição", role: "value", type: "text" });
       cols.push({ key: "CODIGO_BARRA", label: "Código de barra", role: "value", type: "text" });
-      cols.push({ key: "CUSTO_UNIT", label: "Custo unit.", role: "custoUnit", type: "currency" });
+      if (podeVerCusto) cols.push({ key: "CUSTO_UNIT", label: "Custo unit.", role: "custoUnit", type: "currency" });
       cols.push({ key: "VENDAS_PERIODO", label: "Venda período", role: "value", type: "currency" });
       cols.push({ key: "QTDE_PERIODO", label: "Qtd período", role: "value", type: "int" });
       cols.push({ key: "ESTOQUE_REDE", label: "Estoque rede", role: "value", type: "int" });
       cols.push({ key: "TOTAL REDE", label: "Compra total", role: "compraTotal", type: "int" });
-      cols.push({ key: "CUSTO_TOTAL", label: "Custo total", role: "custoTotal", type: "currency" });
+      if (podeVerCusto) cols.push({ key: "CUSTO_TOTAL", label: "Custo total", role: "custoTotal", type: "currency" });
       for (const label of colunasFiliais) {
         cols.push({ key: label, label, role: "filial", type: "int" });
       }
@@ -2962,15 +2966,17 @@ const handleBadgeClick = (cat: string) => {
               <span className={styles.kpiSubtitle}>{fmt(produtosComCurvaExibidos.length)} itens</span>
             )}
           </div>
-          <div className={styles.kpiCard}>
-            <span className={styles.kpiLabel}>CMV</span>
-            <span className={styles.kpiValue}>{displayCMV > 0 ? fmtCurrency(displayCMV) : "—"}</span>
-            {displayCMV > 0 && displayVendas > 0 && (
-              <span className={styles.kpiSubtitle}>
-                margem {Math.round(((displayVendas - displayCMV) / displayVendas) * 100)}%
-              </span>
-            )}
-          </div>
+          {podeVerCusto && (
+            <div className={styles.kpiCard}>
+              <span className={styles.kpiLabel}>CMV</span>
+              <span className={styles.kpiValue}>{displayCMV > 0 ? fmtCurrency(displayCMV) : "—"}</span>
+              {displayCMV > 0 && displayVendas > 0 && (
+                <span className={styles.kpiSubtitle}>
+                  margem {Math.round(((displayVendas - displayCMV) / displayVendas) * 100)}%
+                </span>
+              )}
+            </div>
+          )}
           <div className={styles.stockBucketInline}>
               {(["zero", "low", "high"] as StockBucket[]).map(bucket => {
                 const count = stockBucketTotals[bucket];

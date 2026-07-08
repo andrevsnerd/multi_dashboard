@@ -22,6 +22,7 @@ import { getPermissaoByUsername } from "@/lib/utils/transferencia-permissoes-sto
 import { getAllDestinosByCompany } from "@/lib/utils/destino-romaneio-store";
 import { fetchLogSaidas } from "@/lib/repositories/logSaidas";
 import { findUserByUsername } from "@/lib/auth/users-store";
+import { seesAllFiliais } from "@/lib/auth/permissions";
 import { getActiveFilial } from "@/lib/config/company";
 import { resolveCompanyDynamic } from "@/lib/config/company-server";
 import { getContadorConfirmadosByCompany } from "@/lib/utils/romaneio-confirmacao-store";
@@ -107,9 +108,10 @@ export async function getSaidasPendentesParaUsuario(
   const companyConfig = await resolveCompanyDynamic(companyKey);
   if (!companyConfig) return [];
 
-  // Notificações só fazem sentido para usuário preso a UMA filial.
+  // Notificações só fazem sentido para usuário preso a UMA filial (gerente).
+  // Quem vê todas as filiais (admin/diretor/supervisor/logística) não recebe.
   const userRecord = await findUserByUsername(username);
-  if (userRecord?.role === "logistica") return [];
+  if (seesAllFiliais(userRecord?.role)) return [];
 
   const permissao = await getPermissaoByUsername(username);
   const filialAtribuida = getActiveFilial(companyConfig, permissao?.filialAtribuida ?? "")

@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 import type { ProductDetail } from "@/lib/repositories/products";
+import { useAuth } from "@/components/auth/AuthContext";
+import { canSeeCusto } from "@/lib/auth/permissions";
 
 import styles from "./ProductsTable.module.css";
 
@@ -20,6 +22,8 @@ export default function ProductsRecentTable({
   companyKey,
   selectedFilial = null,
 }: ProductsRecentTableProps) {
+  const { user } = useAuth();
+  const podeVerCusto = canSeeCusto(user);
   const [sortColumn, setSortColumn] = useState<keyof ProductDetail | "registrationDate">("registrationDate");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
@@ -167,15 +171,17 @@ export default function ProductsRecentTable({
                   <span className={styles.sortIndicator}>{sortDirection === "asc" ? "^" : "v"}</span>
                 )}
               </th>
-              <th
-                className={`${styles.sortable} ${styles.currencyHeader}`}
-                onClick={() => handleSort("cost")}
-              >
-                CUSTO
-                {sortColumn === "cost" && (
-                  <span className={styles.sortIndicator}>{sortDirection === "asc" ? "^" : "v"}</span>
-                )}
-              </th>
+              {podeVerCusto && (
+                <th
+                  className={`${styles.sortable} ${styles.currencyHeader}`}
+                  onClick={() => handleSort("cost")}
+                >
+                  CUSTO
+                  {sortColumn === "cost" && (
+                    <span className={styles.sortIndicator}>{sortDirection === "asc" ? "^" : "v"}</span>
+                  )}
+                </th>
+              )}
               <th
                 className={`${styles.sortable} ${styles.markupHeader}`}
                 onClick={() => handleSort("markup")}
@@ -252,7 +258,7 @@ export default function ProductsRecentTable({
                   <td className={styles.currencyCell}>{formatCurrency(product.totalRevenue)}</td>
                   <td className={styles.numberCell}>{formatNumber(product.totalQuantity)}</td>
                   <td className={styles.currencyCell}>{formatCurrency(product.averagePrice)}</td>
-                  <td className={styles.currencyCell}>{formatCurrency(product.cost)}</td>
+                  {podeVerCusto && <td className={styles.currencyCell}>{formatCurrency(product.cost)}</td>}
                   <td className={styles.markupCell}>
                     <span className={styles.markupValue}>{formatMarkup(product.markup)}</span>
                   </td>
@@ -316,9 +322,11 @@ export default function ProductsRecentTable({
                         <span className={styles.cardPriceItem}>
                           <span className={styles.cardPriceLabel}>Preco:</span> {formatCurrency(product.averagePrice)}
                         </span>
-                        <span className={styles.cardPriceItem}>
-                          <span className={styles.cardPriceLabel}>Custo:</span> {formatCurrency(product.cost)}
-                        </span>
+                        {podeVerCusto && (
+                          <span className={styles.cardPriceItem}>
+                            <span className={styles.cardPriceLabel}>Custo:</span> {formatCurrency(product.cost)}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>

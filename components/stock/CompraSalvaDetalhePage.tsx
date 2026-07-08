@@ -45,6 +45,8 @@ import { applyTransitToSuggestion } from "@/lib/utils/compra-transito-analytics"
 import { calcCompraIdealFromResumo, type CompraIdealResult } from "@/lib/utils/compra-ideal";
 import CompraIdealCell from "@/components/shared/CompraIdealCell";
 import { useCatracaDataCompra, type CatracaFreeze } from "@/lib/client/use-catraca-data-compra";
+import { useAuth } from "@/components/auth/AuthContext";
+import { canSeeCusto } from "@/lib/auth/permissions";
 
 import styles from "./ListaCompraSugeridaPage.module.css";
 
@@ -667,6 +669,8 @@ export default function CompraSalvaDetalhePage({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { user } = useAuth();
+  const podeVerCusto = canSeeCusto(user);
   const fromListaLoja = searchParams.get("from") === "lista-loja";
   const fromOperacoes =
     searchParams.get("from") === "operacoes" ||
@@ -1363,8 +1367,7 @@ export default function CompraSalvaDetalhePage({
         QTD_MANUAL: effectiveQtdManual,
         DESTINO: destino,
         ESTOQUE_ATUAL: estoque ?? 0,
-        CUSTO_UNIT: custoUnit ?? 0,
-        CUSTO_TOTAL: custoTotal ?? 0,
+        ...(podeVerCusto ? { CUSTO_UNIT: custoUnit ?? 0, CUSTO_TOTAL: custoTotal ?? 0 } : {}),
       };
     });
 
@@ -1373,7 +1376,7 @@ export default function CompraSalvaDetalhePage({
       { METRICA: "Empresa", VALOR: companyKey },
       { METRICA: "Itens", VALOR: totals.totalItens },
       { METRICA: "Total Qtd Manual", VALOR: totals.totalQtdManual },
-      { METRICA: "Custo Total", VALOR: totals.totalCusto },
+      ...(podeVerCusto ? [{ METRICA: "Custo Total", VALOR: totals.totalCusto }] : []),
     ];
 
     const wb = XLSX.utils.book_new();
@@ -1675,11 +1678,15 @@ export default function CompraSalvaDetalhePage({
                 <span className={styles.summaryLabel}>Total Qtd</span>
                 <span className={styles.summaryValue}>{fmt(totals.totalQtdManual)}</span>
               </div>
-              <div className={styles.summaryDivider} />
-              <div className={styles.summaryItem}>
-                <span className={styles.summaryLabel}>Custo total (referência)</span>
-                <span className={styles.summaryValue}>{fmtBRL(totals.totalCusto)}</span>
-              </div>
+              {podeVerCusto && (
+                <>
+                  <div className={styles.summaryDivider} />
+                  <div className={styles.summaryItem}>
+                    <span className={styles.summaryLabel}>Custo total (referência)</span>
+                    <span className={styles.summaryValue}>{fmtBRL(totals.totalCusto)}</span>
+                  </div>
+                </>
+              )}
             </div>
             <div className={styles.exportActions} data-pdf-hide="" ref={exportMenuRef}>
               <button
@@ -1803,8 +1810,8 @@ export default function CompraSalvaDetalhePage({
                     <th className={styles.right}>Qtd</th>
                     <th>Destino</th>
                     <th className={styles.right}>Estoque</th>
-                    <th className={styles.right}>Custo Unit.</th>
-                    <th className={styles.right}>Custo Total</th>
+                    {podeVerCusto && <th className={styles.right}>Custo Unit.</th>}
+                    {podeVerCusto && <th className={styles.right}>Custo Total</th>}
                     <th style={{ width: 60 }} data-pdf-hide="" />
                   </tr>
                 </thead>
@@ -2032,12 +2039,16 @@ export default function CompraSalvaDetalhePage({
                         >
                           {estoque != null ? fmt(estoque) : "—"}
                         </td>
-                        <td className={`${styles.right} ${custoUnit > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}`}>
-                          {custoUnit > 0 ? fmtBRL2(custoUnit) : "—"}
-                        </td>
-                        <td className={`${styles.right} ${custoTotal > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}`}>
-                          {custoTotal > 0 ? fmtBRL(custoTotal) : "—"}
-                        </td>
+                        {podeVerCusto && (
+                          <td className={`${styles.right} ${custoUnit > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}`}>
+                            {custoUnit > 0 ? fmtBRL2(custoUnit) : "—"}
+                          </td>
+                        )}
+                        {podeVerCusto && (
+                          <td className={`${styles.right} ${custoTotal > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}`}>
+                            {custoTotal > 0 ? fmtBRL(custoTotal) : "—"}
+                          </td>
+                        )}
                         <td className={styles.right} data-pdf-hide="">
                           <button
                             type="button"

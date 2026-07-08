@@ -6,6 +6,8 @@ import Link from "next/link";
 import type { CompanyKey } from "@/lib/config/company";
 import { exportDetalhadoToXlsx } from "@/lib/utils/exportDetalhadoXlsx";
 import { getGiroSessionCache } from "@/lib/utils/giro-session-cache";
+import { useAuth } from "@/components/auth/AuthContext";
+import { canSeeCusto } from "@/lib/auth/permissions";
 
 import styles from "./EstoqueDetalhado01Page.module.css";
 
@@ -179,6 +181,8 @@ export default function EstoqueDetalhado01Page({
   companyName,
 }: EstoqueDetalhado01PageProps) {
   const router = useRouter();
+  const { user } = useAuth();
+  const podeVerCusto = canSeeCusto(user);
   const searchParams = useSearchParams();
   const [detalhes, setDetalhes] = useState<ProdutoDetalhesCompleto | null>(null);
   const [loading, setLoading] = useState(true);

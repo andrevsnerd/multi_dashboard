@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getConnectionPool } from '@/lib/db/connection';
 import { shouldUseProxy, ProxyPool } from '@/lib/db/proxy';
 import { findUserByUsername } from '@/lib/auth/users-store';
+import { readOnlyBlock } from '@/lib/auth/route-guards';
 import { getPermissaoByUsername } from '@/lib/utils/transferencia-permissoes-store';
 import { setDestinoRomaneio } from '@/lib/utils/destino-romaneio-store';
 import {
@@ -123,6 +124,8 @@ async function getActiveFilialForRequest(companyKey: string | undefined, filial:
 export async function POST(request: Request) {
   try {
     const username = request.headers.get('x-auth-username')?.trim();
+    const readOnly = await readOnlyBlock(username);
+    if (readOnly) return readOnly;
     const body = (await request.json()) as SaidaEntradaRequest;
     const {
       tipoOperacao,

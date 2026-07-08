@@ -4,7 +4,13 @@ import {
   type PermissionKey as PagePermissionKey,
 } from "@/lib/config/page-permissions";
 
-export type RoleKey = "admin" | "gestor" | "logistica" | "cliente_corporativo";
+export type RoleKey =
+  | "admin"
+  | "diretor"
+  | "supervisor"
+  | "logistica"
+  | "gerente"
+  | "cliente_corporativo";
 
 /** Chaves de permissao = paginas/perfis de acesso configuraveis no painel admin. */
 export type PermissionKey = PagePermissionKey;
@@ -48,7 +54,9 @@ export const ALL_PERMISSION_KEYS: { key: PermissionKey; label: string }[] = PAGE
 
 export const ROLE_LABELS: Record<RoleKey, string> = {
   admin: "Administrador",
-  gestor: "Gestor",
+  diretor: "Diretor",
+  supervisor: "Supervisor",
   logistica: "Logistica",
+  gerente: "Gerente",
   cliente_corporativo: "Cliente Corporativo",
 };

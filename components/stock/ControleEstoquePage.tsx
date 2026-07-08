@@ -28,6 +28,8 @@ import { resolveCompany } from "@/lib/config/company";
 import { getCurrentMonthRange } from "@/lib/utils/date";
 import { exportEstoqueConsultaXlsx } from "@/lib/utils/exportEstoqueConsultaXlsx";
 import { setGiroSessionCache } from "@/lib/utils/giro-session-cache";
+import { useAuth } from "@/components/auth/AuthContext";
+import { canSeeCusto } from "@/lib/auth/permissions";
 
 import styles from "./ControleEstoquePage.module.css";
 
@@ -357,6 +359,8 @@ export default function ControleEstoquePage({
   companyName,
 }: ControleEstoquePageProps) {
   const router = useRouter();
+  const { user } = useAuth();
+  const podeVerCusto = canSeeCusto(user);
   const initialRange = useMemo(() => {
     const range = getCurrentMonthRange();
     return {
@@ -1417,6 +1421,7 @@ export default function ControleEstoquePage({
           )}
         </div>
 
+        {podeVerCusto && (
         <div className={styles.kpiCard}>
           <div className={styles.kpiLabel}>VALOR EM ESTOQUE</div>
           <div className={styles.kpiValue}>{formatCurrency(kpisFiltrados?.valorEmEstoque ?? 0)}</div>
@@ -1442,6 +1447,7 @@ export default function ControleEstoquePage({
             </>
           )}
         </div>
+        )}
 
         <div className={styles.kpiCard}>
           <div className={styles.kpiLabel}>VENDAS TOTAIS</div>
@@ -2026,12 +2032,14 @@ export default function ControleEstoquePage({
                     {formatNumber(cat.estoqueSemanaPassada)} início do período
                   </div>
                 )}
+                {podeVerCusto && (
                 <div className={styles.categoriaInfo}>
                   <div className={styles.infoRow}>
                     <span className={styles.infoLabel}>Custo total:</span>
                     <span className={styles.infoValue}>{formatCurrency(cat.custoTotal)}</span>
                   </div>
                 </div>
+                )}
                 <div className={styles.categoriaMetrics}>
                   <div className={styles.metricItem}>
                     <span className={styles.metricLabel}>Venda Total (período):</span>
