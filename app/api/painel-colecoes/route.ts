@@ -30,9 +30,10 @@ export const dynamic = "force-dynamic";
 interface ColecaoConfig {
   key: string;
   /**
-   * Rótulo fixo — só para agregados de vários códigos (Galisteu, AG), que não têm
-   * correspondência 1:1 na tabela COLECOES. Coleções de 1 código só NÃO declaram
-   * isto: o nome vem do banco (DESC_COLECAO), ver resolução em `GET`.
+   * Rótulo fixo — usado para agregados de vários códigos (Galisteu, AG), que não
+   * têm correspondência 1:1 na tabela COLECOES, ou para sobrescrever visualmente
+   * o nome de uma coleção de 1 código (ex.: Pantanal). Quando ausente numa
+   * coleção de 1 código, o nome vem do banco (DESC_COLECAO), ver resolução em `GET`.
    */
   customLabel?: string;
   /** Códigos de COLECAO que compõem a coleção (agregado = múltiplos). */
@@ -56,7 +57,7 @@ const COLECOES: ColecaoConfig[] = [
   { key: "brasilidade", codes: ["P8"] },
   { key: "origem", codes: ["O8"] },
   { key: "seaside", codes: ["Y4"] },
-  { key: "pantanal", codes: ["V9"] },
+  { key: "pantanal", customLabel: "PANTANAL (CAIMAN)", codes: ["V9"] },
 ];
 
 function round2(value: number): number {
