@@ -25,6 +25,13 @@ import { withRequest } from "@/lib/db/connection";
 import type { RequestLike } from "@/lib/db/proxy";
 import { fetchProductsWithDetails } from "@/lib/repositories/products";
 import { fetchVendedoresList } from "@/lib/repositories/vendedores-v2";
+import { shiftRangeByMonths, toUtcStartOfDay, type NormalizedRange } from "@/lib/utils/date";
+
+/** Intervalo [start, end) — end exclusivo, padrão do app. */
+export interface Range {
+  start: Date;
+  end: Date;
+}
 
 const MESES_ABREV = [
   "jan", "fev", "mar", "abr", "mai", "jun",
@@ -40,6 +47,8 @@ export interface MesMetric {
   tickets: number;
   quantidade: number;
   ticketMedio: number;
+  /** True no mês corrente (barra parcial: dados só até hoje). */
+  parcial?: boolean;
 }
 
 export interface VendedorLinha {
@@ -66,6 +75,79 @@ export interface RupturaItem {
   ondeTemEstoque: Array<{ filial: string; estoque: number }>;
 }
 
+/** Situação de um item na comparação entre o mês analisado e o mês de comparação. */
+export type SituacaoComparacao = "ruptura" | "tinha_estoque" | "cresceu" | "estavel";
+
+export interface ComparacaoProdutoItem {
+  produto: string;
+  cor: string;
+  corDescricao: string;
+  descricao: string;
+  qtdAnalisado: number;
+  fatAnalisado: number;
+  qtdComparacao: number;
+  fatComparacao: number;
+  /** fatComparacao − fatAnalisado (positivo = comparação vendeu mais). */
+  diffFat: number;
+  estoqueLoja: number; // estoque ATUAL na loja (foto de hoje)
+  /** Saldo reconstruído no fim do mês analisado (null = mês corrente/sem reconstrução). */
+  estoqueFimMesAnalisado: number | null;
+  /** Se ruptura, foi total (mês todo sem produto) ou no meio do mês (zerou). */
+  rupturaTipo: "total" | "meio" | null;
+  temNaRede: boolean; // tem estoque positivo em outra loja da rede
+  situacao: SituacaoComparacao;
+}
+
+export interface ComparacaoProdutosResult {
+  /** Faltou produto: vendia na comparação e ficou sem estoque no mês analisado. */
+  ruptura: ComparacaoProdutoItem[];
+  /** Tinha estoque mas vendeu menos (performance/demanda). */
+  tinhaEstoque: ComparacaoProdutoItem[];
+  /** Compensaram: venderam MAIS que na comparação. */
+  cresceu: ComparacaoProdutoItem[];
+  rupturaCount: number;
+  tinhaEstoqueCount: number;
+  cresceuCount: number;
+  /** R$ perdido por ruptura (soma dos diffs desses produtos). */
+  rupturaFat: number;
+  /** R$ a menos com estoque em casa (soma dos diffs). */
+  tinhaEstoqueFat: number;
+  /** R$ ganho pelos produtos que cresceram (soma dos ganhos). */
+  cresceuFat: number;
+  /** rupturaFat + tinhaEstoqueFat − cresceuFat — fecha com o gap dos KPIs (mesma fórmula). */
+  gapProdutos: number;
+  /** Algum bucket excedeu o limite exibido. */
+  truncado: boolean;
+}
+
+/** Item da aba Produtos: vendas antes × depois + estoque hoje + dias de cobertura. */
+export interface ProdutoVendaEstoqueItem {
+  produto: string;
+  cor: string;
+  corDescricao: string;
+  descricao: string;
+  /** Vendas no mês de referência (antes) — quantidade e faturamento. */
+  qtdAntes: number;
+  fatAntes: number;
+  /** Vendas no mês analisado (depois). */
+  qtdDepois: number;
+  fatDepois: number;
+  /** Estoque ATUAL na loja/rede (foto de hoje). */
+  estoque: number;
+  /** Dias até acabar no ritmo recente; 0 se já zerado; null se sem giro (não vende). */
+  acabaEmDias: number | null;
+}
+
+export interface ProdutosVendaEstoqueResult {
+  /** Vendeu (antes e/ou depois) e está ZERADO hoje. */
+  semEstoque: ProdutoVendaEstoqueItem[];
+  /** Vendeu (antes e/ou depois) e TEM estoque hoje. */
+  comEstoque: ProdutoVendaEstoqueItem[];
+  diasAntes: number;
+  diasDepois: number;
+  truncado: boolean;
+}
+
 // ── Helpers de escopo ────────────────────────────────────────────────────────
 
 /** Expande a filial selecionada (pode ser grupo lógico) para os nomes ERP (FILIAIS.FILIAL). */
@@ -76,6 +158,27 @@ async function resolveFilialNames(
   const cfg = await resolveCompanyLive(company);
   const live = (await liveNameForIncoming(filial)) ?? (filial ?? "").trim();
   if (!cfg || !live || live === VAREJO_VALUE) return [];
+  const members = getFilialGroupMembers(cfg, live)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return members.length ? Array.from(new Set(members)) : [live];
+}
+
+/**
+ * Escopo de filiais para as queries agregadas. Loja específica (ou grupo) → só ela;
+ * SEM filial (visão REDE) → TODAS as lojas físicas da empresa (registry, exclui e-commerce).
+ * Nunca devolve vazio p/ empresa válida — evita varrer o banco inteiro sem filtro.
+ */
+async function filiaisEscopo(
+  company: string | undefined,
+  filial: string | null | undefined
+): Promise<string[]> {
+  const cfg = await resolveCompanyLive(company);
+  if (!cfg) return [];
+  const ecommerce = new Set(cfg.ecommerceFilials ?? []);
+  const todasFisicas = (cfg.filialFilters?.sales ?? []).filter((f) => !ecommerce.has(f));
+  const live = (await liveNameForIncoming(filial)) ?? (filial ?? "").trim();
+  if (!live || live === VAREJO_VALUE) return todasFisicas; // visão rede
   const members = getFilialGroupMembers(cfg, live)
     .map((s) => s.trim())
     .filter(Boolean);
@@ -104,6 +207,29 @@ function buildLinhaTokens(
   return {
     join: "LEFT JOIN PRODUTOS p_lx WITH (NOLOCK) ON p_lx.PRODUTO = vp.PRODUTO",
     where: `AND UPPER(LTRIM(RTRIM(ISNULL(p_lx.LINHA, '')))) IN (${list
+      .map((_, i) => `@${param}${i}`)
+      .join(", ")})`,
+  };
+}
+
+/**
+ * Filtro de LINHA (NERD) reutilizável em qualquer perna da query — recebe o alias da
+ * tabela PRODUTOS e a coluna de PRODUTO da tabela de origem, para poder ser aplicado
+ * tanto às vendas (vp.PRODUTO) quanto às trocas (vt.PRODUTO) na mesma consulta.
+ */
+function buildLinhaFilter(
+  request: sql.Request | RequestLike,
+  linhas: string[] | null | undefined,
+  produtosAlias: string,
+  produtoCol: string,
+  param: string
+): { join: string; where: string } {
+  const list = (linhas ?? []).map((l) => l.trim().toUpperCase()).filter(Boolean);
+  if (!list.length) return { join: "", where: "" };
+  list.forEach((l, i) => request.input(`${param}${i}`, sql.VarChar, l));
+  return {
+    join: `LEFT JOIN PRODUTOS ${produtosAlias} WITH (NOLOCK) ON ${produtosAlias}.PRODUTO = ${produtoCol}`,
+    where: `AND UPPER(LTRIM(RTRIM(ISNULL(${produtosAlias}.LINHA, '')))) IN (${list
       .map((_, i) => `@${param}${i}`)
       .join(", ")})`,
   };
@@ -146,6 +272,56 @@ export function monthRange(ym: string): { start: Date; end: Date } {
   return { start, end };
 }
 
+/** Índice absoluto de mês (ano*12 + mês0) — para calcular deslocamento entre dois YYYY-MM. */
+function monthIndex(ym: string): number {
+  const [ano, mes] = ym.split("-").map((v) => Number(v));
+  return ano * 12 + ((mes || 1) - 1);
+}
+
+export interface JanelaAnalise {
+  range: Range;
+  /** True quando o mês analisado é o corrente (janela parcial [1..hoje]). */
+  isMesCorrente: boolean;
+  /** Dia de corte quando parcial (ex.: 8); null em mês fechado. */
+  diaCorte: number | null;
+  /** Dias efetivos na janela (mês inteiro, ou até hoje se corrente). */
+  dias: number;
+}
+
+/**
+ * Janela do mês analisado, "maçã com maçã": mês inteiro quando fechado; parcial
+ * [início do mês, início de amanhã) quando é o mês corrente (só até hoje). Assim a
+ * comparação nunca coloca dias parciais do mês atual contra um mês inteiro anterior.
+ */
+export function analyzedWindow(mes: string): JanelaAnalise {
+  const { start, end } = monthRange(mes);
+  const now = new Date();
+  const isMesCorrente = now.getTime() >= start.getTime() && now.getTime() < end.getTime();
+  if (!isMesCorrente) {
+    const dias = Math.round((end.getTime() - start.getTime()) / 86_400_000);
+    return { range: { start, end }, isMesCorrente: false, diaCorte: null, dias };
+  }
+  const hoje = toUtcStartOfDay(now); // meia-noite UTC do dia corrente
+  const endExcl = new Date(hoje.getTime() + 86_400_000); // inclui o dia de hoje
+  const diaCorte = hoje.getUTCDate();
+  return { range: { start, end: endExcl }, isMesCorrente: true, diaCorte, dias: diaCorte };
+}
+
+/**
+ * Janela do mês de comparação alinhada por dia à janela analisada, reusando a regra
+ * validada do dashboard (`shiftRangeByMonths`): mesma faixa de dias em qualquer mês
+ * (mês fechado → mês inteiro; janela parcial → mesmos N dias do outro mês).
+ */
+export function comparacaoWindow(
+  analisadoRange: Range,
+  mesAnalisado: string,
+  mesComparacao: string
+): Range {
+  const delta = monthIndex(mesComparacao) - monthIndex(mesAnalisado);
+  const shifted = shiftRangeByMonths(analisadoRange as NormalizedRange, delta);
+  return { start: shifted.start, end: shifted.end };
+}
+
 // ── 1. Faturamento mensal (12 meses) ─────────────────────────────────────────
 
 export async function fetchFaturamentoMensalLoja(params: {
@@ -158,7 +334,7 @@ export async function fetchFaturamentoMensalLoja(params: {
   const start = monthRange(meses[0].ym).start;
   const end = monthRange(meses[meses.length - 1].ym).end;
   const ecom = isEcommerceFilial(company, filial);
-  const names = await resolveFilialNames(company, filial);
+  const names = await filiaisEscopo(company, filial);
 
   const rows = await withRequest(async (request) => {
     request.input("lxStart", sql.DateTime, start);
@@ -187,31 +363,56 @@ export async function fetchFaturamentoMensalLoja(params: {
       return r.recordset;
     }
 
-    const filialFilter = buildFilialIn(request, names, "f", "lxPf");
-    const linha = buildLinhaTokens(request, linhas, "lxLinha");
+    const filialFilterV = buildFilialIn(request, names, "f", "lxPf");
+    const filialFilterT = buildFilialIn(request, names, "ft", "lxTf");
+    const linhaV = buildLinhaFilter(request, linhas, "p_lv", "vp.PRODUTO", "lxLinhaV");
+    const linhaT = buildLinhaFilter(request, linhas, "p_lt", "vt.PRODUTO", "lxLinhaT");
+    // Faturamento LÍQUIDO CANÔNICO por mês (mesma regra de lib/services/salesTotals.ts):
+    //   vendas (preço×qtde − desconto, cancelados = 0) − trocas (LOJA_VENDA_TROCA).
+    // No agregado mensal, subtrair a soma das trocas equivale ao pareamento linha-a-linha
+    // do salesTotals (cada troca entra uma vez), então os totais batem com o dashboard.
     const query = `
-      WITH Base AS (
+      WITH Vendas AS (
         SELECT
           YEAR(vp.DATA_VENDA) AS y,
           MONTH(vp.DATA_VENDA) AS m,
-          CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0
-               ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - (vp.QTDE * vp.PRECO_LIQUIDO * ISNULL(vp.FATOR_DESCONTO_VENDA, 0)) END AS valor,
-          CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE vp.QTDE END AS qtde_eff,
-          CASE WHEN vp.QTDE_CANCELADA = 0 AND vp.QTDE > 0
-               THEN CONCAT(CAST(vp.CODIGO_FILIAL AS VARCHAR(30)), '|', CAST(vp.TICKET AS VARCHAR(30))) ELSE NULL END AS tk
+          SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0
+               ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - (vp.QTDE * vp.PRECO_LIQUIDO * ISNULL(vp.FATOR_DESCONTO_VENDA, 0)) END) AS valor,
+          SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE vp.QTDE END) AS qtde_eff,
+          COUNT(DISTINCT CASE WHEN vp.QTDE_CANCELADA = 0 AND vp.QTDE > 0
+               THEN CONCAT(CAST(vp.CODIGO_FILIAL AS VARCHAR(30)), '|', CAST(vp.TICKET AS VARCHAR(30))) ELSE NULL END) AS tickets
         FROM LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
         LEFT JOIN FILIAIS f WITH (NOLOCK) ON f.COD_FILIAL = vp.CODIGO_FILIAL
-        ${linha.join}
+        ${linhaV.join}
         WHERE vp.DATA_VENDA >= @lxStart AND vp.DATA_VENDA < @lxEnd AND vp.QTDE > 0
-          ${filialFilter}
-          ${linha.where}
+          ${filialFilterV}
+          ${linhaV.where}
+        GROUP BY YEAR(vp.DATA_VENDA), MONTH(vp.DATA_VENDA)
+      ),
+      Trocas AS (
+        SELECT
+          YEAR(v.DATA_VENDA) AS y,
+          MONTH(v.DATA_VENDA) AS m,
+          SUM(vt.PRECO_LIQUIDO * vt.QTDE) AS valorTroca,
+          SUM(vt.QTDE) AS qtdeTroca
+        FROM LOJA_VENDA_TROCA vt WITH (NOLOCK)
+        INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+          ON v.CODIGO_FILIAL = vt.CODIGO_FILIAL AND v.TICKET = vt.TICKET
+        LEFT JOIN FILIAIS ft WITH (NOLOCK) ON ft.COD_FILIAL = vt.CODIGO_FILIAL
+        ${linhaT.join}
+        WHERE v.DATA_VENDA >= @lxStart AND v.DATA_VENDA < @lxEnd AND vt.QTDE_CANCELADA = 0
+          ${filialFilterT}
+          ${linhaT.where}
+        GROUP BY YEAR(v.DATA_VENDA), MONTH(v.DATA_VENDA)
       )
-      SELECT y, m,
-        SUM(valor) AS faturamento,
-        SUM(qtde_eff) AS quantidade,
-        COUNT(DISTINCT tk) AS tickets
-      FROM Base
-      GROUP BY y, m
+      SELECT
+        COALESCE(Vendas.y, Trocas.y) AS y,
+        COALESCE(Vendas.m, Trocas.m) AS m,
+        ISNULL(Vendas.valor, 0) - ISNULL(Trocas.valorTroca, 0) AS faturamento,
+        ISNULL(Vendas.qtde_eff, 0) - ISNULL(Trocas.qtdeTroca, 0) AS quantidade,
+        ISNULL(Vendas.tickets, 0) AS tickets
+      FROM Vendas
+      FULL OUTER JOIN Trocas ON Vendas.y = Trocas.y AND Vendas.m = Trocas.m
     `;
     const r = await request.query<{ y: number; m: number; faturamento: number; quantidade: number; tickets: number }>(query);
     return r.recordset;
@@ -227,6 +428,10 @@ export async function fetchFaturamentoMensalLoja(params: {
     });
   }
 
+  const mesCorrenteYm = analyzedWindow(meses[meses.length - 1].ym).isMesCorrente
+    ? meses[meses.length - 1].ym
+    : null;
+
   return meses.map((m) => {
     const d = byKey.get(m.ym) ?? { faturamento: 0, quantidade: 0, tickets: 0 };
     const faturamento = Math.round(d.faturamento * 100) / 100;
@@ -239,6 +444,7 @@ export async function fetchFaturamentoMensalLoja(params: {
       tickets: d.tickets,
       quantidade: d.quantidade,
       ticketMedio: d.tickets > 0 ? Math.round((faturamento / d.tickets) * 100) / 100 : 0,
+      parcial: m.ym === mesCorrenteYm,
     };
   });
 }
@@ -259,7 +465,7 @@ export async function fetchVendedoresMatrizMensal(params: {
     return { meses: meses.map((m) => m.ym), vendedores: [] };
   }
 
-  const names = await resolveFilialNames(company, filial);
+  const names = await filiaisEscopo(company, filial);
 
   const rows = await withRequest(async (request) => {
     request.input("lxStart", sql.DateTime, start);
@@ -370,6 +576,337 @@ async function fetchEstoquePorProdutos(
   });
 }
 
+// ── Reconstrução de estoque histórico (disponibilidade no mês analisado) ─────
+//
+// O ERP NÃO guarda snapshot histórico de estoque por SKU (as tabelas
+// ESTOQUE_PRODUTOS_HISTORICO / LJ_BLOCOX_ESTOQUEMENSAL existem mas ficam vazias).
+// Então reconstruímos o saldo de um mês passado REBOBINANDO, a partir da foto de
+// hoje (ESTOQUE_PRODUTOS), todos os canais de movimento datados — o mesmo modelo
+// que o próprio ERP usa (colunas QTDE_* de ESTOQUE_PRODUTOS_HISTORICO):
+//   saldo(T) = hoje
+//              − entradas com data >= T   (loja + romaneio + troca/devolução)
+//              + saídas   com data >= T   (venda + saída loja + saída romaneio)
+//              − ajuste de inventário com data >= T
+//
+// Como o mês corrente tem "fim" no futuro, não há movimento após ele e a fórmula
+// devolve o saldo de hoje automaticamente (sem caso especial).
+//
+// GOTCHA (validado em dados reais): estoque no ERP fica NEGATIVO/fantasma (vende no
+// negativo). Um produto pode ter saldo −30 e mesmo assim ter vendido o mês todo.
+// Por isso a reconstrução sozinha engana; cruzamos com a CADÊNCIA de vendas (até
+// que dia do mês vendeu) — se vendeu até perto do fim, tinha produto (é performance,
+// não ruptura), independente do saldo negativo.
+
+export interface DisponibilidadeMes {
+  estoqueHoje: number;
+  estoqueInicioMes: number;
+  estoqueFimMes: number;
+  /** Dia do mês (1-31) da última venda na loja; null se não vendeu no mês. */
+  ultimaVendaDia: number | null;
+  diasNoMes: number;
+  /** Recebeu entrada (transferência/romaneio/devolução) durante o mês. */
+  reposicaoNoMes: boolean;
+  isMesCorrente: boolean;
+}
+
+interface CanalRow {
+  produto: string;
+  cor: string;
+  apos: number; // movimento com data >= fim do mês (para rebobinar até o fim)
+  durante: number; // movimento dentro do mês [início, fim)
+}
+
+/**
+ * Reconstrói a disponibilidade (saldo início/fim do mês + cadência de venda) de um
+ * conjunto de produtos numa loja, para classificar ruptura de forma realista.
+ * Escopo: filial(is) por nome + lista de produtos (IN). Chave = `produto|corCodigo`.
+ */
+async function fetchDisponibilidadeMes(params: {
+  company?: string;
+  filial?: string | null;
+  range: Range; // janela alinhada do mês analisado
+  produtoIds: string[];
+}): Promise<Map<string, DisponibilidadeMes>> {
+  const { company, filial, range, produtoIds } = params;
+  const ids = Array.from(new Set(produtoIds.map((p) => p.trim()).filter(Boolean)));
+  const out = new Map<string, DisponibilidadeMes>();
+  if (ids.length === 0) return out;
+
+  const names = await resolveFilialNames(company, filial);
+  if (names.length === 0) return out;
+
+  const { start, end } = range;
+  const now = new Date();
+  const isMesCorrente = end.getTime() > now.getTime();
+  const diasNoMes = Math.round((end.getTime() - start.getTime()) / 86_400_000);
+  const key = (p: string, c: string) => `${p.trim()}|${(c ?? "").trim()}`;
+
+  // Aplica produto IN + filial IN (por nome) num request, com prefixos únicos.
+  const bindScope = (request: RequestLike, pAlias: string, fAlias: string, prefix: string) => {
+    ids.forEach((p, i) => request.input(`${prefix}p${i}`, sql.VarChar, p));
+    names.forEach((n, i) => request.input(`${prefix}f${i}`, sql.VarChar, n));
+    const prodIn = `${pAlias}.PRODUTO IN (${ids.map((_, i) => `@${prefix}p${i}`).join(", ")})`;
+    const filIn = `RTRIM(${fAlias}.FILIAL) IN (${names.map((_, i) => `@${prefix}f${i}`).join(", ")})`;
+    return { prodIn, filIn };
+  };
+
+  // Roda um canal com janela dupla (apos >= fim / durante [início,fim)).
+  const runCanal = async (
+    buildSql: (
+      req: RequestLike,
+      scope: { prodIn: string; filIn: string },
+      dateCol: string
+    ) => string,
+    pAlias: string,
+    fAlias: string,
+    dateCol: string,
+    prefix: string
+  ): Promise<CanalRow[]> =>
+    withRequest(async (request) => {
+      request.input(`${prefix}Start`, sql.DateTime, start);
+      request.input(`${prefix}End`, sql.DateTime, end);
+      const scope = bindScope(request, pAlias, fAlias, prefix);
+      const r = await request.query<{ produto: string; cor: string; apos: number; durante: number }>(
+        buildSql(request, scope, dateCol)
+      );
+      return r.recordset.map((row) => ({
+        produto: (row.produto ?? "").trim(),
+        cor: (row.cor ?? "").trim(),
+        apos: Number(row.apos ?? 0),
+        durante: Number(row.durante ?? 0),
+      }));
+    });
+
+  const janela = (dateCol: string, prefix: string, qtdExpr: string) => `
+        SUM(CASE WHEN ${dateCol} >= @${prefix}End THEN ${qtdExpr} ELSE 0 END) AS apos,
+        SUM(CASE WHEN ${dateCol} >= @${prefix}Start AND ${dateCol} < @${prefix}End THEN ${qtdExpr} ELSE 0 END) AS durante`;
+
+  const [estoqueRows, vendaRows, ljEntRows, ljSaiRows, prodEntRows, prodSaiRows, trocaRows, ajusteRows] =
+    await Promise.all([
+      // Saldo de HOJE (ESTOQUE_PRODUTOS) por produto+cor na loja.
+      withRequest(async (request) => {
+        const scope = bindScope(request, "e", "e", "est");
+        const r = await request.query<{ produto: string; cor: string; est: number }>(`
+          SELECT RTRIM(e.PRODUTO) AS produto, RTRIM(ISNULL(e.COR_PRODUTO,'')) AS cor,
+                 SUM(e.ESTOQUE) AS est
+          FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+          WHERE ${scope.prodIn} AND ${scope.filIn}
+          GROUP BY e.PRODUTO, e.COR_PRODUTO`);
+        return r.recordset.map((row) => ({
+          produto: (row.produto ?? "").trim(),
+          cor: (row.cor ?? "").trim(),
+          est: Number(row.est ?? 0),
+        }));
+      }),
+      // Vendas (saída) — filial por CODIGO_FILIAL → nome via FILIAIS. Traz também o dia da última venda no mês.
+      withRequest(async (request) => {
+        request.input("vdStart", sql.DateTime, start);
+        request.input("vdEnd", sql.DateTime, end);
+        ids.forEach((p, i) => request.input(`vdp${i}`, sql.VarChar, p));
+        names.forEach((n, i) => request.input(`vdf${i}`, sql.VarChar, n));
+        const r = await request.query<{ produto: string; cor: string; apos: number; durante: number; ultimaDia: number | null }>(`
+          SELECT RTRIM(vp.PRODUTO) AS produto, RTRIM(ISNULL(vp.COR_PRODUTO,'')) AS cor,
+                 SUM(CASE WHEN vp.DATA_VENDA >= @vdEnd THEN (CASE WHEN vp.QTDE_CANCELADA>0 THEN 0 ELSE vp.QTDE END) ELSE 0 END) AS apos,
+                 SUM(CASE WHEN vp.DATA_VENDA >= @vdStart AND vp.DATA_VENDA < @vdEnd THEN (CASE WHEN vp.QTDE_CANCELADA>0 THEN 0 ELSE vp.QTDE END) ELSE 0 END) AS durante,
+                 MAX(CASE WHEN vp.DATA_VENDA >= @vdStart AND vp.DATA_VENDA < @vdEnd AND vp.QTDE_CANCELADA=0 AND vp.QTDE>0 THEN DAY(vp.DATA_VENDA) ELSE NULL END) AS ultimaDia
+          FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
+          INNER JOIN FILIAIS f WITH (NOLOCK) ON RTRIM(f.COD_FILIAL) = RTRIM(vp.CODIGO_FILIAL)
+          WHERE vp.PRODUTO IN (${ids.map((_, i) => `@vdp${i}`).join(", ")})
+            AND RTRIM(f.FILIAL) IN (${names.map((_, i) => `@vdf${i}`).join(", ")})
+          GROUP BY vp.PRODUTO, vp.COR_PRODUTO`);
+        return r.recordset.map((row) => ({
+          produto: (row.produto ?? "").trim(),
+          cor: (row.cor ?? "").trim(),
+          apos: Number(row.apos ?? 0),
+          durante: Number(row.durante ?? 0),
+          ultimaDia: row.ultimaDia == null ? null : Number(row.ultimaDia),
+        }));
+      }),
+      // Entrada de loja (transferência que chegou).
+      runCanal(
+        (_r, s, dc) => `
+          SELECT RTRIM(lep.PRODUTO) AS produto, RTRIM(ISNULL(lep.COR_PRODUTO,'')) AS cor,
+                 ${janela(dc, "ljE", "lep.QTDE_ENTRADA")}
+          FROM LOJA_ENTRADAS le WITH (NOLOCK)
+          INNER JOIN LOJA_ENTRADAS_PRODUTO lep WITH (NOLOCK)
+            ON lep.ROMANEIO_PRODUTO = le.ROMANEIO_PRODUTO AND lep.FILIAL = le.FILIAL
+          WHERE ${s.prodIn} AND ${s.filIn}
+          GROUP BY lep.PRODUTO, lep.COR_PRODUTO`,
+        "lep",
+        "le",
+        "le.EMISSAO",
+        "ljE"
+      ),
+      // Saída de loja (transferência que saiu).
+      runCanal(
+        (_r, s, dc) => `
+          SELECT RTRIM(lsp.PRODUTO) AS produto, RTRIM(ISNULL(lsp.COR_PRODUTO,'')) AS cor,
+                 ${janela(dc, "ljS", "lsp.QTDE_SAIDA")}
+          FROM LOJA_SAIDAS ls WITH (NOLOCK)
+          INNER JOIN LOJA_SAIDAS_PRODUTO lsp WITH (NOLOCK)
+            ON lsp.ROMANEIO_PRODUTO = ls.ROMANEIO_PRODUTO AND lsp.FILIAL = ls.FILIAL
+          WHERE ${s.prodIn} AND ${s.filIn}
+          GROUP BY lsp.PRODUTO, lsp.COR_PRODUTO`,
+        "lsp",
+        "ls",
+        "ls.EMISSAO",
+        "ljS"
+      ),
+      // Entrada de romaneio nativo (ESTOQUE_PROD_ENT).
+      runCanal(
+        (_r, s, dc) => `
+          SELECT RTRIM(pe.PRODUTO) AS produto, RTRIM(ISNULL(pe.COR_PRODUTO,'')) AS cor,
+                 ${janela(dc, "pE", "pe.QTDE")}
+          FROM ESTOQUE_PROD_ENT en WITH (NOLOCK)
+          INNER JOIN ESTOQUE_PROD1_ENT pe WITH (NOLOCK) ON pe.ROMANEIO_PRODUTO = en.ROMANEIO_PRODUTO
+          WHERE ${s.prodIn} AND ${s.filIn}
+          GROUP BY pe.PRODUTO, pe.COR_PRODUTO`,
+        "pe",
+        "pe",
+        "en.EMISSAO",
+        "pE"
+      ),
+      // Saída de romaneio nativo (ESTOQUE_PROD_SAI).
+      runCanal(
+        (_r, s, dc) => `
+          SELECT RTRIM(ps.PRODUTO) AS produto, RTRIM(ISNULL(ps.COR_PRODUTO,'')) AS cor,
+                 ${janela(dc, "pS", "ps.QTDE")}
+          FROM ESTOQUE_PROD_SAI sa WITH (NOLOCK)
+          INNER JOIN ESTOQUE_PROD1_SAI ps WITH (NOLOCK) ON ps.ROMANEIO_PRODUTO = sa.ROMANEIO_PRODUTO
+          WHERE ${s.prodIn} AND ${s.filIn}
+          GROUP BY ps.PRODUTO, ps.COR_PRODUTO`,
+        "ps",
+        "ps",
+        "sa.EMISSAO",
+        "pS"
+      ),
+      // Troca/devolução (volta ao estoque = entrada) — filial por CODIGO_FILIAL.
+      withRequest(async (request) => {
+        request.input("trStart", sql.DateTime, start);
+        request.input("trEnd", sql.DateTime, end);
+        ids.forEach((p, i) => request.input(`trp${i}`, sql.VarChar, p));
+        names.forEach((n, i) => request.input(`trf${i}`, sql.VarChar, n));
+        const r = await request.query<{ produto: string; cor: string; apos: number; durante: number }>(`
+          SELECT RTRIM(t.PRODUTO) AS produto, RTRIM(ISNULL(t.COR_PRODUTO,'')) AS cor,
+                 SUM(CASE WHEN t.DATA_VENDA >= @trEnd THEN t.QTDE ELSE 0 END) AS apos,
+                 SUM(CASE WHEN t.DATA_VENDA >= @trStart AND t.DATA_VENDA < @trEnd THEN t.QTDE ELSE 0 END) AS durante
+          FROM LOJA_VENDA_TROCA t WITH (NOLOCK)
+          INNER JOIN FILIAIS f WITH (NOLOCK) ON RTRIM(f.COD_FILIAL) = RTRIM(t.CODIGO_FILIAL)
+          WHERE t.QTDE_CANCELADA = 0
+            AND t.PRODUTO IN (${ids.map((_, i) => `@trp${i}`).join(", ")})
+            AND RTRIM(f.FILIAL) IN (${names.map((_, i) => `@trf${i}`).join(", ")})
+          GROUP BY t.PRODUTO, t.COR_PRODUTO`);
+        return r.recordset.map((row) => ({
+          produto: (row.produto ?? "").trim(),
+          cor: (row.cor ?? "").trim(),
+          apos: Number(row.apos ?? 0),
+          durante: Number(row.durante ?? 0),
+        }));
+      }),
+      // Ajuste de inventário (delta assinado) — ESTOQUE_PROD_CTG_AJUSTE + CONTAGEM.
+      withRequest(async (request) => {
+        request.input("ajStart", sql.DateTime, start);
+        request.input("ajEnd", sql.DateTime, end);
+        ids.forEach((p, i) => request.input(`ajp${i}`, sql.VarChar, p));
+        names.forEach((n, i) => request.input(`ajf${i}`, sql.VarChar, n));
+        const r = await request.query<{ produto: string; cor: string; apos: number; durante: number }>(`
+          SELECT RTRIM(a.PRODUTO) AS produto, RTRIM(ISNULL(a.COR_PRODUTO,'')) AS cor,
+                 SUM(CASE WHEN c.EMISSAO >= @ajEnd THEN ISNULL(a.QTDE_AJUSTE,0) ELSE 0 END) AS apos,
+                 SUM(CASE WHEN c.EMISSAO >= @ajStart AND c.EMISSAO < @ajEnd THEN ISNULL(a.QTDE_AJUSTE,0) ELSE 0 END) AS durante
+          FROM ESTOQUE_PROD_CTG_AJUSTE a WITH (NOLOCK)
+          INNER JOIN ESTOQUE_PROD_CONTAGEM c WITH (NOLOCK) ON c.NOME_CONTAGEM = a.NOME_CONTAGEM
+          WHERE c.ESTOQUE_AJUSTADO = 1
+            AND a.PRODUTO IN (${ids.map((_, i) => `@ajp${i}`).join(", ")})
+            AND RTRIM(c.FILIAL) IN (${names.map((_, i) => `@ajf${i}`).join(", ")})
+          GROUP BY a.PRODUTO, a.COR_PRODUTO`);
+        return r.recordset.map((row) => ({
+          produto: (row.produto ?? "").trim(),
+          cor: (row.cor ?? "").trim(),
+          apos: Number(row.apos ?? 0),
+          durante: Number(row.durante ?? 0),
+        }));
+      }),
+    ]);
+
+  // Indexa cada canal por produto|cor.
+  const idx = (rows: CanalRow[]) => {
+    const m = new Map<string, CanalRow>();
+    for (const r of rows) m.set(key(r.produto, r.cor), r);
+    return m;
+  };
+  const estM = new Map(estoqueRows.map((r) => [key(r.produto, r.cor), r.est]));
+  const vendaM = new Map(vendaRows.map((r) => [key(r.produto, r.cor), r]));
+  const ljEntM = idx(ljEntRows);
+  const ljSaiM = idx(ljSaiRows);
+  const prodEntM = idx(prodEntRows);
+  const prodSaiM = idx(prodSaiRows);
+  const trocaM = idx(trocaRows);
+  const ajusteM = idx(ajusteRows);
+
+  // Universo = todas as chaves vistas em qualquer canal.
+  const chaves = new Set<string>([
+    ...estM.keys(),
+    ...vendaM.keys(),
+    ...ljEntM.keys(),
+    ...ljSaiM.keys(),
+    ...prodEntM.keys(),
+    ...prodSaiM.keys(),
+    ...trocaM.keys(),
+    ...ajusteM.keys(),
+  ]);
+
+  for (const k of chaves) {
+    const estoqueHoje = estM.get(k) ?? 0;
+    const venda = vendaM.get(k);
+    const ent = (m: Map<string, CanalRow>, w: "apos" | "durante") => m.get(k)?.[w] ?? 0;
+
+    const entradasApos = ent(ljEntM, "apos") + ent(prodEntM, "apos") + ent(trocaM, "apos");
+    const saidasApos = (venda?.apos ?? 0) + ent(ljSaiM, "apos") + ent(prodSaiM, "apos");
+    const ajusteApos = ent(ajusteM, "apos");
+    const estoqueFimMes = estoqueHoje - entradasApos + saidasApos - ajusteApos;
+
+    const entradasDur = ent(ljEntM, "durante") + ent(prodEntM, "durante") + ent(trocaM, "durante");
+    const saidasDur = (venda?.durante ?? 0) + ent(ljSaiM, "durante") + ent(prodSaiM, "durante");
+    const ajusteDur = ent(ajusteM, "durante");
+    const estoqueInicioMes = estoqueFimMes - entradasDur + saidasDur - ajusteDur;
+
+    out.set(k, {
+      estoqueHoje: Math.round(estoqueHoje),
+      estoqueInicioMes: Math.round(estoqueInicioMes),
+      estoqueFimMes: Math.round(estoqueFimMes),
+      ultimaVendaDia: venda?.ultimaDia ?? null,
+      diasNoMes,
+      reposicaoNoMes: entradasDur > 0,
+      isMesCorrente,
+    });
+  }
+  return out;
+}
+
+/**
+ * Classifica a disponibilidade de um item no mês (combinando saldo reconstruído +
+ * cadência de venda), corrigindo o artefato de estoque negativo do ERP.
+ *  - "tinha_estoque": vendeu até perto do fim do mês (tinha produto), OU saldo fim > 0.
+ *  - "ruptura_total": começou o mês sem saldo e não recebeu reposição.
+ *  - "ruptura_meio":  começou com saldo mas zerou no meio (parou de vender cedo, sem reposição).
+ */
+export function classificarDisponibilidade(
+  d: DisponibilidadeMes | undefined
+): "tinha_estoque" | "ruptura_total" | "ruptura_meio" | "desconhecido" {
+  if (!d) return "desconhecido";
+  const { estoqueInicioMes, estoqueFimMes, ultimaVendaDia, diasNoMes, reposicaoNoMes, isMesCorrente } = d;
+  // Vendeu até perto do fim (últimos ~20% do mês ou 5 dias) → tinha produto (corrige negativo-fantasma).
+  const limiteTardio = Math.max(diasNoMes - 5, Math.ceil(diasNoMes * 0.8));
+  const vendeuTarde = ultimaVendaDia != null && ultimaVendaDia >= limiteTardio;
+  if (vendeuTarde) return "tinha_estoque";
+  // Mês corrente: usa saldo de hoje como disponibilidade.
+  if (isMesCorrente) return estoqueFimMes > 0 ? "tinha_estoque" : "ruptura_meio";
+  if (estoqueFimMes > 0) return "tinha_estoque";
+  // Fim do mês zerado/negativo:
+  if (estoqueInicioMes <= 0 && !reposicaoNoMes) return "ruptura_total";
+  return "ruptura_meio";
+}
+
 // ── Resumo leve de vendedores de UM mês (para o Diagnóstico) ─────────────────
 
 export interface VendedorMesResumo {
@@ -385,13 +922,12 @@ export interface VendedorMesResumo {
 export async function fetchVendedoresMesResumo(params: {
   company?: string;
   filial?: string | null;
-  mes: string; // YYYY-MM
+  range: Range; // janela alinhada
   linhas?: string[] | null;
 }): Promise<VendedorMesResumo[]> {
-  const { company, filial, mes, linhas } = params;
+  const { company, filial, range, linhas } = params;
   if (isEcommerceFilial(company, filial)) return [];
-  const range = monthRange(mes);
-  const filials = await resolveFilialNames(company, filial);
+  const filials = await filiaisEscopo(company, filial);
   const lista = await fetchVendedoresList({
     company,
     filial: null,
@@ -414,11 +950,10 @@ export async function fetchVendedoresMesResumo(params: {
 export async function fetchRupturasLoja(params: {
   company?: string;
   filial?: string | null;
-  mes: string; // YYYY-MM
+  range: Range; // janela alinhada do mês analisado
   linhas?: string[] | null;
 }): Promise<RupturaItem[]> {
-  const { company, filial, mes, linhas } = params;
-  const range = monthRange(mes);
+  const { company, filial, range, linhas } = params;
 
   const [produtos, cfg] = await Promise.all([
     fetchProductsWithDetails({
@@ -481,4 +1016,332 @@ export async function fetchRupturasLoja(params: {
       };
     })
     .sort((a, b) => b.faturamento - a.faturamento);
+}
+
+// ── Comparação de produtos: mês analisado vs mês de comparação ───────────────
+
+/**
+ * Cruza o que vendeu no mês de comparação com o que vendeu no mês analisado (por
+ * produto×cor), trazendo o estoque ATUAL na loja e se há estoque na rede. Responde:
+ * "o que vendeu no mês bom?", "o que faltou agora (ruptura) vs o que tinha e vendeu
+ * menos (performance)?". Ordenado pela diferença de faturamento (maior lacuna primeiro).
+ */
+export async function fetchComparacaoProdutosLoja(params: {
+  company?: string;
+  filial?: string | null;
+  /** Janela alinhada do mês analisado (parcial no mês corrente). */
+  rangeAnalisado: Range;
+  /** Janela alinhada do mês de comparação (mesma faixa de dias). */
+  rangeComparacao: Range;
+  linhas?: string[] | null;
+  /** Máx. de itens por bucket (ruptura / tinha estoque / cresceu). */
+  limit?: number;
+}): Promise<ComparacaoProdutosResult> {
+  const { company, filial, rangeAnalisado, rangeComparacao, linhas, limit = 100 } = params;
+
+  const [prodA, prodB] = await Promise.all([
+    fetchProductsWithDetails({
+      company,
+      range: { start: rangeAnalisado.start, end: rangeAnalisado.end },
+      filial: filial ?? null,
+      groupByColor: true,
+      linhas: linhas ?? undefined,
+    }),
+    fetchProductsWithDetails({
+      company,
+      range: { start: rangeComparacao.start, end: rangeComparacao.end },
+      filial: filial ?? null,
+      groupByColor: true,
+      linhas: linhas ?? undefined,
+    }),
+  ]);
+
+  interface Acc {
+    produto: string;
+    cor: string;
+    corDescricao: string;
+    descricao: string;
+    qtdA: number;
+    fatA: number;
+    qtdB: number;
+    fatB: number;
+    estoqueLoja: number;
+  }
+  const map = new Map<string, Acc>();
+  const key = (id: string | null | undefined, cor: string | null | undefined) =>
+    `${(id ?? "").trim()}|${(cor ?? "").trim()}`;
+
+  const upsert = (p: (typeof prodA)[number], which: "A" | "B") => {
+    const k = key(p.productId, p.corProduto);
+    let e = map.get(k);
+    if (!e) {
+      e = {
+        produto: (p.productId ?? "").trim(),
+        cor: (p.corProduto ?? "").trim(),
+        corDescricao: (p.descCorProduto ?? "").trim(),
+        descricao: (p.productName ?? "").trim(),
+        qtdA: 0,
+        fatA: 0,
+        qtdB: 0,
+        fatB: 0,
+        estoqueLoja: Math.round(p.stock ?? 0),
+      };
+      map.set(k, e);
+    }
+    // Estoque é snapshot atual (mesmo nos dois fetches); mantém o valor disponível.
+    if (p.stock != null) e.estoqueLoja = Math.round(p.stock);
+    if (!e.descricao && p.productName) e.descricao = p.productName.trim();
+    if (!e.corDescricao && p.descCorProduto) e.corDescricao = p.descCorProduto.trim();
+    if (which === "A") {
+      e.qtdA = Math.round(p.totalQuantity ?? 0);
+      e.fatA = Math.round((p.totalRevenue ?? 0) * 100) / 100;
+    } else {
+      e.qtdB = Math.round(p.totalQuantity ?? 0);
+      e.fatB = Math.round((p.totalRevenue ?? 0) * 100) / 100;
+    }
+  };
+  prodA.forEach((p) => upsert(p, "A"));
+  prodB.forEach((p) => upsert(p, "B"));
+
+  // Itens que CAÍRAM (venderam menos que na comparação) → candidatos a ruptura/performance.
+  // Só para esses reconstruímos a disponibilidade do mês analisado (query escopada).
+  const caiuIds = Array.from(map.values())
+    .filter((e) => e.fatB - e.fatA > 0.005)
+    .map((e) => e.produto);
+
+  // Disponibilidade no mês analisado (reconstrução real) + estoque na rede HOJE (para "onde puxar").
+  const [disp, estoqueRede] = await Promise.all([
+    fetchDisponibilidadeMes({ company, filial, range: rangeAnalisado, produtoIds: caiuIds }),
+    fetchEstoquePorProdutos(
+      company,
+      Array.from(map.values())
+        .filter((e) => e.estoqueLoja <= 0)
+        .map((e) => e.produto)
+    ),
+  ]);
+  const naRede = new Set(estoqueRede.map((e) => e.produto));
+
+  const ruptura: ComparacaoProdutoItem[] = [];
+  const tinhaEstoque: ComparacaoProdutoItem[] = [];
+  const cresceu: ComparacaoProdutoItem[] = [];
+  let rupturaFat = 0;
+  let tinhaEstoqueFat = 0;
+  let cresceuFat = 0;
+
+  for (const e of map.values()) {
+    const diffFat = Math.round((e.fatB - e.fatA) * 100) / 100;
+    const d = disp.get(`${e.produto}|${e.cor}`);
+    let situacao: SituacaoComparacao;
+    let rupturaTipo: "total" | "meio" | null = null;
+    if (diffFat > 0) {
+      // Classificação REALISTA: saldo reconstruído na janela + cadência de venda
+      // (corrige o estoque negativo-fantasma do ERP). Fallback p/ estoque de hoje
+      // quando não há dado de movimento (produto sem histórico).
+      const cls = classificarDisponibilidade(d);
+      if (cls === "ruptura_total" || cls === "ruptura_meio") {
+        situacao = "ruptura";
+        rupturaTipo = cls === "ruptura_total" ? "total" : "meio";
+      } else if (cls === "tinha_estoque") {
+        situacao = "tinha_estoque";
+      } else {
+        // desconhecido → cai no sinal antigo (estoque de hoje).
+        situacao = e.estoqueLoja <= 0 ? "ruptura" : "tinha_estoque";
+        if (situacao === "ruptura") rupturaTipo = "meio";
+      }
+    } else if (diffFat < 0) {
+      situacao = "cresceu";
+    } else {
+      situacao = "estavel";
+    }
+
+    const item: ComparacaoProdutoItem = {
+      produto: e.produto,
+      cor: e.cor,
+      corDescricao: e.corDescricao,
+      descricao: e.descricao,
+      qtdAnalisado: e.qtdA,
+      fatAnalisado: e.fatA,
+      qtdComparacao: e.qtdB,
+      fatComparacao: e.fatB,
+      diffFat,
+      estoqueLoja: e.estoqueLoja,
+      estoqueFimMesAnalisado: d && !d.isMesCorrente ? d.estoqueFimMes : null,
+      rupturaTipo,
+      temNaRede: e.estoqueLoja <= 0 && naRede.has(e.produto),
+      situacao,
+    };
+
+    if (situacao === "ruptura") {
+      ruptura.push(item);
+      rupturaFat += diffFat;
+    } else if (situacao === "tinha_estoque") {
+      tinhaEstoque.push(item);
+      tinhaEstoqueFat += diffFat;
+    } else if (situacao === "cresceu") {
+      cresceu.push(item);
+      cresceuFat += -diffFat;
+    }
+  }
+
+  // Maior lacuna primeiro em cada bucket (cresceu = maior ganho primeiro).
+  ruptura.sort((a, b) => b.diffFat - a.diffFat);
+  tinhaEstoque.sort((a, b) => b.diffFat - a.diffFat);
+  cresceu.sort((a, b) => a.diffFat - b.diffFat);
+
+  const round2 = (v: number) => Math.round(v * 100) / 100;
+  const truncado = ruptura.length > limit || tinhaEstoque.length > limit || cresceu.length > limit;
+
+  return {
+    ruptura: ruptura.slice(0, limit),
+    tinhaEstoque: tinhaEstoque.slice(0, limit),
+    cresceu: cresceu.slice(0, limit),
+    rupturaCount: ruptura.length,
+    tinhaEstoqueCount: tinhaEstoque.length,
+    cresceuCount: cresceu.length,
+    rupturaFat: round2(rupturaFat),
+    tinhaEstoqueFat: round2(tinhaEstoqueFat),
+    cresceuFat: round2(cresceuFat),
+    gapProdutos: round2(rupturaFat + tinhaEstoqueFat - cresceuFat),
+    truncado,
+  };
+}
+
+// ── Aba Produtos: vendas antes × depois + estoque hoje + dias de cobertura ───
+
+/**
+ * Lista os produtos (produto×cor) que venderam na referência (antes) e/ou no mês
+ * analisado (depois), com o estoque ATUAL e uma estimativa de "acaba em" (dias de
+ * cobertura no ritmo recente). Separa em SEM estoque (zerado hoje) e COM estoque —
+ * para ver de relance o que performou e se ainda temos para vender.
+ *
+ * "Acaba em" = estoque ÷ (vendas/dia). Ritmo = janela DEPOIS (atual); se não vendeu
+ * agora, cai para o ritmo da janela ANTES (referência). Sem giro em nenhuma → null.
+ */
+export async function fetchProdutosVendaEstoque(params: {
+  company?: string;
+  filial?: string | null;
+  rangeAnalisado: Range; // "depois" (atual)
+  rangeComparacao: Range; // "antes" (referência)
+  linhas?: string[] | null;
+  limit?: number;
+}): Promise<ProdutosVendaEstoqueResult> {
+  const { company, filial, rangeAnalisado, rangeComparacao, linhas, limit = 300 } = params;
+
+  const [prodDepois, prodAntes] = await Promise.all([
+    fetchProductsWithDetails({
+      company,
+      range: { start: rangeAnalisado.start, end: rangeAnalisado.end },
+      filial: filial ?? null,
+      groupByColor: true,
+      linhas: linhas ?? undefined,
+    }),
+    fetchProductsWithDetails({
+      company,
+      range: { start: rangeComparacao.start, end: rangeComparacao.end },
+      filial: filial ?? null,
+      groupByColor: true,
+      linhas: linhas ?? undefined,
+    }),
+  ]);
+
+  const diasDepois = Math.max(1, Math.round((rangeAnalisado.end.getTime() - rangeAnalisado.start.getTime()) / 86_400_000));
+  const diasAntes = Math.max(1, Math.round((rangeComparacao.end.getTime() - rangeComparacao.start.getTime()) / 86_400_000));
+
+  interface Acc {
+    produto: string;
+    cor: string;
+    corDescricao: string;
+    descricao: string;
+    qtdAntes: number;
+    fatAntes: number;
+    qtdDepois: number;
+    fatDepois: number;
+    estoque: number;
+  }
+  const map = new Map<string, Acc>();
+  const key = (id: string | null | undefined, cor: string | null | undefined) =>
+    `${(id ?? "").trim()}|${(cor ?? "").trim()}`;
+
+  const upsert = (p: (typeof prodDepois)[number], which: "antes" | "depois") => {
+    const k = key(p.productId, p.corProduto);
+    let e = map.get(k);
+    if (!e) {
+      e = {
+        produto: (p.productId ?? "").trim(),
+        cor: (p.corProduto ?? "").trim(),
+        corDescricao: (p.descCorProduto ?? "").trim(),
+        descricao: (p.productName ?? "").trim(),
+        qtdAntes: 0,
+        fatAntes: 0,
+        qtdDepois: 0,
+        fatDepois: 0,
+        estoque: Math.round(p.stock ?? 0),
+      };
+      map.set(k, e);
+    }
+    if (p.stock != null) e.estoque = Math.round(p.stock);
+    if (!e.descricao && p.productName) e.descricao = p.productName.trim();
+    if (!e.corDescricao && p.descCorProduto) e.corDescricao = p.descCorProduto.trim();
+    if (which === "antes") {
+      e.qtdAntes = Math.round(p.totalQuantity ?? 0);
+      e.fatAntes = Math.round((p.totalRevenue ?? 0) * 100) / 100;
+    } else {
+      e.qtdDepois = Math.round(p.totalQuantity ?? 0);
+      e.fatDepois = Math.round((p.totalRevenue ?? 0) * 100) / 100;
+    }
+  };
+  prodDepois.forEach((p) => upsert(p, "depois"));
+  prodAntes.forEach((p) => upsert(p, "antes"));
+
+  const semEstoque: ProdutoVendaEstoqueItem[] = [];
+  const comEstoque: ProdutoVendaEstoqueItem[] = [];
+
+  for (const e of map.values()) {
+    // Só quem vendeu em alguma das janelas (ignora quem não vendeu em nenhuma).
+    if (e.qtdAntes <= 0 && e.qtdDepois <= 0) continue;
+
+    // Ritmo de venda: atual (depois); cai para referência (antes) se não vende agora.
+    const rateDepois = e.qtdDepois / diasDepois;
+    const rateAntes = e.qtdAntes / diasAntes;
+    const rate = rateDepois > 0 ? rateDepois : rateAntes;
+
+    let acabaEmDias: number | null;
+    if (e.estoque <= 0) acabaEmDias = 0;
+    else if (rate > 0) acabaEmDias = Math.max(0, Math.round(e.estoque / rate));
+    else acabaEmDias = null; // tem estoque mas sem giro
+
+    const item: ProdutoVendaEstoqueItem = {
+      produto: e.produto,
+      cor: e.cor,
+      corDescricao: e.corDescricao,
+      descricao: e.descricao,
+      qtdAntes: e.qtdAntes,
+      fatAntes: e.fatAntes,
+      qtdDepois: e.qtdDepois,
+      fatDepois: e.fatDepois,
+      estoque: e.estoque,
+      acabaEmDias,
+    };
+    if (e.estoque <= 0) semEstoque.push(item);
+    else comEstoque.push(item);
+  }
+
+  // Sem estoque: os maiores vendedores (antes/depois) que faltam primeiro.
+  const peso = (i: ProdutoVendaEstoqueItem) => Math.max(i.qtdDepois, i.qtdAntes);
+  semEstoque.sort((a, b) => peso(b) - peso(a) || b.fatAntes - a.fatAntes);
+  // Com estoque: os que acabam antes primeiro (urgência de reposição); sem giro por último.
+  comEstoque.sort((a, b) => {
+    const da = a.acabaEmDias ?? Number.POSITIVE_INFINITY;
+    const db = b.acabaEmDias ?? Number.POSITIVE_INFINITY;
+    return da - db || peso(b) - peso(a);
+  });
+
+  const truncado = semEstoque.length > limit || comEstoque.length > limit;
+  return {
+    semEstoque: semEstoque.slice(0, limit),
+    comEstoque: comEstoque.slice(0, limit),
+    diasAntes,
+    diasDepois,
+    truncado,
+  };
 }

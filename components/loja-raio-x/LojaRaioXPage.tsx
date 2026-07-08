@@ -14,7 +14,7 @@ import {
 
 import FilialFilter from "@/components/filters/FilialFilter";
 import { useTheme } from "@/components/theme/ThemeContext";
-import type { CompanyKey } from "@/lib/config/company";
+import { resolveCompany, type CompanyKey } from "@/lib/config/company";
 
 import styles from "./LojaRaioXPage.module.css";
 
@@ -29,6 +29,14 @@ interface MesMetric {
   tickets: number;
   quantidade: number;
   ticketMedio: number;
+  parcial?: boolean;
+}
+
+interface Janela {
+  parcial: boolean;
+  diaCorte: number | null;
+  analisadoLabel: string;
+  comparacaoLabel: string | null;
 }
 
 interface PrincipalData {
@@ -37,13 +45,47 @@ interface PrincipalData {
   comparacao: MesMetric | null;
   comparacaoAuto: boolean;
   isMesmo: boolean;
+  janela: Janela;
   decomposicao: { gap: number; porAtendimentos: number; porTicketMedio: number } | null;
   rupturasResumo: { quantidade: number; faturamento: number; comEstoqueNaRede: number };
   vendedoresResumo: {
     ativosAnalisado: number;
     ativosBest: number;
     quedas: Array<{ vendedor: string; analisado: number; melhor: number; queda: number }>;
+    ranking: Array<{ vendedor: string; analisado: number; comparacao: number; diff: number }>;
   };
+}
+
+type SituacaoComparacao = "ruptura" | "tinha_estoque" | "cresceu" | "estavel";
+
+interface ComparacaoProdutoItem {
+  produto: string;
+  cor: string;
+  corDescricao: string;
+  descricao: string;
+  qtdAnalisado: number;
+  fatAnalisado: number;
+  qtdComparacao: number;
+  fatComparacao: number;
+  diffFat: number;
+  estoqueLoja: number;
+  estoqueFimMesAnalisado: number | null;
+  rupturaTipo: "total" | "meio" | null;
+  temNaRede: boolean;
+  situacao: SituacaoComparacao;
+}
+interface ComparacaoData {
+  ruptura: ComparacaoProdutoItem[];
+  tinhaEstoque: ComparacaoProdutoItem[];
+  cresceu: ComparacaoProdutoItem[];
+  rupturaCount: number;
+  tinhaEstoqueCount: number;
+  cresceuCount: number;
+  rupturaFat: number;
+  tinhaEstoqueFat: number;
+  cresceuFat: number;
+  gapProdutos: number;
+  truncado: boolean;
 }
 
 interface VendedorLinha {
@@ -69,7 +111,27 @@ interface RupturaItem {
   ondeTemEstoque: Array<{ filial: string; estoque: number }>;
 }
 
-type Tab = "principal" | "vendedores" | "rupturas";
+interface ProdutoVendaEstoqueItem {
+  produto: string;
+  cor: string;
+  corDescricao: string;
+  descricao: string;
+  qtdAntes: number;
+  fatAntes: number;
+  qtdDepois: number;
+  fatDepois: number;
+  estoque: number;
+  acabaEmDias: number | null;
+}
+interface ProdutosEstoqueData {
+  semEstoque: ProdutoVendaEstoqueItem[];
+  comEstoque: ProdutoVendaEstoqueItem[];
+  diasAntes: number;
+  diasDepois: number;
+  truncado: boolean;
+}
+
+type Tab = "principal" | "produtos" | "vendedores" | "rupturas";
 
 // ── Formatadores ─────────────────────────────────────────────────────────────
 
@@ -126,16 +188,22 @@ export default function LojaRaioXPage({ companyKey }: Props) {
   const [rupturas, setRupturas] = useState<RupturaItem[] | null>(null);
   const [rupturasLoading, setRupturasLoading] = useState(false);
 
-  // Principal (linha do tempo + diagnóstico) — depende de filial + mês.
+  const [comparacao, setComparacao] = useState<ComparacaoData | null>(null);
+  const [comparacaoLoading, setComparacaoLoading] = useState(false);
+
+  const [produtosEstoque, setProdutosEstoque] = useState<ProdutosEstoqueData | null>(null);
+  const [produtosEstoqueLoading, setProdutosEstoqueLoading] = useState(false);
+
+  // Principal (linha do tempo + diagnóstico). filial null = visão rede (agrega todas).
   useEffect(() => {
-    if (!filial) return;
     const controller = new AbortController();
     let cancelled = false;
-    async function load(currentFilial: string) {
+    async function load() {
       setPrincipalLoading(true);
       setPrincipalError(null);
       try {
-        const params = new URLSearchParams({ company: companyKey, filial: currentFilial, mes, section: "principal" });
+        const params = new URLSearchParams({ company: companyKey, mes, section: "principal" });
+        if (filial) params.set("filial", filial);
         if (comparar !== "auto") params.set("comparar", comparar);
         const r = await fetch(`/api/loja-raio-x?${params}`, { cache: "no-store", signal: controller.signal });
         if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Erro ao carregar");
@@ -147,22 +215,23 @@ export default function LojaRaioXPage({ companyKey }: Props) {
         if (!cancelled) setPrincipalLoading(false);
       }
     }
-    void load(filial);
+    void load();
     return () => {
       cancelled = true;
       controller.abort();
     };
   }, [companyKey, filial, mes, comparar]);
 
-  // Vendedores (matriz 12 meses) — depende só de filial; carrega ao abrir a aba.
+  // Vendedores (matriz 12 meses) — carrega ao abrir a aba. filial null = rede.
   useEffect(() => {
-    if (tab !== "vendedores" || !filial) return;
+    if (tab !== "vendedores") return;
     const controller = new AbortController();
     let cancelled = false;
-    async function load(currentFilial: string) {
+    async function load() {
       setVendedoresLoading(true);
       try {
-        const params = new URLSearchParams({ company: companyKey, filial: currentFilial, section: "vendedores" });
+        const params = new URLSearchParams({ company: companyKey, section: "vendedores" });
+        if (filial) params.set("filial", filial);
         const r = await fetch(`/api/loja-raio-x?${params}`, { cache: "no-store", signal: controller.signal });
         const json = await r.json();
         if (!cancelled) setVendedores(json.data as VendedoresData);
@@ -172,22 +241,23 @@ export default function LojaRaioXPage({ companyKey }: Props) {
         if (!cancelled) setVendedoresLoading(false);
       }
     }
-    void load(filial);
+    void load();
     return () => {
       cancelled = true;
       controller.abort();
     };
   }, [companyKey, filial, tab]);
 
-  // Rupturas — depende de filial + mês; carrega ao abrir a aba.
+  // Rupturas — depende de mês; carrega ao abrir a aba. filial null = rede.
   useEffect(() => {
-    if (tab !== "rupturas" || !filial) return;
+    if (tab !== "rupturas") return;
     const controller = new AbortController();
     let cancelled = false;
-    async function load(currentFilial: string) {
+    async function load() {
       setRupturasLoading(true);
       try {
-        const params = new URLSearchParams({ company: companyKey, filial: currentFilial, mes, section: "rupturas" });
+        const params = new URLSearchParams({ company: companyKey, mes, section: "rupturas" });
+        if (filial) params.set("filial", filial);
         const r = await fetch(`/api/loja-raio-x?${params}`, { cache: "no-store", signal: controller.signal });
         const json = await r.json();
         if (!cancelled) setRupturas((json.data as RupturaItem[]) ?? []);
@@ -197,23 +267,92 @@ export default function LojaRaioXPage({ companyKey }: Props) {
         if (!cancelled) setRupturasLoading(false);
       }
     }
-    void load(filial);
+    void load();
     return () => {
       cancelled = true;
       controller.abort();
     };
   }, [companyKey, filial, mes, tab]);
 
+  // Comparação de produtos (mês analisado vs comparação) — lazy, no Diagnóstico,
+  // depois que o principal resolve o mês de comparação. Não roda se for o mesmo mês.
+  const compYm = principal?.comparacao?.ym ?? null;
+  const compIsMesmo = principal?.isMesmo ?? false;
+  useEffect(() => {
+    if (tab !== "principal" || !compYm || compIsMesmo) return;
+    const controller = new AbortController();
+    let cancelled = false;
+    async function load(comparar: string) {
+      setComparacaoLoading(true);
+      try {
+        const params = new URLSearchParams({ company: companyKey, mes, comparar, section: "comparacao" });
+        if (filial) params.set("filial", filial);
+        const r = await fetch(`/api/loja-raio-x?${params}`, { cache: "no-store", signal: controller.signal });
+        const json = await r.json();
+        if (!cancelled) setComparacao(json.data as ComparacaoData);
+      } catch {
+        /* abortado ou erro transitório */
+      } finally {
+        if (!cancelled) setComparacaoLoading(false);
+      }
+    }
+    void load(compYm);
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [companyKey, filial, mes, tab, compYm, compIsMesmo]);
+
+  // Aba Produtos (vendas antes × depois + estoque) — lazy; usa o mês de referência
+  // resolvido pelo principal (melhor mês / escolhido). filial null = rede.
+  useEffect(() => {
+    if (tab !== "produtos" || !compYm) return;
+    const controller = new AbortController();
+    let cancelled = false;
+    async function load(comparar: string) {
+      setProdutosEstoqueLoading(true);
+      try {
+        const params = new URLSearchParams({ company: companyKey, mes, comparar, section: "produtos-estoque" });
+        if (filial) params.set("filial", filial);
+        const r = await fetch(`/api/loja-raio-x?${params}`, { cache: "no-store", signal: controller.signal });
+        const json = await r.json();
+        if (!cancelled) setProdutosEstoque(json.data as ProdutosEstoqueData);
+      } catch {
+        /* abortado ou erro transitório */
+      } finally {
+        if (!cancelled) setProdutosEstoqueLoading(false);
+      }
+    }
+    void load(compYm);
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [companyKey, filial, mes, tab, compYm]);
+
   const timeline = principal?.meses ?? null;
+  const isRede = !filial;
+  const hasEcommerce = (resolveCompany(companyKey)?.ecommerceFilials?.length ?? 0) > 0;
 
   return (
     <div className={styles.wrapper}>
       <header className={styles.header}>
         <div>
-          <h1 className={styles.title}>Loja Raio X</h1>
+          <h1 className={styles.title}>
+            Loja Raio X
+            {isRede && <span className={styles.redeBadge}>REDE — todas as lojas</span>}
+            {isRede && hasEcommerce && (
+              <span className={styles.varejoBadge} title="Vendas de loja física (POS). Não inclui e-commerce.">
+                VAREJO — sem e-commerce
+              </span>
+            )}
+          </h1>
           <p className={styles.subtitle}>
-            Raio-x de performance de uma loja: histórico, o que faltou para bater o melhor mês,
-            vendedores e rupturas.
+            {isRede
+              ? `Visão geral da rede: histórico agregado, o que faltou para bater o melhor mês, vendedores e rupturas.${
+                  hasEcommerce ? " Considera só as lojas físicas (varejo) — o e-commerce não entra nesse agregado." : ""
+                } Selecione uma loja para focar em uma unidade.`
+              : "Raio-x de performance de uma loja: histórico, o que faltou para bater o melhor mês, vendedores e rupturas."}
           </p>
         </div>
         <div className={styles.controls}>
@@ -249,50 +388,62 @@ export default function LojaRaioXPage({ companyKey }: Props) {
         </div>
       </header>
 
-      {!filial && (
-        <div className={styles.empty}>Selecione uma loja para começar o raio-x.</div>
+      <Timeline
+        data={timeline}
+        loading={principalLoading}
+        analyzedYm={mes}
+        comparYm={principal?.comparacao?.ym ?? null}
+        comparAuto={principal?.comparacaoAuto ?? true}
+        onSetAnalisado={setMes}
+        onSetComparacao={(ym) => setComparar(ym)}
+        isRede={isRede}
+        hasEcommerce={hasEcommerce}
+      />
+
+      <nav className={styles.tabs}>
+        {(["principal", "produtos", "vendedores", "rupturas"] as Tab[]).map((t) => (
+          <button
+            key={t}
+            type="button"
+            className={`${styles.tabBtn} ${tab === t ? styles.tabBtnActive : ""}`}
+            onClick={() => setTab(t)}
+          >
+            {t === "principal"
+              ? "Diagnóstico"
+              : t === "produtos"
+                ? "Produtos"
+                : t === "vendedores"
+                  ? "Vendedores"
+                  : "Rupturas"}
+          </button>
+        ))}
+      </nav>
+
+      {tab === "principal" && (
+        <PrincipalTab
+          data={principal}
+          loading={principalLoading}
+          error={principalError}
+          onGoTab={setTab}
+          comparacaoProdutos={comparacao}
+          comparacaoLoading={comparacaoLoading}
+          isRede={isRede}
+        />
       )}
-
-      {filial && (
-        <>
-          <Timeline
-            data={timeline}
-            loading={principalLoading}
-            analyzedYm={mes}
-            comparYm={principal?.comparacao?.ym ?? null}
-            comparAuto={principal?.comparacaoAuto ?? true}
-            onSetAnalisado={setMes}
-            onSetComparacao={(ym) => setComparar(ym)}
-          />
-
-          <nav className={styles.tabs}>
-            {(["principal", "vendedores", "rupturas"] as Tab[]).map((t) => (
-              <button
-                key={t}
-                type="button"
-                className={`${styles.tabBtn} ${tab === t ? styles.tabBtnActive : ""}`}
-                onClick={() => setTab(t)}
-              >
-                {t === "principal" ? "Diagnóstico" : t === "vendedores" ? "Vendedores" : "Rupturas"}
-              </button>
-            ))}
-          </nav>
-
-          {tab === "principal" && (
-            <PrincipalTab
-              data={principal}
-              loading={principalLoading}
-              error={principalError}
-              onGoTab={setTab}
-            />
-          )}
-          {tab === "vendedores" && (
-            <VendedoresTab data={vendedores} loading={vendedoresLoading} analyzedYm={mes} />
-          )}
-          {tab === "rupturas" && (
-            <RupturasTab data={rupturas} loading={rupturasLoading} mesLabel={ymLabel(mes)} />
-          )}
-        </>
+      {tab === "produtos" && (
+        <ProdutosTab
+          data={produtosEstoque}
+          loading={produtosEstoqueLoading}
+          anLabel={principal?.janela.analisadoLabel ?? ymLabel(mes)}
+          compLabel={principal?.janela.comparacaoLabel ?? principal?.comparacao?.label ?? ""}
+          isRede={isRede}
+        />
+      )}
+      {tab === "vendedores" && (
+        <VendedoresTab data={vendedores} loading={vendedoresLoading} analyzedYm={mes} />
+      )}
+      {tab === "rupturas" && (
+        <RupturasTab data={rupturas} loading={rupturasLoading} mesLabel={ymLabel(mes)} isRede={isRede} />
       )}
     </div>
   );
@@ -308,6 +459,8 @@ function Timeline({
   comparAuto,
   onSetAnalisado,
   onSetComparacao,
+  isRede,
+  hasEcommerce,
 }: {
   data: MesMetric[] | null;
   loading: boolean;
@@ -316,6 +469,8 @@ function Timeline({
   comparAuto: boolean;
   onSetAnalisado: (ym: string) => void;
   onSetComparacao: (ym: string) => void;
+  isRede: boolean;
+  hasEcommerce: boolean;
 }) {
   const { theme } = useTheme();
   const [menu, setMenu] = useState<{ ym: string; label: string; x: number; y: number } | null>(null);
@@ -329,7 +484,10 @@ function Timeline({
   return (
     <section className={styles.card}>
       <div className={styles.cardHead}>
-        <h2 className={styles.cardTitle}>Faturamento — últimos 12 meses</h2>
+        <h2 className={styles.cardTitle}>
+          Faturamento {isRede ? "da rede" : "da loja"} — últimos 12 meses
+          {isRede && hasEcommerce && <span className={styles.cardHint}> (varejo, sem e-commerce)</span>}
+        </h2>
         <div className={styles.legend}>
           <span><i className={styles.dot} style={{ background: ANALYZED }} /> Mês analisado</span>
           <span>
@@ -375,11 +533,21 @@ function Timeline({
               }}
             >
               {data.map((m) => (
-                <Cell key={m.ym} fill={m.ym === analyzedYm ? ANALYZED : m.ym === comparYm ? COMPAR : c.bar} />
+                <Cell
+                  key={m.ym}
+                  fill={m.ym === analyzedYm ? ANALYZED : m.ym === comparYm ? COMPAR : c.bar}
+                  fillOpacity={m.parcial ? 0.5 : 1}
+                />
               ))}
             </Bar>
           </BarChart>
         </ResponsiveContainer>
+      )}
+      {data?.some((m) => m.parcial) && (
+        <p className={styles.timelineNote}>
+          A barra mais clara é o mês atual (parcial — dados só até hoje). Na comparação, os meses são
+          alinhados pela mesma faixa de dias.
+        </p>
       )}
 
       {menu && (
@@ -419,39 +587,54 @@ function PrincipalTab({
   loading,
   error,
   onGoTab,
+  comparacaoProdutos,
+  comparacaoLoading,
+  isRede,
 }: {
   data: PrincipalData | null;
   loading: boolean;
   error: string | null;
   onGoTab: (t: Tab) => void;
+  comparacaoProdutos: ComparacaoData | null;
+  comparacaoLoading: boolean;
+  isRede: boolean;
 }) {
   if (error) return <div className={styles.errorBox}>{error}</div>;
   if (loading && !data) return <div className={styles.skeleton} style={{ height: 320 }} />;
   if (!data || !data.analyzed) return <div className={styles.empty}>Sem dados para o mês selecionado.</div>;
 
-  const { analyzed, comparacao, comparacaoAuto, isMesmo, decomposicao, rupturasResumo, vendedoresResumo } = data;
+  const { analyzed, comparacao, comparacaoAuto, isMesmo, janela, decomposicao, rupturasResumo, vendedoresResumo } = data;
+  const anLabel = janela.analisadoLabel;
+  const compLabel = janela.comparacaoLabel ?? comparacao?.label ?? "";
   const temAlerta = rupturasResumo.quantidade > 0 || vendedoresResumo.quedas.length > 0;
   const atendimentosDomina =
     !!decomposicao && Math.abs(decomposicao.porAtendimentos) >= Math.abs(decomposicao.porTicketMedio);
-  const refLabel = comparacao ? `${comparacao.label}${comparacaoAuto ? " (melhor mês)" : ""}` : "";
+  const refLabel = comparacao ? `${compLabel}${comparacaoAuto ? " (melhor mês)" : ""}` : "";
   const acimaDaRef = !!(comparacao && analyzed.faturamento > comparacao.faturamento);
 
   return (
     <div className={styles.tabBody}>
+      {comparacao && !isMesmo && (
+        <p className={styles.janelaInfo}>
+          Comparando <strong>{anLabel}</strong> vs <strong>{compLabel}</strong> — mesma faixa de dias
+          {janela.parcial && <> · {anLabel} é o mês atual (parcial, até hoje)</>}.
+        </p>
+      )}
+
       {isMesmo ? (
         <div className={`${styles.banner} ${styles.bannerInfo}`}>
-          <strong>{analyzed.label} é o próprio mês de comparação.</strong> Escolha outro mês de comparação (no seletor ou clicando numa barra) para ver o que faltou.
+          <strong>{anLabel} é o próprio mês de comparação.</strong> Escolha outro mês de comparação (no seletor ou clicando numa barra) para ver o que faltou.
         </div>
       ) : acimaDaRef && decomposicao ? (
         <div className={`${styles.banner} ${styles.bannerGood}`}>
-          <strong>{analyzed.label} superou {refLabel} em {fmtCurrency(Math.abs(decomposicao.gap))}.</strong>{" "}
+          <strong>{anLabel} superou {refLabel} em {fmtCurrency(Math.abs(decomposicao.gap))}.</strong>{" "}
           Faturou {fmtCurrency(analyzed.faturamento)} vs {fmtCurrency(comparacao!.faturamento)}.
         </div>
       ) : (
         comparacao &&
         decomposicao && (
           <div className={`${styles.banner} ${temAlerta ? styles.bannerAlert : styles.bannerInfo}`}>
-            <strong>Faltam {fmtCurrency(decomposicao.gap)}</strong> para {analyzed.label} igualar {refLabel} (
+            <strong>Faltam {fmtCurrency(decomposicao.gap)}</strong> para {anLabel} alcançar {refLabel} (
             {fmtCurrency(comparacao.faturamento)}).{" "}
             {atendimentosDomina
               ? "O maior peso está em MENOS atendimentos."
@@ -460,12 +643,12 @@ function PrincipalTab({
         )
       )}
 
-      {/* KPIs do mês analisado vs comparação */}
+      {/* KPIs do mês analisado vs comparação (mesma faixa de dias) */}
       <div className={styles.kpiRow}>
-        <Kpi label={`Faturamento (${analyzed.label})`} value={fmtCurrency(analyzed.faturamento)} sub={comparacao ? `comparação: ${fmtCurrency(comparacao.faturamento)}` : undefined} />
-        <Kpi label="Atendimentos" value={fmtNum(analyzed.tickets)} sub={comparacao ? `comparação: ${fmtNum(comparacao.tickets)}` : undefined} />
-        <Kpi label="Ticket médio" value={fmtCurrency(analyzed.ticketMedio)} sub={comparacao ? `comparação: ${fmtCurrency(comparacao.ticketMedio)}` : undefined} />
-        <Kpi label="Peças vendidas" value={fmtNum(analyzed.quantidade)} />
+        <Kpi label={`Faturamento (${anLabel})`} value={fmtCurrency(analyzed.faturamento)} sub={comparacao ? `${compLabel}: ${fmtCurrency(comparacao.faturamento)}` : undefined} />
+        <Kpi label="Atendimentos" value={fmtNum(analyzed.tickets)} sub={comparacao ? `${compLabel}: ${fmtNum(comparacao.tickets)}` : undefined} />
+        <Kpi label="Ticket médio" value={fmtCurrency(analyzed.ticketMedio)} sub={comparacao ? `${compLabel}: ${fmtCurrency(comparacao.ticketMedio)}` : undefined} />
+        <Kpi label="Peças vendidas" value={fmtNum(analyzed.quantidade)} sub={comparacao ? `${compLabel}: ${fmtNum(comparacao.quantidade)}` : undefined} />
       </div>
 
       {/* Decomposição do gap (só quando o mês analisado está ABAIXO da comparação) */}
@@ -477,14 +660,14 @@ function PrincipalTab({
               titulo="Menos atendimentos"
               valor={decomposicao.porAtendimentos}
               gap={decomposicao.gap}
-              dica={`${fmtNum(analyzed.tickets)} vs ${fmtNum(comparacao?.tickets ?? 0)} tickets na comparação`}
+              dica={`${fmtNum(analyzed.tickets)} vs ${fmtNum(comparacao?.tickets ?? 0)} atendimentos`}
               destaque={atendimentosDomina}
             />
             <GapFactor
               titulo="Ticket médio menor"
               valor={decomposicao.porTicketMedio}
               gap={decomposicao.gap}
-              dica={`${fmtCurrency(analyzed.ticketMedio)} vs ${fmtCurrency(comparacao?.ticketMedio ?? 0)} na comparação`}
+              dica={`${fmtCurrency(analyzed.ticketMedio)} vs ${fmtCurrency(comparacao?.ticketMedio ?? 0)}`}
               destaque={!atendimentosDomina}
             />
           </div>
@@ -500,9 +683,9 @@ function PrincipalTab({
           </div>
           <div className={styles.diagBig}>{rupturasResumo.quantidade}</div>
           <div className={styles.diagText}>
-            SKUs que venderam e estão zerados na loja
+            SKUs que venderam e estão zerados {isRede ? "na rede" : "na loja"}
             {rupturasResumo.faturamento > 0 && <> · {fmtCurrency(rupturasResumo.faturamento)} no mês</>}
-            {rupturasResumo.comEstoqueNaRede > 0 && (
+            {!isRede && rupturasResumo.comEstoqueNaRede > 0 && (
               <> · <strong>{rupturasResumo.comEstoqueNaRede}</strong> têm estoque em outra loja</>
             )}
           </div>
@@ -533,6 +716,291 @@ function PrincipalTab({
           )}
           <span className={styles.diagLink}>Ver vendedores →</span>
         </button>
+      </div>
+
+      {/* O que fez a diferença — 3 perguntas simples, clicáveis (só quando há comparação) */}
+      {!isMesmo && comparacao && (
+        <>
+          <DiferencaProdutos
+            data={comparacaoProdutos}
+            loading={comparacaoLoading}
+            anLabel={anLabel}
+            compLabel={compLabel}
+            gapKpi={decomposicao?.gap ?? null}
+            isRede={isRede}
+            onGoTab={onGoTab}
+          />
+
+          {vendedoresResumo.ranking.length > 0 && (
+            <div className={styles.card}>
+              <div className={styles.cardHead}>
+                <h3 className={styles.cardTitle}>Quem vendeu — vendedores</h3>
+                <span className={styles.cardHint}>{anLabel} vs {compLabel}</span>
+              </div>
+              <div className={styles.matrizScroll}>
+                <table className={styles.compTable}>
+                  <thead>
+                    <tr>
+                      <th>Vendedor</th>
+                      <th className={styles.num}>{compLabel}</th>
+                      <th className={styles.num}>{anLabel}</th>
+                      <th className={styles.num}>Diferença</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {vendedoresResumo.ranking.map((v) => (
+                      <tr key={v.vendedor}>
+                        <td>{v.vendedor}</td>
+                        <td className={styles.num}>{fmtCurrency(v.comparacao)}</td>
+                        <td className={styles.num}>{fmtCurrency(v.analisado)}</td>
+                        <td className={`${styles.num} ${v.diff > 0 ? styles.diffNeg : v.diff < 0 ? styles.diffPos : ""}`}>
+                          {v.diff > 0 ? "−" : v.diff < 0 ? "+" : ""}
+                          {fmtCurrency(Math.abs(v.diff))}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+type Bucket = "ruptura" | "tinhaEstoque" | "cresceu";
+
+/**
+ * "O que fez a diferença — produtos": 3 perguntas simples e clicáveis (sem gráfico).
+ * O número em destaque é a CONTAGEM de produtos; o valor é secundário; o detalhe
+ * real por produto abre numa gaveta. A linha de reconciliação fecha com o gap dos KPIs.
+ */
+function DiferencaProdutos({
+  data,
+  loading,
+  anLabel,
+  compLabel,
+  gapKpi,
+  isRede,
+  onGoTab,
+}: {
+  data: ComparacaoData | null;
+  loading: boolean;
+  anLabel: string;
+  compLabel: string;
+  gapKpi: number | null;
+  isRede: boolean;
+  onGoTab: (t: Tab) => void;
+}) {
+  const [aberto, setAberto] = useState<Bucket | null>(null);
+  const toggle = (b: Bucket) => setAberto((cur) => (cur === b ? null : b));
+
+  return (
+    <div className={styles.card}>
+      <div className={styles.cardHead}>
+        <h3 className={styles.cardTitle}>O que fez a diferença — produtos</h3>
+        <span className={styles.cardHint}>diferença por produto · {compLabel} vs {anLabel}</span>
+      </div>
+
+      {loading && !data && <div className={styles.skeleton} style={{ height: 150 }} />}
+
+      {data && (
+        <>
+          <div className={styles.perguntaGrid}>
+            <PerguntaCard
+              icon="📦"
+              titulo="Faltou produto (ficou sem estoque)"
+              count={data.rupturaCount}
+              valor={data.rupturaFat}
+              tone="neg"
+              ativo={aberto === "ruptura"}
+              onClick={() => toggle("ruptura")}
+            />
+            <PerguntaCard
+              icon="📉"
+              titulo="Tinha estoque e vendeu menos"
+              count={data.tinhaEstoqueCount}
+              valor={data.tinhaEstoqueFat}
+              tone="neg"
+              ativo={aberto === "tinhaEstoque"}
+              onClick={() => toggle("tinhaEstoque")}
+            />
+            <PerguntaCard
+              icon="📈"
+              titulo="Compensaram (venderam mais)"
+              count={data.cresceuCount}
+              valor={data.cresceuFat}
+              tone="pos"
+              ativo={aberto === "cresceu"}
+              onClick={() => toggle("cresceu")}
+            />
+          </div>
+
+          <div className={styles.reconBox}>
+            <p className={styles.reconLine}>
+              Produto a produto:{" "}
+              <span className={styles.diffNeg}>−{fmtCurrency(data.rupturaFat)}</span> faltou{"  "}
+              <span className={styles.diffNeg}>−{fmtCurrency(data.tinhaEstoqueFat)}</span> vendeu menos{"  "}
+              <span className={styles.diffPos}>+{fmtCurrency(data.cresceuFat)}</span> cresceu{"  =  "}
+              <strong>{fmtCurrency(data.gapProdutos)}</strong>
+            </p>
+            {gapKpi != null && Math.abs(gapKpi - data.gapProdutos) > 1 && (
+              <p className={styles.reconSub}>
+                {(() => {
+                  const resid = Math.round((gapKpi - data.gapProdutos) * 100) / 100;
+                  const sinal = resid >= 0 ? "+" : "−";
+                  return (
+                    <>
+                      {sinal} {fmtCurrency(Math.abs(resid))} de trocas/devoluções (não entram por produto) ={" "}
+                      <strong>{fmtCurrency(gapKpi)}</strong> de diferença no faturamento total.
+                    </>
+                  );
+                })()}
+              </p>
+            )}
+          </div>
+
+          {aberto === "ruptura" && (
+            <ProdutoLista items={data.ruptura} total={data.rupturaCount} anLabel={anLabel} compLabel={compLabel} tipo="ruptura" isRede={isRede} onGoTab={onGoTab} />
+          )}
+          {aberto === "tinhaEstoque" && (
+            <ProdutoLista items={data.tinhaEstoque} total={data.tinhaEstoqueCount} anLabel={anLabel} compLabel={compLabel} tipo="tinhaEstoque" isRede={isRede} onGoTab={onGoTab} />
+          )}
+          {aberto === "cresceu" && (
+            <ProdutoLista items={data.cresceu} total={data.cresceuCount} anLabel={anLabel} compLabel={compLabel} tipo="cresceu" isRede={isRede} onGoTab={onGoTab} />
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function PerguntaCard({
+  icon,
+  titulo,
+  count,
+  valor,
+  tone,
+  ativo,
+  onClick,
+}: {
+  icon: string;
+  titulo: string;
+  count: number;
+  valor: number;
+  tone: "neg" | "pos";
+  ativo: boolean;
+  onClick: () => void;
+}) {
+  const vazio = count === 0;
+  return (
+    <button
+      type="button"
+      className={`${styles.perguntaCard} ${ativo ? styles.perguntaCardAtivo : ""}`}
+      onClick={onClick}
+      disabled={vazio}
+    >
+      <div className={styles.perguntaHead}>
+        <span className={styles.diagIcon}>{icon}</span>
+        <span className={styles.perguntaTitulo}>{titulo}</span>
+      </div>
+      <div className={styles.perguntaBig}>
+        {count}
+        <span className={styles.perguntaBigUnit}> produto{count === 1 ? "" : "s"}</span>
+      </div>
+      <div className={`${styles.perguntaValor} ${tone === "neg" ? styles.diffNeg : styles.diffPos}`}>
+        {tone === "neg" ? "−" : "+"}
+        {fmtCurrency(valor)}
+      </div>
+      {!vazio && <span className={styles.perguntaLink}>{ativo ? "ocultar ▲" : "ver os produtos ▼"}</span>}
+    </button>
+  );
+}
+
+function ProdutoLista({
+  items,
+  total,
+  anLabel,
+  compLabel,
+  tipo,
+  isRede,
+  onGoTab,
+}: {
+  items: ComparacaoProdutoItem[];
+  total: number;
+  anLabel: string;
+  compLabel: string;
+  tipo: Bucket;
+  isRede: boolean;
+  onGoTab: (t: Tab) => void;
+}) {
+  if (items.length === 0) return <div className={styles.empty}>Nenhum produto neste grupo.</div>;
+  const showEstoque = tipo !== "cresceu";
+  return (
+    <div className={styles.gaveta}>
+      {total > items.length && (
+        <p className={styles.rupturaHint}>Mostrando os {items.length} maiores de {total} produtos.</p>
+      )}
+      <div className={styles.matrizScroll}>
+        <table className={styles.compTable}>
+          <thead>
+            <tr>
+              <th>Produto</th>
+              <th>Cor</th>
+              <th className={styles.num}>{compLabel}</th>
+              <th className={styles.num}>{anLabel}</th>
+              <th className={styles.num}>Diferença</th>
+              {showEstoque && (
+                <th
+                  className={styles.num}
+                  title="Saldo reconstruído no fim da janela analisada (ou estoque de hoje, no mês corrente)"
+                >
+                  Estoque no mês
+                </th>
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((p) => {
+              const estMes = p.estoqueFimMesAnalisado ?? p.estoqueLoja;
+              const cresceu = p.diffFat < 0;
+              return (
+                <tr key={`${p.produto}-${p.cor}`}>
+                  <td>
+                    <div className={styles.prodDesc}>{p.descricao || p.produto}</div>
+                    <div className={styles.prodId}>{p.produto}</div>
+                  </td>
+                  <td>{p.corDescricao || p.cor || "—"}</td>
+                  <td className={styles.num}>
+                    <div>{fmtCurrency(p.fatComparacao)}</div>
+                    <div className={styles.subQtd}>{fmtNum(p.qtdComparacao)} pç</div>
+                  </td>
+                  <td className={styles.num}>
+                    <div>{fmtCurrency(p.fatAnalisado)}</div>
+                    <div className={styles.subQtd}>{fmtNum(p.qtdAnalisado)} pç</div>
+                  </td>
+                  <td className={`${styles.num} ${cresceu ? styles.diffPos : styles.diffNeg}`}>
+                    {cresceu ? "+" : "−"}
+                    {fmtCurrency(Math.abs(p.diffFat))}
+                  </td>
+                  {showEstoque && (
+                    <td className={`${styles.num} ${estMes <= 0 ? styles.zero : ""}`}>
+                      <div>{estMes}</div>
+                      {p.estoqueFimMesAnalisado != null && <div className={styles.subQtd}>hoje: {p.estoqueLoja}</div>}
+                      {tipo === "ruptura" && !isRede && p.temNaRede && (
+                        <button type="button" className={styles.redeLink} onClick={() => onGoTab("rupturas")}>
+                          tem na rede →
+                        </button>
+                      )}
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   );
@@ -599,8 +1067,15 @@ function VendedoresTab({
     return `rgba(37, 99, 235, ${0.08 + t * 0.5})`;
   };
 
+  const now = new Date();
+  const nowYm = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
   return (
     <div className={styles.tabBody}>
+      <p className={styles.rupturaHint}>
+        Faturamento por vendedor, mês a mês (meses completos). O mês atual ({ymLabel(nowYm)}) está parcial —
+        dados só até hoje.
+      </p>
       <div className={styles.matrizScroll}>
         <table className={styles.matriz}>
           <thead>
@@ -649,26 +1124,155 @@ function VendedoresTab({
   );
 }
 
+// ── Aba Produtos (vendas antes × depois + estoque hoje) ──────────────────────────
+
+function fmtAcabaEm(dias: number | null): { texto: string; cls: string } {
+  if (dias == null) return { texto: "sem giro", cls: styles.acabaMuted };
+  if (dias <= 0) return { texto: "esgotado", cls: styles.acabaCrit };
+  if (dias <= 7) return { texto: `${dias} dias`, cls: styles.acabaCrit };
+  if (dias <= 15) return { texto: `${dias} dias`, cls: styles.acabaWarn };
+  if (dias > 180) return { texto: "+180 dias", cls: styles.acabaOk };
+  return { texto: `${dias} dias`, cls: styles.acabaOk };
+}
+
+function ProdutosTab({
+  data,
+  loading,
+  anLabel,
+  compLabel,
+  isRede,
+}: {
+  data: ProdutosEstoqueData | null;
+  loading: boolean;
+  anLabel: string;
+  compLabel: string;
+  isRede: boolean;
+}) {
+  if (loading && !data) return <div className={styles.skeleton} style={{ height: 320 }} />;
+  if (!data) return <div className={styles.empty}>Selecione um mês de comparação para ver os produtos.</div>;
+  if (data.semEstoque.length === 0 && data.comEstoque.length === 0)
+    return <div className={styles.empty}>Nenhum produto vendido nas janelas comparadas.</div>;
+
+  return (
+    <div className={styles.tabBody}>
+      <p className={styles.rupturaHint}>
+        Produtos que venderam em <strong>{compLabel}</strong> (antes) e/ou <strong>{anLabel}</strong> (depois),
+        com o estoque de hoje {isRede ? "na rede" : "na loja"} e em quantos dias ele acaba no ritmo recente.
+        {data.truncado && " Lista grande: mostrando os principais de cada grupo (sem estoque = mais vendidos; com estoque = os que acabam antes)."}
+      </p>
+      <ProdutoEstoqueSecao
+        titulo="Produtos vendidos SEM estoque"
+        subtitulo="venderam no período mas estão zerados hoje — venda perdida até repor"
+        items={data.semEstoque}
+        anLabel={anLabel}
+        compLabel={compLabel}
+        warn
+      />
+      <ProdutoEstoqueSecao
+        titulo="Produtos vendidos COM estoque"
+        subtitulo="têm saldo hoje — 'acaba em' indica a urgência de reposição"
+        items={data.comEstoque}
+        anLabel={anLabel}
+        compLabel={compLabel}
+      />
+    </div>
+  );
+}
+
+function ProdutoEstoqueSecao({
+  titulo,
+  subtitulo,
+  items,
+  anLabel,
+  compLabel,
+  warn = false,
+}: {
+  titulo: string;
+  subtitulo: string;
+  items: ProdutoVendaEstoqueItem[];
+  anLabel: string;
+  compLabel: string;
+  warn?: boolean;
+}) {
+  return (
+    <div className={styles.card}>
+      <div className={styles.cardHead}>
+        <h3 className={`${styles.cardTitle} ${warn ? styles.tituloWarn : ""}`}>
+          {titulo} <span className={styles.secaoCount}>· {items.length}</span>
+        </h3>
+        <span className={styles.cardHint}>{subtitulo}</span>
+      </div>
+      {items.length === 0 ? (
+        <div className={styles.empty}>Nenhum produto neste grupo.</div>
+      ) : (
+        <div className={styles.matrizScroll}>
+          <table className={styles.compTable}>
+            <thead>
+              <tr>
+                <th>Produto</th>
+                <th>Cor</th>
+                <th className={styles.num}>Vendas antes ({compLabel})</th>
+                <th className={styles.num}>Vendas depois ({anLabel})</th>
+                <th className={styles.num}>Estoque</th>
+                <th className={styles.num} title="Dias até acabar no ritmo recente de venda">
+                  Acaba em
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((p) => {
+                const acaba = fmtAcabaEm(p.acabaEmDias);
+                return (
+                  <tr key={`${p.produto}-${p.cor}`}>
+                    <td>
+                      <div className={styles.prodDesc}>{p.descricao || p.produto}</div>
+                      <div className={styles.prodId}>{p.produto}</div>
+                    </td>
+                    <td>{p.corDescricao || p.cor || "—"}</td>
+                    <td className={styles.num}>
+                      <div>{fmtNum(p.qtdAntes)} pç</div>
+                      <div className={styles.subQtd}>{fmtCurrency(p.fatAntes)}</div>
+                    </td>
+                    <td className={styles.num}>
+                      <div>{fmtNum(p.qtdDepois)} pç</div>
+                      <div className={styles.subQtd}>{fmtCurrency(p.fatDepois)}</div>
+                    </td>
+                    <td className={`${styles.num} ${p.estoque <= 0 ? styles.zero : ""}`}>{fmtNum(p.estoque)}</td>
+                    <td className={`${styles.num} ${acaba.cls}`}>{acaba.texto}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Aba Rupturas ───────────────────────────────────────────────────────────────
 
 function RupturasTab({
   data,
   loading,
   mesLabel,
+  isRede,
 }: {
   data: RupturaItem[] | null;
   loading: boolean;
   mesLabel: string;
+  isRede: boolean;
 }) {
+  const escopo = isRede ? "na rede" : "nesta loja";
   if (loading && !data) return <div className={styles.skeleton} style={{ height: 320 }} />;
   if (!data) return null;
   if (data.length === 0)
-    return <div className={styles.empty}>Nenhuma ruptura em {mesLabel}: os produtos que venderam têm estoque na loja. 🎉</div>;
+    return <div className={styles.empty}>Nenhuma ruptura em {mesLabel}: os produtos que venderam têm estoque {escopo}. 🎉</div>;
 
   return (
     <div className={styles.tabBody}>
       <p className={styles.rupturaHint}>
-        {data.length} produto(s) venderam em {mesLabel} e estão zerados nesta loja — do maior faturamento ao menor.
+        {data.length} produto(s) venderam em {mesLabel} e estão zerados {escopo} — do maior faturamento ao menor.
       </p>
       <div className={styles.matrizScroll}>
         <table className={styles.rupturaTable}>
@@ -678,7 +1282,7 @@ function RupturasTab({
               <th>Cor</th>
               <th className={styles.num}>Vendeu</th>
               <th className={styles.num}>Faturou</th>
-              <th className={styles.num}>Estoque loja</th>
+              <th className={styles.num}>Estoque {isRede ? "rede" : "loja"}</th>
               <th>Onde tem estoque</th>
             </tr>
           </thead>

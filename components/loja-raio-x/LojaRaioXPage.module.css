@@ -18,6 +18,31 @@
   font-weight: 700;
   color: var(--t-900);
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.redeBadge {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--s-blue50);
+  color: #2563eb;
+  border: 1px solid rgba(37, 99, 235, 0.3);
+}
+.varejoBadge {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.12);
+  color: #b45309;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  cursor: help;
 }
 .subtitle {
   font-size: 13px;
@@ -373,6 +398,191 @@
 .quedaVal {
   color: #dc2626;
   font-weight: 600;
+}
+
+/* Comparação de produtos / vendedores (Diagnóstico) */
+.cardHint {
+  font-size: 12px;
+  color: var(--t-500);
+}
+/* Linha "Comparando X vs Y" + nota da timeline */
+.janelaInfo {
+  margin: 0;
+  font-size: 13px;
+  color: var(--t-600);
+}
+.janelaInfo strong {
+  color: var(--t-900);
+}
+.timelineNote {
+  margin: 8px 2px 0;
+  font-size: 12px;
+  color: var(--t-500);
+}
+
+/* "O que fez a diferença" — 3 perguntas clicáveis */
+.perguntaGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+.perguntaCard {
+  text-align: left;
+  appearance: none;
+  cursor: pointer;
+  background: var(--s-white);
+  border: 1px solid var(--b-200);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: border-color 0.15s, transform 0.1s, box-shadow 0.15s;
+}
+.perguntaCard:hover:not(:disabled) {
+  border-color: var(--b-300);
+  transform: translateY(-1px);
+}
+.perguntaCard:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.perguntaCardAtivo {
+  border-color: rgba(37, 99, 235, 0.55);
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.35) inset;
+}
+.perguntaHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.perguntaTitulo {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t-800);
+  line-height: 1.25;
+}
+.perguntaBig {
+  font-size: 30px;
+  font-weight: 800;
+  color: var(--t-900);
+  line-height: 1;
+}
+.perguntaBigUnit {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t-500);
+}
+.perguntaValor {
+  font-size: 15px;
+  font-weight: 700;
+}
+.perguntaLink {
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #2563eb;
+}
+
+/* Reconciliação honesta (substitui o disclaimer): soma dos produtos + resíduo de trocas */
+.reconBox {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  background: var(--s-50);
+  border-radius: 8px;
+}
+.reconLine {
+  margin: 0;
+  font-size: 13px;
+  color: var(--t-700);
+  line-height: 1.7;
+}
+.reconLine strong {
+  color: var(--t-900);
+}
+.reconSub {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--t-500);
+  line-height: 1.6;
+}
+.reconSub strong {
+  color: var(--t-700);
+}
+
+/* Gaveta detalhada abaixo dos cartões */
+.gaveta {
+  margin-top: 14px;
+}
+
+/* Aba Produtos (vendas × estoque) */
+.tituloWarn {
+  color: #b45309;
+}
+.secaoCount {
+  font-weight: 600;
+  color: var(--t-500);
+}
+.acabaCrit {
+  color: #dc2626;
+  font-weight: 700;
+}
+.acabaWarn {
+  color: #b45309;
+  font-weight: 700;
+}
+.acabaOk {
+  color: var(--t-700);
+  font-weight: 600;
+}
+.acabaMuted {
+  color: var(--t-400);
+}
+.compTable {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+.compTable th,
+.compTable td {
+  padding: 9px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--b-200);
+  vertical-align: top;
+  white-space: nowrap;
+}
+.compTable thead th {
+  background: var(--s-50);
+  color: var(--t-600);
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+}
+.compTable .num {
+  text-align: right;
+}
+.subQtd {
+  font-size: 10px;
+  color: var(--t-500);
+}
+.diffNeg {
+  color: #dc2626;
+  font-weight: 700;
+}
+.diffPos {
+  color: #16a34a;
+  font-weight: 700;
+}
+.redeLink {
+  appearance: none;
+  border: none;
+  background: none;
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #2563eb;
+  cursor: pointer;
+  padding: 0;
 }
 
 /* Matriz vendedores */
