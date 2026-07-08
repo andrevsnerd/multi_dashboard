@@ -15,6 +15,7 @@ import {
 import FilialFilter from "@/components/filters/FilialFilter";
 import { useTheme } from "@/components/theme/ThemeContext";
 import { resolveCompany, type CompanyKey } from "@/lib/config/company";
+import { exportLojaRaioXXlsx } from "@/lib/utils/exportLojaRaioXXlsx";
 
 import styles from "./LojaRaioXPage.module.css";
 
@@ -194,6 +195,8 @@ export default function LojaRaioXPage({ companyKey }: Props) {
   const [produtosEstoque, setProdutosEstoque] = useState<ProdutosEstoqueData | null>(null);
   const [produtosEstoqueLoading, setProdutosEstoqueLoading] = useState(false);
 
+  const [exporting, setExporting] = useState(false);
+
   // Principal (linha do tempo + diagnóstico). filial null = visão rede (agrega todas).
   useEffect(() => {
     const controller = new AbortController();
@@ -346,6 +349,21 @@ export default function LojaRaioXPage({ companyKey }: Props) {
     rupturas: "Rupturas",
   };
 
+  async function handleExport() {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const filialLabel = filial
+        ? (resolveCompany(companyKey)?.filialDisplayNames?.[filial] ?? filial)
+        : null;
+      await exportLojaRaioXXlsx({ companyKey, filial, mes, comparar, isRede, filialLabel });
+    } catch (err) {
+      alert((err as Error).message || "Erro ao exportar XLSX");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <div className={styles.wrapper}>
       <header className={styles.topbar}>
@@ -396,6 +414,9 @@ export default function LojaRaioXPage({ companyKey }: Props) {
               ))}
             </select>
           </label>
+          <button type="button" className={styles.exportBtn} onClick={handleExport} disabled={exporting}>
+            {exporting ? "Exportando…" : "Exportar XLSX"}
+          </button>
         </div>
       </header>
 
@@ -679,11 +700,17 @@ function PrincipalTab({
           sub={comparacao ? `vs ${fmtNum(comparacao.tickets)} tickets` : undefined}
         />
         <Kpi
-          label="Ticket médio"
-          value={fmtCurrency(analyzed.ticketMedio)}
-          delta={comparacao ? deltaText(analyzed.ticketMedio - comparacao.ticketMedio, "brl") : undefined}
-          deltaTone={comparacao ? (analyzed.ticketMedio >= comparacao.ticketMedio ? "pos" : "neg") : undefined}
-          sub={comparacao ? `vs ${fmtCurrency(comparacao.ticketMedio)}` : undefined}
+          label="Gap"
+          value={decomposicao ? fmtCurrency(Math.abs(decomposicao.gap)) : "—"}
+          delta={decomposicao ? (decomposicao.gap <= 0 ? "+" : "−") : undefined}
+          deltaTone={decomposicao ? (decomposicao.gap <= 0 ? "pos" : "neg") : undefined}
+          sub={
+            decomposicao
+              ? decomposicao.gap <= 0
+                ? `acima de ${refDescr}`
+                : `para igualar ${refDescr}`
+              : undefined
+          }
         />
         <Kpi
           label="Peças vendidas"
@@ -727,7 +754,7 @@ function PrincipalTab({
         </section>
       )}
 
-      {/* O que fez a diferença — 3 perguntas simples, clicáveis + reconciliação */}
+      {/* O que fez a diferença — 3 perguntas simples, clicáveis */}
       {!isMesmo && comparacao && (
         <>
           <DiferencaProdutos
@@ -735,7 +762,6 @@ function PrincipalTab({
             loading={comparacaoLoading}
             anLabel={anLabel}
             compLabel={compLabel}
-            gapKpi={decomposicao?.gap ?? null}
             isRede={isRede}
             onGoTab={onGoTab}
           />
@@ -799,14 +825,13 @@ type Bucket = "ruptura" | "tinhaEstoque" | "cresceu";
 /**
  * "O que fez a diferença — produtos": 3 perguntas simples e clicáveis (sem gráfico).
  * O número em destaque é a CONTAGEM de produtos; o valor é secundário; o detalhe
- * real por produto abre numa gaveta. A linha de reconciliação fecha com o gap dos KPIs.
+ * real por produto abre numa gaveta.
  */
 function DiferencaProdutos({
   data,
   loading,
   anLabel,
   compLabel,
-  gapKpi,
   isRede,
   onGoTab,
 }: {
@@ -814,110 +839,68 @@ function DiferencaProdutos({
   loading: boolean;
   anLabel: string;
   compLabel: string;
-  gapKpi: number | null;
   isRede: boolean;
   onGoTab: (t: Tab) => void;
 }) {
   const [aberto, setAberto] = useState<Bucket | null>(null);
   const toggle = (b: Bucket) => setAberto((cur) => (cur === b ? null : b));
 
-  const gk = gapKpi ?? data?.gapProdutos ?? 0;
-  const trocas = data ? Math.round((data.gapProdutos - gk) * 100) / 100 : 0;
-  const netUs = -gk;
-
   return (
-    <>
-      <section className={styles.section}>
-        <div className={styles.sectionHead}>
-          <h3 className={styles.sectionTitle}>O que fez a diferença — produtos</h3>
-          <span className={styles.sectionHint}>clique para detalhar</span>
-        </div>
+    <section className={styles.section}>
+      <div className={styles.sectionHead}>
+        <h3 className={styles.sectionTitle}>O que fez a diferença — produtos</h3>
+        <span className={styles.sectionHint}>clique para detalhar</span>
+      </div>
 
-        {loading && !data && <div className={styles.skeleton} style={{ height: 170 }} />}
-
-        {data && (
-          <>
-            <div className={styles.perguntaGrid}>
-              <PerguntaCard
-                kind="ruptura"
-                label="Faltou produto"
-                count={data.rupturaCount}
-                valor={data.rupturaFat}
-                valorTone="neg"
-                descricao={`Venderam no período comparado mas estão zerados hoje ${isRede ? "na rede" : "na loja"}.`}
-                ativo={aberto === "ruptura"}
-                onClick={() => toggle("ruptura")}
-              />
-              <PerguntaCard
-                kind="tinha"
-                label="Tinha estoque e vendeu menos"
-                count={data.tinhaEstoqueCount}
-                valor={data.tinhaEstoqueFat}
-                valorTone="neg"
-                descricao="Produtos com saldo que converteram abaixo do período de referência."
-                ativo={aberto === "tinhaEstoque"}
-                onClick={() => toggle("tinhaEstoque")}
-              />
-              <PerguntaCard
-                kind="cresceu"
-                label="Compensaram (venderam mais)"
-                count={data.cresceuCount}
-                valor={data.cresceuFat}
-                valorTone="pos"
-                descricao="Produtos que cresceram acima da referência."
-                ativo={aberto === "cresceu"}
-                onClick={() => toggle("cresceu")}
-              />
-            </div>
-
-            {aberto === "ruptura" && (
-              <ProdutoLista items={data.ruptura} total={data.rupturaCount} anLabel={anLabel} compLabel={compLabel} tipo="ruptura" isRede={isRede} onGoTab={onGoTab} />
-            )}
-            {aberto === "tinhaEstoque" && (
-              <ProdutoLista items={data.tinhaEstoque} total={data.tinhaEstoqueCount} anLabel={anLabel} compLabel={compLabel} tipo="tinhaEstoque" isRede={isRede} onGoTab={onGoTab} />
-            )}
-            {aberto === "cresceu" && (
-              <ProdutoLista items={data.cresceu} total={data.cresceuCount} anLabel={anLabel} compLabel={compLabel} tipo="cresceu" isRede={isRede} onGoTab={onGoTab} />
-            )}
-          </>
-        )}
-      </section>
+      {loading && !data && <div className={styles.skeleton} style={{ height: 170 }} />}
 
       {data && (
-        <section className={styles.section}>
-          <div className={styles.sectionHead}>
-            <h3 className={styles.sectionTitle}>Reconciliação</h3>
-            <span className={styles.reconFecha}>
-              <span className={styles.reconFechaLabel}>Fecha com</span>
-              <span className={styles.reconFechaVal}>Diferença no faturamento total</span>
-            </span>
+        <>
+          <div className={styles.perguntaGrid}>
+            <PerguntaCard
+              kind="ruptura"
+              label="Faltou produto"
+              count={data.rupturaCount}
+              valor={data.rupturaFat}
+              valorTone="neg"
+              descricao={`Venderam no período comparado mas estão zerados hoje ${isRede ? "na rede" : "na loja"}.`}
+              ativo={aberto === "ruptura"}
+              onClick={() => toggle("ruptura")}
+            />
+            <PerguntaCard
+              kind="tinha"
+              label="Tinha estoque e vendeu menos"
+              count={data.tinhaEstoqueCount}
+              valor={data.tinhaEstoqueFat}
+              valorTone="neg"
+              descricao="Produtos com saldo que converteram abaixo do período de referência."
+              ativo={aberto === "tinhaEstoque"}
+              onClick={() => toggle("tinhaEstoque")}
+            />
+            <PerguntaCard
+              kind="cresceu"
+              label="Compensaram (venderam mais)"
+              count={data.cresceuCount}
+              valor={data.cresceuFat}
+              valorTone="pos"
+              descricao="Produtos que cresceram acima da referência."
+              ativo={aberto === "cresceu"}
+              onClick={() => toggle("cresceu")}
+            />
           </div>
-          <div className={styles.reconLineBox}>
-            <span className={styles.diffNeg}>−{fmtCurrency(data.rupturaFat)}</span>
-            <span className={styles.reconTag}>faltou</span>
-            <span className={styles.diffNeg}>−{fmtCurrency(data.tinhaEstoqueFat)}</span>
-            <span className={styles.reconTag}>vendeu menos</span>
-            <span className={styles.diffPos}>+{fmtCurrency(data.cresceuFat)}</span>
-            <span className={styles.reconTag}>cresceu</span>
-            {Math.abs(trocas) > 1 && (
-              <>
-                <span className={trocas >= 0 ? styles.diffPos : styles.diffNeg}>
-                  {trocas >= 0 ? "+" : "−"}
-                  {fmtCurrency(Math.abs(trocas))}
-                </span>
-                <span className={styles.reconTag}>trocas/dev</span>
-              </>
-            )}
-            <span className={styles.reconEq}>=</span>
-            <strong className={netUs >= 0 ? styles.diffPos : styles.diffNeg}>
-              {netUs >= 0 ? "+" : "−"}
-              {fmtCurrency(Math.abs(gk))}
-            </strong>
-            <span className={styles.reconTag}>gap total</span>
-          </div>
-        </section>
+
+          {aberto === "ruptura" && (
+            <ProdutoLista items={data.ruptura} total={data.rupturaCount} anLabel={anLabel} compLabel={compLabel} tipo="ruptura" isRede={isRede} onGoTab={onGoTab} />
+          )}
+          {aberto === "tinhaEstoque" && (
+            <ProdutoLista items={data.tinhaEstoque} total={data.tinhaEstoqueCount} anLabel={anLabel} compLabel={compLabel} tipo="tinhaEstoque" isRede={isRede} onGoTab={onGoTab} />
+          )}
+          {aberto === "cresceu" && (
+            <ProdutoLista items={data.cresceu} total={data.cresceuCount} anLabel={anLabel} compLabel={compLabel} tipo="cresceu" isRede={isRede} onGoTab={onGoTab} />
+          )}
+        </>
       )}
-    </>
+    </section>
   );
 }
 
