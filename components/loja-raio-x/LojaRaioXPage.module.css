@@ -1,108 +1,129 @@
 .wrapper {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 22px;
   width: 100%;
 }
 
-/* Header */
-.header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
-}
-.title {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--t-900);
-  margin: 0;
+/* ── Topbar: marca + abas + filtros numa linha ────────────────────────────── */
+.topbar {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 22px;
   flex-wrap: wrap;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--b-200);
 }
-.redeBadge {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  padding: 3px 10px;
-  border-radius: 999px;
-  background: var(--s-blue50);
-  color: #2563eb;
-  border: 1px solid rgba(37, 99, 235, 0.3);
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
 }
-.varejoBadge {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  padding: 3px 10px;
-  border-radius: 999px;
-  background: rgba(245, 158, 11, 0.12);
-  color: #b45309;
-  border: 1px solid rgba(245, 158, 11, 0.35);
-  cursor: help;
+.title {
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--t-900);
+  margin: 0;
+  letter-spacing: -0.01em;
 }
-.subtitle {
-  font-size: 13px;
+.brandSub {
+  font-size: 12px;
   color: var(--t-500);
-  margin: 4px 0 0;
-  max-width: 620px;
+  white-space: nowrap;
+}
+.tabs {
+  display: flex;
+  gap: 2px;
+}
+.tabBtn {
+  appearance: none;
+  border: 1px solid transparent;
+  background: none;
+  padding: 7px 15px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t-500);
+  cursor: pointer;
+  border-radius: 9px;
+}
+.tabBtn:hover {
+  color: var(--t-800);
+  background: var(--s-50);
+}
+.tabBtnActive,
+.tabBtnActive:hover {
+  background: var(--s-white);
+  color: var(--t-900);
+  border-color: var(--b-200);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
 }
 .controls {
+  margin-left: auto;
   display: flex;
+  align-items: center;
+  gap: 16px;
   flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 12px;
 }
-.mesField {
+.ctrl {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  gap: 6px;
 }
-.mesLabel {
+.ctrlLabel {
   font-size: 12px;
   font-weight: 600;
-  color: var(--t-600);
+  color: var(--t-500);
+  white-space: nowrap;
 }
 .select {
-  height: 38px;
-  padding: 0 12px;
+  height: 32px;
+  padding: 0 8px;
   border-radius: 8px;
   border: 1px solid var(--b-200);
   background: var(--s-white);
-  color: var(--t-900);
-  font-size: 14px;
+  color: var(--t-800);
+  font-size: 13px;
   cursor: pointer;
 }
 
-/* Cards */
-.card {
-  background: var(--s-white);
-  border: 1px solid var(--b-200);
-  border-radius: 12px;
-  padding: 16px 18px;
+/* ── Seções (título uppercase + slot à direita) ───────────────────────────── */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
-.cardHead {
+.sectionHead {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 8px;
 }
-.cardTitle {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--t-800);
-  margin: 0 0 10px;
-}
-.cardHead .cardTitle {
+.sectionTitle {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--t-500);
   margin: 0;
 }
+.sectionTitleWarn {
+  color: #dc2f4b;
+}
+.sectionTitleOk {
+  color: #0f766e;
+}
+.sectionHint {
+  font-size: 12px;
+  color: var(--t-400);
+}
+.secaoCount {
+  font-weight: 700;
+}
+
+/* Legenda / dot */
 .legend {
   display: flex;
-  gap: 14px;
+  gap: 16px;
   font-size: 12px;
   color: var(--t-500);
 }
@@ -112,13 +133,18 @@
   gap: 6px;
 }
 .dot {
-  width: 10px;
-  height: 10px;
+  width: 9px;
+  height: 9px;
   border-radius: 3px;
   display: inline-block;
 }
+.timelineNote {
+  margin: 4px 2px 0;
+  font-size: 12px;
+  color: var(--t-400);
+}
 
-/* Empty / error / skeleton */
+/* Estados */
 .empty {
   padding: 28px;
   text-align: center;
@@ -193,140 +219,162 @@
   background: var(--s-100);
 }
 
-/* Tabs */
-.tabs {
-  display: flex;
-  gap: 6px;
-  border-bottom: 1px solid var(--b-200);
-}
-.tabBtn {
-  appearance: none;
-  border: none;
-  background: none;
-  padding: 10px 16px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--t-500);
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-}
-.tabBtn:hover {
-  color: var(--t-800);
-}
-.tabBtnActive {
-  color: #2563eb;
-  border-bottom-color: #2563eb;
-}
-
 .tabBody {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 26px;
 }
 
-/* Banner */
+/* ── Banner (janela + veredito) ───────────────────────────────────────────── */
 .banner {
-  padding: 14px 16px;
-  border-radius: 10px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  border-radius: 12px;
   font-size: 14px;
   line-height: 1.5;
+  color: var(--t-800);
+}
+.banner strong {
+  color: var(--t-900);
+}
+.bannerAlert {
+  background: #fdf2f3;
+  border: 1px solid #f5d6da;
+}
+.bannerGood {
+  background: #eefaf3;
+  border: 1px solid #c9ecd8;
 }
 .bannerInfo {
   background: var(--s-blue50);
-  border: 1px solid rgba(37, 99, 235, 0.25);
-  color: var(--t-800);
+  border: 1px solid rgba(37, 99, 235, 0.22);
 }
-.bannerAlert {
-  background: rgba(245, 158, 11, 0.12);
-  border: 1px solid rgba(245, 158, 11, 0.4);
-  color: var(--t-800);
+.bannerNeg {
+  color: #dc2626 !important;
 }
-.bannerGood {
-  background: rgba(16, 185, 129, 0.12);
-  border: 1px solid rgba(16, 185, 129, 0.4);
-  color: var(--t-800);
+.bannerTag {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  margin-top: 2px;
+}
+.bannerAlert .bannerTag {
+  color: #dc2f4b;
+}
+.bannerGood .bannerTag {
+  color: #16a34a;
+}
+.bannerInfo .bannerTag {
+  color: #2563eb;
 }
 
-/* KPIs */
-.kpiRow {
+/* ── KPI strip (4 colunas divididas) ──────────────────────────────────────── */
+.kpiStrip {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(4, 1fr);
+  border: 1px solid var(--b-200);
+  border-radius: 12px;
+  background: var(--s-white);
+  overflow: hidden;
 }
 .kpi {
-  background: var(--s-white);
-  border: 1px solid var(--b-200);
-  border-radius: 10px;
-  padding: 12px 14px;
+  padding: 15px 18px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 6px;
+  border-left: 1px solid var(--b-200);
+}
+.kpi:first-child {
+  border-left: none;
 }
 .kpiLabel {
-  font-size: 12px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
   color: var(--t-500);
 }
+.kpiValueRow {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 .kpiValue {
-  font-size: 20px;
-  font-weight: 700;
+  font-size: 26px;
+  font-weight: 800;
   color: var(--t-900);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+.kpiDelta {
+  font-size: 13px;
+  font-weight: 700;
 }
 .kpiSub {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--t-400);
 }
 
-/* Gap decomposition */
+/* ── Decomposição do gap ──────────────────────────────────────────────────── */
 .gapGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 14px;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 32px;
 }
 .gapFactor {
-  border: 1px solid var(--b-200);
-  border-radius: 10px;
-  padding: 12px 14px;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-.gapFactorHi {
-  border-color: rgba(37, 99, 235, 0.5);
-  background: var(--s-blue50);
-}
 .gapFactorTop {
   display: flex;
+  align-items: baseline;
   justify-content: space-between;
+  gap: 12px;
+}
+.gapFactorNome {
   font-size: 13px;
   color: var(--t-700);
 }
 .gapFactorTop strong {
-  color: var(--t-900);
+  font-size: 15px;
+  white-space: nowrap;
 }
 .gapBar {
   height: 8px;
-  border-radius: 4px;
+  border-radius: 999px;
   background: var(--s-100);
   overflow: hidden;
 }
 .gapBarFill {
   height: 100%;
-  background: #2563eb;
-  border-radius: 4px;
+  border-radius: 999px;
+}
+.gapBarNeg {
+  background: #e5484d;
+}
+.gapBarPos {
+  background: #22c55e;
 }
 .gapDica {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--t-500);
 }
 
-/* Diagnostic cards */
-.diagGrid {
+/* ── "O que fez a diferença" — 3 cartões ──────────────────────────────────── */
+.perguntaGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 14px;
 }
-.diagCard {
+.perguntaCard {
   text-align: left;
   appearance: none;
   cursor: pointer;
@@ -336,234 +384,199 @@
   padding: 16px 18px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  transition: border-color 0.15s, transform 0.1s;
-}
-.diagCard:hover {
-  border-color: var(--b-300);
-  transform: translateY(-1px);
-}
-.diagCardWarn {
-  border-color: rgba(245, 158, 11, 0.5);
-  background: rgba(245, 158, 11, 0.06);
-}
-.diagHead {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.diagIcon {
-  font-size: 18px;
-}
-.diagTitle {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--t-800);
-}
-.diagBig {
-  font-size: 32px;
-  font-weight: 800;
-  color: var(--t-900);
-  line-height: 1;
-}
-.diagBigSub {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--t-400);
-}
-.diagText {
-  font-size: 12px;
-  color: var(--t-500);
-}
-.diagLink {
-  margin-top: 4px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #2563eb;
-}
-.quedaList {
-  list-style: none;
-  margin: 6px 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-.quedaList li {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  color: var(--t-700);
-}
-.quedaVal {
-  color: #dc2626;
-  font-weight: 600;
-}
-
-/* Comparação de produtos / vendedores (Diagnóstico) */
-.cardHint {
-  font-size: 12px;
-  color: var(--t-500);
-}
-/* Linha "Comparando X vs Y" + nota da timeline */
-.janelaInfo {
-  margin: 0;
-  font-size: 13px;
-  color: var(--t-600);
-}
-.janelaInfo strong {
-  color: var(--t-900);
-}
-.timelineNote {
-  margin: 8px 2px 0;
-  font-size: 12px;
-  color: var(--t-500);
-}
-
-/* "O que fez a diferença" — 3 perguntas clicáveis */
-.perguntaGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
-}
-.perguntaCard {
-  text-align: left;
-  appearance: none;
-  cursor: pointer;
-  background: var(--s-white);
-  border: 1px solid var(--b-200);
-  border-radius: 12px;
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  transition: border-color 0.15s, transform 0.1s, box-shadow 0.15s;
+  gap: 10px;
+  min-height: 168px;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
 }
 .perguntaCard:hover:not(:disabled) {
   border-color: var(--b-300);
   transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
 }
 .perguntaCard:disabled {
   cursor: default;
-  opacity: 0.6;
+  opacity: 0.55;
 }
-.perguntaCardAtivo {
-  border-color: rgba(37, 99, 235, 0.55);
-  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.35) inset;
+.perguntaCardAtivo,
+.perguntaCardAtivo:hover {
+  border-color: var(--t-800);
+  box-shadow: 0 0 0 1px var(--t-800) inset;
 }
 .perguntaHead {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 8px;
 }
-.perguntaTitulo {
-  font-size: 13px;
+.perguntaLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  line-height: 1.3;
+}
+.pLabelRuptura {
+  color: #dc2f4b;
+}
+.pLabelTinha {
+  color: #c2620c;
+}
+.pLabelCresceu {
+  color: #16a34a;
+}
+.perguntaDetalhar {
+  font-size: 12px;
   font-weight: 600;
-  color: var(--t-800);
-  line-height: 1.25;
+  color: var(--t-500);
+  white-space: nowrap;
 }
 .perguntaBig {
-  font-size: 30px;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 32px;
   font-weight: 800;
   color: var(--t-900);
   line-height: 1;
+  letter-spacing: -0.02em;
 }
 .perguntaBigUnit {
   font-size: 13px;
   font-weight: 600;
   color: var(--t-500);
 }
+.perguntaDesc {
+  font-size: 12.5px;
+  color: var(--t-500);
+  line-height: 1.45;
+  flex: 1;
+}
 .perguntaValor {
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 700;
-}
-.perguntaLink {
-  margin-top: 2px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #2563eb;
+  padding-top: 10px;
+  border-top: 1px solid var(--b-200);
 }
 
-/* Reconciliação honesta (substitui o disclaimer): soma dos produtos + resíduo de trocas */
-.reconBox {
-  margin: 14px 0 0;
-  padding: 10px 12px;
-  background: var(--s-50);
-  border-radius: 8px;
+/* ── Reconciliação ────────────────────────────────────────────────────────── */
+.reconFecha {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  text-align: right;
 }
-.reconLine {
-  margin: 0;
-  font-size: 13px;
-  color: var(--t-700);
-  line-height: 1.7;
-}
-.reconLine strong {
-  color: var(--t-900);
-}
-.reconSub {
-  margin: 6px 0 0;
-  font-size: 12px;
-  color: var(--t-500);
-  line-height: 1.6;
-}
-.reconSub strong {
-  color: var(--t-700);
-}
-
-/* Gaveta detalhada abaixo dos cartões */
-.gaveta {
-  margin-top: 14px;
-}
-
-/* Aba Produtos (vendas × estoque) */
-.tituloWarn {
-  color: #b45309;
-}
-.secaoCount {
-  font-weight: 600;
-  color: var(--t-500);
-}
-.acabaCrit {
-  color: #dc2626;
+.reconFechaLabel {
+  font-size: 10px;
   font-weight: 700;
-}
-.acabaWarn {
-  color: #b45309;
-  font-weight: 700;
-}
-.acabaOk {
-  color: var(--t-700);
-  font-weight: 600;
-}
-.acabaMuted {
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
   color: var(--t-400);
 }
-.compTable {
+.reconFechaVal {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--t-800);
+}
+.reconLineBox {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  padding: 14px 18px;
+  background: var(--s-50);
+  border: 1px solid var(--b-200);
+  border-radius: 12px;
+  font-size: 14px;
+}
+.reconLineBox strong {
+  font-size: 15px;
+}
+.reconTag {
+  font-size: 12px;
+  color: var(--t-500);
+  margin-right: 8px;
+}
+.reconEq {
+  color: var(--t-400);
+  font-weight: 700;
+  margin: 0 3px;
+}
+
+/* ── Gaveta detalhada ─────────────────────────────────────────────────────── */
+.gaveta {
+  margin-top: 4px;
+}
+.gavetaHint {
+  font-size: 12px;
+  color: var(--t-500);
+  margin: 0 2px 8px;
+}
+
+/* ── Tabelas de dados (unificado) ─────────────────────────────────────────── */
+.tableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--b-200);
+  border-radius: 12px;
+  background: var(--s-white);
+}
+.dataTable {
   border-collapse: collapse;
   width: 100%;
   font-size: 13px;
 }
-.compTable th,
-.compTable td {
-  padding: 9px 12px;
+.dataTable th,
+.dataTable td {
+  padding: 11px 16px;
   text-align: left;
   border-bottom: 1px solid var(--b-200);
-  vertical-align: top;
+  vertical-align: middle;
   white-space: nowrap;
 }
-.compTable thead th {
+.dataTable tbody tr:last-child td {
+  border-bottom: none;
+}
+.dataTable thead th {
   background: var(--s-50);
-  color: var(--t-600);
-  font-weight: 600;
+  color: var(--t-500);
+  font-weight: 700;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   position: sticky;
   top: 0;
 }
-.compTable .num {
+.dataTable tbody tr:hover {
+  background: var(--s-50);
+}
+.dataTable .num {
   text-align: right;
 }
 .subQtd {
-  font-size: 10px;
-  color: var(--t-500);
+  font-size: 11px;
+  color: var(--t-400);
+  margin-top: 1px;
+}
+.prodDesc {
+  color: #2c7a7b;
+  font-weight: 600;
+}
+.prodId {
+  font-size: 11px;
+  color: #bd7b7b;
+  margin-top: 1px;
+}
+.vendedorNome {
+  color: #2c7a7b;
+  font-weight: 600;
+}
+.fat {
+  font-weight: 700;
+  color: var(--t-900);
+}
+.zero {
+  color: #dc2626;
+  font-weight: 600;
 }
 .diffNeg {
   color: #dc2626;
@@ -580,12 +593,62 @@
   margin-left: 6px;
   font-size: 11px;
   font-weight: 600;
-  color: #2563eb;
+  color: #0f766e;
   cursor: pointer;
   padding: 0;
 }
+.acabaCrit {
+  color: #dc2626;
+  font-weight: 700;
+}
+.acabaWarn {
+  color: #c2620c;
+  font-weight: 700;
+}
+.acabaOk {
+  color: var(--t-600);
+  font-weight: 600;
+}
+.acabaMuted {
+  color: var(--t-400);
+}
 
-/* Matriz vendedores */
+/* Rupturas — "onde tem estoque" */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  white-space: normal;
+}
+.chip {
+  font-size: 11px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--s-100);
+  color: var(--t-700);
+  white-space: nowrap;
+}
+.chip strong {
+  color: #16a34a;
+}
+.semRede {
+  font-size: 12.5px;
+  color: #dc2626;
+  font-weight: 600;
+}
+
+/* Intro das abas */
+.intro {
+  font-size: 13px;
+  color: var(--t-500);
+  margin: 0;
+  line-height: 1.5;
+}
+.intro strong {
+  color: var(--t-800);
+}
+
+/* ── Matriz vendedores (heatmap) ──────────────────────────────────────────── */
 .matrizScroll {
   overflow-x: auto;
   border: 1px solid var(--b-200);
@@ -605,8 +668,11 @@
 }
 .matriz thead th {
   background: var(--s-50);
-  color: var(--t-600);
-  font-weight: 600;
+  color: var(--t-500);
+  font-weight: 700;
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
   position: sticky;
   top: 0;
 }
@@ -615,13 +681,14 @@
   position: sticky;
   left: 0;
   background: var(--s-white);
-  color: var(--t-900);
+  color: #2c7a7b;
   font-weight: 600;
   z-index: 1;
 }
 .matriz thead .matrizNome {
   z-index: 2;
   background: var(--s-50);
+  color: var(--t-500);
 }
 .matrizColHi {
   outline: 2px solid rgba(37, 99, 235, 0.35);
@@ -649,68 +716,67 @@
   color: var(--t-400);
 }
 
-/* Rupturas */
-.rupturaHint {
-  font-size: 13px;
-  color: var(--t-600);
-  margin: 0;
+/* ── Responsivo ───────────────────────────────────────────────────────────── */
+@media (max-width: 860px) {
+  .kpiStrip {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .kpi:nth-child(3) {
+    border-left: none;
+  }
+  .kpi:nth-child(n + 3) {
+    border-top: 1px solid var(--b-200);
+  }
+  .perguntaGrid {
+    grid-template-columns: 1fr;
+  }
+  .gapGrid {
+    grid-template-columns: 1fr;
+  }
+  .controls {
+    margin-left: 0;
+  }
 }
-.rupturaTable {
-  border-collapse: collapse;
-  width: 100%;
-  font-size: 13px;
+
+/* ── Overrides tema escuro (superfícies com cor literal) ──────────────────── */
+:global(:root[data-theme="dark"]) .bannerAlert {
+  background: rgba(220, 38, 38, 0.13);
+  border-color: rgba(220, 38, 38, 0.32);
 }
-.rupturaTable th,
-.rupturaTable td {
-  padding: 10px 12px;
-  text-align: left;
-  border-bottom: 1px solid var(--b-200);
-  vertical-align: top;
+:global(:root[data-theme="dark"]) .bannerGood {
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.3);
 }
-.rupturaTable thead th {
-  background: var(--s-50);
-  color: var(--t-600);
-  font-weight: 600;
-  white-space: nowrap;
+:global(:root[data-theme="dark"]) .prodDesc,
+:global(:root[data-theme="dark"]) .vendedorNome,
+:global(:root[data-theme="dark"]) .matrizNome {
+  color: #6fd3d1;
 }
-.rupturaTable .num {
-  text-align: right;
-  white-space: nowrap;
+:global(:root[data-theme="dark"]) .prodId {
+  color: #d19a9a;
 }
-.fat {
-  font-weight: 700;
-  color: var(--t-900);
+:global(:root[data-theme="dark"]) .diffNeg,
+:global(:root[data-theme="dark"]) .zero,
+:global(:root[data-theme="dark"]) .semRede,
+:global(:root[data-theme="dark"]) .acabaCrit,
+:global(:root[data-theme="dark"]) .bannerNeg {
+  color: #f87171 !important;
 }
-.zero {
-  color: #dc2626;
-  font-weight: 600;
+:global(:root[data-theme="dark"]) .diffPos,
+:global(:root[data-theme="dark"]) .chip strong {
+  color: #4ade80;
 }
-.prodDesc {
-  color: var(--t-900);
-  font-weight: 600;
+:global(:root[data-theme="dark"]) .pLabelRuptura,
+:global(:root[data-theme="dark"]) .sectionTitleWarn,
+:global(:root[data-theme="dark"]) .bannerAlert .bannerTag {
+  color: #fb7185;
 }
-.prodId {
-  font-size: 11px;
-  color: var(--t-400);
+:global(:root[data-theme="dark"]) .pLabelTinha,
+:global(:root[data-theme="dark"]) .acabaWarn {
+  color: #fbbf24;
 }
-.chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.chip {
-  font-size: 11px;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: var(--s-100);
-  color: var(--t-700);
-  white-space: nowrap;
-}
-.chip strong {
-  color: #16a34a;
-}
-.semRede {
-  font-size: 12px;
-  color: #dc2626;
-  font-weight: 600;
+:global(:root[data-theme="dark"]) .pLabelCresceu,
+:global(:root[data-theme="dark"]) .sectionTitleOk,
+:global(:root[data-theme="dark"]) .redeLink {
+  color: #5eead4;
 }

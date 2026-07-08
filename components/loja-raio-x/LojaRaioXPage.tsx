@@ -334,38 +334,49 @@ export default function LojaRaioXPage({ companyKey }: Props) {
   const isRede = !filial;
   const hasEcommerce = (resolveCompany(companyKey)?.ecommerceFilials?.length ?? 0) > 0;
 
+  const compararLabel =
+    comparar === "auto"
+      ? `Melhor mês${principal?.comparacao ? ` (${MESES_ABREV[(Number(principal.comparacao.ym.split("-")[1]) || 1) - 1]})` : ""}`
+      : ymLabel(comparar);
+
+  const TAB_LABEL: Record<Tab, string> = {
+    principal: "Diagnóstico",
+    produtos: "Produtos",
+    vendedores: "Vendedores",
+    rupturas: "Rupturas",
+  };
+
   return (
     <div className={styles.wrapper}>
-      <header className={styles.header}>
-        <div>
-          <h1 className={styles.title}>
-            Loja Raio X
-            {isRede && <span className={styles.redeBadge}>REDE — todas as lojas</span>}
-            {isRede && hasEcommerce && (
-              <span className={styles.varejoBadge} title="Vendas de loja física (POS). Não inclui e-commerce.">
-                VAREJO — sem e-commerce
-              </span>
-            )}
-          </h1>
-          <p className={styles.subtitle}>
-            {isRede
-              ? `Visão geral da rede: histórico agregado, o que faltou para bater o melhor mês, vendedores e rupturas.${
-                  hasEcommerce ? " Considera só as lojas físicas (varejo) — o e-commerce não entra nesse agregado." : ""
-                } Selecione uma loja para focar em uma unidade.`
-              : "Raio-x de performance de uma loja: histórico, o que faltou para bater o melhor mês, vendedores e rupturas."}
-          </p>
+      <header className={styles.topbar}>
+        <div className={styles.brand}>
+          <h1 className={styles.title}>Loja Raio X</h1>
+          <span className={styles.brandSub}>
+            {isRede ? "Rede — todas as lojas" : "loja selecionada"}
+            {isRede && hasEcommerce ? " · varejo" : ""}
+          </span>
         </div>
+
+        <nav className={styles.tabs}>
+          {(["principal", "produtos", "vendedores", "rupturas"] as Tab[]).map((t) => (
+            <button
+              key={t}
+              type="button"
+              className={`${styles.tabBtn} ${tab === t ? styles.tabBtnActive : ""}`}
+              onClick={() => setTab(t)}
+            >
+              {TAB_LABEL[t]}
+            </button>
+          ))}
+        </nav>
+
         <div className={styles.controls}>
-          <FilialFilter
-            companyKey={companyKey}
-            value={filial}
-            onChange={setFilial}
-            module="sales"
-            hideVarejo
-            label="Loja"
-          />
-          <label className={styles.mesField}>
-            <span className={styles.mesLabel}>Mês analisado</span>
+          <div className={styles.ctrl}>
+            <span className={styles.ctrlLabel}>Loja:</span>
+            <FilialFilter companyKey={companyKey} value={filial} onChange={setFilial} module="sales" hideVarejo />
+          </div>
+          <label className={styles.ctrl}>
+            <span className={styles.ctrlLabel}>Mês:</span>
             <select className={styles.select} value={mes} onChange={(e) => setMes(e.target.value)}>
               {mesesOpcoes.map((m) => (
                 <option key={m.ym} value={m.ym}>
@@ -374,9 +385,9 @@ export default function LojaRaioXPage({ companyKey }: Props) {
               ))}
             </select>
           </label>
-          <label className={styles.mesField}>
-            <span className={styles.mesLabel}>Comparar com</span>
-            <select className={styles.select} value={comparar} onChange={(e) => setComparar(e.target.value)}>
+          <label className={styles.ctrl}>
+            <span className={styles.ctrlLabel}>Comparar:</span>
+            <select className={styles.select} value={comparar} onChange={(e) => setComparar(e.target.value)} title={compararLabel}>
               <option value="auto">Melhor mês (auto)</option>
               {mesesOpcoes.map((m) => (
                 <option key={m.ym} value={m.ym} disabled={m.ym === mes}>
@@ -388,37 +399,6 @@ export default function LojaRaioXPage({ companyKey }: Props) {
         </div>
       </header>
 
-      <Timeline
-        data={timeline}
-        loading={principalLoading}
-        analyzedYm={mes}
-        comparYm={principal?.comparacao?.ym ?? null}
-        comparAuto={principal?.comparacaoAuto ?? true}
-        onSetAnalisado={setMes}
-        onSetComparacao={(ym) => setComparar(ym)}
-        isRede={isRede}
-        hasEcommerce={hasEcommerce}
-      />
-
-      <nav className={styles.tabs}>
-        {(["principal", "produtos", "vendedores", "rupturas"] as Tab[]).map((t) => (
-          <button
-            key={t}
-            type="button"
-            className={`${styles.tabBtn} ${tab === t ? styles.tabBtnActive : ""}`}
-            onClick={() => setTab(t)}
-          >
-            {t === "principal"
-              ? "Diagnóstico"
-              : t === "produtos"
-                ? "Produtos"
-                : t === "vendedores"
-                  ? "Vendedores"
-                  : "Rupturas"}
-          </button>
-        ))}
-      </nav>
-
       {tab === "principal" && (
         <PrincipalTab
           data={principal}
@@ -428,6 +408,11 @@ export default function LojaRaioXPage({ companyKey }: Props) {
           comparacaoProdutos={comparacao}
           comparacaoLoading={comparacaoLoading}
           isRede={isRede}
+          hasEcommerce={hasEcommerce}
+          timeline={timeline}
+          analyzedYm={mes}
+          onSetAnalisado={setMes}
+          onSetComparacao={(ym) => setComparar(ym)}
         />
       )}
       {tab === "produtos" && (
@@ -478,20 +463,20 @@ function Timeline({
     theme === "dark"
       ? { grid: "rgba(148,163,184,0.16)", axisText: "#94a3b8", bar: "#3b4a63", tooltipBg: "#1a2433", tooltipBorder: "#29344b", tooltipText: "#cbd5e1" }
       : { grid: "#e2e8f0", axisText: "#64748b", bar: "#cbd5e1", tooltipBg: "#fff", tooltipBorder: "#e2e8f0", tooltipText: "#334155" };
-  const COMPAR = "#10b981";
+  const COMPAR = "#22c55e";
   const ANALYZED = "#2563eb";
 
   return (
-    <section className={styles.card}>
-      <div className={styles.cardHead}>
-        <h2 className={styles.cardTitle}>
+    <section className={styles.section}>
+      <div className={styles.sectionHead}>
+        <h2 className={styles.sectionTitle}>
           Faturamento {isRede ? "da rede" : "da loja"} — últimos 12 meses
-          {isRede && hasEcommerce && <span className={styles.cardHint}> (varejo, sem e-commerce)</span>}
+          {isRede && hasEcommerce && <span className={styles.sectionHint}> · varejo, sem e-commerce</span>}
         </h2>
         <div className={styles.legend}>
           <span><i className={styles.dot} style={{ background: ANALYZED }} /> Mês analisado</span>
           <span>
-            <i className={styles.dot} style={{ background: COMPAR }} /> Comparação{comparAuto ? " (melhor mês)" : ""}
+            <i className={styles.dot} style={{ background: COMPAR }} /> {comparAuto ? "Melhor mês" : "Comparação"}
           </span>
         </div>
       </div>
@@ -590,6 +575,11 @@ function PrincipalTab({
   comparacaoProdutos,
   comparacaoLoading,
   isRede,
+  hasEcommerce,
+  timeline,
+  analyzedYm,
+  onSetAnalisado,
+  onSetComparacao,
 }: {
   data: PrincipalData | null;
   loading: boolean;
@@ -598,127 +588,146 @@ function PrincipalTab({
   comparacaoProdutos: ComparacaoData | null;
   comparacaoLoading: boolean;
   isRede: boolean;
+  hasEcommerce: boolean;
+  timeline: MesMetric[] | null;
+  analyzedYm: string;
+  onSetAnalisado: (ym: string) => void;
+  onSetComparacao: (ym: string) => void;
 }) {
   if (error) return <div className={styles.errorBox}>{error}</div>;
-  if (loading && !data) return <div className={styles.skeleton} style={{ height: 320 }} />;
+  if (loading && !data) return <div className={styles.skeleton} style={{ height: 420 }} />;
   if (!data || !data.analyzed) return <div className={styles.empty}>Sem dados para o mês selecionado.</div>;
 
-  const { analyzed, comparacao, comparacaoAuto, isMesmo, janela, decomposicao, rupturasResumo, vendedoresResumo } = data;
+  const { analyzed, comparacao, comparacaoAuto, isMesmo, janela, decomposicao, vendedoresResumo } = data;
   const anLabel = janela.analisadoLabel;
   const compLabel = janela.comparacaoLabel ?? comparacao?.label ?? "";
-  const temAlerta = rupturasResumo.quantidade > 0 || vendedoresResumo.quedas.length > 0;
   const atendimentosDomina =
     !!decomposicao && Math.abs(decomposicao.porAtendimentos) >= Math.abs(decomposicao.porTicketMedio);
-  const refLabel = comparacao ? `${compLabel}${comparacaoAuto ? " (melhor mês)" : ""}` : "";
+  const refDescr = comparacaoAuto ? `o melhor mês ${isRede ? "da rede" : "da loja"}` : compLabel;
   const acimaDaRef = !!(comparacao && analyzed.faturamento > comparacao.faturamento);
+
+  const timelineEl = (
+    <Timeline
+      data={timeline}
+      loading={loading}
+      analyzedYm={analyzedYm}
+      comparYm={comparacao?.ym ?? null}
+      comparAuto={comparacaoAuto}
+      onSetAnalisado={onSetAnalisado}
+      onSetComparacao={onSetComparacao}
+      isRede={isRede}
+      hasEcommerce={hasEcommerce}
+    />
+  );
+
+  // % e absolutos vs a comparação (mesma faixa de dias)
+  const pctFat =
+    comparacao && comparacao.faturamento > 0
+      ? ((analyzed.faturamento - comparacao.faturamento) / comparacao.faturamento) * 100
+      : null;
 
   return (
     <div className={styles.tabBody}>
-      {comparacao && !isMesmo && (
-        <p className={styles.janelaInfo}>
-          Comparando <strong>{anLabel}</strong> vs <strong>{compLabel}</strong> — mesma faixa de dias
-          {janela.parcial && <> · {anLabel} é o mês atual (parcial, até hoje)</>}.
-        </p>
-      )}
-
+      {/* Banner: janela + veredito (combinados, como no topo do relatório) */}
       {isMesmo ? (
         <div className={`${styles.banner} ${styles.bannerInfo}`}>
-          <strong>{anLabel} é o próprio mês de comparação.</strong> Escolha outro mês de comparação (no seletor ou clicando numa barra) para ver o que faltou.
+          <span>
+            <strong>{anLabel} é o próprio mês de comparação.</strong> Escolha outro mês de comparação (no seletor ou
+            clicando numa barra) para ver o que faltou.
+          </span>
+          <span className={styles.bannerTag}>Mesmo mês</span>
         </div>
-      ) : acimaDaRef && decomposicao ? (
+      ) : acimaDaRef && decomposicao && comparacao ? (
         <div className={`${styles.banner} ${styles.bannerGood}`}>
-          <strong>{anLabel} superou {refLabel} em {fmtCurrency(Math.abs(decomposicao.gap))}.</strong>{" "}
-          Faturou {fmtCurrency(analyzed.faturamento)} vs {fmtCurrency(comparacao!.faturamento)}.
+          <span>
+            Comparando <strong>{anLabel}</strong> vs <strong>{compLabel}</strong> — mesma faixa de dias.{" "}
+            {anLabel} superou {refDescr} em <strong>{fmtCurrency(Math.abs(decomposicao.gap))}</strong>.
+          </span>
+          <span className={styles.bannerTag}>Acima da referência</span>
         </div>
       ) : (
         comparacao &&
         decomposicao && (
-          <div className={`${styles.banner} ${temAlerta ? styles.bannerAlert : styles.bannerInfo}`}>
-            <strong>Faltam {fmtCurrency(decomposicao.gap)}</strong> para {anLabel} alcançar {refLabel} (
-            {fmtCurrency(comparacao.faturamento)}).{" "}
-            {atendimentosDomina
-              ? "O maior peso está em MENOS atendimentos."
-              : "O maior peso está no TICKET MÉDIO menor."}
+          <div className={`${styles.banner} ${styles.bannerAlert}`}>
+            <span>
+              Comparando <strong>{anLabel}</strong> vs <strong>{compLabel}</strong> — mesma faixa de dias. Faltam{" "}
+              <strong className={styles.bannerNeg}>{fmtCurrency(decomposicao.gap)}</strong> para o faturamento igualar{" "}
+              {refDescr}.
+            </span>
+            <span className={styles.bannerTag}>Gap identificado</span>
           </div>
         )
       )}
 
+      {/* Faturamento — últimos 12 meses */}
+      {timelineEl}
+
       {/* KPIs do mês analisado vs comparação (mesma faixa de dias) */}
-      <div className={styles.kpiRow}>
-        <Kpi label={`Faturamento (${anLabel})`} value={fmtCurrency(analyzed.faturamento)} sub={comparacao ? `${compLabel}: ${fmtCurrency(comparacao.faturamento)}` : undefined} />
-        <Kpi label="Atendimentos" value={fmtNum(analyzed.tickets)} sub={comparacao ? `${compLabel}: ${fmtNum(comparacao.tickets)}` : undefined} />
-        <Kpi label="Ticket médio" value={fmtCurrency(analyzed.ticketMedio)} sub={comparacao ? `${compLabel}: ${fmtCurrency(comparacao.ticketMedio)}` : undefined} />
-        <Kpi label="Peças vendidas" value={fmtNum(analyzed.quantidade)} sub={comparacao ? `${compLabel}: ${fmtNum(comparacao.quantidade)}` : undefined} />
+      <div className={styles.kpiStrip}>
+        <Kpi
+          label={`Faturamento (${anLabel})`}
+          value={fmtCurrency(analyzed.faturamento)}
+          delta={pctFat != null ? deltaText(pctFat, "pct") : undefined}
+          deltaTone={pctFat != null ? (pctFat >= 0 ? "pos" : "neg") : undefined}
+          sub={comparacao ? `vs ${fmtCurrency(comparacao.faturamento)} (${compLabel})` : undefined}
+        />
+        <Kpi
+          label="Atendimentos"
+          value={fmtNum(analyzed.tickets)}
+          delta={comparacao ? deltaText(analyzed.tickets - comparacao.tickets, "num") : undefined}
+          deltaTone={comparacao ? (analyzed.tickets >= comparacao.tickets ? "pos" : "neg") : undefined}
+          sub={comparacao ? `vs ${fmtNum(comparacao.tickets)} tickets` : undefined}
+        />
+        <Kpi
+          label="Ticket médio"
+          value={fmtCurrency(analyzed.ticketMedio)}
+          delta={comparacao ? deltaText(analyzed.ticketMedio - comparacao.ticketMedio, "brl") : undefined}
+          deltaTone={comparacao ? (analyzed.ticketMedio >= comparacao.ticketMedio ? "pos" : "neg") : undefined}
+          sub={comparacao ? `vs ${fmtCurrency(comparacao.ticketMedio)}` : undefined}
+        />
+        <Kpi
+          label="Peças vendidas"
+          value={fmtNum(analyzed.quantidade)}
+          delta={comparacao ? deltaText(analyzed.quantidade - comparacao.quantidade, "num") : undefined}
+          deltaTone={comparacao ? (analyzed.quantidade >= comparacao.quantidade ? "pos" : "neg") : undefined}
+          sub={comparacao ? `vs ${fmtNum(comparacao.quantidade)} unidades` : undefined}
+        />
       </div>
 
       {/* Decomposição do gap (só quando o mês analisado está ABAIXO da comparação) */}
-      {!isMesmo && !acimaDaRef && decomposicao && (
-        <div className={styles.card}>
-          <h3 className={styles.cardTitle}>Por que faltou {fmtCurrency(decomposicao.gap)}?</h3>
+      {!isMesmo && !acimaDaRef && decomposicao && comparacao && (
+        <section className={styles.section}>
+          <div className={styles.sectionHead}>
+            <h3 className={styles.sectionTitle}>
+              Por que faltou {fmtCurrency(decomposicao.gap)}? — Decomposição do gap
+            </h3>
+          </div>
           <div className={styles.gapGrid}>
             <GapFactor
-              titulo="Menos atendimentos"
+              titulo="Menos atendimentos (volume)"
               valor={decomposicao.porAtendimentos}
               gap={decomposicao.gap}
-              dica={`${fmtNum(analyzed.tickets)} vs ${fmtNum(comparacao?.tickets ?? 0)} atendimentos`}
-              destaque={atendimentosDomina}
+              dica={`${fmtNum(analyzed.tickets)} vs ${fmtNum(comparacao.tickets)} atendimentos — ${
+                atendimentosDomina
+                  ? "principal causa do gap."
+                  : `${gapPct(decomposicao.porAtendimentos, decomposicao.gap)} da perda de faturamento.`
+              }`}
             />
             <GapFactor
-              titulo="Ticket médio menor"
+              titulo="Ticket médio menor (valor)"
               valor={decomposicao.porTicketMedio}
               gap={decomposicao.gap}
-              dica={`${fmtCurrency(analyzed.ticketMedio)} vs ${fmtCurrency(comparacao?.ticketMedio ?? 0)}`}
-              destaque={!atendimentosDomina}
+              dica={`${fmtCurrency(analyzed.ticketMedio)} vs ${fmtCurrency(comparacao.ticketMedio)} — ${
+                !atendimentosDomina
+                  ? "principal causa do gap."
+                  : `${gapPct(decomposicao.porTicketMedio, decomposicao.gap)} da perda de faturamento.`
+              }`}
             />
           </div>
-        </div>
+        </section>
       )}
 
-      {/* Diagnóstico: produto e vendedores */}
-      <div className={styles.diagGrid}>
-        <button type="button" className={`${styles.diagCard} ${rupturasResumo.quantidade > 0 ? styles.diagCardWarn : ""}`} onClick={() => onGoTab("rupturas")}>
-          <div className={styles.diagHead}>
-            <span className={styles.diagIcon}>📦</span>
-            <span className={styles.diagTitle}>Faltou produto?</span>
-          </div>
-          <div className={styles.diagBig}>{rupturasResumo.quantidade}</div>
-          <div className={styles.diagText}>
-            SKUs que venderam e estão zerados {isRede ? "na rede" : "na loja"}
-            {rupturasResumo.faturamento > 0 && <> · {fmtCurrency(rupturasResumo.faturamento)} no mês</>}
-            {!isRede && rupturasResumo.comEstoqueNaRede > 0 && (
-              <> · <strong>{rupturasResumo.comEstoqueNaRede}</strong> têm estoque em outra loja</>
-            )}
-          </div>
-          <span className={styles.diagLink}>Ver rupturas →</span>
-        </button>
-
-        <button type="button" className={`${styles.diagCard} ${vendedoresResumo.quedas.length > 0 ? styles.diagCardWarn : ""}`} onClick={() => onGoTab("vendedores")}>
-          <div className={styles.diagHead}>
-            <span className={styles.diagIcon}>🧑‍💼</span>
-            <span className={styles.diagTitle}>Performance dos vendedores?</span>
-          </div>
-          <div className={styles.diagBig}>
-            {vendedoresResumo.ativosAnalisado}
-            {comparacao && !isMesmo && <span className={styles.diagBigSub}> / {vendedoresResumo.ativosBest}</span>}
-          </div>
-          <div className={styles.diagText}>
-            vendedores ativos no mês{comparacao && !isMesmo && <> (vs comparação)</>}
-          </div>
-          {vendedoresResumo.quedas.length > 0 && (
-            <ul className={styles.quedaList}>
-              {vendedoresResumo.quedas.slice(0, 3).map((q) => (
-                <li key={q.vendedor}>
-                  <span>{q.vendedor}</span>
-                  <span className={styles.quedaVal}>−{fmtCurrency(q.queda)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-          <span className={styles.diagLink}>Ver vendedores →</span>
-        </button>
-      </div>
-
-      {/* O que fez a diferença — 3 perguntas simples, clicáveis (só quando há comparação) */}
+      {/* O que fez a diferença — 3 perguntas simples, clicáveis + reconciliação */}
       {!isMesmo && comparacao && (
         <>
           <DiferencaProdutos
@@ -732,13 +741,13 @@ function PrincipalTab({
           />
 
           {vendedoresResumo.ranking.length > 0 && (
-            <div className={styles.card}>
-              <div className={styles.cardHead}>
-                <h3 className={styles.cardTitle}>Quem vendeu — vendedores</h3>
-                <span className={styles.cardHint}>{anLabel} vs {compLabel}</span>
+            <section className={styles.section}>
+              <div className={styles.sectionHead}>
+                <h3 className={styles.sectionTitle}>Quem vendeu — vendedores</h3>
+                <span className={styles.sectionHint}>{anLabel} vs {compLabel}</span>
               </div>
-              <div className={styles.matrizScroll}>
-                <table className={styles.compTable}>
+              <div className={styles.tableWrap}>
+                <table className={styles.dataTable}>
                   <thead>
                     <tr>
                       <th>Vendedor</th>
@@ -750,7 +759,7 @@ function PrincipalTab({
                   <tbody>
                     {vendedoresResumo.ranking.map((v) => (
                       <tr key={v.vendedor}>
-                        <td>{v.vendedor}</td>
+                        <td className={styles.vendedorNome}>{v.vendedor}</td>
                         <td className={styles.num}>{fmtCurrency(v.comparacao)}</td>
                         <td className={styles.num}>{fmtCurrency(v.analisado)}</td>
                         <td className={`${styles.num} ${v.diff > 0 ? styles.diffNeg : v.diff < 0 ? styles.diffPos : ""}`}>
@@ -762,12 +771,27 @@ function PrincipalTab({
                   </tbody>
                 </table>
               </div>
-            </div>
+            </section>
           )}
         </>
       )}
     </div>
   );
+}
+
+/** Texto de variação formatado com sinal (− real). */
+function deltaText(diff: number, kind: "pct" | "num" | "brl"): string {
+  const sinal = diff >= 0 ? "+" : "−";
+  const abs = Math.abs(diff);
+  if (kind === "pct") return `${sinal}${abs.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
+  if (kind === "brl") return `${sinal}${fmtCurrency(abs)}`;
+  return `${sinal}${fmtNum(Math.round(abs))}`;
+}
+
+/** Percentual de um fator sobre o gap total (para o texto da decomposição). */
+function gapPct(valor: number, gap: number): string {
+  if (!gap) return "0%";
+  return `${Math.round((Math.abs(valor) / Math.abs(gap)) * 100)}%`;
 }
 
 type Bucket = "ruptura" | "tinhaEstoque" | "cresceu";
@@ -797,104 +821,128 @@ function DiferencaProdutos({
   const [aberto, setAberto] = useState<Bucket | null>(null);
   const toggle = (b: Bucket) => setAberto((cur) => (cur === b ? null : b));
 
-  return (
-    <div className={styles.card}>
-      <div className={styles.cardHead}>
-        <h3 className={styles.cardTitle}>O que fez a diferença — produtos</h3>
-        <span className={styles.cardHint}>diferença por produto · {compLabel} vs {anLabel}</span>
-      </div>
+  const gk = gapKpi ?? data?.gapProdutos ?? 0;
+  const trocas = data ? Math.round((data.gapProdutos - gk) * 100) / 100 : 0;
+  const netUs = -gk;
 
-      {loading && !data && <div className={styles.skeleton} style={{ height: 150 }} />}
+  return (
+    <>
+      <section className={styles.section}>
+        <div className={styles.sectionHead}>
+          <h3 className={styles.sectionTitle}>O que fez a diferença — produtos</h3>
+          <span className={styles.sectionHint}>clique para detalhar</span>
+        </div>
+
+        {loading && !data && <div className={styles.skeleton} style={{ height: 170 }} />}
+
+        {data && (
+          <>
+            <div className={styles.perguntaGrid}>
+              <PerguntaCard
+                kind="ruptura"
+                label="Faltou produto"
+                count={data.rupturaCount}
+                valor={data.rupturaFat}
+                valorTone="neg"
+                descricao={`Venderam no período comparado mas estão zerados hoje ${isRede ? "na rede" : "na loja"}.`}
+                ativo={aberto === "ruptura"}
+                onClick={() => toggle("ruptura")}
+              />
+              <PerguntaCard
+                kind="tinha"
+                label="Tinha estoque e vendeu menos"
+                count={data.tinhaEstoqueCount}
+                valor={data.tinhaEstoqueFat}
+                valorTone="neg"
+                descricao="Produtos com saldo que converteram abaixo do período de referência."
+                ativo={aberto === "tinhaEstoque"}
+                onClick={() => toggle("tinhaEstoque")}
+              />
+              <PerguntaCard
+                kind="cresceu"
+                label="Compensaram (venderam mais)"
+                count={data.cresceuCount}
+                valor={data.cresceuFat}
+                valorTone="pos"
+                descricao="Produtos que cresceram acima da referência."
+                ativo={aberto === "cresceu"}
+                onClick={() => toggle("cresceu")}
+              />
+            </div>
+
+            {aberto === "ruptura" && (
+              <ProdutoLista items={data.ruptura} total={data.rupturaCount} anLabel={anLabel} compLabel={compLabel} tipo="ruptura" isRede={isRede} onGoTab={onGoTab} />
+            )}
+            {aberto === "tinhaEstoque" && (
+              <ProdutoLista items={data.tinhaEstoque} total={data.tinhaEstoqueCount} anLabel={anLabel} compLabel={compLabel} tipo="tinhaEstoque" isRede={isRede} onGoTab={onGoTab} />
+            )}
+            {aberto === "cresceu" && (
+              <ProdutoLista items={data.cresceu} total={data.cresceuCount} anLabel={anLabel} compLabel={compLabel} tipo="cresceu" isRede={isRede} onGoTab={onGoTab} />
+            )}
+          </>
+        )}
+      </section>
 
       {data && (
-        <>
-          <div className={styles.perguntaGrid}>
-            <PerguntaCard
-              icon="📦"
-              titulo="Faltou produto (ficou sem estoque)"
-              count={data.rupturaCount}
-              valor={data.rupturaFat}
-              tone="neg"
-              ativo={aberto === "ruptura"}
-              onClick={() => toggle("ruptura")}
-            />
-            <PerguntaCard
-              icon="📉"
-              titulo="Tinha estoque e vendeu menos"
-              count={data.tinhaEstoqueCount}
-              valor={data.tinhaEstoqueFat}
-              tone="neg"
-              ativo={aberto === "tinhaEstoque"}
-              onClick={() => toggle("tinhaEstoque")}
-            />
-            <PerguntaCard
-              icon="📈"
-              titulo="Compensaram (venderam mais)"
-              count={data.cresceuCount}
-              valor={data.cresceuFat}
-              tone="pos"
-              ativo={aberto === "cresceu"}
-              onClick={() => toggle("cresceu")}
-            />
+        <section className={styles.section}>
+          <div className={styles.sectionHead}>
+            <h3 className={styles.sectionTitle}>Reconciliação</h3>
+            <span className={styles.reconFecha}>
+              <span className={styles.reconFechaLabel}>Fecha com</span>
+              <span className={styles.reconFechaVal}>Diferença no faturamento total</span>
+            </span>
           </div>
-
-          <div className={styles.reconBox}>
-            <p className={styles.reconLine}>
-              Produto a produto:{" "}
-              <span className={styles.diffNeg}>−{fmtCurrency(data.rupturaFat)}</span> faltou{"  "}
-              <span className={styles.diffNeg}>−{fmtCurrency(data.tinhaEstoqueFat)}</span> vendeu menos{"  "}
-              <span className={styles.diffPos}>+{fmtCurrency(data.cresceuFat)}</span> cresceu{"  =  "}
-              <strong>{fmtCurrency(data.gapProdutos)}</strong>
-            </p>
-            {gapKpi != null && Math.abs(gapKpi - data.gapProdutos) > 1 && (
-              <p className={styles.reconSub}>
-                {(() => {
-                  const resid = Math.round((gapKpi - data.gapProdutos) * 100) / 100;
-                  const sinal = resid >= 0 ? "+" : "−";
-                  return (
-                    <>
-                      {sinal} {fmtCurrency(Math.abs(resid))} de trocas/devoluções (não entram por produto) ={" "}
-                      <strong>{fmtCurrency(gapKpi)}</strong> de diferença no faturamento total.
-                    </>
-                  );
-                })()}
-              </p>
+          <div className={styles.reconLineBox}>
+            <span className={styles.diffNeg}>−{fmtCurrency(data.rupturaFat)}</span>
+            <span className={styles.reconTag}>faltou</span>
+            <span className={styles.diffNeg}>−{fmtCurrency(data.tinhaEstoqueFat)}</span>
+            <span className={styles.reconTag}>vendeu menos</span>
+            <span className={styles.diffPos}>+{fmtCurrency(data.cresceuFat)}</span>
+            <span className={styles.reconTag}>cresceu</span>
+            {Math.abs(trocas) > 1 && (
+              <>
+                <span className={trocas >= 0 ? styles.diffPos : styles.diffNeg}>
+                  {trocas >= 0 ? "+" : "−"}
+                  {fmtCurrency(Math.abs(trocas))}
+                </span>
+                <span className={styles.reconTag}>trocas/dev</span>
+              </>
             )}
+            <span className={styles.reconEq}>=</span>
+            <strong className={netUs >= 0 ? styles.diffPos : styles.diffNeg}>
+              {netUs >= 0 ? "+" : "−"}
+              {fmtCurrency(Math.abs(gk))}
+            </strong>
+            <span className={styles.reconTag}>gap total</span>
           </div>
-
-          {aberto === "ruptura" && (
-            <ProdutoLista items={data.ruptura} total={data.rupturaCount} anLabel={anLabel} compLabel={compLabel} tipo="ruptura" isRede={isRede} onGoTab={onGoTab} />
-          )}
-          {aberto === "tinhaEstoque" && (
-            <ProdutoLista items={data.tinhaEstoque} total={data.tinhaEstoqueCount} anLabel={anLabel} compLabel={compLabel} tipo="tinhaEstoque" isRede={isRede} onGoTab={onGoTab} />
-          )}
-          {aberto === "cresceu" && (
-            <ProdutoLista items={data.cresceu} total={data.cresceuCount} anLabel={anLabel} compLabel={compLabel} tipo="cresceu" isRede={isRede} onGoTab={onGoTab} />
-          )}
-        </>
+        </section>
       )}
-    </div>
+    </>
   );
 }
 
 function PerguntaCard({
-  icon,
-  titulo,
+  kind,
+  label,
   count,
   valor,
-  tone,
+  valorTone,
+  descricao,
   ativo,
   onClick,
 }: {
-  icon: string;
-  titulo: string;
+  kind: "ruptura" | "tinha" | "cresceu";
+  label: string;
   count: number;
   valor: number;
-  tone: "neg" | "pos";
+  valorTone: "neg" | "pos";
+  descricao: string;
   ativo: boolean;
   onClick: () => void;
 }) {
   const vazio = count === 0;
+  const labelCls =
+    kind === "ruptura" ? styles.pLabelRuptura : kind === "tinha" ? styles.pLabelTinha : styles.pLabelCresceu;
   return (
     <button
       type="button"
@@ -903,18 +951,18 @@ function PerguntaCard({
       disabled={vazio}
     >
       <div className={styles.perguntaHead}>
-        <span className={styles.diagIcon}>{icon}</span>
-        <span className={styles.perguntaTitulo}>{titulo}</span>
+        <span className={`${styles.perguntaLabel} ${labelCls}`}>{label}</span>
+        {!vazio && <span className={styles.perguntaDetalhar}>{ativo ? "Ocultar ▲" : "Detalhar →"}</span>}
       </div>
       <div className={styles.perguntaBig}>
         {count}
-        <span className={styles.perguntaBigUnit}> produto{count === 1 ? "" : "s"}</span>
+        <span className={styles.perguntaBigUnit}>SKUs</span>
       </div>
-      <div className={`${styles.perguntaValor} ${tone === "neg" ? styles.diffNeg : styles.diffPos}`}>
-        {tone === "neg" ? "−" : "+"}
+      <div className={styles.perguntaDesc}>{descricao}</div>
+      <div className={`${styles.perguntaValor} ${valorTone === "neg" ? styles.diffNeg : styles.diffPos}`}>
+        {valorTone === "neg" ? "−" : "+"}
         {fmtCurrency(valor)}
       </div>
-      {!vazio && <span className={styles.perguntaLink}>{ativo ? "ocultar ▲" : "ver os produtos ▼"}</span>}
     </button>
   );
 }
@@ -941,10 +989,10 @@ function ProdutoLista({
   return (
     <div className={styles.gaveta}>
       {total > items.length && (
-        <p className={styles.rupturaHint}>Mostrando os {items.length} maiores de {total} produtos.</p>
+        <p className={styles.gavetaHint}>Mostrando os {items.length} maiores de {total} produtos.</p>
       )}
-      <div className={styles.matrizScroll}>
-        <table className={styles.compTable}>
+      <div className={styles.tableWrap}>
+        <table className={styles.dataTable}>
           <thead>
             <tr>
               <th>Produto</th>
@@ -1006,11 +1054,28 @@ function ProdutoLista({
   );
 }
 
-function Kpi({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function Kpi({
+  label,
+  value,
+  delta,
+  deltaTone,
+  sub,
+}: {
+  label: string;
+  value: string;
+  delta?: string;
+  deltaTone?: "pos" | "neg";
+  sub?: string;
+}) {
   return (
     <div className={styles.kpi}>
       <span className={styles.kpiLabel}>{label}</span>
-      <span className={styles.kpiValue}>{value}</span>
+      <span className={styles.kpiValueRow}>
+        <span className={styles.kpiValue}>{value}</span>
+        {delta && (
+          <span className={`${styles.kpiDelta} ${deltaTone === "pos" ? styles.diffPos : styles.diffNeg}`}>{delta}</span>
+        )}
+      </span>
       {sub && <span className={styles.kpiSub}>{sub}</span>}
     </div>
   );
@@ -1021,23 +1086,29 @@ function GapFactor({
   valor,
   gap,
   dica,
-  destaque,
 }: {
   titulo: string;
   valor: number;
   gap: number;
   dica: string;
-  destaque: boolean;
 }) {
-  const pct = gap > 0 ? Math.max(0, Math.min(100, Math.round((valor / gap) * 100))) : 0;
+  // valor > 0 = puxou o faturamento para baixo (perda); < 0 = ajudou.
+  const perda = valor >= 0;
+  const pct =
+    gap !== 0 ? Math.max(0, Math.min(100, Math.round((Math.abs(valor) / Math.abs(gap)) * 100))) : 0;
   return (
-    <div className={`${styles.gapFactor} ${destaque ? styles.gapFactorHi : ""}`}>
+    <div className={styles.gapFactor}>
       <div className={styles.gapFactorTop}>
-        <span>{titulo}</span>
-        <strong>{fmtCurrency(valor)}</strong>
+        <span className={styles.gapFactorNome}>{titulo}</span>
+        <strong className={perda ? styles.diffNeg : styles.diffPos}>
+          {perda ? "−" : "+"} {fmtCurrency(Math.abs(valor))}
+        </strong>
       </div>
       <div className={styles.gapBar}>
-        <div className={styles.gapBarFill} style={{ width: `${pct}%` }} />
+        <div
+          className={`${styles.gapBarFill} ${perda ? styles.gapBarNeg : styles.gapBarPos}`}
+          style={{ width: `${pct}%` }}
+        />
       </div>
       <span className={styles.gapDica}>{dica}</span>
     </div>
@@ -1072,7 +1143,7 @@ function VendedoresTab({
 
   return (
     <div className={styles.tabBody}>
-      <p className={styles.rupturaHint}>
+      <p className={styles.intro}>
         Faturamento por vendedor, mês a mês (meses completos). O mês atual ({ymLabel(nowYm)}) está parcial —
         dados só até hoje.
       </p>
@@ -1155,7 +1226,7 @@ function ProdutosTab({
 
   return (
     <div className={styles.tabBody}>
-      <p className={styles.rupturaHint}>
+      <p className={styles.intro}>
         Produtos que venderam em <strong>{compLabel}</strong> (antes) e/ou <strong>{anLabel}</strong> (depois),
         com o estoque de hoje {isRede ? "na rede" : "na loja"} e em quantos dias ele acaba no ritmo recente.
         {data.truncado && " Lista grande: mostrando os principais de cada grupo (sem estoque = mais vendidos; com estoque = os que acabam antes)."}
@@ -1195,18 +1266,18 @@ function ProdutoEstoqueSecao({
   warn?: boolean;
 }) {
   return (
-    <div className={styles.card}>
-      <div className={styles.cardHead}>
-        <h3 className={`${styles.cardTitle} ${warn ? styles.tituloWarn : ""}`}>
-          {titulo} <span className={styles.secaoCount}>· {items.length}</span>
+    <section className={styles.section}>
+      <div className={styles.sectionHead}>
+        <h3 className={`${styles.sectionTitle} ${warn ? styles.sectionTitleWarn : styles.sectionTitleOk}`}>
+          {titulo} <span className={styles.secaoCount}>— {items.length}</span>
         </h3>
-        <span className={styles.cardHint}>{subtitulo}</span>
+        <span className={styles.sectionHint}>{subtitulo}</span>
       </div>
       {items.length === 0 ? (
         <div className={styles.empty}>Nenhum produto neste grupo.</div>
       ) : (
-        <div className={styles.matrizScroll}>
-          <table className={styles.compTable}>
+        <div className={styles.tableWrap}>
+          <table className={styles.dataTable}>
             <thead>
               <tr>
                 <th>Produto</th>
@@ -1246,7 +1317,7 @@ function ProdutoEstoqueSecao({
           </table>
         </div>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -1271,11 +1342,11 @@ function RupturasTab({
 
   return (
     <div className={styles.tabBody}>
-      <p className={styles.rupturaHint}>
-        {data.length} produto(s) venderam em {mesLabel} e estão zerados {escopo} — do maior faturamento ao menor.
+      <p className={styles.intro}>
+        <strong>{data.length} produtos</strong> venderam em {mesLabel} e estão zerados {escopo} — do maior faturamento ao menor.
       </p>
-      <div className={styles.matrizScroll}>
-        <table className={styles.rupturaTable}>
+      <div className={styles.tableWrap}>
+        <table className={styles.dataTable}>
           <thead>
             <tr>
               <th>Produto</th>
