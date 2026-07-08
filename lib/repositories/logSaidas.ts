@@ -393,7 +393,12 @@ export async function fetchDefeitos(params: DefeitosParams): Promise<DefeitosRes
         SUM(ISNULL(p.QTDE, 0)) AS quantidade,
         MAX(${precoSugeridoExpr}) AS precoSugerido
       ${fromCommon}
-      ${porCor ? "LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON p.COR_PRODUTO = c.COR" : ""}
+      ${porCor ? `LEFT JOIN (
+        SELECT PRODUTO, COR_PRODUTO, MAX(DESC_COR_PRODUTO) AS DESC_COR
+        FROM PRODUTO_CORES WITH (NOLOCK)
+        GROUP BY PRODUTO, COR_PRODUTO
+      ) c ON RTRIM(LTRIM(c.PRODUTO)) = RTRIM(LTRIM(p.PRODUTO))
+         AND (RTRIM(LTRIM(CAST(c.COR_PRODUTO AS VARCHAR(20)))) = RTRIM(LTRIM(CAST(p.COR_PRODUTO AS VARCHAR(20)))) OR TRY_CONVERT(INT, c.COR_PRODUTO) = TRY_CONVERT(INT, p.COR_PRODUTO))` : ""}
       ${whereCommon}
       GROUP BY ${groupBy}
       ORDER BY quantidade DESC

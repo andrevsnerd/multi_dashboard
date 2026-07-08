@@ -672,7 +672,7 @@ function PrincipalTab({
           sub={comparacao ? `vs ${fmtCurrency(comparacao.faturamento)} (${compLabel})` : undefined}
         />
         <Kpi
-          label="Atendimentos"
+          label="Tickets"
           value={fmtNum(analyzed.tickets)}
           delta={comparacao ? deltaText(analyzed.tickets - comparacao.tickets, "num") : undefined}
           deltaTone={comparacao ? (analyzed.tickets >= comparacao.tickets ? "pos" : "neg") : undefined}
@@ -704,10 +704,10 @@ function PrincipalTab({
           </div>
           <div className={styles.gapGrid}>
             <GapFactor
-              titulo="Menos atendimentos (volume)"
+              titulo="Menos tickets (volume)"
               valor={decomposicao.porAtendimentos}
               gap={decomposicao.gap}
-              dica={`${fmtNum(analyzed.tickets)} vs ${fmtNum(comparacao.tickets)} atendimentos — ${
+              dica={`${fmtNum(analyzed.tickets)} vs ${fmtNum(comparacao.tickets)} tickets — ${
                 atendimentosDomina
                   ? "principal causa do gap."
                   : `${gapPct(decomposicao.porAtendimentos, decomposicao.gap)} da perda de faturamento.`

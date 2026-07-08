@@ -894,7 +894,12 @@ async function fetchProductsWithDetailsSales({
       FROM vendas_finais vf
       LEFT JOIN PRODUTOS p WITH (NOLOCK)
         ON vf.PRODUTO = p.PRODUTO
-      ${groupByColor ? 'LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON vf.COR_PRODUTO = c.COR' : ''}
+      ${groupByColor ? `LEFT JOIN (
+        SELECT PRODUTO, COR_PRODUTO, MAX(DESC_COR_PRODUTO) AS DESC_COR
+        FROM PRODUTO_CORES WITH (NOLOCK)
+        GROUP BY PRODUTO, COR_PRODUTO
+      ) c ON RTRIM(LTRIM(c.PRODUTO)) = RTRIM(LTRIM(vf.PRODUTO))
+         AND (RTRIM(LTRIM(CAST(c.COR_PRODUTO AS VARCHAR(20)))) = RTRIM(LTRIM(CAST(vf.COR_PRODUTO AS VARCHAR(20)))) OR TRY_CONVERT(INT, c.COR_PRODUTO) = TRY_CONVERT(INT, vf.COR_PRODUTO))` : ''}
       GROUP BY ${groupByFields}
     `;
     

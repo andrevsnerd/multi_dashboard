@@ -440,7 +440,12 @@ export async function fetchFilialProdutoSales(
           MAX(ISNULL(cor_ref.DESC_COR, '')) AS COR_DESCRICAO,`
         : '';
       const corJoin = groupByCor
-        ? 'LEFT JOIN CORES_BASICAS cor_ref WITH (NOLOCK) ON cor_ref.COR = m.COR_PRODUTO'
+        ? `LEFT JOIN (
+            SELECT PRODUTO, COR_PRODUTO, MAX(DESC_COR_PRODUTO) AS DESC_COR
+            FROM PRODUTO_CORES WITH (NOLOCK)
+            GROUP BY PRODUTO, COR_PRODUTO
+          ) cor_ref ON RTRIM(LTRIM(cor_ref.PRODUTO)) = RTRIM(LTRIM(m.PRODUTO))
+             AND (RTRIM(LTRIM(CAST(cor_ref.COR_PRODUTO AS VARCHAR(20)))) = RTRIM(LTRIM(CAST(m.COR_PRODUTO AS VARCHAR(20)))) OR TRY_CONVERT(INT, cor_ref.COR_PRODUTO) = TRY_CONVERT(INT, m.COR_PRODUTO))`
         : '';
       const corGroupBy = groupByCor ? ', ISNULL(m.COR_PRODUTO, \'\')' : '';
 
@@ -615,7 +620,12 @@ export async function fetchFilialProdutoSales(
           MAX(ISNULL(cor_ref.DESC_COR, '')) AS COR_DESCRICAO,`
         : '';
       const corJoin = groupByCor
-        ? 'LEFT JOIN CORES_BASICAS cor_ref WITH (NOLOCK) ON cor_ref.COR = fp.COR_PRODUTO'
+        ? `LEFT JOIN (
+            SELECT PRODUTO, COR_PRODUTO, MAX(DESC_COR_PRODUTO) AS DESC_COR
+            FROM PRODUTO_CORES WITH (NOLOCK)
+            GROUP BY PRODUTO, COR_PRODUTO
+          ) cor_ref ON RTRIM(LTRIM(cor_ref.PRODUTO)) = RTRIM(LTRIM(fp.PRODUTO))
+             AND (RTRIM(LTRIM(CAST(cor_ref.COR_PRODUTO AS VARCHAR(20)))) = RTRIM(LTRIM(CAST(fp.COR_PRODUTO AS VARCHAR(20)))) OR TRY_CONVERT(INT, cor_ref.COR_PRODUTO) = TRY_CONVERT(INT, fp.COR_PRODUTO))`
         : '';
       const corGroupBy = groupByCor ? ', ISNULL(fp.COR_PRODUTO, \'\')' : '';
 
@@ -1036,7 +1046,12 @@ export async function fetchProdutoEstoqueDetalhadoPorFilial(
           MAX(ISNULL(cor_ref.DESC_COR, '')) AS COR_DESCRICAO,`
       : '';
     const corJoin = groupByCor
-      ? 'LEFT JOIN CORES_BASICAS cor_ref WITH (NOLOCK) ON cor_ref.COR = e.COR_PRODUTO'
+      ? `LEFT JOIN (
+          SELECT PRODUTO, COR_PRODUTO, MAX(DESC_COR_PRODUTO) AS DESC_COR
+          FROM PRODUTO_CORES WITH (NOLOCK)
+          GROUP BY PRODUTO, COR_PRODUTO
+        ) cor_ref ON RTRIM(LTRIM(cor_ref.PRODUTO)) = RTRIM(LTRIM(e.PRODUTO))
+           AND (RTRIM(LTRIM(CAST(cor_ref.COR_PRODUTO AS VARCHAR(20)))) = RTRIM(LTRIM(CAST(e.COR_PRODUTO AS VARCHAR(20)))) OR TRY_CONVERT(INT, cor_ref.COR_PRODUTO) = TRY_CONVERT(INT, e.COR_PRODUTO))`
       : '';
     const corGroup = groupByCor ? `, ISNULL(e.COR_PRODUTO, '')` : '';
     const filialExpr = buildNormalizedFilialSqlExpr('e.FILIAL');

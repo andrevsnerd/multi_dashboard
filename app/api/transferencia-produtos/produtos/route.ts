@@ -139,7 +139,12 @@ export async function GET(request: Request) {
           LEFT JOIN PRODUTOS_BARRA pb WITH (NOLOCK)
             ON pb.PRODUTO = p.PRODUTO
             AND RTRIM(LTRIM(CAST(pb.COR_PRODUTO AS VARCHAR(20)))) = ISNULL(bc.COR_PRODUTO, RTRIM(LTRIM(CAST(pb.COR_PRODUTO AS VARCHAR(20)))))
-          LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON c.COR = bc.COR_PRODUTO
+          LEFT JOIN (
+            SELECT PRODUTO, COR_PRODUTO, MAX(DESC_COR_PRODUTO) AS DESC_COR
+            FROM PRODUTO_CORES WITH (NOLOCK)
+            GROUP BY PRODUTO, COR_PRODUTO
+          ) c ON RTRIM(LTRIM(c.PRODUTO)) = RTRIM(LTRIM(bc.PRODUTO))
+             AND (RTRIM(LTRIM(CAST(c.COR_PRODUTO AS VARCHAR(20)))) = RTRIM(LTRIM(CAST(bc.COR_PRODUTO AS VARCHAR(20)))) OR TRY_CONVERT(INT, c.COR_PRODUTO) = TRY_CONVERT(INT, bc.COR_PRODUTO))
         `;
         req.input('colecaoFiltro', sql.VarChar, colecaoFiltro);
         req.input('filialOrigemParam', sql.VarChar, filialOperacional?.trim() || '');
@@ -200,7 +205,12 @@ export async function GET(request: Request) {
           LEFT JOIN PRODUTOS_BARRA pb WITH (NOLOCK)
             ON pb.PRODUTO = p.PRODUTO
             AND RTRIM(LTRIM(CAST(pb.COR_PRODUTO AS VARCHAR(20)))) = ISNULL(bc.COR_PRODUTO, RTRIM(LTRIM(CAST(pb.COR_PRODUTO AS VARCHAR(20)))))
-          LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON c.COR = bc.COR_PRODUTO
+          LEFT JOIN (
+            SELECT PRODUTO, COR_PRODUTO, MAX(DESC_COR_PRODUTO) AS DESC_COR
+            FROM PRODUTO_CORES WITH (NOLOCK)
+            GROUP BY PRODUTO, COR_PRODUTO
+          ) c ON RTRIM(LTRIM(c.PRODUTO)) = RTRIM(LTRIM(bc.PRODUTO))
+             AND (RTRIM(LTRIM(CAST(c.COR_PRODUTO AS VARCHAR(20)))) = RTRIM(LTRIM(CAST(bc.COR_PRODUTO AS VARCHAR(20)))) OR TRY_CONVERT(INT, c.COR_PRODUTO) = TRY_CONVERT(INT, bc.COR_PRODUTO))
         `;
         req.input('gradeFiltro', sql.VarChar, gradeFiltro);
         req.input('filialOrigemParam', sql.VarChar, filialOperacional?.trim() || '');
@@ -229,7 +239,12 @@ export async function GET(request: Request) {
             pb.CODIGO_BARRA
           FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
           LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = e.PRODUTO
-          LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON c.COR = e.COR_PRODUTO
+          LEFT JOIN (
+            SELECT PRODUTO, COR_PRODUTO, MAX(DESC_COR_PRODUTO) AS DESC_COR
+            FROM PRODUTO_CORES WITH (NOLOCK)
+            GROUP BY PRODUTO, COR_PRODUTO
+          ) c ON RTRIM(LTRIM(c.PRODUTO)) = RTRIM(LTRIM(e.PRODUTO))
+             AND (RTRIM(LTRIM(CAST(c.COR_PRODUTO AS VARCHAR(20)))) = RTRIM(LTRIM(CAST(e.COR_PRODUTO AS VARCHAR(20)))) OR TRY_CONVERT(INT, c.COR_PRODUTO) = TRY_CONVERT(INT, e.COR_PRODUTO))
           LEFT JOIN PRODUTOS_BARRA pb WITH (NOLOCK) ON pb.PRODUTO = e.PRODUTO AND pb.COR_PRODUTO = e.COR_PRODUTO
           WHERE RTRIM(LTRIM(CAST(e.PRODUTO AS VARCHAR(50)))) = RTRIM(LTRIM(@searchTerm))
             AND RTRIM(LTRIM(ISNULL(CAST(e.COR_PRODUTO AS VARCHAR(20)), ''))) = RTRIM(LTRIM(ISNULL(@corProduto, '')))
@@ -308,7 +323,12 @@ export async function GET(request: Request) {
           LEFT JOIN PRODUTOS_BARRA pb WITH (NOLOCK)
             ON pb.PRODUTO = p.PRODUTO
             AND RTRIM(LTRIM(CAST(pb.COR_PRODUTO AS VARCHAR(20)))) = ISNULL(bc.COR_PRODUTO, RTRIM(LTRIM(CAST(pb.COR_PRODUTO AS VARCHAR(20)))))
-          LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON c.COR = bc.COR_PRODUTO
+          LEFT JOIN (
+            SELECT PRODUTO, COR_PRODUTO, MAX(DESC_COR_PRODUTO) AS DESC_COR
+            FROM PRODUTO_CORES WITH (NOLOCK)
+            GROUP BY PRODUTO, COR_PRODUTO
+          ) c ON RTRIM(LTRIM(c.PRODUTO)) = RTRIM(LTRIM(bc.PRODUTO))
+             AND (RTRIM(LTRIM(CAST(c.COR_PRODUTO AS VARCHAR(20)))) = RTRIM(LTRIM(CAST(bc.COR_PRODUTO AS VARCHAR(20)))) OR TRY_CONVERT(INT, c.COR_PRODUTO) = TRY_CONVERT(INT, bc.COR_PRODUTO))
         `;
         req.input('searchPattern', sql.VarChar, searchPattern);
         req.input('searchTermExato', sql.VarChar, searchTermTrimmed);
@@ -339,7 +359,12 @@ export async function GET(request: Request) {
           FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
           LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = e.PRODUTO
           LEFT JOIN PRODUTOS_BARRA pb WITH (NOLOCK) ON pb.PRODUTO = e.PRODUTO AND pb.COR_PRODUTO = e.COR_PRODUTO
-          LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON c.COR = e.COR_PRODUTO
+          LEFT JOIN (
+            SELECT PRODUTO, COR_PRODUTO, MAX(DESC_COR_PRODUTO) AS DESC_COR
+            FROM PRODUTO_CORES WITH (NOLOCK)
+            GROUP BY PRODUTO, COR_PRODUTO
+          ) c ON RTRIM(LTRIM(c.PRODUTO)) = RTRIM(LTRIM(e.PRODUTO))
+             AND (RTRIM(LTRIM(CAST(c.COR_PRODUTO AS VARCHAR(20)))) = RTRIM(LTRIM(CAST(e.COR_PRODUTO AS VARCHAR(20)))) OR TRY_CONVERT(INT, c.COR_PRODUTO) = TRY_CONVERT(INT, e.COR_PRODUTO))
           WHERE (
             p.DESC_PRODUTO LIKE @searchPattern
             OR RTRIM(LTRIM(CAST(e.PRODUTO AS VARCHAR(50)))) LIKE @searchPattern
@@ -437,7 +462,10 @@ export async function GET(request: Request) {
         const key = `${produto}::${cor}`;
 
         if (!produtosMap.has(key)) {
-          const descCorResolvida = getMappedColorDescription(cor || undefined);
+          // Prioriza a descrição de cor per-produto vinda do banco (PRODUTO_CORES);
+          // só cai no mapa global quando o cadastro do produto não tiver a cor.
+          const descCorBanco = row.DESC_COR?.toString().trim() || '';
+          const descCorResolvida = descCorBanco || getMappedColorDescription(cor || undefined);
           produtosMap.set(key, {
             produto,
             descProduto: row.DESC_PRODUTO?.toString().trim() || '',

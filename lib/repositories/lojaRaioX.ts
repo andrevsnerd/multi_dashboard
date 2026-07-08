@@ -237,7 +237,7 @@ function buildLinhaFilter(
 
 /**
  * Chave produto+cor para casar vendas (fetchProductsWithDetails) com estoque
- * (fetchStockByFilial). As duas fontes trazem a DESCRIÇÃO da cor (CORES_BASICAS.DESC_COR),
+ * (fetchStockByFilial). As duas fontes trazem a DESCRIÇÃO da cor (PRODUTO_CORES.DESC_COR_PRODUTO, per-produto),
  * não o código — então casamos por descrição normalizada (ver memória cor-produto-formato-duas-fontes).
  */
 function corKeyFromDesc(desc: string | null | undefined): string {
@@ -560,7 +560,12 @@ async function fetchEstoquePorProdutos(
         e.FILIAL AS filial,
         SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS estoque
       FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
-      LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON e.COR_PRODUTO = c.COR
+      LEFT JOIN (
+        SELECT PRODUTO, COR_PRODUTO, MAX(DESC_COR_PRODUTO) AS DESC_COR
+        FROM PRODUTO_CORES WITH (NOLOCK)
+        GROUP BY PRODUTO, COR_PRODUTO
+      ) c ON RTRIM(LTRIM(c.PRODUTO)) = RTRIM(LTRIM(e.PRODUTO))
+         AND (RTRIM(LTRIM(CAST(c.COR_PRODUTO AS VARCHAR(20)))) = RTRIM(LTRIM(CAST(e.COR_PRODUTO AS VARCHAR(20)))) OR TRY_CONVERT(INT, c.COR_PRODUTO) = TRY_CONVERT(INT, e.COR_PRODUTO))
       WHERE e.PRODUTO IN (${ids.map((_, i) => `@rxProd${i}`).join(", ")})
         AND e.FILIAL IN (${inventoryFiliais.map((_, i) => `@rxFil${i}`).join(", ")})
       GROUP BY e.PRODUTO, c.DESC_COR, e.FILIAL

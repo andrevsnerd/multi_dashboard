@@ -191,12 +191,21 @@ function resolveStrictColorDescription(
   corProduto?: string | null,
   descCor?: string | null
 ) {
+  // A descrição de cor é escopada POR PRODUTO no Linx (o mesmo código descreve
+  // cores diferentes em produtos distintos). Por isso a descrição do cadastro do
+  // item (descCor / PRODUTO_CORES.DESC_COR_PRODUTO) tem prioridade; o mapa global
+  // getMappedColorDescription entra só como fallback quando o item não traz descrição.
+  const doProduto = (descCor ?? "").trim();
+  if (doProduto) {
+    return doProduto;
+  }
+
   const codigoCor = (corProduto ?? "").trim();
   if (codigoCor) {
     return getMappedColorDescription(codigoCor);
   }
 
-  return (descCor ?? "").trim();
+  return "";
 }
 
 async function buscarPorCodigoBarras(codigoBarras: string, companyKey?: string) {

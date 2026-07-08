@@ -271,11 +271,17 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
     const produtoJoinVt = needsProdutoJoin
       ? 'LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = vt.PRODUTO'
       : '';
+    // Descrição de cor é escopada POR PRODUTO no Linx: o mesmo código descreve
+    // cores diferentes por produto. Por isso o filtro casa em PRODUTO_CORES
+    // (DESC_COR_PRODUTO do cadastro do produto), não no mapa global CORES_BASICAS.
+    // Mantém o alias `c` e a coluna `c.DESC_COR` para o filtro downstream não mudar.
     const coresJoinVp = needsCoresJoin
-      ? 'LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON c.COR = vp.COR_PRODUTO'
+      ? `LEFT JOIN (SELECT PRODUTO, COR_PRODUTO, MAX(DESC_COR_PRODUTO) AS DESC_COR FROM PRODUTO_CORES WITH (NOLOCK) GROUP BY PRODUTO, COR_PRODUTO) c
+          ON RTRIM(LTRIM(c.PRODUTO)) = RTRIM(LTRIM(vp.PRODUTO)) AND (RTRIM(LTRIM(CAST(c.COR_PRODUTO AS VARCHAR(20)))) = RTRIM(LTRIM(CAST(vp.COR_PRODUTO AS VARCHAR(20)))) OR TRY_CONVERT(INT, c.COR_PRODUTO) = TRY_CONVERT(INT, vp.COR_PRODUTO))`
       : '';
     const coresJoinVt = needsCoresJoin
-      ? 'LEFT JOIN CORES_BASICAS c WITH (NOLOCK) ON c.COR = vt.COR_PRODUTO'
+      ? `LEFT JOIN (SELECT PRODUTO, COR_PRODUTO, MAX(DESC_COR_PRODUTO) AS DESC_COR FROM PRODUTO_CORES WITH (NOLOCK) GROUP BY PRODUTO, COR_PRODUTO) c
+          ON RTRIM(LTRIM(c.PRODUTO)) = RTRIM(LTRIM(vt.PRODUTO)) AND (RTRIM(LTRIM(CAST(c.COR_PRODUTO AS VARCHAR(20)))) = RTRIM(LTRIM(CAST(vt.COR_PRODUTO AS VARCHAR(20)))) OR TRY_CONVERT(INT, c.COR_PRODUTO) = TRY_CONVERT(INT, vt.COR_PRODUTO))`
       : '';
 
     // Cláusulas de atributo (produto/cor) — idênticas em vendas_base e TrocasPuras.

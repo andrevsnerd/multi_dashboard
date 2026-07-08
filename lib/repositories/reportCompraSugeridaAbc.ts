@@ -51,8 +51,13 @@ function transitDescKey(
   corProduto: string | null | undefined,
   corDescricao?: string | null
 ): string | null {
-  const fromCode = getMappedColorDescription(corProduto);
-  const raw = (fromCode || (corDescricao ?? "")).trim().toUpperCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
+  // A descrição de cor é escopada POR PRODUTO no Linx (o mesmo código descreve
+  // cores diferentes por produto). Prioriza a descrição do cadastro do item
+  // (corDescricao = PRODUTO_CORES.DESC_COR_PRODUTO / descCorProduto do detalhe);
+  // getMappedColorDescription (mapa global) entra só como fallback quando vazia.
+  const doProduto = (corDescricao ?? "").trim();
+  const base = doProduto || getMappedColorDescription(corProduto);
+  const raw = base.trim().toUpperCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
   if (!raw) return null;
   return `${TRANSIT_DESC_PREFIX}${String(produto ?? "").trim()}||${raw}`;
 }

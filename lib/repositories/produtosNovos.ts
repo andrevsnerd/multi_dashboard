@@ -125,8 +125,12 @@ export async function fetchProdutosNovosRecentes(
           ) fallback_cores
         )
       ) color_source
-      LEFT JOIN CORES_BASICAS c WITH (NOLOCK)
-        ON c.COR = color_source.corCodigo
+      LEFT JOIN (
+        SELECT PRODUTO, COR_PRODUTO, MAX(DESC_COR_PRODUTO) AS DESC_COR
+        FROM PRODUTO_CORES WITH (NOLOCK)
+        GROUP BY PRODUTO, COR_PRODUTO
+      ) c ON RTRIM(LTRIM(c.PRODUTO)) = RTRIM(LTRIM(bp.produto))
+         AND (RTRIM(LTRIM(CAST(c.COR_PRODUTO AS VARCHAR(20)))) = RTRIM(LTRIM(CAST(color_source.corCodigo AS VARCHAR(20)))) OR TRY_CONVERT(INT, c.COR_PRODUTO) = TRY_CONVERT(INT, color_source.corCodigo))
       ORDER BY bp.dataCadastro DESC, bp.produto ASC, color_source.corCodigo ASC
     `;
 
