@@ -315,6 +315,15 @@ function getDisplayedStock(row: StockAggregationRow): number {
   return Math.max(0, positiveStock);
 }
 
+// Saldo por filial usado para EXIBIR negativo na ficha do produto: nunca soma
+// negativo quando há saldo positivo (positivo > 0 → só positivo); só mostra o
+// negativo quando a filial NÃO tem nenhum saldo positivo (totalmente negativa).
+function getStockForDisplay(row: StockAggregationRow): number {
+  const positiveStock = Number(row.positiveStock ?? 0);
+  const negativeStock = Number(row.negativeStock ?? 0);
+  return positiveStock > 0 ? positiveStock : negativeStock;
+}
+
 function toNonNegativeStock(value: number): number {
   return value > 0 ? value : 0;
 }
@@ -1464,7 +1473,7 @@ async function fetchProductStockByFilialEcommerce({
     // Criar mapas
     const stockMap = new Map<string, number>();
     stockResult.recordset.forEach((row) => {
-      stockMap.set(row.FILIAL, getDisplayedStock(row));
+      stockMap.set(row.FILIAL, getStockForDisplay(row));
     });
 
     const currentRevenueMap = new Map<string, number>();
@@ -1750,7 +1759,7 @@ export async function fetchProductStockByFilial({
     const stockMap = new Map<string, number>();
     stockResult.recordset.forEach((row) => {
       const normalizedFilial = (row.FILIAL || '').trim();
-      stockMap.set(normalizedFilial, getDisplayedStock(row));
+      stockMap.set(normalizedFilial, getStockForDisplay(row));
     });
 
     const currentRevenueMap = new Map<string, number>();
@@ -1793,7 +1802,9 @@ export async function fetchProductStockByFilial({
       const activeFilialForStock = getActiveFilial(companyConfig, filialName);
       const isActiveFilial = activeFilialForStock.trim().toUpperCase() === filialName.trim().toUpperCase();
       if (isActiveFilial) {
-        existing.stock += Math.max(0, stockMap.get(filialName) ?? 0);
+        // stockMap já decide positivo-only vs negativo-total (getStockForDisplay);
+        // o total geral do card é floreado no frontend (getPositiveStockTotal).
+        existing.stock += stockMap.get(filialName) ?? 0;
         // Só expõe o código da filial ativa se a filial pertence a um grupo com múltiplos membros
         const groupMembers = Object.values(companyConfig.filialGroups ?? {}).find((members) =>
           members.some((m) => m.trim().toUpperCase() === filialName.trim().toUpperCase())
