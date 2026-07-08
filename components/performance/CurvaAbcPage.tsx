@@ -1523,6 +1523,8 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   const [exportingPdf, setExportingPdf] = useState(false);
   const [compraIdealFilialProgresso, setCompraIdealFilialProgresso] = useState<{ feito: number; total: number; fase: "lendo" | "gerando" } | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  // Filtro por grupo de produto (GRUPO_PRODUTO) — só NERD.
+  const [selectedGrupos, setSelectedGrupos] = useState<string[]>([]);
   const [selectedSubgrupos, setSelectedSubgrupos] = useState<string[]>([]);
   const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
   const [selectedColecoes, setSelectedColecoes] = useState<string[]>([]);
@@ -1809,6 +1811,17 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     return activeCategorias ? data.produtos.filter(p => activeCategorias.has(p.categoria)) : data.produtos;
   }, [data, activeCategorias]);
 
+  const availableGrupos = useMemo(() => {
+    if (companyKey !== "nerd") return [];
+    return Array.from(
+      new Set(
+        produtosBaseFiltro
+          .map((p) => (p.categoria ?? "").trim())
+          .filter((value) => value !== "")
+      )
+    ).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [produtosBaseFiltro, companyKey]);
+
   const availableSubgrupos = useMemo(() => {
     return Array.from(
       new Set(
@@ -1838,6 +1851,10 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
       )
     ).sort((a, b) => a.localeCompare(b, "pt-BR"));
   }, [produtosBaseFiltro]);
+
+  useEffect(() => {
+    setSelectedGrupos((prev) => prev.filter((value) => availableGrupos.includes(value)));
+  }, [availableGrupos]);
 
   useEffect(() => {
     setSelectedSubgrupos((prev) => prev.filter((value) => availableSubgrupos.includes(value)));
@@ -1960,13 +1977,16 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
 
   const produtosFiltrados = useMemo(() => {
     let produtos = produtosBaseFiltro;
+    if (companyKey === "nerd" && selectedGrupos.length > 0) {
+      produtos = produtos.filter((p) => selectedGrupos.includes((p.categoria ?? "").trim()));
+    }
     if (selectedSubgrupos.length > 0) {
       produtos = produtos.filter((p) => selectedSubgrupos.includes((p.subgrupo ?? "").trim()));
     }
     if (selectedGrades.length > 0) {
       produtos = produtos.filter((p) => selectedGrades.includes((p.grade ?? "").trim()));
     }
-    if (selectedColecoes.length > 0) {
+    if (companyKey !== "nerd" && selectedColecoes.length > 0) {
       produtos = produtos.filter((p) => selectedColecoes.includes((p.colecao ?? "").trim()));
     }
     if (companyKey === "nerd" && fornecedorFiltro && fornecedoresOpts.length > 0) {
@@ -1979,13 +1999,14 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
       );
     }
     return produtos;
-  }, [produtosBaseFiltro, selectedSubgrupos, selectedGrades, selectedColecoes, companyKey, fornecedorFiltro, fornecedoresOpts]);
+  }, [produtosBaseFiltro, selectedGrupos, selectedSubgrupos, selectedGrades, selectedColecoes, companyKey, fornecedorFiltro, fornecedoresOpts]);
 
   const activeStructureFilterLabels = [
     selectedCategory ? getCategoryHeaderLabel(selectedCategory) : null,
+    companyKey === "nerd" && selectedGrupos.length > 0 ? `Grupos: ${selectedGrupos.join(", ")}` : null,
     selectedSubgrupos.length > 0 ? `Subgrupos: ${selectedSubgrupos.join(", ")}` : null,
     selectedGrades.length > 0 ? `Grades: ${selectedGrades.join(", ")}` : null,
-    selectedColecoes.length > 0 ? `Coleções: ${selectedColecoes.join(", ")}` : null,
+    companyKey !== "nerd" && selectedColecoes.length > 0 ? `Coleções: ${selectedColecoes.join(", ")}` : null,
   ].filter((value): value is string => Boolean(value));
 
   const activeFilterLabels = [
@@ -2179,7 +2200,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
 
   useEffect(() => {
     setCompraMetrics({});
-  }, [companyKey, selectedFilial, porCor, selectedCategory, selectedSubgrupos, selectedGrades, selectedColecoes, range.startDate, range.endDate]);
+  }, [companyKey, selectedFilial, porCor, selectedCategory, selectedGrupos, selectedSubgrupos, selectedGrades, selectedColecoes, range.startDate, range.endDate]);
 
   useEffect(() => {
     if (produtosComCurva.length === 0) return;
@@ -2865,6 +2886,14 @@ const handleBadgeClick = (cat: string) => {
                 </select>
               </div>
             )}
+            {companyKey === "nerd" && availableGrupos.length > 0 && (
+              <MultiSelectFilter
+                label="Grupo"
+                value={selectedGrupos}
+                options={availableGrupos}
+                onChange={setSelectedGrupos}
+              />
+            )}
             {availableSubgrupos.length > 0 && (
               <MultiSelectFilter
                 label="Subgrupo"
@@ -2881,7 +2910,7 @@ const handleBadgeClick = (cat: string) => {
                 onChange={setSelectedGrades}
               />
             )}
-            {availableColecoes.length > 0 && (
+            {companyKey !== "nerd" && availableColecoes.length > 0 && (
               <MultiSelectFilter
                 label="Coleção"
                 value={selectedColecoes}
