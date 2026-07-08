@@ -7166,9 +7166,9 @@
     },
     {
       "itemKey": "N4.32.0004||K9",
-      "dataCompra": "2026-11-23",
+      "dataCompra": "2026-09-28",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T14:44:41.768Z"
+      "updatedAt": "2026-07-08T19:54:02.492Z"
     },
     {
       "itemKey": "N5.21.0008||K9",
@@ -10436,9 +10436,9 @@
     },
     {
       "itemKey": "N4.C3.0012||09",
-      "dataCompra": "2026-10-09",
+      "dataCompra": "2026-10-07",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T14:47:13.783Z"
+      "updatedAt": "2026-07-08T19:54:02.492Z"
     },
     {
       "itemKey": "N5.10.13||06",
@@ -12995,6 +12995,12 @@
       "dataCompra": "2026-10-22",
       "transitoSig": "",
       "updatedAt": "2026-07-08T19:17:28.402Z"
+    },
+    {
+      "itemKey": "28.45.0235||155",
+      "dataCompra": "2027-02-19",
+      "transitoSig": "",
+      "updatedAt": "2026-07-08T19:54:02.492Z"
     }
   ],
   "scarfme::": [

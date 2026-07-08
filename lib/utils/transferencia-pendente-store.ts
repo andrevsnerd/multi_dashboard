@@ -190,7 +190,11 @@ export async function registrarTransferenciasDetectadas(
   );
   if (romaneios.length === 0) return vazio;
 
-  // Quais desses romaneios já existem em transferencia_pendente (qualquer origem)?
+  // Pré-filtro (fast-path): quais desses romaneios já existem em transferencia_pendente
+  // (qualquer origem — execução pela tela OU uma detecção anterior)? Evita processar em
+  // JS romaneios que sabidamente já estão registrados. A garantia real contra corrida
+  // (execução pela tela terminando de gravar ENQUANTO esta detecção roda) vem do guard
+  // atômico abaixo, não deste SELECT solto.
   const existentes = (await sql`
     SELECT DISTINCT romaneio_saida
     FROM transferencia_pendente
@@ -202,52 +206,108 @@ export async function registrarTransferenciasDetectadas(
   const novos = itens.filter((it) => !jaRegistrados.has((it.romaneio || "").trim()));
   if (novos.length === 0) return vazio;
 
+  // Agrupa por romaneio: o guard de corrida precisa ser por romaneio inteiro (não por
+  // item), senão itens do mesmo romaneio se bloqueariam uns aos outros.
+  const porRomaneio = new Map<string, TransferenciaDetectadaRegistro[]>();
+  for (const it of novos) {
+    const rom = (it.romaneio || "").trim();
+    if (!porRomaneio.has(rom)) porRomaneio.set(rom, []);
+    porRomaneio.get(rom)!.push(it);
+  }
+
   let itensInseridos = 0;
   let itensConfirmados = 0;
   const romaneiosTocados = new Set<string>();
 
-  for (const it of novos) {
-    const rom = (it.romaneio || "").trim();
-    const qtd = Math.max(1, Math.floor(it.quantidade));
-    await sql`
+  for (const [rom, itensDoRomaneio] of porRomaneio) {
+    const [primeiro, ...resto] = itensDoRomaneio;
+    const qtdPrimeiro = Math.max(1, Math.floor(primeiro.quantidade));
+
+    // Guard atômico: só insere o primeiro item SE, na hora exata do INSERT, ainda não
+    // existir NENHUMA linha para este romaneio. Fecha a janela de corrida com a
+    // execução pela própria tela (que insere no mesmo instante em que grava o
+    // romaneio no Linx) — diferente do SELECT solto acima, aqui checagem e escrita
+    // são a MESMA instrução SQL, então não há intervalo entre "ler" e "escrever".
+    const claim = (await sql`
       INSERT INTO transferencia_pendente (
         company_key, item_key, produto, cor_descricao, cor_codigo, descricao,
         codigo_barra, origem_canonico, destino_canonico, origem_label, destino_label,
         romaneio_saida, quantidade, data_saida, created_by
-      ) VALUES (
-        ${c},
-        ${`${it.produto}|${it.corCodigo ?? ""}|${it.origemCanonico}|${it.destinoCanonico}`},
-        ${it.produto},
-        ${it.corDescricao},
-        ${it.corCodigo},
-        ${it.descricao},
-        ${it.codigoBarra},
-        ${it.origemCanonico},
-        ${it.destinoCanonico},
-        ${it.origemLabel},
-        ${it.destinoLabel},
-        ${rom},
-        ${qtd},
-        COALESCE(${it.emissao || null}::timestamptz, NOW()),
-        ${"DETECÇÃO AUTOMÁTICA"}
       )
-    `;
-    itensInseridos += 1;
+      SELECT
+        ${c},
+        ${`${primeiro.produto}|${primeiro.corCodigo ?? ""}|${primeiro.origemCanonico}|${primeiro.destinoCanonico}`},
+        ${primeiro.produto},
+        ${primeiro.corDescricao},
+        ${primeiro.corCodigo},
+        ${primeiro.descricao},
+        ${primeiro.codigoBarra},
+        ${primeiro.origemCanonico},
+        ${primeiro.destinoCanonico},
+        ${primeiro.origemLabel},
+        ${primeiro.destinoLabel},
+        ${rom},
+        ${qtdPrimeiro},
+        COALESCE(${primeiro.emissao || null}::timestamptz, NOW()),
+        ${"DETECÇÃO AUTOMÁTICA"}
+      WHERE NOT EXISTS (
+        SELECT 1 FROM transferencia_pendente
+        WHERE company_key = ${c} AND romaneio_saida = ${rom}
+      )
+      RETURNING id
+    `) as Array<{ id: number }>;
+
+    // Alguém (a própria tela ou outra detecção concorrente) já registrou este
+    // romaneio entre o pré-filtro e agora — pula o romaneio inteiro.
+    if (claim.length === 0) continue;
+
     romaneiosTocados.add(rom);
 
-    // Perna de entrada já recebida no Linx → grava confirmação (status "confirmada").
-    const recebido = Math.max(0, Math.floor(it.qtdEntrada));
-    if (recebido > 0) {
-      await confirmarItem(
-        c,
-        rom,
-        it.destinoCanonico,
-        it.produto,
-        it.corCodigo ?? "",
-        Math.min(recebido, qtd),
-        "DETECÇÃO AUTOMÁTICA"
-      );
-      itensConfirmados += 1;
+    // A partir daqui o romaneio está "claimed" por esta chamada — os itens
+    // restantes podem ser inseridos direto, sem novo guard.
+    for (const it of [primeiro, ...resto]) {
+      const qtd = Math.max(1, Math.floor(it.quantidade));
+      if (it !== primeiro) {
+        await sql`
+          INSERT INTO transferencia_pendente (
+            company_key, item_key, produto, cor_descricao, cor_codigo, descricao,
+            codigo_barra, origem_canonico, destino_canonico, origem_label, destino_label,
+            romaneio_saida, quantidade, data_saida, created_by
+          ) VALUES (
+            ${c},
+            ${`${it.produto}|${it.corCodigo ?? ""}|${it.origemCanonico}|${it.destinoCanonico}`},
+            ${it.produto},
+            ${it.corDescricao},
+            ${it.corCodigo},
+            ${it.descricao},
+            ${it.codigoBarra},
+            ${it.origemCanonico},
+            ${it.destinoCanonico},
+            ${it.origemLabel},
+            ${it.destinoLabel},
+            ${rom},
+            ${qtd},
+            COALESCE(${it.emissao || null}::timestamptz, NOW()),
+            ${"DETECÇÃO AUTOMÁTICA"}
+          )
+        `;
+      }
+      itensInseridos += 1;
+
+      // Perna de entrada já recebida no Linx → grava confirmação (status "confirmada").
+      const recebido = Math.max(0, Math.floor(it.qtdEntrada));
+      if (recebido > 0) {
+        await confirmarItem(
+          c,
+          rom,
+          it.destinoCanonico,
+          it.produto,
+          it.corCodigo ?? "",
+          Math.min(recebido, qtd),
+          "DETECÇÃO AUTOMÁTICA"
+        );
+        itensConfirmados += 1;
+      }
     }
   }
 
