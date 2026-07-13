@@ -613,3 +613,117 @@
   color: #c62828;
   font-weight: 700;
 }
+
+/* ── TEMA NOTURNO ── overrides escopados; tema claro intacto ── */
+
+/* Bordas claras → token neutro */
+:global(:root[data-theme="dark"]) .select,
+:global(:root[data-theme="dark"]) .goalsButton,
+:global(:root[data-theme="dark"]) .card,
+:global(:root[data-theme="dark"]) .tableWrapper,
+:global(:root[data-theme="dark"]) .branchCard {
+  border-color: var(--b-200);
+}
+:global(:root[data-theme="dark"]) .goalsButton:hover {
+  border-color: var(--b-300);
+}
+:global(:root[data-theme="dark"]) .table thead tr {
+  border-bottom-color: var(--b-200);
+}
+:global(:root[data-theme="dark"]) .totalsRow {
+  border-top-color: var(--b-200);
+}
+
+/* Texto escuro puro / cinza claro → tokens */
+:global(:root[data-theme="dark"]) .cardLabel,
+:global(:root[data-theme="dark"]) .table thead th {
+  color: var(--t-900);
+}
+:global(:root[data-theme="dark"]) .loadingMsg,
+:global(:root[data-theme="dark"]) .noMeta,
+:global(:root[data-theme="dark"]) .cardQtde,
+:global(:root[data-theme="dark"]) .cardMetaValue {
+  color: var(--t-500);
+}
+
+/* Hover de linha (fundo claro) → token */
+:global(:root[data-theme="dark"]) .bodyRow:hover,
+:global(:root[data-theme="dark"]) .totalsRow:hover {
+  background: var(--s-100);
+}
+
+/* Link azul (filial clicável) → azul claro */
+:global(:root[data-theme="dark"]) .tdFilialClickable {
+  color: #60a5fa;
+}
+:global(:root[data-theme="dark"]) .tdFilialClickable:hover {
+  color: #93c5fd;
+}
+
+/* Coluna de vendas destacada (azul pálido) → tinta translúcida */
+:global(:root[data-theme="dark"]) .tdVendas {
+  background: rgba(59, 130, 246, 0.14);
+  border-color: rgba(59, 130, 246, 0.35);
+}
+
+/* Célula de categoria (contorno neutro) */
+:global(:root[data-theme="dark"]) .tdCat {
+  box-shadow: inset 0 0 0 1px var(--b-200);
+}
+
+/* Categoria máxima/mínima (verde/vermelho/âmbar pálidos) → tintas translúcidas */
+:global(:root[data-theme="dark"]) .tdCatMax {
+  background: rgba(34, 197, 94, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.35);
+}
+:global(:root[data-theme="dark"]) .tdCatMin {
+  background: rgba(244, 63, 94, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(244, 63, 94, 0.35);
+}
+:global(:root[data-theme="dark"]) .tdCatSecondMin {
+  background: rgba(234, 179, 8, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(234, 179, 8, 0.35);
+}
+
+/* Badges de projeção / variação (verde/vermelho pálidos) */
+:global(:root[data-theme="dark"]) .badgeGreen,
+:global(:root[data-theme="dark"]) .variationPos {
+  background: rgba(34, 197, 94, 0.12);
+  color: #4ade80;
+}
+:global(:root[data-theme="dark"]) .badgeRed,
+:global(:root[data-theme="dark"]) .variationNeg {
+  background: rgba(244, 63, 94, 0.12);
+  color: #fb7185;
+}
+
+/* Deltas / percentuais de meta (texto verde/laranja/vermelho) */
+:global(:root[data-theme="dark"]) .deltaUp,
+:global(:root[data-theme="dark"]) .metaPctGreen,
+:global(:root[data-theme="dark"]) .catArrowUp {
+  color: #4ade80;
+}
+:global(:root[data-theme="dark"]) .deltaDown,
+:global(:root[data-theme="dark"]) .metaPctRed,
+:global(:root[data-theme="dark"]) .catArrowDown {
+  color: #fb7185;
+}
+:global(:root[data-theme="dark"]) .metaPctOrange {
+  color: #fbbf24;
+}
+
+/* Pills de categoria (cards view) */
+:global(:root[data-theme="dark"]) .catPillUp {
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.35);
+  color: #4ade80;
+}
+:global(:root[data-theme="dark"]) .catPillDown {
+  background: rgba(244, 63, 94, 0.12);
+  border-color: rgba(244, 63, 94, 0.35);
+  color: #fb7185;
+}
+:global(:root[data-theme="dark"]) .catPillNeutral {
+  background: var(--s-100);
+  border-color: var(--b-300);
+}

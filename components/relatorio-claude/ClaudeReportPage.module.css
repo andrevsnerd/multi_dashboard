@@ -1601,3 +1601,174 @@
     font-size: 14px;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ *  TEMA NOTURNO — overrides escopados; tema claro intacto
+ *  ---------------------------------------------------------------------------
+ *  Esta página usa uma paleta de marca (creme/bordô) quase toda cravada em
+ *  hex, sem tokens. Fundos maroon/dourado sólidos com texto claro por cima
+ *  (botões, capa, rodapé, badges, cabeçalho de tabela) já leem bem no escuro
+ *  e ficam intocados. O que quebra são os CARDS/SUPERFÍCIES claras (creme,
+ *  branco fora de token) e o TEXTO ESCURO (bordô/marrom) sobre elas.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
+/* ── Superfícies claras → superfícies escuras ── */
+:global(:root[data-theme="dark"]) .controlsCard {
+  background: linear-gradient(180deg, var(--s-white) 0%, var(--s-50) 100%);
+}
+:global(:root[data-theme="dark"]) .slide,
+:global(:root[data-theme="dark"]) .donut::after {
+  background: var(--s-white);
+}
+:global(:root[data-theme="dark"]) .coverLeft,
+:global(:root[data-theme="dark"]) .yearSoft {
+  background: var(--s-50);
+}
+:global(:root[data-theme="dark"]) .tab {
+  background: var(--s-50);
+  color: #fb7185;
+}
+:global(:root[data-theme="dark"]) .recommendCard {
+  background: var(--s-white);
+  color: #fb7185;
+}
+:global(:root[data-theme="dark"]) .scopeCardAccent {
+  background: linear-gradient(180deg, var(--s-white) 0%, var(--s-50) 100%);
+}
+:global(:root[data-theme="dark"]) .closingLeft {
+  background: var(--s-50);
+}
+:global(:root[data-theme="dark"]) .vbarChart {
+  background: var(--s-50);
+}
+:global(:root[data-theme="dark"]) .profileCardEcom {
+  background: rgba(234, 179, 8, 0.1);
+}
+
+/* ── Bordas / tracks translúcidos em bordô → token neutro ── */
+:global(:root[data-theme="dark"]) .controlsCard {
+  border-color: var(--b-200);
+}
+:global(:root[data-theme="dark"]) .rangeCard {
+  border-color: var(--b-200);
+}
+:global(:root[data-theme="dark"]) .secondaryButton {
+  border-color: var(--b-300);
+}
+:global(:root[data-theme="dark"]) .table td {
+  border-bottom-color: var(--b-200);
+}
+:global(:root[data-theme="dark"]) .barTrack,
+:global(:root[data-theme="dark"]) .compareTrack,
+:global(:root[data-theme="dark"]) .microBar,
+:global(:root[data-theme="dark"]) .bucketTrack {
+  background: var(--b-200);
+}
+
+/* ── Texto escuro (bordô/marrom) sobre cards claros → tons claros/tokens ── */
+:global(:root[data-theme="dark"]) .pageTitle,
+:global(:root[data-theme="dark"]) .sectionTitle,
+:global(:root[data-theme="dark"]) .slide h1,
+:global(:root[data-theme="dark"]) .profileStore {
+  color: var(--t-900);
+}
+
+:global(:root[data-theme="dark"]) .pageSubtitle,
+:global(:root[data-theme="dark"]) .subtitle,
+:global(:root[data-theme="dark"]) .sectionSubtitle,
+:global(:root[data-theme="dark"]) .statNote,
+:global(:root[data-theme="dark"]) .coverKicker,
+:global(:root[data-theme="dark"]) .coverBottom,
+:global(:root[data-theme="dark"]) .auditItem strong,
+:global(:root[data-theme="dark"]) .donutCenter span,
+:global(:root[data-theme="dark"]) .podiumNote,
+:global(:root[data-theme="dark"]) .vbarLabel,
+:global(:root[data-theme="dark"]) .bucketPct,
+:global(:root[data-theme="dark"]) .driftNote,
+:global(:root[data-theme="dark"]) .scopeCardTitle,
+:global(:root[data-theme="dark"]) .yearLabel,
+:global(:root[data-theme="dark"]) .yearUnits,
+:global(:root[data-theme="dark"]) .yearArrowGray,
+:global(:root[data-theme="dark"]) .profileMetaLabel,
+:global(:root[data-theme="dark"]) .yearNote {
+  color: var(--t-500);
+}
+
+:global(:root[data-theme="dark"]) .auditItem,
+:global(:root[data-theme="dark"]) .scopeCardLine,
+:global(:root[data-theme="dark"]) .profileMeta,
+:global(:root[data-theme="dark"]) .recommendText {
+  color: var(--t-700);
+}
+
+:global(:root[data-theme="dark"]) .closingLeft p {
+  color: var(--t-900);
+}
+
+/* ── Texto bordô (#6d2e46) usado como valor/título sobre card claro → rosa vivo ── */
+:global(:root[data-theme="dark"]) .secondaryButton,
+:global(:root[data-theme="dark"]) .auditTitle,
+:global(:root[data-theme="dark"]) .statValue,
+:global(:root[data-theme="dark"]) .yearValue,
+:global(:root[data-theme="dark"]) .profileValue,
+:global(:root[data-theme="dark"]) .vbarValue,
+:global(:root[data-theme="dark"]) .barValue,
+:global(:root[data-theme="dark"]) .podiumSubtitle,
+:global(:root[data-theme="dark"]) .miniCallout strong,
+:global(:root[data-theme="dark"]) .donutCenter,
+:global(:root[data-theme="dark"]) .compareTitle,
+:global(:root[data-theme="dark"]) .driftTitle,
+:global(:root[data-theme="dark"]) .scopeCardValue,
+:global(:root[data-theme="dark"]) .driftMain,
+:global(:root[data-theme="dark"]) .storyTitle,
+:global(:root[data-theme="dark"]) .recommendTitle {
+  color: #fb7185;
+}
+
+/* ── Faixas/avisos claros (rosa/terracota) → tintas translúcidas ── */
+:global(:root[data-theme="dark"]) .errorBox {
+  background: rgba(244, 63, 94, 0.12);
+  color: #fb7185;
+  border-left-color: #fb7185;
+}
+:global(:root[data-theme="dark"]) .removeButton {
+  color: #fb7185;
+}
+:global(:root[data-theme="dark"]) .warningNote {
+  background: rgba(234, 179, 8, 0.1);
+}
+:global(:root[data-theme="dark"]) .warningNote p {
+  color: #fb923c;
+}
+:global(:root[data-theme="dark"]) .profileColor {
+  color: #fb923c;
+}
+
+/* ── Proteções: mantém texto claro já correto sobre painéis bordô sólidos
+ *    (evita que os overrides genéricos acima, mais específicos, vazem
+ *    para dentro de .coverRight/.closingLeft/.closingRight/.yearDark) ── */
+:global(:root[data-theme="dark"]) .coverRight .subtitle {
+  color: #f6e9dc;
+}
+:global(:root[data-theme="dark"]) .coverRight .auditTitle,
+:global(:root[data-theme="dark"]) .closingLeft .auditTitle,
+:global(:root[data-theme="dark"]) .closingRight .auditTitle {
+  color: #f6e9dc;
+}
+:global(:root[data-theme="dark"]) .coverRight .auditItem,
+:global(:root[data-theme="dark"]) .closingLeft .auditItem,
+:global(:root[data-theme="dark"]) .closingRight .auditItem {
+  color: #f6e9dc;
+}
+:global(:root[data-theme="dark"]) .coverRight .auditItem strong,
+:global(:root[data-theme="dark"]) .closingLeft .auditItem strong,
+:global(:root[data-theme="dark"]) .closingRight .auditItem strong {
+  color: rgba(246, 233, 220, 0.76);
+}
+:global(:root[data-theme="dark"]) .yearDark .yearLabel,
+:global(:root[data-theme="dark"]) .yearDark .yearNote,
+:global(:root[data-theme="dark"]) .yearDark .yearUnits,
+:global(:root[data-theme="dark"]) .yearDark .yearValue {
+  color: #fff2df;
+}

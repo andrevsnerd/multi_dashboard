@@ -1578,3 +1578,150 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+/* ── TEMA NOTURNO ── overrides escopados; tema claro intacto ── */
+
+/* ── Estrutura / header ── */
+:global(:root[data-theme="dark"]) .wrapper {
+  background: var(--s-50);
+}
+:global(:root[data-theme="dark"]) .headerCard {
+  border-color: var(--b-200);
+}
+:global(:root[data-theme="dark"]) .iconWrapper {
+  background: rgba(34, 197, 94, 0.12);
+  color: #4ade80;
+}
+:global(:root[data-theme="dark"]) .dangerButton {
+  background: rgba(244, 63, 94, 0.12);
+  border-color: rgba(244, 63, 94, 0.35);
+  color: #fb7185;
+}
+:global(:root[data-theme="dark"]) .dangerButton:hover {
+  background: rgba(244, 63, 94, 0.2);
+  border-color: rgba(244, 63, 94, 0.45);
+  color: #fb7185;
+}
+
+/* ── Summary / curva text ── */
+:global(:root[data-theme="dark"]) .summaryValue {
+  color: #4ade80;
+}
+:global(:root[data-theme="dark"]) .textA { color: #4ade80; }
+:global(:root[data-theme="dark"]) .textB { color: #fbbf24; }
+:global(:root[data-theme="dark"]) .textC { color: #fb7185; }
+
+/* ── Curva section separator rows ── */
+:global(:root[data-theme="dark"]) .sectionRowA td {
+  background: rgba(34, 197, 94, 0.12);
+  border-top-color: rgba(34, 197, 94, 0.35);
+}
+:global(:root[data-theme="dark"]) .sectionRowB td {
+  background: rgba(234, 179, 8, 0.12);
+  border-top-color: rgba(234, 179, 8, 0.35);
+}
+:global(:root[data-theme="dark"]) .sectionRowC td {
+  background: rgba(244, 63, 94, 0.12);
+  border-top-color: rgba(244, 63, 94, 0.35);
+}
+:global(:root[data-theme="dark"]) .sectionNote {
+  color: #4ade80;
+  background: rgba(34, 197, 94, 0.12);
+}
+:global(:root[data-theme="dark"]) .sectionNoteIncluida {
+  color: #4ade80;
+  background: rgba(34, 197, 94, 0.12);
+}
+:global(:root[data-theme="dark"]) .rank.top {
+  background: rgba(234, 179, 8, 0.12);
+  color: #fbbf24;
+}
+
+/* ── QTD sugerida / suficiente ── */
+:global(:root[data-theme="dark"]) .qtdSugerida {
+  color: #4ade80;
+}
+:global(:root[data-theme="dark"]) .qtdSuficienteTag {
+  color: #4ade80;
+}
+:global(:root[data-theme="dark"]) .qtdSugeridaS {
+  color: #c4b5fd;
+}
+
+/* ── States ── */
+:global(:root[data-theme="dark"]) .error {
+  color: #fb7185;
+}
+
+/* ── Reposição section row ── */
+:global(:root[data-theme="dark"]) .sectionRowReposicao td {
+  border-top-color: rgba(59, 130, 246, 0.35);
+}
+
+/* ── Duração badge ── */
+:global(:root[data-theme="dark"]) .duracaoBadge {
+  background: rgba(244, 63, 94, 0.12);
+  color: #fb7185;
+}
+
+/* ── ABC modo toggle bar / checkboxes ── */
+:global(:root[data-theme="dark"]) .checkboxLabelB { color: #fbbf24; }
+:global(:root[data-theme="dark"]) .checkboxLabelC { color: #fb7185; }
+:global(:root[data-theme="dark"]) .modoMetaTag {
+  color: #4ade80;
+  background: rgba(34, 197, 94, 0.12);
+}
+
+/* ── Badge T (curva de giro) ── */
+:global(:root[data-theme="dark"]) .badgeT {
+  color: #5eead4;
+}
+
+/* ── Banners informativos ── */
+:global(:root[data-theme="dark"]) .abcInfoBanner {
+  background: rgba(234, 179, 8, 0.12);
+  border-color: rgba(234, 179, 8, 0.35);
+  color: #fbbf24;
+}
+:global(:root[data-theme="dark"]) .projecaoSimuladaBanner {
+  background: rgba(234, 179, 8, 0.12);
+  border-color: rgba(234, 179, 8, 0.35);
+  color: #fbbf24;
+}
+
+/* ── Compra final / add-remove buttons ── */
+:global(:root[data-theme="dark"]) .addBtnActive {
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.35);
+  color: #4ade80;
+}
+:global(:root[data-theme="dark"]) .removeBtn {
+  background: rgba(244, 63, 94, 0.12);
+  color: #fb7185;
+}
+:global(:root[data-theme="dark"]) .exportCaret {
+  border-color: var(--b-200);
+}
+
+/* ── Manual distribution (compras salvas) ── */
+:global(:root[data-theme="dark"]) .qtyManualTotal {
+  color: #60a5fa;
+}
+:global(:root[data-theme="dark"]) .manualCancelBtn:hover {
+  background: rgba(244, 63, 94, 0.12);
+  border-color: rgba(244, 63, 94, 0.35);
+  color: #fb7185;
+}
+:global(:root[data-theme="dark"]) .manualProductSearchInput {
+  border-color: var(--b-200);
+}
+:global(:root[data-theme="dark"]) .manualProductSearchInput:focus {
+  border-color: rgba(59, 130, 246, 0.45);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.22);
+}
+:global(:root[data-theme="dark"]) .manualProductError {
+  color: #fb7185;
+}
+:global(:root[data-theme="dark"]) .manualProductAddBtn:hover:not(:disabled) {
+  border-color: rgba(59, 130, 246, 0.35);
+}

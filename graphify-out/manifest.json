@@ -665,8 +665,8 @@
     "semantic_hash": "6d0790d8ecc2367eeaf40389e8e0bc8c"
   },
   "app/api/corporativo/pedidos/route.ts": {
-    "mtime": 1783952714.0265355,
-    "ast_hash": "c8c47556407c8c09ce911239fbf1cafd",
+    "mtime": 1783955459.6366584,
+    "ast_hash": "5bdce6df67b9276cf3e8379480921e2b",
     "semantic_hash": ""
   },
   "app/api/curva-abc-observacoes/route.ts": {
@@ -1175,8 +1175,8 @@
     "semantic_hash": "a9d9886f572b86f5584327849c78fce8"
   },
   "app/corporativo/catalogo/page.tsx": {
-    "mtime": 1783948368.5463145,
-    "ast_hash": "e54ebd83f14f2c349077711c8fb6c827",
+    "mtime": 1783961868.3724637,
+    "ast_hash": "9bdf9ecf30ac9e3954fde1857d36f1b8",
     "semantic_hash": ""
   },
   "app/corporativo/layout.tsx": {
@@ -1185,8 +1185,8 @@
     "semantic_hash": ""
   },
   "app/corporativo/loja/CartContext.tsx": {
-    "mtime": 1783948704.8786118,
-    "ast_hash": "4616b6f3ced33d9387dc8e893e3cd88a",
+    "mtime": 1783955450.051703,
+    "ast_hash": "29ed238a0ecccee7bb8163a982cf7cd0",
     "semantic_hash": ""
   },
   "app/corporativo/loja/carrinho/page.tsx": {
@@ -1230,8 +1230,8 @@
     "semantic_hash": ""
   },
   "app/corporativo/pedidos/page.tsx": {
-    "mtime": 1783948903.7751386,
-    "ast_hash": "65f4593e9864883852d926d8de756aa6",
+    "mtime": 1783960197.5889914,
+    "ast_hash": "63fd2a06dbd3de35ee4ecdf7e0615b8c",
     "semantic_hash": ""
   },
   "app/exportar-relatorios/page.tsx": {
@@ -1380,9 +1380,9 @@
     "semantic_hash": "1f13894059c7c73365fb5303040f3f5a"
   },
   "components/extrato-produto/ExtratoProdutoPage.tsx": {
-    "mtime": 1782489137.4729917,
-    "ast_hash": "91ccfd80db7010e8a132dd33c787bfd1",
-    "semantic_hash": "91ccfd80db7010e8a132dd33c787bfd1"
+    "mtime": 1783963943.0050664,
+    "ast_hash": "3841c5012b475dd2b18ec7216d58ea0a",
+    "semantic_hash": ""
   },
   "components/faturamento/FaturamentoPage.tsx": {
     "mtime": 1782911447.0907376,
@@ -1690,9 +1690,9 @@
     "semantic_hash": "5ee9fca264954c74fc3d39d54de7afaa"
   },
   "components/shared/CompraIdealCell.tsx": {
-    "mtime": 1782389709.917575,
-    "ast_hash": "7a6243b91ab0cd58ff2ff78300c2da27",
-    "semantic_hash": "7a6243b91ab0cd58ff2ff78300c2da27"
+    "mtime": 1783964477.7842536,
+    "ast_hash": "8b29a29fdcbabcb71d8b9a7d87042a95",
+    "semantic_hash": ""
   },
   "components/shared/CompraIdealExplainCard.tsx": {
     "mtime": 1782494053.0252738,
@@ -1840,8 +1840,8 @@
     "semantic_hash": "34537e31a915638b6406c4b7b7df38c1"
   },
   "data/compra-data-fixa.json": {
-    "mtime": 1783937699.3277225,
-    "ast_hash": "03821f52abf04412db2dace07ffde134",
+    "mtime": 1783963978.0494554,
+    "ast_hash": "444a42e25def1ccfc9623eca7e9a0ec7",
     "semantic_hash": ""
   },
   "data/compra-final.json": {
@@ -2525,8 +2525,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/corporativoStore.ts": {
-    "mtime": 1783948760.0656834,
-    "ast_hash": "fed43c97610070ab41b57cea116c66d8",
+    "mtime": 1783960083.9166687,
+    "ast_hash": "d494b39da9238f3c804753d696c21b4a",
     "semantic_hash": ""
   },
   "lib/repositories/ecommerce.ts": {
@@ -3612,6 +3612,31 @@
   "lib/repositories/corporativoCadastros.ts": {
     "mtime": 1783952270.309992,
     "ast_hash": "f7e4edbe5d3bba422fb51f463def9237",
+    "semantic_hash": ""
+  },
+  "app/api/corporativo/catalogo/cores/route.ts": {
+    "mtime": 1783961807.7034948,
+    "ast_hash": "369c005b252c251217e8a68d7ff7b4ff",
+    "semantic_hash": ""
+  },
+  "app/api/corporativo/pedidos/[id]/efetivar/route.ts": {
+    "mtime": 1783960099.6872747,
+    "ast_hash": "c2cf2f20978506d5138bf57b0e1d367b",
+    "semantic_hash": ""
+  },
+  "lib/corporativo/config.ts": {
+    "mtime": 1783955435.3342993,
+    "ast_hash": "7b8332162bceab6345466f1a79c730c4",
+    "semantic_hash": ""
+  },
+  "lib/repositories/pedidoVendaLinx.ts": {
+    "mtime": 1783959841.328051,
+    "ast_hash": "ef9bf64ad8fd89626edef8dc278efeec",
+    "semantic_hash": ""
+  },
+  "docs/CORPORATIVO_PEDIDO_LINX.md": {
+    "mtime": 1783959927.6702356,
+    "ast_hash": "740f780f4cb7d8ce8f3e2191b4611f5a",
     "semantic_hash": ""
   }
 }

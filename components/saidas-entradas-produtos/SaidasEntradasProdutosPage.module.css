@@ -1327,3 +1327,143 @@
   .submitBtn { width: 100%; }
   .addProductBtn { width: 100%; }
 }
+
+/* ── TEMA NOTURNO ── overrides escopados; tema claro intacto ──
+   Este módulo define seus próprios tokens locais (--bg,--card,--border,
+   --text,--text-2,--text-3,--saida-bg,--saida-border,--entrada-bg,
+   --entrada-border) travados no claro. Redefinimos esses tokens dentro do
+   escopo escuro para que todas as regras que já os consomem se ajustem
+   automaticamente, sem tocar nas regras originais. --saida/--entrada (usados
+   também como fundo sólido de botão) ficam intactos; só o TEXTO que usa essas
+   variáveis é corrigido regra a regra abaixo. */
+:global(:root[data-theme="dark"]) {
+  --bg: var(--s-50);
+  --card: var(--s-white);
+  --border: var(--b-200);
+  --text: var(--t-900);
+  --text-2: var(--t-500);
+  --text-3: var(--t-400);
+  --saida-bg: rgba(244, 63, 94, 0.12);
+  --saida-border: rgba(244, 63, 94, 0.35);
+  --entrada-bg: rgba(59, 130, 246, 0.14);
+  --entrada-border: rgba(59, 130, 246, 0.35);
+}
+
+/* ── Ícone do cabeçalho ── */
+:global(:root[data-theme="dark"]) .headerIcon {
+  color: #60a5fa;
+  border-color: rgba(59, 130, 246, 0.35);
+}
+
+/* ── Foco em selects/inputs (anel azul claro) ── */
+:global(:root[data-theme="dark"]) .configBarSelect:focus,
+:global(:root[data-theme="dark"]) .configBarInput:focus {
+  border-color: rgba(59, 130, 246, 0.5);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+}
+:global(:root[data-theme="dark"]) .inlineColorSelect:focus {
+  border-color: rgba(59, 130, 246, 0.5);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.28);
+}
+
+/* ── Link do histórico ── */
+:global(:root[data-theme="dark"]) .historicoActionLink {
+  color: #60a5fa;
+}
+
+/* ── Cancelar custom / limpar ── */
+:global(:root[data-theme="dark"]) .cancelCustomBtn:hover {
+  color: #fb7185;
+}
+
+/* ── Scrollbars finas ── */
+:global(:root[data-theme="dark"]) .logScrollContainer::-webkit-scrollbar-thumb,
+:global(:root[data-theme="dark"]) .produtosList::-webkit-scrollbar-thumb,
+:global(:root[data-theme="dark"]) .modalCartList::-webkit-scrollbar-thumb {
+  background: var(--b-300);
+}
+
+/* ── Hover escuro em botão de editar (era preto translúcido, sumia no escuro) ── */
+:global(:root[data-theme="dark"]) .logEditBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ── Pill de status (verde pálido) ── */
+:global(:root[data-theme="dark"]) .logStatusPill {
+  background: rgba(34, 197, 94, 0.16);
+  color: #4ade80;
+}
+
+/* ── Hover de item de produto / modal ── */
+:global(:root[data-theme="dark"]) .produtoItem:hover,
+:global(:root[data-theme="dark"]) .produtoModalItem:hover {
+  border-color: var(--b-300);
+}
+
+/* ── Botão de quantidade (hover cinza claro) ── */
+:global(:root[data-theme="dark"]) .qtyBtn:hover:not(:disabled) {
+  background: var(--s-100);
+}
+
+/* ── Remover produto (hover vermelho pálido) ── */
+:global(:root[data-theme="dark"]) .removeBtn:hover {
+  background: rgba(244, 63, 94, 0.14);
+  color: #fb7185;
+}
+
+/* ── Botões "adicionar produto" saída/entrada (texto sobre a tinta) ── */
+:global(:root[data-theme="dark"]) .addProductBtnSaida {
+  color: #fb7185;
+}
+:global(:root[data-theme="dark"]) .addProductBtnSaida:hover:not(:disabled) {
+  background: rgba(244, 63, 94, 0.22);
+}
+:global(:root[data-theme="dark"]) .addProductBtnEntrada {
+  color: #60a5fa;
+}
+:global(:root[data-theme="dark"]) .addProductBtnEntrada:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.22);
+}
+
+/* ── Foco de textarea/inputs de observação e busca ── */
+:global(:root[data-theme="dark"]) .obsTextarea:focus,
+:global(:root[data-theme="dark"]) .searchInput:focus,
+:global(:root[data-theme="dark"]) .modalTextarea:focus {
+  border-color: var(--b-300);
+}
+
+/* ── Fechar modal (hover cinza claro) ── */
+:global(:root[data-theme="dark"]) .modalCloseBtn:hover {
+  background: var(--s-100);
+}
+
+/* ── Chip "cancelar" seletor de cor ── */
+:global(:root[data-theme="dark"]) .colorChipCancel:hover {
+  background: var(--b-200);
+}
+
+/* ── Textarea desabilitada / botão secundário (hover) ── */
+:global(:root[data-theme="dark"]) .modalTextarea:disabled {
+  background: var(--s-50);
+}
+:global(:root[data-theme="dark"]) .btnSecondary:hover:not(:disabled) {
+  background: var(--s-50);
+}
+
+/* ── Botão de perigo (fundo pálido vermelho) ── */
+:global(:root[data-theme="dark"]) .btnDanger {
+  background: rgba(244, 63, 94, 0.12);
+  color: #fb7185;
+  border-color: rgba(244, 63, 94, 0.35);
+}
+:global(:root[data-theme="dark"]) .btnDanger:hover:not(:disabled) {
+  background: rgba(244, 63, 94, 0.22);
+}
+
+/* ── Botão primário (era navy sólido, sumia sobre o fundo escuro do app) ── */
+:global(:root[data-theme="dark"]) .btnPrimary {
+  background: #2563eb;
+}
+:global(:root[data-theme="dark"]) .btnPrimary:hover:not(:disabled) {
+  background: #1d4ed8;
+}

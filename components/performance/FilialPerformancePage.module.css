@@ -2544,3 +2544,298 @@
   display: block;
   margin-bottom: 12px;
 }
+
+/*
+ * ═══════════════════════════════════════════════════════════════════════════
+ *  ESQUEMA DE CORES — TEMA NOTURNO (Curva ABC / Filial Performance)
+ *  ---------------------------------------------------------------------------
+ *  Esta página tem MUITAS cores claras cravadas (verde/amarelo/rosa/azul) que
+ *  não foram migradas para tokens. No escuro elas viravam manchas claras com
+ *  texto quase branco por cima (ilegível). Em vez de mexer no tema claro,
+ *  redefinimos aqui só o que quebra, usando tintas translúcidas sobre o navy
+ *  do dashboard. Tudo escopado em :global(:root[data-theme="dark"]).
+ *
+ *  Paleta de tintas (sobre superfície escura):
+ *    verde  : bg rgba(34,197,94,.__)   texto #4ade80
+ *    âmbar  : bg rgba(234,179,8,.__)   texto #fbbf24
+ *    rosa   : bg rgba(244,63,94,.__)   texto #fb7185
+ *    azul   : bg rgba(59,130,246,.__)  texto #60a5fa
+ *    roxo   : bg rgba(139,92,246,.__)  texto #c4b5fd
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
+/* ── Estrutura / cards ── */
+:global(:root[data-theme="dark"]) .wrapper {
+  background: var(--app-bg);
+}
+:global(:root[data-theme="dark"]) .headerCard,
+:global(:root[data-theme="dark"]) .kpiCard,
+:global(:root[data-theme="dark"]) .filterStripCard {
+  border-color: var(--b-200);
+}
+:global(:root[data-theme="dark"]) .tabsRow {
+  border-bottom-color: var(--b-200);
+}
+:global(:root[data-theme="dark"]) .iconWrapper {
+  color: #60a5fa;
+}
+
+/* ── Toggles / botões de filtro ── */
+:global(:root[data-theme="dark"]) .filtroToggle {
+  border-color: var(--b-200);
+}
+:global(:root[data-theme="dark"]) .filtroClearBtn {
+  border-color: rgba(96, 165, 250, 0.35);
+  color: #93c5fd;
+}
+:global(:root[data-theme="dark"]) .filtroClearBtn:hover {
+  background: rgba(59, 130, 246, 0.24);
+  border-color: rgba(96, 165, 250, 0.55);
+}
+:global(:root[data-theme="dark"]) .exportXlsxBtn {
+  border-color: var(--b-300);
+}
+:global(:root[data-theme="dark"]) .exportXlsxBtn:hover:not(:disabled) {
+  background: var(--s-100);
+  color: var(--t-900);
+}
+:global(:root[data-theme="dark"]) .exportMenuDropdown {
+  border-color: var(--b-200);
+}
+:global(:root[data-theme="dark"]) .toggleBtnActive,
+:global(:root[data-theme="dark"]) .toggleBtnActive:hover {
+  background: #2563eb;
+  color: #fff;
+}
+:global(:root[data-theme="dark"]) .tabBtnActive {
+  color: #60a5fa;
+  border-bottom-color: #60a5fa;
+}
+
+/* ── KPIs / variações / metas ── */
+:global(:root[data-theme="dark"]) .kpiCardVendas {
+  background: rgba(34, 197, 94, 0.1) !important;
+  border-color: rgba(34, 197, 94, 0.3) !important;
+  border-left: 4px solid #22c55e !important;
+}
+:global(:root[data-theme="dark"]) .variationPos,
+:global(:root[data-theme="dark"]) .badgeGreen {
+  background: rgba(34, 197, 94, 0.16);
+  color: #4ade80;
+}
+:global(:root[data-theme="dark"]) .variationNeg,
+:global(:root[data-theme="dark"]) .badgeRed {
+  background: rgba(244, 63, 94, 0.16);
+  color: #fb7185;
+}
+:global(:root[data-theme="dark"]) .metaPctGreen { color: #4ade80; }
+:global(:root[data-theme="dark"]) .metaPctOrange { color: #fb923c; }
+:global(:root[data-theme="dark"]) .metaPctRed { color: #fb7185; }
+
+/* ── Faixa de categorias ── */
+:global(:root[data-theme="dark"]) .catPillUp,
+:global(:root[data-theme="dark"]) .catPillDown,
+:global(:root[data-theme="dark"]) .catPillNeutral {
+  color: var(--t-800);
+}
+:global(:root[data-theme="dark"]) .catDeltaUp { color: #4ade80; }
+:global(:root[data-theme="dark"]) .catDeltaDown { color: #f87171; }
+
+/* ── Resumo de curvas ── */
+:global(:root[data-theme="dark"]) .summaryCurveCard {
+  background: linear-gradient(180deg, var(--s-white) 0%, var(--s-50) 100%);
+}
+:global(:root[data-theme="dark"]) .summaryCurveCardActive {
+  background: #22304d;
+  border-color: #3b82f6;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+}
+:global(:root[data-theme="dark"]) .curveDetailPanel {
+  border-color: var(--b-200);
+}
+:global(:root[data-theme="dark"]) .textA { color: #4ade80; }
+:global(:root[data-theme="dark"]) .textB { color: #fbbf24; }
+:global(:root[data-theme="dark"]) .textC { color: #fb7185; }
+
+/* ── Linhas de seção (cabeçalhos de Curva A/B/C) ── */
+:global(:root[data-theme="dark"]) .sectionRowA td {
+  background: rgba(34, 197, 94, 0.1);
+  border-top-color: rgba(34, 197, 94, 0.45);
+}
+:global(:root[data-theme="dark"]) .sectionRowB td {
+  background: rgba(234, 179, 8, 0.1);
+  border-top-color: rgba(234, 179, 8, 0.45);
+}
+:global(:root[data-theme="dark"]) .sectionRowC td {
+  background: rgba(244, 63, 94, 0.1);
+  border-top-color: rgba(244, 63, 94, 0.45);
+}
+:global(:root[data-theme="dark"]) .sectionNote {
+  color: #4ade80;
+  background: rgba(34, 197, 94, 0.16);
+}
+:global(:root[data-theme="dark"]) .descontinuadoRow td {
+  background: rgba(244, 63, 94, 0.1) !important;
+}
+:global(:root[data-theme="dark"]) .rank.top {
+  background: rgba(234, 179, 8, 0.18);
+  color: #fcd34d;
+}
+
+/* ── Ícones de ação da linha ── */
+:global(:root[data-theme="dark"]) .productDetailIcon {
+  color: #60a5fa;
+}
+:global(:root[data-theme="dark"]) .productDetailIcon:hover {
+  background: rgba(59, 130, 246, 0.28);
+  color: #93c5fd;
+}
+:global(:root[data-theme="dark"]) .productPerformanceIcon {
+  background: rgba(234, 179, 8, 0.16);
+  color: #fcd34d;
+}
+:global(:root[data-theme="dark"]) .productPerformanceIcon:hover {
+  background: rgba(234, 179, 8, 0.26);
+  color: #fde047;
+}
+:global(:root[data-theme="dark"]) .productListaLojaIcon {
+  background: rgba(34, 197, 94, 0.16);
+  color: #4ade80;
+}
+:global(:root[data-theme="dark"]) .productListaLojaIcon:hover {
+  background: rgba(34, 197, 94, 0.26);
+  color: #86efac;
+}
+
+/* ── Célula de observação ── */
+:global(:root[data-theme="dark"]) .obsTrigger {
+  border-color: var(--b-300);
+  background: var(--s-50);
+  box-shadow: none;
+}
+:global(:root[data-theme="dark"]) .obsTrigger:hover:not(:disabled) {
+  border-color: var(--t-500);
+  background: var(--s-100);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+:global(:root[data-theme="dark"]) .obsTriggerFilled {
+  border-color: var(--b-300);
+}
+:global(:root[data-theme="dark"]) .obsTriggerEmpty,
+:global(:root[data-theme="dark"]) .obsTriggerInherited {
+  background: var(--s-50);
+}
+:global(:root[data-theme="dark"]) .obsTriggerError {
+  border-color: rgba(244, 63, 94, 0.5);
+  background: rgba(244, 63, 94, 0.12);
+}
+:global(:root[data-theme="dark"]) .obsTriggerIcon {
+  border-color: var(--b-300);
+}
+:global(:root[data-theme="dark"]) .obsModalError {
+  color: #f87171;
+}
+
+/* ── Tooltips inline ── */
+:global(:root[data-theme="dark"]) .inlineTooltipPanel::before {
+  border-top-color: var(--s-50);
+}
+:global(:root[data-theme="dark"]) .inlineTooltipTitle {
+  color: #93c5fd;
+}
+:global(:root[data-theme="dark"]) .inlineTooltipValue {
+  color: #60a5fa;
+}
+:global(:root[data-theme="dark"]) .inlineTooltipRow {
+  border-bottom-color: rgba(148, 163, 184, 0.15);
+}
+
+/* ── Badges diversos ── */
+:global(:root[data-theme="dark"]) .groupedBadge {
+  color: #c4b5fd;
+  background: rgba(139, 92, 246, 0.18);
+  border-color: rgba(139, 92, 246, 0.35);
+}
+:global(:root[data-theme="dark"]) .abcBadgeA {
+  color: #4ade80;
+  background: rgba(34, 197, 94, 0.15);
+  border-color: rgba(34, 197, 94, 0.35);
+}
+:global(:root[data-theme="dark"]) .abcBadgeB {
+  color: #fcd34d;
+  background: rgba(234, 179, 8, 0.15);
+  border-color: rgba(234, 179, 8, 0.35);
+}
+:global(:root[data-theme="dark"]) .abcBadgeC {
+  color: #fb7185;
+  background: rgba(244, 63, 94, 0.15);
+  border-color: rgba(244, 63, 94, 0.35);
+}
+:global(:root[data-theme="dark"]) .reporAdd { color: #38bdf8; }
+:global(:root[data-theme="dark"]) .reporOk { color: #4ade80; }
+:global(:root[data-theme="dark"]) .badgeT { color: #5eead4; }
+
+/* ── Buckets de estoque / alertas ── */
+:global(:root[data-theme="dark"]) .stockBucketCountZero {
+  background: rgba(244, 63, 94, 0.16);
+  color: #fb7185;
+}
+:global(:root[data-theme="dark"]) .stockBucketCountLow {
+  background: rgba(234, 179, 8, 0.16);
+  color: #fbbf24;
+}
+:global(:root[data-theme="dark"]) .stockBucketCountHigh {
+  background: rgba(34, 197, 94, 0.16);
+  color: #4ade80;
+}
+:global(:root[data-theme="dark"]) .alertasValueZero {
+  background: rgba(244, 63, 94, 0.16);
+  color: #fb7185;
+}
+:global(:root[data-theme="dark"]) .alertasValueLow {
+  background: rgba(234, 179, 8, 0.16);
+  color: #fbbf24;
+}
+:global(:root[data-theme="dark"]) .alertasValueHigh {
+  background: rgba(34, 197, 94, 0.16);
+  color: #4ade80;
+}
+
+/* ── Barras de curva (card ABC legado) ── */
+:global(:root[data-theme="dark"]) .abcCurveBarTrackA { background: rgba(34, 197, 94, 0.18); }
+:global(:root[data-theme="dark"]) .abcCurveBarTrackB { background: rgba(234, 179, 8, 0.18); }
+:global(:root[data-theme="dark"]) .abcCurveBarTrackC { background: rgba(244, 63, 94, 0.18); }
+
+/* ── Linhas inline de bucket: hover ── */
+:global(:root[data-theme="dark"]) .stockBucketInlineRow[data-bucket="zero"]:hover {
+  border-color: rgba(244, 63, 94, 0.5);
+  background: rgba(244, 63, 94, 0.12);
+  color: #fb7185;
+}
+:global(:root[data-theme="dark"]) .stockBucketInlineRow[data-bucket="low"]:hover {
+  border-color: rgba(234, 179, 8, 0.5);
+  background: rgba(234, 179, 8, 0.12);
+  color: #fbbf24;
+}
+:global(:root[data-theme="dark"]) .stockBucketInlineRow[data-bucket="high"]:hover {
+  border-color: rgba(34, 197, 94, 0.5);
+  background: rgba(34, 197, 94, 0.12);
+  color: #4ade80;
+}
+
+/* ── Linhas inline de bucket: ativo ── */
+:global(:root[data-theme="dark"]) .stockBucketInlineRow[data-bucket="zero"][data-active="true"] {
+  border-color: #ef4444;
+  background: rgba(244, 63, 94, 0.18);
+  color: #fb7185;
+}
+:global(:root[data-theme="dark"]) .stockBucketInlineRow[data-bucket="low"][data-active="true"] {
+  border-color: #f59e0b;
+  background: rgba(234, 179, 8, 0.18);
+  color: #fbbf24;
+}
+:global(:root[data-theme="dark"]) .stockBucketInlineRow[data-bucket="high"][data-active="true"] {
+  border-color: #22c55e;
+  background: rgba(34, 197, 94, 0.18);
+  color: #4ade80;
+}

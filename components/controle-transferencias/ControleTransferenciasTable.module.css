@@ -1881,3 +1881,103 @@
     font-size: 10px;
   }
 }
+
+/* ── TEMA NOTURNO ── overrides escopados; tema claro intacto ── */
+
+/* Tabs do destinationHeader / pílula ativa */
+:global(:root[data-theme="dark"]) .destinationTabActive {
+  color: #4ade80;
+}
+:global(:root[data-theme="dark"]) .destinationTabActive .destinationTabBadge {
+  background: rgba(34, 197, 94, 0.12);
+  color: #4ade80;
+}
+
+/* Aba Realizadas: status */
+:global(:root[data-theme="dark"]) .realizadasStatusPendente {
+  background: rgba(234, 179, 8, 0.12);
+  color: #fbbf24;
+}
+:global(:root[data-theme="dark"]) .realizadasStatusConfirmada {
+  background: rgba(34, 197, 94, 0.12);
+  color: #4ade80;
+}
+:global(:root[data-theme="dark"]) .realizadasFooterLink {
+  color: #5eead4;
+}
+
+/* Botão de transferência em lote (texto verde) */
+:global(:root[data-theme="dark"]) .bulkTransferBtn {
+  color: #4ade80;
+}
+
+/* Lista de itens do modal */
+:global(:root[data-theme="dark"]) .modalItemMeta span:not(:first-child)::before {
+  color: var(--b-300);
+}
+:global(:root[data-theme="dark"]) .modalItemQtyNumber {
+  color: #4ade80;
+}
+:global(:root[data-theme="dark"]) .modalItemQtyUnit {
+  color: #4ade80;
+}
+
+/* Modal de confirmação: quantidade / erro / sucesso */
+:global(:root[data-theme="dark"]) .modalQuantidade {
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+}
+:global(:root[data-theme="dark"]) .modalQuantidadeNumber,
+:global(:root[data-theme="dark"]) .modalQuantidadeLabel {
+  color: #4ade80;
+}
+:global(:root[data-theme="dark"]) .modalError {
+  background: rgba(244, 63, 94, 0.12);
+  border: 1px solid rgba(244, 63, 94, 0.35);
+  color: #fb7185;
+}
+:global(:root[data-theme="dark"]) .modalSuccess {
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  color: #4ade80;
+}
+
+/* Badge de grade (pílula amarela) */
+:global(:root[data-theme="dark"]) .gradeBadge {
+  background-color: rgba(234, 179, 8, 0.12);
+  color: #fbbf24;
+}
+
+/* Tooltip de quantidade: status de urgência do destino */
+:global(:root[data-theme="dark"]) .qttStatusCritico {
+  background: rgba(244, 63, 94, 0.12);
+  color: #fb7185;
+}
+:global(:root[data-theme="dark"]) .qttStatusAlto {
+  background: rgba(234, 179, 8, 0.12);
+  color: #fbbf24;
+}
+:global(:root[data-theme="dark"]) .qttStatusMedio {
+  background: rgba(59, 130, 246, 0.14);
+  color: #60a5fa;
+}
+:global(:root[data-theme="dark"]) .qttStatusOk {
+  background: rgba(34, 197, 94, 0.12);
+  color: #4ade80;
+}
+:global(:root[data-theme="dark"]) .qttRowAtual {
+  color: #60a5fa;
+}
+:global(:root[data-theme="dark"]) .qttAtualTag {
+  background: rgba(59, 130, 246, 0.14);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+}
+:global(:root[data-theme="dark"]) .qttNota {
+  color: #fbbf24;
+  background: rgba(234, 179, 8, 0.12);
+  border-top: 1px solid rgba(234, 179, 8, 0.35);
+}
+:global(:root[data-theme="dark"]) .qttFooterSep {
+  color: var(--b-300);
+}

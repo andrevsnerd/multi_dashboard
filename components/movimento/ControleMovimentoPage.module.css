@@ -206,3 +206,20 @@
     align-self: flex-start;
   }
 }
+
+/* ── TEMA NOTURNO ── overrides escopados; tema claro intacto ── */
+:global(:root[data-theme="dark"]) .kpiCard {
+  border-color: var(--b-200);
+}
+:global(:root[data-theme="dark"]) .kpiCardWarning {
+  background: rgba(234, 179, 8, 0.12);
+}
+:global(:root[data-theme="dark"]) .loadingSpinner {
+  border-color: var(--b-200);
+  border-top-color: var(--t-900);
+}
+:global(:root[data-theme="dark"]) .errorBanner {
+  background: rgba(244, 63, 94, 0.12);
+  border-color: rgba(244, 63, 94, 0.35);
+  color: #fb7185;
+}

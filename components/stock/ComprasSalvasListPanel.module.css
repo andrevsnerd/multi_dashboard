@@ -323,3 +323,45 @@
 .error {
   color: #b91c1c;
 }
+
+/* ── TEMA NOTURNO ── overrides escopados; tema claro intacto ── */
+:global(:root[data-theme="dark"]) .compradaCheckbox {
+  accent-color: var(--t-600);
+}
+
+:global(:root[data-theme="dark"]) .cardComprada {
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.35);
+}
+
+:global(:root[data-theme="dark"]) .cardComprada:hover {
+  background: rgba(34, 197, 94, 0.2);
+}
+
+:global(:root[data-theme="dark"]) .cardComprada .cardTitle {
+  color: #4ade80;
+}
+
+:global(:root[data-theme="dark"]) .cardComprada .cardMeta,
+:global(:root[data-theme="dark"]) .cardComprada .cardMetaInline {
+  color: #4ade80;
+}
+
+:global(:root[data-theme="dark"]) .cardComprada .totalValorBox {
+  border-color: rgba(34, 197, 94, 0.35);
+  background: rgba(34, 197, 94, 0.2);
+}
+
+:global(:root[data-theme="dark"]) .cardComprada .totalValorValue {
+  color: #4ade80;
+}
+
+:global(:root[data-theme="dark"]) .compradaBadge {
+  color: #4ade80;
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.35);
+}
+
+:global(:root[data-theme="dark"]) .error {
+  color: #fb7185;
+}

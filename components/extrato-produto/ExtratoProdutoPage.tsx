@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthContext";
+import { useTheme } from "@/components/theme/ThemeContext";
 import type { CompanyKey } from "@/lib/config/company";
 import type {
   ExtratoResponse,
@@ -13,11 +14,7 @@ import type {
 import type { ProdutosAtivosResponse } from "@/app/api/extrato-produto/produtos/route";
 import type { AdminFilialOption } from "@/app/api/extrato-produto/filiais/route";
 
-// ── Tema (claro = padrão, escuro = opção) ────────────────────────────────────
-
-type ThemeMode = "light" | "dark";
-
-const THEME_STORAGE_KEY = "extrato-produto-tema";
+// ── Tema (segue o tema global do dashboard — botão único no cabeçalho) ────────
 
 interface Palette {
   pageBg: string;
@@ -119,24 +116,26 @@ const LIGHT: Palette = {
 };
 
 const DARK: Palette = {
-  pageBg: "#0f172a",
+  // Superfícies alinhadas aos tokens globais do dashboard (app-bg/s-white/b-200)
+  // para uniformidade com as demais páginas no tema noturno.
+  pageBg: "#0a111e",
   text: "#e2e8f0",
   heading: "#f1f5f9",
-  muted: "#64748b",
+  muted: "#8494a8",
   subMuted: "#94a3b8",
-  border: "#1e293b",
-  borderStrong: "#334155",
-  cardBg: "#1e293b",
-  inputBg: "#1e293b",
-  inputBorder: "#334155",
+  border: "#29344b",
+  borderStrong: "#38455f",
+  cardBg: "#1a2433",
+  inputBg: "#141d2d",
+  inputBorder: "#38455f",
   inputText: "#f1f5f9",
   accent: "#3b82f6",
   accentText: "#ffffff",
-  tableHeaderBg: "#1e293b",
+  tableHeaderBg: "#222e45",
   tableHeaderText: "#94a3b8",
-  rowEven: "#0f172a",
-  rowOdd: "#111827",
-  rowDiverge: "#451a03",
+  rowEven: "#1a2433",
+  rowOdd: "#141d2d",
+  rowDiverge: "#3a1e0a",
   mono: "#7dd3fc",
   romaneio: "#a78bfa",
   errorBg: "#450a0a",
@@ -212,7 +211,7 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
   const router = useRouter();
   const searchParams = useSearchParams();
   const basePath = `/${companyKey}/extrato-produto`;
-  const [theme, setTheme] = useState<ThemeMode>("light");
+  const { theme } = useTheme();
   const t = theme === "light" ? LIGHT : DARK;
   const [produto, setProduto] = useState("");
   const [cor, setCor] = useState("");
@@ -244,25 +243,6 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
       user ? { "X-Auth-Username": user.username } : {},
     [user]
   );
-
-  // Lê a preferência de tema salva (padrão = claro).
-  useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem(THEME_STORAGE_KEY);
-      if (saved === "dark" || saved === "light") setTheme(saved);
-    } catch {
-      /* localStorage indisponível — mantém claro */
-    }
-  }, []);
-
-  // Persiste a preferência de tema.
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(THEME_STORAGE_KEY, theme);
-    } catch {
-      /* ignora */
-    }
-  }, [theme]);
 
   // Carrega todas as filiais disponíveis uma vez para o autocomplete.
   useEffect(() => {
@@ -521,38 +501,14 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
   return (
     <main style={{ padding: "24px 32px", fontFamily: "var(--font-mono, monospace)", minHeight: "100vh", background: t.pageBg, color: t.text }}>
       {/* ── Cabeçalho ── */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: 24 }}>
-        <div>
-          <h1 style={{ margin: "8px 0 4px", fontSize: 22, color: t.heading }}>
-            Extrato de Produto
-          </h1>
-          <p style={{ margin: 0, fontSize: 13, color: t.muted }}>
-            Visualiza todos os movimentos de estoque de um produto+cor+filial, mostrando a diferença
-            entre o campo QTDE (total) e o campo de grade (EN_1/SA_1 → 90x90).
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setTheme((prev) => (prev === "light" ? "dark" : "light"))}
-          title={theme === "light" ? "Mudar para tema escuro" : "Mudar para tema claro"}
-          style={{
-            flexShrink: 0,
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "7px 12px",
-            background: t.cardBg,
-            border: `1px solid ${t.borderStrong}`,
-            borderRadius: 8,
-            color: t.text,
-            cursor: "pointer",
-            fontSize: 12,
-            fontWeight: 600,
-            whiteSpace: "nowrap",
-          }}
-        >
-          {theme === "light" ? "🌙 Tema escuro" : "☀️ Tema claro"}
-        </button>
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ margin: "8px 0 4px", fontSize: 22, color: t.heading }}>
+          Extrato de Produto
+        </h1>
+        <p style={{ margin: 0, fontSize: 13, color: t.muted }}>
+          Visualiza todos os movimentos de estoque de um produto+cor+filial, mostrando a diferença
+          entre o campo QTDE (total) e o campo de grade (EN_1/SA_1 → 90x90).
+        </p>
       </div>
 
       {/* ── Formulário ── */}

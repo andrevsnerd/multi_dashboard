@@ -24,3 +24,20 @@
 .modalHeader button { border: none; background: transparent; font-size: 24px; cursor: pointer; }
 .detailList { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
 .detailItem { border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; font-size: 14px; color: var(--t-700); }
+
+/* ── TEMA NOTURNO ── overrides escopados; tema claro intacto ── */
+:global(:root[data-theme="dark"]) .backLink {
+  color: #60a5fa;
+}
+:global(:root[data-theme="dark"]) .input,
+:global(:root[data-theme="dark"]) .searchBtn,
+:global(:root[data-theme="dark"]) .pagination button,
+:global(:root[data-theme="dark"]) .detailItem {
+  border-color: var(--b-200);
+}
+:global(:root[data-theme="dark"]) .empty {
+  border-color: var(--b-300);
+}
+:global(:root[data-theme="dark"]) .modal {
+  background: var(--s-white);
+}

@@ -263,3 +263,45 @@
     min-width: 1000px;
   }
 }
+
+/* ── TEMA NOTURNO ── overrides escopados; tema claro intacto ── */
+:global(:root[data-theme="dark"]) .backButton:hover {
+  color: #60a5fa;
+}
+:global(:root[data-theme="dark"]) .error {
+  color: #fb7185;
+}
+:global(:root[data-theme="dark"]) .verificacao {
+  background: rgba(59, 130, 246, 0.14);
+  border-color: rgba(59, 130, 246, 0.35);
+}
+:global(:root[data-theme="dark"]) .verificacaoText {
+  color: var(--t-700);
+}
+:global(:root[data-theme="dark"]) .verificacaoAlerta {
+  background: rgba(234, 179, 8, 0.12);
+  border-color: rgba(234, 179, 8, 0.35);
+  color: #fbbf24;
+}
+:global(:root[data-theme="dark"]) .detailsTable th {
+  border-bottom-color: var(--b-200);
+}
+:global(:root[data-theme="dark"]) .sortableHeader:hover {
+  background-color: var(--s-100);
+}
+:global(:root[data-theme="dark"]) .sortIndicator {
+  color: #60a5fa;
+}
+:global(:root[data-theme="dark"]) .detailsTable tfoot .footerRow {
+  background: rgba(59, 130, 246, 0.14);
+  border-top-color: rgba(59, 130, 246, 0.35);
+}
+:global(:root[data-theme="dark"]) .detailsTable tbody tr:hover {
+  background: rgba(59, 130, 246, 0.14);
+}
+:global(:root[data-theme="dark"]) .productLink {
+  color: #60a5fa;
+}
+:global(:root[data-theme="dark"]) .productLink:hover {
+  color: #93c5fd;
+}

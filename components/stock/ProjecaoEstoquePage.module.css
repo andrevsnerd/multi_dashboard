@@ -1244,3 +1244,191 @@
   font-weight: 700;
   color: #fbbf24;
 }
+
+/* ── TEMA NOTURNO ── overrides escopados; tema claro intacto ── */
+
+/* Estrutura / superfícies */
+:global(:root[data-theme="dark"]) .wrapper {
+  background: var(--s-50);
+}
+:global(:root[data-theme="dark"]) .headerCard {
+  border-color: var(--b-200);
+}
+:global(:root[data-theme="dark"]) .filtersRow {
+  border-top-color: var(--b-200);
+}
+:global(:root[data-theme="dark"]) .titleLink:hover {
+  color: #60a5fa;
+}
+:global(:root[data-theme="dark"]) .snapshotSaved {
+  color: #4ade80;
+}
+
+/* Botão Projetar Compras (outline âmbar) */
+:global(:root[data-theme="dark"]) .projetarComprasBtn {
+  border-color: rgba(234, 179, 8, 0.35);
+  color: #fbbf24;
+}
+:global(:root[data-theme="dark"]) .projetarComprasBtn:hover {
+  background: rgba(234, 179, 8, 0.12);
+  border-color: rgba(234, 179, 8, 0.55);
+  color: #fbbf24;
+}
+
+/* Botões PDF/XLSX desabilitados (washes claros) */
+:global(:root[data-theme="dark"]) .pdfButton:disabled {
+  background: rgba(244, 63, 94, 0.35);
+}
+:global(:root[data-theme="dark"]) .xlsxButton:disabled {
+  background: rgba(34, 197, 94, 0.35);
+}
+
+/* Zebra da linha ESTOQUE */
+:global(:root[data-theme="dark"]) .estoqueRow,
+:global(:root[data-theme="dark"]) .estoqueCell {
+  background: var(--s-50);
+}
+
+/* Bloco NÚMEROS REAIS — wash azul */
+:global(:root[data-theme="dark"]) .realRow,
+:global(:root[data-theme="dark"]) .realLabelCell,
+:global(:root[data-theme="dark"]) .realVendasCell,
+:global(:root[data-theme="dark"]) .realDuracaoCell {
+  background: rgba(59, 130, 246, 0.14);
+}
+:global(:root[data-theme="dark"]) .realEstoqueCell {
+  background: rgba(59, 130, 246, 0.14);
+}
+:global(:root[data-theme="dark"]) .realRow.realRowFirst,
+:global(:root[data-theme="dark"]) .realRowFirst td {
+  border-top-color: rgba(59, 130, 246, 0.35);
+}
+:global(:root[data-theme="dark"]) .realLabelCell,
+:global(:root[data-theme="dark"]) .realVendasCell,
+:global(:root[data-theme="dark"]) .realEstoqueCell,
+:global(:root[data-theme="dark"]) .realDuracaoCell {
+  border-bottom-color: rgba(59, 130, 246, 0.35);
+}
+:global(:root[data-theme="dark"]) .realLabelCell {
+  color: var(--t-500);
+}
+:global(:root[data-theme="dark"]) .realVendasCell,
+:global(:root[data-theme="dark"]) .realEstoqueCell,
+:global(:root[data-theme="dark"]) .realDuracaoCell {
+  color: #60a5fa;
+}
+
+/* Coluna mês atual — realces azuis */
+:global(:root[data-theme="dark"]) .columnMesAtual {
+  box-shadow: inset -1px 0 0 rgba(59, 130, 246, 0.35), inset 1px 0 0 rgba(59, 130, 246, 0.35);
+}
+:global(:root[data-theme="dark"]) .vendasCell.columnMesAtual,
+:global(:root[data-theme="dark"]) .estoqueCell.columnMesAtual,
+:global(:root[data-theme="dark"]) .duracaoCell.columnMesAtual {
+  background: rgba(59, 130, 246, 0.14);
+  box-shadow: inset -1px 0 0 rgba(59, 130, 246, 0.35), inset 1px 0 0 rgba(59, 130, 246, 0.35);
+}
+
+/* Alerta de duração — wash vermelho */
+:global(:root[data-theme="dark"]) .duracaoCell.duracaoAlerta,
+:global(:root[data-theme="dark"]) .duracaoCell.duracaoAlerta.columnMesAtual,
+:global(:root[data-theme="dark"]) .realDuracaoCell.duracaoAlerta {
+  background: rgba(244, 63, 94, 0.12) !important;
+  color: #fb7185;
+  box-shadow: inset -1px 0 0 rgba(244, 63, 94, 0.35), inset 1px 0 0 rgba(244, 63, 94, 0.35);
+}
+
+/* Bloco COMPRA — wash verde */
+:global(:root[data-theme="dark"]) .compraRow,
+:global(:root[data-theme="dark"]) .compraLabelCell,
+:global(:root[data-theme="dark"]) .compraDataCell {
+  background: rgba(34, 197, 94, 0.12);
+}
+:global(:root[data-theme="dark"]) .compraQtdCell {
+  background: rgba(34, 197, 94, 0.12);
+}
+:global(:root[data-theme="dark"]) .compraLabelCell,
+:global(:root[data-theme="dark"]) .compraDataCell,
+:global(:root[data-theme="dark"]) .compraQtdCell {
+  border-bottom-color: rgba(34, 197, 94, 0.35);
+}
+:global(:root[data-theme="dark"]) .compraLabelCell {
+  color: #4ade80;
+}
+:global(:root[data-theme="dark"]) .compraDataCell,
+:global(:root[data-theme="dark"]) .compraQtdCell {
+  color: #4ade80 !important;
+}
+
+/* Células vazias da linha COMPRA — mesmo wash azul das linhas REAL */
+:global(:root[data-theme="dark"]) .compraRow .compraDataCell.compraCellEmpty,
+:global(:root[data-theme="dark"]) .compraRow .compraQtdCell.compraCellEmpty {
+  background: rgba(59, 130, 246, 0.14) !important;
+  color: #4ade80 !important;
+  border-bottom-color: rgba(59, 130, 246, 0.35) !important;
+}
+:global(:root[data-theme="dark"]) .compraRow .compraDataCell.compraCellEmpty.columnMesAtual,
+:global(:root[data-theme="dark"]) .compraRow .compraQtdCell.compraCellEmpty.columnMesAtual {
+  background: rgba(59, 130, 246, 0.14) !important;
+  color: #4ade80 !important;
+  box-shadow: inset -1px 0 0 rgba(59, 130, 246, 0.35), inset 1px 0 0 rgba(59, 130, 246, 0.35) !important;
+}
+
+/* Coluna mês atual — destaque verde mais forte */
+:global(:root[data-theme="dark"]) .compraDataCell.columnMesAtual {
+  background: rgba(34, 197, 94, 0.12) !important;
+  box-shadow: inset -1px 0 0 rgba(34, 197, 94, 0.35), inset 1px 0 0 rgba(34, 197, 94, 0.35);
+}
+:global(:root[data-theme="dark"]) .compraQtdCell.columnMesAtual {
+  background: rgba(34, 197, 94, 0.35) !important;
+  box-shadow: inset -1px 0 0 rgba(34, 197, 94, 0.35), inset 1px 0 0 rgba(34, 197, 94, 0.35);
+}
+:global(:root[data-theme="dark"]) .compraQtdClickable:hover {
+  background: rgba(34, 197, 94, 0.35) !important;
+  color: #4ade80 !important;
+}
+:global(:root[data-theme="dark"]) .compraQtdLoadingInline {
+  color: #4ade80;
+}
+
+/* Sub-nível de compra — wash âmbar/laranja + texto verde */
+:global(:root[data-theme="dark"]) .compraSubNivelCell {
+  background: rgba(234, 179, 8, 0.12) !important;
+  color: #4ade80 !important;
+  box-shadow: inset -1px 0 0 rgba(234, 179, 8, 0.35), inset 1px 0 0 rgba(234, 179, 8, 0.35) !important;
+}
+
+/* Consulta Produtos */
+:global(:root[data-theme="dark"]) .consultaBtn:hover {
+  border-color: var(--b-300);
+}
+:global(:root[data-theme="dark"]) .consultaBtnAtivo {
+  color: #60a5fa;
+}
+:global(:root[data-theme="dark"]) .consultaBtnAtivo:hover {
+  background: rgba(59, 130, 246, 0.14);
+}
+:global(:root[data-theme="dark"]) .consultaLimparBtn:hover {
+  background: rgba(244, 63, 94, 0.12);
+  border-color: rgba(244, 63, 94, 0.35);
+  color: #fb7185;
+}
+:global(:root[data-theme="dark"]) .consultaTermoTag {
+  background: rgba(59, 130, 246, 0.14);
+  color: #60a5fa;
+}
+:global(:root[data-theme="dark"]) .consultaBanner {
+  border-color: rgba(59, 130, 246, 0.35);
+  color: #60a5fa;
+}
+
+/* Células de compra simulada — wash âmbar */
+:global(:root[data-theme="dark"]) .compraSimuladaDataCell {
+  background: rgba(234, 179, 8, 0.12) !important;
+  color: #fbbf24 !important;
+  border-bottom-color: rgba(234, 179, 8, 0.35) !important;
+}
+:global(:root[data-theme="dark"]) .compraSimuladaQtdCell {
+  background: rgba(234, 179, 8, 0.35) !important;
+  color: #fbbf24 !important;
+}

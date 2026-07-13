@@ -897,3 +897,58 @@
     padding: 2px 4px;
   }
 }
+
+/* ── TEMA NOTURNO ── overrides escopados; tema claro intacto ── */
+:global(:root[data-theme="dark"]) .table tbody tr.noSaleRow {
+  border-left-color: rgba(244, 63, 94, 0.35);
+}
+:global(:root[data-theme="dark"]) .table tbody tr.noSaleRow:hover {
+  border-left-color: rgba(244, 63, 94, 0.55);
+}
+:global(:root[data-theme="dark"]) .inlineTooltipPanel::before {
+  border-bottom-color: var(--s-50);
+}
+:global(:root[data-theme="dark"]) .inlineTooltipTitle {
+  color: #60a5fa;
+}
+:global(:root[data-theme="dark"]) .inlineTooltipValue {
+  color: #60a5fa;
+}
+:global(:root[data-theme="dark"]) .stockTooltipAnchor:hover .stockRedeValue {
+  color: #60a5fa;
+  border-bottom-color: rgba(96, 165, 250, 0.6);
+}
+:global(:root[data-theme="dark"]) .stockTooltipPanel {
+  background: linear-gradient(180deg, rgba(26, 36, 51, 0.98) 0%, rgba(17, 27, 43, 0.98) 100%);
+}
+:global(:root[data-theme="dark"]) .stockTooltipHeader {
+  color: #60a5fa;
+}
+:global(:root[data-theme="dark"]) .stockTooltipQty {
+  color: #60a5fa;
+}
+:global(:root[data-theme="dark"]) .variancePositive {
+  color: #4ade80;
+  background-color: rgba(34, 197, 94, 0.12);
+}
+:global(:root[data-theme="dark"]) .varianceNegative {
+  color: #fb7185;
+  background-color: rgba(244, 63, 94, 0.12);
+}
+:global(:root[data-theme="dark"]) .descontinuadoRow td {
+  background-color: rgba(244, 63, 94, 0.12) !important;
+}
+:global(:root[data-theme="dark"]) .markupValue {
+  background-color: rgba(34, 197, 94, 0.12);
+  color: #4ade80;
+}
+:global(:root[data-theme="dark"]) .card.noSaleCard {
+  border-left-color: rgba(244, 63, 94, 0.35);
+}
+:global(:root[data-theme="dark"]) .card.noSaleCard::before {
+  color: #fb7185;
+  background: rgba(244, 63, 94, 0.14);
+}
+:global(:root[data-theme="dark"]) .cardHeader {
+  border-bottom-color: var(--b-subtle);
+}

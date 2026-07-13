@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 
 import { precisaComprarEssaSemana, type CompraIdealResult } from "@/lib/utils/compra-ideal";
 import CompraIdealExplainCard from "@/components/shared/CompraIdealExplainCard";
+import { useTheme } from "@/components/theme/ThemeContext";
 
 const MESES_PT = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 
@@ -53,6 +54,21 @@ function CellTexto({ texto }: { texto: string }) {
 export default function CompraIdealCell({ ideal, loading, semDados, style, descricao, cor, company }: CompraIdealCellProps) {
   // Hook sempre no topo (rules-of-hooks) — antes de qualquer return condicional.
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const { theme } = useTheme();
+  const dark = theme === "dark";
+
+  // Paleta da célula. No tema claro é idêntica à original; no escuro usa tons
+  // vivos com contraste sobre o navy (laranja/verde/vermelho escuros somem no dark).
+  const C = {
+    pcs: dark ? "#fdba74" : "#b45309",
+    suficiente: dark ? "#94a3b8" : "#64748b",
+    transitoBg: dark ? "rgba(34, 197, 94, 0.18)" : "#dcfce7",
+    transitoText: dark ? "#4ade80" : "#166534",
+    transitoBorder: dark ? "rgba(34, 197, 94, 0.55)" : "#22c55e",
+    comprarAgora: dark ? "#f87171" : "#b91c1c",
+    essaSemana: dark ? "#fbbf24" : "#b45309",
+    data: dark ? "#5eead4" : "#0f766e",
+  };
 
   // Estados de carregamento — IGUAIS em todas as telas (antes só a Curva ABC tinha).
   if (loading || ideal == null) return <CellTexto texto="Carregando..." />;
@@ -85,7 +101,7 @@ export default function CompraIdealCell({ ideal, loading, semDados, style, descr
       }}
     >
       <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-        <span style={{ fontWeight: precisaRepor ? 700 : 500, color: precisaRepor ? "#b45309" : "#64748b" }}>
+        <span style={{ fontWeight: precisaRepor ? 700 : 500, color: precisaRepor ? C.pcs : C.suficiente }}>
           {precisaRepor ? `${fmt(ideal.compraIdeal)} pcs` : "Suficiente"}
         </span>
         {ideal.emTransito > 0 && (
@@ -98,9 +114,9 @@ export default function CompraIdealCell({ ideal, loading, semDados, style, descr
               borderRadius: 999,
               fontSize: 10,
               fontWeight: 800,
-              background: "#dcfce7",
-              color: "#166534",
-              border: "1px solid #22c55e",
+              background: C.transitoBg,
+              color: C.transitoText,
+              border: `1px solid ${C.transitoBorder}`,
             }}
           >
             T {fmt(ideal.emTransito)}
@@ -115,7 +131,7 @@ export default function CompraIdealCell({ ideal, loading, semDados, style, descr
             gap: 4,
             fontSize: 11,
             fontWeight: ideal.comprarAgora || essaSemana ? 800 : 600,
-            color: ideal.comprarAgora ? "#b91c1c" : essaSemana ? "#b45309" : "#0f766e",
+            color: ideal.comprarAgora ? C.comprarAgora : essaSemana ? C.essaSemana : C.data,
           }}
         >
           📅{" "}

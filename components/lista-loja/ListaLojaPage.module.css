@@ -1522,3 +1522,99 @@
   transition: color 150ms, background 150ms;
 }
 .deleteBtn:hover { color: var(--ll-danger); background: var(--ll-danger-bg); }
+
+/* ── TEMA NOTURNO ── overrides escopados; tema claro intacto ── */
+
+/* Tokens locais (--ll-*): redefinidos para as superfícies/textos escuros já
+   existentes em globals.css. --ll-accent fica intocado (usado como fundo
+   sólido de botão primário), só o par bg/borda translúcido muda. */
+:global(:root[data-theme="dark"]) {
+  --ll-bg: var(--app-bg);
+  --ll-card: var(--s-white);
+  --ll-border: var(--b-200);
+  --ll-text: var(--t-900);
+  --ll-text-2: var(--t-500);
+  --ll-text-3: var(--t-400);
+  --ll-danger: #fb7185;
+  --ll-danger-bg: rgba(244, 63, 94, 0.12);
+  --ll-success: #4ade80;
+  --ll-success-bg: rgba(34, 197, 94, 0.12);
+  --ll-accent-bg: rgba(59, 130, 246, 0.14);
+  --ll-accent-bdr: rgba(59, 130, 246, 0.35);
+}
+
+/* Toast */
+:global(:root[data-theme="dark"]) .toastSuccess { border-color: rgba(34, 197, 94, 0.35); }
+:global(:root[data-theme="dark"]) .toastError { border-color: rgba(244, 63, 94, 0.35); }
+
+/* Chips/badges de acento azul (texto sobre tinta translúcida) */
+:global(:root[data-theme="dark"]) .filtroClearBtn,
+:global(:root[data-theme="dark"]) .badge,
+:global(:root[data-theme="dark"]) .addProductBtn,
+:global(:root[data-theme="dark"]) .compraViewBtn,
+:global(:root[data-theme="dark"]) .batchBtn,
+:global(:root[data-theme="dark"]) .colorChip,
+:global(:root[data-theme="dark"]) .listaFilialTag {
+  color: #60a5fa;
+}
+:global(:root[data-theme="dark"]) .filtroClearBtn:hover,
+:global(:root[data-theme="dark"]) .addProductBtn:hover,
+:global(:root[data-theme="dark"]) .compraViewBtn:hover,
+:global(:root[data-theme="dark"]) .addModalBtn:hover,
+:global(:root[data-theme="dark"]) .colorChip:hover {
+  background: rgba(59, 130, 246, 0.24);
+}
+
+/* KPI de faturamento */
+:global(:root[data-theme="dark"]) .kpiValue { color: #4ade80; }
+
+/* Bordas/hovers neutros */
+:global(:root[data-theme="dark"]) .produtoItem:hover { border-color: var(--b-300); }
+:global(:root[data-theme="dark"]) .qtyBtn:hover:not(:disabled) { background: var(--s-100); }
+:global(:root[data-theme="dark"]) .clearProductsBtn:hover,
+:global(:root[data-theme="dark"]) .btnSecondary:hover,
+:global(:root[data-theme="dark"]) .produtoModalItem:hover {
+  background: var(--s-50);
+}
+:global(:root[data-theme="dark"]) .modalCloseBtn:hover { background: var(--s-100); }
+:global(:root[data-theme="dark"]) .modalContent::-webkit-scrollbar-thumb { background: var(--b-300); }
+
+/* Remover item / danger hover */
+:global(:root[data-theme="dark"]) .removeBtn:hover { background: rgba(244, 63, 94, 0.14); }
+:global(:root[data-theme="dark"]) .colorChipCancel:hover { background: rgba(244, 63, 94, 0.14); border-color: rgba(244, 63, 94, 0.35); }
+:global(:root[data-theme="dark"]) .btnDanger { border-color: rgba(244, 63, 94, 0.35); }
+:global(:root[data-theme="dark"]) .btnDanger:hover { background: rgba(244, 63, 94, 0.18); }
+
+/* Exportar XLSX (verde) */
+:global(:root[data-theme="dark"]) .exportXlsxBtn {
+  border-color: rgba(34, 197, 94, 0.35);
+  background: rgba(34, 197, 94, 0.12);
+  color: #4ade80;
+}
+:global(:root[data-theme="dark"]) .exportXlsxBtn:hover:not(:disabled) {
+  background: rgba(34, 197, 94, 0.22);
+}
+
+/* Badges ABC */
+:global(:root[data-theme="dark"]) .abcBadgeA {
+  color: #4ade80;
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.35);
+}
+:global(:root[data-theme="dark"]) .abcBadgeB {
+  color: #fbbf24;
+  background: rgba(234, 179, 8, 0.12);
+  border-color: rgba(234, 179, 8, 0.35);
+}
+:global(:root[data-theme="dark"]) .abcBadgeC {
+  color: #fb7185;
+  background: rgba(244, 63, 94, 0.12);
+  border-color: rgba(244, 63, 94, 0.35);
+}
+
+/* Rótulos de reposição/transferência */
+:global(:root[data-theme="dark"]) .reporAdd { color: #60a5fa; }
+:global(:root[data-theme="dark"]) .reporReduce { color: #fbbf24; }
+:global(:root[data-theme="dark"]) .reporOk { color: #4ade80; }
+:global(:root[data-theme="dark"]) .badgeT { color: #5eead4; }
+:global(:root[data-theme="dark"]) .transferenciaTotalBadge { color: #60a5fa; }

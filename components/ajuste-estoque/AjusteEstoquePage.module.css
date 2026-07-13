@@ -396,3 +396,62 @@
   justify-content: flex-end;
   gap: 10px;
 }
+
+/* ── TEMA NOTURNO ── overrides escopados; tema claro intacto ──
+   Este módulo define tokens locais (--ae-bg,--ae-card,--ae-border,--ae-text,
+   --ae-text-2,--ae-text-3,--ae-blue-bg,--ae-red-bg,--ae-green,--ae-amber-bg,
+   --ae-amber-border) travados no claro. Redefinimos os neutros e as tintas
+   pálidas aqui; --ae-blue/--ae-red (também usados como fundo sólido de botão)
+   ficam intactos e só o TEXTO que os usa é corrigido regra a regra. */
+:global(:root[data-theme="dark"]) {
+  --ae-bg: var(--s-50);
+  --ae-card: var(--s-white);
+  --ae-border: var(--b-200);
+  --ae-text: var(--t-900);
+  --ae-text-2: var(--t-500);
+  --ae-text-3: var(--t-400);
+  --ae-blue-bg: rgba(59, 130, 246, 0.14);
+  --ae-red-bg: rgba(244, 63, 94, 0.12);
+  --ae-green: #4ade80;
+  --ae-amber-bg: rgba(234, 179, 8, 0.12);
+  --ae-amber-border: rgba(234, 179, 8, 0.35);
+}
+
+/* ── Botão de perigo desabilitado (rosa claro vira tinta translúcida) ── */
+:global(:root[data-theme="dark"]) .dangerBtn:disabled {
+  background: rgba(244, 63, 94, 0.35);
+}
+
+/* ── Card de sucesso (verde pálido) ── */
+:global(:root[data-theme="dark"]) .sucesso {
+  border-color: rgba(34, 197, 94, 0.35);
+  background: rgba(34, 197, 94, 0.12);
+}
+
+/* ── Total em destaque (borda azul clara) ── */
+:global(:root[data-theme="dark"]) .totalBoxDestaque {
+  border-color: rgba(59, 130, 246, 0.35);
+}
+
+/* ── Texto de aviso âmbar ── */
+:global(:root[data-theme="dark"]) .aviso,
+:global(:root[data-theme="dark"]) .modalWarn {
+  color: #fbbf24;
+}
+
+/* ── Linha de diferença (fundo creme quase branco) ── */
+:global(:root[data-theme="dark"]) .rowDiff {
+  background: rgba(234, 179, 8, 0.12);
+}
+
+/* ── Texto de erro / negativo ── */
+:global(:root[data-theme="dark"]) .erro,
+:global(:root[data-theme="dark"]) .neg {
+  color: #fb7185;
+}
+
+/* ── Texto azul de destaque / link ── */
+:global(:root[data-theme="dark"]) .final,
+:global(:root[data-theme="dark"]) .linkBtn {
+  color: #60a5fa;
+}

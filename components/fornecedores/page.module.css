@@ -297,3 +297,85 @@
 .saveBtn:disabled, .cancelBtn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .formError { color: #f87171; font-size: 13px; margin: 0; }
+
+/* ── TEMA NOTURNO ── overrides escopados; tema claro intacto ──
+ * Este arquivo hardcoda uma paleta "slate-900" própria (não usa os tokens
+ * do dashboard), então no claro os cards já aparecem escuros por padrão.
+ * Aqui alinhamos essas cores aos tokens reais do tema escuro do app para
+ * que esta página fique visualmente consistente com o resto do dashboard.
+ */
+:global(:root[data-theme="dark"]) .title {
+  color: var(--t-900);
+}
+:global(:root[data-theme="dark"]) .card {
+  background: var(--s-white);
+  border-color: var(--b-200);
+}
+:global(:root[data-theme="dark"]) .cardName {
+  color: var(--t-900);
+}
+:global(:root[data-theme="dark"]) .editBtn,
+:global(:root[data-theme="dark"]) .deleteBtn {
+  background: var(--s-50);
+  border-color: var(--b-300);
+}
+:global(:root[data-theme="dark"]) .cardLabel {
+  color: var(--t-500);
+}
+:global(:root[data-theme="dark"]) .cardValue {
+  color: var(--t-700);
+}
+:global(:root[data-theme="dark"]) .modal {
+  background: var(--s-white);
+  border-color: var(--b-200);
+}
+:global(:root[data-theme="dark"]) .modalTitle {
+  color: var(--t-900);
+}
+:global(:root[data-theme="dark"]) .label {
+  color: var(--t-700);
+}
+:global(:root[data-theme="dark"]) .input,
+:global(:root[data-theme="dark"]) .select {
+  background: var(--s-50);
+  border-color: var(--b-300);
+  color: var(--t-900);
+}
+:global(:root[data-theme="dark"]) .section {
+  border-color: var(--b-200);
+}
+:global(:root[data-theme="dark"]) .sectionTitle {
+  color: var(--t-900);
+}
+:global(:root[data-theme="dark"]) .smallBtn {
+  background: var(--s-50);
+  border-color: var(--b-300);
+  color: var(--t-700);
+}
+:global(:root[data-theme="dark"]) .smallBtn:hover {
+  color: var(--t-900);
+  border-color: var(--b-300);
+}
+:global(:root[data-theme="dark"]) .itemRow {
+  background: var(--s-50);
+  color: var(--t-700);
+}
+:global(:root[data-theme="dark"]) .dropdown {
+  background: var(--s-white);
+  border-color: var(--b-300);
+}
+:global(:root[data-theme="dark"]) .dropdownItem {
+  border-bottom-color: var(--b-200);
+  color: var(--t-700);
+}
+:global(:root[data-theme="dark"]) .dropdownItem:hover {
+  background: var(--s-100);
+  color: var(--t-900);
+}
+:global(:root[data-theme="dark"]) .checkboxLabel {
+  color: var(--t-700);
+}
+:global(:root[data-theme="dark"]) .cancelBtn {
+  background: var(--s-50);
+  border-color: var(--b-300);
+}
