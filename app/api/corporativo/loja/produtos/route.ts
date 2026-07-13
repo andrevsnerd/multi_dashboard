@@ -16,7 +16,7 @@ export interface LojaProdutoCard {
 
 /**
  * Vitrine da loja corporativa: produtos ativos do catálogo, com preço de atacado
- * manual, categoria (override ou grupo do Linx) e imagem de capa (se houver).
+ * manual, categoria (override ou subgrupo do Linx) e imagem de capa (se houver).
  * Aceita ?q= (busca por descrição/EAN/código) e ?categoria= (filtro).
  */
 export async function GET(request: Request) {
@@ -38,7 +38,8 @@ export async function GET(request: Request) {
       const m = meta.get(i.produto);
       const desc = m?.descProduto || i.descProduto;
       const ean = m?.ean || i.ean;
-      const categoria = i.categoria?.trim() || m?.grupo || i.grupo || "";
+      // Categoria da vitrine vem do SUBGRUPO (mais específico que o grupo).
+      const categoria = i.categoria?.trim() || m?.subgrupo || i.grupo || "";
       return {
         produto: i.produto,
         descProduto: desc,

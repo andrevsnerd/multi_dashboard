@@ -20,6 +20,8 @@ export interface ProdutoMeta {
   produto: string;
   descProduto: string;
   grupo: string;
+  /** SUBGRUPO_PRODUTO — fonte da categoria mostrada na loja (mais específico que grupo). */
+  subgrupo: string;
   linha: string;
   colecao: string;
   ean: string;
@@ -60,6 +62,7 @@ export async function fetchProdutosMeta(produtos: string[]): Promise<Map<string,
         p.PRODUTO AS produto,
         ISNULL(p.DESC_PRODUTO, '') AS descProduto,
         ISNULL(p.GRUPO_PRODUTO, '') AS grupo,
+        ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo,
         ISNULL(p.LINHA, '') AS linha,
         ISNULL(p.COLECAO, '') AS colecao,
         ISNULL(b.ean, '') AS ean
@@ -77,6 +80,7 @@ export async function fetchProdutosMeta(produtos: string[]): Promise<Map<string,
       produto: string;
       descProduto: string;
       grupo: string;
+      subgrupo: string;
       linha: string;
       colecao: string;
       ean: string;
@@ -88,6 +92,7 @@ export async function fetchProdutosMeta(produtos: string[]): Promise<Map<string,
         produto,
         descProduto: (row.descProduto ?? "").trim(),
         grupo: (row.grupo ?? "").trim(),
+        subgrupo: (row.subgrupo ?? "").trim(),
         linha: (row.linha ?? "").trim(),
         colecao: (row.colecao ?? "").trim(),
         ean: (row.ean ?? "").trim(),
@@ -112,6 +117,7 @@ export async function buscarProdutos(term: string, limit = 40): Promise<ProdutoM
         p.PRODUTO AS produto,
         ISNULL(p.DESC_PRODUTO, '') AS descProduto,
         ISNULL(p.GRUPO_PRODUTO, '') AS grupo,
+        ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo,
         ISNULL(p.LINHA, '') AS linha,
         ISNULL(p.COLECAO, '') AS colecao,
         ISNULL(b.ean, '') AS ean
@@ -135,6 +141,7 @@ export async function buscarProdutos(term: string, limit = 40): Promise<ProdutoM
       produto: string;
       descProduto: string;
       grupo: string;
+      subgrupo: string;
       linha: string;
       colecao: string;
       ean: string;
@@ -144,6 +151,7 @@ export async function buscarProdutos(term: string, limit = 40): Promise<ProdutoM
         produto: String(row.produto ?? "").trim(),
         descProduto: (row.descProduto ?? "").trim(),
         grupo: (row.grupo ?? "").trim(),
+        subgrupo: (row.subgrupo ?? "").trim(),
         linha: (row.linha ?? "").trim(),
         colecao: (row.colecao ?? "").trim(),
         ean: (row.ean ?? "").trim(),

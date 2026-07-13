@@ -19,6 +19,7 @@ interface BuscaResult {
   produto: string;
   descProduto: string;
   grupo: string;
+  subgrupo: string;
   ean: string;
 }
 interface ProdutoImagem {
@@ -206,7 +207,7 @@ export default function CatalogoAdminPage() {
                   <tr>
                     <th>Código</th>
                     <th>Descrição</th>
-                    <th>Grupo</th>
+                    <th>Subgrupo</th>
                     <th>EAN</th>
                     <th></th>
                   </tr>
@@ -216,7 +217,7 @@ export default function CatalogoAdminPage() {
                     <tr key={r.produto}>
                       <td className={styles.codeCell}>{r.produto}</td>
                       <td>{r.descProduto}</td>
-                      <td>{r.grupo}</td>
+                      <td>{r.subgrupo || r.grupo}</td>
                       <td>{r.ean}</td>
                       <td>
                         {jaNoCatalogo.has(r.produto) ? (
@@ -227,7 +228,7 @@ export default function CatalogoAdminPage() {
                             onClick={() => {
                               setAddingFor(r);
                               setNovoPreco("");
-                              setNovaCategoria(r.grupo || "");
+                              setNovaCategoria(r.subgrupo || r.grupo || "");
                             }}
                           >
                             + Adicionar

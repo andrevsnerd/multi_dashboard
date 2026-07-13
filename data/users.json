@@ -10,7 +10,7 @@
     "id": "logistica-initial",
     "username": "logistica",
     "passwordHash": "cf6c936c3dd5ccaf1dcdbb2526d18a5e:5a9f0c5536df564d5ab0bd26c896890fb159ca0e0a61f02e52f90dce799b16d58a0ad68ce4a73ea0dd2f089ffbf39cfdae92858e2c3900ae9e6020dd2a95c3c9",
-    "role": "gestor",
+    "role": "gerente",
     "permissions": [
       "controle-transferencias",
       "transferencia-produtos",
@@ -25,7 +25,7 @@
     "id": "0eca5d022163",
     "username": "logistico",
     "passwordHash": "aa16598be13c79d43cad61f75c056a3e:5e4b28516d2477330d479eb97e18e2a0d731e43aec552650d30d69774c456b556b716ccbbca181e52ffcc7406359321fdb54289c99e4e98e77fecd58b6749272",
-    "role": "gestor",
+    "role": "gerente",
     "permissions": [
       "controle-transferencias",
       "saidas-entradas-produtos"
@@ -39,7 +39,7 @@
     "id": "8006827d2d3d",
     "username": "nerd.higii",
     "passwordHash": "dcfd14047e707ca989bf3ec549622f7b:afba5ee4aac16a4bcd6b462c8efadb92c7949406c79b397d5b8b6a07f2444ad602737e1ae3b07946c7f5fa6dae623549d83a6a9cf057b7def31f109c21b05cd8",
-    "role": "gestor",
+    "role": "gerente",
     "permissions": [
       "controle-transferencias",
       "romaneios",
@@ -48,5 +48,18 @@
     "allowedCompanies": [
       "nerd"
     ]
+  },
+  {
+    "id": "8b42a99aa53d",
+    "username": "corporativo",
+    "passwordHash": "c141c258cb7a063a39716818f9fe3023:4f30afc6d7cb96acb05f1e035c2343a71a3f97c386f8a718310b83ef139cf92396ed320225d632c95391052d96c69df9fa8a142a63470471dc12d4024e96e0fc",
+    "role": "cliente_corporativo",
+    "permissions": [
+      "controle-transferencias"
+    ],
+    "allowedCompanies": [
+      "corporativo"
+    ],
+    "clienteCodigo": "848070"
   }
 ]

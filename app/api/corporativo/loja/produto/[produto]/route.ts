@@ -44,9 +44,11 @@ export async function GET(
         descProduto: detalhe.descProduto,
         ean: detalhe.ean,
         grupo: detalhe.grupo,
+        subgrupo: detalhe.subgrupo,
         linha: detalhe.linha,
         colecao: detalhe.colecao,
-        categoria: catalogo.categoria?.trim() || detalhe.grupo || "",
+        // Categoria da página de produto vem do SUBGRUPO (mais específico que o grupo).
+        categoria: catalogo.categoria?.trim() || detalhe.subgrupo || detalhe.grupo || "",
         precoAtacado: catalogo.precoAtacado,
         cores: detalhe.cores,
         imagensGerais,
