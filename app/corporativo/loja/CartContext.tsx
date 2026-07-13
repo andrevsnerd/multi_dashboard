@@ -11,9 +11,9 @@ import {
   type ReactNode,
 } from "react";
 import { useAuth } from "@/components/auth/AuthContext";
-
-/** Frete fixo (igual para todos os clientes) — definido pelo dono. */
-export const FRETE_FIXO = 90;
+// Fonte única do frete — editar em lib/corporativo/config.ts.
+import { FRETE_FIXO } from "@/lib/corporativo/config";
+export { FRETE_FIXO };
 
 export interface CartItem {
   produto: string;

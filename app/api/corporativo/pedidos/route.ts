@@ -3,10 +3,9 @@ import { NextResponse } from "next/server";
 import { findUserByUsername } from "@/lib/auth/users-store";
 import { readOnlyBlock } from "@/lib/auth/route-guards";
 import { criarPedido, listPedidos, type PedidoItem } from "@/lib/repositories/corporativoStore";
+import { FRETE_FIXO } from "@/lib/corporativo/config";
 
 export const maxDuration = 60;
-
-const FRETE_FIXO = 90;
 
 /**
  * GET: lista pedidos.
