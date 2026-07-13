@@ -1,1 +1,13 @@
-[]
+[
+  {
+    "produto": "13.71.0302",
+    "precoAtacado": 390,
+    "categoria": "LENÇO",
+    "ativo": true,
+    "ordem": 0,
+    "descProduto": "COCAR C12/23",
+    "ean": "039300",
+    "grupo": "LENÇO",
+    "updatedAt": "2026-07-13T12:28:04.065Z"
+  }
+]
