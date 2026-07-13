@@ -39,9 +39,15 @@ const SECTIONS: Section[] = [
         href: "/corporativo/pedidos",
         isActive: (p) => !!p && p.startsWith("/corporativo/pedidos"),
       },
+    ],
+  },
+  {
+    key: "clientes",
+    label: "Clientes Corporativos",
+    items: [
       {
         key: "clientes",
-        label: "Clientes Corporativos",
+        label: "Gestão de Clientes",
         href: "/corporativo",
         isActive: (p) =>
           p === "/corporativo" ||

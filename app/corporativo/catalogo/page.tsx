@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/AuthContext";
-import styles from "../corporativo.module.css";
+import styles from "../loja-admin.module.css";
 
 interface CatalogoItem {
   produto: string;
@@ -176,9 +176,8 @@ export default function CatalogoAdminPage() {
             </p>
           </div>
           <div className={styles.headerActions}>
-            <Link href="/corporativo" className={styles.linkBack}>← Corporativo</Link>
-            <Link href="/corporativo/loja" className={styles.btn}>Ver loja</Link>
-            <Link href="/corporativo/pedidos" className={styles.btn}>Pedidos</Link>
+            <Link href="/corporativo/loja" className={styles.backLink}>← Voltar à loja</Link>
+            <Link href="/corporativo/pedidos" className={styles.navTab}>Pedidos</Link>
           </div>
         </div>
 
@@ -302,7 +301,7 @@ export default function CatalogoAdminPage() {
                         </button>{" "}
                         <button
                           className={`${styles.btn} ${styles.btnSmall}`}
-                          style={{ color: "#dc2626" }}
+                          style={{ color: "var(--la-red)" }}
                           onClick={() => remover(i)}
                         >
                           Remover
@@ -383,14 +382,14 @@ function Overlay({ children, onClose }: { children: React.ReactNode; onClose: ()
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: "var(--s-white)",
-          borderRadius: 14,
+          background: "var(--la-bg)",
+          borderRadius: 6,
           padding: 24,
           width: "100%",
           maxWidth: 560,
           maxHeight: "90vh",
           overflowY: "auto",
-          border: "1px solid var(--b-200)",
+          border: "1px solid var(--la-line)",
         }}
       >
         {children}
@@ -491,23 +490,23 @@ function ImagensManager({
           imagens.map((im) => (
             <div
               key={`${im.cor}-${im.posicao}`}
-              style={{ width: 92, textAlign: "center", fontSize: 11, color: "var(--t-500)" }}
+              style={{ width: 92, textAlign: "center", fontSize: 11, color: "var(--la-muted)" }}
             >
               <div
                 style={{
                   width: 92,
                   height: 92,
-                  borderRadius: 8,
+                  borderRadius: 4,
                   overflow: "hidden",
-                  border: "1px solid var(--b-200)",
-                  background: "var(--s-50)",
+                  border: "1px solid var(--la-line)",
+                  background: "var(--la-surface)",
                 }}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={im.dataUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               </div>
               <div style={{ marginTop: 3 }}>{im.cor ? `cor ${im.cor}` : "geral"}</div>
-              <button className={styles.removeBtn ?? ""} style={{ color: "#dc2626", border: "none", background: "none", cursor: "pointer", fontSize: 11 }} onClick={() => excluir(im)}>
+              <button className={styles.removeBtn} onClick={() => excluir(im)}>
                 excluir
               </button>
             </div>

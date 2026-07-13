@@ -42,6 +42,18 @@ export function canMutate(user: UserSession | null): boolean {
 }
 
 /**
+ * Excecao ao read-only geral: admin, diretor e supervisor podem administrar
+ * o catalogo da loja corporativa (adicionar/editar/remover produtos), mesmo
+ * que diretor/supervisor sejam somente-leitura no restante do sistema.
+ */
+export const CATALOGO_MANAGER_ROLES: RoleKey[] = ["admin", "diretor", "supervisor"];
+
+/** True se a funcao pode administrar o catalogo da loja corporativa. */
+export function canManageCatalogo(role: RoleKey | undefined | null): boolean {
+  return !!role && CATALOGO_MANAGER_ROLES.includes(role);
+}
+
+/**
  * Funcoes que enxergam TODAS as filiais em transferencias/romaneios.
  * So o gerente fica restrito a sua filial atribuida (filialAtribuida).
  */
@@ -161,9 +173,11 @@ export function canAccessPath(user: UserSession | null, pathname: string | null)
   // Área CORPORATIVO tem dois mundos:
   //  - /corporativo/loja/**  → a LOJA (vitrine/carrinho/checkout): admin + cliente_corporativo.
   //  - resto (/corporativo, /novo, /[codigo], /catalogo, /pedidos) → gestão: admin + diretor (leitura).
+  //  - supervisor: exceção pontual, só acessa /corporativo/catalogo (gerenciar catálogo).
   if (companySegment === "corporativo") {
     if (hasFullPageAccess(user.role)) return true; // admin (gestão) e diretor (leitura)
     if (user.role === "cliente_corporativo") return parts[1] === "loja";
+    if (user.role === "supervisor") return parts[1] === "catalogo";
     return false;
   }
 
@@ -176,6 +190,8 @@ export function getFirstAllowedPath(user: UserSession | null, company: string): 
   if (!user) return `/${company}`;
   // Cliente corporativo entra direto na LOJA; admin cai na gestão do corporativo.
   if (user.role === "cliente_corporativo") return "/corporativo/loja";
+  // Supervisor só tem acesso ao catálogo dentro de /corporativo (evita loop de redirect).
+  if (user.role === "supervisor" && company === "corporativo") return "/corporativo/catalogo";
   if (company === "corporativo") return "/corporativo";
   // admin e diretor veem tudo → caem no dashboard da empresa.
   if (hasFullPageAccess(user.role)) return `/${company}`;

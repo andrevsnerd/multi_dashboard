@@ -1,0 +1,226 @@
+/* ═══════════════════════════════════════════════════════════════
+   Ferramentas de administração da Loja Corporativa (Catálogo/Pedidos)
+   Mesma linguagem visual da loja (loja.module.css): clean, acento
+   crimson, sempre em tema claro — mas em formato de painel/tabela.
+   ═══════════════════════════════════════════════════════════════ */
+
+.page {
+  --la-red: #e11d48;
+  --la-red-dark: #be123c;
+  --la-red-tint: #fdeef1;
+  --la-ink: #17181c;
+  --la-text: #33373d;
+  --la-muted: #6b7280;
+  --la-faint: #9aa0a8;
+  --la-line: #ececec;
+  --la-line-strong: #dcdcdc;
+  --la-surface: #f5f5f5;
+  --la-bg: #ffffff;
+
+  min-height: 100vh;
+  background: var(--la-bg);
+  color: var(--la-text);
+  font-family: "Inter", "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  padding: 32px 24px 90px;
+}
+
+.container { max-width: 1160px; margin: 0 auto; }
+
+/* ─────────────────── Cabeçalho ─────────────────── */
+.topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 26px;
+  flex-wrap: wrap;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--la-line);
+}
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--la-red);
+  font-weight: 600;
+}
+.title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--la-ink);
+  margin: 4px 0 0;
+  letter-spacing: 0.01em;
+}
+.subtitle {
+  font-size: 13.5px;
+  color: var(--la-muted);
+  margin: 6px 0 0;
+  font-weight: 300;
+  max-width: 520px;
+}
+.headerActions { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+
+/* Voltar à loja — sempre visível, sempre óbvio */
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--la-ink);
+  text-decoration: none;
+  padding: 10px 16px;
+  border: 1px solid var(--la-ink);
+  border-radius: 3px;
+  transition: all .15s;
+}
+.backLink:hover { background: var(--la-ink); color: #fff; }
+
+/* Navegação secundária entre Catálogo/Pedidos */
+.navTab {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--la-muted);
+  text-decoration: none;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 10px 0;
+  border-bottom: 2px solid transparent;
+}
+.navTab:hover { color: var(--la-ink); }
+
+/* ─────────────────── Cards / seções ─────────────────── */
+.card {
+  background: var(--la-bg);
+  border: 1px solid var(--la-line);
+  border-radius: 4px;
+  padding: 22px 24px;
+  margin-bottom: 18px;
+}
+.sectionTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--la-ink);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sectionHint { font-size: 12.5px; color: var(--la-muted); margin: 0 0 16px; font-weight: 300; }
+
+/* ─────────────────── Formulários ─────────────────── */
+.grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 14px; }
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.col2 { grid-column: span 2; } .col3 { grid-column: span 3; } .col4 { grid-column: span 4; }
+.col5 { grid-column: span 5; } .col6 { grid-column: span 6; } .col7 { grid-column: span 7; }
+.col8 { grid-column: span 8; } .col12 { grid-column: span 12; }
+@media (max-width: 720px) { .col2, .col3, .col4, .col5, .col6, .col7, .col8 { grid-column: span 12; } }
+
+.label {
+  font-size: 12px; font-weight: 600; color: var(--la-ink);
+  text-transform: uppercase; letter-spacing: 0.04em;
+  display: flex; gap: 6px; align-items: baseline;
+}
+.req { color: var(--la-red); font-weight: 700; }
+.opt { color: var(--la-faint); font-weight: 400; font-size: 11px; text-transform: none; }
+
+.input, .select {
+  height: 40px;
+  border: 1px solid var(--la-line-strong);
+  border-radius: 3px;
+  padding: 0 12px;
+  font-size: 13.5px;
+  background: var(--la-bg);
+  color: var(--la-ink);
+  outline: none;
+  width: 100%;
+  transition: border-color .15s;
+}
+.input:focus, .select:focus { border-color: var(--la-ink); }
+.input:disabled { background: var(--la-surface); color: var(--la-muted); }
+
+.checkboxRow { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--la-text); cursor: pointer; user-select: none; }
+.checkboxRow input { width: 16px; height: 16px; accent-color: var(--la-red); }
+
+/* ─────────────────── Botões ─────────────────── */
+.btn {
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  border: 1px solid var(--la-line-strong);
+  background: var(--la-bg);
+  color: var(--la-ink);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  transition: all .15s;
+}
+.btn:hover { border-color: var(--la-ink); }
+.btnPrimary { background: var(--la-red); color: #fff; border-color: var(--la-red); }
+.btnPrimary:hover { background: var(--la-red-dark); border-color: var(--la-red-dark); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btnSmall { height: 32px; padding: 0 12px; font-size: 11px; }
+
+.footerBar {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+  position: sticky; bottom: 0;
+  background: var(--la-bg);
+  border: 1px solid var(--la-line);
+  border-radius: 4px;
+  padding: 16px 20px;
+}
+
+.alert { border-radius: 4px; padding: 12px 16px; font-size: 13px; margin-bottom: 18px; border: 1px solid transparent; font-weight: 300; }
+.alertError { background: var(--la-red-tint); border-color: #f5c6d0; color: var(--la-red-dark); }
+
+/* ─────────────────── Tabelas ─────────────────── */
+.searchRow { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+.searchRow .input { max-width: 420px; }
+
+.tableWrap { overflow-x: auto; border: 1px solid var(--la-line); border-radius: 4px; background: var(--la-bg); }
+.table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.table th {
+  text-align: left; padding: 12px 16px; background: var(--la-surface); color: var(--la-muted);
+  font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; font-size: 11px;
+  border-bottom: 1px solid var(--la-line); white-space: nowrap;
+}
+.table td { padding: 12px 16px; border-bottom: 1px solid var(--la-line); color: var(--la-text); white-space: nowrap; }
+.table tr:last-child td { border-bottom: none; }
+.table tr:hover td { background: var(--la-surface); }
+.codeCell { font-weight: 600; color: var(--la-red); font-variant-numeric: tabular-nums; }
+.tag {
+  display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 500;
+  background: var(--la-surface); color: var(--la-muted); text-transform: uppercase; letter-spacing: 0.03em;
+}
+
+.muted { color: var(--la-muted); font-size: 13px; font-weight: 300; }
+.center { text-align: center; padding: 48px 0; }
+.removeBtn {
+  border: none; background: none; color: var(--la-red); font-size: 11px; cursor: pointer;
+  padding: 0; text-transform: uppercase; letter-spacing: 0.05em;
+}
+.removeBtn:hover { color: var(--la-red-dark); }
+
+/* ─────────────────── Detalhe (somente leitura) ─────────────────── */
+.viewValue {
+  min-height: 40px; display: flex; align-items: center; padding: 0 2px;
+  font-size: 14px; color: var(--la-ink); border-bottom: 1px dashed var(--la-line); font-weight: 300;
+}
+.viewHint { font-size: 12px; color: var(--la-muted); margin-top: 2px; font-weight: 300; }
+
+.statGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 4px; }
+@media (max-width: 720px) { .statGrid { grid-template-columns: repeat(2, 1fr); } }
+.statBox { background: var(--la-surface); border: 1px solid var(--la-line); border-radius: 4px; padding: 14px 16px; }
+.statLabel { font-size: 10.5px; color: var(--la-muted); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500; }
+.statValue { font-size: 16px; font-weight: 600; color: var(--la-ink); margin-top: 3px; }

@@ -11,8 +11,8 @@ import { fetchProductAvailableColors } from "@/lib/repositories/productDetail";
  * descrição, categoria, EAN, cores). Preço NÃO vem daqui: é manual no catálogo
  * (corporativo_catalogo). Fonte: PRODUTOS + PRODUTOS_BARRA + CORES_BASICAS.
  *
- * EAN "maior": entre os códigos de barra da variação, escolhemos o mais longo
- * (EAN-13 real) e, em empate, o de maior valor — foi o pedido do dono ("aquele maior").
+ * EAN "menor": entre os códigos de barra da variação, escolhemos o mais longo
+ * (EAN-13 real) e, em empate, o de menor valor — pedido do dono ("aquele menor").
  */
 
 export interface ProdutoMeta {
@@ -36,7 +36,7 @@ export interface ProdutoDetalheLoja extends ProdutoMeta {
   cores: ProdutoCorLoja[];
 }
 
-/** Metadados (desc, categoria, EAN maior) de vários produtos de uma vez. */
+/** Metadados (desc, categoria, EAN menor) de vários produtos de uma vez. */
 export async function fetchProdutosMeta(produtos: string[]): Promise<Map<string, ProdutoMeta>> {
   const codes = [...new Set(produtos.map((p) => String(p ?? "").trim()).filter(Boolean))];
   const map = new Map<string, ProdutoMeta>();
@@ -59,7 +59,7 @@ export async function fetchProdutosMeta(produtos: string[]): Promise<Map<string,
         FROM PRODUTOS_BARRA pb WITH (NOLOCK)
         WHERE pb.PRODUTO = p.PRODUTO
           AND LTRIM(RTRIM(ISNULL(pb.CODIGO_BARRA, ''))) <> ''
-        ORDER BY LEN(LTRIM(RTRIM(pb.CODIGO_BARRA))) DESC, pb.CODIGO_BARRA DESC
+        ORDER BY LEN(LTRIM(RTRIM(pb.CODIGO_BARRA))) DESC, pb.CODIGO_BARRA ASC
       ) b
       WHERE p.PRODUTO IN (${inList})
     `;
@@ -111,7 +111,7 @@ export async function buscarProdutos(term: string, limit = 40): Promise<ProdutoM
         FROM PRODUTOS_BARRA pb WITH (NOLOCK)
         WHERE pb.PRODUTO = p.PRODUTO
           AND LTRIM(RTRIM(ISNULL(pb.CODIGO_BARRA, ''))) <> ''
-        ORDER BY LEN(LTRIM(RTRIM(pb.CODIGO_BARRA))) DESC, pb.CODIGO_BARRA DESC
+        ORDER BY LEN(LTRIM(RTRIM(pb.CODIGO_BARRA))) DESC, pb.CODIGO_BARRA ASC
       ) b
       WHERE UPPER(p.DESC_PRODUTO) LIKE @term
         OR LTRIM(RTRIM(CAST(p.PRODUTO AS VARCHAR))) = @termExato
@@ -142,7 +142,7 @@ export async function buscarProdutos(term: string, limit = 40): Promise<ProdutoM
   });
 }
 
-/** EAN maior por cor (produto × COR_PRODUTO). */
+/** EAN menor por cor (produto × COR_PRODUTO). */
 async function fetchEanPorCor(produto: string): Promise<Map<string, string>> {
   const cod = String(produto ?? "").trim();
   const map = new Map<string, string>();
@@ -156,7 +156,7 @@ async function fetchEanPorCor(produto: string): Promise<Map<string, string>> {
           LTRIM(RTRIM(pb.CODIGO_BARRA)) AS ean,
           ROW_NUMBER() OVER (
             PARTITION BY ISNULL(pb.COR_PRODUTO, '')
-            ORDER BY LEN(LTRIM(RTRIM(pb.CODIGO_BARRA))) DESC, pb.CODIGO_BARRA DESC
+            ORDER BY LEN(LTRIM(RTRIM(pb.CODIGO_BARRA))) DESC, pb.CODIGO_BARRA ASC
           ) AS rn
         FROM PRODUTOS_BARRA pb WITH (NOLOCK)
         WHERE pb.PRODUTO = @produto

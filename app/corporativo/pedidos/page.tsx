@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/AuthContext";
-import styles from "../corporativo.module.css";
+import styles from "../loja-admin.module.css";
 
 interface PedidoItem {
   produto: string;
@@ -103,8 +103,8 @@ export default function PedidosAdminPage() {
             <p className={styles.subtitle}>Pedidos finalizados pelos clientes na loja corporativa.</p>
           </div>
           <div className={styles.headerActions}>
-            <Link href="/corporativo" className={styles.linkBack}>← Corporativo</Link>
-            <Link href="/corporativo/catalogo" className={styles.btn}>Catálogo</Link>
+            <Link href="/corporativo/loja" className={styles.backLink}>← Voltar à loja</Link>
+            <Link href="/corporativo/catalogo" className={styles.navTab}>Catálogo</Link>
           </div>
         </div>
 
@@ -168,7 +168,7 @@ export default function PedidosAdminPage() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{ background: "var(--s-white)", borderRadius: 14, padding: 24, width: "100%", maxWidth: 620, maxHeight: "90vh", overflowY: "auto", border: "1px solid var(--b-200)" }}
+            style={{ background: "var(--la-bg)", borderRadius: 6, padding: 24, width: "100%", maxWidth: 620, maxHeight: "90vh", overflowY: "auto", border: "1px solid var(--la-line)" }}
           >
             <h2 className={styles.title} style={{ fontSize: 20 }}>
               Pedido #{aberto.id.slice(0, 8).toUpperCase()}

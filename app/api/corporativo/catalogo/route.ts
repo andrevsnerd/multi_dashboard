@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { findUserByUsername } from "@/lib/auth/users-store";
+import { canManageCatalogo } from "@/lib/auth/permissions";
 import {
   listCatalogo,
   upsertCatalogoItem,
@@ -10,11 +11,12 @@ import { fetchProdutosMeta } from "@/lib/repositories/corporativoProdutos";
 
 export const maxDuration = 60;
 
-async function isAdmin(request: Request): Promise<boolean> {
+/** Admin, diretor e supervisor podem administrar o catálogo da loja corporativa. */
+async function canManage(request: Request): Promise<boolean> {
   const username = request.headers.get("x-auth-username");
   if (!username) return false;
   const user = await findUserByUsername(username);
-  return user?.role === "admin";
+  return canManageCatalogo(user?.role);
 }
 
 /** Lista o catálogo (admin). Reenriquece desc/EAN/grupo a partir do Linx. */
@@ -41,9 +43,9 @@ export async function GET() {
   }
 }
 
-/** Adiciona/atualiza um produto no catálogo (admin). */
+/** Adiciona/atualiza um produto no catálogo (admin, diretor, supervisor). */
 export async function POST(request: Request) {
-  if (!(await isAdmin(request)))
+  if (!(await canManage(request)))
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   try {
     const body = await request.json();
@@ -70,9 +72,9 @@ export async function POST(request: Request) {
   }
 }
 
-/** Remove um produto do catálogo (admin). */
+/** Remove um produto do catálogo (admin, diretor, supervisor). */
 export async function DELETE(request: Request) {
-  if (!(await isAdmin(request)))
+  if (!(await canManage(request)))
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   try {
     const { searchParams } = new URL(request.url);

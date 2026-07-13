@@ -10,8 +10,9 @@ export default function Home() {
   const visible = user ? getVisibleCompanies(user) : ["nerd", "scarfme"];
   const nerdHref = user ? getFirstAllowedPath(user, "nerd") : "/nerd";
   const scarfmeHref = user ? getFirstAllowedPath(user, "scarfme") : "/scarfme";
-  // CORPORATIVO só aparece para quem realmente pode entrar (admin + cliente_corporativo).
-  const canCorporativo = user ? canAccessPath(user, "/corporativo") : false;
+  // CORPORATIVO só aparece para quem realmente pode entrar (admin, diretor, cliente_corporativo, supervisor).
+  const corporativoHref = user ? getFirstAllowedPath(user, "corporativo") : "/corporativo/loja";
+  const canCorporativo = user ? canAccessPath(user, corporativoHref) : false;
 
   return (
     <main className={styles.container}>
@@ -40,7 +41,7 @@ export default function Home() {
           </Link>
         )}
         {canCorporativo && (
-          <Link href="/corporativo/loja" className={styles.companyCard}>
+          <Link href={corporativoHref} className={styles.companyCard}>
             <span className={styles.companyLabel}>CORPORATIVO</span>
             <strong className={styles.companyTitle}>Corporativo</strong>
             <span className={styles.companyHint}>Loja de atacado, catálogo e pedidos</span>
