@@ -305,7 +305,6 @@
   "303": "page.tsx",
   "304": "ProdutoTransferencia",
   "305": "page.tsx",
-  "306": "compra-transito-status.ts",
   "307": ".env.local (AWS EC2)",
   "308": "aws-setup/install-aws.sh",
   "309": "PROXY_SECRET",
@@ -445,16 +444,5 @@
   "443": "GUIA_DEPLOY_VM_24H.md",
   "444": "vm-setup/install.sh",
   "445": "PM2 process manager",
-  "446": "proxy-server (pm2 managed process)",
-  "447": "MultiSelectFilter.tsx",
-  "448": "fetchFilialProdutoSales",
-  "449": "exportRelatorios.ts",
-  "450": "page.tsx",
-  "451": "page.tsx",
-  "452": "page.tsx",
-  "453": "page.tsx",
-  "454": "page.tsx",
-  "455": "page.tsx",
-  "456": "page.tsx",
-  "457": "page.tsx"
+  "446": "proxy-server (pm2 managed process)"
 }

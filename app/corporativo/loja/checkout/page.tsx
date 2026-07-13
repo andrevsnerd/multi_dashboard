@@ -38,7 +38,15 @@ export default function CheckoutPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Cadastro ainda não aprovado: cliente sem código do Linx só navega, não compra.
+  const pendenteAprovacao = user?.role === "cliente_corporativo" && !user?.clienteCodigo;
+
   useEffect(() => {
+    if (pendenteAprovacao) {
+      setLoading(false);
+      setCliente(null);
+      return;
+    }
     let alive = true;
     (async () => {
       setLoading(true);
@@ -60,14 +68,14 @@ export default function CheckoutPage() {
     return () => {
       alive = false;
     };
-  }, [user?.clienteCodigo]);
+  }, [user?.clienteCodigo, pendenteAprovacao]);
 
   // Endereço de entrega: usa o de entrega se preenchido, senão o principal.
   const entregaBloco =
     cliente && cliente.entrega?.endereco ? cliente.entrega : cliente?.endereco ?? null;
 
   async function handleConfirm() {
-    if (items.length === 0) return;
+    if (items.length === 0 || pendenteAprovacao) return;
     setSubmitting(true);
     setError(null);
     try {
@@ -103,7 +111,10 @@ export default function CheckoutPage() {
       };
       const res = await fetch("/api/corporativo/pedidos", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(user?.username ? { "x-auth-username": user.username } : {}),
+        },
         body: JSON.stringify(payload),
       });
       const json = await res.json();
@@ -114,6 +125,21 @@ export default function CheckoutPage() {
       setError(e instanceof Error ? e.message : "Erro ao finalizar o pedido.");
       setSubmitting(false);
     }
+  }
+
+  if (pendenteAprovacao) {
+    return (
+      <div className={styles.empty}>
+        <p style={{ fontWeight: 600 }}>Seu cadastro está em análise.</p>
+        <p style={{ maxWidth: 460, margin: "8px auto 0", color: "var(--t-600)" }}>
+          Você já pode navegar e montar seu carrinho, mas a finalização de pedidos será liberada
+          assim que nossa equipe aprovar seu cadastro.
+        </p>
+        <Link href="/corporativo/loja" className={styles.btn} style={{ marginTop: 14 }}>
+          Continuar navegando
+        </Link>
+      </div>
+    );
   }
 
   if (items.length === 0) {

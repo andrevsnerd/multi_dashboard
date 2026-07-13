@@ -114,6 +114,68 @@ export interface ClienteCorporativoCriado {
   cpfCnpj: string;
 }
 
+/**
+ * Payload MÍNIMO enviado pela página pública de AUTOCADASTRO (/cadastro).
+ * O cliente só informa identificação, endereço, contato e credenciais de acesso.
+ * Todos os dados comerciais/fiscais são padronizados no servidor (registroDefaults).
+ */
+export interface RegistroPublicoInput {
+  tipoPessoa: TipoPessoa;
+  /** Razão social (PJ) ou nome completo (PF). */
+  razaoSocial: string;
+  /** CPF (11) ou CNPJ (14) — só dígitos aceitos. */
+  cpfCnpj: string;
+  /** PJ: Inscrição Estadual (obrigatória; vazio => ISENTO). PF: ignorado (sempre ISENTO). */
+  inscricaoEstadual?: string;
+
+  // Endereço principal (usado também para cobrança e entrega).
+  cep: string;
+  endereco: string;
+  numero: string;
+  complemento?: string;
+  bairro: string;
+  cidade: string;
+  uf: string;
+  codMunicipioIbge: string;
+
+  // Contato
+  ddd1: string;
+  telefone1: string;
+  email?: string;
+
+  // Acesso ao sistema (dashboard_users)
+  username: string;
+  password: string;
+}
+
+export type RegistroStatus = "pendente" | "aprovado" | "rejeitado";
+
+/**
+ * Cadastro corporativo PENDENTE de aprovação. O usuário do sistema já existe
+ * (role cliente_corporativo), mas o cliente no Linx só é criado na aprovação.
+ * `payload` guarda o ClienteCorporativoInput completo (já padronizado) para o
+ * aprovador revisar/editar antes de efetivar no Linx.
+ */
+export interface RegistroPendente {
+  id: string;
+  userId: string;
+  username: string;
+  tipoPessoa: TipoPessoa;
+  razaoSocial: string;
+  cpfCnpj: string;
+  status: RegistroStatus;
+  /** ClienteCorporativoInput completo (padronizado) — editável na aprovação. */
+  payload: ClienteCorporativoInput;
+  /** CLIFOR gerado no Linx (preenchido na aprovação). */
+  clienteCodigo: string | null;
+  criadoEm: string;
+  revisadoPor: string | null;
+  revisadoEm: string | null;
+  motivoRejeicao: string | null;
+  /** Avisos de padronização (lookups que não casaram) capturados no cadastro. */
+  avisos: string[];
+}
+
 /** Detalhe completo (mestre + comercial) de um cliente corporativo já cadastrado. */
 export interface ClienteCorporativoDetalhe {
   codigo: string;

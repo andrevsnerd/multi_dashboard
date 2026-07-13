@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSidebar } from "./SidebarContext";
 import { useAuth } from "@/components/auth/AuthContext";
+import { canAccessPath } from "@/lib/auth/permissions";
 import styles from "./Sidebar.module.css";
 
 type Item = {
@@ -54,6 +55,12 @@ const SECTIONS: Section[] = [
           p === "/corporativo/novo" ||
           (!!p && /^\/corporativo\/\d+/.test(p)),
       },
+      {
+        key: "aprovacoes",
+        label: "Aprovação de Cadastros",
+        href: "/corporativo/aprovacoes",
+        isActive: (p) => !!p && p.startsWith("/corporativo/aprovacoes"),
+      },
     ],
   },
   {
@@ -90,7 +97,12 @@ export default function CorporativoSidebar() {
 
   const sections = SECTIONS.map((s) => ({
     ...s,
-    items: s.items.filter((i) => !i.adminOnly || user?.role === "admin"),
+    items: s.items.filter((i) => {
+      if (i.adminOnly) return user?.role === "admin";
+      // Mostra só o que a função pode realmente acessar (ex: supervisor vê apenas
+      // Catálogo e Aprovação de Cadastros).
+      return canAccessPath(user, i.href);
+    }),
   })).filter((s) => s.items.length > 0);
 
   return (

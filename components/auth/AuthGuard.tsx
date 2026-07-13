@@ -13,7 +13,7 @@ import {
   pathnameToPermission,
 } from "@/lib/auth/permissions";
 
-const PUBLIC_PATHS = ["/login"];
+const PUBLIC_PATHS = ["/login", "/cadastro"];
 
 export function AuthGuard({ children }: { children: ReactNode }) {
   const { user, isLoading } = useAuth();

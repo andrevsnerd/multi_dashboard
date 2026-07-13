@@ -58,6 +58,7 @@ export default function CorporativoListPage() {
           </div>
           <div className={styles.headerActions}>
             <Link href="/" className={styles.linkBack}>← Início</Link>
+            <Link href="/corporativo/aprovacoes" className={styles.btn}>Aprovações</Link>
             <Link href="/corporativo/novo" className={`${styles.btn} ${styles.btnPrimary}`}>+ Novo cliente</Link>
           </div>
         </div>

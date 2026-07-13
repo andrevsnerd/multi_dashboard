@@ -61,11 +61,25 @@ function LojaHeader() {
   );
 }
 
+function PendingBanner() {
+  const { user } = useAuth();
+  if (!(user?.role === "cliente_corporativo" && !user?.clienteCodigo)) return null;
+  return (
+    <div className={styles.container} style={{ paddingTop: 16, paddingBottom: 0 }}>
+      <div className={styles.sampleBanner}>
+        Seu cadastro está <strong>em análise</strong>. Você já pode navegar e montar o carrinho — a
+        finalização de pedidos será liberada assim que a equipe aprovar seu cadastro.
+      </div>
+    </div>
+  );
+}
+
 export default function LojaLayout({ children }: { children: ReactNode }) {
   return (
     <CartProvider>
       <div className={styles.shell}>
         <LojaHeader />
+        <PendingBanner />
         <div className={styles.container}>{children}</div>
       </div>
     </CartProvider>

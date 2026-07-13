@@ -54,6 +54,18 @@ export function canManageCatalogo(role: RoleKey | undefined | null): boolean {
 }
 
 /**
+ * Excecao ao read-only geral: admin, diretor e supervisor podem APROVAR
+ * autocadastros corporativos (efetivar o cliente no Linx), mesmo sendo
+ * diretor/supervisor somente-leitura no restante do sistema.
+ */
+export const APPROVE_CADASTRO_ROLES: RoleKey[] = ["admin", "diretor", "supervisor"];
+
+/** True se a funcao pode aprovar/rejeitar autocadastros corporativos. */
+export function canApproveCadastro(role: RoleKey | undefined | null): boolean {
+  return !!role && APPROVE_CADASTRO_ROLES.includes(role);
+}
+
+/**
  * Funcoes que enxergam TODAS as filiais em transferencias/romaneios.
  * So o gerente fica restrito a sua filial atribuida (filialAtribuida).
  */
@@ -177,7 +189,8 @@ export function canAccessPath(user: UserSession | null, pathname: string | null)
   if (companySegment === "corporativo") {
     if (hasFullPageAccess(user.role)) return true; // admin (gestão) e diretor (leitura)
     if (user.role === "cliente_corporativo") return parts[1] === "loja";
-    if (user.role === "supervisor") return parts[1] === "catalogo";
+    // Supervisor: exceções pontuais — gerenciar catálogo e aprovar autocadastros.
+    if (user.role === "supervisor") return parts[1] === "catalogo" || parts[1] === "aprovacoes";
     return false;
   }
 

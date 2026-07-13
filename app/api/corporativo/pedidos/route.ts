@@ -38,8 +38,20 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const readOnly = await readOnlyBlock(request.headers.get("x-auth-username"));
+    const username = request.headers.get("x-auth-username");
+    const readOnly = await readOnlyBlock(username);
     if (readOnly) return readOnly;
+
+    // Trava de compra: cliente corporativo só finaliza pedido após aprovação do
+    // cadastro (quando ganha o clienteCodigo/CLIFOR no Linx). Sem código = só navega.
+    const user = username ? await findUserByUsername(username) : null;
+    if (user?.role === "cliente_corporativo" && !user.clienteCodigo) {
+      return NextResponse.json(
+        { error: "Seu cadastro está em análise. As compras serão liberadas após a aprovação." },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
     const itens = Array.isArray(body.itens) ? (body.itens as PedidoItem[]) : [];
     if (itens.length === 0) {
