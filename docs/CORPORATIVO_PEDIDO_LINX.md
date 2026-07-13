@@ -109,8 +109,12 @@ Quantidades ficam numa **grade de tamanhos**: `VO1..VO48` (venda original) e `VE
 - `ITEM_PEDIDO = '0000'` sempre (a PK já separa por produto+cor; a base confirma `'0000'` mesmo com vários itens).
 - `ENTREGA` = `EMISSAO` (data). Faz parte da PK.
 - Na criação: `VE_i = VO_i`, `QTDE_ENTREGAR = QTDE_ORIGINAL`, `VALOR_ENTREGAR = VALOR_ORIGINAL`.
-- `PRECO1` = preço unitário; `VALOR_ORIGINAL = PRECO1 × QTDE_ORIGINAL`; `VALOR_LIQUIDO = VALOR_ORIGINAL`, `QTDE_LIQUIDA = QTDE_ORIGINAL` (sem desconto).
+- `PRECO1` = preço unitário; `VALOR_ORIGINAL = PRECO1 × QTDE_ORIGINAL` (sem desconto).
+- ⚠️ **Colunas COMPUTADAS — NÃO inserir**: `VENDAS.FATOR_VENDA_LIQUIDA`, `VENDAS_PRODUTO.QTDE_LIQUIDA`,
+  `VENDAS_PRODUTO.VALOR_LIQUIDO` (o Linx calcula sozinho). Inserir nelas dá erro.
 - Campos NOT NULL a preencher: `PEDIDO, PRODUTO, COR_PRODUTO, ENTREGA` (+ `ITEM_PEDIDO` tem default `'0000'`). Todo o resto tem default.
+- ✅ **Validado contra produção** (INSERT real com ROLLBACK): aloca o nº, insere `VENDAS`+`VENDAS_PRODUTO`,
+  passa por todos os triggers de FK, e reverte sem consumir sequencial.
 
 ---
 

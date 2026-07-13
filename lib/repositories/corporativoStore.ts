@@ -67,6 +67,11 @@ async function ensureTables() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `;
+  // Efetivação no Linx (pedido de venda atacado). Colunas adicionadas após o
+  // deploy inicial — ADD IF NOT EXISTS mantém bancos antigos compatíveis.
+  await sql`ALTER TABLE corporativo_pedidos ADD COLUMN IF NOT EXISTS pedido_linx TEXT NOT NULL DEFAULT ''`;
+  await sql`ALTER TABLE corporativo_pedidos ADD COLUMN IF NOT EXISTS linx_efetivado_por TEXT NOT NULL DEFAULT ''`;
+  await sql`ALTER TABLE corporativo_pedidos ADD COLUMN IF NOT EXISTS linx_efetivado_em TIMESTAMPTZ`;
   tablesChecked = true;
 }
 
@@ -398,6 +403,12 @@ export interface Pedido {
   itens: PedidoItem[];
   observacao: string;
   createdAt: string;
+  /** Número do pedido de venda gerado no Linx (vazio enquanto não efetivado). */
+  pedidoLinx: string;
+  /** Usuário que efetivou no Linx. */
+  linxEfetivadoPor: string;
+  /** Quando foi efetivado no Linx (ISO) ou null. */
+  linxEfetivadoEm: string | null;
 }
 
 export interface CriarPedidoInput {
@@ -425,6 +436,9 @@ function rowToPedido(row: {
   itens: PedidoItem[] | string;
   observacao: string;
   created_at: Date | string;
+  pedido_linx?: string;
+  linx_efetivado_por?: string;
+  linx_efetivado_em?: Date | string | null;
 }): Pedido {
   const itens = typeof row.itens === "string" ? (JSON.parse(row.itens) as PedidoItem[]) : row.itens ?? [];
   const endereco =
@@ -443,6 +457,9 @@ function rowToPedido(row: {
     itens,
     observacao: row.observacao ?? "",
     createdAt: new Date(row.created_at).toISOString(),
+    pedidoLinx: row.pedido_linx ?? "",
+    linxEfetivadoPor: row.linx_efetivado_por ?? "",
+    linxEfetivadoEm: row.linx_efetivado_em ? new Date(row.linx_efetivado_em).toISOString() : null,
   };
 }
 
@@ -484,6 +501,9 @@ export async function criarPedido(input: CriarPedidoInput): Promise<Pedido> {
     itens,
     observacao: input.observacao ?? "",
     createdAt: new Date().toISOString(),
+    pedidoLinx: "",
+    linxEfetivadoPor: "",
+    linxEfetivadoEm: null,
   };
   const all = await readFile<Pedido>(PEDIDOS_FILE);
   all.push(pedido);
@@ -539,6 +559,59 @@ export async function updatePedidoStatus(id: string, status: string): Promise<vo
   const idx = all.findIndex((p) => p.id === id);
   if (idx >= 0) {
     all[idx] = { ...all[idx], status };
+    await writeFile(PEDIDOS_FILE, all);
+  }
+}
+
+/**
+ * Marca um pedido como efetivado no Linx: grava o número gerado, quem efetivou e
+ * quando, muda o status para 'efetivado', e persiste o snapshot final (itens/obs/
+ * totais possivelmente editados pelo aprovador) para o Neon não divergir do Linx.
+ * Idempotência é responsabilidade do chamador (não reefetivar se já houver pedido_linx).
+ */
+export async function marcarPedidoEfetivado(
+  id: string,
+  input: {
+    pedidoLinx: string;
+    por: string;
+    itens: PedidoItem[];
+    observacao: string;
+    subtotal: number;
+    total: number;
+  }
+): Promise<void> {
+  const pedidoLinx = String(input.pedidoLinx ?? "").trim();
+  const por = String(input.por ?? "").trim();
+  const itens = input.itens ?? [];
+  const observacao = String(input.observacao ?? "");
+  const subtotal = Number(input.subtotal ?? 0);
+  const total = Number(input.total ?? 0);
+  if (hasPostgres()) {
+    await ensureTables();
+    const sql = getNeonSql();
+    await sql`
+      UPDATE corporativo_pedidos
+         SET status = 'efetivado', pedido_linx = ${pedidoLinx},
+             linx_efetivado_por = ${por}, linx_efetivado_em = NOW(),
+             itens = ${JSON.stringify(itens)}::jsonb, observacao = ${observacao},
+             subtotal = ${subtotal}, total = ${total}
+       WHERE id = ${id}`;
+    return;
+  }
+  const all = await readFile<Pedido>(PEDIDOS_FILE);
+  const idx = all.findIndex((p) => p.id === id);
+  if (idx >= 0) {
+    all[idx] = {
+      ...all[idx],
+      status: "efetivado",
+      pedidoLinx,
+      linxEfetivadoPor: por,
+      linxEfetivadoEm: new Date().toISOString(),
+      itens,
+      observacao,
+      subtotal,
+      total,
+    };
     await writeFile(PEDIDOS_FILE, all);
   }
 }

@@ -38,15 +38,21 @@ interface Pedido {
   itens: PedidoItem[];
   observacao: string;
   createdAt: string;
+  pedidoLinx: string;
+  linxEfetivadoPor: string;
+  linxEfetivadoEm: string | null;
 }
 
-const STATUS = ["pendente", "em_separacao", "confirmado", "cancelado"];
+const STATUS = ["pendente", "em_separacao", "confirmado", "efetivado", "cancelado"];
 const STATUS_LABEL: Record<string, string> = {
   pendente: "Pendente",
   em_separacao: "Em separação",
   confirmado: "Confirmado",
+  efetivado: "Efetivado no Linx",
   cancelado: "Cancelado",
 };
+/** Funções que podem efetivar pedidos no Linx (exceção ao read-only geral). */
+const APPROVE_ROLES = ["admin", "diretor", "supervisor"];
 const brl = (n: number) => (n ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 export default function PedidosAdminPage() {
@@ -60,6 +66,14 @@ export default function PedidosAdminPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [aberto, setAberto] = useState<Pedido | null>(null);
+  const [efetivando, setEfetivando] = useState(false);
+  const [editItens, setEditItens] = useState<PedidoItem[]>([]);
+  const [editObs, setEditObs] = useState("");
+  const canEfetivar = !!user && APPROVE_ROLES.includes(user.role);
+  // Editável só enquanto não efetivado e para quem pode aprovar.
+  const editavel = !!aberto && canEfetivar && !aberto.pedidoLinx;
+  const editSubtotal = editItens.reduce((s, i) => s + (Number(i.quantidade) || 0) * (Number(i.precoUnitario) || 0), 0);
+  const editTotal = editSubtotal + (aberto?.frete ?? 0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -80,6 +94,27 @@ export default function PedidosAdminPage() {
     load();
   }, [load]);
 
+  // Sincroniza o rascunho de edição ao abrir um pedido (por id, para não perder
+  // edições quando `aberto` é mesclado após efetivar).
+  useEffect(() => {
+    if (aberto) {
+      setEditItens(aberto.itens.map((i) => ({ ...i })));
+      setEditObs(aberto.observacao ?? "");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aberto?.id]);
+
+  function setItemCampo(idx: number, campo: "quantidade" | "precoUnitario", valor: number) {
+    setEditItens((prev) =>
+      prev.map((it, i) =>
+        i === idx ? { ...it, [campo]: Number.isFinite(valor) && valor >= 0 ? valor : 0 } : it
+      )
+    );
+  }
+  function removerItem(idx: number) {
+    setEditItens((prev) => prev.filter((_, i) => i !== idx));
+  }
+
   async function mudarStatus(pedido: Pedido, status: string) {
     setPedidos((prev) => prev.map((p) => (p.id === pedido.id ? { ...p, status } : p)));
     try {
@@ -92,6 +127,40 @@ export default function PedidosAdminPage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao atualizar status.");
       load();
+    }
+  }
+
+  async function efetivarPedido(pedido: Pedido) {
+    if (efetivando) return;
+    const itens = editItens.filter((i) => (Number(i.quantidade) || 0) > 0);
+    if (itens.length === 0) {
+      setError("O pedido precisa de ao menos um item com quantidade.");
+      return;
+    }
+    const ok = window.confirm(
+      `Efetivar o pedido de ${pedido.clienteNome || "cliente"} como Pedido de Venda Atacado no Linx?\n\n` +
+        `Isso cria o pedido real (aberto) no Linx. A separação/faturamento continua sendo feita no Linx.`
+    );
+    if (!ok) return;
+    setEfetivando(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/corporativo/pedidos/${pedido.id}/efetivar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ itens, observacao: editObs }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Erro ao efetivar.");
+      const numero = String(json.data?.pedido ?? "");
+      const atualizado: Partial<Pedido> = { status: "efetivado", pedidoLinx: numero };
+      setPedidos((prev) => prev.map((p) => (p.id === pedido.id ? { ...p, ...atualizado } : p)));
+      setAberto((prev) => (prev && prev.id === pedido.id ? { ...prev, ...atualizado } : prev));
+      window.alert(`Pedido efetivado no Linx com o número ${numero}.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erro ao efetivar pedido no Linx.");
+    } finally {
+      setEfetivando(false);
     }
   }
 
@@ -149,6 +218,9 @@ export default function PedidosAdminPage() {
                           <option key={s} value={s}>{STATUS_LABEL[s] ?? s}</option>
                         ))}
                       </select>
+                      {p.pedidoLinx ? (
+                        <div className={styles.muted} style={{ fontSize: 11 }}>Linx nº {p.pedidoLinx}</div>
+                      ) : null}
                     </td>
                     <td>
                       <button className={`${styles.btn} ${styles.btnSmall}`} onClick={() => setAberto(p)}>
@@ -190,7 +262,7 @@ export default function PedidosAdminPage() {
               </div>
               <div className={styles.statBox}>
                 <div className={styles.statLabel}>Subtotal</div>
-                <div className={styles.statValue} style={{ fontSize: 14 }}>{brl(aberto.subtotal)}</div>
+                <div className={styles.statValue} style={{ fontSize: 14 }}>{brl(editSubtotal)}</div>
               </div>
               <div className={styles.statBox}>
                 <div className={styles.statLabel}>Frete</div>
@@ -206,39 +278,116 @@ export default function PedidosAdminPage() {
                   .join(", ")}
               </p>
             )}
-            {aberto.observacao && (
-              <p className={styles.viewValue} style={{ borderBottom: "none" }}>
-                <strong style={{ marginRight: 6 }}>Obs.:</strong> {aberto.observacao}
-              </p>
+
+            {editavel ? (
+              <label style={{ display: "block", marginTop: 8 }}>
+                <span className={styles.statLabel}>Observação</span>
+                <textarea
+                  className={styles.input}
+                  style={{ width: "100%", minHeight: 56, resize: "vertical" }}
+                  value={editObs}
+                  onChange={(e) => setEditObs(e.target.value)}
+                  placeholder="Observação do pedido (vai para o Linx)"
+                />
+              </label>
+            ) : (
+              aberto.observacao && (
+                <p className={styles.viewValue} style={{ borderBottom: "none" }}>
+                  <strong style={{ marginRight: 6 }}>Obs.:</strong> {aberto.observacao}
+                </p>
+              )
             )}
 
             <div className={styles.tableWrap} style={{ marginTop: 12 }}>
               <table className={styles.table}>
                 <thead>
-                  <tr><th>Produto</th><th>Cor</th><th>Tamanho</th><th>Qtd</th><th>Unit.</th><th>Total</th></tr>
+                  <tr>
+                    <th>Produto</th><th>Cor</th><th>Tamanho</th><th>Qtd</th><th>Unit.</th><th>Total</th>
+                    {editavel ? <th></th> : null}
+                  </tr>
                 </thead>
                 <tbody>
-                  {aberto.itens.map((i, idx) => (
-                    <tr key={idx}>
-                      <td>
-                        {i.descProduto || i.produto}
-                        {i.grade ? <span className={styles.gradeNote}> ({i.grade})</span> : null}
-                        {i.ean ? <div className={styles.muted} style={{ fontSize: 11 }}>EAN {i.ean}</div> : null}
-                      </td>
-                      <td>{i.corNome || "—"}</td>
-                      <td>{i.tamanho || "—"}</td>
-                      <td>{i.quantidade}</td>
-                      <td>{brl(i.precoUnitario)}</td>
-                      <td>{brl(i.subtotal)}</td>
-                    </tr>
-                  ))}
+                  {editItens.map((i, idx) => {
+                    const linhaTotal = (Number(i.quantidade) || 0) * (Number(i.precoUnitario) || 0);
+                    return (
+                      <tr key={idx}>
+                        <td>
+                          {i.descProduto || i.produto}
+                          {i.grade ? <span className={styles.gradeNote}> ({i.grade})</span> : null}
+                          {i.ean ? <div className={styles.muted} style={{ fontSize: 11 }}>EAN {i.ean}</div> : null}
+                        </td>
+                        <td>{i.corNome || "—"}</td>
+                        <td>{i.tamanho || "—"}</td>
+                        <td>
+                          {editavel ? (
+                            <input
+                              type="number"
+                              min={0}
+                              step={1}
+                              className={styles.input}
+                              style={{ width: 70, height: 32 }}
+                              value={i.quantidade}
+                              onChange={(e) => setItemCampo(idx, "quantidade", Math.round(Number(e.target.value)))}
+                            />
+                          ) : (
+                            i.quantidade
+                          )}
+                        </td>
+                        <td>
+                          {editavel ? (
+                            <input
+                              type="number"
+                              min={0}
+                              step={0.01}
+                              className={styles.input}
+                              style={{ width: 90, height: 32 }}
+                              value={i.precoUnitario}
+                              onChange={(e) => setItemCampo(idx, "precoUnitario", Number(e.target.value))}
+                            />
+                          ) : (
+                            brl(i.precoUnitario)
+                          )}
+                        </td>
+                        <td>{brl(linhaTotal)}</td>
+                        {editavel ? (
+                          <td>
+                            <button
+                              className={`${styles.btn} ${styles.btnSmall}`}
+                              onClick={() => removerItem(idx)}
+                              title="Remover item"
+                            >
+                              ✕
+                            </button>
+                          </td>
+                        ) : null}
+                      </tr>
+                    );
+                  })}
+                  {editItens.length === 0 && (
+                    <tr><td colSpan={editavel ? 7 : 6} className={styles.center}><span className={styles.muted}>Sem itens.</span></td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
 
-            <div className={styles.footerBar} style={{ marginTop: 18, position: "static" }}>
-              <span className={styles.statValue}>Total: {brl(aberto.total)}</span>
-              <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => setAberto(null)}>Fechar</button>
+            <div className={styles.footerBar} style={{ marginTop: 18, position: "static", flexWrap: "wrap", gap: 10 }}>
+              <span className={styles.statValue}>Total: {brl(editavel ? editTotal : aberto.total)}</span>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                {aberto.pedidoLinx ? (
+                  <span className={styles.statValue} style={{ fontSize: 14, color: "var(--ok, #15803d)" }}>
+                    ✔ Efetivado no Linx: nº {aberto.pedidoLinx}
+                  </span>
+                ) : canEfetivar ? (
+                  <button
+                    className={`${styles.btn} ${styles.btnPrimary}`}
+                    onClick={() => efetivarPedido(aberto)}
+                    disabled={efetivando}
+                  >
+                    {efetivando ? "Efetivando…" : "Aprovar e efetivar no Linx"}
+                  </button>
+                ) : null}
+                <button className={styles.btn} onClick={() => setAberto(null)}>Fechar</button>
+              </div>
             </div>
           </div>
         </div>
