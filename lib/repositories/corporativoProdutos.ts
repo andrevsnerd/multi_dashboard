@@ -25,6 +25,8 @@ export interface ProdutoMeta {
   linha: string;
   colecao: string;
   ean: string;
+  /** PRODUTOS.GRADE — dimensão/medida do produto (ex: "90x90"), não confundir com tamanho/grade de numeração. */
+  grade: string;
 }
 
 export interface ProdutoTamanhoLoja {
@@ -65,6 +67,7 @@ export async function fetchProdutosMeta(produtos: string[]): Promise<Map<string,
         ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo,
         ISNULL(p.LINHA, '') AS linha,
         ISNULL(p.COLECAO, '') AS colecao,
+        ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade,
         ISNULL(b.ean, '') AS ean
       FROM PRODUTOS p WITH (NOLOCK)
       OUTER APPLY (
@@ -83,6 +86,7 @@ export async function fetchProdutosMeta(produtos: string[]): Promise<Map<string,
       subgrupo: string;
       linha: string;
       colecao: string;
+      grade: string;
       ean: string;
     }>(query);
     for (const row of result.recordset) {
@@ -95,6 +99,7 @@ export async function fetchProdutosMeta(produtos: string[]): Promise<Map<string,
         subgrupo: (row.subgrupo ?? "").trim(),
         linha: (row.linha ?? "").trim(),
         colecao: (row.colecao ?? "").trim(),
+        grade: (row.grade ?? "").trim(),
         ean: (row.ean ?? "").trim(),
       });
     }
@@ -120,6 +125,7 @@ export async function buscarProdutos(term: string, limit = 40): Promise<ProdutoM
         ISNULL(p.SUBGRUPO_PRODUTO, '') AS subgrupo,
         ISNULL(p.LINHA, '') AS linha,
         ISNULL(p.COLECAO, '') AS colecao,
+        ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade,
         ISNULL(b.ean, '') AS ean
       FROM PRODUTOS p WITH (NOLOCK)
       OUTER APPLY (
@@ -144,6 +150,7 @@ export async function buscarProdutos(term: string, limit = 40): Promise<ProdutoM
       subgrupo: string;
       linha: string;
       colecao: string;
+      grade: string;
       ean: string;
     }>(query);
     return result.recordset
@@ -154,6 +161,7 @@ export async function buscarProdutos(term: string, limit = 40): Promise<ProdutoM
         subgrupo: (row.subgrupo ?? "").trim(),
         linha: (row.linha ?? "").trim(),
         colecao: (row.colecao ?? "").trim(),
+        grade: (row.grade ?? "").trim(),
         ean: (row.ean ?? "").trim(),
       }))
       .filter((r) => r.produto);

@@ -43,12 +43,12 @@ export async function GET(
         produto: detalhe.produto,
         descProduto: detalhe.descProduto,
         ean: detalhe.ean,
-        grupo: detalhe.grupo,
         subgrupo: detalhe.subgrupo,
         linha: detalhe.linha,
         colecao: detalhe.colecao,
-        // Categoria da página de produto vem do SUBGRUPO (mais específico que o grupo).
-        categoria: catalogo.categoria?.trim() || detalhe.subgrupo || detalhe.grupo || "",
+        grade: detalhe.grade,
+        // Categoria é SEMPRE o SUBGRUPO ao vivo — sem override salvo, sem fallback pro grupo.
+        categoria: detalhe.subgrupo || "",
         precoAtacado: catalogo.precoAtacado,
         cores: detalhe.cores,
         imagensGerais,

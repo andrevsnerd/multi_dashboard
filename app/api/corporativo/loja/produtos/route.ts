@@ -10,13 +10,15 @@ export interface LojaProdutoCard {
   descProduto: string;
   ean: string;
   categoria: string;
+  /** PRODUTOS.GRADE (ex: "90x90") — mostrado entre parênteses ao lado do nome. */
+  grade: string;
   precoAtacado: number;
   imagem: string | null;
 }
 
 /**
  * Vitrine da loja corporativa: produtos ativos do catálogo, com preço de atacado
- * manual, categoria (override ou subgrupo do Linx) e imagem de capa (se houver).
+ * manual, categoria (sempre o SUBGRUPO ao vivo do Linx) e imagem de capa (se houver).
  * Aceita ?q= (busca por descrição/EAN/código) e ?categoria= (filtro).
  */
 export async function GET(request: Request) {
@@ -38,13 +40,14 @@ export async function GET(request: Request) {
       const m = meta.get(i.produto);
       const desc = m?.descProduto || i.descProduto;
       const ean = m?.ean || i.ean;
-      // Categoria da vitrine vem do SUBGRUPO (mais específico que o grupo).
-      const categoria = i.categoria?.trim() || m?.subgrupo || i.grupo || "";
+      // Categoria da vitrine é SEMPRE o SUBGRUPO ao vivo — sem override salvo, sem fallback pro grupo.
+      const categoria = m?.subgrupo || "";
       return {
         produto: i.produto,
         descProduto: desc,
         ean,
         categoria,
+        grade: m?.grade || "",
         precoAtacado: i.precoAtacado,
         imagem: covers.get(i.produto) ?? null,
       };

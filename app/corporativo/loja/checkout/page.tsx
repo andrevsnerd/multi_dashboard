@@ -94,6 +94,7 @@ export default function CheckoutPage() {
           cor: i.cor,
           corNome: i.corNome,
           tamanho: i.tamanho,
+          grade: i.grade,
           quantidade: i.quantidade,
           precoUnitario: i.precoUnitario,
           subtotal: Number((i.precoUnitario * i.quantidade).toFixed(2)),
@@ -211,7 +212,10 @@ export default function CheckoutPage() {
                     )}
                   </div>
                   <div className={styles.cartInfo}>
-                    <span className={styles.cartName}>{i.descProduto || i.produto}</span>
+                    <span className={styles.cartName}>
+                      {i.descProduto || i.produto}
+                      {i.grade ? <span className={styles.gradeNote}> ({i.grade})</span> : null}
+                    </span>
                     {i.corNome && <span className={styles.cartMeta}>Cor: {i.corNome}</span>}
                     {i.tamanho && <span className={styles.cartMeta}>Tamanho: {i.tamanho}</span>}
                     <span className={styles.cartUnit}>

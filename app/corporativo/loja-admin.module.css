@@ -205,6 +205,8 @@
 }
 
 .muted { color: var(--la-muted); font-size: 13px; font-weight: 300; }
+/* Grade (dimensão, ex: "90x90") entre parênteses — sempre menor que o texto ao redor. */
+.gradeNote { font-size: 0.7em; font-weight: 400; color: var(--la-muted); }
 .center { text-align: center; padding: 48px 0; }
 .removeBtn {
   border: none; background: none; color: var(--la-red); font-size: 11px; cursor: pointer;

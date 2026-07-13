@@ -45,7 +45,10 @@ export default function CarrinhoPage() {
                 )}
               </div>
               <div className={styles.cartInfo}>
-                <span className={styles.cartName}>{i.descProduto || i.produto}</span>
+                <span className={styles.cartName}>
+                  {i.descProduto || i.produto}
+                  {i.grade ? <span className={styles.gradeNote}> ({i.grade})</span> : null}
+                </span>
                 {i.corNome && <span className={styles.cartMeta}>Cor: {i.corNome}</span>}
                 {i.tamanho && <span className={styles.cartMeta}>Tamanho: {i.tamanho}</span>}
                 {i.ean && <span className={styles.cartMeta}>EAN {i.ean}</span>}

@@ -367,6 +367,8 @@ export interface PedidoItem {
   cor: string;
   corNome: string;
   tamanho: string;
+  /** PRODUTOS.GRADE (dimensao, ex: "90x90") — exibido entre parenteses ao lado do nome. */
+  grade: string;
   quantidade: number;
   precoUnitario: number;
   subtotal: number;

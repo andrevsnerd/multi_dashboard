@@ -19,7 +19,7 @@ async function canManage(request: Request): Promise<boolean> {
   return canManageCatalogo(user?.role);
 }
 
-/** Lista o catálogo (admin). Reenriquece desc/EAN/grupo a partir do Linx. */
+/** Lista o catálogo (admin). Reenriquece desc/EAN/subgrupo a partir do Linx. */
 export async function GET() {
   try {
     const items = await listCatalogo();
@@ -31,7 +31,8 @@ export async function GET() {
         ...i,
         descProduto: m?.descProduto || i.descProduto,
         ean: m?.ean || i.ean,
-        grupo: m?.grupo || i.grupo,
+        // Categoria mostrada é sempre o subgrupo ao vivo — o campo "categoria" salvo não é mais usado.
+        subgrupo: m?.subgrupo ?? "",
         linha: m?.linha ?? "",
         colecao: m?.colecao ?? "",
       };

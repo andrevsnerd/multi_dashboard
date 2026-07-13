@@ -8,17 +8,15 @@ import styles from "../loja-admin.module.css";
 interface CatalogoItem {
   produto: string;
   precoAtacado: number;
-  categoria: string;
+  subgrupo: string;
   ativo: boolean;
   ordem: number;
   descProduto: string;
   ean: string;
-  grupo: string;
 }
 interface BuscaResult {
   produto: string;
   descProduto: string;
-  grupo: string;
   subgrupo: string;
   ean: string;
 }
@@ -46,7 +44,6 @@ export default function CatalogoAdminPage() {
   const [searching, setSearching] = useState(false);
   const [addingFor, setAddingFor] = useState<BuscaResult | null>(null);
   const [novoPreco, setNovoPreco] = useState("");
-  const [novaCategoria, setNovaCategoria] = useState("");
 
   // Gerenciador de imagens
   const [imgProduto, setImgProduto] = useState<CatalogoItem | null>(null);
@@ -95,9 +92,7 @@ export default function CatalogoAdminPage() {
       body: JSON.stringify({
         produto,
         ...patch,
-        ...(snapshot
-          ? { descProduto: snapshot.descProduto, ean: snapshot.ean, grupo: snapshot.grupo }
-          : {}),
+        ...(snapshot ? { descProduto: snapshot.descProduto, ean: snapshot.ean } : {}),
       }),
     });
     const json = await res.json();
@@ -112,14 +107,12 @@ export default function CatalogoAdminPage() {
         addingFor.produto,
         {
           precoAtacado: Number(novoPreco.replace(",", ".")) || 0,
-          categoria: novaCategoria.trim(),
           ativo: true,
         },
         addingFor
       );
       setAddingFor(null);
       setNovoPreco("");
-      setNovaCategoria("");
       setResults([]);
       setTerm("");
       await load();
@@ -132,7 +125,7 @@ export default function CatalogoAdminPage() {
     const preco = Number(valor.replace(",", ".")) || 0;
     setItems((prev) => prev.map((i) => (i.produto === item.produto ? { ...i, precoAtacado: preco } : i)));
     try {
-      await salvar(item.produto, { precoAtacado: preco, categoria: item.categoria, ativo: item.ativo });
+      await salvar(item.produto, { precoAtacado: preco, ativo: item.ativo });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao salvar preço.");
     }
@@ -142,7 +135,7 @@ export default function CatalogoAdminPage() {
     const ativo = !item.ativo;
     setItems((prev) => prev.map((i) => (i.produto === item.produto ? { ...i, ativo } : i)));
     try {
-      await salvar(item.produto, { precoAtacado: item.precoAtacado, categoria: item.categoria, ativo });
+      await salvar(item.produto, { precoAtacado: item.precoAtacado, ativo });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao salvar.");
     }
@@ -172,8 +165,8 @@ export default function CatalogoAdminPage() {
             <div className={styles.eyebrow}>Corporativo · Loja</div>
             <h1 className={styles.title}>Catálogo da loja</h1>
             <p className={styles.subtitle}>
-              Defina quais produtos aparecem na loja do cliente corporativo, o preço de atacado e a
-              categoria.
+              Defina quais produtos aparecem na loja do cliente corporativo e o preço de atacado.
+              A categoria é sempre o subgrupo do produto no Linx (não é editável aqui).
             </p>
           </div>
           <div className={styles.headerActions}>
@@ -217,7 +210,7 @@ export default function CatalogoAdminPage() {
                     <tr key={r.produto}>
                       <td className={styles.codeCell}>{r.produto}</td>
                       <td>{r.descProduto}</td>
-                      <td>{r.subgrupo || r.grupo}</td>
+                      <td>{r.subgrupo}</td>
                       <td>{r.ean}</td>
                       <td>
                         {jaNoCatalogo.has(r.produto) ? (
@@ -228,7 +221,6 @@ export default function CatalogoAdminPage() {
                             onClick={() => {
                               setAddingFor(r);
                               setNovoPreco("");
-                              setNovaCategoria(r.subgrupo || r.grupo || "");
                             }}
                           >
                             + Adicionar
@@ -253,7 +245,7 @@ export default function CatalogoAdminPage() {
                   <th>Código</th>
                   <th>Descrição</th>
                   <th>EAN</th>
-                  <th>Categoria</th>
+                  <th>Categoria (subgrupo)</th>
                   <th>Preço atacado</th>
                   <th>Ativo</th>
                   <th></th>
@@ -270,18 +262,7 @@ export default function CatalogoAdminPage() {
                       <td className={styles.codeCell}>{i.produto}</td>
                       <td>{i.descProduto}</td>
                       <td>{i.ean}</td>
-                      <td>
-                        <input
-                          className={styles.input}
-                          style={{ height: 32, maxWidth: 160 }}
-                          defaultValue={i.categoria}
-                          onBlur={(e) => {
-                            const categoria = e.target.value.trim();
-                            if (categoria !== i.categoria)
-                              salvar(i.produto, { precoAtacado: i.precoAtacado, categoria, ativo: i.ativo }).catch(() => {});
-                          }}
-                        />
-                      </td>
+                      <td>{i.subgrupo || "—"}</td>
                       <td>
                         <input
                           className={styles.input}
@@ -317,15 +298,16 @@ export default function CatalogoAdminPage() {
         </div>
       </div>
 
-      {/* Modal: adicionar produto (preço + categoria) */}
+      {/* Modal: adicionar produto (preço) */}
       {addingFor && (
         <Overlay onClose={() => setAddingFor(null)}>
           <h2 className={styles.title} style={{ fontSize: 20 }}>Adicionar ao catálogo</h2>
           <p className={styles.subtitle} style={{ marginBottom: 16 }}>
             {addingFor.produto} — {addingFor.descProduto}
+            {addingFor.subgrupo ? ` · ${addingFor.subgrupo}` : ""}
           </p>
           <div className={styles.grid}>
-            <div className={`${styles.field} ${styles.col6}`}>
+            <div className={`${styles.field} ${styles.col12}`}>
               <label className={styles.label}>Preço de atacado (R$)</label>
               <input
                 className={styles.input}
@@ -333,15 +315,6 @@ export default function CatalogoAdminPage() {
                 placeholder="0,00"
                 value={novoPreco}
                 onChange={(e) => setNovoPreco(e.target.value)}
-              />
-            </div>
-            <div className={`${styles.field} ${styles.col6}`}>
-              <label className={styles.label}>Categoria</label>
-              <input
-                className={styles.input}
-                value={novaCategoria}
-                onChange={(e) => setNovaCategoria(e.target.value)}
-                placeholder="Ex: Lenços"
               />
             </div>
           </div>

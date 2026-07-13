@@ -22,8 +22,10 @@ export interface CartItem {
   /** Código da cor (COR_PRODUTO). "" quando o produto não tem cores. */
   cor: string;
   corNome: string;
-  /** Tamanho/grade (TAMANHO). Vazio quando o produto nao tem grade de tamanho. */
+  /** Tamanho (TAMANHO). Vazio quando o produto nao tem grade de numeracao. */
   tamanho: string;
+  /** PRODUTOS.GRADE (dimensao, ex: "90x90") — exibido entre parenteses ao lado do nome. */
+  grade: string;
   precoUnitario: number;
   quantidade: number;
   imagem?: string | null;

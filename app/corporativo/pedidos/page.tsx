@@ -11,6 +11,7 @@ interface PedidoItem {
   ean: string;
   corNome: string;
   tamanho: string;
+  grade: string;
   quantidade: number;
   precoUnitario: number;
   subtotal: number;
@@ -219,7 +220,11 @@ export default function PedidosAdminPage() {
                 <tbody>
                   {aberto.itens.map((i, idx) => (
                     <tr key={idx}>
-                      <td>{i.descProduto || i.produto}{i.ean ? <div className={styles.muted} style={{ fontSize: 11 }}>EAN {i.ean}</div> : null}</td>
+                      <td>
+                        {i.descProduto || i.produto}
+                        {i.grade ? <span className={styles.gradeNote}> ({i.grade})</span> : null}
+                        {i.ean ? <div className={styles.muted} style={{ fontSize: 11 }}>EAN {i.ean}</div> : null}
+                      </td>
                       <td>{i.corNome || "—"}</td>
                       <td>{i.tamanho || "—"}</td>
                       <td>{i.quantidade}</td>

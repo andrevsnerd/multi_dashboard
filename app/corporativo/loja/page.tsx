@@ -11,6 +11,7 @@ interface ProdutoCard {
   descProduto: string;
   ean: string;
   categoria: string;
+  grade: string;
   precoAtacado: number;
   imagem: string | null;
 }
@@ -121,7 +122,10 @@ function Vitrine() {
               </div>
               <div className={styles.cardBody}>
                 {c.categoria && <span className={styles.cardCat}>{c.categoria}</span>}
-                <span className={styles.cardName}>{c.descProduto || c.produto}</span>
+                <span className={styles.cardName}>
+                  {c.descProduto || c.produto}
+                  {c.grade ? <span className={styles.gradeNote}> ({c.grade})</span> : null}
+                </span>
                 {c.ean && <span className={styles.cardEan}>EAN {c.ean}</span>}
                 <div className={styles.cardPriceRow}>
                   <span className={styles.cardPrice}>{formatBRL(c.precoAtacado)}</span>

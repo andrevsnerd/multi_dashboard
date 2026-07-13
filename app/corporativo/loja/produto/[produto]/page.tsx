@@ -22,6 +22,7 @@ interface ProdutoDetalhe {
   descProduto: string;
   ean: string;
   categoria: string;
+  grade: string;
   precoAtacado: number;
   cores: Cor[];
   imagensGerais: string[];
@@ -111,6 +112,7 @@ export default function ProdutoPage() {
       cor: corSel ?? "",
       corNome: corAtual?.displayName ?? "",
       tamanho: tamanhoSel ?? "",
+      grade: data.grade ?? "",
       precoUnitario: data.precoAtacado,
       quantidade: qtd,
       imagem: imagens[0] ?? null,
@@ -165,7 +167,10 @@ export default function ProdutoPage() {
           {/* Informações */}
           <div className={styles.produtoInfo}>
             {eanExibido && <div className={styles.produtoEan}>EAN {eanExibido}</div>}
-            <h1 className={styles.produtoNome}>{data.descProduto || data.produto}</h1>
+            <h1 className={styles.produtoNome}>
+              {data.descProduto || data.produto}
+              {data.grade ? <span className={styles.gradeNote}> ({data.grade})</span> : null}
+            </h1>
             {data.categoria && <div className={styles.produtoCat}>{data.categoria}</div>}
 
             <div className={styles.priceBlock}>

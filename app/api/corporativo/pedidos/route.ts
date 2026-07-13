@@ -58,6 +58,7 @@ export async function POST(request: Request) {
           cor: String(i.cor ?? ""),
           corNome: String(i.corNome ?? ""),
           tamanho: String(i.tamanho ?? ""),
+          grade: String(i.grade ?? ""),
           quantidade,
           precoUnitario,
           subtotal: Number((precoUnitario * quantidade).toFixed(2)),
