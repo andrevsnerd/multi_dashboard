@@ -26,6 +26,53 @@ interface ProdutoImagem {
   posicao: number;
   dataUrl: string;
 }
+interface CorProduto {
+  code: string;
+  description: string;
+  displayName: string;
+}
+
+/**
+ * Reduz e comprime a imagem no cliente antes de enviar. Fotos de celular (3–8 MB)
+ * viram base64 ainda maiores e estouram o limite do corpo da requisição — o
+ * servidor responde "Request Entity Too Large" (texto puro), o que quebrava o
+ * JSON.parse com "Unexpected token 'R'". Redimensionando para no máx. 1400px e
+ * exportando JPEG ~0.82 o payload cai para poucas centenas de KB.
+ */
+async function resizeImageToDataUrl(file: File, maxSide = 1400, quality = 0.82): Promise<string> {
+  const originalDataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("Não foi possível ler o arquivo."));
+    reader.readAsDataURL(file);
+  });
+
+  // SVG não redimensiona bem em canvas; mantém como veio.
+  if (file.type === "image/svg+xml") return originalDataUrl;
+
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const el = new Image();
+    el.onload = () => resolve(el);
+    el.onerror = () => reject(new Error("Imagem inválida."));
+    el.src = originalDataUrl;
+  });
+
+  const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+  const w = Math.max(1, Math.round(img.width * scale));
+  const h = Math.max(1, Math.round(img.height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return originalDataUrl;
+  // Fundo branco: PNG com transparência viraria preto ao exportar como JPEG.
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, w, h);
+  ctx.drawImage(img, 0, 0, w, h);
+  const out = canvas.toDataURL("image/jpeg", quality);
+  // Se por algum motivo o resultado ficar maior que o original, usa o menor.
+  return out.length < originalDataUrl.length ? out : originalDataUrl;
+}
 
 export default function CatalogoAdminPage() {
   const { user } = useAuth();
@@ -382,6 +429,7 @@ function ImagensManager({
   onClose: () => void;
 }) {
   const [imagens, setImagens] = useState<ProdutoImagem[]>([]);
+  const [cores, setCores] = useState<CorProduto[]>([]);
   const [cor, setCor] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -393,9 +441,32 @@ function ImagensManager({
     if (res.ok) setImagens(json.data as ProdutoImagem[]);
   }, [produto.produto]);
 
+  const loadCores = useCallback(async () => {
+    try {
+      const res = await fetch(
+        `/api/corporativo/catalogo/cores?produto=${encodeURIComponent(produto.produto)}`,
+        { headers: authHeader() }
+      );
+      const json = await res.json();
+      if (res.ok) setCores(json.data as CorProduto[]);
+    } catch {
+      // sem cores cadastradas: cai no seletor só com "geral"
+    }
+  }, [produto.produto, authHeader]);
+
   useEffect(() => {
     load();
-  }, [load]);
+    loadCores();
+  }, [load, loadCores]);
+
+  // Nome legível de uma cor já usada nas imagens (para o rótulo abaixo da miniatura).
+  const corLabel = useCallback(
+    (code: string) => {
+      const c = cores.find((x) => x.code === code);
+      return c ? `${c.displayName} (${c.code})` : `cor ${code}`;
+    },
+    [cores]
+  );
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -403,12 +474,7 @@ function ImagensManager({
     setBusy(true);
     setErr(null);
     try {
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result));
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
+      const dataUrl = await resizeImageToDataUrl(file);
       const jaNaCor = imagens.filter((im) => im.cor === cor.trim());
       const posicao = jaNaCor.length; // próxima posição livre para essa cor
       const res = await fetch("/api/corporativo/imagens", {
@@ -416,7 +482,17 @@ function ImagensManager({
         headers: { "Content-Type": "application/json", ...authHeader() },
         body: JSON.stringify({ produto: produto.produto, cor: cor.trim(), posicao, dataUrl }),
       });
-      if (!res.ok) throw new Error((await res.json()).error || "Erro ao enviar.");
+      if (!res.ok) {
+        // Resposta pode não ser JSON (ex.: 413 "Request Entity Too Large" em texto puro).
+        const raw = await res.text();
+        let msg = raw;
+        try {
+          msg = JSON.parse(raw).error || raw;
+        } catch {
+          if (res.status === 413) msg = "Imagem muito grande. Tente uma foto menor.";
+        }
+        throw new Error(msg || "Erro ao enviar.");
+      }
       if (fileRef.current) fileRef.current.value = "";
       await load();
     } catch (e) {
@@ -441,15 +517,22 @@ function ImagensManager({
         {produto.produto} — {produto.descProduto}
       </p>
       <p className={styles.viewHint} style={{ marginBottom: 16 }}>
-        Imagens são globais do sistema (produto × cor). Deixe a cor em branco para a imagem geral.
+        Imagens são globais do sistema (produto × cor). Selecione a cor cadastrada do produto, ou deixe em &ldquo;Geral&rdquo; para uma imagem que vale para todas as cores.
       </p>
 
       {err && <div className={`${styles.alert} ${styles.alertError}`}>{err}</div>}
 
       <div className={styles.grid} style={{ alignItems: "end" }}>
         <div className={`${styles.field} ${styles.col6}`}>
-          <label className={styles.label}>Cor (código, opcional)</label>
-          <input className={styles.input} value={cor} onChange={(e) => setCor(e.target.value)} placeholder="Ex: 06 (vazio = geral)" />
+          <label className={styles.label}>Cor</label>
+          <select className={styles.input} value={cor} onChange={(e) => setCor(e.target.value)}>
+            <option value="">Geral (todas as cores)</option>
+            {cores.map((c) => (
+              <option key={c.code} value={c.code}>
+                {c.displayName} ({c.code})
+              </option>
+            ))}
+          </select>
         </div>
         <div className={`${styles.field} ${styles.col6}`}>
           <label className={styles.label}>Enviar imagem</label>
@@ -479,7 +562,7 @@ function ImagensManager({
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={im.dataUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               </div>
-              <div style={{ marginTop: 3 }}>{im.cor ? `cor ${im.cor}` : "geral"}</div>
+              <div style={{ marginTop: 3 }}>{im.cor ? corLabel(im.cor) : "geral"}</div>
               <button className={styles.removeBtn} onClick={() => excluir(im)}>
                 excluir
               </button>
