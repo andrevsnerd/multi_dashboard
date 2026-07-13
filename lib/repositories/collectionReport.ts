@@ -3,13 +3,26 @@ import sql from "mssql";
 import {
   getFilialLabelForDisplay,
   isEcommerceFilial,
-  resolveCompany,
   VAREJO_VALUE,
+  type CompanyKey,
 } from "@/lib/config/company";
 import { resolveCompanyLive, liveNameForIncoming } from "@/lib/server/company-live";
 import { withRequest } from "@/lib/db/connection";
 import { RequestLike } from "@/lib/db/proxy";
 import { normalizeRangeForQuery } from "@/lib/utils/date";
+import { canonicalKey } from "@/lib/reports/keys";
+import { fetchProductsWithDetails } from "@/lib/repositories/products";
+import { fetchProdutoQtdePorFilial } from "@/lib/repositories/performance";
+
+/**
+ * Relatório de Coleção (Relatório Claude + comparativos entre coleções).
+ *
+ * TODAS as vendas/faturamento seguem a REGRA ÚNICA validada "com trocas" (ver
+ * CLAUDE.md): reaproveitam `fetchProductsWithDetails` (produto × cor, com trocas,
+ * FATOR_DESCONTO_VENDA e cancelamentos tratados) e `fetchProdutoQtdePorFilial`
+ * (mesma lógica, decomposta por filial) para o detalhamento por loja/canal.
+ * NUNCA somar de `W_CTB_LOJA_VENDA_PEDIDO_PRODUTO` nem usar desconto absoluto.
+ */
 
 type ReportChannel = "Varejo" | "E-commerce";
 
@@ -21,32 +34,6 @@ export interface CollectionReportQueryParams {
   };
   filial?: string | null;
   colecoes?: string[] | null;
-}
-
-interface SalesDetailRecord {
-  productId: string;
-  productName: string | null;
-  grade: string | null;
-  colorCode: string | null;
-  colorDescription: string | null;
-  origin: string | null;
-  totalQuantity: number | null;
-  totalRevenue: number | null;
-  firstSaleDate: Date | null;
-  lastSaleDate: Date | null;
-}
-
-interface EcommerceDetailRecord {
-  productId: string;
-  productName: string | null;
-  grade: string | null;
-  colorCode: string | null;
-  colorDescription: string | null;
-  origin: string | null;
-  totalQuantity: number | null;
-  totalRevenue: number | null;
-  firstSaleDate: Date | null;
-  lastSaleDate: Date | null;
 }
 
 export interface CollectionReportDetailRow {
@@ -216,29 +203,23 @@ async function buildEcommerceFilialFilter(
   return `AND ${tableAlias}.FILIAL IN (${placeholders})`;
 }
 
-function buildSalesCollectionFilter(
+/**
+ * Filtro de coleção validado para as tabelas de venda física: casa por
+ * `<saleAlias>.COLECAO` OU `p.COLECAO` (mestre). Registra os @params UMA vez e
+ * devolve uma função que monta a cláusula para qualquer alias de venda — permite
+ * reusar os MESMOS params em `vp` (LOJA_VENDA_PRODUTO) e `vt` (LOJA_VENDA_TROCA).
+ */
+function prepColecaoFilter(
   request: sql.Request | RequestLike,
-  colecoes: string[],
-  paramPrefix: string
-) {
-  if (colecoes.length === 0) {
-    return "";
-  }
-
-  if (colecoes.length === 1) {
-    request.input(`${paramPrefix}Colecao`, sql.VarChar, colecoes[0]);
-    return `AND UPPER(LTRIM(RTRIM(COALESCE(vp.COLECAO, p.COLECAO, '')))) = @${paramPrefix}Colecao`;
-  }
-
-  colecoes.forEach((value, index) => {
-    request.input(`${paramPrefix}Colecao${index}`, sql.VarChar, value);
-  });
-
-  const placeholders = colecoes
-    .map((_, index) => `@${paramPrefix}Colecao${index}`)
-    .join(", ");
-
-  return `AND UPPER(LTRIM(RTRIM(COALESCE(vp.COLECAO, p.COLECAO, '')))) IN (${placeholders})`;
+  colecoes: string[] | null | undefined,
+  prefix: string
+): (saleAlias: string) => string {
+  const list = normalizeCollectionValues(colecoes);
+  if (list.length === 0) return () => "";
+  list.forEach((c, i) => request.input(`${prefix}${i}`, sql.VarChar, c));
+  const ph = list.map((_, i) => `@${prefix}${i}`).join(", ");
+  return (saleAlias) =>
+    `AND (UPPER(LTRIM(RTRIM(ISNULL(${saleAlias}.COLECAO, '')))) IN (${ph}) OR UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) IN (${ph}))`;
 }
 
 function buildEcommerceCollectionFilter(
@@ -266,211 +247,96 @@ function buildEcommerceCollectionFilter(
   return `AND UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) IN (${placeholders})`;
 }
 
-function mapOriginLabel(companySlug: string | undefined, origin: string | null | undefined) {
-  const company = resolveCompany(companySlug);
-  const rawOrigin = origin?.trim() || "";
-  return rawOrigin ? getFilialLabelForDisplay(company, rawOrigin) : "";
-}
-
 function getDetailId(parts: string[]) {
   return parts.map((value) => value.trim()).join("|");
 }
 
-function normalizeProductName(value: string | null | undefined, productId: string) {
-  const trimmed = value?.trim();
-  return trimmed || productId.trim();
-}
+/**
+ * Escopo de filiais (POS/e-commerce) a considerar, respeitando o filtro `filial`
+ * — mesma semântica que `fetchProductsWithDetails` aplica aos totais.
+ */
+function resolveFilialScope(
+  ecommerceFilials: Set<string>,
+  salesFiliais: string[],
+  specific: string | null | undefined
+): { posNames: string[]; ecomNames: string[] } {
+  const allPos = salesFiliais.filter((f) => !ecommerceFilials.has(f));
+  const allEcom = salesFiliais.filter((f) => ecommerceFilials.has(f));
 
-function aggregateProductRows(
-  companySlug: string | undefined,
-  channel: ReportChannel,
-  rows: Array<SalesDetailRecord | EcommerceDetailRecord>,
-  detectedRange: { start: Date | null; end: Date | null },
-  totals: { revenue: number; quantity: number }
-) {
-  const productMap = new Map<string, CollectionReportProductRow>();
-
-  for (const row of rows) {
-    const productId = row.productId?.trim() || "";
-    if (!productId) {
-      continue;
-    }
-
-    const productName = normalizeProductName(row.productName, productId);
-    const productKey = productName.toUpperCase();
-    const grade = row.grade?.trim() || "-";
-    const colorCode = row.colorCode?.trim() || "";
-    const colorDescription = row.colorDescription?.trim() || "-";
-    const origin = mapOriginLabel(companySlug, row.origin) || channel;
-    const quantity = Number(row.totalQuantity ?? 0);
-    const revenue = Number(row.totalRevenue ?? 0);
-
-    if (!productMap.has(productKey)) {
-      productMap.set(productKey, {
-        id: productKey,
-        productName,
-        retailRevenue: 0,
-        ecommerceRevenue: 0,
-        totalRevenue: 0,
-        details: [],
-      });
-    }
-
-    const product = productMap.get(productKey)!;
-    if (channel === "Varejo") {
-      product.retailRevenue += revenue;
-    } else {
-      product.ecommerceRevenue += revenue;
-    }
-    product.totalRevenue += revenue;
-
-    product.details.push({
-      id: getDetailId([channel, origin, productId, grade, colorCode, colorDescription]),
-      channel,
-      origin,
-      productId,
-      productName,
-      grade,
-      colorCode,
-      colorDescription,
-      quantity,
-      revenue,
-    });
-
-    totals.revenue += revenue;
-    totals.quantity += quantity;
-
-    const firstSaleDate = row.firstSaleDate ? new Date(row.firstSaleDate) : null;
-    const lastSaleDate = row.lastSaleDate ? new Date(row.lastSaleDate) : null;
-
-    if (firstSaleDate && (!detectedRange.start || firstSaleDate < detectedRange.start)) {
-      detectedRange.start = firstSaleDate;
-    }
-
-    if (lastSaleDate && (!detectedRange.end || lastSaleDate > detectedRange.end)) {
-      detectedRange.end = lastSaleDate;
-    }
+  if (specific && specific !== VAREJO_VALUE) {
+    if (ecommerceFilials.has(specific)) return { posNames: [], ecomNames: [specific] };
+    return { posNames: [specific], ecomNames: [] };
   }
-
-  return productMap;
+  if (specific === VAREJO_VALUE) return { posNames: allPos, ecomNames: [] };
+  return { posNames: allPos, ecomNames: allEcom };
 }
 
-async function fetchSalesDetails(
-  request: sql.Request | RequestLike,
+/**
+ * MIN/MAX das datas de venda da coleção no período (para o rótulo "período
+ * detectado" do cabeçalho). Datas — não faturamento — então é uma consulta
+ * enxuta nas tabelas validadas (LOJA_VENDA_PRODUTO / FATURAMENTO), nunca W_CTB.
+ */
+async function fetchColecaoDetectedRange(
   company: string | undefined,
   filial: string | null | undefined,
   colecoes: string[]
-) {
-  if (!shouldIncludeSalesChannel(company, filial)) {
-    return [] as SalesDetailRecord[];
-  }
+): Promise<{ start: Date | null; end: Date | null }> {
+  let detectedStart: Date | null = null;
+  let detectedEnd: Date | null = null;
 
-  const salesFilial = filial && filial !== VAREJO_VALUE ? filial : VAREJO_VALUE;
-  const filialFilter = await buildSalesFilialFilter(request, company, salesFilial, "sales");
-  const collectionFilter = buildSalesCollectionFilter(request, colecoes, "sales");
+  await withRequest(async (request) => {
+    if (shouldIncludeSalesChannel(company, filial)) {
+      const salesFilial = filial && filial !== VAREJO_VALUE ? filial : VAREJO_VALUE;
+      const filialFilter = await buildSalesFilialFilter(request, company, salesFilial, "dateSales", "f");
+      const colecao = prepColecaoFilter(request, colecoes, "dateSalesCol");
+      const res = await request.query<{ startDate: Date | null; endDate: Date | null }>(`
+        SELECT MIN(vp.DATA_VENDA) AS startDate, MAX(vp.DATA_VENDA) AS endDate
+        FROM LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
+        INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+          ON v.CODIGO_FILIAL = vp.CODIGO_FILIAL AND v.TICKET = vp.TICKET
+        LEFT JOIN FILIAIS f WITH (NOLOCK) ON f.COD_FILIAL = vp.CODIGO_FILIAL
+        LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = vp.PRODUTO
+        WHERE ISNULL(vp.QTDE_CANCELADA, 0) = 0
+          ${filialFilter}
+          ${colecao("vp")}
+      `);
+      const row = res.recordset[0];
+      if (row?.startDate && (!detectedStart || row.startDate < detectedStart)) detectedStart = row.startDate;
+      if (row?.endDate && (!detectedEnd || row.endDate > detectedEnd)) detectedEnd = row.endDate;
+    }
 
-  const query = `
-    SELECT
-      vp.PRODUTO AS productId,
-      MAX(COALESCE(p.DESC_PRODUTO, vp.DESC_PRODUTO, vp.PRODUTO)) AS productName,
-      MAX(CONVERT(VARCHAR, p.GRADE)) AS grade,
-      MAX(CONVERT(VARCHAR, vp.COR_PRODUTO)) AS colorCode,
-      MAX(COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO, '')) AS colorDescription,
-      MAX(vp.FILIAL) AS origin,
-      SUM(vp.QTDE) AS totalQuantity,
-      SUM(
-        CASE
-          WHEN vp.QTDE_CANCELADA > 0 THEN 0
-          ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0)
-        END
-      ) AS totalRevenue,
-      MIN(vp.DATA_VENDA) AS firstSaleDate,
-      MAX(vp.DATA_VENDA) AS lastSaleDate
-    FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-    LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
-    LEFT JOIN (
-      SELECT PRODUTO, COR_PRODUTO, MAX(DESC_COR_PRODUTO) AS DESC_COR
-      FROM PRODUTO_CORES WITH (NOLOCK)
-      GROUP BY PRODUTO, COR_PRODUTO
-    ) c ON RTRIM(LTRIM(c.PRODUTO)) = RTRIM(LTRIM(vp.PRODUTO))
-       AND (RTRIM(LTRIM(CAST(c.COR_PRODUTO AS VARCHAR(20)))) = RTRIM(LTRIM(CAST(vp.COR_PRODUTO AS VARCHAR(20)))) OR TRY_CONVERT(INT, c.COR_PRODUTO) = TRY_CONVERT(INT, vp.COR_PRODUTO))
-    WHERE vp.DATA_VENDA >= @startDate
-      AND vp.DATA_VENDA < @endDate
-      AND vp.QTDE > 0
-      ${filialFilter}
-      ${collectionFilter}
-    GROUP BY
-      vp.PRODUTO,
-      vp.FILIAL,
-      CONVERT(VARCHAR, p.GRADE),
-      CONVERT(VARCHAR, vp.COR_PRODUTO)
-    ORDER BY totalRevenue DESC
-  `;
+    if (shouldIncludeEcommerceChannel(company, filial)) {
+      const ecommerceFilial = filial && isEcommerceFilial(company, filial) ? filial : null;
+      const filialFilter = await buildEcommerceFilialFilter(request, company, ecommerceFilial, "dateEcom");
+      const colecao = buildEcommerceCollectionFilter(request, colecoes, "dateEcom");
+      const res = await request.query<{ startDate: Date | null; endDate: Date | null }>(`
+        SELECT MIN(f.EMISSAO) AS startDate, MAX(f.EMISSAO) AS endDate
+        FROM FATURAMENTO f WITH (NOLOCK)
+        JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+          ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+        LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = fp.PRODUTO
+        WHERE f.NOTA_CANCELADA = 0
+          AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+          AND fp.QTDE > 0
+          ${filialFilter}
+          ${colecao}
+      `);
+      const row = res.recordset[0];
+      if (row?.startDate && (!detectedStart || row.startDate < detectedStart)) detectedStart = row.startDate;
+      if (row?.endDate && (!detectedEnd || row.endDate > detectedEnd)) detectedEnd = row.endDate;
+    }
+  });
 
-  const result = await request.query<SalesDetailRecord>(query);
-  return result.recordset;
+  return { start: detectedStart, end: detectedEnd };
 }
 
-async function fetchEcommerceDetails(
-  request: sql.Request | RequestLike,
-  company: string | undefined,
-  filial: string | null | undefined,
-  colecoes: string[]
-) {
-  if (!shouldIncludeEcommerceChannel(company, filial)) {
-    return [] as EcommerceDetailRecord[];
-  }
-
-  const ecommerceFilial = filial && isEcommerceFilial(company, filial) ? filial : null;
-  const filialFilter = await buildEcommerceFilialFilter(
-    request,
-    company,
-    ecommerceFilial,
-    "ecom"
-  );
-  const collectionFilter = buildEcommerceCollectionFilter(request, colecoes, "ecom");
-
-  const query = `
-    SELECT
-      fp.PRODUTO AS productId,
-      MAX(COALESCE(p.DESC_PRODUTO, fp.PRODUTO)) AS productName,
-      MAX(CONVERT(VARCHAR, p.GRADE)) AS grade,
-      MAX(CONVERT(VARCHAR, fp.COR_PRODUTO)) AS colorCode,
-      MAX(COALESCE(c.DESC_COR, '')) AS colorDescription,
-      MAX(f.FILIAL) AS origin,
-      SUM(fp.QTDE) AS totalQuantity,
-      SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS totalRevenue,
-      MIN(f.EMISSAO) AS firstSaleDate,
-      MAX(f.EMISSAO) AS lastSaleDate
-    FROM FATURAMENTO f WITH (NOLOCK)
-    JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
-      ON f.FILIAL = fp.FILIAL
-      AND f.NF_SAIDA = fp.NF_SAIDA
-      AND f.SERIE_NF = fp.SERIE_NF
-    LEFT JOIN PRODUTOS p WITH (NOLOCK) ON fp.PRODUTO = p.PRODUTO
-    LEFT JOIN (
-      SELECT PRODUTO, COR_PRODUTO, MAX(DESC_COR_PRODUTO) AS DESC_COR
-      FROM PRODUTO_CORES WITH (NOLOCK)
-      GROUP BY PRODUTO, COR_PRODUTO
-    ) c ON RTRIM(LTRIM(c.PRODUTO)) = RTRIM(LTRIM(fp.PRODUTO))
-       AND (RTRIM(LTRIM(CAST(c.COR_PRODUTO AS VARCHAR(20)))) = RTRIM(LTRIM(CAST(fp.COR_PRODUTO AS VARCHAR(20)))) OR TRY_CONVERT(INT, c.COR_PRODUTO) = TRY_CONVERT(INT, fp.COR_PRODUTO))
-    WHERE f.EMISSAO >= @startDate
-      AND f.EMISSAO < @endDate
-      AND f.NOTA_CANCELADA = 0
-      AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
-      AND fp.QTDE > 0
-      ${filialFilter}
-      ${collectionFilter}
-    GROUP BY
-      fp.PRODUTO,
-      f.FILIAL,
-      CONVERT(VARCHAR, p.GRADE),
-      CONVERT(VARCHAR, fp.COR_PRODUTO)
-    ORDER BY totalRevenue DESC
-  `;
-
-  const result = await request.query<EcommerceDetailRecord>(query);
-  return result.recordset;
+interface SkuMeta {
+  productId: string;
+  productName: string;
+  productKey: string; // productName.toUpperCase() — chave de agrupamento por produto
+  grade: string;
+  colorCode: string;
+  colorDescription: string;
 }
 
 export async function fetchCollectionReport({
@@ -479,121 +345,210 @@ export async function fetchCollectionReport({
   filial,
   colecoes,
 }: CollectionReportQueryParams = {}): Promise<CollectionReportResponse> {
+  const emptySummary = {
+    totalRevenue: 0,
+    retailRevenue: 0,
+    ecommerceRevenue: 0,
+    totalQuantity: 0,
+    retailQuantity: 0,
+    ecommerceQuantity: 0,
+    retailShare: 0,
+    ecommerceShare: 0,
+    detectedStartDate: null,
+    detectedEndDate: null,
+  };
+
   if (company !== "scarfme") {
-    return {
-      summary: {
-        totalRevenue: 0,
-        retailRevenue: 0,
-        ecommerceRevenue: 0,
-        totalQuantity: 0,
-        retailQuantity: 0,
-        ecommerceQuantity: 0,
-        retailShare: 0,
-        ecommerceShare: 0,
-        detectedStartDate: null,
-        detectedEndDate: null,
-      },
-      topProducts: [],
-      products: [],
-    };
+    return { summary: emptySummary, topProducts: [], products: [] };
   }
 
+  const rangeInput = { start: range?.start, end: range?.end };
+  const normRange = normalizeRangeForQuery(rangeInput);
   const normalizedCollections = normalizeCollectionValues(colecoes);
 
-  return withRequest(async (request) => {
-    const { start, end } = resolveRange(range);
-    request.input("startDate", sql.DateTime, start);
-    request.input("endDate", sql.DateTime, end);
+  const isNetworkScope = filial == null; // rede inteira = varejo + e-commerce
+  const specific =
+    filial && filial !== VAREJO_VALUE ? await liveNameForIncoming(filial) : filial ?? null;
+  const scopeIsEcom = !!(
+    specific &&
+    specific !== VAREJO_VALUE &&
+    isEcommerceFilial(company, specific)
+  );
 
-    const salesRows = await fetchSalesDetails(
-      request,
+  // ── Totais validados (com trocas) por produto × cor ────────────────────────
+  // filial null => varejo + e-commerce mesclados (mesma regra do resto do app).
+  const [totalProducts, retailProducts, detectedRange] = await Promise.all([
+    fetchProductsWithDetails({
       company,
-      filial,
-      normalizedCollections
-    );
-    const ecommerceRows = await fetchEcommerceDetails(
-      request,
-      company,
-      filial,
-      normalizedCollections
-    );
+      filial: filial ?? null,
+      colecoes: normalizedCollections,
+      range: rangeInput,
+      groupByColor: true,
+    }),
+    // Split de canal: só precisamos do varejo isolado quando o escopo é a rede
+    // inteira (aí e-commerce = total − varejo, por SKU).
+    isNetworkScope
+      ? fetchProductsWithDetails({
+          company,
+          filial: VAREJO_VALUE,
+          colecoes: normalizedCollections,
+          range: rangeInput,
+          groupByColor: true,
+        })
+      : Promise.resolve(null),
+    fetchColecaoDetectedRange(company, filial ?? null, normalizedCollections),
+  ]);
 
-    const detectedRange = { start: null as Date | null, end: null as Date | null };
-    const retailTotals = { revenue: 0, quantity: 0 };
-    const ecommerceTotals = { revenue: 0, quantity: 0 };
+  const retailRevByKey = new Map<string, number>();
+  const retailQtyByKey = new Map<string, number>();
+  for (const d of retailProducts ?? []) {
+    const k = canonicalKey(d.productId, d.corProduto);
+    retailRevByKey.set(k, (retailRevByKey.get(k) ?? 0) + (d.totalRevenue ?? 0));
+    retailQtyByKey.set(k, (retailQtyByKey.get(k) ?? 0) + (d.totalQuantity ?? 0));
+  }
 
-    const retailMap = aggregateProductRows(
-      company,
-      "Varejo",
-      salesRows,
-      detectedRange,
-      retailTotals
-    );
-    const ecommerceMap = aggregateProductRows(
-      company,
-      "E-commerce",
-      ecommerceRows,
-      detectedRange,
-      ecommerceTotals
-    );
+  // Metadados por SKU (produto × cor) para montar os `details`.
+  const skuMeta = new Map<string, SkuMeta>();
+  const productMap = new Map<string, CollectionReportProductRow>();
 
-    const mergedProducts = new Map<string, CollectionReportProductRow>();
+  for (const d of totalProducts) {
+    const productId = String(d.productId ?? "").trim();
+    if (!productId) continue;
+    const productName = (d.productName ?? "").trim() || productId;
+    const productKey = productName.toUpperCase();
+    const skuK = canonicalKey(productId, d.corProduto);
+    skuMeta.set(skuK, {
+      productId,
+      productName,
+      productKey,
+      grade: d.grade && d.grade !== "-" ? String(d.grade) : "-",
+      colorCode: d.corProduto ? String(d.corProduto).trim() : "",
+      colorDescription: d.descCorProduto?.trim() || "-",
+    });
 
-    for (const product of retailMap.values()) {
-      mergedProducts.set(product.id, {
-        ...product,
-        details: [...product.details],
+    const total = d.totalRevenue ?? 0;
+    let retail: number;
+    let ecom: number;
+    if (isNetworkScope) {
+      retail = retailRevByKey.get(skuK) ?? 0;
+      ecom = total - retail;
+    } else if (scopeIsEcom) {
+      retail = 0;
+      ecom = total;
+    } else {
+      retail = total;
+      ecom = 0;
+    }
+
+    let product = productMap.get(productKey);
+    if (!product) {
+      product = {
+        id: productKey,
+        productName,
+        retailRevenue: 0,
+        ecommerceRevenue: 0,
+        totalRevenue: 0,
+        details: [],
+      };
+      productMap.set(productKey, product);
+    }
+    product.retailRevenue += retail;
+    product.ecommerceRevenue += ecom;
+    product.totalRevenue += total;
+  }
+
+  // ── Detalhamento por filial (validado, com trocas) para os `details` ───────
+  const companyLive = await resolveCompanyLive(company);
+  if (companyLive && skuMeta.size > 0) {
+    const ecommerceFilials = new Set(companyLive.ecommerceFilials ?? []);
+    const salesFiliais = companyLive.filialFilters.sales ?? [];
+    const { posNames, ecomNames } = resolveFilialScope(ecommerceFilials, salesFiliais, specific);
+
+    const perFilial = await fetchProdutoQtdePorFilial(
+      company as CompanyKey,
+      posNames,
+      ecomNames,
+      normRange,
+      { groupByCor: true }
+    ).catch(() => []);
+
+    for (const r of perFilial) {
+      const skuK = canonicalKey(r.produto, r.cor || null);
+      const meta = skuMeta.get(skuK);
+      if (!meta) continue; // fora desta coleção
+      const isEcom = ecommerceFilials.has(r.filial);
+      const channel: ReportChannel = isEcom ? "E-commerce" : "Varejo";
+      const origin = getFilialLabelForDisplay(companyLive, r.filial) || channel;
+      const product = productMap.get(meta.productKey);
+      if (!product) continue;
+      product.details.push({
+        id: getDetailId([channel, origin, meta.productId, meta.grade, meta.colorCode, meta.colorDescription]),
+        channel,
+        origin,
+        productId: meta.productId,
+        productName: meta.productName,
+        grade: meta.grade,
+        colorCode: meta.colorCode,
+        colorDescription: meta.colorDescription,
+        quantity: r.qtde,
+        revenue: r.vendas,
       });
     }
+  }
 
-    for (const product of ecommerceMap.values()) {
-      const existing = mergedProducts.get(product.id);
-      if (!existing) {
-        mergedProducts.set(product.id, {
-          ...product,
-          details: [...product.details],
-        });
-        continue;
-      }
+  const products = Array.from(productMap.values())
+    .map((product) => ({
+      ...product,
+      details: product.details.sort((a, b) => b.revenue - a.revenue),
+    }))
+    .sort((a, b) => b.totalRevenue - a.totalRevenue);
 
-      existing.retailRevenue += product.retailRevenue;
-      existing.ecommerceRevenue += product.ecommerceRevenue;
-      existing.totalRevenue += product.totalRevenue;
-      existing.details.push(...product.details);
-    }
+  // ── Totais / KPIs (com trocas) ─────────────────────────────────────────────
+  const totalRevenue = totalProducts.reduce((s, d) => s + (d.totalRevenue ?? 0), 0);
+  const totalQuantity = totalProducts.reduce((s, d) => s + (d.totalQuantity ?? 0), 0);
 
-    const products = Array.from(mergedProducts.values())
-      .map((product) => ({
-        ...product,
-        details: product.details.sort((a, b) => b.revenue - a.revenue),
-      }))
-      .sort((a, b) => b.totalRevenue - a.totalRevenue);
+  let retailRevenue: number;
+  let ecommerceRevenue: number;
+  let retailQuantity: number;
+  let ecommerceQuantity: number;
+  if (isNetworkScope) {
+    retailRevenue = (retailProducts ?? []).reduce((s, d) => s + (d.totalRevenue ?? 0), 0);
+    retailQuantity = (retailProducts ?? []).reduce((s, d) => s + (d.totalQuantity ?? 0), 0);
+    ecommerceRevenue = totalRevenue - retailRevenue;
+    ecommerceQuantity = totalQuantity - retailQuantity;
+  } else if (scopeIsEcom) {
+    retailRevenue = 0;
+    retailQuantity = 0;
+    ecommerceRevenue = totalRevenue;
+    ecommerceQuantity = totalQuantity;
+  } else {
+    retailRevenue = totalRevenue;
+    retailQuantity = totalQuantity;
+    ecommerceRevenue = 0;
+    ecommerceQuantity = 0;
+  }
 
-    const totalRevenue = retailTotals.revenue + ecommerceTotals.revenue;
-    const totalQuantity = retailTotals.quantity + ecommerceTotals.quantity;
-
-    return {
-      summary: {
-        totalRevenue,
-        retailRevenue: retailTotals.revenue,
-        ecommerceRevenue: ecommerceTotals.revenue,
-        totalQuantity,
-        retailQuantity: retailTotals.quantity,
-        ecommerceQuantity: ecommerceTotals.quantity,
-        retailShare: totalRevenue > 0 ? (retailTotals.revenue / totalRevenue) * 100 : 0,
-        ecommerceShare: totalRevenue > 0 ? (ecommerceTotals.revenue / totalRevenue) * 100 : 0,
-        detectedStartDate: detectedRange.start ? detectedRange.start.toISOString() : null,
-        detectedEndDate: detectedRange.end ? detectedRange.end.toISOString() : null,
-      },
-      topProducts: products.slice(0, 10).map((product) => ({
-        productName: product.productName,
-        retailRevenue: product.retailRevenue,
-        ecommerceRevenue: product.ecommerceRevenue,
-        totalRevenue: product.totalRevenue,
-      })),
-      products,
-    };
-  });
+  return {
+    summary: {
+      totalRevenue,
+      retailRevenue,
+      ecommerceRevenue,
+      totalQuantity,
+      retailQuantity,
+      ecommerceQuantity,
+      retailShare: totalRevenue > 0 ? (retailRevenue / totalRevenue) * 100 : 0,
+      ecommerceShare: totalRevenue > 0 ? (ecommerceRevenue / totalRevenue) * 100 : 0,
+      detectedStartDate: detectedRange.start ? detectedRange.start.toISOString() : null,
+      detectedEndDate: detectedRange.end ? detectedRange.end.toISOString() : null,
+    },
+    topProducts: products.slice(0, 10).map((product) => ({
+      productName: product.productName,
+      retailRevenue: product.retailRevenue,
+      ecommerceRevenue: product.ecommerceRevenue,
+      totalRevenue: product.totalRevenue,
+    })),
+    products,
+  };
 }
 
 export async function fetchCollectionReportColecoes({
@@ -708,13 +663,10 @@ export async function fetchCollectionReportAvailableRange({
         request,
         company,
         salesFilial,
-        "salesRange"
+        "salesRange",
+        "f"
       );
-      const collectionFilter = buildSalesCollectionFilter(
-        request,
-        normalizedCollections,
-        "salesRange"
-      );
+      const colecao = prepColecaoFilter(request, normalizedCollections, "salesRangeCol");
       const result = await request.query<{
         startDate: Date | null;
         endDate: Date | null;
@@ -722,11 +674,14 @@ export async function fetchCollectionReportAvailableRange({
         SELECT
           MIN(vp.DATA_VENDA) AS startDate,
           MAX(vp.DATA_VENDA) AS endDate
-        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-        LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
-        WHERE vp.QTDE > 0
+        FROM LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
+        INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+          ON v.CODIGO_FILIAL = vp.CODIGO_FILIAL AND v.TICKET = vp.TICKET
+        LEFT JOIN FILIAIS f WITH (NOLOCK) ON f.COD_FILIAL = vp.CODIGO_FILIAL
+        LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = vp.PRODUTO
+        WHERE ISNULL(vp.QTDE_CANCELADA, 0) = 0
           ${filialFilter}
-          ${collectionFilter}
+          ${colecao("vp")}
       `);
 
       const row = result.recordset[0];
@@ -811,10 +766,11 @@ export interface CollectionComparativeExtras {
 
 /**
  * Extras do Relatório Comparativo entre Coleções: série mensal de venda líquida
- * (varejo + e-com) e desconto concedido (canal físico). Reaproveita os MESMOS
- * filtros de filial/coleção/canal do `fetchCollectionReport` — mesma tabela,
- * mesmos joins e mesma fórmula de venda líquida. O e-commerce não separa
- * desconto na fonte (FATURAMENTO), então gross/desconto refletem só o físico.
+ * (varejo + e-com) e desconto concedido (canal físico). Usa a REGRA ÚNICA
+ * validada "com trocas" (mesma CTE de `fetchProdutoQtdePorFilial`): base
+ * LOJA_VENDA_PRODUTO com FATOR_DESCONTO_VENDA, deduzindo trocas de item e trocas
+ * puras (LOJA_VENDA_TROCA). O e-commerce não separa desconto na fonte
+ * (FATURAMENTO), então gross/desconto refletem só o físico.
  */
 export async function fetchCollectionComparativeExtras({
   company,
@@ -845,23 +801,97 @@ export async function fetchCollectionComparativeExtras({
 
     if (shouldIncludeSalesChannel(company, filial)) {
       const salesFilial = filial && filial !== VAREJO_VALUE ? filial : VAREJO_VALUE;
-      const filialFilter = await buildSalesFilialFilter(request, company, salesFilial, "extrasSales");
-      const collectionFilter = buildSalesCollectionFilter(request, normalizedCollections, "extrasSales");
+      const filialFilter = await buildSalesFilialFilter(request, company, salesFilial, "extrasSales", "f");
+      const colecao = prepColecaoFilter(request, normalizedCollections, "extrasSalesCol");
+      // CTE validada "com trocas" (espelha fetchProdutoQtdePorFilial), agregada por mês.
+      // gross/desconto vêm da base física (antes de troca); net abate trocas.
       const result = await request.query<{ y: number; m: number; net: number; gross: number; disc: number }>(`
-        SELECT
-          YEAR(vp.DATA_VENDA) AS y,
-          MONTH(vp.DATA_VENDA) AS m,
-          SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE vp.PRECO_LIQUIDO * vp.QTDE END) AS gross,
-          SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE (vp.PRECO_LIQUIDO * vp.QTDE) - ISNULL(vp.DESCONTO_VENDA, 0) END) AS net,
-          SUM(CASE WHEN vp.QTDE_CANCELADA > 0 THEN 0 ELSE ISNULL(vp.DESCONTO_VENDA, 0) END) AS disc
-        FROM W_CTB_LOJA_VENDA_PEDIDO_PRODUTO vp WITH (NOLOCK)
-        LEFT JOIN PRODUTOS p WITH (NOLOCK) ON vp.PRODUTO = p.PRODUTO
-        WHERE vp.DATA_VENDA >= @startDate
-          AND vp.DATA_VENDA < @endDate
-          AND vp.QTDE > 0
-          ${filialFilter}
-          ${collectionFilter}
-        GROUP BY YEAR(vp.DATA_VENDA), MONTH(vp.DATA_VENDA)
+        WITH vendas_base AS (
+          SELECT
+            vp.TICKET, vp.CODIGO_FILIAL, vp.PRODUTO, ISNULL(vp.COR_PRODUTO, '') AS COR_PRODUTO,
+            vp.TAMANHO, vp.QTDE, vp.PRECO_LIQUIDO, vp.DATA_VENDA,
+            CAST((vp.QTDE * vp.PRECO_LIQUIDO * ISNULL(vp.FATOR_DESCONTO_VENDA, 0)) AS DECIMAL(38,6)) AS DESCONTO_VENDA
+          FROM LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
+          INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+            ON v.CODIGO_FILIAL = vp.CODIGO_FILIAL AND v.TICKET = vp.TICKET
+          LEFT JOIN FILIAIS f WITH (NOLOCK) ON f.COD_FILIAL = vp.CODIGO_FILIAL
+          LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = vp.PRODUTO
+          WHERE vp.DATA_VENDA >= @startDate AND vp.DATA_VENDA < @endDate
+            AND ISNULL(vp.QTDE_CANCELADA, 0) = 0
+            ${filialFilter}
+            ${colecao("vp")}
+        ),
+        trocas_item AS (
+          SELECT
+            vt.TICKET, vt.CODIGO_FILIAL, vt.PRODUTO, ISNULL(vt.COR_PRODUTO, '') AS COR_PRODUTO, vt.TAMANHO,
+            SUM(vt.QTDE) AS QTDE_TROCA,
+            CAST(SUM(vt.PRECO_LIQUIDO * vt.QTDE) AS DECIMAL(38,6)) AS VALOR_TROCA
+          FROM LOJA_VENDA_TROCA vt WITH (NOLOCK)
+          INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+            ON v.CODIGO_FILIAL = vt.CODIGO_FILIAL AND v.TICKET = vt.TICKET
+          LEFT JOIN FILIAIS f WITH (NOLOCK) ON f.COD_FILIAL = vt.CODIGO_FILIAL
+          LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = vt.PRODUTO
+          WHERE vt.QTDE_CANCELADA = 0
+            AND v.DATA_VENDA >= @startDate AND v.DATA_VENDA < @endDate
+            ${filialFilter}
+            ${colecao("vt")}
+          GROUP BY vt.TICKET, vt.CODIGO_FILIAL, vt.PRODUTO, ISNULL(vt.COR_PRODUTO, ''), vt.TAMANHO
+        ),
+        TrocasPuras AS (
+          SELECT
+            v.DATA_VENDA,
+            CAST((0 - vt.PRECO_LIQUIDO * vt.QTDE) AS DECIMAL(38,6)) AS VALOR_LIQUIDO_CALC
+          FROM LOJA_VENDA_TROCA vt WITH (NOLOCK)
+          INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+            ON v.CODIGO_FILIAL = vt.CODIGO_FILIAL AND v.TICKET = vt.TICKET
+          LEFT JOIN FILIAIS f WITH (NOLOCK) ON f.COD_FILIAL = vt.CODIGO_FILIAL
+          LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = vt.PRODUTO
+          WHERE vt.QTDE_CANCELADA = 0
+            AND v.DATA_VENDA >= @startDate AND v.DATA_VENDA < @endDate
+            AND NOT EXISTS (
+              SELECT 1 FROM LOJA_VENDA_PRODUTO vp2 WITH (NOLOCK)
+              WHERE vp2.TICKET = vt.TICKET AND vp2.CODIGO_FILIAL = vt.CODIGO_FILIAL
+                AND vp2.PRODUTO = vt.PRODUTO AND ISNULL(vp2.COR_PRODUTO, '') = ISNULL(vt.COR_PRODUTO, '')
+                AND ISNULL(vp2.TAMANHO, 0) = ISNULL(vt.TAMANHO, 0)
+                AND ISNULL(vp2.QTDE_CANCELADA, 0) = 0
+            )
+            ${filialFilter}
+            ${colecao("vt")}
+        ),
+        VendasComNumero AS (
+          SELECT
+            vb.DATA_VENDA, vb.QTDE, vb.PRECO_LIQUIDO, vb.DESCONTO_VENDA, vb.TICKET, vb.CODIGO_FILIAL,
+            vb.PRODUTO, vb.COR_PRODUTO, vb.TAMANHO,
+            ROW_NUMBER() OVER (
+              PARTITION BY vb.TICKET, vb.CODIGO_FILIAL, vb.PRODUTO, vb.COR_PRODUTO, vb.TAMANHO
+              ORDER BY vb.TICKET, vb.CODIGO_FILIAL, vb.PRODUTO, vb.COR_PRODUTO, vb.TAMANHO
+            ) AS RN
+          FROM vendas_base vb
+        ),
+        movimentos AS (
+          SELECT
+            vcn.DATA_VENDA AS DT,
+            CAST(vcn.PRECO_LIQUIDO * vcn.QTDE AS DECIMAL(38,6)) AS GROSS,
+            vcn.DESCONTO_VENDA AS DISC,
+            CAST(
+              CAST(vcn.PRECO_LIQUIDO * vcn.QTDE AS DECIMAL(38,6))
+              - CAST(vcn.DESCONTO_VENDA AS DECIMAL(38,6))
+              - CAST(CASE WHEN vcn.RN = 1 THEN ISNULL(ti.VALOR_TROCA, 0) ELSE 0 END AS DECIMAL(38,6))
+            AS DECIMAL(38,6)) AS NET
+          FROM VendasComNumero vcn
+          LEFT JOIN trocas_item ti
+            ON ti.TICKET = vcn.TICKET AND ti.CODIGO_FILIAL = vcn.CODIGO_FILIAL
+            AND ti.PRODUTO = vcn.PRODUTO AND ti.COR_PRODUTO = vcn.COR_PRODUTO
+            AND ISNULL(ti.TAMANHO, 0) = ISNULL(vcn.TAMANHO, 0)
+          UNION ALL
+          SELECT tp.DATA_VENDA AS DT, CAST(0 AS DECIMAL(38,6)) AS GROSS,
+                 CAST(0 AS DECIMAL(38,6)) AS DISC, tp.VALOR_LIQUIDO_CALC AS NET
+          FROM TrocasPuras tp
+        )
+        SELECT YEAR(DT) AS y, MONTH(DT) AS m,
+               SUM(NET) AS net, SUM(GROSS) AS gross, SUM(DISC) AS disc
+        FROM movimentos
+        GROUP BY YEAR(DT), MONTH(DT)
       `);
       for (const row of result.recordset) {
         addMonthly(Number(row.y), Number(row.m), Number(row.net ?? 0));
