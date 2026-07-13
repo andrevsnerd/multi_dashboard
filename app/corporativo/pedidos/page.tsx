@@ -10,6 +10,7 @@ interface PedidoItem {
   descProduto: string;
   ean: string;
   corNome: string;
+  tamanho: string;
   quantidade: number;
   precoUnitario: number;
   subtotal: number;
@@ -213,13 +214,14 @@ export default function PedidosAdminPage() {
             <div className={styles.tableWrap} style={{ marginTop: 12 }}>
               <table className={styles.table}>
                 <thead>
-                  <tr><th>Produto</th><th>Cor</th><th>Qtd</th><th>Unit.</th><th>Total</th></tr>
+                  <tr><th>Produto</th><th>Cor</th><th>Tamanho</th><th>Qtd</th><th>Unit.</th><th>Total</th></tr>
                 </thead>
                 <tbody>
                   {aberto.itens.map((i, idx) => (
                     <tr key={idx}>
                       <td>{i.descProduto || i.produto}{i.ean ? <div className={styles.muted} style={{ fontSize: 11 }}>EAN {i.ean}</div> : null}</td>
                       <td>{i.corNome || "—"}</td>
+                      <td>{i.tamanho || "—"}</td>
                       <td>{i.quantidade}</td>
                       <td>{brl(i.precoUnitario)}</td>
                       <td>{brl(i.subtotal)}</td>

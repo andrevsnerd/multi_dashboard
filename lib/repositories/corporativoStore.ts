@@ -366,6 +366,7 @@ export interface PedidoItem {
   ean: string;
   cor: string;
   corNome: string;
+  tamanho: string;
   quantidade: number;
   precoUnitario: number;
   subtotal: number;

@@ -10,6 +10,7 @@ interface PedidoItem {
   produto: string;
   descProduto: string;
   corNome: string;
+  tamanho: string;
   quantidade: number;
   precoUnitario: number;
   subtotal: number;
@@ -77,7 +78,9 @@ export default function PedidoConfirmadoPage() {
               <div key={idx} className={styles.summaryRow} style={{ padding: "6px 0" }}>
                 <span>
                   {i.quantidade}× {i.descProduto || i.produto}
-                  {i.corNome ? ` (${i.corNome})` : ""}
+                  {i.corNome || i.tamanho
+                    ? ` (${[i.corNome, i.tamanho].filter(Boolean).join(" - ")})`
+                    : ""}
                 </span>
                 <span>{formatBRL(i.subtotal)}</span>
               </div>

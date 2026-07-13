@@ -57,6 +57,7 @@ export async function POST(request: Request) {
           ean: String(i.ean ?? ""),
           cor: String(i.cor ?? ""),
           corNome: String(i.corNome ?? ""),
+          tamanho: String(i.tamanho ?? ""),
           quantidade,
           precoUnitario,
           subtotal: Number((precoUnitario * quantidade).toFixed(2)),

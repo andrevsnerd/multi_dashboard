@@ -93,6 +93,7 @@ export default function CheckoutPage() {
           ean: i.ean,
           cor: i.cor,
           corNome: i.corNome,
+          tamanho: i.tamanho,
           quantidade: i.quantidade,
           precoUnitario: i.precoUnitario,
           subtotal: Number((i.precoUnitario * i.quantidade).toFixed(2)),
@@ -200,7 +201,7 @@ export default function CheckoutPage() {
             <h2 className={styles.sectionTitle}>🛍️ Itens do pedido</h2>
             <div className={styles.cartList}>
               {items.map((i) => (
-                <div key={`${i.produto} ${i.cor}`} className={styles.cartItem}>
+                <div key={`${i.produto} ${i.cor} ${i.tamanho}`} className={styles.cartItem}>
                   <div className={styles.cartThumb}>
                     {i.imagem ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -212,6 +213,7 @@ export default function CheckoutPage() {
                   <div className={styles.cartInfo}>
                     <span className={styles.cartName}>{i.descProduto || i.produto}</span>
                     {i.corNome && <span className={styles.cartMeta}>Cor: {i.corNome}</span>}
+                    {i.tamanho && <span className={styles.cartMeta}>Tamanho: {i.tamanho}</span>}
                     <span className={styles.cartUnit}>
                       {i.quantidade} × {formatBRL(i.precoUnitario)}
                     </span>

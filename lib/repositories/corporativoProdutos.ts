@@ -25,12 +25,21 @@ export interface ProdutoMeta {
   ean: string;
 }
 
+export interface ProdutoTamanhoLoja {
+  tamanho: string;
+  /** EAN da variação exata (produto × cor × tamanho). */
+  ean: string;
+}
+
 export interface ProdutoCorLoja {
   code: string;
   description: string;
   displayName: string;
-  /** EAN da variação (produto × cor), quando existe. */
+  /** EAN "fallback" da cor (menor entre todos os tamanhos) — usado quando o
+   * produto não tem grade de tamanho ou nenhum tamanho foi selecionado ainda. */
   ean: string;
+  /** Tamanhos disponíveis dessa cor, cada um com seu próprio EAN. Vazio = produto sem grade de tamanho. */
+  tamanhos: ProdutoTamanhoLoja[];
 }
 
 export interface ProdutoDetalheLoja extends ProdutoMeta {
@@ -173,15 +182,71 @@ async function fetchEanPorCor(produto: string): Promise<Map<string, string>> {
   });
 }
 
-/** Detalhe do produto para a página da loja: metadados + cores (com EAN por cor). */
+/**
+ * Tamanhos disponíveis por cor (produto × COR_PRODUTO × TAMANHO), cada um com
+ * o EAN exato da variação. Um mesmo produto×cor pode ter várias grades (P/M/G,
+ * numeração etc.) — o EAN muda a cada tamanho, não só a cada cor.
+ */
+async function fetchTamanhosPorCor(produto: string): Promise<Map<string, ProdutoTamanhoLoja[]>> {
+  const cod = String(produto ?? "").trim();
+  const map = new Map<string, ProdutoTamanhoLoja[]>();
+  if (!cod) return map;
+  return withRequest(async (request: sql.Request | RequestLike) => {
+    request.input("produto", sql.VarChar, cod);
+    const query = `
+      WITH ranked AS (
+        SELECT
+          ISNULL(pb.COR_PRODUTO, '') AS cor,
+          ISNULL(NULLIF(LTRIM(RTRIM(CONVERT(VARCHAR, pb.TAMANHO))), ''), '') AS tamanho,
+          LTRIM(RTRIM(pb.CODIGO_BARRA)) AS ean,
+          ROW_NUMBER() OVER (
+            PARTITION BY ISNULL(pb.COR_PRODUTO, ''), ISNULL(NULLIF(LTRIM(RTRIM(CONVERT(VARCHAR, pb.TAMANHO))), ''), '')
+            ORDER BY LEN(LTRIM(RTRIM(pb.CODIGO_BARRA))) ASC, pb.CODIGO_BARRA ASC
+          ) AS rn
+        FROM PRODUTOS_BARRA pb WITH (NOLOCK)
+        WHERE pb.PRODUTO = @produto
+          AND LTRIM(RTRIM(ISNULL(pb.CODIGO_BARRA, ''))) <> ''
+      )
+      SELECT cor, tamanho, ean FROM ranked WHERE rn = 1
+    `;
+    const result = await request.query<{ cor: string; tamanho: string; ean: string }>(query);
+    for (const row of result.recordset) {
+      const cor = (row.cor ?? "").trim();
+      const tamanho = (row.tamanho ?? "").trim();
+      const ean = (row.ean ?? "").trim();
+      // Barra sem tamanho definido (produto sem grade) não entra na lista de tamanhos —
+      // vira só o fallback via fetchEanPorCor.
+      if (!tamanho) continue;
+      const list = map.get(cor) ?? [];
+      list.push({ tamanho, ean });
+      map.set(cor, list);
+    }
+    for (const [cor, list] of map) {
+      list.sort((a, b) => {
+        const na = Number(a.tamanho);
+        const nb = Number(b.tamanho);
+        const aNum = a.tamanho !== "" && !Number.isNaN(na);
+        const bNum = b.tamanho !== "" && !Number.isNaN(nb);
+        if (aNum && bNum) return na - nb;
+        if (aNum !== bNum) return aNum ? -1 : 1;
+        return a.tamanho.localeCompare(b.tamanho);
+      });
+      map.set(cor, list);
+    }
+    return map;
+  });
+}
+
+/** Detalhe do produto para a página da loja: metadados + cores (com EAN por cor/tamanho). */
 export async function fetchProdutoDetalheLoja(produto: string): Promise<ProdutoDetalheLoja | null> {
   const cod = String(produto ?? "").trim();
   if (!cod) return null;
 
-  const [metaMap, cores, eanPorCor] = await Promise.all([
+  const [metaMap, cores, eanPorCor, tamanhosPorCor] = await Promise.all([
     fetchProdutosMeta([cod]),
     fetchProductAvailableColors(cod),
     fetchEanPorCor(cod),
+    fetchTamanhosPorCor(cod),
   ]);
 
   const meta = metaMap.get(cod);
@@ -192,6 +257,7 @@ export async function fetchProdutoDetalheLoja(produto: string): Promise<ProdutoD
     description: c.description,
     displayName: c.displayName,
     ean: eanPorCor.get(c.code) ?? "",
+    tamanhos: tamanhosPorCor.get(c.code) ?? [],
   }));
 
   return { ...meta, cores: coresLoja };

@@ -6,11 +6,16 @@ import { useEffect, useMemo, useState } from "react";
 import { useCart, formatBRL } from "../../CartContext";
 import styles from "../../loja.module.css";
 
+interface Tamanho {
+  tamanho: string;
+  ean: string;
+}
 interface Cor {
   code: string;
   description: string;
   displayName: string;
   ean: string;
+  tamanhos: Tamanho[];
 }
 interface ProdutoDetalhe {
   produto: string;
@@ -33,6 +38,7 @@ export default function ProdutoPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [corSel, setCorSel] = useState<string | null>(null);
+  const [tamanhoSel, setTamanhoSel] = useState<string | null>(null);
   const [qtd, setQtd] = useState(1);
   const [imgIdx, setImgIdx] = useState(0);
   const [added, setAdded] = useState(false);
@@ -66,6 +72,11 @@ export default function ProdutoPage() {
     [data, corSel]
   );
 
+  const tamanhoAtual = useMemo(
+    () => corAtual?.tamanhos.find((t) => t.tamanho === tamanhoSel) ?? null,
+    [corAtual, tamanhoSel]
+  );
+
   // Imagens exibidas: da cor selecionada (se houver) senão as gerais.
   const imagens = useMemo(() => {
     if (!data) return [];
@@ -75,18 +86,31 @@ export default function ProdutoPage() {
 
   useEffect(() => setImgIdx(0), [corSel]);
 
-  const eanExibido = corAtual?.ean || data?.ean || "";
+  // Tamanho é escopado por cor: ao trocar de cor, reseta (ou auto-seleciona se só há um).
+  useEffect(() => {
+    if (corAtual && corAtual.tamanhos.length === 1) {
+      setTamanhoSel(corAtual.tamanhos[0].tamanho);
+    } else {
+      setTamanhoSel(null);
+    }
+  }, [corAtual]);
+
+  // EAN muda por produto × cor × tamanho: prioriza a variação exata, cai para a cor, depois o produto.
+  const eanExibido = tamanhoAtual?.ean || corAtual?.ean || data?.ean || "";
   const precisaCor = (data?.cores.length ?? 0) > 0;
+  const precisaTamanho = (corAtual?.tamanhos.length ?? 0) > 0;
+  const podeAdicionar = (!precisaCor || !!corSel) && (!precisaTamanho || !!tamanhoSel);
 
   function handleAdd() {
     if (!data) return;
-    if (precisaCor && !corSel) return;
+    if (!podeAdicionar) return;
     addItem({
       produto: data.produto,
       descProduto: data.descProduto,
       ean: eanExibido,
       cor: corSel ?? "",
       corNome: corAtual?.displayName ?? "",
+      tamanho: tamanhoSel ?? "",
       precoUnitario: data.precoAtacado,
       quantidade: qtd,
       imagem: imagens[0] ?? null,
@@ -168,6 +192,25 @@ export default function ProdutoPage() {
               </div>
             )}
 
+            {precisaTamanho && corAtual && (
+              <div>
+                <div className={styles.fieldLabel}>
+                  Tamanho{tamanhoAtual ? `: ${tamanhoAtual.tamanho}` : ""}
+                </div>
+                <div className={styles.swatches}>
+                  {corAtual.tamanhos.map((t) => (
+                    <button
+                      key={t.tamanho}
+                      className={`${styles.swatch} ${tamanhoSel === t.tamanho ? styles.swatchActive : ""}`}
+                      onClick={() => setTamanhoSel(t.tamanho)}
+                    >
+                      {t.tamanho}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div>
               <div className={styles.fieldLabel}>Quantidade</div>
               <div className={styles.stepper}>
@@ -199,9 +242,13 @@ export default function ProdutoPage() {
               <button
                 className={`${styles.btn} ${styles.btnPrimary}`}
                 onClick={handleAdd}
-                disabled={precisaCor && !corSel}
+                disabled={!podeAdicionar}
               >
-                {precisaCor && !corSel ? "Selecione uma cor" : "Adicionar ao carrinho"}
+                {precisaCor && !corSel
+                  ? "Selecione uma cor"
+                  : precisaTamanho && !tamanhoSel
+                  ? "Selecione um tamanho"
+                  : "Adicionar ao carrinho"}
               </button>
               <Link href="/corporativo/loja/carrinho" className={styles.btn}>
                 Ver carrinho

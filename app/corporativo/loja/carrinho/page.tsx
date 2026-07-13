@@ -35,7 +35,7 @@ export default function CarrinhoPage() {
       <div className={styles.cartLayout}>
         <div className={styles.cartList}>
           {items.map((i) => (
-            <div key={`${i.produto} ${i.cor}`} className={styles.cartItem}>
+            <div key={`${i.produto} ${i.cor} ${i.tamanho}`} className={styles.cartItem}>
               <div className={styles.cartThumb}>
                 {i.imagem ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -47,19 +47,20 @@ export default function CarrinhoPage() {
               <div className={styles.cartInfo}>
                 <span className={styles.cartName}>{i.descProduto || i.produto}</span>
                 {i.corNome && <span className={styles.cartMeta}>Cor: {i.corNome}</span>}
+                {i.tamanho && <span className={styles.cartMeta}>Tamanho: {i.tamanho}</span>}
                 {i.ean && <span className={styles.cartMeta}>EAN {i.ean}</span>}
                 <span className={styles.cartUnit}>{formatBRL(i.precoUnitario)} / un.</span>
               </div>
               <div className={styles.cartRight}>
                 <div className={styles.stepperSm}>
-                  <button onClick={() => setQuantidade(i.produto, i.cor, i.quantidade - 1)}>−</button>
+                  <button onClick={() => setQuantidade(i.produto, i.cor, i.tamanho, i.quantidade - 1)}>−</button>
                   <span>{i.quantidade}</span>
-                  <button onClick={() => setQuantidade(i.produto, i.cor, i.quantidade + 1)}>+</button>
+                  <button onClick={() => setQuantidade(i.produto, i.cor, i.tamanho, i.quantidade + 1)}>+</button>
                 </div>
                 <span className={styles.cartLineTotal}>
                   {formatBRL(i.precoUnitario * i.quantidade)}
                 </span>
-                <button className={styles.removeBtn} onClick={() => removeItem(i.produto, i.cor)}>
+                <button className={styles.removeBtn} onClick={() => removeItem(i.produto, i.cor, i.tamanho)}>
                   Remover
                 </button>
               </div>
