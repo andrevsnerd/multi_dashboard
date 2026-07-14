@@ -64,6 +64,12 @@ interface ComparacaoProdutoItem {
   cor: string;
   corDescricao: string;
   descricao: string;
+  subgrupo: string | null;
+  grade: string | null;
+  descontinuado: boolean;
+  emTransito: boolean;
+  transitoQtd: number;
+  transitoData: string | null;
   qtdAnalisado: number;
   fatAnalisado: number;
   qtdComparacao: number;
@@ -105,6 +111,12 @@ interface RupturaItem {
   cor: string;
   corDescricao: string;
   descricao: string;
+  subgrupo: string | null;
+  grade: string | null;
+  descontinuado: boolean;
+  emTransito: boolean;
+  transitoQtd: number;
+  transitoData: string | null;
   qtdVendida: number;
   faturamento: number;
   estoqueLoja: number;
@@ -117,6 +129,12 @@ interface ProdutoVendaEstoqueItem {
   cor: string;
   corDescricao: string;
   descricao: string;
+  subgrupo: string | null;
+  grade: string | null;
+  descontinuado: boolean;
+  emTransito: boolean;
+  transitoQtd: number;
+  transitoData: string | null;
   qtdAntes: number;
   fatAntes: number;
   qtdDepois: number;
@@ -147,6 +165,49 @@ function fmtNum(value: number): string {
 function ymLabel(ym: string): string {
   const [ano, mes] = ym.split("-").map(Number);
   return `${MESES_ABREV[(mes || 1) - 1]}/${String(ano).slice(2)}`;
+}
+/** "2026-07-20" → "20/07". Vazio se inválido. */
+function shortDate(iso: string | null): string {
+  if (!iso) return "";
+  const [, m, d] = iso.split("-");
+  return m && d ? `${d}/${m}` : "";
+}
+
+/** Item que carrega os sinais de badge (descontinuado + trânsito). */
+interface BadgeInfo {
+  descontinuado: boolean;
+  emTransito: boolean;
+  transitoQtd: number;
+  transitoData: string | null;
+}
+
+/**
+ * Badges do produto: "Descontinuado" (sempre que marcado na tela Produtos
+ * Descontinuados) e "Em trânsito" (só onde `showTransito`, ex.: itens em ruptura —
+ * pra saber que já estão a caminho).
+ */
+function ProdBadges({ item, showTransito }: { item: BadgeInfo; showTransito?: boolean }) {
+  const transito = !!showTransito && item.emTransito;
+  if (!item.descontinuado && !transito) return null;
+  const transitoTitle = transito
+    ? `Compra em trânsito${item.transitoQtd > 0 ? ` · ${fmtNum(item.transitoQtd)} un` : ""}${
+        item.transitoData ? ` · chega ${shortDate(item.transitoData)}` : ""
+      }`
+    : undefined;
+  return (
+    <div className={styles.prodBadges}>
+      {item.descontinuado && (
+        <span className={`${styles.badge} ${styles.badgeDescontinuado}`}>Descontinuado</span>
+      )}
+      {transito && (
+        <span className={`${styles.badge} ${styles.badgeTransito}`} title={transitoTitle}>
+          Em trânsito
+          {item.transitoQtd > 0 ? ` +${fmtNum(item.transitoQtd)}` : ""}
+          {item.transitoData ? ` · ${shortDate(item.transitoData)}` : ""}
+        </span>
+      )}
+    </div>
+  );
 }
 
 /** Últimos 12 meses (inclui o atual), cronológico — para o seletor antes do fetch. */
@@ -336,6 +397,18 @@ export default function LojaRaioXPage({ companyKey }: Props) {
   const timeline = principal?.meses ?? null;
   const isRede = !filial;
   const hasEcommerce = (resolveCompany(companyKey)?.ecommerceFilials?.length ?? 0) > 0;
+  // ScarfMe exige subgrupo + grade em todo item de produto (grade só existe p/ scarfme).
+  const showGradeSubgrupo = companyKey === "scarfme";
+
+  // Está carregando ALGO relevante para a aba atual? (inclui recargas com dados na tela).
+  const busy =
+    tab === "principal"
+      ? principalLoading || comparacaoLoading
+      : tab === "produtos"
+        ? produtosEstoqueLoading
+        : tab === "vendedores"
+          ? vendedoresLoading
+          : rupturasLoading;
 
   const compararLabel =
     comparar === "auto"
@@ -373,6 +446,7 @@ export default function LojaRaioXPage({ companyKey }: Props) {
             {isRede ? "Rede — todas as lojas" : "loja selecionada"}
             {isRede && hasEcommerce ? " · varejo" : ""}
           </span>
+          <LoadingCue active={busy} />
         </div>
 
         <nav className={styles.tabs}>
@@ -420,6 +494,7 @@ export default function LojaRaioXPage({ companyKey }: Props) {
         </div>
       </header>
 
+      <div className={`${styles.content} ${busy ? styles.contentBusy : ""}`} aria-busy={busy}>
       {tab === "principal" && (
         <PrincipalTab
           data={principal}
@@ -430,6 +505,7 @@ export default function LojaRaioXPage({ companyKey }: Props) {
           comparacaoLoading={comparacaoLoading}
           isRede={isRede}
           hasEcommerce={hasEcommerce}
+          showGradeSubgrupo={showGradeSubgrupo}
           timeline={timeline}
           analyzedYm={mes}
           onSetAnalisado={setMes}
@@ -443,15 +519,37 @@ export default function LojaRaioXPage({ companyKey }: Props) {
           anLabel={principal?.janela.analisadoLabel ?? ymLabel(mes)}
           compLabel={principal?.janela.comparacaoLabel ?? principal?.comparacao?.label ?? ""}
           isRede={isRede}
+          showGradeSubgrupo={showGradeSubgrupo}
         />
       )}
       {tab === "vendedores" && (
         <VendedoresTab data={vendedores} loading={vendedoresLoading} analyzedYm={mes} />
       )}
       {tab === "rupturas" && (
-        <RupturasTab data={rupturas} loading={rupturasLoading} mesLabel={ymLabel(mes)} isRede={isRede} />
+        <RupturasTab
+          data={rupturas}
+          loading={rupturasLoading}
+          mesLabel={ymLabel(mes)}
+          isRede={isRede}
+          showGradeSubgrupo={showGradeSubgrupo}
+        />
       )}
+      </div>
     </div>
+  );
+}
+
+/** Cue de carregamento no cabeçalho — spinner + texto, some sem saltar layout. */
+function LoadingCue({ active }: { active: boolean }) {
+  return (
+    <span
+      className={`${styles.loadingCue} ${active ? styles.loadingCueActive : ""}`}
+      role="status"
+      aria-hidden={!active}
+    >
+      <span className={styles.spinner} aria-hidden="true" />
+      Carregando dados…
+    </span>
   );
 }
 
@@ -597,6 +695,7 @@ function PrincipalTab({
   comparacaoLoading,
   isRede,
   hasEcommerce,
+  showGradeSubgrupo,
   timeline,
   analyzedYm,
   onSetAnalisado,
@@ -610,6 +709,7 @@ function PrincipalTab({
   comparacaoLoading: boolean;
   isRede: boolean;
   hasEcommerce: boolean;
+  showGradeSubgrupo: boolean;
   timeline: MesMetric[] | null;
   analyzedYm: string;
   onSetAnalisado: (ym: string) => void;
@@ -763,6 +863,7 @@ function PrincipalTab({
             anLabel={anLabel}
             compLabel={compLabel}
             isRede={isRede}
+            showGradeSubgrupo={showGradeSubgrupo}
             onGoTab={onGoTab}
           />
 
@@ -833,6 +934,7 @@ function DiferencaProdutos({
   anLabel,
   compLabel,
   isRede,
+  showGradeSubgrupo,
   onGoTab,
 }: {
   data: ComparacaoData | null;
@@ -840,6 +942,7 @@ function DiferencaProdutos({
   anLabel: string;
   compLabel: string;
   isRede: boolean;
+  showGradeSubgrupo: boolean;
   onGoTab: (t: Tab) => void;
 }) {
   const [aberto, setAberto] = useState<Bucket | null>(null);
@@ -890,13 +993,13 @@ function DiferencaProdutos({
           </div>
 
           {aberto === "ruptura" && (
-            <ProdutoLista items={data.ruptura} total={data.rupturaCount} anLabel={anLabel} compLabel={compLabel} tipo="ruptura" isRede={isRede} onGoTab={onGoTab} />
+            <ProdutoLista items={data.ruptura} total={data.rupturaCount} anLabel={anLabel} compLabel={compLabel} tipo="ruptura" isRede={isRede} showGradeSubgrupo={showGradeSubgrupo} onGoTab={onGoTab} />
           )}
           {aberto === "tinhaEstoque" && (
-            <ProdutoLista items={data.tinhaEstoque} total={data.tinhaEstoqueCount} anLabel={anLabel} compLabel={compLabel} tipo="tinhaEstoque" isRede={isRede} onGoTab={onGoTab} />
+            <ProdutoLista items={data.tinhaEstoque} total={data.tinhaEstoqueCount} anLabel={anLabel} compLabel={compLabel} tipo="tinhaEstoque" isRede={isRede} showGradeSubgrupo={showGradeSubgrupo} onGoTab={onGoTab} />
           )}
           {aberto === "cresceu" && (
-            <ProdutoLista items={data.cresceu} total={data.cresceuCount} anLabel={anLabel} compLabel={compLabel} tipo="cresceu" isRede={isRede} onGoTab={onGoTab} />
+            <ProdutoLista items={data.cresceu} total={data.cresceuCount} anLabel={anLabel} compLabel={compLabel} tipo="cresceu" isRede={isRede} showGradeSubgrupo={showGradeSubgrupo} onGoTab={onGoTab} />
           )}
         </>
       )}
@@ -957,6 +1060,7 @@ function ProdutoLista({
   compLabel,
   tipo,
   isRede,
+  showGradeSubgrupo,
   onGoTab,
 }: {
   items: ComparacaoProdutoItem[];
@@ -965,6 +1069,7 @@ function ProdutoLista({
   compLabel: string;
   tipo: Bucket;
   isRede: boolean;
+  showGradeSubgrupo: boolean;
   onGoTab: (t: Tab) => void;
 }) {
   if (items.length === 0) return <div className={styles.empty}>Nenhum produto neste grupo.</div>;
@@ -980,6 +1085,8 @@ function ProdutoLista({
             <tr>
               <th>Produto</th>
               <th>Cor</th>
+              {showGradeSubgrupo && <th>Subgrupo</th>}
+              {showGradeSubgrupo && <th>Grade</th>}
               <th className={styles.num}>{compLabel}</th>
               <th className={styles.num}>{anLabel}</th>
               <th className={styles.num}>Diferença</th>
@@ -1002,8 +1109,11 @@ function ProdutoLista({
                   <td>
                     <div className={styles.prodDesc}>{p.descricao || p.produto}</div>
                     <div className={styles.prodId}>{p.produto}</div>
+                    <ProdBadges item={p} showTransito={tipo === "ruptura"} />
                   </td>
                   <td>{p.corDescricao || p.cor || "—"}</td>
+                  {showGradeSubgrupo && <td>{p.subgrupo || "—"}</td>}
+                  {showGradeSubgrupo && <td>{p.grade || "—"}</td>}
                   <td className={styles.num}>
                     <div>{fmtCurrency(p.fatComparacao)}</div>
                     <div className={styles.subQtd}>{fmtNum(p.qtdComparacao)} pç</div>
@@ -1195,12 +1305,14 @@ function ProdutosTab({
   anLabel,
   compLabel,
   isRede,
+  showGradeSubgrupo,
 }: {
   data: ProdutosEstoqueData | null;
   loading: boolean;
   anLabel: string;
   compLabel: string;
   isRede: boolean;
+  showGradeSubgrupo: boolean;
 }) {
   if (loading && !data) return <div className={styles.skeleton} style={{ height: 320 }} />;
   if (!data) return <div className={styles.empty}>Selecione um mês de comparação para ver os produtos.</div>;
@@ -1220,6 +1332,7 @@ function ProdutosTab({
         items={data.semEstoque}
         anLabel={anLabel}
         compLabel={compLabel}
+        showGradeSubgrupo={showGradeSubgrupo}
         warn
       />
       <ProdutoEstoqueSecao
@@ -1228,6 +1341,7 @@ function ProdutosTab({
         items={data.comEstoque}
         anLabel={anLabel}
         compLabel={compLabel}
+        showGradeSubgrupo={showGradeSubgrupo}
       />
     </div>
   );
@@ -1239,6 +1353,7 @@ function ProdutoEstoqueSecao({
   items,
   anLabel,
   compLabel,
+  showGradeSubgrupo,
   warn = false,
 }: {
   titulo: string;
@@ -1246,6 +1361,7 @@ function ProdutoEstoqueSecao({
   items: ProdutoVendaEstoqueItem[];
   anLabel: string;
   compLabel: string;
+  showGradeSubgrupo: boolean;
   warn?: boolean;
 }) {
   return (
@@ -1265,6 +1381,8 @@ function ProdutoEstoqueSecao({
               <tr>
                 <th>Produto</th>
                 <th>Cor</th>
+                {showGradeSubgrupo && <th>Subgrupo</th>}
+                {showGradeSubgrupo && <th>Grade</th>}
                 <th className={styles.num}>Vendas antes ({compLabel})</th>
                 <th className={styles.num}>Vendas depois ({anLabel})</th>
                 <th className={styles.num}>Estoque</th>
@@ -1281,8 +1399,11 @@ function ProdutoEstoqueSecao({
                     <td>
                       <div className={styles.prodDesc}>{p.descricao || p.produto}</div>
                       <div className={styles.prodId}>{p.produto}</div>
+                      <ProdBadges item={p} showTransito={warn} />
                     </td>
                     <td>{p.corDescricao || p.cor || "—"}</td>
+                    {showGradeSubgrupo && <td>{p.subgrupo || "—"}</td>}
+                    {showGradeSubgrupo && <td>{p.grade || "—"}</td>}
                     <td className={styles.num}>
                       <div>{fmtNum(p.qtdAntes)} pç</div>
                       <div className={styles.subQtd}>{fmtCurrency(p.fatAntes)}</div>
@@ -1311,11 +1432,13 @@ function RupturasTab({
   loading,
   mesLabel,
   isRede,
+  showGradeSubgrupo,
 }: {
   data: RupturaItem[] | null;
   loading: boolean;
   mesLabel: string;
   isRede: boolean;
+  showGradeSubgrupo: boolean;
 }) {
   const escopo = isRede ? "na rede" : "nesta loja";
   if (loading && !data) return <div className={styles.skeleton} style={{ height: 320 }} />;
@@ -1334,6 +1457,8 @@ function RupturasTab({
             <tr>
               <th>Produto</th>
               <th>Cor</th>
+              {showGradeSubgrupo && <th>Subgrupo</th>}
+              {showGradeSubgrupo && <th>Grade</th>}
               <th className={styles.num}>Vendeu</th>
               <th className={styles.num}>Faturou</th>
               <th className={styles.num}>Estoque {isRede ? "rede" : "loja"}</th>
@@ -1346,8 +1471,11 @@ function RupturasTab({
                 <td>
                   <div className={styles.prodDesc}>{r.descricao || r.produto}</div>
                   <div className={styles.prodId}>{r.produto}</div>
+                  <ProdBadges item={r} showTransito />
                 </td>
                 <td>{r.corDescricao || r.cor || "—"}</td>
+                {showGradeSubgrupo && <td>{r.subgrupo || "—"}</td>}
+                {showGradeSubgrupo && <td>{r.grade || "—"}</td>}
                 <td className={styles.num}>{fmtNum(r.qtdVendida)}</td>
                 <td className={`${styles.num} ${styles.fat}`}>{fmtCurrency(r.faturamento)}</td>
                 <td className={`${styles.num} ${styles.zero}`}>{r.estoqueLoja}</td>

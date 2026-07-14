@@ -19,12 +19,18 @@ import {
   getFilialLabelForDisplay,
   isEcommerceFilial,
   VAREJO_VALUE,
+  type CompanyKey,
 } from "@/lib/config/company";
 import { resolveCompanyLive, liveNameForIncoming } from "@/lib/server/company-live";
 import { withRequest } from "@/lib/db/connection";
 import type { RequestLike } from "@/lib/db/proxy";
 import { fetchProductsWithDetails } from "@/lib/repositories/products";
 import { fetchVendedoresList } from "@/lib/repositories/vendedores-v2";
+import { canonicalKey } from "@/lib/reports/keys";
+import { isCompraTransitoDateActive } from "@/lib/utils/compra-transito-status";
+import { listComprasTransitoFull } from "@/lib/utils/compra-transito-store";
+import { listProdutosDescontinuados } from "@/lib/utils/produto-descontinuado-store";
+import { buildDescontinuadoKeySet, isProdutoDescontinuado } from "@/lib/utils/produtos-descontinuados";
 import { shiftRangeByMonths, toUtcStartOfDay, type NormalizedRange } from "@/lib/utils/date";
 
 /** Intervalo [start, end) — end exclusivo, padrão do app. */
@@ -68,6 +74,14 @@ export interface RupturaItem {
   cor: string;
   corDescricao: string;
   descricao: string;
+  subgrupo: string | null;
+  grade: string | null;
+  /** Marcado como descontinuado na tela Produtos Descontinuados. */
+  descontinuado: boolean;
+  /** Já existe compra em trânsito ativa (a caminho) para este produto/cor. */
+  emTransito: boolean;
+  transitoQtd: number;
+  transitoData: string | null; // chegada mais próxima (YYYY-MM-DD)
   qtdVendida: number;
   faturamento: number;
   estoqueLoja: number; // <= 0 (é ruptura)
@@ -83,6 +97,12 @@ export interface ComparacaoProdutoItem {
   cor: string;
   corDescricao: string;
   descricao: string;
+  subgrupo: string | null;
+  grade: string | null;
+  descontinuado: boolean;
+  emTransito: boolean;
+  transitoQtd: number;
+  transitoData: string | null;
   qtdAnalisado: number;
   fatAnalisado: number;
   qtdComparacao: number;
@@ -126,6 +146,12 @@ export interface ProdutoVendaEstoqueItem {
   cor: string;
   corDescricao: string;
   descricao: string;
+  subgrupo: string | null;
+  grade: string | null;
+  descontinuado: boolean;
+  emTransito: boolean;
+  transitoQtd: number;
+  transitoData: string | null;
   /** Vendas no mês de referência (antes) — quantidade e faturamento. */
   qtdAntes: number;
   fatAntes: number;
@@ -242,6 +268,71 @@ function buildLinhaFilter(
  */
 function corKeyFromDesc(desc: string | null | undefined): string {
   return (desc ?? "").trim().toUpperCase();
+}
+
+// ── Descontinuado + trânsito (badges nos itens de produto) ───────────────────
+
+/** Set de chaves de produto descontinuado da empresa (tela Produtos Descontinuados). */
+async function loadDescontinuadoSet(company: string | undefined): Promise<Set<string>> {
+  if (!company) return new Set<string>();
+  try {
+    return buildDescontinuadoKeySet(await listProdutosDescontinuados(company as CompanyKey));
+  } catch {
+    return new Set<string>();
+  }
+}
+
+/** Quantidade a caminho + data de chegada mais próxima para um produto/cor. */
+export interface TransitoInfo {
+  quantidade: number;
+  dataRecebimento: string | null; // YYYY-MM-DD
+}
+
+/**
+ * Índice de compras EM TRÂNSITO ativas da empresa, para sinalizar que um produto em
+ * ruptura já está a caminho. Casa por produto×cor (canonicalKey, tolera zero à esquerda
+ * — ver [[cor-produto-formato-duas-fontes]]); compras sem cor caem num índice por produto
+ * (valem p/ qualquer cor daquele produto). Retorna um lookup (produto, cor) → info, ou null.
+ */
+async function loadTransitoLookup(
+  company: string | undefined
+): Promise<(produto: string, cor: string | null | undefined) => TransitoInfo | null> {
+  const byKey = new Map<string, TransitoInfo>();
+  const byProduto = new Map<string, TransitoInfo>();
+  if (!company) return () => null;
+
+  const merge = (m: Map<string, TransitoInfo>, k: string, qtd: number, data: string | null) => {
+    const cur = m.get(k);
+    if (!cur) {
+      m.set(k, { quantidade: qtd, dataRecebimento: data });
+      return;
+    }
+    cur.quantidade += qtd;
+    if (data && (!cur.dataRecebimento || data < cur.dataRecebimento)) cur.dataRecebimento = data;
+  };
+
+  try {
+    const compras = await listComprasTransitoFull(company).catch(() => []);
+    const today = new Date();
+    for (const c of compras) {
+      for (const it of c.items ?? []) {
+        if (!isCompraTransitoDateActive(it.dataRecebimento, today)) continue;
+        const qtd = Math.max(0, Math.round(Number(it.quantidade ?? 0)));
+        const data = (it.dataRecebimento ?? "").slice(0, 10) || null;
+        const cor = it.corProduto ?? null;
+        if (cor != null && String(cor).trim() !== "") {
+          merge(byKey, canonicalKey(it.produto, cor), qtd, data);
+        } else {
+          merge(byProduto, String(it.produto ?? "").trim(), qtd, data);
+        }
+      }
+    }
+  } catch {
+    /* trânsito indisponível — sem badge */
+  }
+
+  return (produto, cor) =>
+    byKey.get(canonicalKey(produto, cor)) ?? byProduto.get(String(produto ?? "").trim()) ?? null;
 }
 
 /** Lista dos últimos `n` meses (inclui o mês atual), em ordem cronológica. */
@@ -960,7 +1051,7 @@ export async function fetchRupturasLoja(params: {
 }): Promise<RupturaItem[]> {
   const { company, filial, range, linhas } = params;
 
-  const [produtos, cfg] = await Promise.all([
+  const [produtos, cfg, descSet, transito] = await Promise.all([
     fetchProductsWithDetails({
       company,
       range: { start: range.start, end: range.end },
@@ -969,6 +1060,8 @@ export async function fetchRupturasLoja(params: {
       linhas: linhas ?? undefined,
     }),
     resolveCompanyLive(company),
+    loadDescontinuadoSet(company),
+    loadTransitoLookup(company),
   ]);
 
   // Só os produtos em ruptura (vendeu no mês + zerado na loja).
@@ -1008,11 +1101,18 @@ export async function fetchRupturasLoja(params: {
         }
       }
       onde.sort((a, b) => b.estoque - a.estoque);
+      const t = transito(prod, p.corProduto);
       return {
         produto: prod,
         cor: (p.corProduto ?? "").trim(),
         corDescricao: (p.descCorProduto ?? "").trim(),
         descricao: (p.productName ?? "").trim(),
+        subgrupo: p.subgrupo ?? null,
+        grade: p.grade ?? null,
+        descontinuado: isProdutoDescontinuado(descSet, prod),
+        emTransito: !!t && t.quantidade > 0,
+        transitoQtd: t?.quantidade ?? 0,
+        transitoData: t?.dataRecebimento ?? null,
         qtdVendida: Math.round(p.totalQuantity ?? 0),
         faturamento: Math.round((p.totalRevenue ?? 0) * 100) / 100,
         estoqueLoja: Math.round(p.stock ?? 0),
@@ -1044,7 +1144,7 @@ export async function fetchComparacaoProdutosLoja(params: {
 }): Promise<ComparacaoProdutosResult> {
   const { company, filial, rangeAnalisado, rangeComparacao, linhas, limit = 100 } = params;
 
-  const [prodA, prodB] = await Promise.all([
+  const [prodA, prodB, descSet, transito] = await Promise.all([
     fetchProductsWithDetails({
       company,
       range: { start: rangeAnalisado.start, end: rangeAnalisado.end },
@@ -1059,6 +1159,8 @@ export async function fetchComparacaoProdutosLoja(params: {
       groupByColor: true,
       linhas: linhas ?? undefined,
     }),
+    loadDescontinuadoSet(company),
+    loadTransitoLookup(company),
   ]);
 
   interface Acc {
@@ -1066,6 +1168,8 @@ export async function fetchComparacaoProdutosLoja(params: {
     cor: string;
     corDescricao: string;
     descricao: string;
+    subgrupo: string | null;
+    grade: string | null;
     qtdA: number;
     fatA: number;
     qtdB: number;
@@ -1085,6 +1189,8 @@ export async function fetchComparacaoProdutosLoja(params: {
         cor: (p.corProduto ?? "").trim(),
         corDescricao: (p.descCorProduto ?? "").trim(),
         descricao: (p.productName ?? "").trim(),
+        subgrupo: p.subgrupo ?? null,
+        grade: p.grade ?? null,
         qtdA: 0,
         fatA: 0,
         qtdB: 0,
@@ -1097,6 +1203,8 @@ export async function fetchComparacaoProdutosLoja(params: {
     if (p.stock != null) e.estoqueLoja = Math.round(p.stock);
     if (!e.descricao && p.productName) e.descricao = p.productName.trim();
     if (!e.corDescricao && p.descCorProduto) e.corDescricao = p.descCorProduto.trim();
+    if (!e.subgrupo && p.subgrupo) e.subgrupo = p.subgrupo;
+    if (!e.grade && p.grade) e.grade = p.grade;
     if (which === "A") {
       e.qtdA = Math.round(p.totalQuantity ?? 0);
       e.fatA = Math.round((p.totalRevenue ?? 0) * 100) / 100;
@@ -1159,11 +1267,18 @@ export async function fetchComparacaoProdutosLoja(params: {
       situacao = "estavel";
     }
 
+    const t = transito(e.produto, e.cor);
     const item: ComparacaoProdutoItem = {
       produto: e.produto,
       cor: e.cor,
       corDescricao: e.corDescricao,
       descricao: e.descricao,
+      subgrupo: e.subgrupo,
+      grade: e.grade,
+      descontinuado: isProdutoDescontinuado(descSet, e.produto),
+      emTransito: !!t && t.quantidade > 0,
+      transitoQtd: t?.quantidade ?? 0,
+      transitoData: t?.dataRecebimento ?? null,
       qtdAnalisado: e.qtdA,
       fatAnalisado: e.fatA,
       qtdComparacao: e.qtdB,
@@ -1232,7 +1347,7 @@ export async function fetchProdutosVendaEstoque(params: {
 }): Promise<ProdutosVendaEstoqueResult> {
   const { company, filial, rangeAnalisado, rangeComparacao, linhas, limit = 300 } = params;
 
-  const [prodDepois, prodAntes] = await Promise.all([
+  const [prodDepois, prodAntes, descSet, transito] = await Promise.all([
     fetchProductsWithDetails({
       company,
       range: { start: rangeAnalisado.start, end: rangeAnalisado.end },
@@ -1247,6 +1362,8 @@ export async function fetchProdutosVendaEstoque(params: {
       groupByColor: true,
       linhas: linhas ?? undefined,
     }),
+    loadDescontinuadoSet(company),
+    loadTransitoLookup(company),
   ]);
 
   const diasDepois = Math.max(1, Math.round((rangeAnalisado.end.getTime() - rangeAnalisado.start.getTime()) / 86_400_000));
@@ -1257,6 +1374,8 @@ export async function fetchProdutosVendaEstoque(params: {
     cor: string;
     corDescricao: string;
     descricao: string;
+    subgrupo: string | null;
+    grade: string | null;
     qtdAntes: number;
     fatAntes: number;
     qtdDepois: number;
@@ -1276,6 +1395,8 @@ export async function fetchProdutosVendaEstoque(params: {
         cor: (p.corProduto ?? "").trim(),
         corDescricao: (p.descCorProduto ?? "").trim(),
         descricao: (p.productName ?? "").trim(),
+        subgrupo: p.subgrupo ?? null,
+        grade: p.grade ?? null,
         qtdAntes: 0,
         fatAntes: 0,
         qtdDepois: 0,
@@ -1287,6 +1408,8 @@ export async function fetchProdutosVendaEstoque(params: {
     if (p.stock != null) e.estoque = Math.round(p.stock);
     if (!e.descricao && p.productName) e.descricao = p.productName.trim();
     if (!e.corDescricao && p.descCorProduto) e.corDescricao = p.descCorProduto.trim();
+    if (!e.subgrupo && p.subgrupo) e.subgrupo = p.subgrupo;
+    if (!e.grade && p.grade) e.grade = p.grade;
     if (which === "antes") {
       e.qtdAntes = Math.round(p.totalQuantity ?? 0);
       e.fatAntes = Math.round((p.totalRevenue ?? 0) * 100) / 100;
@@ -1315,11 +1438,18 @@ export async function fetchProdutosVendaEstoque(params: {
     else if (rate > 0) acabaEmDias = Math.max(0, Math.round(e.estoque / rate));
     else acabaEmDias = null; // tem estoque mas sem giro
 
+    const t = transito(e.produto, e.cor);
     const item: ProdutoVendaEstoqueItem = {
       produto: e.produto,
       cor: e.cor,
       corDescricao: e.corDescricao,
       descricao: e.descricao,
+      subgrupo: e.subgrupo,
+      grade: e.grade,
+      descontinuado: isProdutoDescontinuado(descSet, e.produto),
+      emTransito: !!t && t.quantidade > 0,
+      transitoQtd: t?.quantidade ?? 0,
+      transitoData: t?.dataRecebimento ?? null,
       qtdAntes: e.qtdAntes,
       fatAntes: e.fatAntes,
       qtdDepois: e.qtdDepois,

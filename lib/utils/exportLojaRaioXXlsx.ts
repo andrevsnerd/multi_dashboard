@@ -43,6 +43,21 @@ function round2(v: number | null | undefined): number | "" {
   return Math.round(v * 100) / 100;
 }
 
+/** "2026-07-20" → "20/07". Vazio se inválido. */
+function shortDate(iso: string | null): string {
+  if (!iso) return "";
+  const [, m, d] = iso.split("-");
+  return m && d ? `${d}/${m}` : "";
+}
+
+/** Texto da célula "Em trânsito" para o item (vazio quando não há compra a caminho). */
+function transitoCell(item: { emTransito: boolean; transitoQtd: number; transitoData: string | null }): string {
+  if (!item.emTransito) return "";
+  const qtd = item.transitoQtd > 0 ? `+${item.transitoQtd} un` : "Sim";
+  const data = item.transitoData ? ` (${shortDate(item.transitoData)})` : "";
+  return `${qtd}${data}`;
+}
+
 // ── Tipos (espelham o payload de /api/loja-raio-x) ───────────────────────────
 
 interface MesMetric {
@@ -70,6 +85,12 @@ interface ComparacaoProdutoItem {
   cor: string;
   corDescricao: string;
   descricao: string;
+  subgrupo: string | null;
+  grade: string | null;
+  descontinuado: boolean;
+  emTransito: boolean;
+  transitoQtd: number;
+  transitoData: string | null;
   qtdAnalisado: number;
   fatAnalisado: number;
   qtdComparacao: number;
@@ -96,6 +117,12 @@ interface ProdutoVendaEstoqueItem {
   cor: string;
   corDescricao: string;
   descricao: string;
+  subgrupo: string | null;
+  grade: string | null;
+  descontinuado: boolean;
+  emTransito: boolean;
+  transitoQtd: number;
+  transitoData: string | null;
   qtdAntes: number;
   fatAntes: number;
   qtdDepois: number;
@@ -123,6 +150,12 @@ interface RupturaItem {
   cor: string;
   corDescricao: string;
   descricao: string;
+  subgrupo: string | null;
+  grade: string | null;
+  descontinuado: boolean;
+  emTransito: boolean;
+  transitoQtd: number;
+  transitoData: string | null;
   qtdVendida: number;
   faturamento: number;
   estoqueLoja: number;
@@ -197,6 +230,9 @@ export async function exportLojaRaioXXlsx(options: ExportLojaRaioXOptions): Prom
 
   const workbook = XLSX.utils.book_new();
   const escopoLabel = options.isRede ? "Rede (todas as lojas)" : (options.filialLabel ?? options.filial ?? "—");
+  // ScarfMe exige subgrupo + grade em todo item de produto (grade só existe p/ scarfme).
+  const showGradeSubgrupo = options.companyKey === "scarfme";
+  const gsHeaders = showGradeSubgrupo ? ["Subgrupo", "Grade"] : [];
 
   // ─── ABA: RESUMO ────────────────────────────────────────────────────────
   const { analyzed, comparacao: comparacaoMes, janela, decomposicao } = principal;
@@ -258,6 +294,7 @@ export async function exportLojaRaioXXlsx(options: ExportLojaRaioXOptions): Prom
       "Produto",
       "Descrição",
       "Cor",
+      ...gsHeaders,
       `Qtd (${compLabel})`,
       `Fat (${compLabel})`,
       `Qtd (${anLabel})`,
@@ -266,6 +303,8 @@ export async function exportLojaRaioXXlsx(options: ExportLojaRaioXOptions): Prom
       "Estoque no mês",
       "Estoque hoje",
       "Tem na rede",
+      "Descontinuado",
+      "Em trânsito",
     ];
     const rowsFor = (items: ComparacaoProdutoItem[], situacao: string) =>
       items.map((p) => [
@@ -273,6 +312,7 @@ export async function exportLojaRaioXXlsx(options: ExportLojaRaioXOptions): Prom
         p.produto,
         p.descricao || "",
         p.corDescricao || p.cor || "",
+        ...(showGradeSubgrupo ? [p.subgrupo || "", p.grade || ""] : []),
         p.qtdComparacao,
         round2(p.fatComparacao),
         p.qtdAnalisado,
@@ -281,6 +321,9 @@ export async function exportLojaRaioXXlsx(options: ExportLojaRaioXOptions): Prom
         p.estoqueFimMesAnalisado ?? p.estoqueLoja,
         p.estoqueLoja,
         p.temNaRede ? "Sim" : "Não",
+        p.descontinuado ? "Sim" : "Não",
+        // Trânsito só é relevante em ruptura (produto faltando, mas já a caminho).
+        situacao === "Faltou produto" ? transitoCell(p) : "",
       ]);
     const diffRows = [
       ...rowsFor(comparacao.ruptura, "Faltou produto"),
@@ -312,33 +355,40 @@ export async function exportLojaRaioXXlsx(options: ExportLojaRaioXOptions): Prom
       "Produto",
       "Descrição",
       "Cor",
+      ...gsHeaders,
       `Vendas antes (${compLabel})`,
       `Fat antes (${compLabel})`,
       `Vendas depois (${anLabel})`,
       `Fat depois (${anLabel})`,
       "Estoque",
       "Acaba em (dias)",
+      "Descontinuado",
+      "Em trânsito",
     ];
-    const rowsFor = (items: ProdutoVendaEstoqueItem[]) =>
+    // showTransito: só na seção SEM estoque (ruptura — o que já está a caminho importa).
+    const rowsFor = (items: ProdutoVendaEstoqueItem[], showTransito: boolean) =>
       items.map((p) => [
         p.produto,
         p.descricao || "",
         p.corDescricao || p.cor || "",
+        ...(showGradeSubgrupo ? [p.subgrupo || "", p.grade || ""] : []),
         p.qtdAntes,
         round2(p.fatAntes),
         p.qtdDepois,
         round2(p.fatDepois),
         p.estoque,
         p.acabaEmDias == null ? "sem giro" : p.acabaEmDias <= 0 ? "esgotado" : p.acabaEmDias,
+        p.descontinuado ? "Sim" : "Não",
+        showTransito ? transitoCell(p) : "",
       ]);
     const peAoa: (string | number)[][] = [
       [`PRODUTOS VENDIDOS SEM ESTOQUE — ${produtosEstoque.semEstoque.length}`],
       peHeaders,
-      ...rowsFor(produtosEstoque.semEstoque),
+      ...rowsFor(produtosEstoque.semEstoque, true),
       [],
       [`PRODUTOS VENDIDOS COM ESTOQUE — ${produtosEstoque.comEstoque.length}`],
       peHeaders,
-      ...rowsFor(produtosEstoque.comEstoque),
+      ...rowsFor(produtosEstoque.comEstoque, false),
     ];
     if (produtosEstoque.truncado) {
       peAoa.push([], ["Nota", "Lista truncada: mostrando os principais de cada grupo."]);
@@ -375,21 +425,27 @@ export async function exportLojaRaioXXlsx(options: ExportLojaRaioXOptions): Prom
     "Produto",
     "Descrição",
     "Cor",
+    ...gsHeaders,
     "Vendeu (qtd)",
     "Faturou (R$)",
     options.isRede ? "Estoque rede" : "Estoque loja",
     "Onde tem estoque",
+    "Descontinuado",
+    "Em trânsito",
   ];
   const rupRows = rupturas.map((r) => [
     r.produto,
     r.descricao || "",
     r.corDescricao || r.cor || "",
+    ...(showGradeSubgrupo ? [r.subgrupo || "", r.grade || ""] : []),
     r.qtdVendida,
     round2(r.faturamento),
     r.estoqueLoja,
     r.ondeTemEstoque.length === 0
       ? "Zerado em toda a rede"
       : r.ondeTemEstoque.map((f) => `${f.filial}: ${f.estoque}`).join("; "),
+    r.descontinuado ? "Sim" : "Não",
+    transitoCell(r),
   ]);
   const wsRup = XLSX.utils.aoa_to_sheet([[`${janela.analisadoLabel} — ${rupturas.length} produtos zerados`], rupHeaders, ...rupRows]);
   autoWidth(wsRup);

@@ -195,6 +195,44 @@
   100% { background-position: 0 0; }
 }
 
+/* Cue de carregando (cabeçalho) + dim do conteúdo em recarga */
+.loadingCue {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--t-500);
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  pointer-events: none;
+}
+.loadingCueActive {
+  opacity: 1;
+  transform: translateY(0);
+}
+.spinner {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border-radius: 50%;
+  border: 2px solid var(--b-200);
+  border-top-color: #2563eb;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.content {
+  transition: opacity 0.15s ease;
+}
+.contentBusy {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
 /* Menu de clique na barra da timeline */
 .menuOverlay {
   position: fixed;
@@ -541,6 +579,46 @@
   font-size: 11px;
   color: #bd7b7b;
   margin-top: 1px;
+}
+.prodBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.badgeDescontinuado {
+  background: #fef2f2;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+.badgeTransito {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
+  text-transform: none;
+}
+:global(:root[data-theme="dark"]) .badgeDescontinuado {
+  background: rgba(220, 38, 38, 0.14);
+  color: #fca5a5;
+  border-color: rgba(220, 38, 38, 0.4);
+}
+:global(:root[data-theme="dark"]) .badgeTransito {
+  background: rgba(5, 150, 105, 0.16);
+  color: #6ee7b7;
+  border-color: rgba(5, 150, 105, 0.45);
 }
 .vendedorNome {
   color: #2c7a7b;
