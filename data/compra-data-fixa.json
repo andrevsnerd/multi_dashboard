@@ -13804,9 +13804,9 @@
     },
     {
       "itemKey": "13.46.0448||03",
-      "dataCompra": "2026-08-11",
+      "dataCompra": "2026-07-28",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:09:39.620Z"
+      "updatedAt": "2026-07-14T18:39:12.391Z"
     },
     {
       "itemKey": "13.46.0442||86",
@@ -13822,9 +13822,9 @@
     },
     {
       "itemKey": "07.97.101||06",
-      "dataCompra": "2027-02-20",
+      "dataCompra": "2026-11-29",
       "transitoSig": "",
-      "updatedAt": "2026-06-26T18:17:59.225Z"
+      "updatedAt": "2026-07-14T18:39:28.788Z"
     },
     {
       "itemKey": "07.A1.00B3||13",
@@ -13834,15 +13834,15 @@
     },
     {
       "itemKey": "07.97.101||13",
-      "dataCompra": "2026-09-01",
+      "dataCompra": "2026-07-22",
       "transitoSig": "",
-      "updatedAt": "2026-06-26T18:17:59.225Z"
+      "updatedAt": "2026-07-14T18:39:12.391Z"
     },
     {
       "itemKey": "07.A1.00B3||06",
-      "dataCompra": "2026-07-30",
-      "transitoSig": "2026-06-12T15:27:26.644Z",
-      "updatedAt": "2026-06-26T18:17:59.225Z"
+      "dataCompra": "2026-08-31",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:12.391Z"
     },
     {
       "itemKey": "07.A5.01||A7",
@@ -13858,9 +13858,9 @@
     },
     {
       "itemKey": "13.71.0457||09",
-      "dataCompra": "2026-07-15",
+      "dataCompra": "2026-07-14",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:09:39.620Z"
+      "updatedAt": "2026-07-14T18:40:19.172Z"
     },
     {
       "itemKey": "07.06.0002||26",
@@ -13870,15 +13870,15 @@
     },
     {
       "itemKey": "13.46.0449||02",
-      "dataCompra": "2026-09-03",
+      "dataCompra": "2026-08-27",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:09:39.620Z"
+      "updatedAt": "2026-07-14T18:39:28.788Z"
     },
     {
       "itemKey": "07.06.0002||L8",
-      "dataCompra": "2026-08-09",
+      "dataCompra": "2026-07-18",
       "transitoSig": "",
-      "updatedAt": "2026-06-26T18:17:59.225Z"
+      "updatedAt": "2026-07-14T18:39:12.391Z"
     },
     {
       "itemKey": "07.A1.00B3||31",
@@ -13900,9 +13900,9 @@
     },
     {
       "itemKey": "13.46.0054||03",
-      "dataCompra": "2029-08-31",
+      "dataCompra": "2027-09-30",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:09:39.620Z"
+      "updatedAt": "2026-07-14T18:39:12.391Z"
     },
     {
       "itemKey": "07.97.0149||D9",
@@ -14074,9 +14074,9 @@
     },
     {
       "itemKey": "13.71.0593||04",
-      "dataCompra": "2026-07-25",
+      "dataCompra": "2026-07-14",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:09:56.783Z"
+      "updatedAt": "2026-07-14T18:39:12.391Z"
     },
     {
       "itemKey": "13.46.0069||C6",
@@ -14140,9 +14140,9 @@
     },
     {
       "itemKey": "13.71.0594||05",
-      "dataCompra": "2026-08-22",
+      "dataCompra": "2026-07-17",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:09:56.783Z"
+      "updatedAt": "2026-07-14T18:39:28.788Z"
     },
     {
       "itemKey": "13.71.0690||47",
@@ -14176,9 +14176,9 @@
     },
     {
       "itemKey": "13.46.263||151",
-      "dataCompra": "2026-07-28",
+      "dataCompra": "2026-07-14",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:09:56.783Z"
+      "updatedAt": "2026-07-14T18:41:55.459Z"
     },
     {
       "itemKey": "07.97.0149||22",
@@ -14212,15 +14212,15 @@
     },
     {
       "itemKey": "14.20.0071||109",
-      "dataCompra": "2026-08-07",
+      "dataCompra": "2026-07-14",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:09:56.783Z"
+      "updatedAt": "2026-07-14T18:40:02.367Z"
     },
     {
       "itemKey": "13.71.0624||04",
-      "dataCompra": "2026-10-13",
+      "dataCompra": "2026-10-02",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:09:56.783Z"
+      "updatedAt": "2026-07-14T18:40:34.820Z"
     },
     {
       "itemKey": "07.97.0151||L8",
@@ -14236,9 +14236,9 @@
     },
     {
       "itemKey": "13.82.0205||06",
-      "dataCompra": "2026-11-20",
+      "dataCompra": "2026-09-26",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:09:56.783Z"
+      "updatedAt": "2026-07-14T18:39:12.391Z"
     },
     {
       "itemKey": "13.71.0592||03",
@@ -14248,9 +14248,9 @@
     },
     {
       "itemKey": "07.06.0002||Q9",
-      "dataCompra": "2026-08-15",
+      "dataCompra": "2026-07-20",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:09:56.783Z"
+      "updatedAt": "2026-07-14T18:39:12.391Z"
     },
     {
       "itemKey": "13.47.0176||13",
@@ -14260,9 +14260,9 @@
     },
     {
       "itemKey": "13.46.0128||10",
-      "dataCompra": "2026-10-30",
+      "dataCompra": "2026-09-05",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:13.131Z"
+      "updatedAt": "2026-07-14T18:39:45.252Z"
     },
     {
       "itemKey": "14.20.0038||10",
@@ -14272,9 +14272,9 @@
     },
     {
       "itemKey": "13.46.0259||40",
-      "dataCompra": "2026-09-23",
+      "dataCompra": "2026-08-16",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:13.131Z"
+      "updatedAt": "2026-07-14T18:39:45.252Z"
     },
     {
       "itemKey": "13.B1.0071||40",
@@ -14308,15 +14308,15 @@
     },
     {
       "itemKey": "13.46.0138||151",
-      "dataCompra": "2026-09-10",
+      "dataCompra": "2026-07-14",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:13.131Z"
+      "updatedAt": "2026-07-14T18:39:28.788Z"
     },
     {
       "itemKey": "07.A1.00A7||28",
-      "dataCompra": "2028-01-09",
+      "dataCompra": "2026-07-14",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:13.131Z"
+      "updatedAt": "2026-07-14T18:42:43.870Z"
     },
     {
       "itemKey": "13.71.0656||13",
@@ -14338,9 +14338,9 @@
     },
     {
       "itemKey": "13.46.0343||03",
-      "dataCompra": "2026-10-19",
+      "dataCompra": "2026-10-11",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:13.131Z"
+      "updatedAt": "2026-07-14T18:39:45.252Z"
     },
     {
       "itemKey": "13.46.0129||10",
@@ -14362,9 +14362,9 @@
     },
     {
       "itemKey": "13.71.0651||151",
-      "dataCompra": "2026-10-23",
+      "dataCompra": "2026-08-15",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:13.131Z"
+      "updatedAt": "2026-07-14T18:39:45.252Z"
     },
     {
       "itemKey": "07.A1.00B3||14",
@@ -14398,9 +14398,9 @@
     },
     {
       "itemKey": "13.46.0263||10",
-      "dataCompra": "2030-04-28",
+      "dataCompra": "2028-07-26",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:13.131Z"
+      "updatedAt": "2026-07-14T18:40:02.367Z"
     },
     {
       "itemKey": "07.06.0002||22",
@@ -14446,9 +14446,9 @@
     },
     {
       "itemKey": "07.A1.00B5||42",
-      "dataCompra": "2026-09-05",
+      "dataCompra": "2026-07-26",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:13.131Z"
+      "updatedAt": "2026-07-14T18:40:02.367Z"
     },
     {
       "itemKey": "07.A1.00B3||34",
@@ -14464,9 +14464,9 @@
     },
     {
       "itemKey": "07.A1.00A7||14",
-      "dataCompra": "2026-07-23",
+      "dataCompra": "2026-07-14",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:13.131Z"
+      "updatedAt": "2026-07-14T18:41:07.029Z"
     },
     {
       "itemKey": "07.97.0155||09",
@@ -14482,9 +14482,9 @@
     },
     {
       "itemKey": "45.14.0042||10",
-      "dataCompra": "2026-12-18",
+      "dataCompra": "2026-10-10",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:13.131Z"
+      "updatedAt": "2026-07-14T18:40:02.367Z"
     },
     {
       "itemKey": "45.10.0020||40",
@@ -14494,9 +14494,9 @@
     },
     {
       "itemKey": "13.46.0156||H5",
-      "dataCompra": "2027-02-13",
+      "dataCompra": "2026-12-04",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:13.131Z"
+      "updatedAt": "2026-07-14T18:41:39.056Z"
     },
     {
       "itemKey": "96.03.0148||06",
@@ -14518,15 +14518,15 @@
     },
     {
       "itemKey": "45.10.0058||C6",
-      "dataCompra": "2027-03-22",
+      "dataCompra": "2027-02-09",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:28.534Z"
+      "updatedAt": "2026-07-14T18:39:12.391Z"
     },
     {
       "itemKey": "13.46.0086||03",
-      "dataCompra": "2026-08-30",
+      "dataCompra": "2026-07-14",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:28.534Z"
+      "updatedAt": "2026-07-14T18:40:02.367Z"
     },
     {
       "itemKey": "A3.43.0044||14",
@@ -14536,9 +14536,9 @@
     },
     {
       "itemKey": "13.46.0049||05",
-      "dataCompra": "2026-11-24",
+      "dataCompra": "2026-07-24",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:28.534Z"
+      "updatedAt": "2026-07-14T18:39:28.788Z"
     },
     {
       "itemKey": "13.71.0681||09",
@@ -14554,9 +14554,9 @@
     },
     {
       "itemKey": "07.A5.01||06",
-      "dataCompra": "2028-02-05",
+      "dataCompra": "2027-11-26",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:28.534Z"
+      "updatedAt": "2026-07-14T18:39:12.391Z"
     },
     {
       "itemKey": "07.97.0155||Z16",
@@ -14572,15 +14572,15 @@
     },
     {
       "itemKey": "13.71.0457||06",
-      "dataCompra": "2027-01-17",
+      "dataCompra": "2026-10-10",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:28.534Z"
+      "updatedAt": "2026-07-14T18:39:12.391Z"
     },
     {
       "itemKey": "45.10.0020||04",
-      "dataCompra": "2029-01-30",
+      "dataCompra": "2028-08-22",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:28.534Z"
+      "updatedAt": "2026-07-14T18:39:45.252Z"
     },
     {
       "itemKey": "13.46.0273||40",
@@ -14596,9 +14596,9 @@
     },
     {
       "itemKey": "13.46.0134||116",
-      "dataCompra": "2026-08-15",
+      "dataCompra": "2026-07-28",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:28.534Z"
+      "updatedAt": "2026-07-14T18:39:28.788Z"
     },
     {
       "itemKey": "13.71.0635||U9",
@@ -14632,9 +14632,9 @@
     },
     {
       "itemKey": "13.46.309||120",
-      "dataCompra": "2027-09-11",
+      "dataCompra": "2026-08-12",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:28.534Z"
+      "updatedAt": "2026-07-14T18:40:51.955Z"
     },
     {
       "itemKey": "13.47.0157||03",
@@ -14668,9 +14668,9 @@
     },
     {
       "itemKey": "13.46.0371||03",
-      "dataCompra": "2026-12-15",
+      "dataCompra": "2026-12-14",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:28.534Z"
+      "updatedAt": "2026-07-14T18:40:51.955Z"
     },
     {
       "itemKey": "13.46.0123||107",
@@ -14680,9 +14680,9 @@
     },
     {
       "itemKey": "13.46.0417||04",
-      "dataCompra": "2026-10-24",
+      "dataCompra": "2026-10-20",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:28.534Z"
+      "updatedAt": "2026-07-14T18:41:55.459Z"
     },
     {
       "itemKey": "13.71.0659||10",
@@ -14692,9 +14692,9 @@
     },
     {
       "itemKey": "07.97.0155||B4",
-      "dataCompra": "2026-07-15",
+      "dataCompra": "2026-07-14",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:28.534Z"
+      "updatedAt": "2026-07-14T18:39:45.252Z"
     },
     {
       "itemKey": "07.06.0002||104",
@@ -14704,9 +14704,9 @@
     },
     {
       "itemKey": "55.14.17||03",
-      "dataCompra": "2026-12-15",
+      "dataCompra": "2026-09-27",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:28.534Z"
+      "updatedAt": "2026-07-14T18:40:34.820Z"
     },
     {
       "itemKey": "07.97.0130||40",
@@ -14728,15 +14728,15 @@
     },
     {
       "itemKey": "96.03.0140||03",
-      "dataCompra": "2029-05-30",
+      "dataCompra": "2027-09-27",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:28.534Z"
+      "updatedAt": "2026-07-14T18:39:12.391Z"
     },
     {
       "itemKey": "13.46.0139||10",
-      "dataCompra": "2032-09-14",
+      "dataCompra": "2032-06-05",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:28.534Z"
+      "updatedAt": "2026-07-14T18:40:34.820Z"
     },
     {
       "itemKey": "13.71.0701||13",
@@ -14746,15 +14746,15 @@
     },
     {
       "itemKey": "85.03.0223||09",
-      "dataCompra": "2026-10-30",
+      "dataCompra": "2026-08-12",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:44.234Z"
+      "updatedAt": "2026-07-14T18:41:39.056Z"
     },
     {
       "itemKey": "07.A5.01||C9",
-      "dataCompra": "2026-08-14",
+      "dataCompra": "2026-07-14",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:44.234Z"
+      "updatedAt": "2026-07-14T18:39:28.788Z"
     },
     {
       "itemKey": "07.A5.01||31",
@@ -14788,9 +14788,9 @@
     },
     {
       "itemKey": "13.46.233||97",
-      "dataCompra": "2026-12-03",
+      "dataCompra": "2026-09-23",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:44.234Z"
+      "updatedAt": "2026-07-14T18:40:02.367Z"
     },
     {
       "itemKey": "45.10.0070||04",
@@ -14800,21 +14800,21 @@
     },
     {
       "itemKey": "13.B1.0071||05",
-      "dataCompra": "2026-08-10",
+      "dataCompra": "2026-08-06",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:44.234Z"
+      "updatedAt": "2026-07-14T18:41:55.459Z"
     },
     {
       "itemKey": "07.A5.01||47",
-      "dataCompra": "2027-11-07",
+      "dataCompra": "2027-04-30",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:44.234Z"
+      "updatedAt": "2026-07-14T18:40:19.172Z"
     },
     {
       "itemKey": "07.97.101||102",
-      "dataCompra": "2026-07-25",
+      "dataCompra": "2026-07-14",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:44.234Z"
+      "updatedAt": "2026-07-14T18:40:19.172Z"
     },
     {
       "itemKey": "45.10.0124||04",
@@ -14824,15 +14824,15 @@
     },
     {
       "itemKey": "13.46.397||04",
-      "dataCompra": "2026-10-16",
+      "dataCompra": "2026-09-23",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:44.234Z"
+      "updatedAt": "2026-07-14T18:41:22.781Z"
     },
     {
       "itemKey": "96.03.100||10",
-      "dataCompra": "2028-02-05",
+      "dataCompra": "2027-03-01",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:44.234Z"
+      "updatedAt": "2026-07-14T18:40:34.820Z"
     },
     {
       "itemKey": "96.03.0133||Y2",
@@ -14848,9 +14848,9 @@
     },
     {
       "itemKey": "14.09.199||C6",
-      "dataCompra": "2026-12-15",
+      "dataCompra": "2026-08-01",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:44.234Z"
+      "updatedAt": "2026-07-14T18:40:51.955Z"
     },
     {
       "itemKey": "07.97.101||44",
@@ -14860,15 +14860,15 @@
     },
     {
       "itemKey": "07.79.90||13",
-      "dataCompra": "2028-06-13",
+      "dataCompra": "2027-01-20",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:44.234Z"
+      "updatedAt": "2026-07-14T18:39:12.391Z"
     },
     {
       "itemKey": "13.46.0122||107",
-      "dataCompra": "2028-12-14",
+      "dataCompra": "2028-10-14",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:44.234Z"
+      "updatedAt": "2026-07-14T18:40:19.172Z"
     },
     {
       "itemKey": "13.67.0077||10",
@@ -14890,9 +14890,9 @@
     },
     {
       "itemKey": "13.46.0188||03",
-      "dataCompra": "2028-05-19",
+      "dataCompra": "2026-09-29",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:44.234Z"
+      "updatedAt": "2026-07-14T18:40:51.955Z"
     },
     {
       "itemKey": "07.97.101||05",
@@ -14920,9 +14920,9 @@
     },
     {
       "itemKey": "07.97.101||Z18",
-      "dataCompra": "2026-07-30",
+      "dataCompra": "2026-07-28",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:44.234Z"
+      "updatedAt": "2026-07-14T18:40:19.172Z"
     },
     {
       "itemKey": "07.97.114||03",
@@ -14944,9 +14944,9 @@
     },
     {
       "itemKey": "13.46.0067||C6",
-      "dataCompra": "2026-12-23",
+      "dataCompra": "2026-11-08",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:44.234Z"
+      "updatedAt": "2026-07-14T18:41:55.459Z"
     },
     {
       "itemKey": "13.71.0391||C6",
@@ -14962,9 +14962,9 @@
     },
     {
       "itemKey": "13.71.0614||107",
-      "dataCompra": "2026-11-02",
+      "dataCompra": "2026-09-17",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:44.234Z"
+      "updatedAt": "2026-07-14T18:40:51.955Z"
     },
     {
       "itemKey": "13.71.0662||03",
@@ -14974,9 +14974,9 @@
     },
     {
       "itemKey": "13.46.395||10",
-      "dataCompra": "2027-02-13",
+      "dataCompra": "2026-08-06",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:10:44.234Z"
+      "updatedAt": "2026-07-14T18:40:51.955Z"
     },
     {
       "itemKey": "13.46.0154||10",
@@ -14986,9 +14986,9 @@
     },
     {
       "itemKey": "13.B1.0088||H7",
-      "dataCompra": "2026-08-11",
+      "dataCompra": "2026-07-21",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:11:08.853Z"
+      "updatedAt": "2026-07-14T18:41:39.056Z"
     },
     {
       "itemKey": "07.97.0137||18",
@@ -15028,9 +15028,9 @@
     },
     {
       "itemKey": "13.B1.0071||09",
-      "dataCompra": "2026-08-21",
+      "dataCompra": "2026-07-24",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:11:08.853Z"
+      "updatedAt": "2026-07-14T18:40:34.820Z"
     },
     {
       "itemKey": "13.71.0677||06",
@@ -15064,9 +15064,9 @@
     },
     {
       "itemKey": "07.06.0002||20",
-      "dataCompra": "2028-02-06",
+      "dataCompra": "2028-01-28",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:11:08.853Z"
+      "updatedAt": "2026-07-14T18:39:45.252Z"
     },
     {
       "itemKey": "13.71.0607||03",
@@ -15088,9 +15088,9 @@
     },
     {
       "itemKey": "13.46.0246||72",
-      "dataCompra": "2026-08-07",
+      "dataCompra": "2026-07-14",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:11:08.853Z"
+      "updatedAt": "2026-07-14T18:39:45.252Z"
     },
     {
       "itemKey": "07.A1.00A7||71",
@@ -15106,15 +15106,15 @@
     },
     {
       "itemKey": "07.06.0002||B4",
-      "dataCompra": "2026-08-26",
+      "dataCompra": "2026-08-15",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:11:08.853Z"
+      "updatedAt": "2026-07-14T18:40:19.172Z"
     },
     {
       "itemKey": "13.B1.0071||06",
-      "dataCompra": "2026-08-17",
+      "dataCompra": "2026-07-31",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:11:08.853Z"
+      "updatedAt": "2026-07-14T18:39:45.252Z"
     },
     {
       "itemKey": "13.47.0156||03",
@@ -15136,9 +15136,9 @@
     },
     {
       "itemKey": "13.47.0073||10",
-      "dataCompra": "2026-12-12",
+      "dataCompra": "2026-08-16",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:11:08.853Z"
+      "updatedAt": "2026-07-14T18:39:12.391Z"
     },
     {
       "itemKey": "13.71.0663||04",
@@ -15154,9 +15154,9 @@
     },
     {
       "itemKey": "13.46.0232||03",
-      "dataCompra": "2026-12-15",
+      "dataCompra": "2026-10-05",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:11:08.853Z"
+      "updatedAt": "2026-07-14T18:40:34.820Z"
     },
     {
       "itemKey": "07.A1.00B3||30",
@@ -15190,9 +15190,9 @@
     },
     {
       "itemKey": "07.97.114||06",
-      "dataCompra": "2027-02-10",
+      "dataCompra": "2026-12-01",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:11:08.853Z"
+      "updatedAt": "2026-07-14T18:39:12.391Z"
     },
     {
       "itemKey": "13.46.0131||35",
@@ -15202,15 +15202,3183 @@
     },
     {
       "itemKey": "13.71.0583||20",
-      "dataCompra": "2026-09-13",
+      "dataCompra": "2026-07-24",
       "transitoSig": "",
-      "updatedAt": "2026-06-25T16:11:08.853Z"
+      "updatedAt": "2026-07-14T18:40:51.955Z"
     },
     {
       "itemKey": "13.46.0236||04",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:10.840Z"
+    },
+    {
+      "itemKey": "41.11.13||30",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:12.391Z"
+    },
+    {
+      "itemKey": "07.79.90||06",
+      "dataCompra": "2027-01-09",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:12.391Z"
+    },
+    {
+      "itemKey": "13.46.0455||03",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:12.391Z"
+    },
+    {
+      "itemKey": "07.A5.01||16",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:12.391Z"
+    },
+    {
+      "itemKey": "07.97.0161||13",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:12.391Z"
+    },
+    {
+      "itemKey": "07.97.0161||06",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:12.391Z"
+    },
+    {
+      "itemKey": "07.97.0163||13",
+      "dataCompra": "2027-01-30",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:12.391Z"
+    },
+    {
+      "itemKey": "41.11.13||09",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:12.391Z"
+    },
+    {
+      "itemKey": "07.79.90||40",
+      "dataCompra": "2026-09-22",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:12.391Z"
+    },
+    {
+      "itemKey": "07.97.0162||40",
+      "dataCompra": "2026-11-16",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:12.391Z"
+    },
+    {
+      "itemKey": "13.71.0698||03",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:12.391Z"
+    },
+    {
+      "itemKey": "07.79.90||H2",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:28.788Z"
+    },
+    {
+      "itemKey": "96.03.0146||03",
+      "dataCompra": "2027-03-01",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:28.788Z"
+    },
+    {
+      "itemKey": "07.79.90||42",
+      "dataCompra": "2026-09-02",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:28.788Z"
+    },
+    {
+      "itemKey": "07.97.101||155",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:28.788Z"
+    },
+    {
+      "itemKey": "96.03.0114||04",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:28.788Z"
+    },
+    {
+      "itemKey": "13.46.0130||13",
+      "dataCompra": "2026-08-30",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:28.788Z"
+    },
+    {
+      "itemKey": "13.71.0553||S3",
+      "dataCompra": "2026-07-31",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:28.788Z"
+    },
+    {
+      "itemKey": "41.11.13||14",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:28.788Z"
+    },
+    {
+      "itemKey": "13.82.0212||151",
+      "dataCompra": "2026-08-11",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:28.788Z"
+    },
+    {
+      "itemKey": "13.47.0165||03",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:28.788Z"
+    },
+    {
+      "itemKey": "13.71.199||H4",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:28.788Z"
+    },
+    {
+      "itemKey": "07.97.101||70",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:28.788Z"
+    },
+    {
+      "itemKey": "07.79.90||S1",
+      "dataCompra": "2027-06-29",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:28.788Z"
+    },
+    {
+      "itemKey": "13.71.150||05",
+      "dataCompra": "2026-11-04",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:28.788Z"
+    },
+    {
+      "itemKey": "13.46.0453||120",
+      "dataCompra": "2026-08-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:28.788Z"
+    },
+    {
+      "itemKey": "07.79.84||I2",
+      "dataCompra": "2026-09-26",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:45.252Z"
+    },
+    {
+      "itemKey": "97.94.134||01",
+      "dataCompra": "2027-09-09",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:45.252Z"
+    },
+    {
+      "itemKey": "96.03.86||40",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:45.252Z"
+    },
+    {
+      "itemKey": "45.10.0020||06",
+      "dataCompra": "2027-03-10",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:45.252Z"
+    },
+    {
+      "itemKey": "13.46.0147||03",
+      "dataCompra": "2028-05-27",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:45.252Z"
+    },
+    {
+      "itemKey": "13.46.0456||04",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:45.252Z"
+    },
+    {
+      "itemKey": "07.97.0161||40",
+      "dataCompra": "2027-01-30",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:45.252Z"
+    },
+    {
+      "itemKey": "55.14.18||03",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:45.252Z"
+    },
+    {
+      "itemKey": "13.46.0133||116",
+      "dataCompra": "2027-11-17",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:45.252Z"
+    },
+    {
+      "itemKey": "96.95.0132||10",
+      "dataCompra": "2026-10-12",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:45.252Z"
+    },
+    {
+      "itemKey": "13.46.0131||13",
+      "dataCompra": "2028-09-09",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:45.252Z"
+    },
+    {
+      "itemKey": "60.06.0007||03",
+      "dataCompra": "2030-10-11",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:45.252Z"
+    },
+    {
+      "itemKey": "14.20.0043||02",
+      "dataCompra": "2026-10-02",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:45.252Z"
+    },
+    {
+      "itemKey": "13.47.0163||179",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:45.252Z"
+    },
+    {
+      "itemKey": "13.46.0268||04",
+      "dataCompra": "2027-05-18",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:45.252Z"
+    },
+    {
+      "itemKey": "07.97.0162||94",
+      "dataCompra": "2027-11-26",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:39:45.252Z"
+    },
+    {
+      "itemKey": "07.97.0162||06",
+      "dataCompra": "2027-06-29",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:02.367Z"
+    },
+    {
+      "itemKey": "07.79.84||H4",
+      "dataCompra": "2026-12-19",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:02.367Z"
+    },
+    {
+      "itemKey": "13.47.0177||Y1",
+      "dataCompra": "2026-12-31",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:02.367Z"
+    },
+    {
+      "itemKey": "07.A1.00A7||18",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:02.367Z"
+    },
+    {
+      "itemKey": "13.46.77||10",
+      "dataCompra": "2026-12-11",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:02.367Z"
+    },
+    {
+      "itemKey": "14.20.0068||06",
+      "dataCompra": "2026-12-31",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:02.367Z"
+    },
+    {
+      "itemKey": "13.46.0299||18",
+      "dataCompra": "2026-08-11",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:02.367Z"
+    },
+    {
+      "itemKey": "13.47.0074||10",
+      "dataCompra": "2027-09-27",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:02.367Z"
+    },
+    {
+      "itemKey": "13.46.0453||G9",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:02.367Z"
+    },
+    {
+      "itemKey": "07.79.84||J9",
+      "dataCompra": "2026-11-16",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:02.367Z"
+    },
+    {
+      "itemKey": "13.71.0548||03",
+      "dataCompra": "2026-10-17",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:02.367Z"
+    },
+    {
+      "itemKey": "07.79.84||74",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:02.367Z"
+    },
+    {
+      "itemKey": "13.71.263||10",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:02.367Z"
+    },
+    {
+      "itemKey": "37.05.0006||28",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:02.367Z"
+    },
+    {
+      "itemKey": "13.B1.0070||09",
+      "dataCompra": "2026-08-21",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:02.367Z"
+    },
+    {
+      "itemKey": "41.11.13||08",
+      "dataCompra": "2026-11-01",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:02.367Z"
+    },
+    {
+      "itemKey": "07.79.90||102",
+      "dataCompra": "2026-07-22",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:02.367Z"
+    },
+    {
+      "itemKey": "13.46.229||03",
+      "dataCompra": "2026-11-21",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:02.367Z"
+    },
+    {
+      "itemKey": "07.79.90||05",
+      "dataCompra": "2026-10-25",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:02.367Z"
+    },
+    {
+      "itemKey": "07.79.90||37",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:02.367Z"
+    },
+    {
+      "itemKey": "13.46.0141||10",
+      "dataCompra": "2027-01-29",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:02.367Z"
+    },
+    {
+      "itemKey": "07.79.90||104",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:19.172Z"
+    },
+    {
+      "itemKey": "07.97.0162||09",
+      "dataCompra": "2027-11-26",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:19.172Z"
+    },
+    {
+      "itemKey": "97.94.139||107",
+      "dataCompra": "2026-11-01",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:19.172Z"
+    },
+    {
+      "itemKey": "45.10.0020||Y2",
+      "dataCompra": "2026-12-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:19.172Z"
+    },
+    {
+      "itemKey": "45.14.0105||107",
+      "dataCompra": "2027-06-17",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:19.172Z"
+    },
+    {
+      "itemKey": "13.82.0211||06",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:19.172Z"
+    },
+    {
+      "itemKey": "07.A5.01||B5",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:19.172Z"
+    },
+    {
+      "itemKey": "07.79.84||20",
+      "dataCompra": "2028-06-23",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:19.172Z"
+    },
+    {
+      "itemKey": "07.79.84||06",
+      "dataCompra": "2026-08-21",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:19.172Z"
+    },
+    {
+      "itemKey": "07.79.90||30",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:19.172Z"
+    },
+    {
+      "itemKey": "14.20.0058||120",
+      "dataCompra": "2026-09-02",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:19.172Z"
+    },
+    {
+      "itemKey": "13.46.0210||10",
+      "dataCompra": "2026-11-30",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:19.172Z"
+    },
+    {
+      "itemKey": "13.67.0069||10",
+      "dataCompra": "2027-02-02",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:19.172Z"
+    },
+    {
+      "itemKey": "14.15.64||C6",
+      "dataCompra": "2026-08-26",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:19.172Z"
+    },
+    {
+      "itemKey": "13.71.0578||04",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:19.172Z"
+    },
+    {
+      "itemKey": "41.11.13||L9",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:19.172Z"
+    },
+    {
+      "itemKey": "07.A1.00A7||35",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:19.172Z"
+    },
+    {
+      "itemKey": "13.46.0178||04",
+      "dataCompra": "2027-01-11",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:19.172Z"
+    },
+    {
+      "itemKey": "07.A1.00A7||05",
+      "dataCompra": "2026-07-22",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:19.172Z"
+    },
+    {
+      "itemKey": "13.71.0547||107",
+      "dataCompra": "2026-11-01",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:19.172Z"
+    },
+    {
+      "itemKey": "13.71.0670||05",
+      "dataCompra": "2027-01-30",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:19.172Z"
+    },
+    {
+      "itemKey": "13.46.0450||Y1",
+      "dataCompra": "2026-10-09",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:19.172Z"
+    },
+    {
+      "itemKey": "13.46.0286||20",
+      "dataCompra": "2033-06-30",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:19.172Z"
+    },
+    {
+      "itemKey": "13.46.0295||08",
+      "dataCompra": "2026-09-02",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:34.820Z"
+    },
+    {
+      "itemKey": "07.A5.01||L8",
+      "dataCompra": "2026-08-03",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:34.820Z"
+    },
+    {
+      "itemKey": "07.A5.01||12",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:34.820Z"
+    },
+    {
+      "itemKey": "07.79.84||Z10",
+      "dataCompra": "2027-03-31",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:34.820Z"
+    },
+    {
+      "itemKey": "41.11.13||05",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:34.820Z"
+    },
+    {
+      "itemKey": "41.11.13||19",
+      "dataCompra": "2026-10-02",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:34.820Z"
+    },
+    {
+      "itemKey": "13.46.0273||05",
+      "dataCompra": "2026-09-02",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:34.820Z"
+    },
+    {
+      "itemKey": "45.14.0072||05",
+      "dataCompra": "2027-10-30",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:34.820Z"
+    },
+    {
+      "itemKey": "14.09.0230||41",
+      "dataCompra": "2027-07-17",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:34.820Z"
+    },
+    {
+      "itemKey": "45.10.094||38",
+      "dataCompra": "2026-11-21",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:34.820Z"
+    },
+    {
+      "itemKey": "96.95.0134||10",
+      "dataCompra": "2026-11-01",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:34.820Z"
+    },
+    {
+      "itemKey": "13.71.0617||04",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:34.820Z"
+    },
+    {
+      "itemKey": "13.71.0631||06",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:34.820Z"
+    },
+    {
+      "itemKey": "13.71.0622||04",
+      "dataCompra": "2026-11-01",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:34.820Z"
+    },
+    {
+      "itemKey": "45.10.0107||08",
+      "dataCompra": "2027-11-26",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:34.820Z"
+    },
+    {
+      "itemKey": "07.A1.00B3||28",
+      "dataCompra": "2027-11-29",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:34.820Z"
+    },
+    {
+      "itemKey": "07.A1.00B3||42",
+      "dataCompra": "2026-09-28",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:34.820Z"
+    },
+    {
+      "itemKey": "07.06.0002||44",
+      "dataCompra": "2027-08-01",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:34.820Z"
+    },
+    {
+      "itemKey": "07.80.0085||22",
+      "dataCompra": "2028-06-18",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:34.820Z"
+    },
+    {
+      "itemKey": "13.46.298||10",
+      "dataCompra": "2027-02-12",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:34.820Z"
+    },
+    {
+      "itemKey": "13.46.0454||120",
+      "dataCompra": "2026-09-23",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:34.820Z"
+    },
+    {
+      "itemKey": "45.05.10||01",
+      "dataCompra": "2027-11-05",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:34.820Z"
+    },
+    {
+      "itemKey": "28.07.0130||C1",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:34.820Z"
+    },
+    {
+      "itemKey": "13.B1.0091||09",
+      "dataCompra": "2026-10-29",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:34.820Z"
+    },
+    {
+      "itemKey": "13.46.88||11",
+      "dataCompra": "2027-04-03",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:34.820Z"
+    },
+    {
+      "itemKey": "41.11.13||J1",
+      "dataCompra": "2027-04-30",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:34.820Z"
+    },
+    {
+      "itemKey": "13.B1.0070||03",
+      "dataCompra": "2026-11-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:34.820Z"
+    },
+    {
+      "itemKey": "28.05.0113||04",
+      "dataCompra": "2026-12-04",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:34.820Z"
+    },
+    {
+      "itemKey": "07.79.90||41",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:51.955Z"
+    },
+    {
+      "itemKey": "13.46.0295||Y2",
+      "dataCompra": "2026-12-04",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:51.955Z"
+    },
+    {
+      "itemKey": "14.09.0231||13",
+      "dataCompra": "2027-06-02",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:51.955Z"
+    },
+    {
+      "itemKey": "14.04.0031||06",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:51.955Z"
+    },
+    {
+      "itemKey": "55.14.96||10",
+      "dataCompra": "2028-06-16",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:51.955Z"
+    },
+    {
+      "itemKey": "13.46.81||40",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:51.955Z"
+    },
+    {
+      "itemKey": "13.B1.0087||28",
+      "dataCompra": "2026-09-05",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:51.955Z"
+    },
+    {
+      "itemKey": "13.46.0307||09",
+      "dataCompra": "2026-10-16",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:51.955Z"
+    },
+    {
+      "itemKey": "13.46.0140||10",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:51.955Z"
+    },
+    {
+      "itemKey": "96.95.0138||47",
+      "dataCompra": "2027-04-10",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:51.955Z"
+    },
+    {
+      "itemKey": "13.46.0374||38",
+      "dataCompra": "2026-12-22",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:51.955Z"
+    },
+    {
+      "itemKey": "13.46.0457||11",
+      "dataCompra": "2026-08-16",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:51.955Z"
+    },
+    {
+      "itemKey": "13.46.0344||03",
+      "dataCompra": "2026-12-04",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:51.955Z"
+    },
+    {
+      "itemKey": "13.B2.00B5||06",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:51.955Z"
+    },
+    {
+      "itemKey": "14.09.0242||09",
+      "dataCompra": "2027-02-02",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:51.955Z"
+    },
+    {
+      "itemKey": "45.14.651||03",
+      "dataCompra": "2029-09-19",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:51.955Z"
+    },
+    {
+      "itemKey": "45.14.0082||05",
+      "dataCompra": "2027-11-05",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:51.955Z"
+    },
+    {
+      "itemKey": "14.09.0234||02",
+      "dataCompra": "2026-07-22",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:51.955Z"
+    },
+    {
+      "itemKey": "13.46.0133||03",
+      "dataCompra": "2027-06-22",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:51.955Z"
+    },
+    {
+      "itemKey": "45.14.652||03",
+      "dataCompra": "2028-07-11",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:51.955Z"
+    },
+    {
+      "itemKey": "13.71.0572||151",
+      "dataCompra": "2026-09-02",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:51.955Z"
+    },
+    {
+      "itemKey": "07.06.0002||30",
+      "dataCompra": "2026-12-30",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:51.955Z"
+    },
+    {
+      "itemKey": "13.46.0453||107",
+      "dataCompra": "2026-11-10",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:51.955Z"
+    },
+    {
+      "itemKey": "13.67.0089||10",
+      "dataCompra": "2027-04-03",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:51.955Z"
+    },
+    {
+      "itemKey": "13.47.0092||11",
+      "dataCompra": "2027-04-10",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:51.955Z"
+    },
+    {
+      "itemKey": "45.14.0058||U9",
+      "dataCompra": "2026-12-23",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:40:51.955Z"
+    },
+    {
+      "itemKey": "13.46.0177||10",
+      "dataCompra": "2026-12-28",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:07.029Z"
+    },
+    {
+      "itemKey": "14.09.0212||35",
+      "dataCompra": "2026-12-16",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:07.029Z"
+    },
+    {
+      "itemKey": "45.14.0100||151",
+      "dataCompra": "2027-03-01",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:07.029Z"
+    },
+    {
+      "itemKey": "13.B1.0071||31",
+      "dataCompra": "2026-08-22",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:07.029Z"
+    },
+    {
+      "itemKey": "45.14.646||110",
+      "dataCompra": "2027-01-27",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:07.029Z"
+    },
+    {
+      "itemKey": "13.46.242||89",
+      "dataCompra": "2026-10-25",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:07.029Z"
+    },
+    {
+      "itemKey": "13.B1.0092||109",
+      "dataCompra": "2027-07-02",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:07.029Z"
+    },
+    {
+      "itemKey": "45.14.594||110",
+      "dataCompra": "2028-01-16",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:07.029Z"
+    },
+    {
+      "itemKey": "13.B2.00B9||04",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:07.029Z"
+    },
+    {
+      "itemKey": "13.71.0541||C9",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:07.029Z"
+    },
+    {
+      "itemKey": "13.47.0122||116",
+      "dataCompra": "2026-07-19",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:07.029Z"
+    },
+    {
+      "itemKey": "07.79.84||04",
+      "dataCompra": "2027-01-30",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:07.029Z"
+    },
+    {
+      "itemKey": "13.47.48||06",
+      "dataCompra": "2026-12-01",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:07.029Z"
+    },
+    {
+      "itemKey": "13.47.0129||04",
+      "dataCompra": "2026-11-01",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:07.029Z"
+    },
+    {
+      "itemKey": "07.79.84||28",
+      "dataCompra": "2027-01-30",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:07.029Z"
+    },
+    {
+      "itemKey": "13.71.0536||151",
+      "dataCompra": "2026-08-13",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:07.029Z"
+    },
+    {
+      "itemKey": "13.47.0140||120",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:07.029Z"
+    },
+    {
+      "itemKey": "13.47.0146||22",
+      "dataCompra": "2026-09-22",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:07.029Z"
+    },
+    {
+      "itemKey": "13.46.0458||11",
+      "dataCompra": "2026-08-24",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:07.029Z"
+    },
+    {
+      "itemKey": "45.14.0045||11",
+      "dataCompra": "2029-05-02",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:07.029Z"
+    },
+    {
+      "itemKey": "13.71.0448||H2",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:07.029Z"
+    },
+    {
+      "itemKey": "13.71.0609||37",
+      "dataCompra": "2027-04-30",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:07.029Z"
+    },
+    {
+      "itemKey": "13.46.0390||151",
+      "dataCompra": "2026-11-21",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:07.029Z"
+    },
+    {
+      "itemKey": "13.71.0541||13",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:07.029Z"
+    },
+    {
+      "itemKey": "14.09.0203||10",
+      "dataCompra": "2026-08-21",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:07.029Z"
+    },
+    {
+      "itemKey": "45.14.0070||03",
+      "dataCompra": "2027-02-27",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:07.029Z"
+    },
+    {
+      "itemKey": "07.79.90||14",
+      "dataCompra": "2026-07-24",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:07.029Z"
+    },
+    {
+      "itemKey": "13.B2.00C0||03",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:07.029Z"
+    },
+    {
+      "itemKey": "13.B2.00C1||03",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:07.029Z"
+    },
+    {
+      "itemKey": "07.06.0002||B3",
+      "dataCompra": "2027-01-21",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:07.029Z"
+    },
+    {
+      "itemKey": "85.04.65||05",
+      "dataCompra": "2026-12-11",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:22.781Z"
+    },
+    {
+      "itemKey": "45.14.0055||10",
+      "dataCompra": "2026-08-06",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:22.781Z"
+    },
+    {
+      "itemKey": "13.71.0582||09",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:22.781Z"
+    },
+    {
+      "itemKey": "07.A1.00B3||A7",
+      "dataCompra": "2027-03-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:22.781Z"
+    },
+    {
+      "itemKey": "13.46.0454||G9",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:22.781Z"
+    },
+    {
+      "itemKey": "45.10.0125||86",
+      "dataCompra": "2026-09-02",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:22.781Z"
+    },
+    {
+      "itemKey": "97.94.0164||120",
+      "dataCompra": "2028-06-23",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:22.781Z"
+    },
+    {
+      "itemKey": "97.94.136||C6",
+      "dataCompra": "2027-03-16",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:22.781Z"
+    },
+    {
+      "itemKey": "97.94.141||10",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:22.781Z"
+    },
+    {
+      "itemKey": "13.46.0328||08",
+      "dataCompra": "2026-08-06",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:22.781Z"
+    },
+    {
+      "itemKey": "45.14.0051||13",
+      "dataCompra": "2028-08-22",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:22.781Z"
+    },
+    {
+      "itemKey": "13.67.0101||10",
+      "dataCompra": "2026-10-29",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:22.781Z"
+    },
+    {
+      "itemKey": "13.71.0219||11",
+      "dataCompra": "2026-10-12",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:22.781Z"
+    },
+    {
+      "itemKey": "45.10.0062||89",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:22.781Z"
+    },
+    {
+      "itemKey": "13.71.0578||13",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:22.781Z"
+    },
+    {
+      "itemKey": "45.10.0020||38",
+      "dataCompra": "2026-11-01",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:22.781Z"
+    },
+    {
+      "itemKey": "45.10.0020||44",
+      "dataCompra": "2026-09-02",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:22.781Z"
+    },
+    {
+      "itemKey": "13.71.0702||13",
+      "dataCompra": "2027-09-21",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:22.781Z"
+    },
+    {
+      "itemKey": "13.71.0700||03",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:22.781Z"
+    },
+    {
+      "itemKey": "13.46.399||10",
+      "dataCompra": "2027-01-11",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:22.781Z"
+    },
+    {
+      "itemKey": "07.79.84||J8",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:22.781Z"
+    },
+    {
+      "itemKey": "07.79.84||L8",
+      "dataCompra": "2027-01-30",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:22.781Z"
+    },
+    {
+      "itemKey": "07.79.84||30",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:22.781Z"
+    },
+    {
+      "itemKey": "13.46.288||10",
+      "dataCompra": "2026-11-17",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:22.781Z"
+    },
+    {
+      "itemKey": "13.46.0056||03",
+      "dataCompra": "2026-08-06",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:22.781Z"
+    },
+    {
+      "itemKey": "13.46.0373||37",
+      "dataCompra": "2026-12-10",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:22.781Z"
+    },
+    {
+      "itemKey": "13.67.0086||05",
+      "dataCompra": "2027-04-03",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:22.781Z"
+    },
+    {
+      "itemKey": "28.05.0116||04",
+      "dataCompra": "2026-09-13",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:22.781Z"
+    },
+    {
+      "itemKey": "13.46.0144||05",
+      "dataCompra": "2026-08-03",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:22.781Z"
+    },
+    {
+      "itemKey": "13.46.0266||20",
+      "dataCompra": "2027-05-24",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:22.781Z"
+    },
+    {
+      "itemKey": "45.10.0020||47",
+      "dataCompra": "2026-09-02",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:22.781Z"
+    },
+    {
+      "itemKey": "45.10.0121||38",
+      "dataCompra": "2026-07-24",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:22.781Z"
+    },
+    {
+      "itemKey": "13.71.0603||151",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:22.781Z"
+    },
+    {
+      "itemKey": "85.03.0249||03",
+      "dataCompra": "2026-07-27",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:39.056Z"
+    },
+    {
+      "itemKey": "85.03.0194||35",
+      "dataCompra": "2026-09-06",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:39.056Z"
+    },
+    {
+      "itemKey": "13.B1.0071||03",
+      "dataCompra": "2026-08-11",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:39.056Z"
+    },
+    {
+      "itemKey": "13.46.0414||06",
+      "dataCompra": "2027-02-12",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:39.056Z"
+    },
+    {
+      "itemKey": "13.82.0131||10",
+      "dataCompra": "2026-12-31",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:39.056Z"
+    },
+    {
+      "itemKey": "13.82.0137||06",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:39.056Z"
+    },
+    {
+      "itemKey": "13.71.0602||08",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:39.056Z"
+    },
+    {
+      "itemKey": "13.46.0450||107",
       "dataCompra": "2026-08-05",
       "transitoSig": "",
-      "updatedAt": "2026-06-26T17:20:46.690Z"
+      "updatedAt": "2026-07-14T18:41:39.056Z"
+    },
+    {
+      "itemKey": "13.46.0132||03",
+      "dataCompra": "2027-08-22",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:39.056Z"
+    },
+    {
+      "itemKey": "13.71.0638||C9",
+      "dataCompra": "2027-03-18",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:39.056Z"
+    },
+    {
+      "itemKey": "85.03.0248||04",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:39.056Z"
+    },
+    {
+      "itemKey": "85.04.72||107",
+      "dataCompra": "2026-08-03",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:39.056Z"
+    },
+    {
+      "itemKey": "13.71.0570||08",
+      "dataCompra": "2027-01-20",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:39.056Z"
+    },
+    {
+      "itemKey": "13.46.0063||03",
+      "dataCompra": "2027-04-03",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:39.056Z"
+    },
+    {
+      "itemKey": "13.46.0161||10",
+      "dataCompra": "2026-12-16",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:39.056Z"
+    },
+    {
+      "itemKey": "13.46.0147||06",
+      "dataCompra": "2027-06-25",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:39.056Z"
+    },
+    {
+      "itemKey": "13.46.0109||10",
+      "dataCompra": "2026-08-06",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:39.056Z"
+    },
+    {
+      "itemKey": "45.14.0085||20",
+      "dataCompra": "2026-12-17",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:39.056Z"
+    },
+    {
+      "itemKey": "45.14.508||10",
+      "dataCompra": "2029-09-19",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:39.056Z"
+    },
+    {
+      "itemKey": "45.14.0036||C6",
+      "dataCompra": "2026-08-11",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:39.056Z"
+    },
+    {
+      "itemKey": "45.14.539||10",
+      "dataCompra": "2028-09-09",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:39.056Z"
+    },
+    {
+      "itemKey": "45.14.0106||G4",
+      "dataCompra": "2031-11-08",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:39.056Z"
+    },
+    {
+      "itemKey": "28.05.0117||04",
+      "dataCompra": "2026-10-31",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:39.056Z"
+    },
+    {
+      "itemKey": "13.46.0306||09",
+      "dataCompra": "2027-02-15",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:39.056Z"
+    },
+    {
+      "itemKey": "13.50.0097||04",
+      "dataCompra": "2026-12-24",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:39.056Z"
+    },
+    {
+      "itemKey": "07.06.0002||40",
+      "dataCompra": "2027-02-02",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:39.056Z"
+    },
+    {
+      "itemKey": "97.02.0039||04",
+      "dataCompra": "2026-11-01",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:39.056Z"
+    },
+    {
+      "itemKey": "97.94.0147||10",
+      "dataCompra": "2028-05-24",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:39.056Z"
+    },
+    {
+      "itemKey": "97.94.0148||47",
+      "dataCompra": "2028-02-24",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:39.056Z"
+    },
+    {
+      "itemKey": "97.94.142||05",
+      "dataCompra": "2026-09-02",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:39.056Z"
+    },
+    {
+      "itemKey": "13.46.0267||08",
+      "dataCompra": "2027-01-18",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:39.056Z"
+    },
+    {
+      "itemKey": "45.10.0107||107",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:39.056Z"
+    },
+    {
+      "itemKey": "07.06.0002||41",
+      "dataCompra": "2027-02-02",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:39.056Z"
+    },
+    {
+      "itemKey": "45.10.122||20",
+      "dataCompra": "2026-09-02",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:39.056Z"
+    },
+    {
+      "itemKey": "13.71.0691||47",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:55.459Z"
+    },
+    {
+      "itemKey": "13.46.0151||47",
+      "dataCompra": "2026-10-13",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:55.459Z"
+    },
+    {
+      "itemKey": "45.14.0081||28",
+      "dataCompra": "2027-02-02",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:55.459Z"
+    },
+    {
+      "itemKey": "45.14.637||04",
+      "dataCompra": "2027-02-26",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:55.459Z"
+    },
+    {
+      "itemKey": "45.14.0035||C6",
+      "dataCompra": "2027-01-13",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:55.459Z"
+    },
+    {
+      "itemKey": "13.46.0147||42",
+      "dataCompra": "2026-12-29",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:55.459Z"
+    },
+    {
+      "itemKey": "14.09.0258||03",
+      "dataCompra": "2027-01-03",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:55.459Z"
+    },
+    {
+      "itemKey": "13.46.0308||09",
+      "dataCompra": "2027-06-02",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:55.459Z"
+    },
+    {
+      "itemKey": "Y1.02.0374||04",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:55.459Z"
+    },
+    {
+      "itemKey": "13.71.0637||04",
+      "dataCompra": "2027-05-26",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:55.459Z"
+    },
+    {
+      "itemKey": "13.71.0486||05",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:55.459Z"
+    },
+    {
+      "itemKey": "13.46.0401||03",
+      "dataCompra": "2026-07-17",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:55.459Z"
+    },
+    {
+      "itemKey": "45.14.0069||05",
+      "dataCompra": "2033-05-01",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:55.459Z"
+    },
+    {
+      "itemKey": "45.14.642||11",
+      "dataCompra": "2026-07-17",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:55.459Z"
+    },
+    {
+      "itemKey": "13.46.0314||89",
+      "dataCompra": "2026-07-18",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:55.459Z"
+    },
+    {
+      "itemKey": "07.06.0002||34",
+      "dataCompra": "2028-04-23",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:55.459Z"
+    },
+    {
+      "itemKey": "45.14.0067||03",
+      "dataCompra": "2033-05-01",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:55.459Z"
+    },
+    {
+      "itemKey": "07.79.90||07",
+      "dataCompra": "2027-05-11",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:55.459Z"
+    },
+    {
+      "itemKey": "07.79.90||B7",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:55.459Z"
+    },
+    {
+      "itemKey": "07.79.90||C8",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:55.459Z"
+    },
+    {
+      "itemKey": "07.79.90||L5",
+      "dataCompra": "2026-11-01",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:55.459Z"
+    },
+    {
+      "itemKey": "07.79.90||44",
+      "dataCompra": "2026-11-01",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:55.459Z"
+    },
+    {
+      "itemKey": "85.04.0113||13",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:55.459Z"
+    },
+    {
+      "itemKey": "07.06.0002||C8",
+      "dataCompra": "2026-12-13",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:55.459Z"
+    },
+    {
+      "itemKey": "07.06.0002||18",
+      "dataCompra": "2026-11-09",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:55.459Z"
+    },
+    {
+      "itemKey": "13.46.0287||20",
+      "dataCompra": "2027-06-20",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:55.459Z"
+    },
+    {
+      "itemKey": "07.79.84||40",
+      "dataCompra": "2026-12-31",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:55.459Z"
+    },
+    {
+      "itemKey": "07.79.84||S2",
+      "dataCompra": "2026-09-02",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:55.459Z"
+    },
+    {
+      "itemKey": "14.09.0236||Y1",
+      "dataCompra": "2026-08-26",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:55.459Z"
+    },
+    {
+      "itemKey": "14.09.150||06",
+      "dataCompra": "2028-02-27",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:41:55.459Z"
+    },
+    {
+      "itemKey": "14.09.0254||03",
+      "dataCompra": "2027-05-03",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:10.840Z"
+    },
+    {
+      "itemKey": "13.46.0311||07",
+      "dataCompra": "2026-11-06",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:10.840Z"
+    },
+    {
+      "itemKey": "14.09.0229||18",
+      "dataCompra": "2028-09-24",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:10.840Z"
+    },
+    {
+      "itemKey": "13.46.0434||11",
+      "dataCompra": "2026-09-24",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:10.840Z"
+    },
+    {
+      "itemKey": "85.03.0200||107",
+      "dataCompra": "2026-09-03",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:10.840Z"
+    },
+    {
+      "itemKey": "07.06.0002||M3",
+      "dataCompra": "2027-12-07",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:10.840Z"
+    },
+    {
+      "itemKey": "13.B1.0071||13",
+      "dataCompra": "2026-11-08",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:10.840Z"
+    },
+    {
+      "itemKey": "85.04.0098||04",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:10.840Z"
+    },
+    {
+      "itemKey": "13.46.0234||90",
+      "dataCompra": "2027-04-18",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:10.840Z"
+    },
+    {
+      "itemKey": "13.46.0355||05",
+      "dataCompra": "2026-08-02",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:10.840Z"
+    },
+    {
+      "itemKey": "16.70.0103||41",
+      "dataCompra": "2026-12-31",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:10.840Z"
+    },
+    {
+      "itemKey": "23.86.0034||41",
+      "dataCompra": "2026-12-31",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:10.840Z"
+    },
+    {
+      "itemKey": "13.46.0130||35",
+      "dataCompra": "2027-05-26",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:10.840Z"
+    },
+    {
+      "itemKey": "14.15.0080||13",
+      "dataCompra": "2027-10-20",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:10.840Z"
+    },
+    {
+      "itemKey": "14.09.0245||22",
+      "dataCompra": "2026-12-04",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:10.840Z"
+    },
+    {
+      "itemKey": "13.46.0452||20",
+      "dataCompra": "2026-10-04",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:10.840Z"
+    },
+    {
+      "itemKey": "97.94.0156||11",
+      "dataCompra": "2026-09-19",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:10.840Z"
+    },
+    {
+      "itemKey": "14.09.0249||38",
+      "dataCompra": "2027-06-02",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:10.840Z"
+    },
+    {
+      "itemKey": "14.15.42||08",
+      "dataCompra": "2026-11-04",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:10.840Z"
+    },
+    {
+      "itemKey": "13.46.263||10",
+      "dataCompra": "2027-01-03",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:10.840Z"
+    },
+    {
+      "itemKey": "45.14.0039||107",
+      "dataCompra": "2031-03-13",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:10.840Z"
+    },
+    {
+      "itemKey": "85.03.0207||03",
+      "dataCompra": "2026-10-07",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:10.840Z"
+    },
+    {
+      "itemKey": "85.03.140||112",
+      "dataCompra": "2026-07-27",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:10.840Z"
+    },
+    {
+      "itemKey": "14.09.0210||90",
+      "dataCompra": "2027-02-02",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:10.840Z"
+    },
+    {
+      "itemKey": "14.09.0211||107",
+      "dataCompra": "2029-05-22",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:10.840Z"
+    },
+    {
+      "itemKey": "14.09.170||10",
+      "dataCompra": "2027-10-30",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:10.840Z"
+    },
+    {
+      "itemKey": "85.03.0208||116",
+      "dataCompra": "2026-07-19",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:10.840Z"
+    },
+    {
+      "itemKey": "07.A1.00B3||121",
+      "dataCompra": "2027-03-19",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:10.840Z"
+    },
+    {
+      "itemKey": "07.A1.00A7||06",
+      "dataCompra": "2026-09-11",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:10.840Z"
+    },
+    {
+      "itemKey": "07.A1.00B3||03",
+      "dataCompra": "2027-04-03",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:10.840Z"
+    },
+    {
+      "itemKey": "07.A1.00B3||40",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:10.840Z"
+    },
+    {
+      "itemKey": "13.46.0348||22",
+      "dataCompra": "2027-01-07",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:10.840Z"
+    },
+    {
+      "itemKey": "28.10.0002||06",
+      "dataCompra": "2027-09-02",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:10.840Z"
+    },
+    {
+      "itemKey": "13.46.0346||05",
+      "dataCompra": "2028-05-16",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:10.840Z"
+    },
+    {
+      "itemKey": "07.79.90||99",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:10.840Z"
+    },
+    {
+      "itemKey": "14.15.61||08",
+      "dataCompra": "2026-12-04",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:29.215Z"
+    },
+    {
+      "itemKey": "14.09.0224||120",
+      "dataCompra": "2027-08-01",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:29.215Z"
+    },
+    {
+      "itemKey": "07.50.56||C6",
+      "dataCompra": "2030-11-13",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:29.215Z"
+    },
+    {
+      "itemKey": "85.03.0222||18",
+      "dataCompra": "2026-08-19",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:29.215Z"
+    },
+    {
+      "itemKey": "13.46.229||20",
+      "dataCompra": "2037-02-09",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:29.215Z"
+    },
+    {
+      "itemKey": "13.71.0581||09",
+      "dataCompra": "2026-12-23",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:29.215Z"
+    },
+    {
+      "itemKey": "13.46.0097||09",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:29.215Z"
+    },
+    {
+      "itemKey": "07.79.90||B2",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:29.215Z"
+    },
+    {
+      "itemKey": "13.46.96||10",
+      "dataCompra": "2027-02-28",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:29.215Z"
+    },
+    {
+      "itemKey": "14.15.65||10",
+      "dataCompra": "2026-09-23",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:29.215Z"
+    },
+    {
+      "itemKey": "14.09.191||03",
+      "dataCompra": "2027-02-02",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:29.215Z"
+    },
+    {
+      "itemKey": "14.15.0081||40",
+      "dataCompra": "2028-03-28",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:29.215Z"
+    },
+    {
+      "itemKey": "07.A1.00B5||Z11",
+      "dataCompra": "2027-02-28",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:29.215Z"
+    },
+    {
+      "itemKey": "13.67.0076||10",
+      "dataCompra": "2026-10-05",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:29.215Z"
+    },
+    {
+      "itemKey": "13.46.0345||05",
+      "dataCompra": "2027-12-11",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:29.215Z"
+    },
+    {
+      "itemKey": "17.05.0007||08",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:29.215Z"
+    },
+    {
+      "itemKey": "16.70.0105||03",
+      "dataCompra": "2026-10-05",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:29.215Z"
+    },
+    {
+      "itemKey": "13.46.0354||04",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:29.215Z"
+    },
+    {
+      "itemKey": "79.01.0002||10",
+      "dataCompra": "2027-07-20",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:29.215Z"
+    },
+    {
+      "itemKey": "13.46.229||47",
+      "dataCompra": "2027-06-02",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:29.215Z"
+    },
+    {
+      "itemKey": "85.03.0201||U9",
+      "dataCompra": "2033-01-31",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:29.215Z"
+    },
+    {
+      "itemKey": "13.46.197||20",
+      "dataCompra": "2027-09-30",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:29.215Z"
+    },
+    {
+      "itemKey": "13.B1.0089||09",
+      "dataCompra": "2027-03-04",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:29.215Z"
+    },
+    {
+      "itemKey": "13.02.0516||10",
+      "dataCompra": "2037-03-21",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:29.215Z"
+    },
+    {
+      "itemKey": "13.71.0191||35",
+      "dataCompra": "2028-02-24",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:29.215Z"
+    },
+    {
+      "itemKey": "13.46.0295||18",
+      "dataCompra": "2027-02-22",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:29.215Z"
+    },
+    {
+      "itemKey": "28.07.0132||C1",
+      "dataCompra": "2027-09-30",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:29.215Z"
+    },
+    {
+      "itemKey": "13.46.0286||23",
+      "dataCompra": "2026-08-06",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:29.215Z"
+    },
+    {
+      "itemKey": "13.50.0151||22",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:29.215Z"
+    },
+    {
+      "itemKey": "13.46.0313||86",
+      "dataCompra": "2027-02-10",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:29.215Z"
+    },
+    {
+      "itemKey": "13.46.0155||10",
+      "dataCompra": "2027-05-21",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:29.215Z"
+    },
+    {
+      "itemKey": "07.A1.00A7||03",
+      "dataCompra": "2026-08-26",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:29.215Z"
+    },
+    {
+      "itemKey": "13.B1.0071||04",
+      "dataCompra": "2026-12-04",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:29.215Z"
+    },
+    {
+      "itemKey": "13.46.0119||90",
+      "dataCompra": "2029-12-08",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:29.215Z"
+    },
+    {
+      "itemKey": "13.B1.0071||47",
+      "dataCompra": "2027-11-29",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:29.215Z"
+    },
+    {
+      "itemKey": "28.05.0115||04",
+      "dataCompra": "2026-08-16",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:29.215Z"
+    },
+    {
+      "itemKey": "13.46.0176||10",
+      "dataCompra": "2027-04-03",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:43.870Z"
+    },
+    {
+      "itemKey": "13.46.0068||C6",
+      "dataCompra": "2031-06-15",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:43.870Z"
+    },
+    {
+      "itemKey": "45.14.0052||10",
+      "dataCompra": "2027-02-28",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:43.870Z"
+    },
+    {
+      "itemKey": "45.14.0104||03",
+      "dataCompra": "2035-12-17",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:43.870Z"
+    },
+    {
+      "itemKey": "45.14.0042||151",
+      "dataCompra": "2027-07-10",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:43.870Z"
+    },
+    {
+      "itemKey": "07.06.0002||21",
+      "dataCompra": "2027-05-23",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:43.870Z"
+    },
+    {
+      "itemKey": "45.14.0076||09",
+      "dataCompra": "2027-09-18",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:43.870Z"
+    },
+    {
+      "itemKey": "07.80.0085||40",
+      "dataCompra": "2028-12-06",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:43.870Z"
+    },
+    {
+      "itemKey": "45.14.0107||04",
+      "dataCompra": "2029-08-30",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:43.870Z"
+    },
+    {
+      "itemKey": "07.06.0002||31",
+      "dataCompra": "2028-02-10",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:43.870Z"
+    },
+    {
+      "itemKey": "45.14.640||10",
+      "dataCompra": "2027-02-20",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:43.870Z"
+    },
+    {
+      "itemKey": "45.14.0073||01",
+      "dataCompra": "2026-10-05",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:43.870Z"
+    },
+    {
+      "itemKey": "07.06.0002||05",
+      "dataCompra": "2026-12-04",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:43.870Z"
+    },
+    {
+      "itemKey": "07.06.0002||02",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:43.870Z"
+    },
+    {
+      "itemKey": "45.14.0106||03",
+      "dataCompra": "2029-07-21",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:43.870Z"
+    },
+    {
+      "itemKey": "45.14.601||10",
+      "dataCompra": "2028-01-08",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:43.870Z"
+    },
+    {
+      "itemKey": "45.14.0103||03",
+      "dataCompra": "2027-03-04",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:43.870Z"
+    },
+    {
+      "itemKey": "45.14.0086||89",
+      "dataCompra": "2028-06-26",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:43.870Z"
+    },
+    {
+      "itemKey": "07.80.0085||68",
+      "dataCompra": "2028-12-26",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:43.870Z"
+    },
+    {
+      "itemKey": "13.46.100||05",
+      "dataCompra": "2027-05-18",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:43.870Z"
+    },
+    {
+      "itemKey": "13.46.0301||28",
+      "dataCompra": "2026-08-06",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:43.870Z"
+    },
+    {
+      "itemKey": "13.46.0142||10",
+      "dataCompra": "2027-01-07",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:43.870Z"
+    },
+    {
+      "itemKey": "28.L5.00L6||03",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:43.870Z"
+    },
+    {
+      "itemKey": "85.03.0210||121",
+      "dataCompra": "2026-12-08",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:43.870Z"
+    },
+    {
+      "itemKey": "13.46.0068||S3",
+      "dataCompra": "2030-05-17",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:43.870Z"
+    },
+    {
+      "itemKey": "85.03.189||90",
+      "dataCompra": "2028-01-28",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:43.870Z"
+    },
+    {
+      "itemKey": "13.46.0146||B7",
+      "dataCompra": "2027-05-13",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:43.870Z"
+    },
+    {
+      "itemKey": "16.70.0105||14",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:43.870Z"
+    },
+    {
+      "itemKey": "97.94.0146||116",
+      "dataCompra": "2028-06-23",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:43.870Z"
+    },
+    {
+      "itemKey": "28.05.0114||04",
+      "dataCompra": "2026-08-23",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:43.870Z"
+    },
+    {
+      "itemKey": "13.46.0312||54",
+      "dataCompra": "2028-03-08",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:43.870Z"
+    },
+    {
+      "itemKey": "07.06.0002||83",
+      "dataCompra": "2026-10-24",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:43.870Z"
+    },
+    {
+      "itemKey": "13.46.0433||11",
+      "dataCompra": "2027-01-09",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:43.870Z"
+    },
+    {
+      "itemKey": "13.46.0147||47",
+      "dataCompra": "2026-08-06",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:43.870Z"
+    },
+    {
+      "itemKey": "13.46.384||13",
+      "dataCompra": "2027-11-29",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:43.870Z"
+    },
+    {
+      "itemKey": "13.46.0372||05",
+      "dataCompra": "2027-03-25",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:42:43.870Z"
+    },
+    {
+      "itemKey": "13.46.0435||116",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:01.244Z"
+    },
+    {
+      "itemKey": "13.46.0208||10",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:01.244Z"
+    },
+    {
+      "itemKey": "Y1.02.0464||05",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:01.244Z"
+    },
+    {
+      "itemKey": "Y1.02.0474||03",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:01.244Z"
+    },
+    {
+      "itemKey": "Y1.02.0469||03",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:01.244Z"
+    },
+    {
+      "itemKey": "Y1.02.0471||03",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:01.244Z"
+    },
+    {
+      "itemKey": "Y1.02.0473||03",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:01.244Z"
+    },
+    {
+      "itemKey": "45.14.647||120",
+      "dataCompra": "2030-12-23",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:01.244Z"
+    },
+    {
+      "itemKey": "45.14.0084||20",
+      "dataCompra": "2027-12-10",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:01.244Z"
+    },
+    {
+      "itemKey": "45.14.0091||18",
+      "dataCompra": "2029-02-11",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:01.244Z"
+    },
+    {
+      "itemKey": "13.46.0340||Z5",
+      "dataCompra": "2026-10-31",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:01.244Z"
+    },
+    {
+      "itemKey": "Y1.02.0468||S3",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:01.244Z"
+    },
+    {
+      "itemKey": "45.14.610||10",
+      "dataCompra": "2027-06-22",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:01.244Z"
+    },
+    {
+      "itemKey": "45.14.635||04",
+      "dataCompra": "2028-03-04",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:01.244Z"
+    },
+    {
+      "itemKey": "28.05.0106||04",
+      "dataCompra": "2026-08-06",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:01.244Z"
+    },
+    {
+      "itemKey": "13.67.0093||10",
+      "dataCompra": "2026-07-23",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:01.244Z"
+    },
+    {
+      "itemKey": "45.14.0045||10",
+      "dataCompra": "2026-08-16",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:01.244Z"
+    },
+    {
+      "itemKey": "13.46.0147||U9",
+      "dataCompra": "2026-12-16",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:01.244Z"
+    },
+    {
+      "itemKey": "Y1.02.0439||03",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:01.244Z"
+    },
+    {
+      "itemKey": "13.46.320||10",
+      "dataCompra": "2028-01-28",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:01.244Z"
+    },
+    {
+      "itemKey": "13.46.0079||02",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:01.244Z"
+    },
+    {
+      "itemKey": "13.46.0080||10",
+      "dataCompra": "2027-03-04",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:01.244Z"
+    },
+    {
+      "itemKey": "13.46.0237||18",
+      "dataCompra": "2026-08-26",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:01.244Z"
+    },
+    {
+      "itemKey": "13.46.0454||107",
+      "dataCompra": "2026-10-30",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:01.244Z"
+    },
+    {
+      "itemKey": "55.14.180||04",
+      "dataCompra": "2026-09-21",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:01.244Z"
+    },
+    {
+      "itemKey": "13.46.0151||03",
+      "dataCompra": "2027-02-02",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:01.244Z"
+    },
+    {
+      "itemKey": "45.14.0081||11",
+      "dataCompra": "2027-08-16",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:01.244Z"
+    },
+    {
+      "itemKey": "45.14.593||07",
+      "dataCompra": "2026-09-11",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:01.244Z"
+    },
+    {
+      "itemKey": "07.06.0002||82",
+      "dataCompra": "2026-10-05",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:01.244Z"
+    },
+    {
+      "itemKey": "07.80.0085||20",
+      "dataCompra": "2027-11-29",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:01.244Z"
+    },
+    {
+      "itemKey": "28.L1.03||28",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:01.244Z"
+    },
+    {
+      "itemKey": "13.46.0151||18",
+      "dataCompra": "2026-09-08",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:01.244Z"
+    },
+    {
+      "itemKey": "13.46.0400||06",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:01.244Z"
+    },
+    {
+      "itemKey": "W9.21.0028||Z7",
+      "dataCompra": "2027-02-02",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:01.244Z"
+    },
+    {
+      "itemKey": "Y1.02.0458||03",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:01.244Z"
+    },
+    {
+      "itemKey": "Y1.02.0467||S3",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:01.244Z"
+    },
+    {
+      "itemKey": "45.14.0101||08",
+      "dataCompra": "2026-10-05",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:01.244Z"
+    },
+    {
+      "itemKey": "28.74.80||A4",
+      "dataCompra": "2026-08-18",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "Y1.02.0476||H4",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "Y1.02.0472||U9",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "28.74.80||40",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "13.46.154||08",
+      "dataCompra": "2026-07-26",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "07.06.0002||29",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "85.03.189||M3",
+      "dataCompra": "2027-11-04",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "14.09.0252||38",
+      "dataCompra": "2028-04-27",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "85.03.0246||03",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "13.46.0310||11",
+      "dataCompra": "2026-10-13",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "13.46.155||04",
+      "dataCompra": "2027-03-28",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "28.05.0119||04",
+      "dataCompra": "2026-09-15",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "Y1.02.0470||08",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "Y1.02.0121||06",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "Y1.02.0416||09",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "85.03.0198||10",
+      "dataCompra": "2026-12-01",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "45.14.0052||40",
+      "dataCompra": "2026-10-23",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "45.14.0083||11",
+      "dataCompra": "2027-08-31",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "07.06.0002||100",
+      "dataCompra": "2027-02-02",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "07.06.0002||12",
+      "dataCompra": "2027-03-04",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "07.06.0002||11",
+      "dataCompra": "2026-09-13",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "45.14.547||03",
+      "dataCompra": "2028-04-27",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "13.50.0093||04",
+      "dataCompra": "2027-07-17",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "W9.21.0030||13",
+      "dataCompra": "2027-04-03",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "85.03.0239||20",
+      "dataCompra": "2026-09-28",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "55.14.171||04",
+      "dataCompra": "2026-12-13",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "85.03.121||10",
+      "dataCompra": "2027-01-21",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "13.71.0351||40",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "28.07.0115||20",
+      "dataCompra": "2026-08-06",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "85.03.156||10",
+      "dataCompra": "2026-09-18",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "Y1.02.0369||13",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "Y1.02.0382||13",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "Y1.02.0475||02",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "55.14.32||10",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "28.05.0071||08",
+      "dataCompra": "2026-10-05",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "Y1.02.0466||13",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "13.46.0306||03",
+      "dataCompra": "2026-10-28",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "13.46.0465||54",
+      "dataCompra": "2032-08-19",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "85.04.0101||22",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "42.01.0011||89",
+      "dataCompra": "2026-08-06",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:17.007Z"
+    },
+    {
+      "itemKey": "13.B1.0090||09",
+      "dataCompra": "2027-07-20",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:33.552Z"
+    },
+    {
+      "itemKey": "85.03.0201||47",
+      "dataCompra": "2027-08-31",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:33.552Z"
+    },
+    {
+      "itemKey": "28.07.0072||03",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:33.552Z"
+    },
+    {
+      "itemKey": "13.46.0304||11",
+      "dataCompra": "2026-12-19",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:33.552Z"
+    },
+    {
+      "itemKey": "13.B1.0090||03",
+      "dataCompra": "2027-09-15",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:33.552Z"
+    },
+    {
+      "itemKey": "28.07.0106||05",
+      "dataCompra": "2026-07-17",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:33.552Z"
+    },
+    {
+      "itemKey": "N4.22.0025||99",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:33.552Z"
+    },
+    {
+      "itemKey": "45.14.541||10",
+      "dataCompra": "2030-04-17",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:33.552Z"
+    },
+    {
+      "itemKey": "45.10.074||10",
+      "dataCompra": "2026-08-21",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:33.552Z"
+    },
+    {
+      "itemKey": "13.46.238||10",
+      "dataCompra": "2030-05-17",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:33.552Z"
+    },
+    {
+      "itemKey": "13.B1.0071||11",
+      "dataCompra": "2027-03-12",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:33.552Z"
+    },
+    {
+      "itemKey": "13.71.0566||03",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:33.552Z"
+    },
+    {
+      "itemKey": "85.04.56||H4",
+      "dataCompra": "2026-07-17",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:33.552Z"
+    },
+    {
+      "itemKey": "13.71.0509||08",
+      "dataCompra": "2026-08-13",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:33.552Z"
+    },
+    {
+      "itemKey": "13.46.0119||M3",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:33.552Z"
+    },
+    {
+      "itemKey": "85.03.60||05",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:33.552Z"
+    },
+    {
+      "itemKey": "13.46.0300||08",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:33.552Z"
+    },
+    {
+      "itemKey": "85.03.120||03",
+      "dataCompra": "2026-12-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:33.552Z"
+    },
+    {
+      "itemKey": "13.46.241||10",
+      "dataCompra": "2029-01-12",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:33.552Z"
+    },
+    {
+      "itemKey": "13.46.0226||35",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:33.552Z"
+    },
+    {
+      "itemKey": "85.04.0077||10",
+      "dataCompra": "2027-09-19",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:33.552Z"
+    },
+    {
+      "itemKey": "28.L1.0008||107",
+      "dataCompra": "2027-04-03",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:33.552Z"
+    },
+    {
+      "itemKey": "28.06.0017||07",
+      "dataCompra": "2030-04-27",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:33.552Z"
+    },
+    {
+      "itemKey": "85.03.0246||04",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:33.552Z"
+    },
+    {
+      "itemKey": "28.06.0017||03",
+      "dataCompra": "2034-01-26",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:33.552Z"
+    },
+    {
+      "itemKey": "28.07.0040||18",
+      "dataCompra": "2026-08-06",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:33.552Z"
+    },
+    {
+      "itemKey": "28.W9.00X1||05",
+      "dataCompra": "2026-10-05",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:33.552Z"
+    },
+    {
+      "itemKey": "W9.21.0027||09",
+      "dataCompra": "2026-09-11",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:33.552Z"
+    },
+    {
+      "itemKey": "85.03.33||10",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:33.552Z"
+    },
+    {
+      "itemKey": "13.46.0249||40",
+      "dataCompra": "2026-08-06",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:33.552Z"
+    },
+    {
+      "itemKey": "85.03.0223||03",
+      "dataCompra": "2028-06-11",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:33.552Z"
+    },
+    {
+      "itemKey": "85.03.52||10",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:33.552Z"
+    },
+    {
+      "itemKey": "W9.21.0029||03",
+      "dataCompra": "2029-01-22",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:33.552Z"
+    },
+    {
+      "itemKey": "W9.21.0024||107",
+      "dataCompra": "2027-07-02",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:33.552Z"
+    },
+    {
+      "itemKey": "W9.21.0037||05",
+      "dataCompra": "2027-06-22",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:33.552Z"
+    },
+    {
+      "itemKey": "55.14.159||10",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:33.552Z"
+    },
+    {
+      "itemKey": "W9.21.0028||03",
+      "dataCompra": "2030-03-18",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:33.552Z"
+    },
+    {
+      "itemKey": "28.45.0278||86",
+      "dataCompra": "2026-08-06",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:33.552Z"
+    },
+    {
+      "itemKey": "13.46.0399||13",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:49.429Z"
+    },
+    {
+      "itemKey": "85.03.0245||10",
+      "dataCompra": "2031-11-08",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:49.429Z"
+    },
+    {
+      "itemKey": "13.46.0244||90",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:49.429Z"
+    },
+    {
+      "itemKey": "85.03.0222||41",
+      "dataCompra": "2026-09-15",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:49.429Z"
+    },
+    {
+      "itemKey": "13.46.144||20",
+      "dataCompra": "2026-07-23",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:49.429Z"
+    },
+    {
+      "itemKey": "13.46.0120||04",
+      "dataCompra": "2027-02-12",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:49.429Z"
+    },
+    {
+      "itemKey": "85.04.74||09",
+      "dataCompra": "2027-09-27",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:49.429Z"
+    },
+    {
+      "itemKey": "85.03.0241||O7",
+      "dataCompra": "2026-09-05",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:49.429Z"
+    },
+    {
+      "itemKey": "13.46.0393||11",
+      "dataCompra": "2026-07-22",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:49.429Z"
+    },
+    {
+      "itemKey": "13.46.0348||03",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:49.429Z"
+    },
+    {
+      "itemKey": "85.03.0201||18",
+      "dataCompra": "2026-12-28",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:49.429Z"
+    },
+    {
+      "itemKey": "55.14.185||10",
+      "dataCompra": "2032-01-07",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:49.429Z"
+    },
+    {
+      "itemKey": "13.50.0151||99",
+      "dataCompra": "2026-08-06",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:49.429Z"
+    },
+    {
+      "itemKey": "13.46.0300||18",
+      "dataCompra": "2026-09-05",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:49.429Z"
+    },
+    {
+      "itemKey": "85.03.108||04",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:49.429Z"
+    },
+    {
+      "itemKey": "13.46.132||14",
+      "dataCompra": "2027-02-26",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:49.429Z"
+    },
+    {
+      "itemKey": "13.71.0243||10",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:49.429Z"
+    },
+    {
+      "itemKey": "13.46.0341||18",
+      "dataCompra": "2027-03-22",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:49.429Z"
+    },
+    {
+      "itemKey": "28.C4.0085||17",
+      "dataCompra": "2027-11-29",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:49.429Z"
+    },
+    {
+      "itemKey": "28.C4.0082||03",
+      "dataCompra": "2026-09-05",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:49.429Z"
+    },
+    {
+      "itemKey": "Y1.02.0396||H4",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:49.429Z"
+    },
+    {
+      "itemKey": "28.22.0029||04",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:49.429Z"
+    },
+    {
+      "itemKey": "90.02.0004||10",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:49.429Z"
+    },
+    {
+      "itemKey": "28.07.0120||03",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:49.429Z"
+    },
+    {
+      "itemKey": "13.46.0151||42",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:49.429Z"
+    },
+    {
+      "itemKey": "Y1.02.0437||03",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:49.429Z"
+    },
+    {
+      "itemKey": "13.46.0329||08",
+      "dataCompra": "2026-08-26",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:49.429Z"
+    },
+    {
+      "itemKey": "13.46.0058||L8",
+      "dataCompra": "2026-08-06",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:49.429Z"
+    },
+    {
+      "itemKey": "07.06.0002||15",
+      "dataCompra": "2029-03-23",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:49.429Z"
+    },
+    {
+      "itemKey": "13.46.0305||18",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:49.429Z"
+    },
+    {
+      "itemKey": "28.05.0111||04",
+      "dataCompra": "2026-12-04",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:49.429Z"
+    },
+    {
+      "itemKey": "45.13.343||10",
+      "dataCompra": "2028-01-04",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:49.429Z"
+    },
+    {
+      "itemKey": "28.05.0112||04",
+      "dataCompra": "2028-09-24",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:49.429Z"
+    },
+    {
+      "itemKey": "28.05.0105||04",
+      "dataCompra": "2027-01-09",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:49.429Z"
+    },
+    {
+      "itemKey": "85.04.0116||03",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:49.429Z"
+    },
+    {
+      "itemKey": "07.06.0002||84",
+      "dataCompra": "2028-06-11",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:55.907Z"
+    },
+    {
+      "itemKey": "14.09.164||10",
+      "dataCompra": "2026-09-05",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:55.907Z"
+    },
+    {
+      "itemKey": "07.97.114||28",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:55.907Z"
+    },
+    {
+      "itemKey": "07.97.106||45",
+      "dataCompra": "2026-09-02",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:43:55.907Z"
     }
   ],
   "nerd::NERD CENTER NORTE": [
@@ -16293,6 +19461,878 @@
       "dataCompra": "2026-10-28",
       "transitoSig": "",
       "updatedAt": "2026-07-14T16:31:27.259Z"
+    }
+  ],
+  "scarfme::IGUATEMI SP - JJJ": [
+    {
+      "itemKey": "07.A5.01||09",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "07.97.0161||06",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "07.97.0149||B5",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "07.97.0162||40",
+      "dataCompra": "2026-08-03",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "13.71.0699||03",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "07.81.85||10",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "07.97.101||155",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "07.97.101||26",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "07.A5.01||47",
+      "dataCompra": "2026-11-01",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "07.97.101||Z18",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "13.71.0448||151",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "07.A5.01||26",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "07.97.101||102",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "13.71.0547||107",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "07.97.101||06",
+      "dataCompra": "2027-03-31",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "07.A5.01||16",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "96.03.100||10",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "13.71.0679||13",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "13.71.0696||13",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "13.B2.00B4||47",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "13.71.0454||40",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "13.71.199||H4",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "13.71.0651||151",
+      "dataCompra": "2026-12-31",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "07.79.84||28",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "13.71.0693||03",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "13.71.0311||107",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "13.71.0690||47",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "13.71.0592||03",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "13.71.0698||03",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "13.71.0457||06",
+      "dataCompra": "2026-07-19",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "13.71.0593||04",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "13.71.0607||03",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "13.71.0512||11",
+      "dataCompra": "2026-11-01",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "13.71.0541||13",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "13.71.0609||37",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "13.71.0448||H2",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "07.A1.00B3||104",
+      "dataCompra": "2026-09-17",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "07.A1.00A7||05",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "13.71.0633||09",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "13.71.0219||11",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:01.153Z"
+    },
+    {
+      "itemKey": "13.71.0578||13",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:03.896Z"
+    },
+    {
+      "itemKey": "45.10.0062||89",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:03.896Z"
+    },
+    {
+      "itemKey": "45.10.0020||44",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:03.896Z"
+    },
+    {
+      "itemKey": "45.10.0020||38",
+      "dataCompra": "2026-12-31",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:03.896Z"
+    },
+    {
+      "itemKey": "13.46.0445||S3",
+      "dataCompra": "2026-08-02",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:03.896Z"
+    },
+    {
+      "itemKey": "13.71.0661||107",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:03.896Z"
+    },
+    {
+      "itemKey": "13.71.0611||13",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:03.896Z"
+    },
+    {
+      "itemKey": "13.46.0455||03",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:03.896Z"
+    },
+    {
+      "itemKey": "13.46.0210||10",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:03.896Z"
+    },
+    {
+      "itemKey": "13.46.0131||13",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:03.896Z"
+    },
+    {
+      "itemKey": "13.82.0132||06",
+      "dataCompra": "2027-03-01",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:03.896Z"
+    },
+    {
+      "itemKey": "13.46.0308||20",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:03.896Z"
+    },
+    {
+      "itemKey": "07.06.0002||13",
+      "dataCompra": "2026-11-04",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:03.896Z"
+    },
+    {
+      "itemKey": "13.71.0517||03",
+      "dataCompra": "2027-04-30",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:03.896Z"
+    },
+    {
+      "itemKey": "Y1.02.0374||04",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:03.896Z"
+    },
+    {
+      "itemKey": "07.79.90||13",
+      "dataCompra": "2026-11-21",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:03.896Z"
+    },
+    {
+      "itemKey": "07.79.90||30",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:03.896Z"
+    },
+    {
+      "itemKey": "07.79.90||102",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:03.896Z"
+    },
+    {
+      "itemKey": "07.79.90||06",
+      "dataCompra": "2027-03-01",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:03.896Z"
+    },
+    {
+      "itemKey": "07.79.90||H2",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:03.896Z"
+    },
+    {
+      "itemKey": "07.79.90||S1",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:03.896Z"
+    },
+    {
+      "itemKey": "14.09.0231||13",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:03.896Z"
+    },
+    {
+      "itemKey": "07.A1.00B3||40",
+      "dataCompra": "2026-10-05",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:03.896Z"
+    },
+    {
+      "itemKey": "07.A1.00A7||18",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:03.896Z"
+    },
+    {
+      "itemKey": "07.A1.00A7||14",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:03.896Z"
+    },
+    {
+      "itemKey": "13.46.0132||03",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:03.896Z"
+    },
+    {
+      "itemKey": "07.A1.00B5||Z11",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:03.896Z"
+    },
+    {
+      "itemKey": "07.A1.00B3||31",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:03.896Z"
+    },
+    {
+      "itemKey": "16.70.0105||04",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:03.896Z"
+    },
+    {
+      "itemKey": "16.70.0105||03",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:03.896Z"
+    },
+    {
+      "itemKey": "13.B1.0071||06",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:03.896Z"
+    },
+    {
+      "itemKey": "13.B1.0091||09",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:03.896Z"
+    },
+    {
+      "itemKey": "13.B1.0070||09",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:03.896Z"
+    },
+    {
+      "itemKey": "13.46.0273||05",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:03.896Z"
+    },
+    {
+      "itemKey": "13.46.0259||40",
+      "dataCompra": "2026-08-06",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:03.896Z"
+    },
+    {
+      "itemKey": "13.46.309||120",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:03.896Z"
+    },
+    {
+      "itemKey": "13.46.0268||04",
+      "dataCompra": "2026-10-05",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:03.896Z"
+    },
+    {
+      "itemKey": "13.46.0133||116",
+      "dataCompra": "2026-08-26",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:03.896Z"
+    },
+    {
+      "itemKey": "13.46.0263||10",
+      "dataCompra": "2026-08-06",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:07.160Z"
+    },
+    {
+      "itemKey": "13.46.0448||03",
+      "dataCompra": "2026-10-05",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:07.160Z"
+    },
+    {
+      "itemKey": "13.46.0453||120",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:07.160Z"
+    },
+    {
+      "itemKey": "07.06.0002||102",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:07.160Z"
+    },
+    {
+      "itemKey": "07.06.0002||44",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:07.160Z"
+    },
+    {
+      "itemKey": "07.06.0002||22",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:07.160Z"
+    },
+    {
+      "itemKey": "45.14.508||10",
+      "dataCompra": "2026-10-05",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:07.160Z"
+    },
+    {
+      "itemKey": "45.14.0105||107",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:07.160Z"
+    },
+    {
+      "itemKey": "07.06.0002||B4",
+      "dataCompra": "2026-08-06",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:07.160Z"
+    },
+    {
+      "itemKey": "13.46.0457||11",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:07.160Z"
+    },
+    {
+      "itemKey": "13.46.0301||28",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:07.160Z"
+    },
+    {
+      "itemKey": "13.46.0374||38",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:07.160Z"
+    },
+    {
+      "itemKey": "16.70.0105||14",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:07.160Z"
+    },
+    {
+      "itemKey": "28.05.0117||04",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:07.160Z"
+    },
+    {
+      "itemKey": "13.46.0307||09",
+      "dataCompra": "2026-08-26",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:07.160Z"
+    },
+    {
+      "itemKey": "Y1.02.0464||05",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:07.160Z"
+    },
+    {
+      "itemKey": "13.46.288||10",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:07.160Z"
+    },
+    {
+      "itemKey": "13.46.0299||18",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:07.160Z"
+    },
+    {
+      "itemKey": "13.02.0516||10",
+      "dataCompra": "2027-01-21",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:07.160Z"
+    },
+    {
+      "itemKey": "45.14.0081||28",
+      "dataCompra": "2026-08-06",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:07.160Z"
+    },
+    {
+      "itemKey": "45.14.637||04",
+      "dataCompra": "2026-10-05",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:07.160Z"
+    },
+    {
+      "itemKey": "07.06.0002||Q9",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:07.160Z"
+    },
+    {
+      "itemKey": "28.05.0106||04",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:07.160Z"
+    },
+    {
+      "itemKey": "07.06.0002||B3",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:07.160Z"
+    },
+    {
+      "itemKey": "13.46.0441||86",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:07.160Z"
+    },
+    {
+      "itemKey": "13.46.0079||02",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:07.160Z"
+    },
+    {
+      "itemKey": "28.74.80||A4",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:07.160Z"
+    },
+    {
+      "itemKey": "Y1.02.0476||H4",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:07.160Z"
+    },
+    {
+      "itemKey": "85.03.0207||03",
+      "dataCompra": "2026-08-06",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:07.160Z"
+    },
+    {
+      "itemKey": "28.10.0002||06",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:07.160Z"
+    },
+    {
+      "itemKey": "13.71.0351||40",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:07.160Z"
+    },
+    {
+      "itemKey": "13.B1.0071||03",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:07.160Z"
+    },
+    {
+      "itemKey": "13.B1.0071||09",
+      "dataCompra": "2026-08-06",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:07.160Z"
+    },
+    {
+      "itemKey": "13.B1.0071||04",
+      "dataCompra": "2026-08-06",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:07.160Z"
+    },
+    {
+      "itemKey": "13.B1.0092||109",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:07.160Z"
+    },
+    {
+      "itemKey": "13.B1.0087||28",
+      "dataCompra": "2026-07-17",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:07.160Z"
+    },
+    {
+      "itemKey": "13.B1.0070||03",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:07.160Z"
+    },
+    {
+      "itemKey": "13.46.0449||02",
+      "dataCompra": "2026-09-25",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:10.000Z"
+    },
+    {
+      "itemKey": "13.46.0123||107",
+      "dataCompra": "2026-12-04",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:10.000Z"
+    },
+    {
+      "itemKey": "85.04.65||05",
+      "dataCompra": "2026-11-19",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:10.000Z"
+    },
+    {
+      "itemKey": "13.46.298||10",
+      "dataCompra": "2026-12-04",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:10.000Z"
+    },
+    {
+      "itemKey": "13.46.154||08",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:10.000Z"
+    },
+    {
+      "itemKey": "13.46.0086||03",
+      "dataCompra": "2026-08-06",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:10.000Z"
+    },
+    {
+      "itemKey": "85.03.120||03",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:10.000Z"
+    },
+    {
+      "itemKey": "13.46.0226||35",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:10.000Z"
+    },
+    {
+      "itemKey": "13.46.0151||03",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:10.000Z"
+    },
+    {
+      "itemKey": "13.46.0119||M3",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:10.000Z"
+    },
+    {
+      "itemKey": "85.03.0194||35",
+      "dataCompra": "2026-07-17",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:10.000Z"
+    },
+    {
+      "itemKey": "85.03.0248||04",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:10.000Z"
+    },
+    {
+      "itemKey": "13.46.0273||40",
+      "dataCompra": "2026-12-04",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:10.000Z"
+    },
+    {
+      "itemKey": "13.46.229||03",
+      "dataCompra": "2026-08-06",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:10.000Z"
+    },
+    {
+      "itemKey": "13.46.0129||10",
+      "dataCompra": "2027-08-01",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:10.000Z"
+    },
+    {
+      "itemKey": "13.46.0456||04",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:10.000Z"
+    },
+    {
+      "itemKey": "13.46.0454||G9",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:10.000Z"
+    },
+    {
+      "itemKey": "13.46.0440||03",
+      "dataCompra": "2026-09-03",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:10.000Z"
+    },
+    {
+      "itemKey": "85.03.0222||18",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:10.000Z"
+    },
+    {
+      "itemKey": "13.46.0097||09",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:10.000Z"
+    },
+    {
+      "itemKey": "85.03.0222||41",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:10.000Z"
+    },
+    {
+      "itemKey": "Y1.02.0396||H4",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:10.000Z"
+    },
+    {
+      "itemKey": "13.71.0676||06",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:10.000Z"
+    },
+    {
+      "itemKey": "13.46.0151||42",
+      "dataCompra": "2026-08-06",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:10.000Z"
+    },
+    {
+      "itemKey": "13.B1.0088||H7",
+      "dataCompra": "2026-10-05",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:10.000Z"
+    },
+    {
+      "itemKey": "85.03.0223||09",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:10.000Z"
+    },
+    {
+      "itemKey": "13.46.0306||09",
+      "dataCompra": "2026-08-06",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:10.000Z"
+    },
+    {
+      "itemKey": "13.46.0049||05",
+      "dataCompra": "2027-04-03",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:10.000Z"
+    },
+    {
+      "itemKey": "13.71.0594||05",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:10.000Z"
+    },
+    {
+      "itemKey": "13.71.0634||03",
+      "dataCompra": "2026-07-14",
+      "transitoSig": "",
+      "updatedAt": "2026-07-14T18:00:10.000Z"
     }
   ]
 }

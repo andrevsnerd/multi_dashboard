@@ -1470,8 +1470,8 @@
     "semantic_hash": "7a672d31b6ac254cb25f6a420501049d"
   },
   "components/layout/Sidebar.tsx": {
-    "mtime": 1783537823.9344573,
-    "ast_hash": "bb3b9820440e906060000195bdc29f15",
+    "mtime": 1784054353.9222496,
+    "ast_hash": "d41ff2de6d8653b37357530e7b0637dd",
     "semantic_hash": ""
   },
   "components/layout/SidebarContext.tsx": {
@@ -1550,8 +1550,8 @@
     "semantic_hash": "3a1ac7d9dac7349b3338e8b433eb5031"
   },
   "components/performance/CurvaAbcPage.tsx": {
-    "mtime": 1784045419.8014169,
-    "ast_hash": "2af7639a9c14b3df65441535de727626",
+    "mtime": 1784050501.2360988,
+    "ast_hash": "fedb8618bb7784dd3ca1be5d311387be",
     "semantic_hash": ""
   },
   "components/performance/CurvaPorProdutoPage.tsx": {
@@ -1840,8 +1840,8 @@
     "semantic_hash": "34537e31a915638b6406c4b7b7df38c1"
   },
   "data/compra-data-fixa.json": {
-    "mtime": 1784024568.887581,
-    "ast_hash": "7be608220bf05f7443edd3e0558b2489",
+    "mtime": 1784054635.9215047,
+    "ast_hash": "8adba9b2f73ea30234f6ff7482116f35",
     "semantic_hash": ""
   },
   "data/compra-final.json": {
@@ -1905,9 +1905,9 @@
     "semantic_hash": "d751713988987e9331980363e24189ce"
   },
   "data/produto-labels.json": {
-    "mtime": 1782494411.0390866,
-    "ast_hash": "d934fb2c418f4997b33636ba208e3063",
-    "semantic_hash": "d934fb2c418f4997b33636ba208e3063"
+    "mtime": 1784056443.073769,
+    "ast_hash": "c87297488e2e195b315826a18a73779a",
+    "semantic_hash": ""
   },
   "data/produtos-agrupados.json": {
     "mtime": 1780073682.8023067,
@@ -2225,8 +2225,8 @@
     "semantic_hash": "eea593bd079f994e683ebc69a8478c04"
   },
   "lib/config/page-permissions.ts": {
-    "mtime": 1783540036.5679865,
-    "ast_hash": "6bfea718763f5e97789d030cf90ca419",
+    "mtime": 1784054311.811206,
+    "ast_hash": "6667c40eb0cdf82d0f30ab92bff52178",
     "semantic_hash": ""
   },
   "lib/constants/columns.ts": {
@@ -2390,8 +2390,8 @@
     "semantic_hash": "d907b2b11f2629a2edb97e34f6158c45"
   },
   "lib/reports/compra-sugerida-abc.ts": {
-    "mtime": 1784045655.804618,
-    "ast_hash": "bcca2a83110403a736b90de4a1798bb8",
+    "mtime": 1784047291.3869534,
+    "ast_hash": "c91e5d76b57a478e685c8ba22774177a",
     "semantic_hash": ""
   },
   "lib/reports/enrich.server.ts": {
@@ -3530,18 +3530,18 @@
     "semantic_hash": ""
   },
   "components/loja-raio-x/LojaRaioXPage.tsx": {
-    "mtime": 1783522797.6700315,
-    "ast_hash": "5b9ddeed4268fa1f3ac725b47a7b919b",
+    "mtime": 1784050094.9783087,
+    "ast_hash": "ccfefb2c242591f92139ae1dd6211bd1",
     "semantic_hash": ""
   },
   "lib/repositories/lojaRaioX.ts": {
-    "mtime": 1783520661.057432,
-    "ast_hash": "cd6fac3fd432859f5e1510bbb5e92282",
+    "mtime": 1784049740.1519134,
+    "ast_hash": "5f1d128b64a00acd0f9b238c652eee01",
     "semantic_hash": ""
   },
   "lib/utils/exportLojaRaioXXlsx.ts": {
-    "mtime": 1783522748.1037173,
-    "ast_hash": "2b6a064f8f37c265b648e988abbd2fd9",
+    "mtime": 1784049928.5857885,
+    "ast_hash": "527e185f76a5804c9ded5620b0a1a60b",
     "semantic_hash": ""
   },
   "app/api/transferencias-pendentes/detectar/route.ts": {
@@ -3640,8 +3640,33 @@
     "semantic_hash": ""
   },
   "lib/utils/transferencia-regras.ts": {
-    "mtime": 1784045268.4147315,
-    "ast_hash": "b319a2add7aec9d881e62572488fd470",
+    "mtime": 1784046983.5969415,
+    "ast_hash": "da681acfe24791a644e9897279bb0b37",
+    "semantic_hash": ""
+  },
+  "app/(companies)/[company]/distribuicao-matriz/page.tsx": {
+    "mtime": 1784054304.889788,
+    "ast_hash": "e7cd5dc488a127dcffd79922da1404ae",
+    "semantic_hash": ""
+  },
+  "components/distribuicao-matriz/DistribuicaoMatrizPage.tsx": {
+    "mtime": 1784056112.9204338,
+    "ast_hash": "b972c1127085fc4bc7c44849b5fc9005",
+    "semantic_hash": ""
+  },
+  "lib/utils/distribuicao-matriz.ts": {
+    "mtime": 1784056555.7159216,
+    "ast_hash": "bf09a872bbd3a3701ce492d0ce2e02a4",
+    "semantic_hash": ""
+  },
+  "app/api/distribuicao-matriz/route.ts": {
+    "mtime": 1784055332.9539638,
+    "ast_hash": "3ec3dd329bba0f93438d15b9eaa899a0",
+    "semantic_hash": ""
+  },
+  "lib/repositories/distribuicaoMatriz.ts": {
+    "mtime": 1784056358.3047101,
+    "ast_hash": "255c77ef480345e9104845c66697f6dc",
     "semantic_hash": ""
   }
 }

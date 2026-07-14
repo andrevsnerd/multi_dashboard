@@ -126,6 +126,10 @@ export default function Sidebar({ companyName }: SidebarProps) {
     basePath && basePath !== "/"
       ? `${basePath}/transferencia-produtos`
       : "/transferencia-produtos";
+  const distribuicaoMatrizHref =
+    basePath && basePath !== "/"
+      ? `${basePath}/distribuicao-matriz`
+      : "/distribuicao-matriz";
   const romaneiosHref =
     basePath && basePath !== "/" ? `${basePath}/romaneios` : "/romaneios";
   const saidasEntradasProdutosHref =
@@ -215,6 +219,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     "/curva-por-produto",
     "/controle-transferencias",
     "/transferencia-produtos",
+    "/distribuicao-matriz",
     "/romaneios",
     "/saidas-entradas-produtos",
     "/extrato-produto",
@@ -423,6 +428,14 @@ export default function Sidebar({ companyName }: SidebarProps) {
           permission: "transferencia-produtos",
           isActive: (currentPathname) =>
             matchesSegment(currentPathname, "/transferencia-produtos", transferenciaProdutosHref),
+        },
+        {
+          key: "distribuicao-matriz",
+          label: "Distribuição Matriz",
+          href: distribuicaoMatrizHref,
+          permission: "distribuicao-matriz",
+          isActive: (currentPathname) =>
+            matchesSegment(currentPathname, "/distribuicao-matriz", distribuicaoMatrizHref),
         },
         {
           key: "romaneios",
