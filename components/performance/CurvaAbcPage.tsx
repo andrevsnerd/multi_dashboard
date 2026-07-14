@@ -1598,9 +1598,9 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   const [focusedCurve, setFocusedCurve] = useState<Curva>("A");
   const [compraMetrics, setCompraMetrics] = useState<Record<string, CompraMetricRow>>({});
   const [comprasTransitoIndex, setComprasTransitoIndex] = useState<CompraTransitoIndex>(new Map());
-  // Lente de transferência (opcional, read-only): mostra o estoque parado na rede e o que
-  // a compra ficaria descontando transferências. Nasce DESLIGADA — a tela fica idêntica à de hoje.
-  const [verTransferencias, setVerTransferencias] = useState(false);
+  // Lente de transferência (read-only): mostra o estoque parado na rede e o que a compra
+  // ficaria descontando transferências. Nasce LIGADA (preferência do dono).
+  const [verTransferencias, setVerTransferencias] = useState(true);
   const [transferLensIndex, setTransferLensIndex] = useState<TransferLensIndex | null>(null);
   const [transferLensLoading, setTransferLensLoading] = useState(false);
   // Catraca da data de compra (modo ciclo) — mesma lógica/persistência das demais telas.
