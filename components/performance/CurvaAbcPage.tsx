@@ -2850,6 +2850,14 @@ const handleBadgeClick = (cat: string) => {
         <div className={styles.header}>
           <div className={styles.titleRow}>
             <h1 className={styles.title}>Curva A,B,C</h1>
+            <span
+              className={`${styles.loadingCue} ${loading ? styles.loadingCueActive : ""}`}
+              role="status"
+              aria-hidden={!loading}
+            >
+              <span className={styles.spinner} aria-hidden="true" />
+              Carregando dados…
+            </span>
           </div>
 
           <div className={styles.headerRight}>

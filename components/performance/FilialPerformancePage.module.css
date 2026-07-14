@@ -2057,6 +2057,34 @@
   margin-left: 4px;
 }
 
+/* ── Header loading cue (spinner + texto) ── */
+.loadingCue {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--t-500);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+.loadingCueActive {
+  opacity: 1;
+}
+.spinner {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border-radius: 50%;
+  border: 2px solid var(--b-200);
+  border-top-color: #2563eb;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 /* ── Filter strip card ── */
 .filterStripCard {
   background: var(--s-white);
