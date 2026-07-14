@@ -127,6 +127,12 @@ export interface ReportFilters {
   compraIdeal?: boolean;
   /** Id do grupo de fornecedor (NERD) para filtrar produtos (Externo / Centro / ...). */
   fornecedor?: string | null;
+  /**
+   * Compra sugerida ABC: quando true, calcula a lente de transferência (reusa a régua do
+   * Controle de Transferências, janela 30d) e anexa Disponível p/ transferir, Compra líquida,
+   * Custo líquido e "De onde". Opt-in — ligado quando o usuário inclui essas colunas.
+   */
+  considerarTransferencias?: boolean;
 }
 
 /** Cartão de KPI exibido no topo do resultado (ex.: Vendas Total, Ticket Médio). */

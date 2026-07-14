@@ -18,6 +18,14 @@ import { listComprasTransitoFull } from "@/lib/utils/compra-transito-store";
 import { isCompraTransitoDateActive } from "@/lib/utils/compra-transito-status";
 import type { CompraTransitoIndexEntry } from "@/lib/client/compras-transito";
 import { COMPRA_FILIAL_COL_PREFIX } from "@/lib/reports/compra-sugerida-abc";
+import { fetchControleTransferencias } from "@/lib/repositories/controleTransferencias";
+import {
+  buildTransferLensIndex,
+  resolveTransferLens,
+  applyTransferLens,
+  type TransferLensIndex,
+} from "@/lib/utils/transferencia-regras";
+import type { CompanyKey } from "@/lib/config/company";
 import type { ReportRunContext } from "@/lib/reports/registry.server";
 import type {
   ReportColumnDef,
@@ -210,7 +218,7 @@ export async function fetchCompraSugeridaAbc(
   // em 0/N e avança a cada loja concluída; o front mostra "Calculando compra por loja… X/N".
   let lojasFeitas = 0;
   ctx?.onProgress?.(0, orderedNames.length, "lojas");
-  const [metricasPorFilial, transitIndex] = await Promise.all([
+  const [metricasPorFilial, transitIndex, transferLens] = await Promise.all([
     mapWithConcurrency(orderedNames, FILIAL_CONCURRENCY, (name) =>
       getControleEstoqueMetricasItensBatched({
         company: filters.company,
@@ -225,6 +233,12 @@ export async function fetchCompraSugeridaAbc(
         })
     ),
     buildTransitIndex(filters.company),
+    // Lente de transferência (opt-in): mesma régua/janela (30d) do Controle de Transferências.
+    filters.considerarTransferencias
+      ? fetchControleTransferencias({ company: filters.company, filial: null })
+          .then((data) => buildTransferLensIndex(data, filters.company as CompanyKey))
+          .catch(() => null as TransferLensIndex | null)
+      : Promise.resolve(null as TransferLensIndex | null),
   ]);
 
   const hoje = new Date();
@@ -296,6 +310,19 @@ export async function fetchCompraSugeridaAbc(
       const label = dyn.key.slice(COMPRA_FILIAL_COL_PREFIX.length);
       row[dyn.key] = roundInt(qtyByLabel.get(label) ?? 0);
     }
+
+    // Lente de transferência: desconta da compra o que a rede pode mover (read-only).
+    if (transferLens) {
+      const entry = resolveTransferLens(transferLens, pid, corKey);
+      const lente = applyTransferLens(total, entry);
+      row.TRANSFERIVEL = roundInt(lente.disponivelTransferir);
+      row.COMPRA_LIQUIDA = roundInt(lente.compraLiquida);
+      row.CUSTO_LIQUIDO = round2(custoUnit * lente.compraLiquida);
+      row.TRANSFERIR_DE = lente.doadoras
+        .map((doadora) => `${doadora.origem} (${roundInt(doadora.quantidade)})`)
+        .join(" · ");
+    }
+
     rows.push(row);
   }
 

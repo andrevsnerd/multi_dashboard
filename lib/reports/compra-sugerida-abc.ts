@@ -32,7 +32,22 @@ export const COMPRA_SUGERIDA_ABC_COLUMNS: ReportColumnDef[] = [
   { key: "CUSTO_UNITARIO", defaultLabel: "Custo unit.", type: "currency" },
   { key: "COMPRA_TOTAL", defaultLabel: "Compra total", type: "int" },
   { key: "CUSTO_TOTAL", defaultLabel: "Custo total", type: "currency" },
+  // Lente de transferência (opt-in): incluir qualquer uma destas colunas liga o cálculo
+  // (reusa a régua do Controle de Transferências, janela 30d). Fora do preset padrão →
+  // o export continua idêntico até você adicionar a coluna.
+  { key: "TRANSFERIVEL", defaultLabel: "Disponível p/ transferir", type: "int" },
+  { key: "COMPRA_LIQUIDA", defaultLabel: "Compra líquida (após transferir)", type: "int" },
+  { key: "CUSTO_LIQUIDO", defaultLabel: "Custo líquido", type: "currency" },
+  { key: "TRANSFERIR_DE", defaultLabel: "Transferir de", type: "text" },
 ];
+
+/** Colunas que, se selecionadas, ligam a lente de transferência no backend. */
+export const COMPRA_TRANSFER_LENS_COLUMNS = [
+  "TRANSFERIVEL",
+  "COMPRA_LIQUIDA",
+  "CUSTO_LIQUIDO",
+  "TRANSFERIR_DE",
+] as const;
 
 const col = (key: string, label?: string) => ({
   key,
@@ -56,6 +71,9 @@ const COMPRA_SUGERIDA_ABC_PRESETS: ReportPresetDef[] = [
       col("CUSTO_UNITARIO", "Custo unit."),
       col("COMPRA_TOTAL", "Compra total"),
       col("CUSTO_TOTAL", "Custo total"),
+      // Lente de transferência: origens na mesma célula + compra líquida (após transferir).
+      col("TRANSFERIR_DE", "Transferência"),
+      col("COMPRA_LIQUIDA", "Compra líquida"),
     ],
   },
 ];

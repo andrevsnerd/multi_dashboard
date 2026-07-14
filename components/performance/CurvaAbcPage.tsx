@@ -41,6 +41,14 @@ import { formatDateForQuery } from "@/lib/utils/date";
 import { productMatchesFornecedor, type Fornecedor } from "@/lib/utils/fornecedor-matcher";
 import { applyTransitToSuggestion } from "@/lib/utils/compra-transito-analytics";
 import { calcCompraIdealFromResumo, precisaComprarEssaSemana, type CompraIdealResult } from "@/lib/utils/compra-ideal";
+import {
+  buildTransferLensIndex,
+  resolveTransferLens,
+  applyTransferLens,
+  type TransferLensIndex,
+  type TransferLensResult,
+} from "@/lib/utils/transferencia-regras";
+import type { ProdutoTransferencia } from "@/lib/repositories/controleTransferencias";
 import CompraIdealCell from "@/components/shared/CompraIdealCell";
 import { useCatracaDataCompra, type CatracaFreeze } from "@/lib/client/use-catraca-data-compra";
 import {
@@ -1032,6 +1040,42 @@ function renderFilialMetricTooltip(
   );
 }
 
+/** Tooltip da coluna Transferência: painel com as lojas de origem e quanto cada uma cede. */
+function renderTransferenciaTooltip(
+  lente: TransferLensResult,
+  fmt: (value: number) => string
+): React.ReactNode {
+  const trigger = (
+    <span style={{ color: "#7c3aed", fontWeight: 600 }}>{fmt(lente.disponivelTransferir)} un</span>
+  );
+  if (lente.doadoras.length === 0) return trigger;
+
+  return (
+    <div className={styles.inlineTooltipWrapper}>
+      <span className={styles.inlineTooltipTrigger}>{trigger}</span>
+      <div className={`${styles.inlineTooltipPanel} ${styles.inlineTooltipPanelRight}`}>
+        <div className={styles.inlineTooltipTitle}>Transferir de</div>
+        <div className={styles.inlineTooltipList}>
+          {lente.doadoras.map((doadora) => (
+            <div key={doadora.origemCanonico} className={styles.inlineTooltipRow}>
+              <span className={styles.inlineTooltipLabel}>
+                <span className={styles.inlineTooltipFilial}>{doadora.origem}</span>
+              </span>
+              <span className={styles.inlineTooltipValue}>{fmt(doadora.quantidade)}</span>
+            </div>
+          ))}
+        </div>
+        {lente.doadoras.length > 1 && (
+          <div className={styles.inlineTooltipFooter}>
+            <span>Total</span>
+            <span>{fmt(lente.disponivelTransferir)}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ObservacaoEditorModal({
   modal,
   saving,
@@ -1363,7 +1407,8 @@ async function buildCompraIdealPorFilialRowsCurvaAbc(
    * nenhuma loja precisa comprar agora somem. Mesma regra de `calcCompraIdealFromResumo` +
    * `comprarAgora`/`precisaComprarEssaSemana` usada na tabela.
    */
-  gating: "none" | "sugeridos" | "comprar-agora" = "none"
+  gating: "none" | "sugeridos" | "comprar-agora" = "none",
+  transferLensIndex?: TransferLensIndex | null
 ): Promise<{ rows: Array<Record<string, string | number | boolean | null>>; colunasFiliais: string[] }> {
   // Plano por linha: chave de métrica + itens-membro (produto agrupado expande para seus membros).
   const plans = produtos.map((row) => {
@@ -1482,6 +1527,13 @@ async function buildCompraIdealPorFilialRowsCurvaAbc(
     row["TOTAL REDE"] = totalRede;
     // Custo total = custo unit. × compra total da rede (vira fórmula dinâmica no XLSX).
     row.CUSTO_TOTAL = Math.round((Number(row.CUSTO_UNIT) || 0) * totalRede * 100) / 100;
+    // Lente de transferência: origens (na mesma célula) + compra líquida (após transferir).
+    const lente = applyTransferLens(
+      totalRede,
+      resolveTransferLens(transferLensIndex ?? null, p.produto, porCor ? (p.cor ?? null) : null)
+    );
+    row.TRANSFERENCIA = lente.doadoras.map((d) => `${d.origem} (${d.quantidade})`).join(" · ");
+    row.COMPRA_LIQUIDA = lente.compraLiquida;
     return row;
   });
 
@@ -1546,6 +1598,11 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   const [focusedCurve, setFocusedCurve] = useState<Curva>("A");
   const [compraMetrics, setCompraMetrics] = useState<Record<string, CompraMetricRow>>({});
   const [comprasTransitoIndex, setComprasTransitoIndex] = useState<CompraTransitoIndex>(new Map());
+  // Lente de transferência (opcional, read-only): mostra o estoque parado na rede e o que
+  // a compra ficaria descontando transferências. Nasce DESLIGADA — a tela fica idêntica à de hoje.
+  const [verTransferencias, setVerTransferencias] = useState(false);
+  const [transferLensIndex, setTransferLensIndex] = useState<TransferLensIndex | null>(null);
+  const [transferLensLoading, setTransferLensLoading] = useState(false);
   // Catraca da data de compra (modo ciclo) — mesma lógica/persistência das demais telas.
   const catraca = useCatracaDataCompra(companyKey, selectedFilial ?? "");
   // metricKey -> (escopo da filial -> observação). Escopo "" = padrão (fallback de todas as filiais).
@@ -1710,6 +1767,29 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
       cancelled = true;
     };
   }, [companyKey]);
+
+  // Lente de transferência: só busca os dados da rede quando o toggle é ligado (custo zero quando off).
+  // Reusa a MESMA fonte do Controle de Transferências (uma chamada batcheada, todas as filiais, 30d).
+  useEffect(() => {
+    if (!verTransferencias) return;
+    let cancelled = false;
+    setTransferLensLoading(true);
+    fetch(`/api/controle-transferencias?company=${companyKey}`, { cache: "no-store" })
+      .then((res) => res.json())
+      .then((json: { data?: ProdutoTransferencia[] }) => {
+        if (cancelled) return;
+        setTransferLensIndex(buildTransferLensIndex(json.data ?? [], companyKey));
+      })
+      .catch(() => {
+        if (!cancelled) setTransferLensIndex(null);
+      })
+      .finally(() => {
+        if (!cancelled) setTransferLensLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [verTransferencias, companyKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -2548,6 +2628,19 @@ const handleBadgeClick = (cat: string) => {
           ? "sugeridos"
           : "none";
 
+      // Lente de transferência para o export: usa o índice já carregado ou busca sob demanda
+      // (o export sempre traz as colunas Transferência/Compra líquida, mesmo com o toggle off).
+      let lensIndex = transferLensIndex;
+      if (!lensIndex) {
+        try {
+          const res = await fetch(`/api/controle-transferencias?company=${companyKey}`, { cache: "no-store" });
+          const json = (await res.json()) as { data?: ProdutoTransferencia[] };
+          lensIndex = buildTransferLensIndex(json.data ?? [], companyKey);
+        } catch {
+          lensIndex = null;
+        }
+      }
+
       setCompraIdealFilialProgresso({ feito: 0, total: targets.length, fase: "gerando" });
       const { rows, colunasFiliais } = await buildCompraIdealPorFilialRowsCurvaAbc(
         companyKey,
@@ -2556,7 +2649,8 @@ const handleBadgeClick = (cat: string) => {
         comprasTransitoIndex,
         porCor,
         () => setCompraIdealFilialProgresso((prev) => (prev ? { ...prev, feito: prev.feito + 1 } : prev)),
-        gating
+        gating,
+        lensIndex
       );
       if (rows.length === 0) {
         alert(
@@ -2602,6 +2696,8 @@ const handleBadgeClick = (cat: string) => {
       cols.push({ key: "ESTOQUE_REDE", label: "Estoque rede", role: "value", type: "int" });
       cols.push({ key: "TOTAL REDE", label: "Compra total", role: "compraTotal", type: "int" });
       if (podeVerCusto) cols.push({ key: "CUSTO_TOTAL", label: "Custo total", role: "custoTotal", type: "currency" });
+      cols.push({ key: "TRANSFERENCIA", label: "Transferência", role: "value", type: "text" });
+      cols.push({ key: "COMPRA_LIQUIDA", label: "Compra líquida", role: "value", type: "int" });
       for (const label of colunasFiliais) {
         cols.push({ key: label, label, role: "filial", type: "int" });
       }
@@ -2845,6 +2941,17 @@ const handleBadgeClick = (cat: string) => {
                 onChange={(e) => setFiltrarComprarAgora(e.target.checked)}
               />
               Comprar agora
+            </label>
+            <label
+              className={styles.checkboxLabel}
+              title="Mostra o estoque parado na rede (Matriz + lojas sem giro) que pode cobrir a compra por transferência. Não desconta nada à força — só mostra."
+            >
+              <input
+                type="checkbox"
+                checked={verTransferencias}
+                onChange={(e) => setVerTransferencias(e.target.checked)}
+              />
+              Ver transferências possíveis{transferLensLoading ? " (carregando…)" : ""}
             </label>
             <span className={styles.filterStripDivider} />
             {(["A", "B", "C"] as Curva[]).map(curva => (
@@ -3148,6 +3255,8 @@ const handleBadgeClick = (cat: string) => {
                       {showEstoqueRede && <th className={styles.right}>Estoque rede</th>}
                       <th className={styles.right}>Markup</th>
                       <th className={styles.right}>Compra ideal</th>
+                      {verTransferencias && <th className={styles.right}>Transferência</th>}
+                      {verTransferencias && <th className={styles.right}>Compra líquida</th>}
                     </>
                   </tr>
                 </thead>
@@ -3158,7 +3267,7 @@ const handleBadgeClick = (cat: string) => {
                     return (
                       <React.Fragment key={curva}>
                         <tr className={`${styles.sectionRow} ${styles[`sectionRow${curva}`]}`}>
-                          <td colSpan={showEstoqueRede ? 10 : 9}>
+                          <td colSpan={(showEstoqueRede ? 10 : 9) + (verTransferencias ? 2 : 0)}>
                             <div className={styles.sectionLabel}>
                               <span className={`${styles.curvaBadge} ${CURVA_BADGE_CLASS[curva]}`}>{curva}</span>
                               <span className={styles.sectionTitle}>{CURVA_LABEL[curva]}</span>
@@ -3173,6 +3282,25 @@ const handleBadgeClick = (cat: string) => {
                           const precoMedio = p.qtde > 0 ? p.vendas / p.qtde : 0;
                           const markup = p.custo > 0 && precoMedio > 0 ? precoMedio / p.custo : null;
                           const obsResolved = resolveObservacao(buildCurvaAbcMetricKey(p.produto, p.cor ?? null, porCor));
+                          // Lente de transferência (só quando o toggle está ligado). Calcula uma vez por linha.
+                          const lente = (() => {
+                            if (!verTransferencias || !transferLensIndex) return null;
+                            const metricKey = buildCurvaAbcMetricKey(p.produto, p.cor ?? null, porCor);
+                            const live = compraMetrics[metricKey];
+                            const hasLive = Object.prototype.hasOwnProperty.call(compraMetrics, metricKey);
+                            const semBaseLive =
+                              live?.qtde12m == null && live?.vendasMesAtual == null && live?.estoqueFilial == null;
+                            if (!hasLive || semBaseLive) return null;
+                            const corCat = porCor ? (p.cor ?? null) : null;
+                            const compraOriginal =
+                              catraca.reconcile(
+                                buildCompraIdealFromMetricRow(live, p, comprasTransitoIndex, porCor, companyKey),
+                                buildControleEstoqueItemKey(p.produto, corCat),
+                                getCompraTransitoEntries(comprasTransitoIndex, p.produto, corCat)
+                              ).ideal?.compraIdeal ?? 0;
+                            const entry = resolveTransferLens(transferLensIndex, p.produto, corCat);
+                            return applyTransferLens(compraOriginal, entry);
+                          })();
                           return (
                             <tr
                               key={`${p.produto}-${p.categoria}-${p.cor ?? ""}-${p.grade ?? ""}`}
@@ -3419,6 +3547,28 @@ const handleBadgeClick = (cat: string) => {
                                     );
                                   })()}
                                 </td>
+                              {verTransferencias && (
+                                <td className={styles.vendas}>
+                                  {!transferLensIndex ? (
+                                    <span className={styles.noData}>{transferLensLoading ? "…" : "—"}</span>
+                                  ) : !lente || lente.disponivelTransferir <= 0 ? (
+                                    <span className={styles.noData}>—</span>
+                                  ) : (
+                                    renderTransferenciaTooltip(lente, fmt)
+                                  )}
+                                </td>
+                              )}
+                              {verTransferencias && (
+                                <td className={styles.vendas}>
+                                  {!transferLensIndex ? (
+                                    <span className={styles.noData}>{transferLensLoading ? "…" : "—"}</span>
+                                  ) : !lente || lente.compraOriginal <= 0 ? (
+                                    <span className={styles.noData}>—</span>
+                                  ) : (
+                                    <span style={{ fontWeight: 600 }}>{fmt(lente.compraLiquida)} un</span>
+                                  )}
+                                </td>
+                              )}
                               </>
                             </tr>
                           );
@@ -3436,7 +3586,7 @@ const handleBadgeClick = (cat: string) => {
         <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, tableLayout: "fixed" }}>
           <thead>
             <tr>
-              {["", "Produto", "Obs.", "Participação", "Faturamento no período", "Qtd vendida", "Estoque", ...(showEstoqueRede ? ["Estoque rede"] : []), "Markup", "Compra ideal"].map((label, i) => (
+              {["", "Produto", "Obs.", "Participação", "Faturamento no período", "Qtd vendida", "Estoque", ...(showEstoqueRede ? ["Estoque rede"] : []), "Markup", "Compra ideal", ...(verTransferencias ? ["Transferência", "Compra líquida"] : [])].map((label, i) => (
                 <th key={i} className={styles.stickyTableHeaderTh} style={{ textAlign: i >= 3 ? "right" : "left" }}>
                   {label}
                 </th>

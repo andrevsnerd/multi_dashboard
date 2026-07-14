@@ -11,7 +11,7 @@ import { getCurrentMonthRange, formatDateForQuery } from "@/lib/utils/date";
 import { exportRelatorioXlsx } from "@/lib/utils/exportRelatorioXlsx";
 import { exportCompraSugeridaAbcXlsx } from "@/lib/utils/exportCompraSugeridaAbcXlsx";
 import { exportClientesFilialXlsx } from "@/lib/utils/exportClientesFilialXlsx";
-import { COMPRA_FILIAL_COL_PREFIX, COMPRA_SUGERIDA_ABC_ID } from "@/lib/reports/compra-sugerida-abc";
+import { COMPRA_FILIAL_COL_PREFIX, COMPRA_SUGERIDA_ABC_ID, COMPRA_TRANSFER_LENS_COLUMNS } from "@/lib/reports/compra-sugerida-abc";
 import { CLIENTES_FILIAL_ID, FILIAL_COMPRAS_COL_PREFIX } from "@/lib/reports/clientes-filial";
 import { formatData, formatDataVenda, formatDiasParado } from "@/lib/reports/format";
 import { getDefaultPresets, getReportMeta, REPORT_TYPES, VENDAS_FATURAMENTO_ID } from "@/lib/reports/registry";
@@ -545,8 +545,13 @@ export default function GeradorRelatoriosPage({
 
       // Análise demorada → streaming com progresso por loja.
       if (reportTypeId === COMPRA_SUGERIDA_ABC_ID) {
+        // Liga a lente de transferência no backend só quando uma coluna de transferência
+        // está selecionada (opt-in — export idêntico ao de hoje até você adicionar a coluna).
+        const transferOn = workingColumns.some(
+          (c) => c.enabled && COMPRA_TRANSFER_LENS_COLUMNS.includes(c.key as (typeof COMPRA_TRANSFER_LENS_COLUMNS)[number])
+        );
         await generateViaStream(
-          `/api/relatorios/compra-sugerida-abc/stream?reportType=${encodeURIComponent(reportTypeId)}&${qs}`
+          `/api/relatorios/compra-sugerida-abc/stream?reportType=${encodeURIComponent(reportTypeId)}&${qs}${transferOn ? "&considerarTransferencias=1" : ""}`
         );
         return;
       }

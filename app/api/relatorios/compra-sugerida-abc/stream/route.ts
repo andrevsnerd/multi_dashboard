@@ -33,6 +33,7 @@ export async function GET(request: Request) {
   const tipos = searchParams.getAll("tipo").filter(Boolean);
   const produtoId = searchParams.get("produtoId");
   const produtoSearchTerm = searchParams.get("produtoSearchTerm");
+  const considerarTransferencias = searchParams.get("considerarTransferencias") === "1";
 
   const filters: ReportFilters = {
     company,
@@ -48,6 +49,7 @@ export async function GET(request: Request) {
     tipos: tipos.length > 0 ? tipos : null,
     produtoId: produtoId || null,
     produtoSearchTerm: produtoSearchTerm || null,
+    considerarTransferencias,
   };
 
   const encoder = new TextEncoder();
