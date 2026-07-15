@@ -46,6 +46,7 @@ export const PAGE_PERMISSION_DEFINITIONS = [
   { key: "filial", label: "Filiais", routeSegments: ["filial"] },
   { key: "exportar-relatorios", label: "Exportar Relatorios", routeSegments: ["exportar-relatorios"] },
   { key: "gerador-relatorios", label: "Gerador de Relatorios", routeSegments: ["gerador-relatorios"] },
+  { key: "aumentos-descontos", label: "Aumentos e Descontos", routeSegments: ["aumentos-descontos"] },
   { key: "gerador-apresentacoes", label: "Gerador de Apresentacoes", routeSegments: ["gerador-apresentacoes"] },
   { key: "fornecedores", label: "Grupos de Fornecedores", routeSegments: ["fornecedores"] },
   { key: "sincronizacao", label: "Sincronizacao", routeSegments: ["sincronizacao"] },

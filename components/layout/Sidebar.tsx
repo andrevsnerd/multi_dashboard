@@ -97,6 +97,8 @@ export default function Sidebar({ companyName }: SidebarProps) {
     basePath && basePath !== "/" ? `${basePath}/exportar-relatorios` : "/exportar-relatorios";
   const geradorRelatoriosHref =
     basePath && basePath !== "/" ? `${basePath}/gerador-relatorios` : "/gerador-relatorios";
+  const aumentosDescontosHref =
+    basePath && basePath !== "/" ? `${basePath}/aumentos-descontos` : "/aumentos-descontos";
   const geradorApresentacoesHref =
     basePath && basePath !== "/" ? `${basePath}/gerador-apresentacoes` : "/gerador-apresentacoes";
   const fornecedoresHref =
@@ -242,6 +244,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     "/faturamento",
     "/exportar-relatorios",
     "/gerador-relatorios",
+    "/aumentos-descontos",
     "/gerador-apresentacoes",
     "/mapa-clientes",
     "/sincronizacao",
@@ -519,6 +522,14 @@ export default function Sidebar({ companyName }: SidebarProps) {
           permission: "gerador-relatorios",
           isActive: (currentPathname) =>
             matchesSegment(currentPathname, "/gerador-relatorios", geradorRelatoriosHref),
+        },
+        {
+          key: "aumentos-descontos",
+          label: "Aumentos e Descontos",
+          href: aumentosDescontosHref,
+          permission: "aumentos-descontos",
+          isActive: (currentPathname) =>
+            matchesSegment(currentPathname, "/aumentos-descontos", aumentosDescontosHref),
         },
         ...(isScarfme
           ? [

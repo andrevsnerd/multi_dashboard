@@ -1,0 +1,257 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 8px 4px 40px;
+  color: var(--t-900);
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.title {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.subtitle {
+  font-size: 13px;
+  color: var(--t-500);
+  margin: 0;
+}
+
+.panel {
+  background: var(--s-white);
+  border: 1px solid var(--b-200);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.filtersGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.btn {
+  border: 1px solid var(--b-300);
+  border-radius: 10px;
+  padding: 9px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--s-white);
+  color: var(--t-900);
+  transition: filter 0.15s ease, opacity 0.15s ease;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btnPrimary {
+  background: #0ea5e9;
+  border-color: #0ea5e9;
+  color: #fff;
+}
+
+.btnPrimary:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.btnExport {
+  background: #16a34a;
+  border-color: #16a34a;
+  color: #fff;
+}
+
+.btnExport:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.errorBox {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-size: 13px;
+}
+
+/* ── KPIs ── */
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.kpiCard {
+  border: 1px solid var(--b-200);
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--s-white);
+}
+
+.kpiCardDesc {
+  border-left: 4px solid #dc2626;
+}
+
+.kpiCardAum {
+  border-left: 4px solid #16a34a;
+}
+
+.kpiCardNeutral {
+  border-left: 4px solid #64748b;
+}
+
+.kpiLabel {
+  font-size: 12px;
+  color: var(--t-500);
+  font-weight: 600;
+}
+
+.kpiValue {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.kpiSub {
+  font-size: 11px;
+  color: var(--t-400);
+}
+
+.valueDesc {
+  color: #dc2626;
+}
+
+.valueAum {
+  color: #16a34a;
+}
+
+/* ── Tabs ── */
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--b-200);
+}
+
+.tab {
+  border: none;
+  background: none;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--t-500);
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
+}
+
+.tabActiveDesc {
+  color: #dc2626;
+  border-bottom-color: #dc2626;
+}
+
+.tabActiveAum {
+  color: #16a34a;
+  border-bottom-color: #16a34a;
+}
+
+.tabCount {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--t-400);
+  margin-left: 6px;
+}
+
+/* ── Tabela ── */
+.tableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--b-200);
+  border-radius: 12px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  min-width: 900px;
+}
+
+.table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--s-50);
+  text-align: left;
+  padding: 10px 12px;
+  font-weight: 600;
+  color: var(--t-700);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid var(--b-200);
+}
+
+.table tbody td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--b-200);
+  white-space: nowrap;
+}
+
+.table tbody tr:hover {
+  background: var(--s-50);
+}
+
+.numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.strongDesc {
+  font-weight: 700;
+  color: #dc2626;
+}
+
+.strongAum {
+  font-weight: 700;
+  color: #16a34a;
+}
+
+.sortArrow {
+  font-size: 10px;
+  color: var(--t-400);
+  margin-left: 4px;
+}
+
+.empty {
+  padding: 40px;
+  text-align: center;
+  color: var(--t-500);
+  font-size: 14px;
+}
+
+.footNote {
+  font-size: 12px;
+  color: var(--t-500);
+  margin: 4px 2px 0;
+}
