@@ -57,12 +57,20 @@ export default function Sidebar({ companyName }: SidebarProps) {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
+  // Empresa "dona" desta sidebar, derivada do nome que a PageLayout injeta.
+  // Serve de fallback quando a URL atual não tem um segmento de empresa válido
+  // (ex.: navegação com pathname transitório/nulo): sem isso, getBasePath cairia
+  // para "/" e TODOS os links do menu perderiam o prefixo /nerd ou /scarfme,
+  // prendendo o usuário em rotas sem empresa (404).
+  const companyKeyFromName =
+    companyName === "SCARF ME" ? "scarfme" : companyName === "NERD" ? "nerd" : null;
+
   const getBasePath = () => {
     const parts = (pathname || "").split("/").filter(Boolean);
-    if (parts.length === 0) return "/";
-
     const company = parts[0];
     if (company === "nerd" || company === "scarfme") return `/${company}`;
+
+    if (companyKeyFromName) return `/${companyKeyFromName}`;
 
     return "/";
   };

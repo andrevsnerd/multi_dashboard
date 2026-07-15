@@ -1470,8 +1470,8 @@
     "semantic_hash": "7a672d31b6ac254cb25f6a420501049d"
   },
   "components/layout/Sidebar.tsx": {
-    "mtime": 1784139395.6271942,
-    "ast_hash": "75d26190edf403b100f2e4023493cf5e",
+    "mtime": 1784140611.2942388,
+    "ast_hash": "dee9f40dadf4589da4684a5e8250be52",
     "semantic_hash": ""
   },
   "components/layout/SidebarContext.tsx": {
@@ -3675,23 +3675,23 @@
     "semantic_hash": ""
   },
   "app/api/aumentos-descontos/route.ts": {
-    "mtime": 1784139163.0419183,
-    "ast_hash": "ec0ce66805fc43733f568caa3710a917",
+    "mtime": 1784140936.1177685,
+    "ast_hash": "6345530ef3b37acce5f701dc85697b49",
     "semantic_hash": ""
   },
   "components/aumentos-descontos/AumentosDescontosPage.tsx": {
-    "mtime": 1784139496.7870467,
-    "ast_hash": "d7cee3b0972dbe20b4f58159a3ff933d",
+    "mtime": 1784144071.7433841,
+    "ast_hash": "d79e48bd7dacff9548a5a8a603ed55f7",
     "semantic_hash": ""
   },
   "lib/repositories/aumentosDescontos.ts": {
-    "mtime": 1784139150.360525,
-    "ast_hash": "e81f7354d32f709778345ba3082d6e16",
+    "mtime": 1784143996.565766,
+    "ast_hash": "d1626dffaeda0a1bf8816a6997e2e15e",
     "semantic_hash": ""
   },
   "lib/utils/exportAumentosDescontosXlsx.ts": {
-    "mtime": 1784139229.6703522,
-    "ast_hash": "b2cd5cc290b1912127dc8732460fb641",
+    "mtime": 1784143191.2878363,
+    "ast_hash": "faa5db03d5db0e9a990878a2d015a862",
     "semantic_hash": ""
   },
   "lib/utils/exportEstoqueConsultaItemXlsx.ts": {

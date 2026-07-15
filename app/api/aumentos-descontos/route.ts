@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 
-import { fetchAumentosDescontos } from "@/lib/repositories/aumentosDescontos";
+import {
+  fetchAumentosDescontos,
+  fetchAumentosDescontosDetalhe,
+} from "@/lib/repositories/aumentosDescontos";
 
 // Pro: até 300s. A consulta de vendas (rede inteira) pode varrer muitos itens.
 export const maxDuration = 300;
@@ -27,23 +30,29 @@ export async function GET(request: Request) {
   const tipos = searchParams.getAll("tipo").filter(Boolean);
   const produtoId = searchParams.get("produtoId");
   const produtoSearchTerm = searchParams.get("produtoSearchTerm");
+  const view = searchParams.get("view"); // "detalhe" → transação a transação
+
+  const commonFilters = {
+    company,
+    filial: filial || null,
+    start,
+    end,
+    grupos: grupos.length > 0 ? grupos : null,
+    linhas: linhas.length > 0 ? linhas : null,
+    subgrupos: subgrupos.length > 0 ? subgrupos : null,
+    grades: grades.length > 0 ? grades : null,
+    colecoes: colecoes.length > 0 ? colecoes : null,
+    cores: cores.length > 0 ? cores : null,
+    tipos: tipos.length > 0 ? tipos : null,
+    produtoId: produtoId || null,
+    produtoSearchTerm: produtoSearchTerm || null,
+  };
 
   try {
-    const result = await fetchAumentosDescontos({
-      company,
-      filial: filial || null,
-      start,
-      end,
-      grupos: grupos.length > 0 ? grupos : null,
-      linhas: linhas.length > 0 ? linhas : null,
-      subgrupos: subgrupos.length > 0 ? subgrupos : null,
-      grades: grades.length > 0 ? grades : null,
-      colecoes: colecoes.length > 0 ? colecoes : null,
-      cores: cores.length > 0 ? cores : null,
-      tipos: tipos.length > 0 ? tipos : null,
-      produtoId: produtoId || null,
-      produtoSearchTerm: produtoSearchTerm || null,
-    });
+    const result =
+      view === "detalhe"
+        ? await fetchAumentosDescontosDetalhe(commonFilters)
+        : await fetchAumentosDescontos(commonFilters);
     return NextResponse.json(result);
   } catch (error) {
     console.error("Erro ao gerar Aumentos e Descontos", error);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import DateRangeFilter, { type DateRangeValue } from "@/components/filters/DateRangeFilter";
 import FilialFilter from "@/components/filters/FilialFilter";
@@ -10,6 +10,7 @@ import { getCurrentMonthRange, formatDateForQuery } from "@/lib/utils/date";
 import { exportAumentosDescontosXlsx } from "@/lib/utils/exportAumentosDescontosXlsx";
 import type {
   AumentoDescontoRow,
+  AumentoDescontoDetalheRow,
   AumentosDescontosResumo,
 } from "@/lib/repositories/aumentosDescontos";
 
@@ -20,23 +21,36 @@ interface AumentosDescontosPageProps {
   companyName: string;
 }
 
-interface ApiResult {
+interface AggResult {
   descontos: AumentoDescontoRow[];
   aumentos: AumentoDescontoRow[];
   resumo: AumentosDescontosResumo;
 }
+interface DetResult {
+  descontos: AumentoDescontoDetalheRow[];
+  aumentos: AumentoDescontoDetalheRow[];
+  total: number;
+  truncated: boolean;
+  itensSemPrecoSugerido: number;
+  itensPrecoJusto: number;
+}
 
 type OptKind = "grupo" | "linha" | "subgrupo" | "grade" | "colecao" | "cor" | "tipo";
 type Tab = "descontos" | "aumentos";
+type View = "agregado" | "detalhe";
 type SortDir = "asc" | "desc";
 
-const BRL = (v: number) =>
-  v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const BRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const INT = (v: number) => Math.round(v).toLocaleString("pt-BR");
-const PCT = (v: number) => `${v.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+const PCT = (v: number) =>
+  `${v.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
 
-/** Chaves ordenáveis da tabela. */
-type SortKey = keyof AumentoDescontoRow;
+interface Column {
+  key: string;
+  label: string;
+  numeric?: boolean;
+  kind?: "brl" | "int" | "pct";
+}
 
 export default function AumentosDescontosPage({ companyKey, companyName }: AumentosDescontosPageProps) {
   const isScarfme = companyKey === "scarfme";
@@ -65,13 +79,15 @@ export default function AumentosDescontosPage({ companyKey, companyName }: Aumen
   const [optTipos, setOptTipos] = useState<string[]>([]);
   const [loadingOpt, setLoadingOpt] = useState<Partial<Record<OptKind, boolean>>>({});
 
-  const [result, setResult] = useState<ApiResult | null>(null);
+  const [result, setResult] = useState<AggResult | null>(null);
+  const [detail, setDetail] = useState<DetResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [generatedOnce, setGeneratedOnce] = useState(false);
 
+  const [view, setView] = useState<View>("agregado");
   const [tab, setTab] = useState<Tab>("descontos");
-  const [sortKey, setSortKey] = useState<SortKey>("valor");
+  const [sortKey, setSortKey] = useState<string>("valor");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   const startStr = formatDateForQuery(range.startDate);
@@ -123,39 +139,88 @@ export default function AumentosDescontosPage({ companyKey, companyName }: Aumen
     });
   }, [loadOptions]);
 
-  // ── Gerar ──
-  const handleGenerate = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams();
-      params.set("company", companyKey);
-      if (filial) params.set("filial", filial);
-      params.set("start", startStr);
-      params.set("end", endStr);
-      grupos.forEach((v) => params.append("grupo", v));
-      linhas.forEach((v) => params.append("linha", v));
-      subgrupos.forEach((v) => params.append("subgrupo", v));
-      grades.forEach((v) => params.append("grade", v));
-      colecoes.forEach((v) => params.append("colecao", v));
-      cores.forEach((v) => params.append("cor", v));
-      tipos.forEach((v) => params.append("tipo", v));
-
-      const res = await fetch(`/api/aumentos-descontos?${params}`, { cache: "no-store" });
-      if (!res.ok) {
-        const j = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(j.error ?? `Erro ${res.status}`);
-      }
-      const json = (await res.json()) as ApiResult;
-      setResult(json);
-      setGeneratedOnce(true);
-    } catch (e) {
-      setResult(null);
-      setError(e instanceof Error ? e.message : "Erro ao gerar análise");
-    } finally {
-      setLoading(false);
-    }
+  // ── Assinatura dos filtros (dispara a busca automática) ──
+  const filtersQuery = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set("company", companyKey);
+    if (filial) params.set("filial", filial);
+    params.set("start", startStr);
+    params.set("end", endStr);
+    grupos.forEach((v) => params.append("grupo", v));
+    linhas.forEach((v) => params.append("linha", v));
+    subgrupos.forEach((v) => params.append("subgrupo", v));
+    grades.forEach((v) => params.append("grade", v));
+    colecoes.forEach((v) => params.append("colecao", v));
+    cores.forEach((v) => params.append("cor", v));
+    tipos.forEach((v) => params.append("tipo", v));
+    return params.toString();
   }, [companyKey, filial, startStr, endStr, grupos, linhas, subgrupos, grades, colecoes, cores, tipos]);
+
+  // ── Busca automática do AGREGADO (sem botão): ao montar e quando filtros mudam ──
+  const aggCtrl = useRef<AbortController | null>(null);
+  useEffect(() => {
+    const ctrl = new AbortController();
+    aggCtrl.current?.abort();
+    aggCtrl.current = ctrl;
+    const t = setTimeout(async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(`/api/aumentos-descontos?${filtersQuery}`, {
+          cache: "no-store",
+          signal: ctrl.signal,
+        });
+        if (!res.ok) {
+          const j = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(j.error ?? `Erro ${res.status}`);
+        }
+        setResult((await res.json()) as AggResult);
+      } catch (e) {
+        if ((e as Error).name === "AbortError") return;
+        setResult(null);
+        setError(e instanceof Error ? e.message : "Erro ao gerar análise");
+      } finally {
+        if (!ctrl.signal.aborted) setLoading(false);
+      }
+    }, 450);
+    return () => {
+      clearTimeout(t);
+      ctrl.abort();
+    };
+  }, [filtersQuery]);
+
+  // ── Busca do DETALHE (só quando a visão detalhada está ativa) ──
+  const detCtrl = useRef<AbortController | null>(null);
+  useEffect(() => {
+    if (view !== "detalhe") return;
+    const ctrl = new AbortController();
+    detCtrl.current?.abort();
+    detCtrl.current = ctrl;
+    const t = setTimeout(async () => {
+      setDetailLoading(true);
+      try {
+        const res = await fetch(`/api/aumentos-descontos?${filtersQuery}&view=detalhe`, {
+          cache: "no-store",
+          signal: ctrl.signal,
+        });
+        if (!res.ok) {
+          const j = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(j.error ?? `Erro ${res.status}`);
+        }
+        setDetail((await res.json()) as DetResult);
+      } catch (e) {
+        if ((e as Error).name === "AbortError") return;
+        setDetail(null);
+        setError(e instanceof Error ? e.message : "Erro ao detalhar");
+      } finally {
+        if (!ctrl.signal.aborted) setDetailLoading(false);
+      }
+    }, 450);
+    return () => {
+      clearTimeout(t);
+      ctrl.abort();
+    };
+  }, [filtersQuery, view]);
 
   const periodoLabel = `${range.startDate.toLocaleDateString("pt-BR")} — ${range.endDate.toLocaleDateString("pt-BR")}`;
 
@@ -173,11 +238,64 @@ export default function AumentosDescontosPage({ companyKey, companyName }: Aumen
     });
   }, [result, companyKey, companyName, filial, periodoLabel, isScarfme]);
 
-  // ── Ordenação da tabela ativa ──
-  const activeRows = useMemo(
-    () => (tab === "descontos" ? result?.descontos ?? [] : result?.aumentos ?? []),
-    [tab, result]
-  );
+  const resumo = result?.resumo;
+  const isDesc = tab === "descontos";
+
+  // ── Colunas por visão ──
+  const groupCol: Column = isScarfme
+    ? { key: "subgrupo", label: "Subgrupo" }
+    : { key: "grupo", label: "Grupo" };
+
+  const aggColumns: Column[] = [
+    { key: "produto", label: "Código" },
+    { key: "descricao", label: "Descrição" },
+    { key: "corDescricao", label: "Cor" },
+    { key: "linha", label: "Linha" },
+    groupCol,
+    ...(isScarfme ? [{ key: "grade", label: "Grade" }] : []),
+    { key: "qtde", label: "Qtde", numeric: true, kind: "int" as const },
+    { key: "precoSugerido", label: "Preço sugerido", numeric: true, kind: "brl" as const },
+    { key: "valorSugerido", label: "Valor sugerido", numeric: true, kind: "brl" as const },
+    { key: "precoMedioReal", label: "Preço médio real", numeric: true, kind: "brl" as const },
+    { key: "valorReal", label: "Valor real vendido", numeric: true, kind: "brl" as const },
+    { key: "valor", label: isDesc ? "Desconto total (R$)" : "Aumento total (R$)", numeric: true, kind: "brl" as const },
+    {
+      key: "valorMedioUnit",
+      label: isDesc ? "Desconto médio/unid." : "Aumento médio/unid.",
+      numeric: true,
+      kind: "brl" as const,
+    },
+    { key: "percentual", label: isDesc ? "% Desc. (item)" : "% Aum. (item)", numeric: true, kind: "pct" as const },
+    { key: "participacaoPerc", label: "% do total", numeric: true, kind: "pct" as const },
+  ];
+
+  const detColumns: Column[] = [
+    { key: "data", label: "Data" },
+    { key: "ticket", label: "Ticket/NF" },
+    { key: "filial", label: "Filial" },
+    ...(isScarfme ? [] : [{ key: "vendedor", label: "Vendedor" }]),
+    { key: "produto", label: "Código" },
+    { key: "descricao", label: "Descrição" },
+    { key: "corDescricao", label: "Cor" },
+    { key: "qtde", label: "Qtde", numeric: true, kind: "int" as const },
+    { key: "precoSugerido", label: "Preço sugerido", numeric: true, kind: "brl" as const },
+    { key: "precoReal", label: "Preço real", numeric: true, kind: "brl" as const },
+    { key: "valorSugerido", label: "Valor sugerido", numeric: true, kind: "brl" as const },
+    { key: "valorReal", label: "Valor real", numeric: true, kind: "brl" as const },
+    { key: "valor", label: isDesc ? "Desconto (R$)" : "Aumento (R$)", numeric: true, kind: "brl" as const },
+    { key: "percentual", label: isDesc ? "% Desc." : "% Aum.", numeric: true, kind: "pct" as const },
+  ];
+
+  const columns = view === "detalhe" ? detColumns : aggColumns;
+
+  const activeRows = useMemo<Array<Record<string, string | number | null>>>(() => {
+    const rows =
+      view === "detalhe"
+        ? (isDesc ? detail?.descontos : detail?.aumentos) ?? []
+        : (isDesc ? result?.descontos : result?.aumentos) ?? [];
+    return rows as unknown as Array<Record<string, string | number | null>>;
+  }, [view, isDesc, detail, result]);
+
   const sortedRows = useMemo(() => {
     const rows = [...activeRows];
     rows.sort((a, b) => {
@@ -191,46 +309,24 @@ export default function AumentosDescontosPage({ companyKey, companyName }: Aumen
     return rows;
   }, [activeRows, sortKey, sortDir]);
 
-  const onSort = (key: SortKey) => {
-    if (key === sortKey) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
+  const onSort = (key: string) => {
+    if (key === sortKey) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else {
       setSortKey(key);
-      setSortDir(typeof (activeRows[0]?.[key]) === "number" ? "desc" : "asc");
+      setSortDir(typeof activeRows[0]?.[key] === "number" ? "desc" : "asc");
     }
   };
 
-  const resumo = result?.resumo;
-  const isDesc = tab === "descontos";
-  const valorHeader = isDesc ? "Desconto (R$)" : "Aumento (R$)";
-  const percHeader = isDesc ? "% Desc." : "% Aum.";
-
-  const groupCol: { key: SortKey; label: string } = isScarfme
-    ? { key: "subgrupo", label: "Subgrupo" }
-    : { key: "grupo", label: "Grupo" };
-
-  const columns: Array<{ key: SortKey; label: string; numeric?: boolean }> = [
-    { key: "produto", label: "Código" },
-    { key: "descricao", label: "Descrição" },
-    { key: "corDescricao", label: "Cor" },
-    { key: "linha", label: "Linha" },
-    groupCol,
-    ...(isScarfme ? [{ key: "grade" as SortKey, label: "Grade" }] : []),
-    { key: "qtde", label: "Qtde", numeric: true },
-    { key: "precoSugerido", label: "Preço sugerido", numeric: true },
-    { key: "valorSugerido", label: "Valor sugerido", numeric: true },
-    { key: "precoMedioReal", label: "Preço médio real", numeric: true },
-    { key: "valorReal", label: "Valor real vendido", numeric: true },
-    { key: "valor", label: valorHeader, numeric: true },
-    { key: "percentual", label: percHeader, numeric: true },
-  ];
-
-  const fmtCell = (key: SortKey, value: string | number): string => {
-    if (typeof value !== "number") return value || "—";
-    if (key === "qtde") return INT(value);
-    if (key === "percentual") return PCT(value);
-    return BRL(value);
+  const fmtCell = (col: Column, value: string | number | null): string => {
+    if (value == null || value === "") return "—";
+    if (typeof value !== "number") return String(value);
+    if (col.kind === "int") return INT(value);
+    if (col.kind === "pct") return PCT(value);
+    if (col.kind === "brl") return BRL(value);
+    return String(value);
   };
+
+  const busy = view === "detalhe" ? detailLoading : loading;
 
   return (
     <div className={styles.wrapper}>
@@ -238,7 +334,7 @@ export default function AumentosDescontosPage({ companyKey, companyName }: Aumen
         <h1 className={styles.title}>Aumentos e Descontos</h1>
         <p className={styles.subtitle}>
           {companyName} · Compara o valor real vendido (regra de vendas validada) contra o preço
-          sugerido do cadastro, por produto × cor.
+          sugerido do cadastro, por produto × cor. A busca é automática ao mudar os filtros.
         </p>
       </div>
 
@@ -321,14 +417,7 @@ export default function AumentosDescontosPage({ companyKey, companyName }: Aumen
         </div>
 
         <div className={styles.actions}>
-          <button
-            type="button"
-            className={`${styles.btn} ${styles.btnPrimary}`}
-            onClick={() => void handleGenerate()}
-            disabled={loading}
-          >
-            {loading ? "Gerando…" : "Gerar análise"}
-          </button>
+          {busy && <span className={styles.kpiSub}>Carregando…</span>}
           <button
             type="button"
             className={`${styles.btn} ${styles.btnExport}`}
@@ -345,6 +434,11 @@ export default function AumentosDescontosPage({ companyKey, companyName }: Aumen
       {/* ── KPIs ── */}
       {resumo && (
         <div className={styles.kpiGrid}>
+          <div className={`${styles.kpiCard} ${styles.kpiCardNeutral}`}>
+            <span className={styles.kpiLabel}>Vendas no período</span>
+            <span className={styles.kpiValue}>{BRL(resumo.vendasPeriodo)}</span>
+            <span className={styles.kpiSub}>base global (Dashboard / Curva ABC)</span>
+          </div>
           <div className={`${styles.kpiCard} ${styles.kpiCardDesc}`}>
             <span className={styles.kpiLabel}>Total em descontos</span>
             <span className={`${styles.kpiValue} ${styles.valueDesc}`}>{BRL(resumo.totalDescontoValor)}</span>
@@ -362,12 +456,7 @@ export default function AumentosDescontosPage({ companyKey, companyName }: Aumen
           <div className={`${styles.kpiCard} ${styles.kpiCardNeutral}`}>
             <span className={styles.kpiLabel}>Valor sugerido total</span>
             <span className={styles.kpiValue}>{BRL(resumo.valorSugeridoTotal)}</span>
-            <span className={styles.kpiSub}>preço de cadastro × qtde</span>
-          </div>
-          <div className={`${styles.kpiCard} ${styles.kpiCardNeutral}`}>
-            <span className={styles.kpiLabel}>Valor real vendido total</span>
-            <span className={styles.kpiValue}>{BRL(resumo.valorRealTotal)}</span>
-            <span className={styles.kpiSub}>faturamento líquido validado</span>
+            <span className={styles.kpiSub}>itens analisados · preço cadastro × qtde</span>
           </div>
           <div className={`${styles.kpiCard} ${styles.kpiCardNeutral}`}>
             <span className={styles.kpiLabel}>Impacto líquido</span>
@@ -379,9 +468,26 @@ export default function AumentosDescontosPage({ companyKey, companyName }: Aumen
         </div>
       )}
 
-      {/* ── Tabelas por aba ── */}
+      {/* ── Tabelas ── */}
       {resumo && (
         <div className={styles.panel}>
+          <div className={styles.viewToggle}>
+            <button
+              type="button"
+              className={`${styles.viewBtn} ${view === "agregado" ? styles.viewBtnActive : ""}`}
+              onClick={() => setView("agregado")}
+            >
+              Agregado (produto × cor)
+            </button>
+            <button
+              type="button"
+              className={`${styles.viewBtn} ${view === "detalhe" ? styles.viewBtnActive : ""}`}
+              onClick={() => setView("detalhe")}
+            >
+              Detalhar (por venda)
+            </button>
+          </div>
+
           <div className={styles.tabs}>
             <button
               type="button"
@@ -389,7 +495,11 @@ export default function AumentosDescontosPage({ companyKey, companyName }: Aumen
               onClick={() => setTab("descontos")}
             >
               Descontos
-              <span className={styles.tabCount}>{INT(result?.descontos.length ?? 0)}</span>
+              <span className={styles.tabCount}>
+                {INT(
+                  (view === "detalhe" ? detail?.descontos.length : result?.descontos.length) ?? 0
+                )}
+              </span>
             </button>
             <button
               type="button"
@@ -397,11 +507,15 @@ export default function AumentosDescontosPage({ companyKey, companyName }: Aumen
               onClick={() => setTab("aumentos")}
             >
               Aumentos
-              <span className={styles.tabCount}>{INT(result?.aumentos.length ?? 0)}</span>
+              <span className={styles.tabCount}>
+                {INT((view === "detalhe" ? detail?.aumentos.length : result?.aumentos.length) ?? 0)}
+              </span>
             </button>
           </div>
 
-          {sortedRows.length === 0 ? (
+          {busy && view === "detalhe" && !detail ? (
+            <div className={styles.empty}>Carregando vendas detalhadas…</div>
+          ) : sortedRows.length === 0 ? (
             <div className={styles.empty}>
               Nenhum item {isDesc ? "com desconto" : "com aumento"} no período/filtros selecionados.
             </div>
@@ -426,7 +540,7 @@ export default function AumentosDescontosPage({ companyKey, companyName }: Aumen
                 </thead>
                 <tbody>
                   {sortedRows.map((row, i) => (
-                    <tr key={`${row.produto}-${row.cor}-${i}`}>
+                    <tr key={`${row.produto}-${row.cor ?? ""}-${row.ticket ?? ""}-${i}`}>
                       {columns.map((c) => {
                         const isImpact = c.key === "valor" || c.key === "percentual";
                         const impactClass = isImpact
@@ -439,7 +553,7 @@ export default function AumentosDescontosPage({ companyKey, companyName }: Aumen
                             key={c.key}
                             className={`${c.numeric ? styles.numeric : ""} ${impactClass}`.trim()}
                           >
-                            {fmtCell(c.key, row[c.key])}
+                            {fmtCell(c, row[c.key])}
                           </td>
                         );
                       })}
@@ -450,20 +564,34 @@ export default function AumentosDescontosPage({ companyKey, companyName }: Aumen
             </div>
           )}
 
+          {view === "detalhe" && detail?.truncated && (
+            <p className={styles.footNote}>
+              Mostrando as vendas mais recentes (limite atingido) — refine os filtros para ver o
+              período inteiro.
+            </p>
+          )}
           <p className={styles.footNote}>
-            {INT(resumo.itensPrecoJusto)} item(ns) vendido(s) exatamente ao preço sugerido ·{" "}
-            {INT(resumo.itensSemPrecoSugerido)} sem preço sugerido cadastrado (fora da análise).
+            {view === "agregado" ? (
+              <>
+                {INT(resumo.itensPrecoJusto)} item(ns) vendido(s) exatamente ao preço sugerido ·{" "}
+                {INT(resumo.itensSemPrecoSugerido)} sem preço sugerido cadastrado (fora da análise).
+              </>
+            ) : (
+              <>
+                {INT(detail?.itensPrecoJusto ?? 0)} venda(s) exatamente ao preço sugerido ·{" "}
+                {INT(detail?.itensSemPrecoSugerido ?? 0)} sem preço sugerido cadastrado (fora da
+                análise). Visão por transação (regra de vendas validada por linha) — não abate
+                trocas por linha, então pode diferir em poucas unidades do agregado (que é líquido
+                de trocas). Número oficial de vendas: “Vendas no período”.
+              </>
+            )}
           </p>
         </div>
       )}
 
       {!resumo && !loading && !error && (
         <div className={styles.panel}>
-          <div className={styles.empty}>
-            {generatedOnce
-              ? "Sem dados para os filtros selecionados."
-              : "Selecione o período e os filtros e clique em “Gerar análise”."}
-          </div>
+          <div className={styles.empty}>Carregando análise…</div>
         </div>
       )}
     </div>

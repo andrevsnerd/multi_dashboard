@@ -1,4 +1,8 @@
 import { fetchProductsWithDetails, fetchProdutosCustoPrecoMestre } from "@/lib/repositories/products";
+import { fetchSalesTotals } from "@/lib/services/salesTotals";
+import { fetchVendasHistorico } from "@/lib/repositories/reportVendasHistorico";
+import { normalizeRangeForQuery } from "@/lib/utils/date";
+import type { ReportFilters } from "@/lib/reports/types";
 
 /**
  * Análise "Aumentos e Descontos" (por produto × cor).
@@ -52,11 +56,22 @@ export interface AumentoDescontoRow {
   valorReal: number; // faturamento líquido canônico
   /** Valor da diferença (sempre positivo): desconto concedido ou aumento praticado. */
   valor: number;
-  /** Percentual relativo ao valor sugerido (sempre positivo). */
+  /** Desconto/aumento MÉDIO por unidade vendida (valor ÷ qtde), em R$. */
+  valorMedioUnit: number;
+  /** Percentual relativo ao valor sugerido do próprio item (sempre positivo). */
   percentual: number;
+  /** Participação deste item no total de descontos (ou aumentos) do período, em %. */
+  participacaoPerc: number;
 }
 
 export interface AumentosDescontosResumo {
+  /**
+   * Vendas líquidas do período pela FONTE CANÔNICA (`fetchSalesTotals`), a mesma
+   * do Dashboard e da Curva ABC. É o número que TEM que bater com o resto do app.
+   * Difere de `valorRealTotal` porque este cobre só os itens analisáveis (com
+   * preço sugerido cadastrado e quantidade líquida positiva).
+   */
+  vendasPeriodo: number;
   valorSugeridoTotal: number;
   valorRealTotal: number;
   totalDescontoValor: number;
@@ -99,19 +114,38 @@ function roundInt(value: number | null | undefined): number {
 export async function fetchAumentosDescontos(
   filters: AumentosDescontosFilters
 ): Promise<AumentosDescontosResult> {
-  const details = await fetchProductsWithDetails({
-    company: filters.company,
-    range: { start: filters.start, end: filters.end },
-    filial: filters.filial ?? null,
-    grupos: filters.grupos ?? null,
-    linhas: filters.linhas ?? null,
-    subgrupos: filters.subgrupos ?? null,
-    grades: filters.grades ?? null,
-    colecoes: filters.colecoes ?? null,
-    produtoId: filters.produtoId ?? undefined,
-    produtoSearchTerm: filters.produtoSearchTerm ?? undefined,
-    groupByColor: true,
-  });
+  // Vendas do período pela fonte canônica (bate com Dashboard/Curva ABC) e os
+  // detalhes por produto × cor rodam em paralelo. O `fetchSalesTotals` já conhece
+  // TODOS os filtros (inclui cor por descrição e tipo).
+  const [details, salesTotals] = await Promise.all([
+    fetchProductsWithDetails({
+      company: filters.company,
+      range: { start: filters.start, end: filters.end },
+      filial: filters.filial ?? null,
+      grupos: filters.grupos ?? null,
+      linhas: filters.linhas ?? null,
+      subgrupos: filters.subgrupos ?? null,
+      grades: filters.grades ?? null,
+      colecoes: filters.colecoes ?? null,
+      produtoId: filters.produtoId ?? undefined,
+      produtoSearchTerm: filters.produtoSearchTerm ?? undefined,
+      groupByColor: true,
+    }),
+    fetchSalesTotals({
+      company: filters.company,
+      range: normalizeRangeForQuery({ start: filters.start, end: filters.end }),
+      filial: filters.filial ?? null,
+      linhas: filters.linhas ?? null,
+      grupos: filters.grupos ?? null,
+      subgrupos: filters.subgrupos ?? null,
+      grades: filters.grades ?? null,
+      colecoes: filters.colecoes ?? null,
+      cores: filters.cores ?? null,
+      tipos: filters.tipos ?? null,
+      produtoId: filters.produtoId ?? null,
+      produtoSearchTerm: filters.produtoSearchTerm ?? null,
+    }).catch(() => null),
+  ]);
 
   // Filtros pós-consulta (cor por DESCRIÇÃO e tipo) — mesma regra do Gerador de
   // Relatórios; `fetchProductsWithDetails` não expõe esses dois filtros.
@@ -170,7 +204,10 @@ export async function fetchAumentosDescontos(
     valorSugeridoTotal += valorSugerido;
     valorRealTotal += valorReal;
 
-    const base: Omit<AumentoDescontoRow, "valor" | "percentual"> = {
+    const base: Omit<
+      AumentoDescontoRow,
+      "valor" | "valorMedioUnit" | "percentual" | "participacaoPerc"
+    > = {
       produto: pid,
       cor: d.corProduto ? String(d.corProduto).trim() : "",
       corDescricao: d.descCorProduto ?? "",
@@ -190,14 +227,26 @@ export async function fetchAumentosDescontos(
     const difArred = round2(diferenca);
     if (difArred > 0) {
       const perc = valorSugerido !== 0 ? (diferenca / valorSugerido) * 100 : 0;
-      descontos.push({ ...base, valor: difArred, percentual: round2(perc) });
+      descontos.push({
+        ...base,
+        valor: difArred,
+        valorMedioUnit: round2(qtde > 0 ? difArred / qtde : 0),
+        percentual: round2(perc),
+        participacaoPerc: 0, // preenchido após conhecer o total
+      });
       totalDescontoValor += diferenca;
       qtdeDesconto += qtde;
       valorSugeridoDesconto += valorSugerido;
     } else if (difArred < 0) {
       const aumento = -diferenca;
       const perc = valorSugerido !== 0 ? (aumento / valorSugerido) * 100 : 0;
-      aumentos.push({ ...base, valor: round2(aumento), percentual: round2(perc) });
+      aumentos.push({
+        ...base,
+        valor: round2(aumento),
+        valorMedioUnit: round2(qtde > 0 ? aumento / qtde : 0),
+        percentual: round2(perc),
+        participacaoPerc: 0,
+      });
       totalAumentoValor += aumento;
       qtdeAumento += qtde;
       valorSugeridoAumento += valorSugerido;
@@ -206,11 +255,20 @@ export async function fetchAumentosDescontos(
     }
   }
 
+  // Participação de cada item no total do seu grupo (soma das participações = 100%).
+  for (const row of descontos) {
+    row.participacaoPerc = totalDescontoValor !== 0 ? round2((row.valor / totalDescontoValor) * 100) : 0;
+  }
+  for (const row of aumentos) {
+    row.participacaoPerc = totalAumentoValor !== 0 ? round2((row.valor / totalAumentoValor) * 100) : 0;
+  }
+
   // Maior impacto primeiro (valor em R$).
   descontos.sort((a, b) => b.valor - a.valor);
   aumentos.sort((a, b) => b.valor - a.valor);
 
   const resumo: AumentosDescontosResumo = {
+    vendasPeriodo: round2(salesTotals?.vendas ?? valorRealTotal),
     valorSugeridoTotal: round2(valorSugeridoTotal),
     valorRealTotal: round2(valorRealTotal),
     totalDescontoValor: round2(totalDescontoValor),
@@ -228,4 +286,139 @@ export async function fetchAumentosDescontos(
   };
 
   return { descontos, aumentos, resumo };
+}
+
+/**
+ * Visão DETALHADA (transação a transação): cada linha é um item vendido num
+ * ticket/nota, comparado contra o preço sugerido do cadastro.
+ *
+ * Reusa a fonte canônica `fetchVendasHistorico` (nível de transação, regra de
+ * vendas validada — POS via LOJA_VENDA_PRODUTO com fator de desconto, e-commerce
+ * via FATURAMENTO). Observação: por ser nível de transação, o valor real da linha
+ * NÃO abate trocas (trocas não se atribuem a uma linha específica); por isso a
+ * soma da visão detalhada pode diferir levemente da agregada, que é líquida de
+ * trocas. Para o número oficial de vendas do período, use `vendasPeriodo`.
+ */
+export interface AumentoDescontoDetalheRow {
+  data: string; // ISO 'yyyy-mm-dd'
+  ticket: string;
+  filial: string;
+  vendedor: string;
+  produto: string;
+  cor: string;
+  corDescricao: string;
+  descricao: string;
+  tamanho: number | null;
+  linha: string;
+  grupo: string;
+  subgrupo: string;
+  grade: string;
+  tipo: string;
+  qtde: number;
+  precoSugerido: number; // unitário
+  valorSugerido: number; // precoSugerido × qtde
+  precoReal: number; // valor real ÷ qtde
+  valorReal: number; // valor líquido da linha (regra validada)
+  valor: number; // |diferença| (desconto ou aumento)
+  percentual: number;
+}
+
+export interface AumentosDescontosDetalheResult {
+  descontos: AumentoDescontoDetalheRow[];
+  aumentos: AumentoDescontoDetalheRow[];
+  total: number;
+  truncated: boolean;
+  itensSemPrecoSugerido: number;
+  itensPrecoJusto: number;
+}
+
+export async function fetchAumentosDescontosDetalhe(
+  filters: AumentosDescontosFilters
+): Promise<AumentosDescontosDetalheResult> {
+  const reportFilters: ReportFilters = {
+    company: filters.company,
+    filial: filters.filial ?? null,
+    start: filters.start,
+    end: filters.end,
+    grupos: filters.grupos ?? null,
+    linhas: filters.linhas ?? null,
+    subgrupos: filters.subgrupos ?? null,
+    grades: filters.grades ?? null,
+    colecoes: filters.colecoes ?? null,
+    cores: filters.cores ?? null,
+    tipos: filters.tipos ?? null,
+    produtoId: filters.produtoId ?? null,
+    produtoSearchTerm: filters.produtoSearchTerm ?? null,
+  };
+
+  const historico = await fetchVendasHistorico(reportFilters);
+  const rows = historico.rows;
+
+  const custoPreco = await fetchProdutosCustoPrecoMestre(
+    rows.map((r) => String(r.PRODUTO ?? "").trim())
+  );
+
+  const descontos: AumentoDescontoDetalheRow[] = [];
+  const aumentos: AumentoDescontoDetalheRow[] = [];
+  let itensSemPrecoSugerido = 0;
+  let itensPrecoJusto = 0;
+
+  for (const r of rows) {
+    const pid = String(r.PRODUTO ?? "").trim();
+    const qtde = Number(r.QTDE ?? 0);
+    const valorReal = Number(r.VALOR ?? 0);
+    const mestre = custoPreco.get(pid);
+    const precoSugerido = mestre && mestre.precoSugerido != null ? mestre.precoSugerido : null;
+
+    if (precoSugerido == null || precoSugerido <= 0 || qtde <= 0) {
+      itensSemPrecoSugerido += 1;
+      continue;
+    }
+
+    const valorSugerido = precoSugerido * qtde;
+    const diferenca = valorSugerido - valorReal;
+    const difArred = round2(diferenca);
+    if (difArred === 0) {
+      itensPrecoJusto += 1;
+      continue;
+    }
+
+    const base: Omit<AumentoDescontoDetalheRow, "valor" | "percentual"> = {
+      data: String(r.DATA_VENDA ?? ""),
+      ticket: String(r.TICKET ?? ""),
+      filial: String(r.FILIAL ?? ""),
+      vendedor: String(r.VENDEDOR ?? ""),
+      produto: pid,
+      cor: String(r.COR ?? ""),
+      corDescricao: String(r.COR_DESCRICAO ?? ""),
+      descricao: String(r.DESCRICAO ?? ""),
+      tamanho: r.TAMANHO != null ? Number(r.TAMANHO) : null,
+      linha: String(r.LINHA ?? ""),
+      grupo: String(r.GRUPO ?? ""),
+      subgrupo: String(r.SUBGRUPO ?? ""),
+      grade: String(r.GRADE ?? ""),
+      tipo: String(r.TIPO ?? ""),
+      qtde: roundInt(qtde),
+      precoSugerido: round2(precoSugerido),
+      valorSugerido: round2(valorSugerido),
+      precoReal: round2(qtde > 0 ? valorReal / qtde : 0),
+      valorReal: round2(valorReal),
+    };
+
+    const perc = valorSugerido !== 0 ? (Math.abs(diferenca) / valorSugerido) * 100 : 0;
+    if (difArred > 0) descontos.push({ ...base, valor: difArred, percentual: round2(perc) });
+    else aumentos.push({ ...base, valor: round2(-diferenca), percentual: round2(perc) });
+  }
+
+  descontos.sort((a, b) => b.valor - a.valor);
+  aumentos.sort((a, b) => b.valor - a.valor);
+
+  return {
+    descontos,
+    aumentos,
+    total: descontos.length + aumentos.length,
+    truncated: historico.truncated,
+    itensSemPrecoSugerido,
+    itensPrecoJusto,
+  };
 }

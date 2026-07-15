@@ -195,6 +195,7 @@ function buildDashboardSheet(
   r += 1;
 
   section("Totais do período", HEADER_FILL_DASH);
+  kpi("Vendas no período (base global)", resumo.vendasPeriodo, CUR_FMT);
   kpi("Valor sugerido total", resumo.valorSugeridoTotal, CUR_FMT);
   kpi("Valor real vendido total", resumo.valorRealTotal, CUR_FMT);
   kpi("Impacto líquido (aumento − desconto)", resumo.totalAumentoValor - resumo.totalDescontoValor, CUR_FMT);
@@ -239,7 +240,9 @@ function buildDetailSheet(
     { key: "precoMedioReal", label: "Preço médio real", width: 16, fmt: CUR_FMT, align: "right" },
     { key: "valorReal", label: "Valor real vendido", width: 17, fmt: CUR_FMT, align: "right" },
     { key: "valor", label: opts.valorLabel, width: 15, fmt: CUR_FMT, align: "right" },
+    { key: "valorMedioUnit", label: `${opts.valorLabel.replace(" (R$)", "")} médio/unid.`, width: 16, fmt: CUR_FMT, align: "right" },
     { key: "percentual", label: opts.percLabel, width: 12, fmt: PCT_FMT, align: "right" },
+    { key: "participacaoPerc", label: "% do total", width: 11, fmt: PCT_FMT, align: "right" },
   ];
 
   const columnCount = cols.length;

@@ -148,6 +148,35 @@
   color: #16a34a;
 }
 
+/* ── Alternador de visão (Agregado / Detalhar) ── */
+.viewToggle {
+  display: inline-flex;
+  gap: 0;
+  border: 1px solid var(--b-300);
+  border-radius: 10px;
+  overflow: hidden;
+  align-self: flex-start;
+}
+
+.viewBtn {
+  border: none;
+  background: var(--s-white);
+  color: var(--t-600);
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.viewBtn + .viewBtn {
+  border-left: 1px solid var(--b-300);
+}
+
+.viewBtnActive {
+  background: #0ea5e9;
+  color: #fff;
+}
+
 /* ── Tabs ── */
 .tabs {
   display: flex;
