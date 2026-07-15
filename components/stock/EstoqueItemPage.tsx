@@ -7,9 +7,11 @@ import {
   compareFilialDisplayOrder,
   getFilialLabelForDisplay,
   resolveCompany,
+  VAREJO_VALUE,
   type CompanyKey,
 } from "@/lib/config/company";
 import { getCurrentMonthRange } from "@/lib/utils/date";
+import { exportEstoqueConsultaItemXlsx } from "@/lib/utils/exportEstoqueConsultaItemXlsx";
 
 import styles from "./EstoqueItemPage.module.css";
 
@@ -764,6 +766,63 @@ export default function EstoqueItemPage({
     };
   }, [data, filteredPivotRows, visibleFiliaisColumns]);
 
+  const selectedFilialLabel = useMemo(() => {
+    if (!selectedFilial) return null;
+    if (selectedFilial === VAREJO_VALUE) return "VAREJO";
+    return companyCfg?.filialDisplayNames?.[selectedFilial] ?? selectedFilial;
+  }, [selectedFilial, companyCfg]);
+
+  const handleExportXlsx = useCallback(() => {
+    if (sortedPivotRows.length === 0) return;
+
+    const filtros: string[] = [];
+    if (itensInput.trim()) filtros.push(`Itens: ${itensInput.trim()}`);
+    if (cor) filtros.push(`Cor: ${cor}`);
+    if (companyKey === "nerd" && grupo) filtros.push(`Grupo: ${grupo}`);
+    if (companyKey === "scarfme") {
+      if (linha) filtros.push(`Linha: ${linha}`);
+      if (subgrupo) filtros.push(`Subgrupo: ${subgrupo}`);
+      if (grade) filtros.push(`Grade: ${grade}`);
+      if (colecao) filtros.push(`Coleção: ${colecao}`);
+    }
+    if (mostrarZerados) filtros.push("Incluindo zerados");
+    if (mostrarNegativos) filtros.push("Incluindo negativos");
+
+    void exportEstoqueConsultaItemXlsx({
+      companyKey,
+      companyName,
+      filialLabel: selectedFilialLabel,
+      filtrosResumo: filtros.length ? `Filtros: ${filtros.join(" · ")}` : undefined,
+      rows: sortedPivotRows.map((row) => ({
+        produto: row.produto,
+        descricao: row.descricao,
+        cor: row.cor,
+        linha: row.linha,
+        subgrupo: row.subgrupo,
+        grade: row.grade,
+        colecao: row.colecao,
+        total: row.total,
+        porFilial: row.porFilial,
+      })),
+      filiaisColumns: visibleFiliaisColumns,
+    });
+  }, [
+    sortedPivotRows,
+    itensInput,
+    cor,
+    companyKey,
+    grupo,
+    linha,
+    subgrupo,
+    grade,
+    colecao,
+    mostrarZerados,
+    mostrarNegativos,
+    companyName,
+    selectedFilialLabel,
+    visibleFiliaisColumns,
+  ]);
+
   const limparFiltros = () => {
     setItensInput("");
     setGrupo(null);
@@ -999,6 +1058,16 @@ export default function EstoqueItemPage({
             onToggle={toggleFilialColumn}
             onShowAll={showAllFiliais}
           />
+        ) : null}
+
+        {sortedPivotRows.length > 0 ? (
+          <button
+            type="button"
+            className={styles.secondaryBtn}
+            onClick={handleExportXlsx}
+          >
+            Exportar Excel
+          </button>
         ) : null}
       </div>
 
