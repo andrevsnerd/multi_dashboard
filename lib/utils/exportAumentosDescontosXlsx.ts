@@ -235,14 +235,16 @@ function buildDetailSheet(
         ])
       : ([{ key: "grupo" as const, label: "Grupo", width: 16, align: "left" as const }])),
     { key: "qtde", label: "Qtde", width: 10, fmt: INT_FMT, align: "right" },
+    // Preços unitários lado a lado (sugerido vs. real médio).
     { key: "precoSugerido", label: "Preço sugerido", width: 15, fmt: CUR_FMT, align: "right" },
-    { key: "valorSugerido", label: "Valor sugerido", width: 16, fmt: CUR_FMT, align: "right" },
     { key: "precoMedioReal", label: "Preço médio real", width: 16, fmt: CUR_FMT, align: "right" },
+    // Valores totais lado a lado (sugerido vs. real).
+    { key: "valorSugerido", label: "Valor sugerido", width: 16, fmt: CUR_FMT, align: "right" },
     { key: "valorReal", label: "Valor real vendido", width: 17, fmt: CUR_FMT, align: "right" },
-    { key: "valor", label: opts.valorLabel, width: 15, fmt: CUR_FMT, align: "right" },
+    // Impacto: médio por unidade antes do total, seguido do %.
     { key: "valorMedioUnit", label: `${opts.valorLabel.replace(" (R$)", "")} médio/unid.`, width: 16, fmt: CUR_FMT, align: "right" },
+    { key: "valor", label: opts.valorLabel, width: 15, fmt: CUR_FMT, align: "right" },
     { key: "percentual", label: opts.percLabel, width: 12, fmt: PCT_FMT, align: "right" },
-    { key: "participacaoPerc", label: "% do total", width: 11, fmt: PCT_FMT, align: "right" },
   ];
 
   const columnCount = cols.length;

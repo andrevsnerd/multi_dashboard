@@ -254,19 +254,21 @@ export default function AumentosDescontosPage({ companyKey, companyName }: Aumen
     groupCol,
     ...(isScarfme ? [{ key: "grade", label: "Grade" }] : []),
     { key: "qtde", label: "Qtde", numeric: true, kind: "int" as const },
+    // Preços unitários lado a lado (sugerido vs. real médio).
     { key: "precoSugerido", label: "Preço sugerido", numeric: true, kind: "brl" as const },
-    { key: "valorSugerido", label: "Valor sugerido", numeric: true, kind: "brl" as const },
     { key: "precoMedioReal", label: "Preço médio real", numeric: true, kind: "brl" as const },
+    // Valores totais lado a lado (sugerido vs. real).
+    { key: "valorSugerido", label: "Valor sugerido", numeric: true, kind: "brl" as const },
     { key: "valorReal", label: "Valor real vendido", numeric: true, kind: "brl" as const },
-    { key: "valor", label: isDesc ? "Desconto total (R$)" : "Aumento total (R$)", numeric: true, kind: "brl" as const },
+    // Impacto: médio por unidade antes do total, seguido do % do item.
     {
       key: "valorMedioUnit",
       label: isDesc ? "Desconto médio/unid." : "Aumento médio/unid.",
       numeric: true,
       kind: "brl" as const,
     },
-    { key: "percentual", label: isDesc ? "% Desc. (item)" : "% Aum. (item)", numeric: true, kind: "pct" as const },
-    { key: "participacaoPerc", label: "% do total", numeric: true, kind: "pct" as const },
+    { key: "valor", label: isDesc ? "Desconto total (R$)" : "Aumento total (R$)", numeric: true, kind: "brl" as const },
+    { key: "percentual", label: isDesc ? "% Desc." : "% Aum.", numeric: true, kind: "pct" as const },
   ];
 
   const detColumns: Column[] = [

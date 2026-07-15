@@ -60,8 +60,6 @@ export interface AumentoDescontoRow {
   valorMedioUnit: number;
   /** Percentual relativo ao valor sugerido do próprio item (sempre positivo). */
   percentual: number;
-  /** Participação deste item no total de descontos (ou aumentos) do período, em %. */
-  participacaoPerc: number;
 }
 
 export interface AumentosDescontosResumo {
@@ -204,10 +202,7 @@ export async function fetchAumentosDescontos(
     valorSugeridoTotal += valorSugerido;
     valorRealTotal += valorReal;
 
-    const base: Omit<
-      AumentoDescontoRow,
-      "valor" | "valorMedioUnit" | "percentual" | "participacaoPerc"
-    > = {
+    const base: Omit<AumentoDescontoRow, "valor" | "valorMedioUnit" | "percentual"> = {
       produto: pid,
       cor: d.corProduto ? String(d.corProduto).trim() : "",
       corDescricao: d.descCorProduto ?? "",
@@ -232,7 +227,6 @@ export async function fetchAumentosDescontos(
         valor: difArred,
         valorMedioUnit: round2(qtde > 0 ? difArred / qtde : 0),
         percentual: round2(perc),
-        participacaoPerc: 0, // preenchido após conhecer o total
       });
       totalDescontoValor += diferenca;
       qtdeDesconto += qtde;
@@ -245,7 +239,6 @@ export async function fetchAumentosDescontos(
         valor: round2(aumento),
         valorMedioUnit: round2(qtde > 0 ? aumento / qtde : 0),
         percentual: round2(perc),
-        participacaoPerc: 0,
       });
       totalAumentoValor += aumento;
       qtdeAumento += qtde;
@@ -253,14 +246,6 @@ export async function fetchAumentosDescontos(
     } else {
       itensPrecoJusto += 1;
     }
-  }
-
-  // Participação de cada item no total do seu grupo (soma das participações = 100%).
-  for (const row of descontos) {
-    row.participacaoPerc = totalDescontoValor !== 0 ? round2((row.valor / totalDescontoValor) * 100) : 0;
-  }
-  for (const row of aumentos) {
-    row.participacaoPerc = totalAumentoValor !== 0 ? round2((row.valor / totalAumentoValor) * 100) : 0;
   }
 
   // Maior impacto primeiro (valor em R$).
