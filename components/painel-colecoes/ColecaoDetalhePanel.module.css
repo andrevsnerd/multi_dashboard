@@ -1,0 +1,300 @@
+/* Painel de performance expandido de uma coleção.
+   Estética coral/creme, fiel ao deck de apresentação (copa-galisteu / relatório
+   Claude) — intencionalmente self-contained e claro, como o tema "Com fotos".
+   Fonte serifada nos números para casar com o restante do painel.
+   Layout COMPACTO: KPIs primeiro (linha horizontal), depois destaques + lojas. */
+
+.panel {
+  margin-top: 4px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--b-gray200, #e5e7eb);
+  animation: pcFade 0.28s ease;
+}
+
+@keyframes pcFade {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.loading,
+.error,
+.emptyBlock {
+  padding: 16px;
+  text-align: center;
+  color: #9a9aa2;
+  font-size: 0.85rem;
+}
+
+.error {
+  color: #b91c1c;
+}
+
+.grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.block {
+  background: #fffdfb;
+  border: 1px solid #f0ece8;
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+
+/* KPIs em cima, largura total */
+.blockNumeros {
+  grid-column: 1 / -1;
+}
+
+.blockHeader {
+  margin-bottom: 10px;
+}
+
+.blockTitle {
+  margin: 0;
+  font-family: "Cambria", Georgia, "Times New Roman", serif;
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: #2b2b2b;
+  letter-spacing: -0.01em;
+}
+
+.blockSubtitle {
+  margin: 2px 0 0;
+  font-size: 0.74rem;
+  color: #9a9aa2;
+}
+
+/* ── Os números (KPIs) — linha horizontal compacta ─────────────────────────*/
+.kpiRow {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.kpiTile {
+  flex: 1 1 130px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fbf7f4;
+  border: 1px solid #f0ebe7;
+}
+
+.kpiTileHero {
+  background: linear-gradient(135deg, #f5806f 0%, #ea5a48 100%);
+  border-color: transparent;
+  box-shadow: 0 8px 18px rgba(233, 90, 72, 0.22);
+}
+
+.kpiLabel {
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #b0868a;
+}
+
+.kpiTileHero .kpiLabel {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.kpiValue {
+  font-family: "Cambria", Georgia, "Times New Roman", serif;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #2b2b2b;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.kpiTileHero .kpiValue {
+  color: #fff;
+}
+
+.kpiHint {
+  font-size: 0.66rem;
+  color: #9a9aa2;
+}
+
+.kpiTileHero .kpiHint {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* ── Destaques ─────────────────────────────────────────────────────────────*/
+.destaquesList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.destaqueRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+}
+
+.destaqueRank {
+  flex-shrink: 0;
+  font-family: "Cambria", Georgia, "Times New Roman", serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #ef6a5a;
+  line-height: 1.1;
+  width: 16px;
+  text-align: center;
+}
+
+.destaqueBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.destaqueName {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #2b2b2b;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+}
+
+.destaqueMeta {
+  font-size: 0.7rem;
+  color: #9a9aa2;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.destaqueBarTrack {
+  margin-top: 2px;
+  height: 5px;
+  border-radius: 999px;
+  background: #f4eeeb;
+  overflow: hidden;
+}
+
+.destaqueBarFill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #f28a7a, #ef6a5a);
+  transition: width 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.destaqueValues {
+  flex-shrink: 0;
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.destaqueRevenue {
+  font-family: "Cambria", Georgia, "Times New Roman", serif;
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: #2b2b2b;
+  white-space: nowrap;
+}
+
+.destaquePct {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #ef6a5a;
+  white-space: nowrap;
+}
+
+/* ── Vendas por loja ───────────────────────────────────────────────────────*/
+.lojasTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.thLeft,
+.thRight {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #b6b6bd;
+  padding: 0 0 7px;
+}
+
+.thLeft {
+  text-align: left;
+}
+
+.thRight {
+  text-align: right;
+}
+
+.lojasTable tbody tr {
+  border-top: 1px solid #f0ece8;
+}
+
+.tdCanal {
+  padding: 7px 0;
+  font-weight: 700;
+  color: #2b2b2b;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+}
+
+.tdRight {
+  padding: 7px 0;
+  text-align: right;
+  color: #4a4a52;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.tdPct {
+  padding: 7px 0;
+  text-align: right;
+  font-weight: 700;
+  color: #ef6a5a;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.lojasTable tfoot tr {
+  border-top: 2px solid #e6e2de;
+}
+
+.tdTotal {
+  padding: 8px 0 0;
+  font-weight: 800;
+  color: #2b2b2b;
+  text-transform: uppercase;
+}
+
+.tdTotalRight {
+  padding: 8px 0 0;
+  text-align: right;
+  font-weight: 800;
+  color: #2b2b2b;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Responsivo ────────────────────────────────────────────────────────────*/
+@media (max-width: 900px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}

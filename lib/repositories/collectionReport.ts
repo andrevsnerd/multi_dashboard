@@ -204,10 +204,13 @@ async function buildEcommerceFilialFilter(
 }
 
 /**
- * Filtro de coleção validado para as tabelas de venda física: casa por
- * `<saleAlias>.COLECAO` OU `p.COLECAO` (mestre). Registra os @params UMA vez e
- * devolve uma função que monta a cláusula para qualquer alias de venda — permite
- * reusar os MESMOS params em `vp` (LOJA_VENDA_PRODUTO) e `vt` (LOJA_VENDA_TROCA).
+ * Filtro de coleção validado para as tabelas de venda física: casa pela COLECAO
+ * da tabela MESTRE `p.COLECAO` (PRODUTOS). As tabelas de venda (LOJA_VENDA_PRODUTO
+ * `vp` e LOJA_VENDA_TROCA `vt`) NÃO possuem coluna COLECAO — por isso todas as
+ * queries que usam este filtro fazem JOIN em PRODUTOS `p` e a coleção vem sempre
+ * de lá (mesmo padrão de `fetchProductsWithDetails`, que também resolve por
+ * `p.COLECAO`). Registra os @params UMA vez e devolve uma função por alias de
+ * venda — o alias é mantido só por compatibilidade dos chamadores.
  */
 function prepColecaoFilter(
   request: sql.Request | RequestLike,
@@ -218,8 +221,8 @@ function prepColecaoFilter(
   if (list.length === 0) return () => "";
   list.forEach((c, i) => request.input(`${prefix}${i}`, sql.VarChar, c));
   const ph = list.map((_, i) => `@${prefix}${i}`).join(", ");
-  return (saleAlias) =>
-    `AND (UPPER(LTRIM(RTRIM(ISNULL(${saleAlias}.COLECAO, '')))) IN (${ph}) OR UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) IN (${ph}))`;
+  return () =>
+    `AND UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) IN (${ph})`;
 }
 
 function buildEcommerceCollectionFilter(

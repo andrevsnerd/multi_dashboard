@@ -11,8 +11,12 @@ import { resolveCompany, VAREJO_VALUE, type CompanyKey } from "@/lib/config/comp
 import { paletteForIndex } from "@/lib/presentations/palettes";
 import { formatDateForQuery, getCurrentMonthRange } from "@/lib/utils/date";
 import { exportColecoesPanelToExcel } from "@/lib/utils/exportColecoesPanelXlsx";
+import type { ColecaoDetalheResponse } from "@/app/api/painel-colecoes/detalhe/route";
 
+import ColecaoDetalhePanel from "./ColecaoDetalhePanel";
 import styles from "./ColecoesPanelPage.module.css";
+
+type DetalheState = "loading" | "error" | ColecaoDetalheResponse;
 
 interface ColecoesPanelPageProps {
   companyKey: CompanyKey;
@@ -128,6 +132,36 @@ async function fetchPanel(
   return json.data ?? [];
 }
 
+async function fetchDetalhe(
+  company: string,
+  codes: string[],
+  range: DateRangeValue,
+  filial: string | null
+): Promise<ColecaoDetalheResponse> {
+  const searchParams = new URLSearchParams({
+    company,
+    codes: codes.join(","),
+    start: range.startDate.toISOString(),
+    end: range.endDate.toISOString(),
+  });
+  if (filial) {
+    searchParams.set("filial", filial);
+  }
+
+  const response = await fetch(
+    `/api/painel-colecoes/detalhe?${searchParams.toString()}`,
+    { cache: "no-store" }
+  );
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err?.error || "Erro ao carregar detalhe da coleção");
+  }
+
+  const json = (await response.json()) as { data: ColecaoDetalheResponse };
+  return json.data;
+}
+
 export default function ColecoesPanelPage({ companyKey }: ColecoesPanelPageProps) {
   const initialRange = useMemo(() => {
     const range = getCurrentMonthRange();
@@ -144,6 +178,11 @@ export default function ColecoesPanelPage({ companyKey }: ColecoesPanelPageProps
   const [error, setError] = useState<string | null>(null);
   const [exportingPdf, setExportingPdf] = useState(false);
 
+  // Cards expandidos + cache do detalhe de performance por coleção. Ambos são
+  // zerados quando período/filial mudam (o detalhe fica obsoleto).
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [detalhes, setDetalhes] = useState<Record<string, DetalheState>>({});
+
   // Imagens do tema "Com fotos" — mesmo banco (`presentation_assets`) e mesma
   // rota do Gerador de Apresentações. undefined = ainda não buscada; null =
   // buscada, sem imagem; string = data URL salva.
@@ -157,6 +196,9 @@ export default function ColecoesPanelPage({ companyKey }: ColecoesPanelPageProps
     let active = true;
     setLoading(true);
     setError(null);
+    // Detalhe é dependente de período/filial → invalida ao trocar de filtro.
+    setExpanded(new Set());
+    setDetalhes({});
 
     fetchPanel(companyKey, range, selectedFilial)
       .then((data) => {
@@ -229,6 +271,24 @@ export default function ColecoesPanelPage({ companyKey }: ColecoesPanelPageProps
       setCoverError(e instanceof Error ? e.message : "Erro ao salvar a imagem.");
     } finally {
       setUploadingCoverRef(null);
+    }
+  };
+
+  const toggleExpand = (item: ColecaoPanelItem) => {
+    const willExpand = !expanded.has(item.key);
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (willExpand) next.add(item.key);
+      else next.delete(item.key);
+      return next;
+    });
+
+    const cached = detalhes[item.key];
+    if (willExpand && (!cached || cached === "error")) {
+      setDetalhes((prev) => ({ ...prev, [item.key]: "loading" }));
+      fetchDetalhe(companyKey, item.codes, range, selectedFilial)
+        .then((data) => setDetalhes((prev) => ({ ...prev, [item.key]: data })))
+        .catch(() => setDetalhes((prev) => ({ ...prev, [item.key]: "error" })));
     }
   };
 
@@ -436,9 +496,28 @@ export default function ColecoesPanelPage({ companyKey }: ColecoesPanelPageProps
             const cover = covers[ref] ?? null;
             const isUploading = uploadingCoverRef === ref;
 
+            const isExpanded = expanded.has(item.key);
+
             return (
-              <article key={item.key} className={styles.photoCard}>
-                <label className={styles.photoWrap} style={{ background: hex(palette.tint) }}>
+              <article
+                key={item.key}
+                className={`${styles.photoCard} ${styles.photoCardClickable}`}
+                role="button"
+                tabIndex={0}
+                aria-expanded={isExpanded}
+                onClick={() => toggleExpand(item)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    toggleExpand(item);
+                  }
+                }}
+              >
+                <label
+                  className={styles.photoWrap}
+                  style={{ background: hex(palette.tint) }}
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <input
                     type="file"
                     accept="image/*"
@@ -495,6 +574,12 @@ export default function ColecoesPanelPage({ companyKey }: ColecoesPanelPageProps
                 <div className={styles.photoChart}>
                   <MiniAreaChart months={item.months} maxV={item.maxV} palette={palette} />
                 </div>
+
+                {isExpanded && (
+                  <div className={styles.detalheWrap} onClick={(e) => e.stopPropagation()}>
+                    <ColecaoDetalhePanel state={detalhes[item.key] ?? "loading"} />
+                  </div>
+                )}
               </article>
             );
           })}
@@ -509,11 +594,22 @@ export default function ColecoesPanelPage({ companyKey }: ColecoesPanelPageProps
                 : 0;
             const isFeatured = index === 0;
             const isAggregate = item.codes.length > 1;
+            const isExpanded = expanded.has(item.key);
 
             return (
               <article
                 key={item.key}
-                className={`${styles.card} ${isFeatured ? styles.cardFeatured : ""}`}
+                className={`${styles.card} ${styles.cardClickable} ${isFeatured ? styles.cardFeatured : ""}`}
+                role="button"
+                tabIndex={0}
+                aria-expanded={isExpanded}
+                onClick={() => toggleExpand(item)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    toggleExpand(item);
+                  }
+                }}
               >
                 <div className={styles.cardMain}>
                   <div className={styles.identity}>
@@ -561,6 +657,12 @@ export default function ColecoesPanelPage({ companyKey }: ColecoesPanelPageProps
                 <div className={styles.barTrack}>
                   <div className={styles.barFill} style={{ width: `${pct}%` }} />
                 </div>
+
+                {isExpanded && (
+                  <div className={styles.detalheWrap} onClick={(e) => e.stopPropagation()}>
+                    <ColecaoDetalhePanel state={detalhes[item.key] ?? "loading"} />
+                  </div>
+                )}
               </article>
             );
           })}

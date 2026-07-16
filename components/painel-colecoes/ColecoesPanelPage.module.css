@@ -508,6 +508,21 @@
   }
 }
 
+/* ── Expandir performance (detalhe) ───────────────────────────────────────── */
+.cardClickable {
+  cursor: pointer;
+}
+
+.photoCardClickable {
+  cursor: pointer;
+}
+
+.detalheWrap {
+  flex-basis: 100%;
+  width: 100%;
+  cursor: default;
+}
+
 /* ── States ─────────────────────────────────────────────────────────────── */
 .error {
   padding: 20px;

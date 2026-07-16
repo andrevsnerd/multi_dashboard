@@ -88,8 +88,6 @@ export default function Sidebar({ companyName }: SidebarProps) {
     basePath && basePath !== "/" ? `${basePath}/produto-descontinuado` : "/produto-descontinuado";
   const produtosNovosHref =
     basePath && basePath !== "/" ? `${basePath}/produtos-novos` : "/produtos-novos";
-  const relatorioColecaoHref =
-    basePath && basePath !== "/" ? `${basePath}/relatorio-colecao` : "/relatorio-colecao";
   const painelColecoesHref =
     basePath && basePath !== "/" ? `${basePath}/painel-colecoes` : "/painel-colecoes";
   const relatorioClaudeHref =
@@ -242,7 +240,6 @@ export default function Sidebar({ companyName }: SidebarProps) {
     "/produto-agrupado",
     "/produto-descontinuado",
     "/produtos-novos",
-    "/relatorio-colecao",
     "/painel-colecoes",
     "/relatorio-claude",
     "/produto-detalhado",
@@ -315,14 +312,6 @@ export default function Sidebar({ companyName }: SidebarProps) {
                 permission: "painel-colecoes" as const,
                 isActive: (currentPathname: string | null) =>
                   matchesSegment(currentPathname, "/painel-colecoes", painelColecoesHref),
-              },
-              {
-                key: "relatorio-colecao",
-                label: "Relatório Coleção",
-                href: relatorioColecaoHref,
-                permission: "relatorio-colecao" as const,
-                isActive: (currentPathname: string | null) =>
-                  matchesSegment(currentPathname, "/relatorio-colecao", relatorioColecaoHref),
               },
               {
                 key: "relatorio-claude",

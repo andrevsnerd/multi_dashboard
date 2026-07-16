@@ -14,7 +14,6 @@ export const PAGE_PERMISSION_DEFINITIONS = [
   { key: "produto-performance", label: "Produto Performance", routeSegments: ["produto-performance"] },
   { key: "produtos-recentes", label: "Produtos Recentes", routeSegments: ["produtos-recentes"] },
   { key: "produtos-novos", label: "Produtos Novos", routeSegments: ["produtos-novos"] },
-  { key: "relatorio-colecao", label: "Relatorio Colecao", routeSegments: ["relatorio-colecao"] },
   { key: "painel-colecoes", label: "Painel de Colecoes", routeSegments: ["painel-colecoes"] },
   { key: "relatorio-claude", label: "Relatorio Claude", routeSegments: ["relatorio-claude"] },
   { key: "vendedores", label: "Vendedores", routeSegments: ["vendedores"] },
