@@ -2460,8 +2460,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/collectionReport.ts": {
-    "mtime": 1784207273.6609108,
-    "ast_hash": "ccd055ac5c69f131ae6d7356173b4259",
+    "mtime": 1784209826.604455,
+    "ast_hash": "21ca3c3d6984f71240f54b0453dd463b",
     "semantic_hash": ""
   },
   "lib/repositories/comparativoColecoes.ts": {
@@ -2685,8 +2685,8 @@
     "semantic_hash": "29ce1c73943d226f43e1886d06bd8173"
   },
   "lib/services/salesTotals.ts": {
-    "mtime": 1783520661.0364802,
-    "ast_hash": "bd4c93a9fe38d9815cd9e1c0c2fae1c0",
+    "mtime": 1784210320.4639816,
+    "ast_hash": "a7995bb8d7a27703505f6541f9822875",
     "semantic_hash": ""
   },
   "lib/transfer-executor.js": {

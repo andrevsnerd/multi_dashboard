@@ -3787,7 +3787,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_admin_transferencia_permissoes_setup_logistica_route",
-      "community": 84,
+      "community": 53,
       "norm_label": "route.ts"
     },
     {
@@ -3797,7 +3797,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "app_api_admin_transferencia_permissoes_setup_logistica_route_isadmin",
-      "community": 84,
+      "community": 53,
       "norm_label": "isadmin()"
     },
     {
@@ -3807,7 +3807,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "app_api_admin_transferencia_permissoes_setup_logistica_route_post",
-      "community": 84,
+      "community": 53,
       "norm_label": "post()"
     },
     {
@@ -4747,7 +4747,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_controle_estoque_detalhes_route",
-      "community": 6,
+      "community": 296,
       "norm_label": "route.ts"
     },
     {
@@ -4757,7 +4757,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "app_api_controle_estoque_detalhes_route_runfetchdetalhes",
-      "community": 6,
+      "community": 296,
       "norm_label": "runfetchdetalhes()"
     },
     {
@@ -4767,7 +4767,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "app_api_controle_estoque_detalhes_route_get",
-      "community": 6,
+      "community": 296,
       "norm_label": "get()"
     },
     {
@@ -4777,7 +4777,7 @@
       "source_location": "L82",
       "_origin": "ast",
       "id": "app_api_controle_estoque_detalhes_route_post",
-      "community": 6,
+      "community": 296,
       "norm_label": "post()"
     },
     {
@@ -5557,7 +5557,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_corporativo_pedidos_route",
-      "community": 84,
+      "community": 289,
       "norm_label": "route.ts"
     },
     {
@@ -5567,7 +5567,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "app_api_corporativo_pedidos_route_get",
-      "community": 84,
+      "community": 289,
       "norm_label": "get()"
     },
     {
@@ -5577,7 +5577,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "app_api_corporativo_pedidos_route_post",
-      "community": 84,
+      "community": 289,
       "norm_label": "post()"
     },
     {
@@ -5967,7 +5967,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_distribuicao_matriz_route",
-      "community": 228,
+      "community": 114,
       "norm_label": "route.ts"
     },
     {
@@ -5977,7 +5977,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "app_api_distribuicao_matriz_route_get",
-      "community": 228,
+      "community": 114,
       "norm_label": "get()"
     },
     {
@@ -6997,7 +6997,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_painel_colecoes_detalhe_route",
-      "community": 40,
+      "community": 18,
       "norm_label": "route.ts"
     },
     {
@@ -7007,7 +7007,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "app_api_painel_colecoes_detalhe_route_colecaodetalhedestaque",
-      "community": 40,
+      "community": 18,
       "norm_label": "colecaodetalhedestaque"
     },
     {
@@ -7017,7 +7017,7 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "app_api_painel_colecoes_detalhe_route_colecaodetalhecanal",
-      "community": 40,
+      "community": 18,
       "norm_label": "colecaodetalhecanal"
     },
     {
@@ -7037,7 +7037,7 @@
       "source_location": "L57",
       "_origin": "ast",
       "id": "app_api_painel_colecoes_detalhe_route_get",
-      "community": 40,
+      "community": 18,
       "norm_label": "get()"
     },
     {
@@ -7167,7 +7167,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_product_detail_color_route",
-      "community": 84,
+      "community": 53,
       "norm_label": "route.ts"
     },
     {
@@ -7177,7 +7177,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "app_api_product_detail_color_route_isadmin",
-      "community": 84,
+      "community": 53,
       "norm_label": "isadmin()"
     },
     {
@@ -7187,7 +7187,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "app_api_product_detail_color_route_patch",
-      "community": 84,
+      "community": 53,
       "norm_label": "patch()"
     },
     {
@@ -7647,7 +7647,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_produtos_parados_entradas_por_filial_route",
-      "community": 2,
+      "community": 300,
       "norm_label": "route.ts"
     },
     {
@@ -7657,7 +7657,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "app_api_produtos_parados_entradas_por_filial_route_get",
-      "community": 2,
+      "community": 300,
       "norm_label": "get()"
     },
     {
@@ -8087,7 +8087,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_romaneios_entradas_route",
-      "community": 300,
+      "community": 99,
       "norm_label": "route.ts"
     },
     {
@@ -8097,7 +8097,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "app_api_romaneios_entradas_route_get",
-      "community": 300,
+      "community": 99,
       "norm_label": "get()"
     },
     {
@@ -8137,7 +8137,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_romaneios_renomear_romaneio_route",
-      "community": 84,
+      "community": 53,
       "norm_label": "route.ts"
     },
     {
@@ -8147,7 +8147,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "app_api_romaneios_renomear_romaneio_route_podechamar",
-      "community": 84,
+      "community": 53,
       "norm_label": "podechamar()"
     },
     {
@@ -8157,7 +8157,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "app_api_romaneios_renomear_romaneio_route_post",
-      "community": 84,
+      "community": 53,
       "norm_label": "post()"
     },
     {
@@ -8207,7 +8207,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_romaneios_transito_route",
-      "community": 300,
+      "community": 53,
       "norm_label": "route.ts"
     },
     {
@@ -8217,7 +8217,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "app_api_romaneios_transito_route_get",
-      "community": 300,
+      "community": 53,
       "norm_label": "get()"
     },
     {
@@ -8737,7 +8737,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_log_saidas_route",
-      "community": 99,
+      "community": 130,
       "norm_label": "route.ts"
     },
     {
@@ -8747,7 +8747,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_log_saidas_route_get",
-      "community": 99,
+      "community": 130,
       "norm_label": "get()"
     },
     {
@@ -8757,7 +8757,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_log_route",
-      "community": 300,
+      "community": 99,
       "norm_label": "route.ts"
     },
     {
@@ -8767,7 +8767,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_log_route_get",
-      "community": 300,
+      "community": 99,
       "norm_label": "get()"
     },
     {
@@ -11749,7 +11749,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_distribuicao_matriz_distribuicaomatrizpage",
-      "community": 228,
+      "community": 114,
       "norm_label": "distribuicaomatrizpage.tsx"
     },
     {
@@ -11759,7 +11759,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "components_distribuicao_matriz_distribuicaomatrizpage_distribuicaomatrizpageprops",
-      "community": 228,
+      "community": 114,
       "norm_label": "distribuicaomatrizpageprops"
     },
     {
@@ -11769,7 +11769,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "components_distribuicao_matriz_distribuicaomatrizpage_normalize",
-      "community": 228,
+      "community": 114,
       "norm_label": "normalize()"
     },
     {
@@ -11779,7 +11779,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "components_distribuicao_matriz_distribuicaomatrizpage_status_class",
-      "community": 228,
+      "community": 114,
       "norm_label": "status_class"
     },
     {
@@ -11789,7 +11789,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "components_distribuicao_matriz_distribuicaomatrizpage_empty_result",
-      "community": 228,
+      "community": 114,
       "norm_label": "empty_result"
     },
     {
@@ -11799,7 +11799,7 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "components_distribuicao_matriz_distribuicaomatrizpage_fetchdistribuicao",
-      "community": 228,
+      "community": 114,
       "norm_label": "fetchdistribuicao()"
     },
     {
@@ -11809,7 +11809,7 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "components_distribuicao_matriz_distribuicaomatrizpage_distribuicaomatrizpage",
-      "community": 228,
+      "community": 114,
       "norm_label": "distribuicaomatrizpage()"
     },
     {
@@ -11819,7 +11819,7 @@
       "source_location": "L272",
       "_origin": "ast",
       "id": "components_distribuicao_matriz_distribuicaomatrizpage_itemrow",
-      "community": 228,
+      "community": 114,
       "norm_label": "itemrow()"
     },
     {
@@ -17729,7 +17729,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_products_productsalehistorytable",
-      "community": 18,
+      "community": 20,
       "norm_label": "productsalehistorytable.tsx"
     },
     {
@@ -17739,7 +17739,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "components_products_productsalehistorytable_productsalehistorytableprops",
-      "community": 18,
+      "community": 20,
       "norm_label": "productsalehistorytableprops"
     },
     {
@@ -17749,7 +17749,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "components_products_productsalehistorytable_formatcurrency",
-      "community": 18,
+      "community": 20,
       "norm_label": "formatcurrency()"
     },
     {
@@ -17759,7 +17759,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "components_products_productsalehistorytable_formatnumber",
-      "community": 18,
+      "community": 20,
       "norm_label": "formatnumber()"
     },
     {
@@ -17769,7 +17769,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "components_products_productsalehistorytable_formatdate",
-      "community": 18,
+      "community": 20,
       "norm_label": "formatdate()"
     },
     {
@@ -17779,7 +17779,7 @@
       "source_location": "L34",
       "_origin": "ast",
       "id": "components_products_productsalehistorytable_productsalehistorytable",
-      "community": 18,
+      "community": 20,
       "norm_label": "productsalehistorytable()"
     },
     {
@@ -22479,7 +22479,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_vendedores_vendedorprodutodetalhepage",
-      "community": 289,
+      "community": 6,
       "norm_label": "vendedorprodutodetalhepage.tsx"
     },
     {
@@ -22489,7 +22489,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "components_vendedores_vendedorprodutodetalhepage_vendedorprodutodetalhepageprops",
-      "community": 289,
+      "community": 6,
       "norm_label": "vendedorprodutodetalhepageprops"
     },
     {
@@ -22499,7 +22499,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "components_vendedores_vendedorprodutodetalhepage_fetchvendas",
-      "community": 289,
+      "community": 6,
       "norm_label": "fetchvendas()"
     },
     {
@@ -22509,7 +22509,7 @@
       "source_location": "L39",
       "_origin": "ast",
       "id": "components_vendedores_vendedorprodutodetalhepage_formatdate",
-      "community": 289,
+      "community": 6,
       "norm_label": "formatdate()"
     },
     {
@@ -22519,7 +22519,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "components_vendedores_vendedorprodutodetalhepage_vendedorprodutodetalhepage",
-      "community": 289,
+      "community": 6,
       "norm_label": "vendedorprodutodetalhepage()"
     },
     {
@@ -28509,7 +28509,7 @@
       "source_location": "L72",
       "_origin": "ast",
       "id": "lib_auth_permissions_all_filiais_roles",
-      "community": 300,
+      "community": 99,
       "norm_label": "all_filiais_roles"
     },
     {
@@ -28519,7 +28519,7 @@
       "source_location": "L75",
       "_origin": "ast",
       "id": "lib_auth_permissions_seesallfiliais",
-      "community": 300,
+      "community": 99,
       "norm_label": "seesallfiliais()"
     },
     {
@@ -28849,7 +28849,7 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "lib_auth_users_store_finduserbyusername",
-      "community": 84,
+      "community": 53,
       "norm_label": "finduserbyusername()"
     },
     {
@@ -30139,7 +30139,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_corporativo_regioes",
-      "community": 218,
+      "community": 24,
       "norm_label": "regioes.ts"
     },
     {
@@ -34626,7 +34626,7 @@
       "label": "SkuMeta",
       "file_type": "code",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L336",
+      "source_location": "L349",
       "_origin": "ast",
       "id": "lib_repositories_collectionreport_skumeta",
       "community": 40,
@@ -34636,7 +34636,7 @@
       "label": "fetchCollectionReport()",
       "file_type": "code",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L345",
+      "source_location": "L358",
       "_origin": "ast",
       "id": "lib_repositories_collectionreport_fetchcollectionreport",
       "community": 40,
@@ -34646,7 +34646,7 @@
       "label": "fetchCollectionReportColecoes()",
       "file_type": "code",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L557",
+      "source_location": "L570",
       "_origin": "ast",
       "id": "lib_repositories_collectionreport_fetchcollectionreportcolecoes",
       "community": 40,
@@ -34656,7 +34656,7 @@
       "label": "fetchCollectionReportAvailableRange()",
       "file_type": "code",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L634",
+      "source_location": "L647",
       "_origin": "ast",
       "id": "lib_repositories_collectionreport_fetchcollectionreportavailablerange",
       "community": 40,
@@ -34666,7 +34666,7 @@
       "label": "CollectionMonthlyPoint",
       "file_type": "code",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L755",
+      "source_location": "L772",
       "_origin": "ast",
       "id": "lib_repositories_collectionreport_collectionmonthlypoint",
       "community": 40,
@@ -34676,7 +34676,7 @@
       "label": "CollectionComparativeExtras",
       "file_type": "code",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L761",
+      "source_location": "L778",
       "_origin": "ast",
       "id": "lib_repositories_collectionreport_collectioncomparativeextras",
       "community": 40,
@@ -34686,7 +34686,7 @@
       "label": "fetchCollectionComparativeExtras()",
       "file_type": "code",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L778",
+      "source_location": "L795",
       "_origin": "ast",
       "id": "lib_repositories_collectionreport_fetchcollectioncomparativeextras",
       "community": 40,
@@ -35309,7 +35309,7 @@
       "source_location": "L1144",
       "_origin": "ast",
       "id": "lib_repositories_controleestoque_fetchultimasentradasporfilial",
-      "community": 2,
+      "community": 300,
       "norm_label": "fetchultimasentradasporfilial()"
     },
     {
@@ -36569,7 +36569,7 @@
       "source_location": "L425",
       "_origin": "ast",
       "id": "lib_repositories_corporativostore_rowtopedido",
-      "community": 84,
+      "community": 289,
       "norm_label": "rowtopedido()"
     },
     {
@@ -36579,7 +36579,7 @@
       "source_location": "L466",
       "_origin": "ast",
       "id": "lib_repositories_corporativostore_criarpedido",
-      "community": 84,
+      "community": 289,
       "norm_label": "criarpedido()"
     },
     {
@@ -36589,7 +36589,7 @@
       "source_location": "L514",
       "_origin": "ast",
       "id": "lib_repositories_corporativostore_listpedidos",
-      "community": 84,
+      "community": 289,
       "norm_label": "listpedidos()"
     },
     {
@@ -36659,7 +36659,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_distribuicaomatriz",
-      "community": 228,
+      "community": 114,
       "norm_label": "distribuicaomatriz.ts"
     },
     {
@@ -36669,7 +36669,7 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "lib_repositories_distribuicaomatriz_mapwithconcurrency",
-      "community": 228,
+      "community": 114,
       "norm_label": "mapwithconcurrency()"
     },
     {
@@ -36679,7 +36679,7 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "lib_repositories_distribuicaomatriz_transitdesckey",
-      "community": 228,
+      "community": 114,
       "norm_label": "transitdesckey()"
     },
     {
@@ -36689,7 +36689,7 @@
       "source_location": "L84",
       "_origin": "ast",
       "id": "lib_repositories_distribuicaomatriz_buildtransitindex",
-      "community": 228,
+      "community": 114,
       "norm_label": "buildtransitindex()"
     },
     {
@@ -36699,7 +36699,7 @@
       "source_location": "L112",
       "_origin": "ast",
       "id": "lib_repositories_distribuicaomatriz_resolvetransit",
-      "community": 228,
+      "community": 114,
       "norm_label": "resolvetransit()"
     },
     {
@@ -36709,7 +36709,7 @@
       "source_location": "L126",
       "_origin": "ast",
       "id": "lib_repositories_distribuicaomatriz_metricasmap",
-      "community": 228,
+      "community": 114,
       "norm_label": "metricasmap"
     },
     {
@@ -36719,7 +36719,7 @@
       "source_location": "L133",
       "_origin": "ast",
       "id": "lib_repositories_distribuicaomatriz_fetchdistribuicaomatriz",
-      "community": 228,
+      "community": 114,
       "norm_label": "fetchdistribuicaomatriz()"
     },
     {
@@ -37279,7 +37279,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_inventory",
-      "community": 37,
+      "community": 18,
       "norm_label": "inventory.ts"
     },
     {
@@ -37289,7 +37289,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "lib_repositories_inventory_buildfilialfilter",
-      "community": 37,
+      "community": 18,
       "norm_label": "buildfilialfilter()"
     },
     {
@@ -37299,7 +37299,7 @@
       "source_location": "L109",
       "_origin": "ast",
       "id": "lib_repositories_inventory_productstockparams",
-      "community": 37,
+      "community": 18,
       "norm_label": "productstockparams"
     },
     {
@@ -37309,7 +37309,7 @@
       "source_location": "L116",
       "_origin": "ast",
       "id": "lib_repositories_inventory_productstock",
-      "community": 37,
+      "community": 18,
       "norm_label": "productstock"
     },
     {
@@ -37319,7 +37319,7 @@
       "source_location": "L126",
       "_origin": "ast",
       "id": "lib_repositories_inventory_fetchproductstock",
-      "community": 37,
+      "community": 18,
       "norm_label": "fetchproductstock()"
     },
     {
@@ -37359,7 +37359,7 @@
       "source_location": "L450",
       "_origin": "ast",
       "id": "lib_repositories_inventory_fetchmultipleproductsstockbycolorporfilial",
-      "community": 37,
+      "community": 18,
       "norm_label": "fetchmultipleproductsstockbycolorporfilial()"
     },
     {
@@ -37369,7 +37369,7 @@
       "source_location": "L560",
       "_origin": "ast",
       "id": "lib_repositories_inventory_stocksummaryparams",
-      "community": 37,
+      "community": 18,
       "norm_label": "stocksummaryparams"
     },
     {
@@ -37379,7 +37379,7 @@
       "source_location": "L580",
       "_origin": "ast",
       "id": "lib_repositories_inventory_stocksummary",
-      "community": 37,
+      "community": 18,
       "norm_label": "stocksummary"
     },
     {
@@ -37389,7 +37389,7 @@
       "source_location": "L590",
       "_origin": "ast",
       "id": "lib_repositories_inventory_fetchstocksummary",
-      "community": 40,
+      "community": 18,
       "norm_label": "fetchstocksummary()"
     },
     {
@@ -37399,7 +37399,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_logentradas",
-      "community": 300,
+      "community": 99,
       "norm_label": "logentradas.ts"
     },
     {
@@ -37409,7 +37409,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "lib_repositories_logentradas_logentradarow",
-      "community": 300,
+      "community": 99,
       "norm_label": "logentradarow"
     },
     {
@@ -37419,7 +37419,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "lib_repositories_logentradas_buildsearchconfig",
-      "community": 300,
+      "community": 99,
       "norm_label": "buildsearchconfig()"
     },
     {
@@ -37429,7 +37429,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "lib_repositories_logentradas_productentryrow",
-      "community": 300,
+      "community": 99,
       "norm_label": "productentryrow"
     },
     {
@@ -37449,7 +37449,7 @@
       "source_location": "L188",
       "_origin": "ast",
       "id": "lib_repositories_logentradas_fetchlogentradas",
-      "community": 300,
+      "community": 99,
       "norm_label": "fetchlogentradas()"
     },
     {
@@ -37459,7 +37459,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_logsaidas",
-      "community": 99,
+      "community": 130,
       "norm_label": "logsaidas.ts"
     },
     {
@@ -37469,7 +37469,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "lib_repositories_logsaidas_logsaidarow",
-      "community": 99,
+      "community": 130,
       "norm_label": "logsaidarow"
     },
     {
@@ -37479,7 +37479,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "lib_repositories_logsaidas_buildsearchconfig",
-      "community": 99,
+      "community": 130,
       "norm_label": "buildsearchconfig()"
     },
     {
@@ -37489,7 +37489,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "lib_repositories_logsaidas_fetchlogsaidas",
-      "community": 99,
+      "community": 130,
       "norm_label": "fetchlogsaidas()"
     },
     {
@@ -37499,7 +37499,7 @@
       "source_location": "L246",
       "_origin": "ast",
       "id": "lib_repositories_logsaidas_defeitoitem",
-      "community": 99,
+      "community": 130,
       "norm_label": "defeitoitem"
     },
     {
@@ -37509,7 +37509,7 @@
       "source_location": "L259",
       "_origin": "ast",
       "id": "lib_repositories_logsaidas_defeitosresult",
-      "community": 99,
+      "community": 130,
       "norm_label": "defeitosresult"
     },
     {
@@ -37519,7 +37519,7 @@
       "source_location": "L268",
       "_origin": "ast",
       "id": "lib_repositories_logsaidas_defeitosparams",
-      "community": 99,
+      "community": 130,
       "norm_label": "defeitosparams"
     },
     {
@@ -37539,7 +37539,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_logtransito",
-      "community": 300,
+      "community": 53,
       "norm_label": "logtransito.ts"
     },
     {
@@ -37549,7 +37549,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "lib_repositories_logtransito_logtransitorow",
-      "community": 300,
+      "community": 53,
       "norm_label": "logtransitorow"
     },
     {
@@ -37559,7 +37559,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "lib_repositories_logtransito_buildsearchconfig",
-      "community": 300,
+      "community": 53,
       "norm_label": "buildsearchconfig()"
     },
     {
@@ -37569,7 +37569,7 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "lib_repositories_logtransito_fetchlogtransito",
-      "community": 300,
+      "community": 53,
       "norm_label": "fetchlogtransito()"
     },
     {
@@ -38539,7 +38539,7 @@
       "source_location": "L580",
       "_origin": "ast",
       "id": "lib_repositories_productdetail_updateproductcolorregistration",
-      "community": 84,
+      "community": 53,
       "norm_label": "updateproductcolorregistration()"
     },
     {
@@ -40399,7 +40399,7 @@
       "source_location": "L642",
       "_origin": "ast",
       "id": "lib_repositories_vendedores_v2_vendedorprodutovendaitem",
-      "community": 289,
+      "community": 6,
       "norm_label": "vendedorprodutovendaitem"
     },
     {
@@ -41229,7 +41229,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_server_notificacoes_saidas",
-      "community": 99,
+      "community": 130,
       "norm_label": "notificacoes-saidas.ts"
     },
     {
@@ -41249,7 +41249,7 @@
       "source_location": "L72",
       "_origin": "ast",
       "id": "lib_server_notificacoes_saidas_cleandestino",
-      "community": 99,
+      "community": 130,
       "norm_label": "cleandestino()"
     },
     {
@@ -41259,7 +41259,7 @@
       "source_location": "L78",
       "_origin": "ast",
       "id": "lib_server_notificacoes_saidas_getdestinosalvo",
-      "community": 99,
+      "community": 130,
       "norm_label": "getdestinosalvo()"
     },
     {
@@ -41269,7 +41269,7 @@
       "source_location": "L99",
       "_origin": "ast",
       "id": "lib_server_notificacoes_saidas_dentrodajanela",
-      "community": 99,
+      "community": 130,
       "norm_label": "dentrodajanela()"
     },
     {
@@ -41279,7 +41279,7 @@
       "source_location": "L110",
       "_origin": "ast",
       "id": "lib_server_notificacoes_saidas_getsaidaspendentesparausuario",
-      "community": 99,
+      "community": 130,
       "norm_label": "getsaidaspendentesparausuario()"
     },
     {
@@ -43549,7 +43549,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_utils_date",
-      "community": 3,
+      "community": 296,
       "norm_label": "date.ts"
     },
     {
@@ -43569,7 +43569,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "lib_utils_date_startofcurrentmonth",
-      "community": 3,
+      "community": 296,
       "norm_label": "startofcurrentmonth()"
     },
     {
@@ -43579,7 +43579,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "lib_utils_date_endofcurrentmonth",
-      "community": 3,
+      "community": 296,
       "norm_label": "endofcurrentmonth()"
     },
     {
@@ -43629,7 +43629,7 @@
       "source_location": "L84",
       "_origin": "ast",
       "id": "lib_utils_date_toutcstartofday",
-      "community": 3,
+      "community": 296,
       "norm_label": "toutcstartofday()"
     },
     {
@@ -43639,7 +43639,7 @@
       "source_location": "L92",
       "_origin": "ast",
       "id": "lib_utils_date_toutcexclusiveend",
-      "community": 3,
+      "community": 296,
       "norm_label": "toutcexclusiveend()"
     },
     {
@@ -43659,7 +43659,7 @@
       "source_location": "L108",
       "_origin": "ast",
       "id": "lib_utils_date_addmonthsutc",
-      "community": 3,
+      "community": 296,
       "norm_label": "addmonthsutc()"
     },
     {
@@ -43669,7 +43669,7 @@
       "source_location": "L144",
       "_origin": "ast",
       "id": "lib_utils_date_lastdayofmonthutc",
-      "community": 3,
+      "community": 296,
       "norm_label": "lastdayofmonthutc()"
     },
     {
@@ -43799,7 +43799,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_utils_distribuicao_matriz",
-      "community": 228,
+      "community": 114,
       "norm_label": "distribuicao-matriz.ts"
     },
     {
@@ -43809,7 +43809,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "lib_utils_distribuicao_matriz_lojadiststatus",
-      "community": 228,
+      "community": 114,
       "norm_label": "lojadiststatus"
     },
     {
@@ -43819,7 +43819,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "lib_utils_distribuicao_matriz_lojadistribuicao",
-      "community": 228,
+      "community": 114,
       "norm_label": "lojadistribuicao"
     },
     {
@@ -43829,7 +43829,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "lib_utils_distribuicao_matriz_distribuicaoitem",
-      "community": 228,
+      "community": 114,
       "norm_label": "distribuicaoitem"
     },
     {
@@ -43839,7 +43839,7 @@
       "source_location": "L74",
       "_origin": "ast",
       "id": "lib_utils_distribuicao_matriz_distribuicaoresult",
-      "community": 228,
+      "community": 114,
       "norm_label": "distribuicaoresult"
     },
     {
@@ -43859,7 +43859,7 @@
       "source_location": "L91",
       "_origin": "ast",
       "id": "lib_utils_distribuicao_matriz_ideal_status_label",
-      "community": 228,
+      "community": 114,
       "norm_label": "ideal_status_label"
     },
     {
@@ -43869,7 +43869,7 @@
       "source_location": "L97",
       "_origin": "ast",
       "id": "lib_utils_distribuicao_matriz_classificarstatus",
-      "community": 228,
+      "community": 114,
       "norm_label": "classificarstatus()"
     },
     {
@@ -43879,7 +43879,7 @@
       "source_location": "L111",
       "_origin": "ast",
       "id": "lib_utils_distribuicao_matriz_lojacomideal",
-      "community": 228,
+      "community": 114,
       "norm_label": "lojacomideal"
     },
     {
@@ -43889,7 +43889,7 @@
       "source_location": "L116",
       "_origin": "ast",
       "id": "lib_utils_distribuicao_matriz_prioridade",
-      "community": 228,
+      "community": 114,
       "norm_label": "prioridade()"
     },
     {
@@ -43899,7 +43899,7 @@
       "source_location": "L128",
       "_origin": "ast",
       "id": "lib_utils_distribuicao_matriz_montardistribuicaoitem",
-      "community": 228,
+      "community": 114,
       "norm_label": "montardistribuicaoitem()"
     },
     {
@@ -43909,7 +43909,7 @@
       "source_location": "L223",
       "_origin": "ast",
       "id": "lib_utils_distribuicao_matriz_montaritemsemhistorico",
-      "community": 228,
+      "community": 114,
       "norm_label": "montaritemsemhistorico()"
     },
     {
@@ -44929,7 +44929,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_utils_exportlistaloja",
-      "community": 1,
+      "community": 228,
       "norm_label": "exportlistaloja.ts"
     },
     {
@@ -44939,7 +44939,7 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "lib_utils_exportlistaloja_xlsxcellvalue",
-      "community": 1,
+      "community": 228,
       "norm_label": "xlsxcellvalue"
     },
     {
@@ -44949,7 +44949,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "lib_utils_exportlistaloja_exportlistalojaoptions",
-      "community": 1,
+      "community": 228,
       "norm_label": "exportlistalojaoptions"
     },
     {
@@ -44959,7 +44959,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "lib_utils_exportlistaloja_getheaders",
-      "community": 1,
+      "community": 228,
       "norm_label": "getheaders()"
     },
     {
@@ -44969,7 +44969,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "lib_utils_exportlistaloja_addautowidths",
-      "community": 1,
+      "community": 228,
       "norm_label": "addautowidths()"
     },
     {
@@ -44979,7 +44979,7 @@
       "source_location": "L48",
       "_origin": "ast",
       "id": "lib_utils_exportlistaloja_exportlistalojatoxlsx",
-      "community": 1,
+      "community": 228,
       "norm_label": "exportlistalojatoxlsx()"
     },
     {
@@ -44989,7 +44989,7 @@
       "source_location": "L85",
       "_origin": "ast",
       "id": "lib_utils_exportlistaloja_exportcompraidealporfilialoptions",
-      "community": 1,
+      "community": 228,
       "norm_label": "exportcompraidealporfilialoptions"
     },
     {
@@ -44999,7 +44999,7 @@
       "source_location": "L99",
       "_origin": "ast",
       "id": "lib_utils_exportlistaloja_exportcompraidealporfilialtoxlsx",
-      "community": 1,
+      "community": 228,
       "norm_label": "exportcompraidealporfilialtoxlsx()"
     },
     {
@@ -48519,7 +48519,7 @@
       "source_location": "L87",
       "_origin": "ast",
       "id": "lib_utils_transferencia_regras_isblockeddestinationfilial",
-      "community": 228,
+      "community": 114,
       "norm_label": "isblockeddestinationfilial()"
     },
     {
@@ -144087,7 +144087,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/services/salesTotals.ts",
-      "source_location": "L200",
+      "source_location": "L211",
       "weight": 1.0,
       "source": "lib_services_salestotals_fetchsalestotals",
       "target": "lib_config_company_resolvecompany"
@@ -144394,7 +144394,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L312",
+      "source_location": "L325",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcolecaodetectedrange",
       "target": "lib_config_company_isecommercefilial",
@@ -144406,7 +144406,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L907",
+      "source_location": "L924",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectioncomparativeextras",
       "target": "lib_config_company_isecommercefilial"
@@ -144417,7 +144417,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L378",
+      "source_location": "L391",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectionreport",
       "target": "lib_config_company_isecommercefilial"
@@ -144428,7 +144428,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L700",
+      "source_location": "L721",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectionreportavailablerange",
       "target": "lib_config_company_isecommercefilial"
@@ -144439,7 +144439,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L599",
+      "source_location": "L612",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectionreportcolecoes",
       "target": "lib_config_company_isecommercefilial"
@@ -144681,7 +144681,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/services/salesTotals.ts",
-      "source_location": "L176",
+      "source_location": "L187",
       "weight": 1.0,
       "source": "lib_services_salestotals_fetchsalestotals",
       "target": "lib_config_company_isecommercefilial"
@@ -145242,7 +145242,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L484",
+      "source_location": "L497",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectionreport",
       "target": "lib_config_company_getfiliallabelfordisplay"
@@ -148538,7 +148538,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L290",
+      "source_location": "L303",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcolecaodetectedrange",
       "target": "lib_db_connection_withrequest",
@@ -148550,7 +148550,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L789",
+      "source_location": "L806",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectioncomparativeextras",
       "target": "lib_db_connection_withrequest"
@@ -148561,7 +148561,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L658",
+      "source_location": "L671",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectionreportavailablerange",
       "target": "lib_db_connection_withrequest"
@@ -148572,7 +148572,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L566",
+      "source_location": "L579",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectionreportcolecoes",
       "target": "lib_db_connection_withrequest"
@@ -150222,7 +150222,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/services/salesTotals.ts",
-      "source_location": "L235",
+      "source_location": "L246",
       "weight": 1.0,
       "source": "lib_services_salestotals_fetchsalestotals",
       "target": "lib_db_connection_withrequest"
@@ -154471,7 +154471,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L293",
+      "source_location": "L306",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcolecaodetectedrange",
       "target": "lib_db_proxy_proxypool_request"
@@ -154482,7 +154482,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L807",
+      "source_location": "L824",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectioncomparativeextras",
       "target": "lib_db_proxy_proxypool_request"
@@ -154493,7 +154493,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L666",
+      "source_location": "L691",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectionreportavailablerange",
       "target": "lib_db_proxy_proxypool_request"
@@ -154504,7 +154504,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L579",
+      "source_location": "L592",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectionreportcolecoes",
       "target": "lib_db_proxy_proxypool_request"
@@ -155373,7 +155373,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "lib/services/salesTotals.ts",
-      "source_location": "L241",
+      "source_location": "L252",
       "weight": 1.0,
       "source": "lib_services_salestotals_fetchsalestotals",
       "target": "lib_db_proxy_proxypool_request"
@@ -161523,7 +161523,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L408",
+      "source_location": "L421",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectionreport",
       "target": "lib_reports_keys_canonicalkey"
@@ -167818,7 +167818,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L761",
+      "source_location": "L778",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport",
       "target": "lib_repositories_collectionreport_collectioncomparativeextras",
@@ -167828,7 +167828,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L755",
+      "source_location": "L772",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport",
       "target": "lib_repositories_collectionreport_collectionmonthlypoint",
@@ -167898,7 +167898,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L778",
+      "source_location": "L795",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport",
       "target": "lib_repositories_collectionreport_fetchcollectioncomparativeextras",
@@ -167908,7 +167908,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L345",
+      "source_location": "L358",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport",
       "target": "lib_repositories_collectionreport_fetchcollectionreport",
@@ -167918,7 +167918,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L634",
+      "source_location": "L647",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport",
       "target": "lib_repositories_collectionreport_fetchcollectionreportavailablerange",
@@ -167928,7 +167928,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L557",
+      "source_location": "L570",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport",
       "target": "lib_repositories_collectionreport_fetchcollectionreportcolecoes",
@@ -168018,7 +168018,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L336",
+      "source_location": "L349",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport",
       "target": "lib_repositories_collectionreport_skumeta",
@@ -168150,7 +168150,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L790",
+      "source_location": "L807",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectioncomparativeextras",
       "target": "lib_repositories_collectionreport_resolverange",
@@ -168161,7 +168161,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L570",
+      "source_location": "L583",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectionreportcolecoes",
       "target": "lib_repositories_collectionreport_resolverange",
@@ -168183,7 +168183,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L787",
+      "source_location": "L804",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectioncomparativeextras",
       "target": "lib_repositories_collectionreport_normalizecollectionvalues",
@@ -168194,7 +168194,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L370",
+      "source_location": "L383",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectionreport",
       "target": "lib_repositories_collectionreport_normalizecollectionvalues",
@@ -168205,7 +168205,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L648",
+      "source_location": "L661",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectionreportavailablerange",
       "target": "lib_repositories_collectionreport_normalizecollectionvalues",
@@ -168227,7 +168227,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L291",
+      "source_location": "L304",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcolecaodetectedrange",
       "target": "lib_repositories_collectionreport_shouldincludesaleschannel",
@@ -168238,7 +168238,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L805",
+      "source_location": "L822",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectioncomparativeextras",
       "target": "lib_repositories_collectionreport_shouldincludesaleschannel",
@@ -168249,7 +168249,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L663",
+      "source_location": "L688",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectionreportavailablerange",
       "target": "lib_repositories_collectionreport_shouldincludesaleschannel",
@@ -168260,7 +168260,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L577",
+      "source_location": "L590",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectionreportcolecoes",
       "target": "lib_repositories_collectionreport_shouldincludesaleschannel",
@@ -168271,7 +168271,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L311",
+      "source_location": "L324",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcolecaodetectedrange",
       "target": "lib_repositories_collectionreport_shouldincludeecommercechannel",
@@ -168282,7 +168282,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L906",
+      "source_location": "L923",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectioncomparativeextras",
       "target": "lib_repositories_collectionreport_shouldincludeecommercechannel",
@@ -168293,7 +168293,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L699",
+      "source_location": "L720",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectionreportavailablerange",
       "target": "lib_repositories_collectionreport_shouldincludeecommercechannel",
@@ -168304,7 +168304,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L598",
+      "source_location": "L611",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectionreportcolecoes",
       "target": "lib_repositories_collectionreport_shouldincludeecommercechannel",
@@ -168337,7 +168337,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L293",
+      "source_location": "L306",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcolecaodetectedrange",
       "target": "lib_repositories_collectionreport_buildsalesfilialfilter",
@@ -168348,7 +168348,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L807",
+      "source_location": "L824",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectioncomparativeextras",
       "target": "lib_repositories_collectionreport_buildsalesfilialfilter",
@@ -168359,7 +168359,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L665",
+      "source_location": "L690",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectionreportavailablerange",
       "target": "lib_repositories_collectionreport_buildsalesfilialfilter",
@@ -168370,7 +168370,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L579",
+      "source_location": "L592",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectionreportcolecoes",
       "target": "lib_repositories_collectionreport_buildsalesfilialfilter",
@@ -168403,7 +168403,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L313",
+      "source_location": "L326",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcolecaodetectedrange",
       "target": "lib_repositories_collectionreport_buildecommercefilialfilter",
@@ -168414,7 +168414,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L908",
+      "source_location": "L925",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectioncomparativeextras",
       "target": "lib_repositories_collectionreport_buildecommercefilialfilter",
@@ -168425,7 +168425,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L701",
+      "source_location": "L722",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectionreportavailablerange",
       "target": "lib_repositories_collectionreport_buildecommercefilialfilter",
@@ -168436,7 +168436,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L600",
+      "source_location": "L613",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectionreportcolecoes",
       "target": "lib_repositories_collectionreport_buildecommercefilialfilter",
@@ -168447,7 +168447,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L294",
+      "source_location": "L307",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcolecaodetectedrange",
       "target": "lib_repositories_collectionreport_prepcolecaofilter",
@@ -168458,7 +168458,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L808",
+      "source_location": "L825",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectioncomparativeextras",
       "target": "lib_repositories_collectionreport_prepcolecaofilter",
@@ -168469,7 +168469,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L672",
+      "source_location": "L697",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectionreportavailablerange",
       "target": "lib_repositories_collectionreport_prepcolecaofilter",
@@ -168480,7 +168480,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L314",
+      "source_location": "L327",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcolecaodetectedrange",
       "target": "lib_repositories_collectionreport_buildecommercecollectionfilter",
@@ -168491,7 +168491,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L909",
+      "source_location": "L926",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectioncomparativeextras",
       "target": "lib_repositories_collectionreport_buildecommercecollectionfilter",
@@ -168502,7 +168502,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L707",
+      "source_location": "L728",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectionreportavailablerange",
       "target": "lib_repositories_collectionreport_buildecommercecollectionfilter",
@@ -168513,7 +168513,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L488",
+      "source_location": "L501",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectionreport",
       "target": "lib_repositories_collectionreport_getdetailid",
@@ -168524,7 +168524,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L468",
+      "source_location": "L481",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectionreport",
       "target": "lib_repositories_collectionreport_resolvefilialscope",
@@ -168535,7 +168535,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L402",
+      "source_location": "L415",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectionreport",
       "target": "lib_repositories_collectionreport_fetchcolecaodetectedrange",
@@ -168547,7 +168547,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L470",
+      "source_location": "L483",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectionreport",
       "target": "lib_repositories_performance_fetchprodutoqtdeporfilial"
@@ -168558,7 +168558,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L384",
+      "source_location": "L397",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectionreport",
       "target": "lib_repositories_products_fetchproductswithdetails"
@@ -168569,7 +168569,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L374",
+      "source_location": "L387",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectionreport",
       "target": "lib_server_company_live_livenameforincoming"
@@ -168580,7 +168580,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L464",
+      "source_location": "L477",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectionreport",
       "target": "lib_server_company_live_resolvecompanylive"
@@ -168591,7 +168591,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L369",
+      "source_location": "L382",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectionreport",
       "target": "lib_utils_date_normalizerangeforquery"
@@ -168646,7 +168646,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "lib/repositories/collectionReport.ts",
-      "source_location": "L800",
+      "source_location": "L817",
       "weight": 1.0,
       "source": "lib_repositories_collectionreport_fetchcollectioncomparativeextras",
       "target": "lib_utils_destino_romaneio_store_key"
@@ -176496,7 +176496,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/services/salesTotals.ts",
-      "source_location": "L177",
+      "source_location": "L188",
       "weight": 1.0,
       "source": "lib_services_salestotals_fetchsalestotals",
       "target": "lib_repositories_ecommerce_fetchecommercesummary"
@@ -189386,7 +189386,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/services/salesTotals.ts",
-      "source_location": "L245",
+      "source_location": "L256",
       "weight": 1.0,
       "source": "lib_services_salestotals_fetchsalestotals",
       "target": "lib_services_salestotals_buildinlistclause",
@@ -189397,7 +189397,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/services/salesTotals.ts",
-      "source_location": "L241",
+      "source_location": "L252",
       "weight": 1.0,
       "source": "lib_services_salestotals_fetchsalestotals",
       "target": "lib_services_salestotals_buildfilialclause",
@@ -189408,7 +189408,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/services/salesTotals.ts",
-      "source_location": "L242",
+      "source_location": "L253",
       "weight": 1.0,
       "source": "lib_services_salestotals_fetchsalestotals",
       "target": "lib_services_salestotals_buildlinhaclause",
@@ -189420,7 +189420,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/services/salesTotals.ts",
-      "source_location": "L233",
+      "source_location": "L244",
       "weight": 1.0,
       "source": "lib_services_salestotals_fetchsalestotals",
       "target": "lib_utils_date_shiftrangebymonths"
@@ -212293,5 +212293,5 @@
       "source_file": "tmp_scarfme_poliester_pages.txt"
     }
   ],
-  "built_at_commit": "2eb20bd4343ea03b25df22349654f9ff00686a0c"
+  "built_at_commit": "b723af70c1ff7dc6ab35a21fff7da2f9b958c500"
 }
