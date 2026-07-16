@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import {
   fetchAumentosDescontos,
   fetchAumentosDescontosDetalhe,
+  fetchAumentosDescontosPorTicket,
 } from "@/lib/repositories/aumentosDescontos";
 
 // Pro: até 300s. A consulta de vendas (rede inteira) pode varrer muitos itens.
@@ -30,7 +31,7 @@ export async function GET(request: Request) {
   const tipos = searchParams.getAll("tipo").filter(Boolean);
   const produtoId = searchParams.get("produtoId");
   const produtoSearchTerm = searchParams.get("produtoSearchTerm");
-  const view = searchParams.get("view"); // "detalhe" → transação a transação
+  const view = searchParams.get("view"); // "detalhe" → transação a transação; "ticket" → agrupado por ticket
 
   const commonFilters = {
     company,
@@ -50,9 +51,11 @@ export async function GET(request: Request) {
 
   try {
     const result =
-      view === "detalhe"
-        ? await fetchAumentosDescontosDetalhe(commonFilters)
-        : await fetchAumentosDescontos(commonFilters);
+      view === "ticket"
+        ? await fetchAumentosDescontosPorTicket(commonFilters)
+        : view === "detalhe"
+          ? await fetchAumentosDescontosDetalhe(commonFilters)
+          : await fetchAumentosDescontos(commonFilters);
     return NextResponse.json(result);
   } catch (error) {
     console.error("Erro ao gerar Aumentos e Descontos", error);

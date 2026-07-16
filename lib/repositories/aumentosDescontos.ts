@@ -407,3 +407,284 @@ export async function fetchAumentosDescontosDetalhe(
     itensPrecoJusto,
   };
 }
+
+/**
+ * Visão POR TICKET: agrupa as mesmas vendas transação-a-transação por
+ * ticket/nota (filial + ticket), e compara o TICKET INTEIRO — não o item
+ * isolado — contra a soma dos preços sugeridos dos itens que o compõem.
+ *
+ * Por quê: um produto pode aparecer "com desconto" só porque foi vendido
+ * junto com outros itens (kit, negociação no caixa que abate um item pra
+ * fechar a venda, etc.). Olhado sozinho, isso parece desconto ruim; olhado
+ * no ticket completo, o resultado real pode ser neutro ou até positivo,
+ * porque outro item do mesmo carrinho teve aumento. Esta visão existe pra
+ * mostrar esse quadro completo — o "valor do ticket" é a métrica que
+ * realmente importa pro impacto do negócio, não o item isolado.
+ *
+ * Reusa a mesma fonte canônica de transações (`fetchVendasHistorico`) e o
+ * mesmo preço sugerido (`fetchProdutosCustoPrecoMestre`) da visão Detalhar —
+ * só muda o agrupamento e a matemática de comparação (por ticket, não por
+ * linha). Mesma ressalva: nível de transação não abate trocas por linha.
+ */
+export interface TicketItemRow {
+  produto: string;
+  cor: string;
+  corDescricao: string;
+  descricao: string;
+  qtde: number;
+  /** null = produto sem preço sugerido cadastrado (não entra na comparação do ticket). */
+  precoSugerido: number | null;
+  precoReal: number;
+  valorSugerido: number | null;
+  valorReal: number;
+  /** sugerido − real do ITEM (0 quando sem preço sugerido); só contexto, o líquido do ticket é que importa. */
+  diferenca: number;
+  classificacao: "desconto" | "aumento" | "justo" | "sem_preco";
+}
+
+export interface TicketRow {
+  ticket: string;
+  filial: string;
+  data: string;
+  vendedor: string;
+  /** Nº de linhas de produto (produto × cor) distintas no ticket. */
+  qtdeItens: number;
+  /** Soma das quantidades vendidas no ticket. */
+  qtdeTotal: number;
+  /** Valor REAL TOTAL do ticket — TODOS os itens, inclusive os sem preço sugerido cadastrado. */
+  valorTicketTotal: number;
+  /** Soma do valor sugerido só dos itens com preço cadastrado (base comparável). */
+  valorSugeridoComparavel: number;
+  /** Soma do valor real só dos itens com preço cadastrado (mesma base do comparável acima). */
+  valorRealComparavel: number;
+  /** valorSugeridoComparavel − valorRealComparavel: > 0 desconto líquido do ticket, < 0 aumento líquido. */
+  diferenca: number;
+  /** Percentual da diferença relativo ao valorSugeridoComparavel. */
+  percentual: number;
+  itensComDesconto: number;
+  itensComAumento: number;
+  itensJusto: number;
+  itensSemPreco: number;
+  itens: TicketItemRow[];
+}
+
+export interface AumentosDescontosPorTicketResumo {
+  /** Tickets com pelo menos 1 item de desconto OU de aumento (universo desta visão). */
+  ticketsAnalisados: number;
+  /** Diferença líquida > 0: desconto que realmente sobrou depois de olhar o ticket inteiro. */
+  ticketsDescontoLiquido: number;
+  /** Diferença líquida < 0: aumento que realmente sobrou depois de olhar o ticket inteiro. */
+  ticketsAumentoLiquido: number;
+  /**
+   * Tickets que tinham item de desconto E de aumento ao mesmo tempo — evidência direta
+   * de compensação dentro do carrinho (o caso que você descreveu).
+   */
+  ticketsMistos: number;
+  /** Dentro dos mistos: quantos zeraram exatamente (desconto de um item 100% absorvido por outro). */
+  ticketsNeutralizados: number;
+  descontoLiquidoTotal: number;
+  aumentoLiquidoTotal: number;
+  /** Soma do valor total (real, todos os itens) de todos os tickets analisados — dá a escala da amostra. */
+  valorTicketsTotal: number;
+}
+
+export interface AumentosDescontosPorTicketResult {
+  ticketsComDesconto: TicketRow[];
+  ticketsComAumento: TicketRow[];
+  resumo: AumentosDescontosPorTicketResumo;
+  truncated: boolean;
+}
+
+export async function fetchAumentosDescontosPorTicket(
+  filters: AumentosDescontosFilters
+): Promise<AumentosDescontosPorTicketResult> {
+  const reportFilters: ReportFilters = {
+    company: filters.company,
+    filial: filters.filial ?? null,
+    start: filters.start,
+    end: filters.end,
+    grupos: filters.grupos ?? null,
+    linhas: filters.linhas ?? null,
+    subgrupos: filters.subgrupos ?? null,
+    grades: filters.grades ?? null,
+    colecoes: filters.colecoes ?? null,
+    cores: filters.cores ?? null,
+    tipos: filters.tipos ?? null,
+    produtoId: filters.produtoId ?? null,
+    produtoSearchTerm: filters.produtoSearchTerm ?? null,
+  };
+
+  const historico = await fetchVendasHistorico(reportFilters);
+  const rows = historico.rows;
+
+  const custoPreco = await fetchProdutosCustoPrecoMestre(
+    rows.map((r) => String(r.PRODUTO ?? "").trim())
+  );
+
+  // Agrupa por FILIAL + TICKET (chave do ticket no POS/e-commerce; o mesmo
+  // par identifica univocamente uma venda em LOJA_VENDA / FATURAMENTO).
+  interface Acc extends Omit<TicketRow, "diferenca" | "percentual"> {
+    _valorSugeridoRaw: number;
+    _valorRealComparavelRaw: number;
+    _valorTicketTotalRaw: number;
+  }
+  const map = new Map<string, Acc>();
+
+  for (const r of rows) {
+    const filial = String(r.FILIAL ?? "");
+    const ticket = String(r.TICKET ?? "");
+    const key = `${filial}::${ticket}`;
+
+    let t = map.get(key);
+    if (!t) {
+      t = {
+        ticket,
+        filial,
+        data: String(r.DATA_VENDA ?? ""),
+        vendedor: String(r.VENDEDOR ?? ""),
+        qtdeItens: 0,
+        qtdeTotal: 0,
+        valorTicketTotal: 0,
+        valorSugeridoComparavel: 0,
+        valorRealComparavel: 0,
+        itensComDesconto: 0,
+        itensComAumento: 0,
+        itensJusto: 0,
+        itensSemPreco: 0,
+        itens: [],
+        _valorSugeridoRaw: 0,
+        _valorRealComparavelRaw: 0,
+        _valorTicketTotalRaw: 0,
+      };
+      map.set(key, t);
+    }
+
+    const pid = String(r.PRODUTO ?? "").trim();
+    const qtde = Number(r.QTDE ?? 0);
+    const valorReal = Number(r.VALOR ?? 0);
+    const mestre = custoPreco.get(pid);
+    const precoSugerido = mestre && mestre.precoSugerido != null ? mestre.precoSugerido : null;
+
+    t.qtdeItens += 1;
+    t.qtdeTotal += qtde;
+    t._valorTicketTotalRaw += valorReal; // SEMPRE soma — é o valor real do ticket completo
+
+    let classificacao: TicketItemRow["classificacao"];
+    let itemValorSugerido: number | null = null;
+    let itemDiferenca = 0;
+
+    if (precoSugerido == null || precoSugerido <= 0 || qtde <= 0) {
+      classificacao = "sem_preco";
+      t.itensSemPreco += 1;
+    } else {
+      itemValorSugerido = precoSugerido * qtde;
+      itemDiferenca = round2(itemValorSugerido - valorReal);
+      t._valorSugeridoRaw += itemValorSugerido;
+      t._valorRealComparavelRaw += valorReal;
+      if (itemDiferenca > 0) {
+        classificacao = "desconto";
+        t.itensComDesconto += 1;
+      } else if (itemDiferenca < 0) {
+        classificacao = "aumento";
+        t.itensComAumento += 1;
+      } else {
+        classificacao = "justo";
+        t.itensJusto += 1;
+      }
+    }
+
+    t.itens.push({
+      produto: pid,
+      cor: String(r.COR ?? ""),
+      corDescricao: String(r.COR_DESCRICAO ?? ""),
+      descricao: String(r.DESCRICAO ?? ""),
+      qtde: roundInt(qtde),
+      precoSugerido: precoSugerido != null ? round2(precoSugerido) : null,
+      precoReal: round2(qtde > 0 ? valorReal / qtde : 0),
+      valorSugerido: itemValorSugerido != null ? round2(itemValorSugerido) : null,
+      valorReal: round2(valorReal),
+      diferenca: itemDiferenca,
+      classificacao,
+    });
+  }
+
+  const ticketsComDesconto: TicketRow[] = [];
+  const ticketsComAumento: TicketRow[] = [];
+  let ticketsMistos = 0;
+  let ticketsNeutralizados = 0;
+  let descontoLiquidoTotal = 0;
+  let aumentoLiquidoTotal = 0;
+  let valorTicketsTotal = 0;
+
+  for (const t of map.values()) {
+    // Só interessam tickets com pelo menos 1 item classificável como desconto
+    // ou aumento — tickets 100% "preço justo"/"sem preço" não têm o que mostrar aqui.
+    if (t.itensComDesconto === 0 && t.itensComAumento === 0) continue;
+
+    const valorTicketTotal = round2(t._valorTicketTotalRaw);
+    const valorSugeridoComparavel = round2(t._valorSugeridoRaw);
+    const valorRealComparavel = round2(t._valorRealComparavelRaw);
+    const diferenca = round2(t._valorSugeridoRaw - t._valorRealComparavelRaw);
+    const percentual = valorSugeridoComparavel !== 0 ? round2((diferenca / valorSugeridoComparavel) * 100) : 0;
+
+    t.itens.sort((a, b) => Math.abs(b.diferenca) - Math.abs(a.diferenca));
+
+    const ticketRow: TicketRow = {
+      ticket: t.ticket,
+      filial: t.filial,
+      data: t.data,
+      vendedor: t.vendedor,
+      qtdeItens: t.qtdeItens,
+      qtdeTotal: roundInt(t.qtdeTotal),
+      valorTicketTotal,
+      valorSugeridoComparavel,
+      valorRealComparavel,
+      diferenca,
+      percentual,
+      itensComDesconto: t.itensComDesconto,
+      itensComAumento: t.itensComAumento,
+      itensJusto: t.itensJusto,
+      itensSemPreco: t.itensSemPreco,
+      itens: t.itens,
+    };
+
+    valorTicketsTotal += valorTicketTotal;
+    if (t.itensComDesconto > 0 && t.itensComAumento > 0) {
+      ticketsMistos += 1;
+      if (diferenca === 0) ticketsNeutralizados += 1;
+    }
+
+    if (diferenca > 0) {
+      ticketsComDesconto.push(ticketRow);
+      descontoLiquidoTotal += diferenca;
+    } else if (diferenca < 0) {
+      ticketsComAumento.push(ticketRow);
+      aumentoLiquidoTotal += -diferenca;
+    }
+    // diferenca === 0 sem ser misto não deveria acontecer (exigiria item de
+    // desconto ou aumento cuja diferença sozinha já fosse zero — impossível
+    // pela classificação), mas se ocorrer fica de fora das duas abas por não
+    // ter lado (nem desconto nem aumento líquido).
+  }
+
+  ticketsComDesconto.sort((a, b) => b.diferenca - a.diferenca);
+  ticketsComAumento.sort((a, b) => a.diferenca - b.diferenca);
+
+  const resumo: AumentosDescontosPorTicketResumo = {
+    ticketsAnalisados: ticketsComDesconto.length + ticketsComAumento.length,
+    ticketsDescontoLiquido: ticketsComDesconto.length,
+    ticketsAumentoLiquido: ticketsComAumento.length,
+    ticketsMistos,
+    ticketsNeutralizados,
+    descontoLiquidoTotal: round2(descontoLiquidoTotal),
+    aumentoLiquidoTotal: round2(aumentoLiquidoTotal),
+    valorTicketsTotal: round2(valorTicketsTotal),
+  };
+
+  return {
+    ticketsComDesconto,
+    ticketsComAumento,
+    resumo,
+    truncated: historico.truncated,
+  };
+}

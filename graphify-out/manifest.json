@@ -1520,8 +1520,8 @@
     "semantic_hash": ""
   },
   "components/painel-colecoes/ColecoesPanelPage.tsx": {
-    "mtime": 1784206890.0515487,
-    "ast_hash": "061ee02419f672060e0f931a575c1524",
+    "mtime": 1784207990.6180525,
+    "ast_hash": "f927412e306d738edfc98714b69ec7e9",
     "semantic_hash": ""
   },
   "components/performance/ControlePerformancePage.tsx": {
@@ -1880,8 +1880,8 @@
     "semantic_hash": "d751713988987e9331980363e24189ce"
   },
   "data/produto-labels.json": {
-    "mtime": 1784203338.8502624,
-    "ast_hash": "1dd94022ba0ae8beab6ee7d4b672093d",
+    "mtime": 1784207778.9690158,
+    "ast_hash": "0dc9a0fe857b6a7df1dbd1261cdf2fbe",
     "semantic_hash": ""
   },
   "data/produtos-agrupados.json": {
@@ -3650,18 +3650,18 @@
     "semantic_hash": ""
   },
   "app/api/aumentos-descontos/route.ts": {
-    "mtime": 1784140936.1177685,
-    "ast_hash": "6345530ef3b37acce5f701dc85697b49",
+    "mtime": 1784208716.6676948,
+    "ast_hash": "2369236bb8199444854d319017f2b844",
     "semantic_hash": ""
   },
   "components/aumentos-descontos/AumentosDescontosPage.tsx": {
-    "mtime": 1784144826.0402167,
-    "ast_hash": "a03bbad73ce7be290b8077b204df3ae6",
+    "mtime": 1784208968.408709,
+    "ast_hash": "f2da8295c8bfbe5466e134a6fb991ec9",
     "semantic_hash": ""
   },
   "lib/repositories/aumentosDescontos.ts": {
-    "mtime": 1784144806.753363,
-    "ast_hash": "30af97f8b1664452c88538d9ca0256cf",
+    "mtime": 1784208679.0260458,
+    "ast_hash": "107799a89cffef9017277562b28ecb7a",
     "semantic_hash": ""
   },
   "lib/utils/exportAumentosDescontosXlsx.ts": {
@@ -3680,8 +3680,8 @@
     "semantic_hash": ""
   },
   "components/painel-colecoes/ColecaoDetalhePanel.tsx": {
-    "mtime": 1784206709.4178324,
-    "ast_hash": "187878df0d9d6c04d9030b48920a7ecb",
+    "mtime": 1784208027.1026213,
+    "ast_hash": "c456485159d5b7463bd98f2a74862b93",
     "semantic_hash": ""
   }
 }

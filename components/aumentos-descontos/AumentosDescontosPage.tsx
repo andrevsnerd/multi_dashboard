@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import DateRangeFilter, { type DateRangeValue } from "@/components/filters/DateRangeFilter";
 import FilialFilter from "@/components/filters/FilialFilter";
@@ -12,6 +12,8 @@ import type {
   AumentoDescontoRow,
   AumentoDescontoDetalheRow,
   AumentosDescontosResumo,
+  TicketRow,
+  AumentosDescontosPorTicketResumo,
 } from "@/lib/repositories/aumentosDescontos";
 
 import styles from "./AumentosDescontosPage.module.css";
@@ -34,11 +36,18 @@ interface DetResult {
   itensSemPrecoSugerido: number;
   itensPrecoJusto: number;
 }
+interface TicketResult {
+  ticketsComDesconto: TicketRow[];
+  ticketsComAumento: TicketRow[];
+  resumo: AumentosDescontosPorTicketResumo;
+  truncated: boolean;
+}
 
 type OptKind = "grupo" | "linha" | "subgrupo" | "grade" | "colecao" | "cor" | "tipo";
 type Tab = "descontos" | "aumentos";
-type View = "agregado" | "detalhe";
+type View = "agregado" | "detalhe" | "ticket";
 type SortDir = "asc" | "desc";
+const ticketKey = (t: Pick<TicketRow, "filial" | "ticket">) => `${t.filial}::${t.ticket}`;
 
 const BRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const INT = (v: number) => Math.round(v).toLocaleString("pt-BR");
@@ -81,14 +90,19 @@ export default function AumentosDescontosPage({ companyKey, companyName }: Aumen
 
   const [result, setResult] = useState<AggResult | null>(null);
   const [detail, setDetail] = useState<DetResult | null>(null);
+  const [ticketResult, setTicketResult] = useState<TicketResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [ticketLoading, setTicketLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [view, setView] = useState<View>("agregado");
   const [tab, setTab] = useState<Tab>("descontos");
   const [sortKey, setSortKey] = useState<string>("valor");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [ticketSortKey, setTicketSortKey] = useState<string>("diferenca");
+  const [ticketSortDir, setTicketSortDir] = useState<SortDir>("desc");
+  const [expandedTickets, setExpandedTickets] = useState<Set<string>>(new Set());
 
   const startStr = formatDateForQuery(range.startDate);
   const endStr = formatDateForQuery(range.endDate);
@@ -222,6 +236,40 @@ export default function AumentosDescontosPage({ companyKey, companyName }: Aumen
     };
   }, [filtersQuery, view]);
 
+  // ── Busca do POR TICKET (só quando a visão está ativa) ──
+  const ticketCtrl = useRef<AbortController | null>(null);
+  useEffect(() => {
+    if (view !== "ticket") return;
+    const ctrl = new AbortController();
+    ticketCtrl.current?.abort();
+    ticketCtrl.current = ctrl;
+    const t = setTimeout(async () => {
+      setTicketLoading(true);
+      try {
+        const res = await fetch(`/api/aumentos-descontos?${filtersQuery}&view=ticket`, {
+          cache: "no-store",
+          signal: ctrl.signal,
+        });
+        if (!res.ok) {
+          const j = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(j.error ?? `Erro ${res.status}`);
+        }
+        setTicketResult((await res.json()) as TicketResult);
+        setExpandedTickets(new Set());
+      } catch (e) {
+        if ((e as Error).name === "AbortError") return;
+        setTicketResult(null);
+        setError(e instanceof Error ? e.message : "Erro ao agrupar por ticket");
+      } finally {
+        if (!ctrl.signal.aborted) setTicketLoading(false);
+      }
+    }, 450);
+    return () => {
+      clearTimeout(t);
+      ctrl.abort();
+    };
+  }, [filtersQuery, view]);
+
   const periodoLabel = `${range.startDate.toLocaleDateString("pt-BR")} — ${range.endDate.toLocaleDateString("pt-BR")}`;
 
   const handleExport = useCallback(() => {
@@ -288,6 +336,19 @@ export default function AumentosDescontosPage({ companyKey, companyName }: Aumen
     { key: "percentual", label: isDesc ? "% Desc." : "% Aum.", numeric: true, kind: "pct" as const },
   ];
 
+  const ticketColumns: Column[] = [
+    { key: "data", label: "Data" },
+    { key: "ticket", label: "Ticket/NF" },
+    { key: "filial", label: "Filial" },
+    { key: "vendedor", label: "Vendedor" },
+    { key: "qtdeItens", label: "Itens", numeric: true, kind: "int" as const },
+    { key: "qtdeTotal", label: "Qtde", numeric: true, kind: "int" as const },
+    { key: "valorTicketTotal", label: "Valor do ticket", numeric: true, kind: "brl" as const },
+    { key: "valorSugeridoComparavel", label: "Valor sugerido", numeric: true, kind: "brl" as const },
+    { key: "diferenca", label: isDesc ? "Desconto líquido" : "Aumento líquido", numeric: true, kind: "brl" as const },
+    { key: "percentual", label: "%", numeric: true, kind: "pct" as const },
+  ];
+
   const columns = view === "detalhe" ? detColumns : aggColumns;
 
   const activeRows = useMemo<Array<Record<string, string | number | null>>>(() => {
@@ -328,7 +389,38 @@ export default function AumentosDescontosPage({ companyKey, companyName }: Aumen
     return String(value);
   };
 
-  const busy = view === "detalhe" ? detailLoading : loading;
+  const activeTicketRows = useMemo<TicketRow[]>(() => {
+    const rows = (isDesc ? ticketResult?.ticketsComDesconto : ticketResult?.ticketsComAumento) ?? [];
+    const sorted = [...rows];
+    sorted.sort((a, b) => {
+      const av = a[ticketSortKey as keyof TicketRow];
+      const bv = b[ticketSortKey as keyof TicketRow];
+      let cmp: number;
+      if (typeof av === "number" && typeof bv === "number") cmp = av - bv;
+      else cmp = String(av ?? "").localeCompare(String(bv ?? ""), "pt-BR");
+      return ticketSortDir === "asc" ? cmp : -cmp;
+    });
+    return sorted;
+  }, [isDesc, ticketResult, ticketSortKey, ticketSortDir]);
+
+  const onTicketSort = (key: string) => {
+    if (key === ticketSortKey) setTicketSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setTicketSortKey(key);
+      setTicketSortDir("desc");
+    }
+  };
+
+  const toggleTicketExpanded = (key: string) => {
+    setExpandedTickets((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const busy = view === "detalhe" ? detailLoading : view === "ticket" ? ticketLoading : loading;
 
   return (
     <div className={styles.wrapper}>
@@ -470,6 +562,45 @@ export default function AumentosDescontosPage({ companyKey, companyName }: Aumen
         </div>
       )}
 
+      {/* ── KPIs específicos da visão Por Ticket ── */}
+      {view === "ticket" && ticketResult && (
+        <div className={styles.kpiGrid}>
+          <div className={`${styles.kpiCard} ${styles.kpiCardDesc}`}>
+            <span className={styles.kpiLabel}>Desconto líquido (por ticket)</span>
+            <span className={`${styles.kpiValue} ${styles.valueDesc}`}>
+              {BRL(ticketResult.resumo.descontoLiquidoTotal)}
+            </span>
+            <span className={styles.kpiSub}>{INT(ticketResult.resumo.ticketsDescontoLiquido)} tickets</span>
+          </div>
+          <div className={`${styles.kpiCard} ${styles.kpiCardAum}`}>
+            <span className={styles.kpiLabel}>Aumento líquido (por ticket)</span>
+            <span className={`${styles.kpiValue} ${styles.valueAum}`}>
+              {BRL(ticketResult.resumo.aumentoLiquidoTotal)}
+            </span>
+            <span className={styles.kpiSub}>{INT(ticketResult.resumo.ticketsAumentoLiquido)} tickets</span>
+          </div>
+          <div className={`${styles.kpiCard} ${styles.kpiCardNeutral}`}>
+            <span className={styles.kpiLabel}>Tickets neutralizados</span>
+            <span className={styles.kpiValue}>{INT(ticketResult.resumo.ticketsNeutralizados)}</span>
+            <span className={styles.kpiSub}>
+              desconto de um item 100% absorvido por outro do mesmo carrinho
+            </span>
+          </div>
+          <div className={`${styles.kpiCard} ${styles.kpiCardNeutral}`}>
+            <span className={styles.kpiLabel}>Tickets mistos (desconto + aumento)</span>
+            <span className={styles.kpiValue}>{INT(ticketResult.resumo.ticketsMistos)}</span>
+            <span className={styles.kpiSub}>
+              de {INT(ticketResult.resumo.ticketsAnalisados)} tickets analisados
+            </span>
+          </div>
+          <div className={`${styles.kpiCard} ${styles.kpiCardNeutral}`}>
+            <span className={styles.kpiLabel}>Valor total dos tickets analisados</span>
+            <span className={styles.kpiValue}>{BRL(ticketResult.resumo.valorTicketsTotal)}</span>
+            <span className={styles.kpiSub}>soma do valor real (todos os itens)</span>
+          </div>
+        </div>
+      )}
+
       {/* ── Tabelas ── */}
       {resumo && (
         <div className={styles.panel}>
@@ -488,6 +619,13 @@ export default function AumentosDescontosPage({ companyKey, companyName }: Aumen
             >
               Detalhar (por venda)
             </button>
+            <button
+              type="button"
+              className={`${styles.viewBtn} ${view === "ticket" ? styles.viewBtnActive : ""}`}
+              onClick={() => setView("ticket")}
+            >
+              Ver por ticket
+            </button>
           </div>
 
           <div className={styles.tabs}>
@@ -499,7 +637,11 @@ export default function AumentosDescontosPage({ companyKey, companyName }: Aumen
               Descontos
               <span className={styles.tabCount}>
                 {INT(
-                  (view === "detalhe" ? detail?.descontos.length : result?.descontos.length) ?? 0
+                  view === "ticket"
+                    ? ticketResult?.ticketsComDesconto.length ?? 0
+                    : view === "detalhe"
+                      ? detail?.descontos.length ?? 0
+                      : result?.descontos.length ?? 0
                 )}
               </span>
             </button>
@@ -510,12 +652,137 @@ export default function AumentosDescontosPage({ companyKey, companyName }: Aumen
             >
               Aumentos
               <span className={styles.tabCount}>
-                {INT((view === "detalhe" ? detail?.aumentos.length : result?.aumentos.length) ?? 0)}
+                {INT(
+                  view === "ticket"
+                    ? ticketResult?.ticketsComAumento.length ?? 0
+                    : view === "detalhe"
+                      ? detail?.aumentos.length ?? 0
+                      : result?.aumentos.length ?? 0
+                )}
               </span>
             </button>
           </div>
 
-          {busy && view === "detalhe" && !detail ? (
+          {view === "ticket" ? (
+            busy && !ticketResult ? (
+              <div className={styles.empty}>Carregando tickets…</div>
+            ) : activeTicketRows.length === 0 ? (
+              <div className={styles.empty}>
+                Nenhum ticket com {isDesc ? "desconto" : "aumento"} líquido no período/filtros
+                selecionados.
+              </div>
+            ) : (
+              <div className={styles.tableWrap}>
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th className={styles.expandCol} />
+                      {ticketColumns.map((c) => (
+                        <th
+                          key={c.key}
+                          className={c.numeric ? styles.numeric : undefined}
+                          onClick={() => onTicketSort(c.key)}
+                        >
+                          {c.label}
+                          {ticketSortKey === c.key && (
+                            <span className={styles.sortArrow}>
+                              {ticketSortDir === "asc" ? "▲" : "▼"}
+                            </span>
+                          )}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {activeTicketRows.map((t) => {
+                      const key = ticketKey(t);
+                      const expanded = expandedTickets.has(key);
+                      return (
+                        <Fragment key={key}>
+                          <tr className={styles.ticketRow} onClick={() => toggleTicketExpanded(key)}>
+                            <td className={styles.expandCol}>{expanded ? "▾" : "▸"}</td>
+                            {ticketColumns.map((c) => {
+                              const isImpact = c.key === "diferenca" || c.key === "percentual";
+                              const impactClass = isImpact ? (isDesc ? styles.strongDesc : styles.strongAum) : "";
+                              const raw = t[c.key as keyof TicketRow];
+                              const value =
+                                typeof raw === "number" && isImpact ? Math.abs(raw) : (raw as string | number);
+                              return (
+                                <td
+                                  key={c.key}
+                                  className={`${c.numeric ? styles.numeric : ""} ${impactClass}`.trim()}
+                                >
+                                  {fmtCell(c, value)}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                          {expanded && (
+                            <tr className={styles.ticketExpandRow}>
+                              <td colSpan={ticketColumns.length + 1}>
+                                <table className={styles.nestedTable}>
+                                  <thead>
+                                    <tr>
+                                      <th>Produto</th>
+                                      <th>Cor</th>
+                                      <th className={styles.numeric}>Qtde</th>
+                                      <th className={styles.numeric}>Preço sugerido</th>
+                                      <th className={styles.numeric}>Preço real</th>
+                                      <th className={styles.numeric}>Diferença</th>
+                                      <th>Classificação</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {t.itens.map((item, ii) => (
+                                      <tr key={`${item.produto}-${item.cor}-${ii}`}>
+                                        <td>
+                                          {item.produto} — {item.descricao}
+                                        </td>
+                                        <td>{item.corDescricao || "—"}</td>
+                                        <td className={styles.numeric}>{INT(item.qtde)}</td>
+                                        <td className={styles.numeric}>
+                                          {item.precoSugerido != null ? BRL(item.precoSugerido) : "—"}
+                                        </td>
+                                        <td className={styles.numeric}>{BRL(item.precoReal)}</td>
+                                        <td className={styles.numeric}>
+                                          {item.valorSugerido != null ? BRL(Math.abs(item.diferenca)) : "—"}
+                                        </td>
+                                        <td>
+                                          <span
+                                            className={`${styles.badge} ${
+                                              item.classificacao === "desconto"
+                                                ? styles.badgeDesc
+                                                : item.classificacao === "aumento"
+                                                  ? styles.badgeAum
+                                                  : item.classificacao === "justo"
+                                                    ? styles.badgeJusto
+                                                    : styles.badgeSemPreco
+                                            }`}
+                                          >
+                                            {item.classificacao === "desconto"
+                                              ? "Desconto"
+                                              : item.classificacao === "aumento"
+                                                ? "Aumento"
+                                                : item.classificacao === "justo"
+                                                  ? "Preço justo"
+                                                  : "Sem preço"}
+                                          </span>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )
+          ) : busy && view === "detalhe" && !detail ? (
             <div className={styles.empty}>Carregando vendas detalhadas…</div>
           ) : sortedRows.length === 0 ? (
             <div className={styles.empty}>
@@ -572,19 +839,31 @@ export default function AumentosDescontosPage({ companyKey, companyName }: Aumen
               período inteiro.
             </p>
           )}
+          {view === "ticket" && ticketResult?.truncated && (
+            <p className={styles.footNote}>
+              Base de transações truncada pelo limite da consulta — refine os filtros para garantir
+              que todos os tickets do período entraram na análise.
+            </p>
+          )}
           <p className={styles.footNote}>
             {view === "agregado" ? (
               <>
                 {INT(resumo.itensPrecoJusto)} item(ns) vendido(s) exatamente ao preço sugerido ·{" "}
                 {INT(resumo.itensSemPrecoSugerido)} sem preço sugerido cadastrado (fora da análise).
               </>
-            ) : (
+            ) : view === "detalhe" ? (
               <>
                 {INT(detail?.itensPrecoJusto ?? 0)} venda(s) exatamente ao preço sugerido ·{" "}
                 {INT(detail?.itensSemPrecoSugerido ?? 0)} sem preço sugerido cadastrado (fora da
                 análise). Visão por transação (regra de vendas validada por linha) — não abate
                 trocas por linha, então pode diferir em poucas unidades do agregado (que é líquido
                 de trocas). Número oficial de vendas: “Vendas no período”.
+              </>
+            ) : (
+              <>
+                Clique num ticket pra ver os produtos que o compõem. “Valor do ticket” é o valor
+                real TOTAL (todos os itens); “Valor sugerido” e a diferença só consideram os itens
+                com preço cadastrado. Tickets 100% preço justo/sem preço não aparecem aqui.
               </>
             )}
           </p>
