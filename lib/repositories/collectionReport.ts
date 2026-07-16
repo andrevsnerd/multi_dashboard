@@ -287,6 +287,19 @@ async function fetchColecaoDetectedRange(
   let detectedStart: Date | null = null;
   let detectedEnd: Date | null = null;
 
+  // O proxy de DB (HTTP/JSON) devolve datas como STRING, não como Date — então
+  // normalizamos aqui antes de comparar/`toISOString()` (com driver direto já
+  // vem Date; `new Date(Date)` é idempotente). Evita "toISOString is not a function".
+  const toDate = (value: unknown): Date | null => {
+    if (!value) return null;
+    const d = value instanceof Date ? value : new Date(value as string);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+  const earlier = (a: Date | null, b: Date | null): Date | null =>
+    a && b ? (a.getTime() <= b.getTime() ? a : b) : a ?? b;
+  const later = (a: Date | null, b: Date | null): Date | null =>
+    a && b ? (a.getTime() >= b.getTime() ? a : b) : a ?? b;
+
   await withRequest(async (request) => {
     if (shouldIncludeSalesChannel(company, filial)) {
       const salesFilial = filial && filial !== VAREJO_VALUE ? filial : VAREJO_VALUE;
@@ -304,8 +317,8 @@ async function fetchColecaoDetectedRange(
           ${colecao("vp")}
       `);
       const row = res.recordset[0];
-      if (row?.startDate && (!detectedStart || row.startDate < detectedStart)) detectedStart = row.startDate;
-      if (row?.endDate && (!detectedEnd || row.endDate > detectedEnd)) detectedEnd = row.endDate;
+      detectedStart = earlier(detectedStart, toDate(row?.startDate));
+      detectedEnd = later(detectedEnd, toDate(row?.endDate));
     }
 
     if (shouldIncludeEcommerceChannel(company, filial)) {
@@ -325,8 +338,8 @@ async function fetchColecaoDetectedRange(
           ${colecao}
       `);
       const row = res.recordset[0];
-      if (row?.startDate && (!detectedStart || row.startDate < detectedStart)) detectedStart = row.startDate;
-      if (row?.endDate && (!detectedEnd || row.endDate > detectedEnd)) detectedEnd = row.endDate;
+      detectedStart = earlier(detectedStart, toDate(row?.startDate));
+      detectedEnd = later(detectedEnd, toDate(row?.endDate));
     }
   });
 
@@ -660,6 +673,18 @@ export async function fetchCollectionReportAvailableRange({
     let detectedEndDate: Date | null = null;
     let collectionDescription: string | null = null;
 
+    // Proxy de DB devolve datas como string → normaliza p/ Date (ver
+    // fetchColecaoDetectedRange). Evita "toISOString is not a function".
+    const toDate = (value: unknown): Date | null => {
+      if (!value) return null;
+      const d = value instanceof Date ? value : new Date(value as string);
+      return Number.isNaN(d.getTime()) ? null : d;
+    };
+    const earlier = (a: Date | null, b: Date | null): Date | null =>
+      a && b ? (a.getTime() <= b.getTime() ? a : b) : a ?? b;
+    const later = (a: Date | null, b: Date | null): Date | null =>
+      a && b ? (a.getTime() >= b.getTime() ? a : b) : a ?? b;
+
     if (shouldIncludeSalesChannel(company, filial)) {
       const salesFilial = filial && filial !== VAREJO_VALUE ? filial : VAREJO_VALUE;
       const filialFilter = await buildSalesFilialFilter(
@@ -688,12 +713,8 @@ export async function fetchCollectionReportAvailableRange({
       `);
 
       const row = result.recordset[0];
-      if (row?.startDate && (!detectedStartDate || row.startDate < detectedStartDate)) {
-        detectedStartDate = row.startDate;
-      }
-      if (row?.endDate && (!detectedEndDate || row.endDate > detectedEndDate)) {
-        detectedEndDate = row.endDate;
-      }
+      detectedStartDate = earlier(detectedStartDate, toDate(row?.startDate));
+      detectedEndDate = later(detectedEndDate, toDate(row?.endDate));
     }
 
     if (shouldIncludeEcommerceChannel(company, filial)) {
@@ -732,12 +753,8 @@ export async function fetchCollectionReportAvailableRange({
       `);
 
       const row = result.recordset[0];
-      if (row?.startDate && (!detectedStartDate || row.startDate < detectedStartDate)) {
-        detectedStartDate = row.startDate;
-      }
-      if (row?.endDate && (!detectedEndDate || row.endDate > detectedEndDate)) {
-        detectedEndDate = row.endDate;
-      }
+      detectedStartDate = earlier(detectedStartDate, toDate(row?.startDate));
+      detectedEndDate = later(detectedEndDate, toDate(row?.endDate));
       if (!collectionDescription && row?.collectionDescription?.trim()) {
         collectionDescription = row.collectionDescription.trim();
       }
