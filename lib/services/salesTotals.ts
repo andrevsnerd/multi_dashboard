@@ -172,11 +172,22 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
 
   if (!company) return { ...EMPTY };
 
+  // `fetchSalesTotals` recebe um range JÁ NORMALIZADO (end EXCLUSIVO — início do dia
+  // seguinte ao último dia). `fetchEcommerceSummary`, porém, espera um range CRU
+  // (end = último dia INCLUSIVO) e ele mesmo normaliza via toUtcExclusiveEnd. Se
+  // repassarmos o end exclusivo, ele normaliza de novo e a janela ganha +1 dia
+  // (bug: o KPI e-commerce do Loja Raio X incluía o dia seguinte na comparação e
+  // divergia do dashboard). Recuamos 1 dia aqui para a normalização dele acertar o alvo.
+  const ecommerceRange = {
+    start: range.start,
+    end: new Date(range.end.getTime() - 24 * 60 * 60 * 1000),
+  };
+
   // Ecommerce: se a filial selecionada é puramente ecommerce, delegar para o repositório de ecommerce
   if (isEcommerceFilial(company as string, filial ?? null)) {
     const summary = await fetchEcommerceSummary({
       company: company as string,
-      range,
+      range: ecommerceRange,
       filial: filial ?? null,
       linhas: linhas ?? null,
       grupos: grupos ?? null,
@@ -206,7 +217,7 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
       fetchSalesTotals({ ...params, filial: VAREJO_VALUE }),
       fetchEcommerceSummary({
         company: company as string,
-        range,
+        range: ecommerceRange,
         filial: null,
         linhas: linhas ?? null,
         grupos: grupos ?? null,
