@@ -131,7 +131,7 @@ export async function GET(request: Request) {
             GROUP BY PRODUTO, COR_PRODUTO
           ) c ON RTRIM(LTRIM(c.PRODUTO)) = RTRIM(LTRIM(sp.PRODUTO))
              AND (RTRIM(LTRIM(CAST(c.COR_PRODUTO AS VARCHAR(20)))) = RTRIM(LTRIM(CAST(sp.COR_PRODUTO AS VARCHAR(20)))) OR TRY_CONVERT(INT, c.COR_PRODUTO) = TRY_CONVERT(INT, sp.COR_PRODUTO))
-          WHERE sp.ROMANEIO_PRODUTO = @romaneio AND sp.FILIAL = @filialOrigem
+          WHERE LTRIM(RTRIM(sp.ROMANEIO_PRODUTO)) = @romaneio AND LTRIM(RTRIM(sp.FILIAL)) = @filialOrigem
           UNION ALL
           SELECT
             ep.PRODUTO,
@@ -151,11 +151,11 @@ export async function GET(request: Request) {
             GROUP BY PRODUTO, COR_PRODUTO
           ) c2 ON RTRIM(LTRIM(c2.PRODUTO)) = RTRIM(LTRIM(ep.PRODUTO))
              AND (RTRIM(LTRIM(CAST(c2.COR_PRODUTO AS VARCHAR(20)))) = RTRIM(LTRIM(CAST(ep.COR_PRODUTO AS VARCHAR(20)))) OR TRY_CONVERT(INT, c2.COR_PRODUTO) = TRY_CONVERT(INT, ep.COR_PRODUTO))
-          WHERE ep.ROMANEIO_PRODUTO = @romaneio AND ep.FILIAL = @filialOrigem
+          WHERE LTRIM(RTRIM(ep.ROMANEIO_PRODUTO)) = @romaneio AND LTRIM(RTRIM(ep.FILIAL)) = @filialOrigem
             AND NOT EXISTS (
               SELECT 1 FROM LOJA_SAIDAS_PRODUTO sp2 WITH (NOLOCK)
-              WHERE sp2.ROMANEIO_PRODUTO = ep.ROMANEIO_PRODUTO 
-                AND sp2.FILIAL = ep.FILIAL
+              WHERE LTRIM(RTRIM(sp2.ROMANEIO_PRODUTO)) = LTRIM(RTRIM(ep.ROMANEIO_PRODUTO))
+                AND LTRIM(RTRIM(sp2.FILIAL)) = LTRIM(RTRIM(ep.FILIAL))
                 AND sp2.PRODUTO = ep.PRODUTO
                 AND ISNULL(sp2.COR_PRODUTO, '') = ISNULL(ep.COR_PRODUTO, '')
             )
@@ -181,7 +181,7 @@ export async function GET(request: Request) {
             GROUP BY PRODUTO, COR_PRODUTO
           ) c ON RTRIM(LTRIM(c.PRODUTO)) = RTRIM(LTRIM(ep.PRODUTO))
              AND (RTRIM(LTRIM(CAST(c.COR_PRODUTO AS VARCHAR(20)))) = RTRIM(LTRIM(CAST(ep.COR_PRODUTO AS VARCHAR(20)))) OR TRY_CONVERT(INT, c.COR_PRODUTO) = TRY_CONVERT(INT, ep.COR_PRODUTO))
-          WHERE ep.ROMANEIO_PRODUTO = @romaneio AND ep.FILIAL = @filialDestino
+          WHERE LTRIM(RTRIM(ep.ROMANEIO_PRODUTO)) = @romaneio AND LTRIM(RTRIM(ep.FILIAL)) = @filialDestino
           UNION ALL
           SELECT
             lep.PRODUTO,
@@ -201,10 +201,10 @@ export async function GET(request: Request) {
             GROUP BY PRODUTO, COR_PRODUTO
           ) c2 ON RTRIM(LTRIM(c2.PRODUTO)) = RTRIM(LTRIM(lep.PRODUTO))
              AND (RTRIM(LTRIM(CAST(c2.COR_PRODUTO AS VARCHAR(20)))) = RTRIM(LTRIM(CAST(lep.COR_PRODUTO AS VARCHAR(20)))) OR TRY_CONVERT(INT, c2.COR_PRODUTO) = TRY_CONVERT(INT, lep.COR_PRODUTO))
-          WHERE lep.ROMANEIO_PRODUTO = @romaneio AND lep.FILIAL = @filialDestino
+          WHERE LTRIM(RTRIM(lep.ROMANEIO_PRODUTO)) = @romaneio AND LTRIM(RTRIM(lep.FILIAL)) = @filialDestino
             AND NOT EXISTS (
               SELECT 1 FROM ESTOQUE_PROD1_ENT ep2 WITH (NOLOCK)
-              WHERE ep2.ROMANEIO_PRODUTO = lep.ROMANEIO_PRODUTO AND ep2.FILIAL = lep.FILIAL
+              WHERE LTRIM(RTRIM(ep2.ROMANEIO_PRODUTO)) = LTRIM(RTRIM(lep.ROMANEIO_PRODUTO)) AND LTRIM(RTRIM(ep2.FILIAL)) = LTRIM(RTRIM(lep.FILIAL))
                 AND ep2.PRODUTO = lep.PRODUTO AND ISNULL(ep2.COR_PRODUTO, '') = ISNULL(lep.COR_PRODUTO, '')
             )
         `;

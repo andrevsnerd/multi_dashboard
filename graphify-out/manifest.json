@@ -1040,8 +1040,8 @@
     "semantic_hash": "6be9e0704a0dc0e8bd1622d08ead7b12"
   },
   "app/api/transferencia-produtos/log-detalhes/route.ts": {
-    "mtime": 1783520661.0347185,
-    "ast_hash": "4d108a584fd66aba7229969aa2e1533e",
+    "mtime": 1784233716.7637327,
+    "ast_hash": "5ae6cee4ce066afcff331106d1baca54",
     "semantic_hash": ""
   },
   "app/api/transferencia-produtos/log-saidas/route.ts": {
@@ -1520,8 +1520,8 @@
     "semantic_hash": ""
   },
   "components/painel-colecoes/ColecoesPanelPage.tsx": {
-    "mtime": 1784207990.6180525,
-    "ast_hash": "f927412e306d738edfc98714b69ec7e9",
+    "mtime": 1784221639.9532034,
+    "ast_hash": "ac2baa367fa494e919914331f8b31f0d",
     "semantic_hash": ""
   },
   "components/performance/ControlePerformancePage.tsx": {
@@ -1605,8 +1605,8 @@
     "semantic_hash": ""
   },
   "components/products/ProductsTable.tsx": {
-    "mtime": 1783538655.3946462,
-    "ast_hash": "3ffa341af105fa0ecd31052d7bca5671",
+    "mtime": 1784219431.1011875,
+    "ast_hash": "2b5912facd8835c232607faeb7cf6463",
     "semantic_hash": ""
   },
   "components/produto-agrupado/ProdutoAgrupadoPage.tsx": {
@@ -1675,9 +1675,9 @@
     "semantic_hash": "a2ecdd2aa6a5bbf4f1d7f0a997a89670"
   },
   "components/shared/MiniAreaChart.tsx": {
-    "mtime": 1783339925.2958736,
-    "ast_hash": "953bb852b2f220244ce3d17045decdbe",
-    "semantic_hash": "953bb852b2f220244ce3d17045decdbe"
+    "mtime": 1784221598.4166288,
+    "ast_hash": "59358b2158582657ea1de8a3bda62935",
+    "semantic_hash": ""
   },
   "components/sincronizacao/SincronizacaoPage.tsx": {
     "mtime": 1780073682.7675796,
@@ -1880,8 +1880,8 @@
     "semantic_hash": "d751713988987e9331980363e24189ce"
   },
   "data/produto-labels.json": {
-    "mtime": 1784207778.9690158,
-    "ast_hash": "0dc9a0fe857b6a7df1dbd1261cdf2fbe",
+    "mtime": 1784219544.2124379,
+    "ast_hash": "0226e794cae2058dd02ea1359950e8dc",
     "semantic_hash": ""
   },
   "data/produtos-agrupados.json": {
