@@ -106,22 +106,45 @@ function toListEntry(c: CompraSalva): CompraSalvaListEntry {
   };
 }
 
-export async function listComprasSalvasFull(companyKey: string): Promise<CompraSalva[]> {
+/**
+ * `from`/`to` (opcionais): quando informados, filtram por `saved_at` já no SQL
+ * em vez de baixar a tabela inteira e filtrar em memória (era o que a rota
+ * de listagem fazia antes — o JSONB `items` cresce por registro e sem filtro
+ * no banco o payload por request só aumenta com o tempo). Omitidos = mesmo
+ * comportamento de sempre (todas as compras salvas da empresa).
+ */
+export async function listComprasSalvasFull(companyKey: string, from?: Date, to?: Date): Promise<CompraSalva[]> {
   if (hasPostgres()) {
     await ensureTable();
     const sql = getNeonSql();
-    const rows = await sql`
-      SELECT id, company_key, source_context_key, title, expandir_por_cor, items, comprada, saved_at, updated_at
-      FROM compras_salvas
-      WHERE company_key = ${companyKey}
-      ORDER BY saved_at DESC
-    `;
+    const rows =
+      from || to
+        ? await sql`
+            SELECT id, company_key, source_context_key, title, expandir_por_cor, items, comprada, saved_at, updated_at
+            FROM compras_salvas
+            WHERE company_key = ${companyKey}
+              AND saved_at >= ${(from ?? new Date(0)).toISOString()}
+              AND saved_at <= ${(to ?? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)).toISOString()}
+            ORDER BY saved_at DESC
+          `
+        : await sql`
+            SELECT id, company_key, source_context_key, title, expandir_por_cor, items, comprada, saved_at, updated_at
+            FROM compras_salvas
+            WHERE company_key = ${companyKey}
+            ORDER BY saved_at DESC
+          `;
     return rows.map((r) => rowToCompraSalva(r as never));
   }
 
   const all = await readFileAll();
   return all
     .filter((c) => c.companyKey === companyKey)
+    .filter((c) => {
+      const t = new Date(c.savedAt).getTime();
+      if (from && t < from.getTime()) return false;
+      if (to && t > to.getTime()) return false;
+      return true;
+    })
     .sort((a, b) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime());
 }
 

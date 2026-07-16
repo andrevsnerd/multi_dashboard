@@ -13,16 +13,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "company é obrigatório" }, { status: 400 });
   }
   try {
-    const comprasAll = await listComprasSalvasFull(companyKey);
-    const fromDate = from ? new Date(`${from}T00:00:00`) : null;
-    const toDate = to ? new Date(`${to}T23:59:59.999`) : null;
-    const compras = comprasAll.filter((c) => {
-      const savedAt = new Date(c.savedAt);
-      if (Number.isNaN(savedAt.getTime())) return false;
-      if (fromDate && savedAt < fromDate) return false;
-      if (toDate && savedAt > toDate) return false;
-      return true;
-    });
+    const fromDate = from ? new Date(`${from}T00:00:00`) : undefined;
+    const toDate = to ? new Date(`${to}T23:59:59.999`) : undefined;
+    const compras = await listComprasSalvasFull(companyKey, fromDate, toDate);
 
     // Coleta todos os códigos únicos de produto para buscar custo em lote
     const todosProdutos = Array.from(
