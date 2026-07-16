@@ -7,6 +7,7 @@ import DateRangeFilter, {
 } from "@/components/filters/DateRangeFilter";
 import FilialFilter from "@/components/filters/FilialFilter";
 import MiniAreaChart from "@/components/shared/MiniAreaChart";
+import { useTheme } from "@/components/theme/ThemeContext";
 import { resolveCompany, VAREJO_VALUE, type CompanyKey } from "@/lib/config/company";
 import { paletteForIndex } from "@/lib/presentations/palettes";
 import { formatDateForQuery, getCurrentMonthRange } from "@/lib/utils/date";
@@ -163,6 +164,7 @@ async function fetchDetalhe(
 }
 
 export default function ColecoesPanelPage({ companyKey }: ColecoesPanelPageProps) {
+  const { theme: appTheme } = useTheme();
   const initialRange = useMemo(() => {
     const range = getCurrentMonthRange();
     return { startDate: range.start, endDate: range.end };
@@ -572,7 +574,12 @@ export default function ColecoesPanelPage({ companyKey }: ColecoesPanelPageProps
                 </div>
 
                 <div className={styles.photoChart}>
-                  <MiniAreaChart months={item.months} maxV={item.maxV} palette={palette} />
+                  <MiniAreaChart
+                    months={item.months}
+                    maxV={item.maxV}
+                    palette={palette}
+                    dark={appTheme === "dark"}
+                  />
                 </div>
 
                 {isExpanded && (

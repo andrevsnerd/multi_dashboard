@@ -342,8 +342,9 @@
 
 /* ── Tema "Com fotos" (mesmo layout do Comparativo Resumido) ───────────────
    Card branco fixo, cores vindas da paleta da coleção (inline style), como no
-   deck de apresentação — intencionalmente não segue os tokens de dark mode: é
-   um tema visual à parte, replicando fielmente o comparativo. */
+   deck de apresentação. Superfícies fixas e o texto "ink" (quase-preto) viram
+   tokens no modo escuro (ver bloco `:root[data-theme="dark"]` no fim do
+   arquivo); as cores de marca da paleta (anel, linha do gráfico) continuam. */
 .photoCard {
   background: #ffffff;
   border: 1.5px solid #eceef1;
@@ -584,4 +585,36 @@
   .exportButton {
     flex: 1;
   }
+}
+
+/* ── Dark mode: tema "Com fotos" ────────────────────────────────────────────
+   `.photoName`/`.photoMetricValue`/`.photoRankBadge` recebem a cor "ink" da
+   paleta via inline style (JS) — precisam de !important para vencer o inline
+   no modo escuro. O quadrado do avatar (`.photoWrap`) também é inline (tint
+   pastel da paleta): vira um overlay neutro sutil em vez do pastel quase-branco. */
+:global(:root[data-theme="dark"]) .photoCard {
+  background: var(--s-white);
+  border-color: var(--b-gray200);
+}
+
+:global(:root[data-theme="dark"]) .photoWrap {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+:global(:root[data-theme="dark"]) .photoMetric {
+  background: var(--s-50);
+}
+
+:global(:root[data-theme="dark"]) .photoMetricLabel {
+  color: var(--t-gray500) !important;
+}
+
+:global(:root[data-theme="dark"]) .photoName,
+:global(:root[data-theme="dark"]) .photoMetricValue,
+:global(:root[data-theme="dark"]) .photoRankBadge {
+  color: var(--t-gray900) !important;
+}
+
+:global(:root[data-theme="dark"]) .photoSubtitle {
+  color: var(--t-gray500);
 }

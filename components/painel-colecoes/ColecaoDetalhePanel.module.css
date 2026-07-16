@@ -1,8 +1,9 @@
 /* Painel de performance expandido de uma coleção.
    Estética coral/creme, fiel ao deck de apresentação (copa-galisteu / relatório
-   Claude) — intencionalmente self-contained e claro, como o tema "Com fotos".
-   Fonte serifada nos números para casar com o restante do painel.
-   Layout COMPACTO: KPIs primeiro (linha horizontal), depois destaques + lojas. */
+   Claude), como o tema "Com fotos". Fonte serifada nos números para casar com
+   o restante do painel. Layout COMPACTO: KPIs primeiro (linha horizontal),
+   depois destaques + lojas. Cores fixas viram tokens no modo escuro (ver bloco
+   `:root[data-theme="dark"]` no fim do arquivo) — os acentos coral permanecem. */
 
 .panel {
   margin-top: 4px;
@@ -297,4 +298,82 @@
   .grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* ── Dark mode: superfícies/textos fixos → tokens do dashboard ─────────────
+   Acentos coral (destaqueRank, destaquePct, tdPct, kpiTileHero) ficam como
+   estão — já são saturados o bastante para ler bem sobre fundo escuro. */
+:global(:root[data-theme="dark"]) .loading,
+:global(:root[data-theme="dark"]) .emptyBlock {
+  color: var(--t-gray500);
+}
+
+:global(:root[data-theme="dark"]) .error {
+  color: #f87171;
+}
+
+:global(:root[data-theme="dark"]) .block {
+  background: var(--s-white);
+  border-color: var(--b-gray200);
+}
+
+:global(:root[data-theme="dark"]) .blockTitle {
+  color: var(--t-gray900);
+}
+
+:global(:root[data-theme="dark"]) .blockSubtitle {
+  color: var(--t-gray500);
+}
+
+:global(:root[data-theme="dark"]) .kpiTile {
+  background: var(--s-50);
+  border-color: var(--b-gray200);
+}
+
+:global(:root[data-theme="dark"]) .kpiLabel {
+  color: var(--t-gray500);
+}
+
+:global(:root[data-theme="dark"]) .kpiValue {
+  color: var(--t-gray900);
+}
+
+:global(:root[data-theme="dark"]) .kpiHint {
+  color: var(--t-gray500);
+}
+
+:global(:root[data-theme="dark"]) .destaqueName,
+:global(:root[data-theme="dark"]) .destaqueRevenue {
+  color: var(--t-gray900);
+}
+
+:global(:root[data-theme="dark"]) .destaqueMeta {
+  color: var(--t-gray500);
+}
+
+:global(:root[data-theme="dark"]) .destaqueBarTrack {
+  background: var(--b-gray200);
+}
+
+:global(:root[data-theme="dark"]) .thLeft,
+:global(:root[data-theme="dark"]) .thRight {
+  color: var(--t-gray500);
+}
+
+:global(:root[data-theme="dark"]) .lojasTable tbody tr {
+  border-top-color: var(--b-gray200);
+}
+
+:global(:root[data-theme="dark"]) .tdCanal,
+:global(:root[data-theme="dark"]) .tdTotal,
+:global(:root[data-theme="dark"]) .tdTotalRight {
+  color: var(--t-gray900);
+}
+
+:global(:root[data-theme="dark"]) .tdRight {
+  color: var(--t-gray700);
+}
+
+:global(:root[data-theme="dark"]) .lojasTable tfoot tr {
+  border-top-color: var(--b-gray200);
 }

@@ -4,8 +4,9 @@ import type { CollectionPalette } from "@/lib/presentations/palettes";
 
 /**
  * Mini gráfico de área/linha da evolução mensal — compartilhado entre o
- * Comparativo Resumido (deck de apresentação) e o tema "Com fotos" do Painel
- * de Coleções. Cores vêm da paleta da coleção (mesmo estilo nos dois lugares).
+ * Comparativo Resumido (deck de apresentação, sempre claro — fiel ao slide
+ * exportado) e o tema "Com fotos" do Painel de Coleções (acompanha o tema do
+ * dashboard via a prop `dark`). Cores vêm da paleta da coleção em ambos.
  */
 export interface MiniAreaChartPoint {
   label: string;
@@ -19,9 +20,20 @@ interface MiniAreaChartProps {
   palette: CollectionPalette;
   width?: number;
   height?: number;
+  /** true quando o card ao redor acompanha o modo escuro do dashboard. */
+  dark?: boolean;
 }
 
 const hex = (c: string) => (c.startsWith("#") ? c : `#${c}`);
+
+/** Tint pastel da paleta (feito p/ fundo claro) diluído sobre fundo escuro. */
+function withAlpha(c: string, alpha: number): string {
+  const clean = hex(c).slice(1);
+  const r = parseInt(clean.slice(0, 2), 16);
+  const g = parseInt(clean.slice(2, 4), 16);
+  const b = parseInt(clean.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
 
 export default function MiniAreaChart({
   months,
@@ -29,7 +41,10 @@ export default function MiniAreaChart({
   palette: p,
   width = 250,
   height = 92,
+  dark = false,
 }: MiniAreaChartProps) {
+  const areaFill = dark ? withAlpha(p.primary, 0.18) : hex(p.chartTint);
+  const monthLabelColor = dark ? "#94a3b8" : hex(p.grey);
   const n = months.length;
   const padT = 18;
   const padB = 20;
@@ -70,7 +85,7 @@ export default function MiniAreaChart({
 
   return (
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ display: "block" }}>
-      <path d={areaPath} fill={hex(p.chartTint)} stroke="none" />
+      <path d={areaPath} fill={areaFill} stroke="none" />
       {n > 1 && <path d={linePath} fill="none" stroke={hex(p.primary)} strokeWidth={2.4} strokeLinejoin="round" />}
       {pts.map((q, i) => {
         const anchor = i === 0 ? "start" : i === pts.length - 1 ? "end" : "middle";
@@ -95,7 +110,7 @@ export default function MiniAreaChart({
               textAnchor="middle"
               fontFamily="Arial, sans-serif"
               fontSize={10.5}
-              fill={hex(p.grey)}
+              fill={monthLabelColor}
             >
               {q.label}
             </text>
