@@ -33,6 +33,15 @@ import type { SaidaPendente } from "@/lib/types/notificacao";
 export const NOTIF_JANELA_DIAS = 30;
 
 /**
+ * Janela (dias) para as consultas de apoio ao Neon (destinos salvos e
+ * confirmações). Como o polling só considera saídas dos últimos 90 dias
+ * (fetchLogSaidas) e as exibe dentro de NOTIF_JANELA_DIAS, 180 dias dá ampla
+ * margem e evita varrer as tabelas inteiras a cada request — que é o que
+ * estourava a cota de transferência do Neon.
+ */
+export const NOTIF_QUERY_JANELA_DIAS = 180;
+
+/**
  * Regras da TRAVA de bloqueio (popup persistente) — constantes em
  * lib/config/notificacoes-trava.ts (módulo puro, compartilhado com o client).
  *
@@ -125,8 +134,8 @@ export async function getSaidasPendentesParaUsuario(
 
   const [saidas, destinosMap, confirmadosCounter] = await Promise.all([
     fetchLogSaidas(1000, 90, "", filiaisInventory),
-    getAllDestinosByCompany(companyKey),
-    getContadorConfirmadosByCompany(companyKey),
+    getAllDestinosByCompany(companyKey, NOTIF_QUERY_JANELA_DIAS),
+    getContadorConfirmadosByCompany(companyKey, NOTIF_QUERY_JANELA_DIAS),
   ]);
 
   const pendentes: SaidaPendente[] = [];

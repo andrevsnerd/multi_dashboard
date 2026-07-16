@@ -102,9 +102,16 @@ export async function getDestinoRomaneio(
 
 /**
  * Retorna mapa de destino por romaneio (chave: romaneioId|filialOrigem, valor: filialDestino) para a empresa.
+ *
+ * `sinceDays` (opcional): quando informado, limita a busca aos destinos
+ * atualizados nos últimos N dias (via `updated_at`). Usado pelo polling de
+ * notificações — que só olha saídas recentes — para não varrer a tabela
+ * inteira a cada request e estourar a cota de transferência do Neon.
+ * Omitido = comportamento original (todos os destinos da empresa).
  */
 export async function getAllDestinosByCompany(
-  companyKey: string
+  companyKey: string,
+  sinceDays?: number
 ): Promise<Map<string, string>> {
   const c = (companyKey || "").trim().toLowerCase();
   const map = new Map<string, string>();
@@ -122,11 +129,19 @@ export async function getAllDestinosByCompany(
   const sql = getNeonSql();
   await ensureTable(sql);
 
-  const result = await sql`
-    SELECT romaneio_id, filial_origem, filial_destino
-    FROM destino_romaneio_saida
-    WHERE company_key = ${c}
-  `;
+  const result =
+    sinceDays && sinceDays > 0
+      ? await sql`
+          SELECT romaneio_id, filial_origem, filial_destino
+          FROM destino_romaneio_saida
+          WHERE company_key = ${c}
+            AND updated_at >= ${new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000).toISOString()}
+        `
+      : await sql`
+          SELECT romaneio_id, filial_origem, filial_destino
+          FROM destino_romaneio_saida
+          WHERE company_key = ${c}
+        `;
 
   for (const row of result) {
     const rId = row.romaneio_id != null ? String(row.romaneio_id).trim() : "";

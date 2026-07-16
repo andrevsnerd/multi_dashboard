@@ -16,7 +16,7 @@ import { TRAVA_DIAS_MINIMOS } from "@/lib/config/notificacoes-trava";
 import type { Notificacao, NotificacoesResponse } from "@/lib/types/notificacao";
 
 const COMPANIES = ["nerd", "scarfme"] as const;
-const POLL_MS = 60_000;
+const POLL_MS = 120_000;
 
 /** Extrai a empresa atual da URL (ex.: /nerd/... -> "nerd"). */
 function getCompanyFromPath(pathname: string | null): string | null {
@@ -97,14 +97,34 @@ export function NotificacoesProvider({ children }: { children: ReactNode }) {
     }
   }, [username, company]);
 
-  // Polling principal.
+  // Polling principal. Pausa quando a aba está em segundo plano (a maior fonte
+  // de requests desperdiçados: abas ficam abertas 24/7 e continuavam pollando).
+  // Ao voltar o foco para a aba, revalida na hora para não exibir dado velho.
   useEffect(() => {
     activeRef.current = true;
-    void fetchNotificacoes();
-    const id = username && company ? setInterval(() => void fetchNotificacoes(), POLL_MS) : undefined;
+    void fetchNotificacoes(); // self-guard: reseta o estado quando sem usuário/empresa
+
+    if (!username || !company) {
+      return () => {
+        activeRef.current = false;
+      };
+    }
+
+    const tick = () => {
+      if (document.visibilityState === "hidden") return; // aba em segundo plano: não consome banco
+      void fetchNotificacoes();
+    };
+    const id = setInterval(tick, POLL_MS);
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") void fetchNotificacoes();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
     return () => {
       activeRef.current = false;
-      if (id) clearInterval(id);
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [username, company, fetchNotificacoes]);
 

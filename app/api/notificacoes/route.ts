@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSaidasPendentesParaUsuario, isSaidaBloqueante } from "@/lib/server/notificacoes-saidas";
+import { getSaidasPendentesParaUsuario, isSaidaBloqueante, NOTIF_QUERY_JANELA_DIAS } from "@/lib/server/notificacoes-saidas";
 import { getLidasByUsername, marcarLidas } from "@/lib/utils/notificacoes-leitura-store";
 import { getDiasMinimos } from "@/lib/utils/notificacoes-trava-store";
 import { TRAVA_DIAS_MINIMOS } from "@/lib/config/notificacoes-trava";
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
 
     const [pendentes, lidas, diasMinimos] = await Promise.all([
       getSaidasPendentesParaUsuario(companyKey, username),
-      getLidasByUsername(username),
+      getLidasByUsername(username, NOTIF_QUERY_JANELA_DIAS),
       getDiasMinimos(companyKey),
     ]);
 

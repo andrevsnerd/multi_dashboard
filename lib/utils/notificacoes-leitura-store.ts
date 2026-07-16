@@ -57,8 +57,14 @@ async function ensureTable(sql: ReturnType<typeof getNeonSql>) {
 
 /**
  * Retorna o conjunto de keys de notificações que o usuário já leu.
+ *
+ * `sinceDays` (opcional): quando informado, considera apenas leituras dos
+ * últimos N dias (via `read_at`). O polling passa uma janela para não trazer
+ * o histórico inteiro de lidas (que só cresce) a cada request — leituras
+ * antigas referem-se a saídas que já saíram da janela e não seriam exibidas.
+ * Omitido = comportamento original (todas as lidas do usuário).
  */
-export async function getLidasByUsername(username: string): Promise<Set<string>> {
+export async function getLidasByUsername(username: string, sinceDays?: number): Promise<Set<string>> {
   const normalized = username.toLowerCase().trim();
   if (!normalized) return new Set();
 
@@ -69,9 +75,16 @@ export async function getLidasByUsername(username: string): Promise<Set<string>>
 
   const sql = getNeonSql();
   await ensureTable(sql);
-  const rows = await sql`
-    SELECT notif_key FROM notificacoes_leitura WHERE username = ${normalized}
-  `;
+  const rows =
+    sinceDays && sinceDays > 0
+      ? await sql`
+          SELECT notif_key FROM notificacoes_leitura
+          WHERE username = ${normalized}
+            AND read_at >= ${new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000).toISOString()}
+        `
+      : await sql`
+          SELECT notif_key FROM notificacoes_leitura WHERE username = ${normalized}
+        `;
   return new Set(rows.map((r) => String(r.notif_key)));
 }
 

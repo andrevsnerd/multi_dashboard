@@ -78,9 +78,16 @@ async function ensureTable(sql: ReturnType<typeof getNeonSql>) {
 /**
  * Retorna mapa de "romaneioId|filialDestino" → quantidade de itens confirmados,
  * para todos os romaneios de uma empresa. Usado para indicador na listagem.
+ *
+ * `sinceDays` (opcional): quando informado, considera apenas confirmações dos
+ * últimos N dias (via `confirmed_at`). Usado pelo polling de notificações —
+ * que só olha saídas recentes — para não fazer GROUP BY sobre a tabela inteira
+ * a cada request e estourar a cota de transferência do Neon.
+ * Omitido = comportamento original (todas as confirmações da empresa).
  */
 export async function getContadorConfirmadosByCompany(
-  companyKey: string
+  companyKey: string,
+  sinceDays?: number
 ): Promise<Map<string, number>> {
   const c = (companyKey || "").trim().toLowerCase();
   const counter: Map<string, number> = new Map();
@@ -98,12 +105,21 @@ export async function getContadorConfirmadosByCompany(
   const sql = getNeonSql();
   await ensureTable(sql);
 
-  const rows = await sql`
-    SELECT romaneio_id, filial_destino, COUNT(*) AS cnt
-    FROM romaneio_item_confirmado
-    WHERE company_key = ${c}
-    GROUP BY romaneio_id, filial_destino
-  `;
+  const rows =
+    sinceDays && sinceDays > 0
+      ? await sql`
+          SELECT romaneio_id, filial_destino, COUNT(*) AS cnt
+          FROM romaneio_item_confirmado
+          WHERE company_key = ${c}
+            AND confirmed_at >= ${new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000).toISOString()}
+          GROUP BY romaneio_id, filial_destino
+        `
+      : await sql`
+          SELECT romaneio_id, filial_destino, COUNT(*) AS cnt
+          FROM romaneio_item_confirmado
+          WHERE company_key = ${c}
+          GROUP BY romaneio_id, filial_destino
+        `;
 
   for (const row of rows) {
     const k = `${row.romaneio_id}|${row.filial_destino}`;
