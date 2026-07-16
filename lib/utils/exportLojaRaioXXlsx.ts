@@ -345,17 +345,25 @@ export async function exportLojaRaioXXlsx(options: ExportLojaRaioXOptions): Prom
     temComparacao && janela.comparacaoLabel ? `Comparação: ${janela.comparacaoLabel}` : "",
   ].filter(Boolean);
 
-  // ─── ABA: RESUMO ────────────────────────────────────────────────────────
-  buildResumoSheet(workbook, { analyzed: analyzed!, comparacaoMes, janela, decomposicao, isMesmo: principal.isMesmo, contexto });
+  // ─── ABA: RESUMO (KPIs + resumo por grupo) ──────────────────────────────
+  buildResumoSheet(workbook, {
+    analyzed: analyzed!,
+    comparacaoMes,
+    janela,
+    decomposicao,
+    isMesmo: principal.isMesmo,
+    contexto,
+    comparacao,
+  });
 
-  // ─── ABA: DIFERENÇA DE PRODUTOS ─────────────────────────────────────────
+  // ─── ABAS: DIFERENÇA DE PRODUTOS (uma aba por grupo) ────────────────────
   if (comparacao) {
-    buildDiferencaSheet(workbook, comparacao, { janela, gsCols, showGradeSubgrupo, contexto });
+    buildDiferencaSheets(workbook, comparacao, { janela, gsCols, showGradeSubgrupo, contexto });
   }
 
-  // ─── ABA: PRODUTOS (VENDAS x ESTOQUE) ───────────────────────────────────
+  // ─── ABAS: PRODUTOS VENDIDOS (sem estoque / com estoque) ────────────────
   if (produtosEstoque) {
-    buildProdutosSheet(workbook, produtosEstoque, { janela, gsCols, showGradeSubgrupo, contexto });
+    buildProdutosSheets(workbook, produtosEstoque, { janela, gsCols, showGradeSubgrupo, contexto });
   }
 
   // ─── ABA: VENDEDORES ─────────────────────────────────────────────────────
@@ -382,6 +390,61 @@ export async function exportLojaRaioXXlsx(options: ExportLojaRaioXOptions): Prom
   URL.revokeObjectURL(url);
 }
 
+// ── Tabela genérica: 1 aba = 1 tabela limpa (título + cabeçalho + linhas) ────
+function buildTableSheet(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  workbook: any,
+  opts: {
+    name: string;
+    titleLines: string[];
+    headerFill: string;
+    zebra: string;
+    cols: Col[];
+    rows: (string | number)[][];
+    note?: string | null;
+    freezeFirstCol?: boolean;
+    /** Colunas (1-based) a destacar em negrito nas linhas de dados (ex.: totais). */
+    boldCols?: number[];
+    emptyMessage?: string;
+  }
+): void {
+  const { name, titleLines, headerFill, zebra, cols, rows, note, freezeFirstCol, boldCols, emptyMessage } = opts;
+  const ncols = cols.length;
+  const ws: ExcelJSWorksheet = workbook.addWorksheet(name.slice(0, 31));
+  ws.columns = cols.map((c) => ({ width: c.width }));
+
+  const headerRowNum = writeTitle(ws, titleLines, ncols);
+  writeHeader(ws, headerRowNum, cols, headerFill);
+  writeRows(ws, headerRowNum + 1, cols, rows, zebra);
+
+  if (boldCols?.length) {
+    for (let i = 0; i < rows.length; i++) {
+      const xrow = ws.getRow(headerRowNum + 1 + i);
+      for (const c of boldCols) {
+        xrow.getCell(c).font = { size: 10, name: FONT, bold: true, color: { argb: DARK_TEXT } };
+      }
+    }
+  }
+
+  const afterRows = headerRowNum + 1 + rows.length;
+  if (rows.length === 0 && emptyMessage) {
+    const ec = ws.getRow(afterRows).getCell(1);
+    ec.value = emptyMessage;
+    ws.mergeCells(afterRows, 1, afterRows, ncols);
+    ec.font = { italic: true, size: 10, name: FONT, color: { argb: GREY_TEXT } };
+  }
+  if (note) {
+    const noteRow = afterRows + (rows.length === 0 && emptyMessage ? 2 : 1);
+    const nc = ws.getRow(noteRow).getCell(1);
+    nc.value = note;
+    ws.mergeCells(noteRow, 1, noteRow, ncols);
+    nc.font = { italic: true, size: 10, name: FONT, color: { argb: GREY_TEXT } };
+  }
+
+  ws.autoFilter = { from: { row: headerRowNum, column: 1 }, to: { row: headerRowNum, column: ncols } };
+  ws.views = [{ state: "frozen", ySplit: headerRowNum, ...(freezeFirstCol ? { xSplit: 1 } : {}) }];
+}
+
 // ── Aba Resumo (estilo dashboard de KPIs) ────────────────────────────────────
 function buildResumoSheet(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -393,9 +456,10 @@ function buildResumoSheet(
     decomposicao: { gap: number; porAtendimentos: number; porTicketMedio: number } | null;
     isMesmo: boolean;
     contexto: string[];
+    comparacao: ComparacaoData | null;
   }
 ): void {
-  const { analyzed, comparacaoMes, janela, decomposicao, isMesmo, contexto } = data;
+  const { analyzed, comparacaoMes, janela, decomposicao, isMesmo, contexto, comparacao } = data;
   const ncols = 4;
   const ws: ExcelJSWorksheet = workbook.addWorksheet("Resumo");
   ws.columns = [{ width: 34 }, { width: 20 }, { width: 20 }, { width: 20 }];
@@ -511,11 +575,55 @@ function buildResumoSheet(
     note.font = { italic: true, size: 10, name: FONT, color: { argb: GREY_TEXT } };
   }
 
+  // Resumo por grupo da comparação (as listas detalhadas vão em abas próprias).
+  if (comparacao) {
+    r += 1;
+    writeBand(ws, r, "Diferença de produtos — resumo por grupo", NAVY, ncols);
+    r += 1;
+    const grpHeader = ws.getRow(r);
+    ["Grupo", "Qtd SKUs", "Faturamento (R$)"].forEach((l, i) => (grpHeader.getCell(i + 1).value = l));
+    grpHeader.eachCell({ includeEmpty: true }, (cell: ExcelJSCell, colNum: number) => {
+      if (colNum > 3) return;
+      cell.fill = solid(NAVY);
+      cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 10, name: FONT };
+      cell.alignment = { horizontal: colNum === 1 ? "left" : "center", vertical: "middle" };
+      cell.border = THIN;
+    });
+    r += 1;
+    const grpRows: Array<[string, number, number, string]> = [
+      ["🔴 Faltou produto", comparacao.rupturaCount, round2(comparacao.rupturaFat) as number, RED],
+      ["🟡 Tinha estoque, vendeu menos", comparacao.tinhaEstoqueCount, round2(comparacao.tinhaEstoqueFat) as number, AMBER],
+      ["🟢 Compensou (cresceu)", comparacao.cresceuCount, round2(comparacao.cresceuFat) as number, GREEN],
+    ];
+    grpRows.forEach(([label, qtd, fat, color], i) => {
+      const xrow = ws.getRow(r + i);
+      const c1 = xrow.getCell(1);
+      c1.value = label;
+      c1.font = { size: 10, name: FONT, bold: true, color: { argb: color } };
+      c1.alignment = { horizontal: "left", vertical: "middle" };
+      const c2 = xrow.getCell(2);
+      c2.value = qtd;
+      c2.numFmt = INT_FMT;
+      c2.alignment = { horizontal: "right", vertical: "middle" };
+      c2.font = { size: 10, name: FONT };
+      const c3 = xrow.getCell(3);
+      c3.value = fat;
+      c3.numFmt = CUR_FMT;
+      c3.alignment = { horizontal: "right", vertical: "middle" };
+      c3.font = { size: 10, name: FONT };
+      [c1, c2, c3].forEach((cell) => {
+        cell.border = HAIR;
+        if (i % 2 === 1) cell.fill = solid(ZEBRA_NEUTRO);
+      });
+      xrow.height = 16;
+    });
+  }
+
   ws.views = [{ state: "frozen", ySplit: headerRowNum }];
 }
 
-// ── Aba Diferença de Produtos (3 grupos coloridos) ───────────────────────────
-function buildDiferencaSheet(
+// ── Abas Diferença de Produtos (uma aba por grupo) ───────────────────────────
+function buildDiferencaSheets(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   workbook: any,
   comparacao: ComparacaoData,
@@ -541,10 +649,6 @@ function buildDiferencaSheet(
     { label: "Descontinuado", width: 13, align: "center" },
     { label: "Em trânsito", width: 16, align: "left" },
   ];
-  const ncols = cols.length;
-
-  const ws: ExcelJSWorksheet = workbook.addWorksheet("Diferença de Produtos");
-  ws.columns = cols.map((c) => ({ width: c.width }));
 
   const rowsFor = (items: ComparacaoProdutoItem[], showTransito: boolean): (string | number)[][] =>
     items.map((p) => [
@@ -564,53 +668,34 @@ function buildDiferencaSheet(
       showTransito ? transitoCell(p) : "",
     ]);
 
-  let r = writeTitle(ws, ["Diferença de Produtos", ...contexto], ncols);
+  const note = comparacao.truncado ? "Nota: lista truncada — mostrando os maiores do grupo." : null;
 
-  const groups: Array<{ label: string; fill: string; zebra: string; items: ComparacaoProdutoItem[]; transito: boolean }> = [
-    { label: `FALTOU PRODUTO — ${comparacao.rupturaCount} SKUs`, fill: RED, zebra: RED_ZEBRA, items: comparacao.ruptura, transito: true },
-    { label: `TINHA ESTOQUE, VENDEU MENOS — ${comparacao.tinhaEstoqueCount} SKUs`, fill: AMBER, zebra: AMBER_ZEBRA, items: comparacao.tinhaEstoque, transito: false },
-    { label: `COMPENSOU (CRESCEU) — ${comparacao.cresceuCount} SKUs`, fill: GREEN, zebra: GREEN_ZEBRA, items: comparacao.cresceu, transito: false },
+  const groups = [
+    { name: "Faltou Produto", title: "Faltou produto (ruptura)", fill: RED, zebra: RED_ZEBRA, items: comparacao.ruptura, count: comparacao.rupturaCount, fat: comparacao.rupturaFat, transito: true },
+    { name: "Tinha Estoque", title: "Tinha estoque, vendeu menos", fill: AMBER, zebra: AMBER_ZEBRA, items: comparacao.tinhaEstoque, count: comparacao.tinhaEstoqueCount, fat: comparacao.tinhaEstoqueFat, transito: false },
+    { name: "Cresceu", title: "Compensou (cresceu)", fill: GREEN, zebra: GREEN_ZEBRA, items: comparacao.cresceu, count: comparacao.cresceuCount, fat: comparacao.cresceuFat, transito: false },
   ];
 
   for (const g of groups) {
-    if (g.items.length === 0) continue;
-    writeBand(ws, r, g.label, g.fill, ncols);
-    r += 1;
-    writeHeader(ws, r, cols, g.fill);
-    r += 1;
-    r = writeRows(ws, r, cols, rowsFor(g.items, g.transito), g.zebra);
-    r += 1; // espaço entre grupos
+    if (g.items.length === 0) continue; // sem itens → não cria aba vazia
+    buildTableSheet(workbook, {
+      name: g.name,
+      titleLines: [
+        g.title,
+        `${g.count.toLocaleString("pt-BR")} SKUs  ·  ${(round2(g.fat) as number).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`,
+        ...contexto,
+      ],
+      headerFill: g.fill,
+      zebra: g.zebra,
+      cols,
+      rows: rowsFor(g.items, g.transito),
+      note,
+    });
   }
-
-  // Resumo por grupo (mini-tabela).
-  writeBand(ws, r, "Resumo por grupo", NAVY, ncols);
-  r += 1;
-  const resumoCols: Col[] = [
-    { label: "Grupo", width: 34, align: "left" },
-    { label: "Qtd SKUs", width: 14, fmt: INT_FMT, align: "right" },
-    { label: "Faturamento (R$)", width: 18, fmt: CUR_FMT, align: "right" },
-  ];
-  writeHeader(ws, r, resumoCols, NAVY);
-  r += 1;
-  r = writeRows(ws, r, resumoCols, [
-    ["Faltou produto", comparacao.rupturaCount, round2(comparacao.rupturaFat)],
-    ["Tinha estoque, vendeu menos", comparacao.tinhaEstoqueCount, round2(comparacao.tinhaEstoqueFat)],
-    ["Compensou (cresceu)", comparacao.cresceuCount, round2(comparacao.cresceuFat)],
-  ], ZEBRA_NEUTRO);
-
-  if (comparacao.truncado) {
-    r += 1;
-    const note = ws.getRow(r).getCell(1);
-    note.value = "Nota: lista truncada — mostrando os maiores de cada grupo.";
-    ws.mergeCells(r, 1, r, ncols);
-    note.font = { italic: true, size: 10, name: FONT, color: { argb: GREY_TEXT } };
-  }
-
-  ws.views = [{ state: "frozen", ySplit: contexto.length + 1 }];
 }
 
-// ── Aba Produtos (Vendas x Estoque) — 2 grupos coloridos ─────────────────────
-function buildProdutosSheet(
+// ── Abas Produtos vendidos (sem estoque / com estoque) ───────────────────────
+function buildProdutosSheets(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   workbook: any,
   produtosEstoque: ProdutosEstoqueData,
@@ -634,10 +719,6 @@ function buildProdutosSheet(
     { label: "Descontinuado", width: 13, align: "center" },
     { label: "Em trânsito", width: 16, align: "left" },
   ];
-  const ncols = cols.length;
-
-  const ws: ExcelJSWorksheet = workbook.addWorksheet("Produtos (Vendas x Estoque)");
-  ws.columns = cols.map((c) => ({ width: c.width }));
 
   const rowsFor = (items: ProdutoVendaEstoqueItem[], showTransito: boolean): (string | number)[][] =>
     items.map((p) => [
@@ -655,30 +736,37 @@ function buildProdutosSheet(
       showTransito ? transitoCell(p) : "",
     ]);
 
-  let r = writeTitle(ws, ["Produtos — vendas x estoque", ...contexto], ncols);
+  const note = produtosEstoque.truncado ? "Nota: lista truncada — mostrando os principais do grupo." : null;
 
-  writeBand(ws, r, `SEM ESTOQUE (zerado hoje) — ${produtosEstoque.semEstoque.length}`, RED, ncols);
-  r += 1;
-  writeHeader(ws, r, cols, RED);
-  r += 1;
-  r = writeRows(ws, r, cols, rowsFor(produtosEstoque.semEstoque, true), RED_ZEBRA);
-  r += 1;
+  buildTableSheet(workbook, {
+    name: "Sem Estoque",
+    titleLines: [
+      "Produtos vendidos — SEM estoque hoje",
+      `${produtosEstoque.semEstoque.length.toLocaleString("pt-BR")} produtos`,
+      ...contexto,
+    ],
+    headerFill: RED,
+    zebra: RED_ZEBRA,
+    cols,
+    rows: rowsFor(produtosEstoque.semEstoque, true),
+    note,
+    emptyMessage: "Nenhum produto vendido está zerado hoje.",
+  });
 
-  writeBand(ws, r, `COM ESTOQUE — ${produtosEstoque.comEstoque.length}`, GREEN, ncols);
-  r += 1;
-  writeHeader(ws, r, cols, GREEN);
-  r += 1;
-  r = writeRows(ws, r, cols, rowsFor(produtosEstoque.comEstoque, false), GREEN_ZEBRA);
-
-  if (produtosEstoque.truncado) {
-    r += 1;
-    const note = ws.getRow(r).getCell(1);
-    note.value = "Nota: lista truncada — mostrando os principais de cada grupo.";
-    ws.mergeCells(r, 1, r, ncols);
-    note.font = { italic: true, size: 10, name: FONT, color: { argb: GREY_TEXT } };
-  }
-
-  ws.views = [{ state: "frozen", ySplit: contexto.length + 1 }];
+  buildTableSheet(workbook, {
+    name: "Com Estoque",
+    titleLines: [
+      "Produtos vendidos — COM estoque hoje",
+      `${produtosEstoque.comEstoque.length.toLocaleString("pt-BR")} produtos`,
+      ...contexto,
+    ],
+    headerFill: GREEN,
+    zebra: GREEN_ZEBRA,
+    cols,
+    rows: rowsFor(produtosEstoque.comEstoque, false),
+    note,
+    emptyMessage: "Nenhum produto vendido com estoque no período.",
+  });
 }
 
 // ── Aba Vendedores (matriz mês a mês) ────────────────────────────────────────

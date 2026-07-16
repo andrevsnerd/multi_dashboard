@@ -239,12 +239,10 @@ export default function ProductsTable({
               productId: member.produto,
               colors: groupByColor ? member.colors : [],
             }))
-          : companyKey === "scarfme"
-            ? [{
-                productId: product.productId,
-                colors: groupByColor ? [product.corProduto ?? NO_COLOR_PARAM] : [],
-              }]
-            : [];
+          : [{
+              productId: product.productId,
+              colors: groupByColor ? [product.corProduto ?? NO_COLOR_PARAM] : [],
+            }];
 
         if (requestEntries.length === 0) {
           return;
@@ -735,14 +733,13 @@ export default function ProductsTable({
                   )}
                   {showStockColumn && (
                     <td className={styles.numberCell}>
-                      {shouldShowGroupedStockTooltip ? (
-                        <div
-                          className={styles.stockTooltipAnchor}
-                          onMouseEnter={(e) => {
-                            setTooltipAnchorRect((e.currentTarget as HTMLElement).getBoundingClientRect());
-                            setHoveredStockKey(stockCellTooltipKey);
-                            void loadStockTooltip(product);
-                          }}
+                      <div
+                        className={styles.stockTooltipAnchor}
+                        onMouseEnter={(e) => {
+                          setTooltipAnchorRect((e.currentTarget as HTMLElement).getBoundingClientRect());
+                          setHoveredStockKey(stockCellTooltipKey);
+                          void loadStockTooltip(product);
+                        }}
                           onMouseLeave={() => {
                             setHoveredStockKey((current) =>
                               current === stockCellTooltipKey ? null : current
@@ -792,10 +789,7 @@ export default function ProductsTable({
                               )}
                             </div>
                           )}
-                        </div>
-                      ) : (
-                        formatNumber(product.stock)
-                      )}
+                      </div>
                     </td>
                   )}
                   {showStockRedeColumn && (
