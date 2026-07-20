@@ -378,6 +378,14 @@ export async function exportLojaRaioXXlsx(options: ExportLojaRaioXOptions): Prom
   // ─── ABA: RUPTURAS ───────────────────────────────────────────────────────
   buildRupturasSheet(workbook, rupturas, { janela, gsCols, showGradeSubgrupo, isRede: options.isRede, contexto });
 
+  const dateStr = new Date().toISOString().split("T")[0];
+  const escopoSlug = options.isRede ? "rede" : safeFilenamePart(options.filialLabel ?? options.filial ?? "loja");
+  await triggerDownload(workbook, `loja-raio-x-${options.companyKey}-${escopoSlug}-${options.mes}-${dateStr}.xlsx`);
+}
+
+/** Escreve o workbook num Blob e dispara o download no navegador. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function triggerDownload(workbook: any, filename: string): Promise<void> {
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer as ArrayBuffer], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -385,13 +393,71 @@ export async function exportLojaRaioXXlsx(options: ExportLojaRaioXOptions): Prom
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  const dateStr = new Date().toISOString().split("T")[0];
-  const escopoSlug = options.isRede ? "rede" : safeFilenamePart(options.filialLabel ?? options.filial ?? "loja");
-  a.download = `loja-raio-x-${options.companyKey}-${escopoSlug}-${options.mes}-${dateStr}.xlsx`;
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+export interface ExportRupturasOptions {
+  companyKey: CompanyKey;
+  filial: string | null;
+  filialLabel?: string | null;
+  isRede: boolean;
+  /** Rótulo do mês (ex.: "jul/26") para título. */
+  mesLabel: string;
+  /** YYYY-MM analisado, para o nome do arquivo. */
+  mes: string;
+  /** Checkbox "só zerados na rede toda" ativo — muda o título e o nome do arquivo. */
+  soZerados: boolean;
+  /** Itens JÁ FILTRADOS como aparecem na tela (a função não refaz fetch nem filtra). */
+  rupturas: RupturaItem[];
+}
+
+/**
+ * Export DIRETO só das Rupturas — exporta exatamente a lista visível na aba (respeitando
+ * o checkbox "só zerados na rede toda"), num único sheet com as mesmas colunas da tela
+ * (+ Compra Ideal, Custo unitário e Custo total). Não refaz fetch: recebe os itens já
+ * carregados/filtrados no cliente, então o arquivo bate 1:1 com o que está na tela.
+ */
+export async function exportRupturasXlsx(options: ExportRupturasOptions): Promise<void> {
+  const excelJsMod = await import("exceljs");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ExcelJS = (excelJsMod as any).default ?? excelJsMod;
+  const workbook = new ExcelJS.Workbook();
+
+  const showGradeSubgrupo = options.companyKey === "scarfme";
+  const gsCols: Col[] = showGradeSubgrupo
+    ? [
+        { label: "Subgrupo", width: 16, align: "left" },
+        { label: "Grade", width: 12, align: "left" },
+      ]
+    : [];
+
+  const escopoLabel = options.isRede ? "Rede (todas as lojas)" : options.filialLabel ?? options.filial ?? "—";
+  const contexto = [
+    `${options.companyKey.toUpperCase()}  ·  Escopo: ${escopoLabel}`,
+    `Mês: ${options.mesLabel}`,
+    options.soZerados ? "Filtro: só produtos zerados em toda a rede" : "",
+  ].filter(Boolean);
+
+  const janela: Janela = { parcial: false, analisadoLabel: options.mesLabel, comparacaoLabel: null };
+  buildRupturasSheet(workbook, options.rupturas, {
+    janela,
+    gsCols,
+    showGradeSubgrupo,
+    isRede: options.isRede,
+    contexto,
+  });
+
+  const dateStr = new Date().toISOString().split("T")[0];
+  const escopoSlug = options.isRede ? "rede" : safeFilenamePart(options.filialLabel ?? options.filial ?? "loja");
+  const sufixo = options.soZerados ? "-zerados-rede" : "";
+  await triggerDownload(
+    workbook,
+    `rupturas-${options.companyKey}-${escopoSlug}-${options.mes}${sufixo}-${dateStr}.xlsx`
+  );
 }
 
 // ── Tabela genérica: 1 aba = 1 tabela limpa (título + cabeçalho + linhas) ────

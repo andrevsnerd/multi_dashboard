@@ -17,7 +17,7 @@ import CompraIdealCell from "@/components/shared/CompraIdealCell";
 import { useTheme } from "@/components/theme/ThemeContext";
 import { resolveCompany, type CompanyKey } from "@/lib/config/company";
 import type { CompraIdealResult } from "@/lib/utils/compra-ideal";
-import { exportLojaRaioXXlsx } from "@/lib/utils/exportLojaRaioXXlsx";
+import { exportLojaRaioXXlsx, exportRupturasXlsx } from "@/lib/utils/exportLojaRaioXXlsx";
 
 import styles from "./LojaRaioXPage.module.css";
 
@@ -129,6 +129,7 @@ interface RupturaItem {
   compraIdealQtd: number;
   compraIdealStatus: "REPOR" | "OK" | "EXCESSO" | null;
   compraIdealTransito: number;
+  custoUnitario: number;
 }
 
 interface ProdutoVendaEstoqueItem {
@@ -536,10 +537,13 @@ export default function LojaRaioXPage({ companyKey }: Props) {
         <RupturasTab
           data={rupturas}
           loading={rupturasLoading}
+          mes={mes}
           mesLabel={ymLabel(mes)}
           isRede={isRede}
           showGradeSubgrupo={showGradeSubgrupo}
           companyKey={companyKey}
+          filial={filial}
+          filialLabel={filial ? (resolveCompany(companyKey)?.filialDisplayNames?.[filial] ?? filial) : null}
         />
       )}
       </div>
@@ -1469,19 +1473,26 @@ function RupturaCompraIdeal({ item, companyKey }: { item: RupturaItem; companyKe
 function RupturasTab({
   data,
   loading,
+  mes,
   mesLabel,
   isRede,
   showGradeSubgrupo,
   companyKey,
+  filial,
+  filialLabel,
 }: {
   data: RupturaItem[] | null;
   loading: boolean;
+  mes: string;
   mesLabel: string;
   isRede: boolean;
   showGradeSubgrupo: boolean;
   companyKey: CompanyKey;
+  filial: string | null;
+  filialLabel: string | null;
 }) {
   const [soZeradoRede, setSoZeradoRede] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const escopo = isRede ? "na rede" : "nesta loja";
   if (loading && !data) return <div className={styles.skeleton} style={{ height: 320 }} />;
   if (!data) return null;
@@ -1492,6 +1503,27 @@ function RupturasTab({
   const zeradosRede = data.filter((r) => r.ondeTemEstoque.length === 0).length;
   const visiveis = soZeradoRede ? data.filter((r) => r.ondeTemEstoque.length === 0) : data;
 
+  async function handleExportRupturas() {
+    if (exporting || visiveis.length === 0) return;
+    setExporting(true);
+    try {
+      await exportRupturasXlsx({
+        companyKey,
+        filial,
+        filialLabel,
+        isRede,
+        mes,
+        mesLabel,
+        soZerados: soZeradoRede,
+        rupturas: visiveis,
+      });
+    } catch (err) {
+      alert((err as Error).message || "Erro ao exportar rupturas");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <div className={styles.tabBody}>
       <div className={styles.rupturasHead}>
@@ -1499,15 +1531,26 @@ function RupturasTab({
           <strong>{data.length} produtos</strong> venderam em {mesLabel} e estão zerados {escopo} — do maior faturamento ao menor.
           {" "}A coluna <strong>Compra Ideal</strong> usa a mesma regra da Curva ABC{isRede ? " (soma da necessidade por loja)" : ""}.
         </p>
-        <label className={styles.checkFilter} title="Mostra só os itens sem estoque positivo em nenhuma loja da rede">
-          <input
-            type="checkbox"
-            checked={soZeradoRede}
-            onChange={(e) => setSoZeradoRede(e.target.checked)}
-          />
-          <span>Só zerados na rede toda</span>
-          <span className={styles.checkCount}>{zeradosRede}</span>
-        </label>
+        <div className={styles.rupturasActions}>
+          <label className={styles.checkFilter} title="Mostra só os itens sem estoque positivo em nenhuma loja da rede">
+            <input
+              type="checkbox"
+              checked={soZeradoRede}
+              onChange={(e) => setSoZeradoRede(e.target.checked)}
+            />
+            <span>Só zerados na rede toda</span>
+            <span className={styles.checkCount}>{zeradosRede}</span>
+          </label>
+          <button
+            type="button"
+            className={styles.exportRupturasBtn}
+            onClick={handleExportRupturas}
+            disabled={exporting || visiveis.length === 0}
+            title="Exporta em XLSX exatamente a lista de rupturas mostrada (respeita o filtro), com Compra Ideal e custos"
+          >
+            {exporting ? "Exportando…" : `Exportar rupturas (${visiveis.length})`}
+          </button>
+        </div>
       </div>
       {visiveis.length === 0 ? (
         <div className={styles.empty}>Nenhum produto zerado em toda a rede em {mesLabel}. 🎉</div>
