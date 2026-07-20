@@ -36,6 +36,10 @@ function cenario(ideal: CompraIdealResult): { emoji: string; label: string } {
   if (ideal.usouTrechoRecente) {
     return { emoji: "🔄", label: `Trecho recente (maior estava velho · gap ${fmt(ideal.ritmoGapDias)}d)` };
   }
+  // Resgate por venda recente: vendeu (últimos 60d) mas nenhum trecho com estoque capturou (venda no negativo).
+  if (ideal.resgateVendaRecente) {
+    return { emoji: "🔄", label: "Vendeu recente sem saldo (fantasma) · ritmo resgatado" };
+  }
   if (ideal.ritmoDiasBase < 30) return { emoji: "🆕", label: "Base curta (<30d) — ritmo amortecido" };
   if (ideal.ritmoDiasBase < 60) return { emoji: "📊", label: "Base parcial (30–59d)" };
   return { emoji: "✅", label: "Janela cheia (≥60d) — estável" };
@@ -69,7 +73,9 @@ function buildPerguntas(ideal: CompraIdealResult): QA[] {
       ? `maior trecho não vendeu (0) → usa o RECENTE: ${baseHist}`
       : ideal.usouTrechoRecente
         ? `maior trecho ficou ${fmt(ideal.ritmoGapDias)}d parado (> ${fmt(ideal.gapAntigoDias ?? 0)}d) → usa o RECENTE: ${baseHist}`
-        : baseHist;
+        : ideal.resgateVendaRecente
+          ? `vendeu ${fmt(ideal.ritmoVendasBase)} nos últimos 60d, mas sem saldo positivo no dia (fantasma) → resgata a venda recente: divide por 30`
+          : baseHist;
 
   // 2. consumo/dia
   const consumo = `${fmt(ideal.ritmoVendasBase)} vendas ÷ ${divisor} = ${fmt2(ideal.consumoDiario)}/dia  (≈ ${fmt(ideal.ritmoMensal)}/mês)`;

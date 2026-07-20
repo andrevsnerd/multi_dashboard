@@ -115,5 +115,40 @@ console.log("\n=== Cenário 8: CATRACA — registrada 2026-09-21, agora ACELEROU
 const cat2 = aplicaCatraca("2026-09-21", calcCom(16));
 console.log(`  recalculada hoje = ${calcCom(16).dataCompra} → catraca AVANÇA p/ = ${cat2.dataCompra} (esperado 2026-08-07)`);
 
+console.log("\n=== Cenário 9: RESGATE por venda recente (estoque negativo-fantasma) ===");
+// Item novo (NERD): vendeu 1 nos últimos 60d, zerou, mas NENHUM trecho com estoque capturou a
+// venda (saiu no negativo). ritmoDiasComEstoque/ritmoVendasPeriodo = 0 e sem trecho recente.
+// Antes: consumo 0 → "Suficiente". Agora: qtde60d resgata → REPOR (comprar ~1).
+const rResgate = calcCompraIdeal({
+  estoqueAtual: 0,
+  ritmoDiasComEstoque: 0,
+  ritmoVendasPeriodo: 0,
+  ritmoRecenteDias: 0,
+  ritmoRecenteVendas: 0,
+  qtde60d: 1,
+  coberturaDias: 30,
+  producaoDias: 14,
+  recenteHorizonteDias: 60, // nerd
+  transitEntries: [],
+  hoje,
+});
+console.log(`  resgateVendaRecente=${rResgate.resgateVendaRecente} consumo/dia=${fmt(rResgate.consumoDiario)}`);
+console.log(`  QUANTIDADE = ${rResgate.compraIdeal}  status=${rResgate.status}  comprarAgora=${rResgate.comprarAgora}  (esperado: REPOR, 1, agora)`);
+
+console.log("\n=== Cenário 10: SEM horizonte configurado → resgate desligado (legado) ===");
+const rSemHorizonte = calcCompraIdeal({
+  estoqueAtual: 0,
+  ritmoDiasComEstoque: 0,
+  ritmoVendasPeriodo: 0,
+  qtde60d: 1,
+  coberturaDias: 30,
+  producaoDias: 14,
+  // recenteHorizonteDias ausente → não resgata
+  transitEntries: [],
+  hoje,
+});
+console.log(`  resgateVendaRecente=${rSemHorizonte.resgateVendaRecente} consumo/dia=${fmt(rSemHorizonte.consumoDiario)}`);
+console.log(`  QUANTIDADE = ${rSemHorizonte.compraIdeal}  status=${rSemHorizonte.status}  (esperado: OK, 0)`);
+
 void chegada;
 void consumoMensal;

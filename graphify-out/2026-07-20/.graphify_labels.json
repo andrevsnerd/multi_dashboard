@@ -304,6 +304,8 @@
   "302": "page.tsx",
   "303": "page.tsx",
   "304": "route.ts",
+  "305": "page.tsx",
+  "306": "page.tsx",
   "307": ".env.local (AWS EC2)",
   "308": "aws-setup/install-aws.sh",
   "309": "PROXY_SECRET",
@@ -444,6 +446,13 @@
   "444": "vm-setup/install.sh",
   "445": "PM2 process manager",
   "446": "proxy-server (pm2 managed process)",
+  "447": "page.tsx",
   "448": "ControleTransferenciasTable",
-  "449": "RealizadasPanel.tsx"
+  "449": "RealizadasPanel.tsx",
+  "450": "page.tsx",
+  "451": "page.tsx",
+  "452": "page.tsx",
+  "453": "page.tsx",
+  "454": "page.tsx",
+  "456": "executeQueryWithParams"
 }

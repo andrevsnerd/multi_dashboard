@@ -59,7 +59,12 @@ export interface CompraIdealInput {
    * o recente em vez de zerar o consumo. `null` (empresa não configurada) → resgate desligado.
    */
   recenteHorizonteDias?: number | null;
-  /** @deprecated Não é mais usado no cálculo de ritmo (a regra usa só a janela `ritmoDiasComEstoque`). */
+  /**
+   * Vendas líquidas dos últimos 60 dias (independe da reconstrução de estoque). NÃO alimenta o
+   * ritmo normal (que usa a janela `ritmoDiasComEstoque`); serve só de rede de segurança para o
+   * RESGATE POR VENDA RECENTE: quando nenhum trecho com estoque capturou a venda (item vendido no
+   * negativo/fantasma), este número reativa o consumo em vez de zerar. Ver `resgateVendaRecente`.
+   */
   qtde60d?: number | null;
   linha?: string | null;
   subgrupo?: string | null;
@@ -104,6 +109,13 @@ export interface CompraIdealResult {
   usouTrechoRecente: boolean;
   /** Por que trocou pro trecho recente: "gap" (janela antiga) | "zerado" (resgate) | null. */
   motivoTrechoRecente: "gap" | "zerado" | null;
+  /**
+   * true quando o ritmo foi RESGATADO por venda recente (`qtde60d`) porque nenhum trecho contínuo
+   * com estoque capturou a venda — item vendido com saldo reconstruído ≤ 0 ("estoque
+   * negativo-fantasma" do ERP, típico de item novo cuja entrada foi lançada depois da venda).
+   * Sem isso o consumo ficaria 0 e o item cairia em "Suficiente" mesmo tendo vendido e zerado.
+   */
+  resgateVendaRecente: boolean;
   /** Gap (dias) entre o fim do maior trecho e o início do recente (0 = mesmo trecho). */
   ritmoGapDias: number;
   /** Tolerância de gap (dias) aplicada, ou null quando a empresa não tem janela antiga configurada. */
@@ -325,10 +337,26 @@ export function calcCompraIdeal(input: CompraIdealInput): CompraIdealResult {
       ? "zerado"
       : null;
   const ritmoDiasBase = usouTrechoRecente ? recenteDias : melhorDias;
-  const ritmoVendasBase = usouTrechoRecente ? recenteVendas : melhorVendas;
+  let ritmoVendasBase = usouTrechoRecente ? recenteVendas : melhorVendas;
+  // (3) RESGATE POR VENDA RECENTE FORA DE TRECHO — nenhum trecho contínuo com estoque capturou
+  // venda (ritmoVendasBase = 0), mas o item VENDEU nos últimos 60 dias (`qtde60d`). Acontece
+  // quando a venda saiu com o saldo reconstruído ≤ 0 ("estoque negativo-fantasma" do ERP, comum
+  // em item novo cuja entrada foi lançada depois da venda): a venda existe, mas fica invisível à
+  // janela de ritmo (dia sem estoque positivo), zerando o consumo e derrubando o item em
+  // "Suficiente" mesmo tendo zerado. Aqui a venda recente reativa o ritmo (qtde60d ÷ piso de 30 →
+  // base curta, confiabilidade muito baixa), espelhando o resgate de janela zerada para o caso em
+  // que NEM o trecho recente vendeu. Gated pelo horizonte de resgate da empresa (null = desligado,
+  // preserva o legado). Só sobe o consumo — nunca reduz um ritmo saudável (gated em <= 0).
+  const qtde60dRecente = Math.max(0, Number(input.qtde60d ?? 0));
+  const resgateVendaRecente =
+    ritmoVendasBase <= 0 &&
+    recenteHorizonteDias != null &&
+    recenteHorizonteDias > 0 &&
+    qtde60dRecente > 0;
+  if (resgateVendaRecente) ritmoVendasBase = qtde60dRecente;
   const divisorRitmo = Math.max(ritmoDiasBase, RITMO_DIAS_BASE_MINIMO);
   const consumoDiario = ritmoVendasBase / divisorRitmo;
-  // Trecho < 30 (inclui "sem trecho" = novo): o consumo foi amortecido pelo piso de 30.
+  // Trecho < 30 (inclui "sem trecho" = novo, e o resgate por venda recente): consumo amortecido pelo piso de 30.
   const ritmoBaseAmortecida = ritmoDiasBase < RITMO_DIAS_BASE_MINIMO;
   const confiabilidade: CompraIdealConfiabilidade =
     ritmoDiasBase >= 60 ? "alta" : ritmoDiasBase >= 14 ? "baixa" : "muito_baixa";
@@ -484,6 +512,7 @@ export function calcCompraIdeal(input: CompraIdealInput): CompraIdealResult {
     ritmoBaseAmortecida,
     usouTrechoRecente,
     motivoTrechoRecente,
+    resgateVendaRecente,
     ritmoGapDias,
     gapAntigoDias,
     confiabilidade,

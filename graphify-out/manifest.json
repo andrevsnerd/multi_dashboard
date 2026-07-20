@@ -1530,7 +1530,7 @@
     "semantic_hash": "3a1ac7d9dac7349b3338e8b433eb5031"
   },
   "components/performance/CurvaAbcPage.tsx": {
-    "mtime": 1784050501.2360988,
+    "mtime": 1784563698.6956916,
     "ast_hash": "fedb8618bb7784dd3ca1be5d311387be",
     "semantic_hash": ""
   },
@@ -1670,9 +1670,9 @@
     "semantic_hash": ""
   },
   "components/shared/CompraIdealExplainCard.tsx": {
-    "mtime": 1782494053.0252738,
-    "ast_hash": "a2ecdd2aa6a5bbf4f1d7f0a997a89670",
-    "semantic_hash": "a2ecdd2aa6a5bbf4f1d7f0a997a89670"
+    "mtime": 1784562870.534233,
+    "ast_hash": "35050859ef2bde5d4eee08725afb000a",
+    "semantic_hash": ""
   },
   "components/shared/MiniAreaChart.tsx": {
     "mtime": 1784221598.4166288,
@@ -1880,8 +1880,8 @@
     "semantic_hash": "d751713988987e9331980363e24189ce"
   },
   "data/produto-labels.json": {
-    "mtime": 1784219544.2124379,
-    "ast_hash": "0226e794cae2058dd02ea1359950e8dc",
+    "mtime": 1784563641.442037,
+    "ast_hash": "6ad3169aabea0c5954a791f2d6873544",
     "semantic_hash": ""
   },
   "data/produtos-agrupados.json": {
@@ -2745,9 +2745,9 @@
     "semantic_hash": "37ea71ca6457aed7d45ede842d5903dd"
   },
   "lib/utils/compra-ideal.ts": {
-    "mtime": 1782494029.8513925,
-    "ast_hash": "013382cbb90d304dc82ecd8eaa72860f",
-    "semantic_hash": "013382cbb90d304dc82ecd8eaa72860f"
+    "mtime": 1784562849.8424025,
+    "ast_hash": "a2cf0ba580e16263910f7b64dc4d9d9c",
+    "semantic_hash": ""
   },
   "lib/utils/compra-salva-store.ts": {
     "mtime": 1784201667.1675014,
@@ -3235,9 +3235,9 @@
     "semantic_hash": "b636ec9c76d4676bae4aa9a7a136ec0f"
   },
   "tmp/test-compra-ciclo.ts": {
-    "mtime": 1782235267.6497316,
-    "ast_hash": "3f5322ae3b286f0cb4e8c3fc3c6cd765",
-    "semantic_hash": "3f5322ae3b286f0cb4e8c3fc3c6cd765"
+    "mtime": 1784563030.3881283,
+    "ast_hash": "e02a3a341fbae6faa47ed12c1eafc579",
+    "semantic_hash": ""
   },
   "tmp/test-po-badge.ts": {
     "mtime": 1780073682.905932,
