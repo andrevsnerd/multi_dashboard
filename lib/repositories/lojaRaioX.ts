@@ -17,6 +17,8 @@ import sql from "mssql";
 import {
   getFilialGroupMembers,
   getFilialLabelForDisplay,
+  getOperationalFilials,
+  compareFilialDisplayOrder,
   isEcommerceFilial,
   VAREJO_VALUE,
   type CompanyKey,
@@ -32,6 +34,19 @@ import { listComprasTransitoFull } from "@/lib/utils/compra-transito-store";
 import { listProdutosDescontinuados } from "@/lib/utils/produto-descontinuado-store";
 import { buildDescontinuadoKeySet, isProdutoDescontinuado } from "@/lib/utils/produtos-descontinuados";
 import { shiftRangeByMonths, toUtcStartOfDay, type NormalizedRange } from "@/lib/utils/date";
+import { getControleEstoqueMetricasItensBatched } from "@/lib/server/controle-estoque-metricas";
+import {
+  buildControleEstoqueItemKey,
+  dedupeControleEstoqueItens,
+  type ControleEstoqueItemMetricas,
+} from "@/lib/utils/controle-estoque-metricas";
+import {
+  calcCompraIdealFromResumo,
+  type CompraIdealResult,
+  type CompraIdealStatus,
+} from "@/lib/utils/compra-ideal";
+import { getMappedColorDescription } from "@/lib/utils/colorMapping";
+import type { CompraTransitoIndexEntry } from "@/lib/client/compras-transito";
 
 /** Intervalo [start, end) — end exclusivo, padrão do app. */
 export interface Range {
@@ -87,6 +102,21 @@ export interface RupturaItem {
   estoqueLoja: number; // <= 0 (é ruptura)
   estoqueRede: number;
   ondeTemEstoque: Array<{ filial: string; estoque: number }>;
+  /**
+   * Compra Ideal — MESMA regra global de Lista Loja / Curva ABC
+   * (`calcCompraIdealFromResumo`), computada só na aba Rupturas (`withCompraIdeal`).
+   * Escopo = a loja selecionada; na visão REDE = soma da necessidade por loja.
+   * `compraIdeal` é o resultado completo (só no escopo de UMA loja → alimenta o
+   * CompraIdealCell com tooltip); `null` na rede, onde só a soma faz sentido.
+   */
+  compraIdeal: CompraIdealResult | null;
+  /** Quantidade a repor (loja: max(0, compraIdeal); rede: soma da necessidade por loja). */
+  compraIdealQtd: number;
+  compraIdealStatus: CompraIdealStatus | null;
+  /** Compras em trânsito (peças a caminho) consideradas no cálculo. */
+  compraIdealTransito: number;
+  /** Custo unitário canônico (máx. das vendas por loja; fallback = custo do produto). */
+  custoUnitario: number;
 }
 
 /** Situação de um item na comparação entre o mês analisado e o mês de comparação. */
@@ -1043,13 +1073,200 @@ export async function fetchVendedoresMesResumo(params: {
   return Array.from(map.values());
 }
 
+// ── Compra Ideal na aba Rupturas (regra global, igual à Curva ABC) ───────────
+//
+// Reusa a MESMA pipeline de "Compra sugerida por Curva ABC" / Distribuição Matriz:
+// métricas de ritmo/estoque por loja EM LOTE (`getControleEstoqueMetricasItensBatched`,
+// 1 chamada por loja, nunca N+1 por item) + trânsito da rede + `calcCompraIdealFromResumo`.
+// Assim o número bate com Lista Loja, Curva ABC e Compras Salvas para o mesmo produto×loja.
+//
+// Só rodamos isto na aba Rupturas (parâmetro `withCompraIdeal`) — o Diagnóstico usa
+// fetchRupturasLoja apenas para a CONTAGEM/faturamento e não paga esse custo.
+
+/** Quantas lojas calcular em paralelo (cada uma já batcheia os itens internamente). */
+const COMPRA_IDEAL_FILIAL_CONCURRENCY = 3;
+/** Teto de itens enriquecidos com Compra Ideal (rupturas já vêm ordenadas por faturamento). */
+const COMPRA_IDEAL_RUPTURA_LIMIT = 1200;
+
+const TRANSIT_DESC_PREFIX = " desc ";
+
+/** Espelha reportCompraSugeridaAbc/distribuicaoMatriz: casa trânsito por descrição de cor. */
+function transitDescKey(
+  produto: string | null | undefined,
+  corProduto: string | null | undefined,
+  corDescricao?: string | null
+): string | null {
+  const doProduto = (corDescricao ?? "").trim();
+  const base = doProduto || getMappedColorDescription(corProduto);
+  const raw = base.trim().toUpperCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
+  if (!raw) return null;
+  return `${TRANSIT_DESC_PREFIX}${String(produto ?? "").trim()}||${raw}`;
+}
+
+/** Índice de compras em trânsito ativas por (produto × cor canônica) — pool da rede. */
+async function buildCompraTransitIndex(
+  company: string | undefined
+): Promise<Map<string, CompraTransitoIndexEntry[]>> {
+  const idx = new Map<string, CompraTransitoIndexEntry[]>();
+  if (!company) return idx;
+  const compras = await listComprasTransitoFull(company).catch(() => []);
+  const today = new Date();
+  for (const c of compras) {
+    for (const it of c.items ?? []) {
+      if (!isCompraTransitoDateActive(it.dataRecebimento, today)) continue;
+      const entry: CompraTransitoIndexEntry = {
+        itemKey: it.itemKey ?? "",
+        produto: it.produto,
+        corProduto: it.corProduto ?? null,
+        quantidade: Number(it.quantidade ?? 0),
+        dataRecebimento: it.dataRecebimento,
+        title: c.title ?? "",
+        confirmedAt: c.confirmedAt ?? "",
+      };
+      const k = canonicalKey(it.produto, it.corProduto ?? null);
+      idx.set(k, [...(idx.get(k) ?? []), entry]);
+      const dk = transitDescKey(it.produto, it.corProduto, it.corDescricao);
+      if (dk) idx.set(dk, [...(idx.get(dk) ?? []), entry]);
+    }
+  }
+  return idx;
+}
+
+function resolveTransit(
+  transitIndex: Map<string, CompraTransitoIndexEntry[]>,
+  produto: string,
+  codigoCor: string | null | undefined,
+  corDescricao: string | null | undefined
+): CompraTransitoIndexEntry[] {
+  let transit = transitIndex.get(canonicalKey(produto, codigoCor ?? null)) ?? [];
+  if (transit.length === 0) {
+    const dk = transitDescKey(produto, codigoCor, corDescricao);
+    if (dk) transit = transitIndex.get(dk) ?? [];
+  }
+  return transit;
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  mapper: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+  if (items.length === 0) return [];
+  const results = new Array<R>(items.length);
+  let next = 0;
+  async function worker() {
+    while (true) {
+      const i = next;
+      next += 1;
+      if (i >= items.length) return;
+      results[i] = await mapper(items[i]!, i);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
+type MetricasMap = Record<string, ControleEstoqueItemMetricas>;
+
+/**
+ * Enriquece os itens de ruptura com a Compra Ideal (regra global). Muta `items` in-place.
+ * Escopo:
+ *  - LOJA específica → 1 lote de métricas dessa loja; guarda o `CompraIdealResult` completo
+ *    (alimenta o CompraIdealCell com tooltip, idêntico à Curva ABC daquela filial).
+ *  - REDE (sem filial) → calcula por loja e SOMA a necessidade (max(0, compraIdeal) dos itens
+ *    em REPOR) — mesma consolidação de "Compra sugerida por Curva ABC" (rede = soma por loja).
+ */
+async function attachCompraIdealRupturas(params: {
+  company: string | undefined;
+  filial: string | null | undefined;
+  cfg: Awaited<ReturnType<typeof resolveCompanyLive>>;
+  items: RupturaItem[];
+  meta: Map<string, { linha: string | null; subgrupo: string | null; cost: number }>;
+}): Promise<void> {
+  const { company, filial, cfg, items, meta } = params;
+  if (!company || items.length === 0) return;
+
+  const live = (await liveNameForIncoming(filial)) ?? (filial ?? "").trim();
+  const isRede = !live || live === VAREJO_VALUE;
+
+  // Lojas do escopo. Loja específica → a própria (o batched resolve grupo→canônica ativa).
+  // Rede → todas as lojas físicas operacionais (canônicas ativas, sem e-commerce), como no ABC.
+  const filiaisScope = isRede
+    ? getOperationalFilials(cfg ?? null, "sales")
+        .filter((f) => !isEcommerceFilial(company, f))
+        .sort((a, b) => compareFilialDisplayOrder(a, b, cfg ?? null))
+    : [filial as string];
+  if (filiaisScope.length === 0) return;
+
+  const alvo = items.slice(0, COMPRA_IDEAL_RUPTURA_LIMIT);
+  const itensInput = dedupeControleEstoqueItens(
+    alvo.map((r) => ({ produto: r.produto, corProduto: r.cor || null }))
+  );
+
+  const [metricasPorFilial, transitIndex] = await Promise.all([
+    mapWithConcurrency(filiaisScope, COMPRA_IDEAL_FILIAL_CONCURRENCY, (name) =>
+      getControleEstoqueMetricasItensBatched({
+        company,
+        filial: name,
+        includeHistorico: true,
+        itens: itensInput,
+      }).catch(() => ({}) as MetricasMap)
+    ),
+    buildCompraTransitIndex(company),
+  ]);
+
+  for (const item of alvo) {
+    const itemKey = buildControleEstoqueItemKey(item.produto, item.cor || null);
+    const metaItem = meta.get(itemKey) ?? { linha: null, subgrupo: null, cost: 0 };
+    const transit = resolveTransit(transitIndex, item.produto, item.cor, item.corDescricao);
+
+    // Custo unitário canônico = máx. do custo das vendas por loja (igual à Curva ABC);
+    // fallback para o custo do produto quando nenhuma loja tem venda com custo.
+    let custoMax = 0;
+
+    if (!isRede) {
+      const resumo = metricasPorFilial[0]?.[itemKey]?.resumo ?? null;
+      const ideal = calcCompraIdealFromResumo(resumo, transit, {
+        linha: metaItem.linha,
+        subgrupo: metaItem.subgrupo,
+        company,
+      });
+      custoMax = Number(resumo?.custoUnitario ?? 0);
+      item.compraIdeal = ideal;
+      item.compraIdealStatus = ideal.status;
+      item.compraIdealQtd = ideal.status === "REPOR" ? Math.max(0, ideal.compraIdeal) : 0;
+      item.compraIdealTransito = ideal.emTransito;
+    } else {
+      let soma = 0;
+      filiaisScope.forEach((_, idx) => {
+        const resumo = metricasPorFilial[idx]?.[itemKey]?.resumo ?? null;
+        custoMax = Math.max(custoMax, Number(resumo?.custoUnitario ?? 0));
+        const ideal = calcCompraIdealFromResumo(resumo, transit, {
+          linha: metaItem.linha,
+          subgrupo: metaItem.subgrupo,
+          company,
+        });
+        if (ideal.status === "REPOR") soma += Math.max(0, ideal.compraIdeal);
+      });
+      item.compraIdeal = null; // soma da rede não tem um único resumo/tooltip
+      item.compraIdealQtd = soma;
+      item.compraIdealStatus = soma > 0 ? "REPOR" : "OK";
+      item.compraIdealTransito = transit.reduce((s, e) => s + Math.max(0, Number(e.quantidade ?? 0)), 0);
+    }
+
+    item.custoUnitario = custoMax > 0 ? Math.round(custoMax * 100) / 100 : Math.round(metaItem.cost * 100) / 100;
+  }
+}
+
 export async function fetchRupturasLoja(params: {
   company?: string;
   filial?: string | null;
   range: Range; // janela alinhada do mês analisado
   linhas?: string[] | null;
+  /** Calcula a Compra Ideal (regra global) por item — só na aba Rupturas (caro). */
+  withCompraIdeal?: boolean;
 }): Promise<RupturaItem[]> {
-  const { company, filial, range, linhas } = params;
+  const { company, filial, range, linhas, withCompraIdeal } = params;
 
   const [produtos, cfg, descSet, transito] = await Promise.all([
     fetchProductsWithDetails({
@@ -1086,7 +1303,7 @@ export async function fetchRupturasLoja(params: {
     stockPorProduto.set(e.produto, agg);
   }
 
-  return emRuptura
+  const itens: RupturaItem[] = emRuptura
     .map((p) => {
       const prod = (p.productId ?? "").trim();
       const corDesc = corKeyFromDesc(p.descCorProduto);
@@ -1118,9 +1335,30 @@ export async function fetchRupturasLoja(params: {
         estoqueLoja: Math.round(p.stock ?? 0),
         estoqueRede: Math.round(p.estoqueRede ?? onde.reduce((s, f) => s + f.estoque, 0)),
         ondeTemEstoque: onde,
+        compraIdeal: null,
+        compraIdealQtd: 0,
+        compraIdealStatus: null,
+        compraIdealTransito: 0,
+        custoUnitario: 0,
       };
     })
     .sort((a, b) => b.faturamento - a.faturamento);
+
+  if (withCompraIdeal) {
+    // Metadados canônicos (linha/subgrupo/custo) da MESMA fonte de produto do app,
+    // necessários para a cobertura-alvo por linha da Compra Ideal + custo de fallback.
+    const meta = new Map<string, { linha: string | null; subgrupo: string | null; cost: number }>();
+    for (const p of emRuptura) {
+      meta.set(buildControleEstoqueItemKey(p.productId, p.corProduto ?? null), {
+        linha: p.linha ?? null,
+        subgrupo: p.subgrupo ?? null,
+        cost: Number(p.cost ?? 0),
+      });
+    }
+    await attachCompraIdealRupturas({ company, filial, cfg, items: itens, meta });
+  }
+
+  return itens;
 }
 
 // ── Comparação de produtos: mês analisado vs mês de comparação ───────────────

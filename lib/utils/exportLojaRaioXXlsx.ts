@@ -255,6 +255,10 @@ interface RupturaItem {
   faturamento: number;
   estoqueLoja: number;
   ondeTemEstoque: Array<{ filial: string; estoque: number }>;
+  compraIdealQtd: number;
+  compraIdealStatus: "REPOR" | "OK" | "EXCESSO" | null;
+  compraIdealTransito: number;
+  custoUnitario: number;
 }
 
 export interface ExportLojaRaioXOptions {
@@ -836,6 +840,9 @@ function buildRupturasSheet(
     { label: "Vendeu (qtd)", width: 12, fmt: INT_FMT, align: "right" },
     { label: "Faturou (R$)", width: 14, fmt: CUR_FMT, align: "right" },
     { label: isRede ? "Estoque rede" : "Estoque loja", width: 13, fmt: INT_FMT, align: "right" },
+    { label: isRede ? "Compra Ideal rede (qtd)" : "Compra Ideal (qtd)", width: 15, fmt: INT_FMT, align: "right" },
+    { label: "Custo unitário (R$)", width: 15, fmt: CUR_FMT, align: "right" },
+    { label: "Custo total (R$)", width: 15, fmt: CUR_FMT, align: "right" },
     { label: "Onde tem estoque", width: 40, align: "left" },
     { label: "Descontinuado", width: 13, align: "center" },
     { label: "Em trânsito", width: 16, align: "left" },
@@ -853,20 +860,28 @@ function buildRupturasSheet(
   writeHeader(ws, r, cols, RED);
   const headerRowNum = r;
 
-  const rows: (string | number)[][] = rupturas.map((rup) => [
-    rup.produto,
-    rup.descricao || "",
-    rup.corDescricao || rup.cor || "",
-    ...(showGradeSubgrupo ? [rup.subgrupo || "", rup.grade || ""] : []),
-    rup.qtdVendida,
-    round2(rup.faturamento),
-    rup.estoqueLoja,
-    rup.ondeTemEstoque.length === 0
-      ? "Zerado em toda a rede"
-      : rup.ondeTemEstoque.map((f) => `${f.filial}: ${f.estoque}`).join("; "),
-    rup.descontinuado ? "Sim" : "Não",
-    transitoCell(rup),
-  ]);
+  const rows: (string | number)[][] = rupturas.map((rup) => {
+    const qtd = Math.max(0, Math.round(rup.compraIdealQtd ?? 0));
+    const custoUnit = round2(rup.custoUnitario);
+    const custoTotal = typeof custoUnit === "number" ? round2(custoUnit * qtd) : "";
+    return [
+      rup.produto,
+      rup.descricao || "",
+      rup.corDescricao || rup.cor || "",
+      ...(showGradeSubgrupo ? [rup.subgrupo || "", rup.grade || ""] : []),
+      rup.qtdVendida,
+      round2(rup.faturamento),
+      rup.estoqueLoja,
+      qtd,
+      custoUnit,
+      custoTotal,
+      rup.ondeTemEstoque.length === 0
+        ? "Zerado em toda a rede"
+        : rup.ondeTemEstoque.map((f) => `${f.filial}: ${f.estoque}`).join("; "),
+      rup.descontinuado ? "Sim" : "Não",
+      transitoCell(rup),
+    ];
+  });
   writeRows(ws, headerRowNum + 1, cols, rows, RED_ZEBRA);
 
   ws.autoFilter = { from: { row: headerRowNum, column: 1 }, to: { row: headerRowNum, column: ncols } };

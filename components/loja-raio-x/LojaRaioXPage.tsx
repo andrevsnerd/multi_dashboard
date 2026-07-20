@@ -13,8 +13,10 @@ import {
 } from "recharts";
 
 import FilialFilter from "@/components/filters/FilialFilter";
+import CompraIdealCell from "@/components/shared/CompraIdealCell";
 import { useTheme } from "@/components/theme/ThemeContext";
 import { resolveCompany, type CompanyKey } from "@/lib/config/company";
+import type { CompraIdealResult } from "@/lib/utils/compra-ideal";
 import { exportLojaRaioXXlsx } from "@/lib/utils/exportLojaRaioXXlsx";
 
 import styles from "./LojaRaioXPage.module.css";
@@ -122,6 +124,11 @@ interface RupturaItem {
   estoqueLoja: number;
   estoqueRede: number;
   ondeTemEstoque: Array<{ filial: string; estoque: number }>;
+  /** Compra Ideal (regra global, igual à Curva ABC). null quando é a soma da rede. */
+  compraIdeal: CompraIdealResult | null;
+  compraIdealQtd: number;
+  compraIdealStatus: "REPOR" | "OK" | "EXCESSO" | null;
+  compraIdealTransito: number;
 }
 
 interface ProdutoVendaEstoqueItem {
@@ -532,6 +539,7 @@ export default function LojaRaioXPage({ companyKey }: Props) {
           mesLabel={ymLabel(mes)}
           isRede={isRede}
           showGradeSubgrupo={showGradeSubgrupo}
+          companyKey={companyKey}
         />
       )}
       </div>
@@ -1427,76 +1435,136 @@ function ProdutoEstoqueSecao({
 
 // ── Aba Rupturas ───────────────────────────────────────────────────────────────
 
+/**
+ * Célula de Compra Ideal na aba Rupturas. Numa loja específica reusa o CompraIdealCell
+ * global (mesmo número + tooltip da Curva ABC); na visão REDE mostra a SOMA da necessidade
+ * por loja (não há um único resumo/tooltip), com o mesmo visual "N pcs" / "Suficiente".
+ */
+function RupturaCompraIdeal({ item, companyKey }: { item: RupturaItem; companyKey: CompanyKey }) {
+  if (item.compraIdeal) {
+    return (
+      <CompraIdealCell
+        ideal={item.compraIdeal}
+        company={companyKey}
+        descricao={item.descricao || item.produto}
+        cor={item.corDescricao || item.cor}
+      />
+    );
+  }
+  // Rede: soma por loja (sem tooltip).
+  if (item.compraIdealStatus == null) return <span className={styles.acabaMuted}>—</span>;
+  const repor = item.compraIdealStatus === "REPOR";
+  return (
+    <span className={styles.compraIdealRede} title="Soma da necessidade de compra de todas as lojas da rede">
+      <span className={repor ? styles.compraIdealRepor : styles.compraIdealSuficiente}>
+        {repor ? `${fmtNum(item.compraIdealQtd)} pcs` : "Suficiente"}
+      </span>
+      {item.compraIdealTransito > 0 && (
+        <span className={styles.compraIdealTransito}>T {fmtNum(item.compraIdealTransito)}</span>
+      )}
+    </span>
+  );
+}
+
 function RupturasTab({
   data,
   loading,
   mesLabel,
   isRede,
   showGradeSubgrupo,
+  companyKey,
 }: {
   data: RupturaItem[] | null;
   loading: boolean;
   mesLabel: string;
   isRede: boolean;
   showGradeSubgrupo: boolean;
+  companyKey: CompanyKey;
 }) {
+  const [soZeradoRede, setSoZeradoRede] = useState(false);
   const escopo = isRede ? "na rede" : "nesta loja";
   if (loading && !data) return <div className={styles.skeleton} style={{ height: 320 }} />;
   if (!data) return null;
   if (data.length === 0)
     return <div className={styles.empty}>Nenhuma ruptura em {mesLabel}: os produtos que venderam têm estoque {escopo}. 🎉</div>;
 
+  // "Zerou na rede toda" = nenhuma loja tem estoque positivo do item (ondeTemEstoque vazio).
+  const zeradosRede = data.filter((r) => r.ondeTemEstoque.length === 0).length;
+  const visiveis = soZeradoRede ? data.filter((r) => r.ondeTemEstoque.length === 0) : data;
+
   return (
     <div className={styles.tabBody}>
-      <p className={styles.intro}>
-        <strong>{data.length} produtos</strong> venderam em {mesLabel} e estão zerados {escopo} — do maior faturamento ao menor.
-      </p>
-      <div className={styles.tableWrap}>
-        <table className={styles.dataTable}>
-          <thead>
-            <tr>
-              <th>Produto</th>
-              <th>Cor</th>
-              {showGradeSubgrupo && <th>Subgrupo</th>}
-              {showGradeSubgrupo && <th>Grade</th>}
-              <th className={styles.num}>Vendeu</th>
-              <th className={styles.num}>Faturou</th>
-              <th className={styles.num}>Estoque {isRede ? "rede" : "loja"}</th>
-              <th>Onde tem estoque</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.map((r) => (
-              <tr key={`${r.produto}-${r.cor}`}>
-                <td>
-                  <div className={styles.prodDesc}>{r.descricao || r.produto}</div>
-                  <div className={styles.prodId}>{r.produto}</div>
-                  <ProdBadges item={r} showTransito />
-                </td>
-                <td>{r.corDescricao || r.cor || "—"}</td>
-                {showGradeSubgrupo && <td>{r.subgrupo || "—"}</td>}
-                {showGradeSubgrupo && <td>{r.grade || "—"}</td>}
-                <td className={styles.num}>{fmtNum(r.qtdVendida)}</td>
-                <td className={`${styles.num} ${styles.fat}`}>{fmtCurrency(r.faturamento)}</td>
-                <td className={`${styles.num} ${styles.zero}`}>{r.estoqueLoja}</td>
-                <td>
-                  {r.ondeTemEstoque.length === 0 ? (
-                    <span className={styles.semRede}>Zerado em toda a rede</span>
-                  ) : (
-                    <div className={styles.chips}>
-                      {r.ondeTemEstoque.map((f) => (
-                        <span key={f.filial} className={styles.chip}>
-                          {f.filial} <strong>{fmtNum(f.estoque)}</strong>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className={styles.rupturasHead}>
+        <p className={styles.intro}>
+          <strong>{data.length} produtos</strong> venderam em {mesLabel} e estão zerados {escopo} — do maior faturamento ao menor.
+          {" "}A coluna <strong>Compra Ideal</strong> usa a mesma regra da Curva ABC{isRede ? " (soma da necessidade por loja)" : ""}.
+        </p>
+        <label className={styles.checkFilter} title="Mostra só os itens sem estoque positivo em nenhuma loja da rede">
+          <input
+            type="checkbox"
+            checked={soZeradoRede}
+            onChange={(e) => setSoZeradoRede(e.target.checked)}
+          />
+          <span>Só zerados na rede toda</span>
+          <span className={styles.checkCount}>{zeradosRede}</span>
+        </label>
       </div>
+      {visiveis.length === 0 ? (
+        <div className={styles.empty}>Nenhum produto zerado em toda a rede em {mesLabel}. 🎉</div>
+      ) : (
+        <div className={styles.tableWrap}>
+          <table className={styles.dataTable}>
+            <thead>
+              <tr>
+                <th>Produto</th>
+                <th>Cor</th>
+                {showGradeSubgrupo && <th>Subgrupo</th>}
+                {showGradeSubgrupo && <th>Grade</th>}
+                <th className={styles.num}>Vendeu</th>
+                <th className={styles.num}>Faturou</th>
+                <th className={styles.num}>Estoque {isRede ? "rede" : "loja"}</th>
+                <th className={styles.num} title="Compra Ideal — mesma regra global da Curva ABC / Lista Loja">
+                  Compra Ideal
+                </th>
+                <th>Onde tem estoque</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visiveis.map((r) => (
+                <tr key={`${r.produto}-${r.cor}`}>
+                  <td>
+                    <div className={styles.prodDesc}>{r.descricao || r.produto}</div>
+                    <div className={styles.prodId}>{r.produto}</div>
+                    <ProdBadges item={r} showTransito />
+                  </td>
+                  <td>{r.corDescricao || r.cor || "—"}</td>
+                  {showGradeSubgrupo && <td>{r.subgrupo || "—"}</td>}
+                  {showGradeSubgrupo && <td>{r.grade || "—"}</td>}
+                  <td className={styles.num}>{fmtNum(r.qtdVendida)}</td>
+                  <td className={`${styles.num} ${styles.fat}`}>{fmtCurrency(r.faturamento)}</td>
+                  <td className={`${styles.num} ${styles.zero}`}>{r.estoqueLoja}</td>
+                  <td className={styles.num}>
+                    <RupturaCompraIdeal item={r} companyKey={companyKey} />
+                  </td>
+                  <td>
+                    {r.ondeTemEstoque.length === 0 ? (
+                      <span className={styles.semRede}>Zerado em toda a rede</span>
+                    ) : (
+                      <div className={styles.chips}>
+                        {r.ondeTemEstoque.map((f) => (
+                          <span key={f.filial} className={styles.chip}>
+                            {f.filial} <strong>{fmtNum(f.estoque)}</strong>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

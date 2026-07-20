@@ -120,7 +120,7 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: "Mês inválido." }, { status: 400 });
       }
       const win = analyzedWindow(mes);
-      const data = await fetchRupturasLoja({ company, filial, range: win.range, linhas });
+      const data = await fetchRupturasLoja({ company, filial, range: win.range, linhas, withCompraIdeal: true });
       return NextResponse.json({ data });
     }
 

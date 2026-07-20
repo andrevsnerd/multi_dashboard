@@ -303,7 +303,6 @@
   "301": "page.tsx",
   "302": "page.tsx",
   "303": "page.tsx",
-  "304": "route.ts",
   "307": ".env.local (AWS EC2)",
   "308": "aws-setup/install-aws.sh",
   "309": "PROXY_SECRET",
@@ -445,5 +444,6 @@
   "445": "PM2 process manager",
   "446": "proxy-server (pm2 managed process)",
   "448": "ControleTransferenciasTable",
-  "449": "RealizadasPanel.tsx"
+  "449": "RealizadasPanel.tsx",
+  "450": "fetchUltimasEntradasPorFilial"
 }
