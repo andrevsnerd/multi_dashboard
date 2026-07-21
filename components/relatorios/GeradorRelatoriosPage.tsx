@@ -11,6 +11,8 @@ import { getCurrentMonthRange, formatDateForQuery } from "@/lib/utils/date";
 import { exportRelatorioXlsx } from "@/lib/utils/exportRelatorioXlsx";
 import { exportCompraSugeridaAbcXlsx } from "@/lib/utils/exportCompraSugeridaAbcXlsx";
 import { exportClientesFilialXlsx } from "@/lib/utils/exportClientesFilialXlsx";
+import { exportEstoqueRedeXlsx } from "@/lib/utils/exportEstoqueRedeXlsx";
+import { ESTOQUE_REDE_ID } from "@/lib/reports/estoque-rede";
 import { COMPRA_FILIAL_COL_PREFIX, COMPRA_SUGERIDA_ABC_ID, COMPRA_TRANSFER_LENS_COLUMNS } from "@/lib/reports/compra-sugerida-abc";
 import { CLIENTES_FILIAL_ID, FILIAL_COMPRAS_COL_PREFIX } from "@/lib/reports/clientes-filial";
 import { formatData, formatDataVenda, formatDiasParado } from "@/lib/reports/format";
@@ -779,6 +781,22 @@ export default function GeradorRelatoriosPage({
     // Clientes por filial: export dedicado com estilo (cabeçalho, zebra, linha TOTAL).
     if (reportTypeId === CLIENTES_FILIAL_ID) {
       void exportClientesFilialXlsx(
+        sortedRows,
+        enabledColumns.map((c) => ({ key: c.key, label: c.label })),
+        {
+          companyKey,
+          range: { startDate: range.startDate, endDate: range.endDate },
+          filialLabel,
+          sheetName: meta?.label,
+          columnTypes,
+        }
+      );
+      return;
+    }
+    // Estoque por filial: export dedicado com heat-map de cores (zerados/negativos/positivos),
+    // cabeçalho estilizado, zebra e linha TOTAL por filial.
+    if (reportTypeId === ESTOQUE_REDE_ID) {
+      void exportEstoqueRedeXlsx(
         sortedRows,
         enabledColumns.map((c) => ({ key: c.key, label: c.label })),
         {

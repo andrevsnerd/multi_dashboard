@@ -297,10 +297,12 @@
   "295": "page.tsx",
   "296": "page.tsx",
   "297": "exportCompraSugeridaAbcXlsx.ts",
+  "298": "page.tsx",
   "299": "vendas.ts",
   "300": "seesAllFiliais",
   "301": "page.tsx",
   "302": "page.tsx",
+  "303": "page.tsx",
   "304": "route.ts",
   "305": "page.tsx",
   "306": "page.tsx",
@@ -448,8 +450,10 @@
   "448": "ControleTransferenciasTable",
   "449": "RealizadasPanel.tsx",
   "450": "page.tsx",
+  "451": "page.tsx",
   "452": "page.tsx",
   "453": "page.tsx",
+  "454": "page.tsx",
   "455": "inventory.ts",
   "456": "executeQueryWithParams"
 }

@@ -165,6 +165,15 @@ type CompraMetricRow = {
   ritmoDiasComVenda: number | null;
   ritmoPrimeiraVendaIso: string | null;
   ritmoUltimaVendaIso: string | null;
+  // Campos do resgate por venda recente — sem eles calcCompraIdealFromResumo não aplica
+  // o resgate e itens finos (q=1) que zeraram e venderam recente saem como "Suficiente",
+  // divergindo da ruptura/Compra Ideal do resto do app. Ver [[compra-ideal-resgate-venda-recente-fantasma]].
+  ritmoRecenteDias: number | null;
+  ritmoRecenteVendas: number | null;
+  ritmoRecenteInicioIso: string | null;
+  ritmoRecenteFimIso: string | null;
+  ritmoRecenteUltimaVendaIso: string | null;
+  ritmoGapDias: number | null;
   totalNmQty: number | null;
   filiaisNM: FilialNecessidadeMinimaInfo[] | null;
   vendasPorFilial: Array<{
@@ -219,6 +228,12 @@ const EMPTY_COMPRA_METRIC_ROW: CompraMetricRow = {
   ritmoDiasComVenda: null,
   ritmoPrimeiraVendaIso: null,
   ritmoUltimaVendaIso: null,
+  ritmoRecenteDias: null,
+  ritmoRecenteVendas: null,
+  ritmoRecenteInicioIso: null,
+  ritmoRecenteFimIso: null,
+  ritmoRecenteUltimaVendaIso: null,
+  ritmoGapDias: null,
   totalNmQty: null,
   filiaisNM: null,
   vendasPorFilial: null,
@@ -244,6 +259,12 @@ function buildCompraIdealFromMetricRow(
       ritmoDiasComVenda: live?.ritmoDiasComVenda ?? null,
       ritmoPrimeiraVendaIso: live?.ritmoPrimeiraVendaIso ?? null,
       ritmoUltimaVendaIso: live?.ritmoUltimaVendaIso ?? null,
+      ritmoRecenteDias: live?.ritmoRecenteDias ?? null,
+      ritmoRecenteVendas: live?.ritmoRecenteVendas ?? null,
+      ritmoRecenteInicioIso: live?.ritmoRecenteInicioIso ?? null,
+      ritmoRecenteFimIso: live?.ritmoRecenteFimIso ?? null,
+      ritmoRecenteUltimaVendaIso: live?.ritmoRecenteUltimaVendaIso ?? null,
+      ritmoGapDias: live?.ritmoGapDias ?? null,
     },
     getCompraTransitoEntries(comprasTransitoIndex, p.produto, porCor ? (p.cor ?? null) : null),
     { linha: p.linha, subgrupo: p.subgrupo, company }
@@ -2363,6 +2384,12 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                 ritmoDiasComVenda: value.resumo.ritmoDiasComVenda,
                 ritmoPrimeiraVendaIso: value.resumo.ritmoPrimeiraVendaIso,
                 ritmoUltimaVendaIso: value.resumo.ritmoUltimaVendaIso,
+                ritmoRecenteDias: value.resumo.ritmoRecenteDias,
+                ritmoRecenteVendas: value.resumo.ritmoRecenteVendas,
+                ritmoRecenteInicioIso: value.resumo.ritmoRecenteInicioIso,
+                ritmoRecenteFimIso: value.resumo.ritmoRecenteFimIso,
+                ritmoRecenteUltimaVendaIso: value.resumo.ritmoRecenteUltimaVendaIso,
+                ritmoGapDias: value.resumo.ritmoGapDias,
                 totalNmQty: filiaisNM.reduce((sum, row) => sum + row.qtd, 0),
                 filiaisNM,
                 vendasPorFilial: value.vendasPorFilial,
@@ -2403,6 +2430,12 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
                 ritmoDiasComVenda: merged.resumo.ritmoDiasComVenda,
                 ritmoPrimeiraVendaIso: merged.resumo.ritmoPrimeiraVendaIso,
                 ritmoUltimaVendaIso: merged.resumo.ritmoUltimaVendaIso,
+                ritmoRecenteDias: merged.resumo.ritmoRecenteDias,
+                ritmoRecenteVendas: merged.resumo.ritmoRecenteVendas,
+                ritmoRecenteInicioIso: merged.resumo.ritmoRecenteInicioIso,
+                ritmoRecenteFimIso: merged.resumo.ritmoRecenteFimIso,
+                ritmoRecenteUltimaVendaIso: merged.resumo.ritmoRecenteUltimaVendaIso,
+                ritmoGapDias: merged.resumo.ritmoGapDias,
                 totalNmQty: filiaisNM.reduce((sum, metricRow) => sum + metricRow.qtd, 0),
                 filiaisNM,
                 vendasPorFilial: merged.vendasPorFilial,
