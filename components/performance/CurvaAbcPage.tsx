@@ -1499,7 +1499,9 @@ async function buildCompraIdealPorFilialRowsCurvaAbc(
         getCompraTransitoEntries(comprasTransitoIndex, plan.row.produto, porCor ? (plan.row.cor ?? null) : null),
         { linha: plan.row.linha, subgrupo: plan.row.subgrupo, company: companyKey }
       );
-      const ciFull = Math.max(0, ideal.compraIdeal);
+      // Descontinuado nunca sugere compra → 0 em toda loja (e some sob "comprar agora",
+      // que filtra por TOTAL REDE > 0). Mesma regra da tela e do export "visão simples".
+      const ciFull = plan.row.descontinuado ? 0 : Math.max(0, ideal.compraIdeal);
       // No modo "comprar-agora", a qtd da loja só conta quando a data de compra já chegou
       // (comprarAgora) ou cai antes do próximo dia de compra (precisaComprarEssaSemana).
       const ci =
@@ -2159,6 +2161,8 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
       : produtosComCurva;
     if (!filtrarComprarAgora) return base;
     return base.filter((p) => {
+      // Descontinuado nunca sugere compra → some do "comprar agora".
+      if (p.descontinuado) return false;
       const metricKey = buildCurvaAbcMetricKey(p.produto, p.cor ?? null, porCor);
       const live = compraMetrics[metricKey];
       const hasLive = Object.prototype.hasOwnProperty.call(compraMetrics, metricKey);
@@ -2515,7 +2519,9 @@ const handleBadgeClick = (cat: string) => {
     setSelectedCategory(prev => prev === cat ? null : cat);
   };
 
-  const getSugestaoCompraExportValue = (p: ProdutoComCurva): number | "" => {
+  const getSugestaoCompraExportValue = (p: ProdutoComCurva): number | string => {
+    // Descontinuado nunca sugere compra — mesma regra da tela.
+    if (p.descontinuado) return "Descontinuado";
     const metricKey = buildCurvaAbcMetricKey(p.produto, p.cor ?? null, porCor);
     const live = compraMetrics[metricKey];
     const hasLive = Object.prototype.hasOwnProperty.call(compraMetrics, metricKey);
@@ -3608,6 +3614,7 @@ const handleBadgeClick = (cat: string) => {
                                         descricao={p.descricao}
                                         cor={p.cor}
                                         company={companyKey}
+                                        descontinuado={p.descontinuado}
                                       />
                                     );
                                   })()}

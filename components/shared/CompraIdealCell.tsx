@@ -35,6 +35,8 @@ interface CompraIdealCellProps {
   cor?: string | null;
   /** Empresa — habilita o rótulo "comprar essa semana" (hoje só NERD compra em dia fixo). */
   company?: string | null;
+  /** Produto descontinuado → nunca sugere compra; mostra "Descontinuado" no lugar da qtd. */
+  descontinuado?: boolean;
 }
 
 /** Texto neutro (carregando / sem dados) — mesma aparência em todas as telas. */
@@ -51,11 +53,17 @@ function CellTexto({ texto }: { texto: string }) {
  * (2) `semDados` → "Sem dados" · (3) caso contrário → número/data. Nunca mostra 0 falso:
  * enquanto o dado real do ritmo não chega, fica em "Carregando...".
  */
-export default function CompraIdealCell({ ideal, loading, semDados, style, descricao, cor, company }: CompraIdealCellProps) {
+export default function CompraIdealCell({ ideal, loading, semDados, style, descricao, cor, company, descontinuado }: CompraIdealCellProps) {
   // Hook sempre no topo (rules-of-hooks) — antes de qualquer return condicional.
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   const { theme } = useTheme();
   const dark = theme === "dark";
+
+  // Descontinuado nunca sugere compra — decidido pelo cadastro, independe de métrica.
+  // Vem antes de loading/semDados: já sabemos sem esperar as métricas chegarem.
+  if (descontinuado) {
+    return <span style={{ color: dark ? "#94a3b8" : "#64748b", fontWeight: 600, fontStyle: "italic", whiteSpace: "nowrap" }}>Descontinuado</span>;
+  }
 
   // Paleta da célula. No tema claro é idêntica à original; no escuro usa tons
   // vivos com contraste sobre o navy (laranja/verde/vermelho escuros somem no dark).

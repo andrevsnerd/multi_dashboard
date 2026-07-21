@@ -22,7 +22,7 @@ export interface CurvaAbcSimpleXlsxRow {
   VENDAS: number;
   CUSTO_UNIT: number;
   MARKUP: number | "";
-  COMPRA_IDEAL: number | "";
+  COMPRA_IDEAL: number | string;
   VAR_VS_PERIODO_ANTERIOR: number | string;
 }
 
