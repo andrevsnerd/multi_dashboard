@@ -1596,6 +1596,8 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
 
   const [data, setData] = useState<FilialData | null>(null);
   const [loading, setLoading] = useState(true);
+  // Progresso da 2ª fase (Compra Ideal / "comprar agora" por item, carregada em lotes).
+  const [metricasCarregando, setMetricasCarregando] = useState<{ feito: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [compraIdealFilialProgresso, setCompraIdealFilialProgresso] = useState<{ feito: number; total: number; fase: "lendo" | "gerando" } | null>(null);
@@ -2304,7 +2306,10 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   }, [companyKey, selectedFilial, porCor, selectedCategory, selectedGrupos, selectedSubgrupos, selectedGrades, selectedColecoes, range.startDate, range.endDate]);
 
   useEffect(() => {
-    if (produtosComCurva.length === 0) return;
+    if (produtosComCurva.length === 0) {
+      setMetricasCarregando(null);
+      return;
+    }
     let cancelled = false;
     const load = async () => {
       clearControleEstoqueMetricasClientCache();
@@ -2336,9 +2341,16 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
 
       const itens = Array.from(itemLookup.values());
 
+      const chunks: Array<{ chunk: typeof itens; index: number }> = [];
       for (let i = 0; i < itens.length; i += METRICAS_CHUNK_SIZE) {
+        chunks.push({ chunk: itens.slice(i, i + METRICAS_CHUNK_SIZE), index: i });
+      }
+      if (!cancelled) setMetricasCarregando({ feito: 0, total: itens.length });
+
+      // Lotes em PARALELO (concorrência limitada p/ não saturar o proxy) com progresso visível.
+      // Antes era 100% sequencial → dezenas de segundos sem nenhum indicador na tela.
+      await mapWithConcurrency(chunks, 4, async ({ chunk, index: i }) => {
         if (cancelled) return;
-        const chunk = itens.slice(i, i + METRICAS_CHUNK_SIZE);
         try {
           const rows = await fetchControleEstoqueMetricasItensClient({
             company: companyKey,
@@ -2442,8 +2454,15 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
           });
         } catch {
           if (!cancelled && i === 0) setCompraMetrics({});
+        } finally {
+          if (!cancelled) {
+            setMetricasCarregando((prev) =>
+              prev ? { ...prev, feito: Math.min(prev.total, prev.feito + chunk.length) } : prev
+            );
+          }
         }
-      }
+      });
+      if (!cancelled) setMetricasCarregando(null);
     };
     void load();
     return () => {
@@ -3092,7 +3111,12 @@ const handleBadgeClick = (cat: string) => {
             <span className={styles.kpiLabel}>QTD. VENDAS</span>
             <span className={styles.kpiValue}>{fmt(displayQtde)}</span>
             {produtosComCurvaExibidos.length > 0 && (
-              <span className={styles.kpiSubtitle}>{fmt(produtosComCurvaExibidos.length)} itens</span>
+              <span className={styles.kpiSubtitle}>
+                {fmt(produtosComCurvaExibidos.length)} itens
+                {metricasCarregando
+                  ? ` · compra ideal ${fmt(metricasCarregando.feito)}/${fmt(metricasCarregando.total)}`
+                  : ""}
+              </span>
             )}
           </div>
           {podeVerCusto && (
@@ -3151,7 +3175,7 @@ const handleBadgeClick = (cat: string) => {
         </div>
       )}
 
-      {activeTab === "produtos" && loading && <div className={styles.loading}>Carregando...</div>}
+      {/* Loading da fase 1 é sinalizado só pelo "Carregando dados…" no header (evita duplicidade). */}
 
       {activeTab === "vendedores" && selectedFilial && (
         <FilialVendedoresTab
@@ -3245,6 +3269,27 @@ const handleBadgeClick = (cat: string) => {
 
           {/* ABC Table */}
           <div className={styles.tableCard}>
+            {metricasCarregando && metricasCarregando.feito < metricasCarregando.total && (
+              <div
+                role="status"
+                aria-live="polite"
+                style={{ padding: "10px 12px", borderBottom: "1px solid var(--border-color, rgba(127,127,127,0.25))" }}
+              >
+                <div style={{ fontSize: "0.85em", opacity: 0.85, marginBottom: 6 }}>
+                  Carregando Compra Ideal e “comprar agora”… {fmt(metricasCarregando.feito)}/{fmt(metricasCarregando.total)} itens
+                </div>
+                <div style={{ height: 3, borderRadius: 2, overflow: "hidden", background: "var(--border-color, rgba(127,127,127,0.2))" }}>
+                  <div
+                    style={{
+                      height: "100%",
+                      width: `${Math.round((metricasCarregando.feito / Math.max(1, metricasCarregando.total)) * 100)}%`,
+                      background: "var(--accent-color, #6366f1)",
+                      transition: "width .3s ease",
+                    }}
+                  />
+                </div>
+              </div>
+            )}
             {produtosComCurvaExibidos.length === 0 && hasAnyDisplayFilter && (
               <div className={styles.empty}>
                 {filtrarComprarAgora
