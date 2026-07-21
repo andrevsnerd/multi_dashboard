@@ -1445,6 +1445,10 @@ function ProdutoEstoqueSecao({
  * por loja (não há um único resumo/tooltip), com o mesmo visual "N pcs" / "Suficiente".
  */
 function RupturaCompraIdeal({ item, companyKey }: { item: RupturaItem; companyKey: CompanyKey }) {
+  // Descontinuado nunca sugere compra — mesma regra da Curva ABC. Só o texto; fica fora do export.
+  if (item.descontinuado) {
+    return <span className={styles.acabaMuted} style={{ fontStyle: "italic", fontWeight: 600 }}>Descontinuado</span>;
+  }
   if (item.compraIdeal) {
     return (
       <CompraIdealCell
@@ -1502,9 +1506,11 @@ function RupturasTab({
   // "Zerou na rede toda" = nenhuma loja tem estoque positivo do item (ondeTemEstoque vazio).
   const zeradosRede = data.filter((r) => r.ondeTemEstoque.length === 0).length;
   const visiveis = soZeradoRede ? data.filter((r) => r.ondeTemEstoque.length === 0) : data;
+  // Descontinuado aparece na tela (marcado "Descontinuado") mas NÃO vai pro export.
+  const exportaveis = visiveis.filter((r) => !r.descontinuado);
 
   async function handleExportRupturas() {
-    if (exporting || visiveis.length === 0) return;
+    if (exporting || exportaveis.length === 0) return;
     setExporting(true);
     try {
       await exportRupturasXlsx({
@@ -1515,7 +1521,7 @@ function RupturasTab({
         mes,
         mesLabel,
         soZerados: soZeradoRede,
-        rupturas: visiveis,
+        rupturas: exportaveis,
       });
     } catch (err) {
       alert((err as Error).message || "Erro ao exportar rupturas");
@@ -1545,10 +1551,10 @@ function RupturasTab({
             type="button"
             className={styles.exportRupturasBtn}
             onClick={handleExportRupturas}
-            disabled={exporting || visiveis.length === 0}
-            title="Exporta em XLSX exatamente a lista de rupturas mostrada (respeita o filtro), com Compra Ideal e custos"
+            disabled={exporting || exportaveis.length === 0}
+            title="Exporta em XLSX a lista de rupturas mostrada (respeita o filtro), sem os descontinuados, com Compra Ideal e custos"
           >
-            {exporting ? "Exportando…" : `Exportar rupturas (${visiveis.length})`}
+            {exporting ? "Exportando…" : `Exportar rupturas (${exportaveis.length})`}
           </button>
         </div>
       </div>

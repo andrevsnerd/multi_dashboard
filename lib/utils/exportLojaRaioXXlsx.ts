@@ -376,7 +376,8 @@ export async function exportLojaRaioXXlsx(options: ExportLojaRaioXOptions): Prom
   }
 
   // ─── ABA: RUPTURAS ───────────────────────────────────────────────────────
-  buildRupturasSheet(workbook, rupturas, { janela, gsCols, showGradeSubgrupo, isRede: options.isRede, contexto });
+  // Descontinuado não sugere compra → fica fora do export (aparece só na tela).
+  buildRupturasSheet(workbook, rupturas.filter((r) => !r.descontinuado), { janela, gsCols, showGradeSubgrupo, isRede: options.isRede, contexto });
 
   const dateStr = new Date().toISOString().split("T")[0];
   const escopoSlug = options.isRede ? "rede" : safeFilenamePart(options.filialLabel ?? options.filial ?? "loja");
