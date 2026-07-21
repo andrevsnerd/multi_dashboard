@@ -1530,8 +1530,8 @@
     "semantic_hash": "3a1ac7d9dac7349b3338e8b433eb5031"
   },
   "components/performance/CurvaAbcPage.tsx": {
-    "mtime": 1784563698.6956916,
-    "ast_hash": "fedb8618bb7784dd3ca1be5d311387be",
+    "mtime": 1784646447.2588806,
+    "ast_hash": "b17f66f25ed92c45bbbb2f8a99ec0bac",
     "semantic_hash": ""
   },
   "components/performance/CurvaPorProdutoPage.tsx": {
@@ -1665,8 +1665,8 @@
     "semantic_hash": "5ee9fca264954c74fc3d39d54de7afaa"
   },
   "components/shared/CompraIdealCell.tsx": {
-    "mtime": 1783964477.7842536,
-    "ast_hash": "8b29a29fdcbabcb71d8b9a7d87042a95",
+    "mtime": 1784646190.1977992,
+    "ast_hash": "bdab81f9655217ca7ae5c8a9168aabd1",
     "semantic_hash": ""
   },
   "components/shared/CompraIdealExplainCard.tsx": {
@@ -1815,8 +1815,8 @@
     "semantic_hash": "34537e31a915638b6406c4b7b7df38c1"
   },
   "data/compra-data-fixa.json": {
-    "mtime": 1784631120.3448994,
-    "ast_hash": "79a94f97f06c6795a4f0b79206dd7d9a",
+    "mtime": 1784645799.427902,
+    "ast_hash": "c59af4d3784c007dbc995b77e7ce5ed3",
     "semantic_hash": ""
   },
   "data/compra-final.json": {
@@ -1865,8 +1865,8 @@
     "semantic_hash": "31660a4f5d52a2a38bd5e5b40c2967e8"
   },
   "data/notificacao-trava-prazo.json": {
-    "mtime": 1783512392.7278645,
-    "ast_hash": "c102e0c85ea5c400299b4633644d1070",
+    "mtime": 1784639763.311753,
+    "ast_hash": "45e97365f6ae0f5820412a6d287f62a0",
     "semantic_hash": ""
   },
   "data/notificacoes-leitura.json": {
@@ -1880,8 +1880,8 @@
     "semantic_hash": "d751713988987e9331980363e24189ce"
   },
   "data/produto-labels.json": {
-    "mtime": 1784630892.4423547,
-    "ast_hash": "65264718040ac1b6a8658f6b08ba7c6c",
+    "mtime": 1784649675.1739728,
+    "ast_hash": "2b2182c319efc40cfb8b26eba1261101",
     "semantic_hash": ""
   },
   "data/produtos-agrupados.json": {
@@ -2175,9 +2175,9 @@
     "semantic_hash": "5833c722a251787b20988f26509942d2"
   },
   "lib/config/compra-ciclo.ts": {
-    "mtime": 1783361182.426338,
-    "ast_hash": "76935d071ac9946b461c8d6328dd6487",
-    "semantic_hash": "76935d071ac9946b461c8d6328dd6487"
+    "mtime": 1784659087.3553984,
+    "ast_hash": "6e90ce50ac3f3e7fc97035ff17232570",
+    "semantic_hash": ""
   },
   "lib/config/filial-config-builder.ts": {
     "mtime": 1781698561.6583278,
@@ -2830,9 +2830,9 @@
     "semantic_hash": "24f29a4cb7f47f692faf3e3159ed9b31"
   },
   "lib/utils/exportCurvaAbcSimpleXlsx.ts": {
-    "mtime": 1782150138.1799674,
-    "ast_hash": "212e093cadb6b56e47a76210e4168dfd",
-    "semantic_hash": "212e093cadb6b56e47a76210e4168dfd"
+    "mtime": 1784646243.5442154,
+    "ast_hash": "36a7db08cda3d1f2e35894ac91c07095",
+    "semantic_hash": ""
   },
   "lib/utils/exportCurvaPorProdutoCsv.ts": {
     "mtime": 1780073682.8689008,
@@ -3505,8 +3505,8 @@
     "semantic_hash": ""
   },
   "components/loja-raio-x/LojaRaioXPage.tsx": {
-    "mtime": 1784556395.0789366,
-    "ast_hash": "755eb962270b7e8b039bf9efc727135d",
+    "mtime": 1784647026.7347064,
+    "ast_hash": "2eb440d6ec932ba11bca34810c92473b",
     "semantic_hash": ""
   },
   "lib/repositories/lojaRaioX.ts": {
@@ -3515,8 +3515,8 @@
     "semantic_hash": ""
   },
   "lib/utils/exportLojaRaioXXlsx.ts": {
-    "mtime": 1784556261.7011757,
-    "ast_hash": "1022fd63aae8d8b08e069b3dd6eacad8",
+    "mtime": 1784647068.1535492,
+    "ast_hash": "8e044482fa0972ecda1b9508b864fd24",
     "semantic_hash": ""
   },
   "app/api/transferencias-pendentes/detectar/route.ts": {

@@ -44,15 +44,16 @@ function normalize(value?: string | null): string {
 }
 
 /**
- * SCARF ME — números definidos pelo dono (jun/2026):
- *   Seda, Cashmere, Kafta        → 90 cobertura / 70 produção
+ * SCARF ME — números definidos pelo dono (jun/2026; Seda → 80 produção em jul/2026):
+ *   Seda                         → 90 cobertura / 80 produção
+ *   Cashmere, Kafta              → 90 cobertura / 70 produção
  *   Pashmina Brasil, Lenços Brasil → 60 cobertura / 37 produção
  *
  * Precedência: material (SEDA) vence linha. ELETRONICOS mantém 30 (legado).
  */
 const SCARFME_RULES: CicloRule[] = [
   // Material manda: qualquer subgrupo de seda é "Seda", mesmo em LENÇOS/PASHMINA.
-  { grupo: "Seda", coberturaDias: 90, producaoDias: 70, match: (_l, sg) => sg.includes("SEDA") },
+  { grupo: "Seda", coberturaDias: 90, producaoDias: 80, match: (_l, sg) => sg.includes("SEDA") },
   { grupo: "Cashmere", coberturaDias: 90, producaoDias: 70, match: (l) => l === "INDIA" },
   { grupo: "Kafta", coberturaDias: 90, producaoDias: 70, match: (l) => l === "FASHION" },
   { grupo: "Pashmina Brasil", coberturaDias: 60, producaoDias: 37, match: (l) => l === "PASHMINA" },
@@ -75,7 +76,7 @@ interface CompanyCicloConfig {
    *
    * Números medidos nos dados reais (jun/2026, SKUs que zeraram e voltaram em 13 meses):
    *  - SCARF ME: gap mediano ~35d, P75 ~105d → 60d cobre ~64% dos casos como ruptura (mantém
-   *    o histórico) e troca só nos gaps longos; alinhado ao ciclo de produção (37–70d).
+   *    o histórico) e troca só nos gaps longos; alinhado ao ciclo de produção (37–80d).
    *  - NERD: gap mediano ~14d, P75 ~49d → 30d cobre ~66% como ruptura; é o dobro do lead (14d).
    */
   gapAntigoDias: number;

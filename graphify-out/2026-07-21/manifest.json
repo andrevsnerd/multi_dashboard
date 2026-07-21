@@ -1630,8 +1630,8 @@
     "semantic_hash": "7100ad93329f4cae6f0cf2636fa8a06f"
   },
   "components/relatorios/GeradorRelatoriosPage.tsx": {
-    "mtime": 1784045740.1877816,
-    "ast_hash": "ced2bc64221fc5d6cd0d3b7a907043bb",
+    "mtime": 1784632885.5455613,
+    "ast_hash": "0fcee1ac923fcb98d09e402907a058f8",
     "semantic_hash": ""
   },
   "components/romaneios/RomaneioDeleteModal.tsx": {
@@ -1815,8 +1815,8 @@
     "semantic_hash": "34537e31a915638b6406c4b7b7df38c1"
   },
   "data/compra-data-fixa.json": {
-    "mtime": 1784054635.9215047,
-    "ast_hash": "8adba9b2f73ea30234f6ff7482116f35",
+    "mtime": 1784631120.3448994,
+    "ast_hash": "79a94f97f06c6795a4f0b79206dd7d9a",
     "semantic_hash": ""
   },
   "data/compra-final.json": {
@@ -1880,8 +1880,8 @@
     "semantic_hash": "d751713988987e9331980363e24189ce"
   },
   "data/produto-labels.json": {
-    "mtime": 1784563641.442037,
-    "ast_hash": "6ad3169aabea0c5954a791f2d6873544",
+    "mtime": 1784630892.4423547,
+    "ast_hash": "65264718040ac1b6a8658f6b08ba7c6c",
     "semantic_hash": ""
   },
   "data/produtos-agrupados.json": {
@@ -3682,6 +3682,11 @@
   "components/painel-colecoes/ColecaoDetalhePanel.tsx": {
     "mtime": 1784208027.1026213,
     "ast_hash": "c456485159d5b7463bd98f2a74862b93",
+    "semantic_hash": ""
+  },
+  "lib/utils/exportEstoqueRedeXlsx.ts": {
+    "mtime": 1784632863.7526011,
+    "ast_hash": "767c61cd94cbc4f925523495fb45b1e5",
     "semantic_hash": ""
   }
 }
