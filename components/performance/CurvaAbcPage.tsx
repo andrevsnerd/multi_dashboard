@@ -1611,8 +1611,8 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   const [activeTab, setActiveTab] = useState<"produtos" | "vendedores">("produtos");
   const [porCor, setPorCor] = useState(true);
   const [filtrarEletronicos, setFiltrarEletronicos] = useState(companyKey === 'nerd');
-  const [filtrarSugeridos, setFiltrarSugeridos] = useState(false);
-  // Subconjunto dos sugeridos: só os que precisam comprar AGORA (data de compra chegou/passou).
+  // Filtro único de compra: só os que precisam comprar AGORA (data de compra chegou/passou)
+  // ou essa semana. O antigo checkbox "Sugeridos" (compraIdeal>0 sem checar data) foi removido.
   const [filtrarComprarAgora, setFiltrarComprarAgora] = useState(false);
   const [selectedCurvas, setSelectedCurvas] = useState<Set<Curva>>(new Set());
   const [selectedStockBuckets, setSelectedStockBuckets] = useState<Set<StockBucket>>(new Set());
@@ -2155,7 +2155,7 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     const base = (companyKey === 'nerd' && filtrarEletronicos)
       ? produtosComCurva.filter((p) => normalizeKey(p.linha ?? '') === 'ELETRONICOS')
       : produtosComCurva;
-    if (!filtrarSugeridos && !filtrarComprarAgora) return base;
+    if (!filtrarComprarAgora) return base;
     return base.filter((p) => {
       const metricKey = buildCurvaAbcMetricKey(p.produto, p.cor ?? null, porCor);
       const live = compraMetrics[metricKey];
@@ -2167,13 +2167,11 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
         live?.estoqueFilial == null;
       if (semBaseLive) return false;
       const ideal = buildCompraIdealFromMetricRow(live, p, comprasTransitoIndex, porCor, companyKey);
-      // "Comprar agora" é subconjunto de "Sugeridos": precisa comprar E a data chegou — OU cai na
-      // janela "comprar essa semana" (NERD às segundas), que entra junto no mesmo filtro.
-      if (filtrarComprarAgora)
-        return ideal.compraIdeal > 0 && (ideal.comprarAgora || precisaComprarEssaSemana(ideal, companyKey));
-      return ideal.compraIdeal > 0;
+      // "Comprar agora": precisa comprar E a data chegou — OU cai na janela "comprar essa
+      // semana" (NERD às segundas), que entra junto no mesmo filtro.
+      return ideal.compraIdeal > 0 && (ideal.comprarAgora || precisaComprarEssaSemana(ideal, companyKey));
     });
-  }, [filtrarEletronicos, filtrarSugeridos, filtrarComprarAgora, companyKey, produtosComCurva, compraMetrics, comprasTransitoIndex, diasCorridosMes, porCor]);
+  }, [filtrarEletronicos, filtrarComprarAgora, companyKey, produtosComCurva, compraMetrics, comprasTransitoIndex, diasCorridosMes, porCor]);
 
   const produtosComCurvaComFiltroEstoque = useMemo(() => {
     if (selectedStockBuckets.size === 0) return produtosComCurvaComFiltroSugestao;
@@ -2220,7 +2218,6 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   const hasAnyDisplayFilter =
     hasStructuredFilters ||
     (companyKey === "nerd" && filtrarEletronicos) ||
-    filtrarSugeridos ||
     filtrarComprarAgora ||
     selectedCurvas.size > 0 ||
     selectedStockBuckets.size > 0;
@@ -2232,7 +2229,6 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
   const onlyServerSideFilters =
     (companyKey === "nerd" && filtrarEletronicos) &&
     !hasStructuredFilters &&
-    !filtrarSugeridos &&
     !filtrarComprarAgora &&
     selectedCurvas.size === 0 &&
     selectedStockBuckets.size === 0;
@@ -2654,12 +2650,10 @@ const handleBadgeClick = (cat: string) => {
       const universo = calcularCurvas(Array.from(universoMap.values()));
       if (universo.length === 0) return;
 
-      // Espelha o filtro da tela: "Comprar agora" tem precedência sobre "Sugeridos".
+      // Espelha o filtro da tela: só "Comprar agora" (o checkbox "Sugeridos" foi removido).
       const gating: "none" | "sugeridos" | "comprar-agora" = filtrarComprarAgora
         ? "comprar-agora"
-        : filtrarSugeridos
-          ? "sugeridos"
-          : "none";
+        : "none";
 
       // Lente de transferência para o export: usa o índice já carregado ou busca sob demanda
       // (o export sempre traz as colunas Transferência/Compra líquida, mesmo com o toggle off).
@@ -2689,9 +2683,7 @@ const handleBadgeClick = (cat: string) => {
         alert(
           gating === "comprar-agora"
             ? "Nenhum item para comprar agora/essa semana nas lojas no período."
-            : gating === "sugeridos"
-              ? "Nenhum item com compra sugerida nas lojas no período."
-              : "Nenhum item para exportar."
+            : "Nenhum item para exportar."
         );
         return;
       }
@@ -2699,9 +2691,7 @@ const handleBadgeClick = (cat: string) => {
       const gatingLabel =
         gating === "comprar-agora"
           ? " · só comprar agora/essa semana"
-          : gating === "sugeridos"
-            ? " · só com compra sugerida"
-            : "";
+          : "";
       const filtroAplicado =
         `Todas as lojas · união das curvas ABC por loja` +
         (porCor ? " · por cor" : "") +
@@ -2967,14 +2957,6 @@ const handleBadgeClick = (cat: string) => {
                 Eletrônicos
               </label>
             )}
-            <label className={styles.checkboxLabel} title="Mostra apenas produtos com sugestão de compra">
-              <input
-                type="checkbox"
-                checked={filtrarSugeridos}
-                onChange={(e) => setFiltrarSugeridos(e.target.checked)}
-              />
-              Sugeridos
-            </label>
             <label className={styles.checkboxLabel} title="Mostra os que precisam comprar agora (data chegou) ou essa semana (NERD: até a próxima segunda)">
               <input
                 type="checkbox"
@@ -3005,14 +2987,13 @@ const handleBadgeClick = (cat: string) => {
                 <span className={styles.curvaCheckDot} data-curva={curva}>{curva}</span>
               </label>
             ))}
-            {(selectedCurvas.size > 0 || selectedStockBuckets.size > 0 || filtrarSugeridos || filtrarComprarAgora) && (
+            {(selectedCurvas.size > 0 || selectedStockBuckets.size > 0 || filtrarComprarAgora) && (
               <button
                 type="button"
                 className={styles.filtroClearBtn}
                 onClick={() => {
                   setSelectedCurvas(new Set());
                   setSelectedStockBuckets(new Set());
-                  setFiltrarSugeridos(false);
                   setFiltrarComprarAgora(false);
                 }}
               >
@@ -3266,16 +3247,14 @@ const handleBadgeClick = (cat: string) => {
           <div className={styles.tableCard}>
             {produtosComCurvaExibidos.length === 0 && hasAnyDisplayFilter && (
               <div className={styles.empty}>
-                {filtrarSugeridos
-                  ? "Nenhum produto com sugestão de compra neste filtro."
+                {filtrarComprarAgora
+                  ? "Nenhum produto para comprar agora/essa semana neste filtro."
                   : "Nenhum produto encontrado nos filtros selecionados neste período."}
               </div>
             )}
             {produtosComCurvaExibidos.length === 0 && !hasAnyDisplayFilter && (
               <div className={styles.empty}>
-                {filtrarSugeridos
-                  ? "Nenhum produto com sugestão de compra neste filtro."
-                  : "Nenhum produto encontrado para este período."}
+                Nenhum produto encontrado para este período.
               </div>
             )}
             {produtosComCurvaExibidos.length > 0 && (
