@@ -3695,13 +3695,13 @@
     "semantic_hash": ""
   },
   "components/stock/ProdutoGiroPage.tsx": {
-    "mtime": 1784738548.5333705,
-    "ast_hash": "3f7c614536e670cc15ed29fce00e2170",
+    "mtime": 1784738070.604133,
+    "ast_hash": "1e18161ac4f86a6c6fd79b9365abd020",
     "semantic_hash": ""
   },
   "lib/utils/exportProdutoGiroXlsx.ts": {
-    "mtime": 1784738495.264167,
-    "ast_hash": "b6f46c60b92f2c2a5154224373235603",
+    "mtime": 1784725967.1688056,
+    "ast_hash": "f4835e0b97ea083099f51baa16cc92e3",
     "semantic_hash": ""
   },
   "app/api/produto-giro/performance/route.ts": {

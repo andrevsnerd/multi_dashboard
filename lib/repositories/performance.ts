@@ -359,9 +359,21 @@ export async function fetchFilialProdutoSales(
   ecommerceFilialNames: string[],
   range: NormalizedRange,
   comparisonMode: 'month' | 'year' = 'month',
-  options?: { groupByCor?: boolean; limit?: number; linhas?: string[] | null },
+  options?: {
+    groupByCor?: boolean;
+    limit?: number;
+    linhas?: string[] | null;
+    /** Restringe a consulta a uma lista de produtos (scoping da mesma query validada, não nova lógica). */
+    produtoIds?: string[] | null;
+    /** Quando false, não busca o período anterior (vendasPrevious = 0) — economiza metade das queries. */
+    includePrevious?: boolean;
+  },
 ): Promise<FilialProdutoSalesRow[]> {
   const groupByCor = options?.groupByCor === true;
+  const includePrevious = options?.includePrevious !== false;
+  const produtoIdList = (options?.produtoIds ?? [])
+    .map((p) => (p ?? '').trim())
+    .filter(Boolean);
   const linhaList = (companyKey === 'nerd' && options?.linhas)
     ? options.linhas.map(l => l.trim().toUpperCase()).filter(Boolean)
     : [];
@@ -460,6 +472,15 @@ export async function fetchFilialProdutoSales(
           linhaFinalClause = `AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) IN (${linhaPlaceholders})`;
         }
       }
+      // Scoping opcional por produto — restringe a MESMA query validada a uma lista de itens.
+      let produtoVpClause = '';
+      let produtoVtClause = '';
+      if (produtoIdList.length > 0) {
+        produtoIdList.forEach((prod, i) => request.input(`${prefix}Prod${i}`, sql.VarChar, prod));
+        const prodPlaceholders = produtoIdList.map((_, i) => `@${prefix}Prod${i}`).join(', ');
+        produtoVpClause = `AND vp.PRODUTO IN (${prodPlaceholders})`;
+        produtoVtClause = `AND vt.PRODUTO IN (${prodPlaceholders})`;
+      }
       const query = `
         WITH vendas_base AS (
           SELECT
@@ -481,6 +502,7 @@ export async function fetchFilialProdutoSales(
             AND vp.DATA_VENDA < @${prefix}End
             AND ISNULL(vp.QTDE_CANCELADA, 0) = 0
             AND f.FILIAL IN (${placeholders})
+            ${produtoVpClause}
         ),
         trocas_item AS (
           SELECT
@@ -500,6 +522,7 @@ export async function fetchFilialProdutoSales(
             AND v.DATA_VENDA >= @${prefix}Start
             AND v.DATA_VENDA < @${prefix}End
             AND f.FILIAL IN (${placeholders})
+            ${produtoVtClause}
           GROUP BY vt.TICKET, vt.CODIGO_FILIAL, vt.PRODUTO, ISNULL(vt.COR_PRODUTO, ''), vt.TAMANHO
         ),
         TrocasPuras AS (
@@ -518,6 +541,7 @@ export async function fetchFilialProdutoSales(
             AND v.DATA_VENDA >= @${prefix}Start
             AND v.DATA_VENDA < @${prefix}End
             AND f.FILIAL IN (${placeholders})
+            ${produtoVtClause}
             AND NOT EXISTS (
               SELECT 1 FROM LOJA_VENDA_PRODUTO vp2 WITH (NOLOCK)
               WHERE vp2.TICKET = vt.TICKET
@@ -641,6 +665,13 @@ export async function fetchFilialProdutoSales(
         }
       }
 
+      let produtoFpClause = '';
+      if (produtoIdList.length > 0) {
+        produtoIdList.forEach((prod, i) => request.input(`${prefix}EcomProd${i}`, sql.VarChar, prod));
+        const prodPlaceholders = produtoIdList.map((_, i) => `@${prefix}EcomProd${i}`).join(', ');
+        produtoFpClause = `AND fp.PRODUTO IN (${prodPlaceholders})`;
+      }
+
       const query = `
         SELECT ${topClause}
           ISNULL(fp.PRODUTO, '') AS PRODUTO,
@@ -675,6 +706,7 @@ export async function fetchFilialProdutoSales(
           AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
           AND f.FILIAL IN (${placeholders})
           ${linhaEcomClause}
+          ${produtoFpClause}
         GROUP BY ISNULL(fp.PRODUTO, ''), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))), ${categoriaExpr}${gradeGroupBy}, ISNULL(p.CUSTO_REPOSICAO1, 0)${corGroupBy}
         ORDER BY VENDAS DESC
       `;
@@ -686,8 +718,8 @@ export async function fetchFilialProdutoSales(
   const [posCur, ecomCur, posPrev, ecomPrev] = await Promise.all([
     runPos(start, end, 'fp'),
     runEcom(start, end, 'fp'),
-    runPos(startPrev, endPrev, 'fpp'),
-    runEcom(startPrev, endPrev, 'fpp'),
+    includePrevious ? runPos(startPrev, endPrev, 'fpp') : Promise.resolve([]),
+    includePrevious ? runEcom(startPrev, endPrev, 'fpp') : Promise.resolve([]),
   ]);
 
   const merged = new Map<string, FilialProdutoSalesRow>();

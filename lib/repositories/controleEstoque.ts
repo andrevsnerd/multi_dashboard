@@ -364,8 +364,16 @@ async function buildScarfmeEcommerceFaturamentoFilialFilter(
 
   if (filial && filial !== VAREJO_VALUE) {
     if (ecommerceFilials.includes(filial)) {
-      request.input(`${paramPrefix}Single`, sql.VarChar, filial);
-      return `AND f.FILIAL = @${paramPrefix}Single`;
+      // Uma filial e-commerce selecionada representa o GRUPO e-commerce inteiro — mesma regra de
+      // buildVendasFilialFilter / buildEntradaFilialFilter / buildFilialFilter. O e-commerce ScarfMe
+      // faz rodízio entre filiais (MSC↔AKS) a cada ~15d; escopar a UMA filial fazia o ritmo/qtde60d
+      // perderem as vendas do outro membro do rodízio (medido na filial errada → consumo 0 →
+      // "Suficiente" com estoque 0). Agrega todas as e-commerce (já restritas às permitidas acima).
+      ecommerceFilials.forEach((filialNome, index) => {
+        request.input(`${paramPrefix}Grp${index}`, sql.VarChar, filialNome);
+      });
+      const placeholders = ecommerceFilials.map((_, i) => `@${paramPrefix}Grp${i}`).join(', ');
+      return `AND f.FILIAL IN (${placeholders})`;
     }
     return `AND 1=0`;
   }

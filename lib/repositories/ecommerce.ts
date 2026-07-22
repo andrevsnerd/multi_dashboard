@@ -115,6 +115,8 @@ export interface SummaryQueryParams {
   grade?: string | null;
   grades?: string[] | null;
   produtoId?: string;
+  /** Lista de produtos (IN) — usada para filtrar por vários itens selecionados. */
+  produtoIds?: string[] | null;
   produtoSearchTerm?: string;
   acimaDoTicket?: boolean;
   filterByRegistrationDate?: boolean; // Se true, filtra produtos pela data de cadastramento ao invés da data de venda
@@ -213,6 +215,7 @@ export async function fetchEcommerceSummary({
   grade,
   grades,
   produtoId,
+  produtoIds,
   produtoSearchTerm,
   acimaDoTicket = false,
   filterByRegistrationDate = false,
@@ -320,7 +323,12 @@ export async function fetchEcommerceSummary({
 
     // Filtro de produto
     let produtoFilter = '';
-    if (produtoId) {
+    const produtoIdsList = (produtoIds ?? []).map((p) => (p ?? '').trim()).filter(Boolean);
+    if (produtoIdsList.length > 0) {
+      produtoIdsList.forEach((p, i) => request.input(`produtoIdsEcommerce${i}`, sql.VarChar, p));
+      const placeholders = produtoIdsList.map((_, i) => `@produtoIdsEcommerce${i}`).join(', ');
+      produtoFilter = `AND fp.PRODUTO IN (${placeholders})`;
+    } else if (produtoId) {
       request.input('produtoIdEcommerce', sql.VarChar, produtoId);
       produtoFilter = `AND fp.PRODUTO = @produtoIdEcommerce`;
     } else if (produtoSearchTerm && produtoSearchTerm.trim().length >= 2) {

@@ -115,6 +115,10 @@ export default function Sidebar({ companyName }: SidebarProps) {
     basePath && basePath !== "/" ? `${basePath}/estoque-consulta` : "/estoque-consulta";
   const controleGiroHref =
     basePath && basePath !== "/" ? `${basePath}/controle-giro` : "/controle-giro";
+  const produtoGiroHref =
+    basePath && basePath !== "/" ? `${basePath}/produto-giro` : "/produto-giro";
+  const produtoProjecaoCompraHref =
+    basePath && basePath !== "/" ? `${basePath}/produto-projecao-compra` : "/produto-projecao-compra";
   const produtosParadosHref =
     basePath && basePath !== "/" ? `${basePath}/produtos-parados` : "/produtos-parados";
   const controlePerformanceHref =
@@ -220,6 +224,8 @@ export default function Sidebar({ companyName }: SidebarProps) {
     "/controle-estoque",
     "/estoque-consulta",
     "/controle-giro",
+    "/produto-giro",
+    "/produto-projecao-compra",
     "/produtos-parados",
     "/controle-performance",
     "/loja-raio-x",
@@ -360,6 +366,22 @@ export default function Sidebar({ companyName }: SidebarProps) {
           permission: "controle-giro",
           isActive: (currentPathname) =>
             matchesSegment(currentPathname, "/controle-giro", controleGiroHref),
+        },
+        {
+          key: "produto-giro",
+          label: "Produto Giro",
+          href: produtoGiroHref,
+          permission: "produto-giro",
+          isActive: (currentPathname) =>
+            matchesSegment(currentPathname, "/produto-giro", produtoGiroHref),
+        },
+        {
+          key: "produto-projecao-compra",
+          label: "Produto Projeção Compra",
+          href: produtoProjecaoCompraHref,
+          permission: "produto-projecao-compra",
+          isActive: (currentPathname) =>
+            matchesSegment(currentPathname, "/produto-projecao-compra", produtoProjecaoCompraHref),
         },
         {
           key: "produtos-parados",

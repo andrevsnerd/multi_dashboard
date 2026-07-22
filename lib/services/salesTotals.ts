@@ -31,6 +31,8 @@ export interface SalesTotalsParams {
   cores?: string[] | null;
   tipos?: string[] | null;
   produtoId?: string | null;
+  /** Lista de produtos (IN) — filtra os totais por vários itens selecionados. */
+  produtoIds?: string[] | null;
   produtoSearchTerm?: string | null;
 }
 
@@ -167,6 +169,7 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
     cores,
     tipos,
     produtoId,
+    produtoIds,
     produtoSearchTerm,
   } = params;
 
@@ -194,6 +197,7 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
       subgrupos: subgrupos ?? null,
       grades: grades ?? null,
       colecoes: colecoes ?? null,
+      produtoIds: produtoIds ?? null,
     });
     const s = summary.summary;
     return {
@@ -224,6 +228,7 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
         subgrupos: subgrupos ?? null,
         grades: grades ?? null,
         colecoes: colecoes ?? null,
+        produtoIds: produtoIds ?? null,
       }),
     ]);
     const e = ecom.summary;
@@ -265,16 +270,24 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
       !!grupoClause || !!subgrupoClause || !!gradeClause || !!colecaoClause || !!tipoClause;
     const needsCoresJoin = !!corClause;
 
-    // Filtro por produto específico (id) ou busca textual (apenas em vendas_base).
+    // Filtro por lista de produtos (IN), produto específico (id) ou busca textual.
+    // A lista tem prioridade (seleção de vários itens na Produto Giro). Aplica em vendas_base e trocas.
+    const produtoIdsList = (produtoIds ?? []).map((p) => (p ?? '').trim()).filter(Boolean);
     let produtoClauseVp = '';
-    if (produtoId) {
+    let produtoClauseVt = '';
+    if (produtoIdsList.length > 0) {
+      produtoIdsList.forEach((p, i) => request.input(`stProdutoIds${i}`, sql.VarChar, p));
+      const placeholders = produtoIdsList.map((_, i) => `@stProdutoIds${i}`).join(', ');
+      produtoClauseVp = `AND vp.PRODUTO IN (${placeholders})`;
+      produtoClauseVt = `AND vt.PRODUTO IN (${placeholders})`;
+    } else if (produtoId) {
       request.input('stProdutoId', sql.VarChar, produtoId);
       produtoClauseVp = 'AND vp.PRODUTO = @stProdutoId';
+      produtoClauseVt = 'AND vt.PRODUTO = @stProdutoId';
     } else if (produtoSearchTerm && produtoSearchTerm.trim().length >= 2) {
       request.input('stProdutoSearch', sql.VarChar, `%${produtoSearchTerm.trim()}%`);
       produtoClauseVp = 'AND vp.DESC_PRODUTO LIKE @stProdutoSearch';
     }
-    const produtoClauseVt = produtoId ? 'AND vt.PRODUTO = @stProdutoId' : '';
 
     const produtoJoinVp = needsProdutoJoin
       ? 'LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = vp.PRODUTO'

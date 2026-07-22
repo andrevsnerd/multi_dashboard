@@ -1,0 +1,420 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 4px 2px 48px;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+.headerCard {
+  background: var(--s-white);
+  border: 1px solid var(--b-200);
+  border-radius: 14px;
+  padding: 18px 20px;
+}
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--t-900);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+.subtitle {
+  font-size: 12.5px;
+  color: var(--t-500);
+  margin: 4px 0 0;
+  max-width: 720px;
+  line-height: 1.45;
+}
+.loadingCue {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--t-500);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.loadingCueActive {
+  opacity: 1;
+}
+.spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--b-300);
+  border-top-color: var(--t-500);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── Layout de duas colunas ─────────────────────────────────────────────── */
+.grid {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+.leftCol {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: sticky;
+  top: 8px;
+}
+.rightCol {
+  min-width: 0;
+}
+
+/* ── Parâmetros ─────────────────────────────────────────────────────────── */
+.paramCard {
+  background: var(--s-white);
+  border: 1px solid var(--b-200);
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.paramTitle {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--t-500);
+  margin-bottom: 2px;
+}
+.paramField {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.paramLabel {
+  font-size: 13px;
+  color: var(--t-700, var(--t-900));
+  font-weight: 500;
+}
+.paramInput {
+  width: 148px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--b-300);
+  border-radius: 8px;
+  background: #fff7db;
+  color: var(--t-900);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: right;
+}
+.paramInput:disabled {
+  background: var(--s-100, #f3f4f6);
+  color: var(--t-500);
+  font-weight: 500;
+}
+.paramInput:focus {
+  outline: 2px solid var(--brand-scarfme, #2563eb);
+  outline-offset: -1px;
+}
+.paramComputed .paramValue {
+  width: 148px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: var(--s-50, #eef2ff);
+  border: 1px solid var(--b-200);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--t-900);
+}
+.resetLink {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--brand-scarfme, #2563eb);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.resetLink:hover {
+  text-decoration: underline;
+}
+
+/* ── Picker ─────────────────────────────────────────────────────────────── */
+.pickerCard {
+  background: var(--s-white);
+  border: 1px solid var(--b-200);
+  border-radius: 14px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.searchBox {
+  position: relative;
+}
+.searchInput {
+  width: 100%;
+  height: 36px;
+  padding: 0 32px 0 12px;
+  border: 1px solid var(--b-300);
+  border-radius: 9px;
+  background: var(--s-white);
+  color: var(--t-900);
+  font-size: 13px;
+}
+.searchInput:focus {
+  outline: 2px solid var(--brand-scarfme, #2563eb);
+  outline-offset: -1px;
+}
+.searchClear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: var(--b-200);
+  border-radius: 50%;
+  color: var(--t-700, var(--t-900));
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+.pickerList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 460px;
+  overflow-y: auto;
+}
+.pickerEmpty {
+  padding: 24px 8px;
+  text-align: center;
+  color: var(--t-500);
+  font-size: 12.5px;
+}
+.pickerRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.pickerRow:hover {
+  background: var(--s-50, #f8fafc);
+}
+.pickerRowActive {
+  background: var(--s-50, #eff6ff);
+}
+.pickerRow input {
+  accent-color: var(--brand-scarfme, #2563eb);
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+.pickerInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.pickerName {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--t-900);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pickerMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--t-500);
+}
+.pickerHint {
+  font-size: 11px;
+  color: var(--t-500);
+  text-align: center;
+}
+
+/* ── Painel vazio ───────────────────────────────────────────────────────── */
+.emptyPanel {
+  background: var(--s-white);
+  border: 1px dashed var(--b-300);
+  border-radius: 14px;
+  padding: 64px 24px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.emptyIcon {
+  font-size: 34px;
+}
+.emptyTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--t-900);
+}
+.emptyText {
+  font-size: 13px;
+  color: var(--t-500);
+  max-width: 380px;
+  line-height: 1.45;
+}
+
+/* ── Painel de projeção ─────────────────────────────────────────────────── */
+.projCard {
+  background: var(--s-white);
+  border: 1px solid var(--b-200);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.projHead {
+  padding: 16px 18px;
+  background: linear-gradient(135deg, #1e3a5f, #2b4d7e);
+  color: #fff;
+}
+.projTitle {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.projSubtitle {
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.85);
+  margin-top: 4px;
+}
+.projSubtitle strong {
+  color: #fff;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.chip {
+  border: none;
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.chip:hover {
+  background: rgba(255, 255, 255, 0.32);
+}
+
+.tableScroll {
+  overflow-x: auto;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.table thead th {
+  background: var(--s-50, #f1f5f9);
+  color: var(--t-700, var(--t-900));
+  font-weight: 600;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  padding: 10px 12px;
+  text-align: right;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--b-200);
+}
+.table thead th.thLeft {
+  text-align: left;
+}
+.table tbody td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--b-100, var(--b-200));
+  color: var(--t-900);
+}
+.tdLeft {
+  text-align: left;
+  font-weight: 600;
+}
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.muted {
+  color: var(--t-400, var(--t-500));
+}
+.rowBase td {
+  background: #fff7db;
+  font-weight: 600;
+}
+.sugestao {
+  color: var(--brand-scarfme, #2563eb);
+  font-weight: 700;
+}
+.qtdInput {
+  width: 78px;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--b-300);
+  border-radius: 7px;
+  background: #fff7db;
+  color: var(--t-900);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.qtdInput:focus {
+  outline: 2px solid var(--brand-scarfme, #2563eb);
+  outline-offset: -1px;
+}
+.qtdInputEdited {
+  border-color: var(--brand-scarfme, #2563eb);
+  box-shadow: 0 0 0 1px var(--brand-scarfme, #2563eb) inset;
+}
+.footNote {
+  padding: 12px 18px 16px;
+  font-size: 11.5px;
+  color: var(--t-500);
+  line-height: 1.5;
+  background: #fffbea;
+  border-top: 1px solid var(--b-200);
+}
+.footNote strong {
+  color: var(--t-700, var(--t-900));
+}

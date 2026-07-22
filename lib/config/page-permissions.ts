@@ -22,6 +22,8 @@ export const PAGE_PERMISSION_DEFINITIONS = [
   { key: "controle-estoque", label: "Controle de Estoque", routeSegments: ["controle-estoque"] },
   { key: "estoque-consulta", label: "Estoque Consulta", routeSegments: ["estoque-consulta"] },
   { key: "controle-giro", label: "Controle de Giro", routeSegments: ["controle-giro"] },
+  { key: "produto-giro", label: "Produto Giro", routeSegments: ["produto-giro"] },
+  { key: "produto-projecao-compra", label: "Produto Projecao Compra", routeSegments: ["produto-projecao-compra"] },
   { key: "produtos-parados", label: "Produtos Parados", routeSegments: ["produtos-parados"] },
   { key: "controle-performance", label: "Controle de Performance", routeSegments: ["controle-performance"] },
   { key: "loja-raio-x", label: "Loja Raio X", routeSegments: ["loja-raio-x"] },

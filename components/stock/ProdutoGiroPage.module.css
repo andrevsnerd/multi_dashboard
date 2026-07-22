@@ -1,0 +1,574 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 4px 2px 48px;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+.headerCard {
+  background: var(--s-white);
+  border: 1px solid var(--b-200);
+  border-radius: 14px;
+  padding: 18px 20px;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--t-900);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.subtitle {
+  font-size: 12.5px;
+  color: var(--t-500);
+  margin: 4px 0 0;
+  max-width: 640px;
+  line-height: 1.4;
+}
+
+.headerRight {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.exportBtn {
+  height: 38px;
+  padding: 0 16px;
+  border: 1px solid var(--brand-scarfme);
+  border-radius: 9px;
+  background: var(--brand-scarfme);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s ease;
+}
+.exportBtn:hover {
+  opacity: 0.9;
+}
+.exportBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.loadingCue {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--t-500);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.loadingCueActive {
+  opacity: 1;
+}
+.spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--b-300);
+  border-top-color: var(--t-500);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── Filter strip ───────────────────────────────────────────────────────── */
+.filterStripCard {
+  background: var(--s-white);
+  border: 1px solid var(--b-200);
+  border-radius: 14px;
+  padding: 12px 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.searchBox {
+  position: relative;
+  flex: 1 1 240px;
+  min-width: 200px;
+}
+.searchInput {
+  width: 100%;
+  height: 38px;
+  padding: 0 34px 0 12px;
+  border: 1px solid var(--b-300);
+  border-radius: 9px;
+  background: var(--s-50);
+  color: var(--t-900);
+  font-size: 13.5px;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+.searchInput:focus {
+  border-color: var(--t-500);
+}
+.searchInput::placeholder {
+  color: var(--t-400);
+}
+.searchClear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: var(--t-400);
+  font-size: 16px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 2px 4px;
+}
+.searchClear:hover {
+  color: var(--t-700);
+}
+
+.toggleBtn {
+  height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--b-300);
+  border-radius: 9px;
+  background: var(--s-50);
+  color: var(--t-600);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.toggleBtn:hover {
+  border-color: var(--t-500);
+}
+.toggleBtnActive {
+  background: var(--brand-scarfme);
+  border-color: var(--brand-scarfme);
+  color: #fff;
+}
+
+.filterSpacer {
+  flex: 1 1 auto;
+}
+
+.clearBtn {
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--b-300);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--t-500);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.clearBtn:hover {
+  color: var(--t-800);
+  border-color: var(--t-500);
+}
+
+/* ── KPI cards ──────────────────────────────────────────────────────────── */
+.kpiRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.kpiCard {
+  background: var(--s-white);
+  border: 1px solid var(--b-200);
+  border-radius: 14px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 92px;
+}
+.kpiCardAccent {
+  border-left: 3px solid var(--brand-scarfme);
+}
+
+.kpiLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--t-500);
+}
+.kpiValue {
+  font-size: 25px;
+  font-weight: 700;
+  color: var(--t-900);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.kpiValueCents {
+  font-size: 0.62em;
+  color: var(--t-500);
+  font-weight: 600;
+}
+.kpiSub {
+  font-size: 12px;
+  color: var(--t-500);
+  font-weight: 500;
+}
+.kpiSubStrong {
+  color: var(--t-700);
+  font-weight: 600;
+}
+.kpiDanger {
+  color: #dc2626;
+}
+:global(:root[data-theme="dark"]) .kpiDanger {
+  color: #f87171;
+}
+.kpiWarn {
+  color: #b45309;
+}
+:global(:root[data-theme="dark"]) .kpiWarn {
+  color: #fbbf24;
+}
+
+/* ── Table ──────────────────────────────────────────────────────────────── */
+.tableCard {
+  background: var(--s-white);
+  border: 1px solid var(--b-200);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.tableScroll {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--s-50);
+  color: var(--t-500);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: right;
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--b-200);
+  white-space: nowrap;
+  user-select: none;
+  z-index: 2;
+}
+.thLeft {
+  text-align: left;
+}
+.thSortable {
+  cursor: pointer;
+}
+.thSortable:hover {
+  color: var(--t-800);
+}
+.sortArrow {
+  font-size: 9px;
+  margin-left: 3px;
+  color: var(--brand-scarfme);
+}
+
+.table tbody td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--b-subtle);
+  text-align: right;
+  color: var(--t-800);
+  white-space: nowrap;
+}
+.table tbody tr:hover td {
+  background: var(--s-50);
+}
+.tdProduto {
+  text-align: left;
+  max-width: 320px;
+}
+.produtoName {
+  font-weight: 600;
+  color: var(--t-900);
+  white-space: normal;
+  line-height: 1.3;
+}
+.produtoCode {
+  font-size: 11px;
+  color: var(--t-400);
+  font-variant-numeric: tabular-nums;
+  margin-top: 1px;
+}
+.tdCor {
+  text-align: left;
+  color: var(--t-600);
+}
+.num {
+  font-variant-numeric: tabular-nums;
+}
+.strong {
+  font-weight: 700;
+  color: var(--t-900);
+}
+.muted {
+  color: var(--t-400);
+}
+
+/* Duração pill (velocidade de esgotamento) */
+.duraPill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.duraCrit {
+  background: rgba(220, 38, 38, 0.12);
+  color: #b91c1c;
+}
+.duraWarn {
+  background: rgba(217, 119, 6, 0.14);
+  color: #b45309;
+}
+.duraOk {
+  background: rgba(22, 163, 74, 0.12);
+  color: #15803d;
+}
+:global(:root[data-theme="dark"]) .duraCrit {
+  background: rgba(248, 113, 113, 0.16);
+  color: #fca5a5;
+}
+:global(:root[data-theme="dark"]) .duraWarn {
+  background: rgba(251, 191, 36, 0.16);
+  color: #fcd34d;
+}
+:global(:root[data-theme="dark"]) .duraOk {
+  background: rgba(74, 222, 128, 0.14);
+  color: #86efac;
+}
+
+.emptyState {
+  padding: 48px 20px;
+  text-align: center;
+  color: var(--t-500);
+  font-size: 14px;
+}
+
+.footNote {
+  font-size: 11.5px;
+  color: var(--t-400);
+  padding: 10px 16px;
+  border-top: 1px solid var(--b-subtle);
+  line-height: 1.5;
+}
+
+.progressBar {
+  height: 3px;
+  background: var(--b-200);
+  overflow: hidden;
+}
+.progressFill {
+  height: 100%;
+  background: var(--brand-scarfme);
+  transition: width 0.3s ease;
+}
+
+/* ── Lente de transferência (coluna Transferência / Compra líquida) ───────── */
+.noData {
+  color: #cbd5e1;
+}
+
+.inlineTooltipWrapper {
+  position: relative;
+  display: inline-flex;
+  max-width: 100%;
+  /* Estende a área de hover para cima, cobrindo o gap até o painel. */
+  padding-top: 10px;
+  margin-top: -10px;
+}
+
+.inlineTooltipTrigger {
+  cursor: help;
+  display: inline-flex;
+}
+
+/* Painel renderizado em portal (position: fixed) — não é recortado pelo overflow da tabela. */
+.portalTooltip {
+  position: fixed;
+  z-index: 1000;
+  min-width: 220px;
+  max-width: min(320px, calc(100vw - 32px));
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: linear-gradient(180deg, var(--s-white) 0%, var(--s-50) 100%);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.16);
+  pointer-events: none;
+}
+
+.inlineTooltipPanel {
+  display: none;
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  min-width: 240px;
+  max-width: min(320px, calc(100vw - 32px));
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: linear-gradient(180deg, var(--s-white) 0%, var(--s-50) 100%);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.16);
+  z-index: 50;
+}
+
+.inlineTooltipPanel::before {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 18px;
+  border: 6px solid transparent;
+  border-top-color: rgba(248, 250, 252, 0.99);
+}
+
+.inlineTooltipPanelRight {
+  left: auto;
+  right: 0;
+}
+
+.inlineTooltipPanelRight::before {
+  left: auto;
+  right: 18px;
+}
+
+.inlineTooltipWrapper:hover .inlineTooltipPanel {
+  display: block;
+}
+
+.inlineTooltipTitle {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #1e3a8a;
+}
+
+.inlineTooltipList {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.inlineTooltipRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+}
+
+.inlineTooltipRow:last-child {
+  border-bottom: none;
+}
+
+.inlineTooltipLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  text-align: left;
+  color: var(--t-900);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.inlineTooltipFilial {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--t-900);
+}
+
+.inlineTooltipValue {
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.inlineTooltipFooter {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(148, 163, 184, 0.22);
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--t-900);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Número do estoque com tooltip de rede (dica visual de que é interativo). */
+.estoqueRedeTrigger {
+  text-decoration: underline dotted rgba(148, 163, 184, 0.75);
+  text-underline-offset: 3px;
+}
+
+/* ── Seleção de itens por clique ──────────────────────────────────────────── */
+.rowClickable {
+  cursor: pointer;
+}
+
+.rowSelected td {
+  background: var(--s-blue50) !important;
+}
+
+.rowSelected .tdProduto {
+  box-shadow: inset 3px 0 0 0 #2563eb;
+}
+
+.selectionBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 14px;
+  background: var(--s-blue50);
+  border: 1px solid var(--b-200);
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--t-800);
+}
