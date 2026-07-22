@@ -161,12 +161,9 @@ export async function GET(request: Request) {
       }
     });
 
-    const itens = Array.from(acc.values())
-      .map((it) => ({
-        ...it,
-        totalVendas: Math.round(it.totalVendas),
-      }))
-      .sort((a, b) => b.totalQtde - a.totalQtde);
+    // totalVendas fica em precisão PLENA (arredondar cada item e depois somar tirava ~R$
+    // do total). O frontend/export arredondam só na exibição.
+    const itens = Array.from(acc.values()).sort((a, b) => b.totalQtde - a.totalQtde);
 
     return NextResponse.json({ dias, itens }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {

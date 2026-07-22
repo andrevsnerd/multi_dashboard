@@ -953,7 +953,7 @@ export default function ProdutoGiroPage({ companyKey }: ProdutoGiroPageProps) {
               colecao: it.colecao,
               grade: it.grade,
               totalQtde: it.totalQtde,
-              totalVendas: it.totalVendas,
+              totalVendas: Math.round(it.totalVendas * 100) / 100,
               porDia: it.porDia,
             })),
           }
@@ -1403,7 +1403,7 @@ export default function ProdutoGiroPage({ companyKey }: ProdutoGiroPageProps) {
                     <tr className={styles.diarioTotalRow}>
                       <td className={`${styles.tdProduto} ${styles.diarioStickyProduto}`}>
                         <div className={styles.produtoName}>TOTAL GERAL</div>
-                        <div className={styles.produtoCode}>{fmt(diario.itens.length)} itens · {fmtBRL(diarioTotais.totalVendas)}</div>
+                        <div className={styles.produtoCode}>{fmt(diario.itens.length)} itens · {fmtBRLc(diarioTotais.totalVendas)}</div>
                       </td>
                       {porCor && <td className={`${styles.tdCor} ${styles.diarioStickyCor}`}>—</td>}
                       <td className={`${styles.num} ${styles.strong} ${styles.diarioTotalCol}`}>{fmt(diarioTotais.totalQtde)}</td>

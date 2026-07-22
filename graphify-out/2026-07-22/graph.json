@@ -977,7 +977,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_companies_company_blackfriday_page",
-      "community": 454,
+      "community": 6,
       "norm_label": "page.tsx"
     },
     {
@@ -987,7 +987,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "app_companies_company_blackfriday_page_blackfridaypageprops",
-      "community": 454,
+      "community": 6,
       "norm_label": "blackfridaypageprops"
     },
     {
@@ -997,7 +997,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "app_companies_company_blackfriday_page_generatemetadata",
-      "community": 454,
+      "community": 6,
       "norm_label": "generatemetadata()"
     },
     {
@@ -1007,7 +1007,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "app_companies_company_blackfriday_page_blackfridaypageroute",
-      "community": 454,
+      "community": 6,
       "norm_label": "blackfridaypageroute()"
     },
     {
@@ -3257,7 +3257,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_companies_company_vendedores_page",
-      "community": 6,
+      "community": 109,
       "norm_label": "page.tsx"
     },
     {
@@ -3267,7 +3267,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "app_companies_company_vendedores_page_vendedorespageprops",
-      "community": 6,
+      "community": 109,
       "norm_label": "vendedorespageprops"
     },
     {
@@ -3277,7 +3277,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "app_companies_company_vendedores_page_generatemetadata",
-      "community": 6,
+      "community": 109,
       "norm_label": "generatemetadata()"
     },
     {
@@ -3287,7 +3287,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "app_companies_company_vendedores_page_vendedorespageroute",
-      "community": 6,
+      "community": 109,
       "norm_label": "vendedorespageroute()"
     },
     {
@@ -4487,7 +4487,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_compras_transito_id_reconciliacao_route",
-      "community": 142,
+      "community": 130,
       "norm_label": "route.ts"
     },
     {
@@ -4497,7 +4497,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "app_api_compras_transito_id_reconciliacao_route_get",
-      "community": 142,
+      "community": 130,
       "norm_label": "get()"
     },
     {
@@ -4567,7 +4567,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_compras_transito_reconciliacao_route",
-      "community": 142,
+      "community": 130,
       "norm_label": "route.ts"
     },
     {
@@ -4577,7 +4577,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "app_api_compras_transito_reconciliacao_route_get",
-      "community": 142,
+      "community": 130,
       "norm_label": "get()"
     },
     {
@@ -4587,7 +4587,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_compras_transito_route",
-      "community": 171,
+      "community": 104,
       "norm_label": "route.ts"
     },
     {
@@ -4597,7 +4597,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "app_api_compras_transito_route_formatdefaulttitle",
-      "community": 171,
+      "community": 104,
       "norm_label": "formatdefaulttitle()"
     },
     {
@@ -4607,7 +4607,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "app_api_compras_transito_route_get",
-      "community": 126,
+      "community": 104,
       "norm_label": "get()"
     },
     {
@@ -4617,7 +4617,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "app_api_compras_transito_route_post",
-      "community": 171,
+      "community": 104,
       "norm_label": "post()"
     },
     {
@@ -14569,7 +14569,7 @@
       "source_location": "L1390",
       "_origin": "ast",
       "id": "components_lista_loja_listalojapage_calcqtdsugestaos",
-      "community": 12,
+      "community": 1,
       "norm_label": "calcqtdsugestaos()"
     },
     {
@@ -14639,7 +14639,7 @@
       "source_location": "L1575",
       "_origin": "ast",
       "id": "components_lista_loja_listalojapage_itemtemcompraagora",
-      "community": 1,
+      "community": 10,
       "norm_label": "itemtemcompraagora()"
     },
     {
@@ -14659,7 +14659,7 @@
       "source_location": "L1617",
       "_origin": "ast",
       "id": "components_lista_loja_listalojapage_getreposicaobasetype",
-      "community": 12,
+      "community": 1,
       "norm_label": "getreposicaobasetype()"
     },
     {
@@ -29819,7 +29819,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_client_compras_transito",
-      "community": 15,
+      "community": 228,
       "norm_label": "compras-transito.ts"
     },
     {
@@ -29829,7 +29829,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "lib_client_compras_transito_loosecolorkeypart",
-      "community": 15,
+      "community": 228,
       "norm_label": "loosecolorkeypart()"
     },
     {
@@ -29839,7 +29839,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "lib_client_compras_transito_buildprodutotransitokey",
-      "community": 15,
+      "community": 228,
       "norm_label": "buildprodutotransitokey()"
     },
     {
@@ -29849,7 +29849,7 @@
       "source_location": "L58",
       "_origin": "ast",
       "id": "lib_client_compras_transito_colordesckeypart",
-      "community": 15,
+      "community": 228,
       "norm_label": "colordesckeypart()"
     },
     {
@@ -29859,7 +29859,7 @@
       "source_location": "L64",
       "_origin": "ast",
       "id": "lib_client_compras_transito_builddesctransitokey",
-      "community": 15,
+      "community": 228,
       "norm_label": "builddesctransitokey()"
     },
     {
@@ -29869,7 +29869,7 @@
       "source_location": "L69",
       "_origin": "ast",
       "id": "lib_client_compras_transito_buildloosecompratransitokey",
-      "community": 15,
+      "community": 228,
       "norm_label": "buildloosecompratransitokey()"
     },
     {
@@ -29879,7 +29879,7 @@
       "source_location": "L75",
       "_origin": "ast",
       "id": "lib_client_compras_transito_cacheentry",
-      "community": 15,
+      "community": 228,
       "norm_label": "cacheentry"
     },
     {
@@ -29889,7 +29889,7 @@
       "source_location": "L80",
       "_origin": "ast",
       "id": "lib_client_compras_transito_comprascache",
-      "community": 15,
+      "community": 228,
       "norm_label": "comprascache"
     },
     {
@@ -29899,7 +29899,7 @@
       "source_location": "L81",
       "_origin": "ast",
       "id": "lib_client_compras_transito_pendingbycompany",
-      "community": 15,
+      "community": 228,
       "norm_label": "pendingbycompany"
     },
     {
@@ -29919,7 +29919,7 @@
       "source_location": "L93",
       "_origin": "ast",
       "id": "lib_client_compras_transito_compratransitoindex",
-      "community": 15,
+      "community": 228,
       "norm_label": "compratransitoindex"
     },
     {
@@ -29929,7 +29929,7 @@
       "source_location": "L95",
       "_origin": "ast",
       "id": "lib_client_compras_transito_normalizedate",
-      "community": 15,
+      "community": 228,
       "norm_label": "normalizedate()"
     },
     {
@@ -29939,7 +29939,7 @@
       "source_location": "L99",
       "_origin": "ast",
       "id": "lib_client_compras_transito_getcached",
-      "community": 15,
+      "community": 228,
       "norm_label": "getcached()"
     },
     {
@@ -29949,7 +29949,7 @@
       "source_location": "L109",
       "_origin": "ast",
       "id": "lib_client_compras_transito_setcached",
-      "community": 15,
+      "community": 228,
       "norm_label": "setcached()"
     },
     {
@@ -29959,7 +29959,7 @@
       "source_location": "L116",
       "_origin": "ast",
       "id": "lib_client_compras_transito_fetchcomprastransitoclient",
-      "community": 15,
+      "community": 228,
       "norm_label": "fetchcomprastransitoclient()"
     },
     {
@@ -29969,7 +29969,7 @@
       "source_location": "L146",
       "_origin": "ast",
       "id": "lib_client_compras_transito_buildcompratransitoindex",
-      "community": 15,
+      "community": 228,
       "norm_label": "buildcompratransitoindex()"
     },
     {
@@ -29979,7 +29979,7 @@
       "source_location": "L209",
       "_origin": "ast",
       "id": "lib_client_compras_transito_getcompratransitoentries",
-      "community": 15,
+      "community": 228,
       "norm_label": "getcompratransitoentries()"
     },
     {
@@ -30479,7 +30479,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_config_compra_ciclo",
-      "community": 1,
+      "community": 10,
       "norm_label": "compra-ciclo.ts"
     },
     {
@@ -30489,7 +30489,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "lib_config_compra_ciclo_ciclocompra",
-      "community": 1,
+      "community": 10,
       "norm_label": "ciclocompra"
     },
     {
@@ -30499,7 +30499,7 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "lib_config_compra_ciclo_ciclorule",
-      "community": 1,
+      "community": 10,
       "norm_label": "ciclorule"
     },
     {
@@ -30509,7 +30509,7 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "lib_config_compra_ciclo_normalize",
-      "community": 1,
+      "community": 10,
       "norm_label": "normalize()"
     },
     {
@@ -30519,7 +30519,7 @@
       "source_location": "L54",
       "_origin": "ast",
       "id": "lib_config_compra_ciclo_scarfme_rules",
-      "community": 1,
+      "community": 10,
       "norm_label": "scarfme_rules"
     },
     {
@@ -30529,7 +30529,7 @@
       "source_location": "L65",
       "_origin": "ast",
       "id": "lib_config_compra_ciclo_companycicloconfig",
-      "community": 1,
+      "community": 10,
       "norm_label": "companycicloconfig"
     },
     {
@@ -30539,7 +30539,7 @@
       "source_location": "L109",
       "_origin": "ast",
       "id": "lib_config_compra_ciclo_ciclo_config",
-      "community": 1,
+      "community": 10,
       "norm_label": "ciclo_config"
     },
     {
@@ -30559,7 +30559,7 @@
       "source_location": "L160",
       "_origin": "ast",
       "id": "lib_config_compra_ciclo_hasciclocompra",
-      "community": 1,
+      "community": 10,
       "norm_label": "hasciclocompra()"
     },
     {
@@ -30569,7 +30569,7 @@
       "source_location": "L170",
       "_origin": "ast",
       "id": "lib_config_compra_ciclo_resolvegapantigodias",
-      "community": 1,
+      "community": 10,
       "norm_label": "resolvegapantigodias()"
     },
     {
@@ -30579,7 +30579,7 @@
       "source_location": "L182",
       "_origin": "ast",
       "id": "lib_config_compra_ciclo_resolverecentehorizontedias",
-      "community": 1,
+      "community": 10,
       "norm_label": "resolverecentehorizontedias()"
     },
     {
@@ -30589,7 +30589,7 @@
       "source_location": "L193",
       "_origin": "ast",
       "id": "lib_config_compra_ciclo_resolvecompradiasemana",
-      "community": 1,
+      "community": 10,
       "norm_label": "resolvecompradiasemana()"
     },
     {
@@ -35889,7 +35889,7 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "lib_repositories_comprastransitoreconciliacao_fetchmatrizentriesbycolor",
-      "community": 142,
+      "community": 130,
       "norm_label": "fetchmatrizentriesbycolor()"
     },
     {
@@ -41769,7 +41769,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_server_compra_transito_reconciliacao",
-      "community": 142,
+      "community": 130,
       "norm_label": "compra-transito-reconciliacao.ts"
     },
     {
@@ -41779,7 +41779,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "lib_server_compra_transito_reconciliacao_reconcilecompanycompras",
-      "community": 142,
+      "community": 130,
       "norm_label": "reconcilecompanycompras()"
     },
     {
@@ -41789,7 +41789,7 @@
       "source_location": "L78",
       "_origin": "ast",
       "id": "lib_server_compra_transito_reconciliacao_buildreconciliacaoresposta",
-      "community": 142,
+      "community": 130,
       "norm_label": "buildreconciliacaoresposta()"
     },
     {
@@ -42519,7 +42519,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_types_compra_transito",
-      "community": 142,
+      "community": 126,
       "norm_label": "compra-transito.ts"
     },
     {
@@ -42529,7 +42529,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_types_compra_transito_compratransitostatus",
-      "community": 298,
+      "community": 126,
       "norm_label": "compratransitostatus"
     },
     {
@@ -42549,7 +42549,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "lib_types_compra_transito_compratransito",
-      "community": 142,
+      "community": 126,
       "norm_label": "compratransito"
     },
     {
@@ -42559,7 +42559,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "lib_types_compra_transito_compratransitolistentry",
-      "community": 142,
+      "community": 126,
       "norm_label": "compratransitolistentry"
     },
     {
@@ -42579,7 +42579,7 @@
       "source_location": "L66",
       "_origin": "ast",
       "id": "lib_types_compra_transito_compratransitoitemreconciliacao",
-      "community": 142,
+      "community": 126,
       "norm_label": "compratransitoitemreconciliacao"
     },
     {
@@ -42589,7 +42589,7 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "lib_types_compra_transito_compratransitoitemreconciledrow",
-      "community": 142,
+      "community": 126,
       "norm_label": "compratransitoitemreconciledrow"
     },
     {
@@ -42599,7 +42599,7 @@
       "source_location": "L93",
       "_origin": "ast",
       "id": "lib_types_compra_transito_compratransitoreconciliacaoresposta",
-      "community": 142,
+      "community": 130,
       "norm_label": "compratransitoreconciliacaoresposta"
     },
     {
@@ -43319,7 +43319,7 @@
       "source_location": "L670",
       "_origin": "ast",
       "id": "lib_utils_compra_ideal_precisacompraressasemana",
-      "community": 1,
+      "community": 10,
       "norm_label": "precisacompraressasemana()"
     },
     {
@@ -43549,7 +43549,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics",
-      "community": 228,
+      "community": 142,
       "norm_label": "compra-transito-analytics.ts"
     },
     {
@@ -43559,7 +43559,7 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_transitawaresuggestiontype",
-      "community": 228,
+      "community": 142,
       "norm_label": "transitawaresuggestiontype"
     },
     {
@@ -43569,7 +43569,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_transitadjustmentresult",
-      "community": 228,
+      "community": 142,
       "norm_label": "transitadjustmentresult"
     },
     {
@@ -43579,7 +43579,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_transitawaresuggestionview",
-      "community": 228,
+      "community": 142,
       "norm_label": "transitawaresuggestionview"
     },
     {
@@ -43589,7 +43589,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_startoflocalday",
-      "community": 228,
+      "community": 142,
       "norm_label": "startoflocalday()"
     },
     {
@@ -43599,7 +43599,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_normalizedate",
-      "community": 228,
+      "community": 142,
       "norm_label": "normalizedate()"
     },
     {
@@ -43609,7 +43609,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_daysuntil",
-      "community": 228,
+      "community": 142,
       "norm_label": "daysuntil()"
     },
     {
@@ -43619,7 +43619,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_groupentriesbyday",
-      "community": 228,
+      "community": 142,
       "norm_label": "groupentriesbyday()"
     },
     {
@@ -43629,7 +43629,7 @@
       "source_location": "L68",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_computecoveragedeficit",
-      "community": 228,
+      "community": 142,
       "norm_label": "computecoveragedeficit()"
     },
     {
@@ -43639,7 +43639,7 @@
       "source_location": "L94",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_summarizetransitadjustment",
-      "community": 228,
+      "community": 142,
       "norm_label": "summarizetransitadjustment()"
     },
     {
@@ -43649,7 +43649,7 @@
       "source_location": "L170",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_applytransittosuggestion",
-      "community": 228,
+      "community": 142,
       "norm_label": "applytransittosuggestion()"
     },
     {
@@ -43819,7 +43819,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_status",
-      "community": 298,
+      "community": 126,
       "norm_label": "compra-transito-status.ts"
     },
     {
@@ -43829,7 +43829,7 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_status_normalizedate",
-      "community": 298,
+      "community": 126,
       "norm_label": "normalizedate()"
     },
     {
@@ -43839,7 +43839,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_status_startoflocalday",
-      "community": 298,
+      "community": 126,
       "norm_label": "startoflocalday()"
     },
     {
@@ -43849,7 +43849,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_status_iscompratransitodateactive",
-      "community": 298,
+      "community": 126,
       "norm_label": "iscompratransitodateactive()"
     },
     {
@@ -43859,7 +43859,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_status_getcompratransitoitemstatus",
-      "community": 298,
+      "community": 126,
       "norm_label": "getcompratransitoitemstatus()"
     },
     {
@@ -43979,7 +43979,7 @@
       "source_location": "L171",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_store_listcomprastransitofull",
-      "community": 126,
+      "community": 104,
       "norm_label": "listcomprastransitofull()"
     },
     {
@@ -43989,7 +43989,7 @@
       "source_location": "L200",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_store_listcomprastransito",
-      "community": 126,
+      "community": 104,
       "norm_label": "listcomprastransito()"
     },
     {
@@ -44129,7 +44129,7 @@
       "source_location": "L97",
       "_origin": "ast",
       "id": "lib_utils_controle_estoque_metricas_normalizecontroleestoqueitemkeypart",
-      "community": 15,
+      "community": 228,
       "norm_label": "normalizecontroleestoqueitemkeypart()"
     },
     {
@@ -49149,7 +49149,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "lib_utils_suggestion_rules_suggestionsdata",
-      "community": 12,
+      "community": 1,
       "norm_label": "suggestionsdata"
     },
     {
@@ -49159,7 +49159,7 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "lib_utils_suggestion_rules_suggestionedata",
-      "community": 12,
+      "community": 1,
       "norm_label": "suggestionedata"
     },
     {
@@ -129218,7 +129218,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProdutoGiroPage.tsx",
-      "source_location": "L1114",
+      "source_location": "L1130",
       "weight": 1.0,
       "source": "components_stock_produtogiropage_produtogiropage",
       "target": "components_stock_produtogiropage_fmt",
@@ -129229,7 +129229,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProdutoGiroPage.tsx",
-      "source_location": "L1120",
+      "source_location": "L1136",
       "weight": 1.0,
       "source": "components_stock_produtogiropage_produtogiropage",
       "target": "components_stock_produtogiropage_fmtdec",
@@ -129240,7 +129240,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProdutoGiroPage.tsx",
-      "source_location": "L1114",
+      "source_location": "L1130",
       "weight": 1.0,
       "source": "components_stock_produtogiropage_produtogiropage",
       "target": "components_stock_produtogiropage_fmtbrl",
@@ -129262,7 +129262,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProdutoGiroPage.tsx",
-      "source_location": "L1143",
+      "source_location": "L1159",
       "weight": 1.0,
       "source": "components_stock_produtogiropage_produtogiropage",
       "target": "components_stock_produtogiropage_fmtdatacurta",
@@ -129273,7 +129273,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProdutoGiroPage.tsx",
-      "source_location": "L1381",
+      "source_location": "L1397",
       "weight": 1.0,
       "source": "components_stock_produtogiropage_produtogiropage",
       "target": "components_stock_produtogiropage_fmtdiacurto",
@@ -129328,7 +129328,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProdutoGiroPage.tsx",
-      "source_location": "L1415",
+      "source_location": "L1431",
       "weight": 1.0,
       "source": "components_stock_produtogiropage_produtogiropage",
       "target": "components_stock_produtogiropage_diarioheatclass",
@@ -129339,7 +129339,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProdutoGiroPage.tsx",
-      "source_location": "L1318",
+      "source_location": "L1334",
       "weight": 1.0,
       "source": "components_stock_produtogiropage_produtogiropage",
       "target": "components_stock_produtogiropage_duraclass",
@@ -129350,7 +129350,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProdutoGiroPage.tsx",
-      "source_location": "L1311",
+      "source_location": "L1327",
       "weight": 1.0,
       "source": "components_stock_produtogiropage_produtogiropage",
       "target": "components_stock_produtogiropage_renderestoquetooltip",
@@ -129361,7 +129361,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProdutoGiroPage.tsx",
-      "source_location": "L1342",
+      "source_location": "L1358",
       "weight": 1.0,
       "source": "components_stock_produtogiropage_produtogiropage",
       "target": "components_stock_produtogiropage_rendertransferenciatooltip",
