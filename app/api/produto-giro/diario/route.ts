@@ -122,6 +122,8 @@ export async function GET(request: Request) {
 
   try {
     const acc = new Map<string, ItemAcc>();
+    // Total agregado por dia (todos os itens do escopo) — qtd e R$.
+    const totaisPorDiaMap = new Map<string, { qtde: number; vendas: number }>();
 
     await mapWithConcurrency(dias, CONCURRENCY, async (dia) => {
       const range = normalizeRangeForQuery({ start: dia, end: dia });
@@ -155,17 +157,27 @@ export async function GET(request: Request) {
         if (!item.descricao && r.descricao) item.descricao = r.descricao;
         if (!item.codigoBarra && r.codigoBarra) item.codigoBarra = r.codigoBarra;
         const qtd = Math.round(Number(r.qtde ?? 0));
+        const val = Number(r.vendas ?? 0);
         item.porDia[dia] = (item.porDia[dia] ?? 0) + qtd;
         item.totalQtde += qtd;
-        item.totalVendas += Number(r.vendas ?? 0);
+        item.totalVendas += val;
+        const tot = totaisPorDiaMap.get(dia) ?? { qtde: 0, vendas: 0 };
+        tot.qtde += qtd;
+        tot.vendas += val;
+        totaisPorDiaMap.set(dia, tot);
       }
     });
 
     // totalVendas fica em precisão PLENA (arredondar cada item e depois somar tirava ~R$
     // do total). O frontend/export arredondam só na exibição.
     const itens = Array.from(acc.values()).sort((a, b) => b.totalQtde - a.totalQtde);
+    const totaisPorDia = dias.map((d) => ({
+      dia: d,
+      qtde: totaisPorDiaMap.get(d)?.qtde ?? 0,
+      vendas: totaisPorDiaMap.get(d)?.vendas ?? 0,
+    }));
 
-    return NextResponse.json({ dias, itens }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ dias, itens, totaisPorDia }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     console.error("Erro em /api/produto-giro/diario:", error);
     return NextResponse.json({ error: "Erro ao carregar vendas por dia" }, { status: 500 });

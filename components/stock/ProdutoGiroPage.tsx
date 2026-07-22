@@ -37,6 +37,7 @@ import {
   exportProdutoGiroXlsx,
   type ProdutoGiroXlsxRow,
   type ProdutoGiroPerfXlsxRow,
+  type ProdutoGiroResumoRow,
 } from "@/lib/utils/exportProdutoGiroXlsx";
 import type { CompanyKey } from "@/lib/config/company";
 
@@ -116,6 +117,7 @@ interface DiarioItem {
 interface DiarioResponse {
   dias: string[];
   itens: DiarioItem[];
+  totaisPorDia?: Array<{ dia: string; qtde: number; vendas: number }>;
 }
 
 interface FilialVendaRow {
@@ -628,7 +630,7 @@ export default function ProdutoGiroPage({ companyKey }: ProdutoGiroPageProps) {
     const res = await fetch(`/api/produto-giro/diario?${params.toString()}`, { cache: "no-store" });
     const json = (await res.json()) as DiarioResponse & { error?: string };
     if (json.error) throw new Error(json.error);
-    return { dias: json.dias ?? [], itens: json.itens ?? [] };
+    return { dias: json.dias ?? [], itens: json.itens ?? [], totaisPorDia: json.totaisPorDia ?? [] };
   };
 
   // Vendas por filial — mesmo escopo/filtros da tela. Reusado pelo painel e pelo export.
@@ -927,10 +929,35 @@ export default function ProdutoGiroPage({ companyKey }: ProdutoGiroPageProps) {
         ...(verTransferencias ? { TRANSFERENCIA: lente ? lente.disponivelTransferir : "" } : {}),
       };
     });
+    // Filtros ativos (para a aba Resumo).
+    const filtrosAtivos: string[] = [];
+    if (searchDebounced) filtrosAtivos.push(`busca "${searchDebounced}"`);
+    if (selectedGrupos.length) filtrosAtivos.push(`grupo: ${selectedGrupos.join(", ")}`);
+    if (selectedSubgrupos.length) filtrosAtivos.push(`subgrupo: ${selectedSubgrupos.join(", ")}`);
+    if (selectedGrades.length) filtrosAtivos.push(`grade: ${selectedGrades.join(", ")}`);
+    if (selectedColecoes.length) filtrosAtivos.push(`coleção: ${selectedColecoes.join(", ")}`);
+    if (selectedItemKeys.size > 0) filtrosAtivos.push(`${selectedItemKeys.size} item(ns) selecionado(s)`);
+
+    const resumo: ProdutoGiroResumoRow[] = [
+      ["Empresa", companyKey.toUpperCase()],
+      ["Escopo (filial)", data?.displayName ?? "Todas as filiais"],
+      ["Período", `${range.startDate.toLocaleDateString("pt-BR")} a ${range.endDate.toLocaleDateString("pt-BR")} (${fmt(daysElapsed)} dias)`],
+      ["Filtros", filtrosAtivos.length ? filtrosAtivos.join(" · ") : "nenhum"],
+      ["Itens (produto × cor)", sortedRows.length],
+      ["Vendas no período (R$)", Math.round(kpis.vendas * 100) / 100],
+      ["Quantidade vendida (un)", kpis.qtde],
+      ["Média diária (un/dia)", Math.round(kpis.mediaDiariaUn * 100) / 100],
+      ["Média diária (R$/dia)", Math.round(kpis.mediaDiariaVal * 100) / 100],
+      ["Estoque na rede (un)", kpis.estoque],
+      ["Projeção (dias até acabar)", kpis.duraDias === null ? "sem giro" : Math.round(kpis.duraDias)],
+      ["Estoque acaba em", kpis.acabaEm ? kpis.acabaEm.toLocaleDateString("pt-BR") : "—"],
+    ];
+
     exportProdutoGiroXlsx(rows, {
       companyKey,
       range: { startDate: range.startDate, endDate: range.endDate },
       filialLabel: data?.displayName ?? null,
+      resumo,
       performance,
       performanceLabel: "Performance semanal",
       filiais: filiaisExport
@@ -945,6 +972,7 @@ export default function ProdutoGiroPage({ companyKey }: ProdutoGiroPageProps) {
       diario: diarioExport
         ? {
             dias: diarioExport.dias,
+            totaisPorDia: diarioExport.totaisPorDia ?? [],
             itens: diarioExport.itens.map((it) => ({
               produto: it.produto,
               descricao: it.descricao || it.produto.trim(),

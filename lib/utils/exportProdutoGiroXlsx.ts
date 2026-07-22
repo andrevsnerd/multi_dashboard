@@ -47,6 +47,8 @@ export interface ProdutoGiroPerfXlsxRow {
 /** Matriz "vendas por dia": cada linha é um item×cor; colunas de dia são dinâmicas (dd/mm). */
 export interface ProdutoGiroDiarioSheet {
   dias: string[]; // ISO yyyy-MM-dd, na ordem das colunas
+  /** Totais agregados por dia (todos os itens) — qtd e R$. */
+  totaisPorDia?: Array<{ dia: string; qtde: number; vendas: number }>;
   itens: Array<{
     produto: string;
     descricao: string;
@@ -59,6 +61,9 @@ export interface ProdutoGiroDiarioSheet {
     porDia: Record<string, number>;
   }>;
 }
+
+/** Uma linha rótulo→valor da aba "Resumo" (KPIs). */
+export type ProdutoGiroResumoRow = [string, string | number];
 
 /** Linha da aba "Vendas por filial". */
 export interface ProdutoGiroFilialXlsxRow {
@@ -88,11 +93,21 @@ export function exportProdutoGiroXlsx(
     performanceLabel?: string;
     diario?: ProdutoGiroDiarioSheet | null;
     filiais?: ProdutoGiroFilialXlsxRow[] | null;
+    resumo?: ProdutoGiroResumoRow[] | null;
   }
 ): void {
   if (rows.length === 0) {
     alert("Não há dados para exportar");
     return;
+  }
+
+  const workbook = XLSX.utils.book_new();
+
+  // Aba 1 (primeira página): Resumo com os principais KPIs.
+  if (options.resumo && options.resumo.length > 0) {
+    const resumoSheet = XLSX.utils.aoa_to_sheet([["INDICADOR", "VALOR"], ...options.resumo]);
+    resumoSheet["!cols"] = [{ wch: 30 }, { wch: 28 }];
+    XLSX.utils.book_append_sheet(workbook, resumoSheet, "Resumo");
   }
 
   const worksheet = XLSX.utils.json_to_sheet(rows);
@@ -118,7 +133,6 @@ export function exportProdutoGiroXlsx(
   if (rows[0]?.TRANSFERENCIA !== undefined) cols.push({ wch: 14 }); // TRANSFERENCIA
   worksheet["!cols"] = cols;
 
-  const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "Produto Giro");
 
   // Segunda aba: performance por período (venda real por semana/mês), quando fornecida.
@@ -146,7 +160,7 @@ export function exportProdutoGiroXlsx(
 
   // Aba extra: matriz de vendas por dia (item×cor nas linhas, um dia por coluna).
   if (options.diario && options.diario.itens.length > 0 && options.diario.dias.length > 0) {
-    const { dias, itens } = options.diario;
+    const { dias, itens, totaisPorDia } = options.diario;
     const aoa: (string | number)[][] = [];
     // Cabeçalho
     aoa.push([
@@ -160,19 +174,15 @@ export function exportProdutoGiroXlsx(
       "TOTAL_VENDAS",
       ...dias.map(diaHeader),
     ]);
-    // Linha de TOTAL GERAL (agregado de todos os itens por dia), logo após o cabeçalho.
-    const totalPorDia = dias.map((d) => itens.reduce((s, it) => s + (it.porDia[d] ?? 0), 0));
-    aoa.push([
-      "TOTAL GERAL",
-      `${itens.length} itens`,
-      "",
-      "",
-      "",
-      "",
-      itens.reduce((s, it) => s + it.totalQtde, 0),
-      itens.reduce((s, it) => s + it.totalVendas, 0),
-      ...totalPorDia,
-    ]);
+    // Totais por dia — preferir os agregados do servidor (qtd + R$); fallback pela soma dos itens.
+    const totByDia = new Map((totaisPorDia ?? []).map((t) => [t.dia, t]));
+    const qtdePorDia = dias.map((d) => totByDia.get(d)?.qtde ?? itens.reduce((s, it) => s + (it.porDia[d] ?? 0), 0));
+    const vendasPorDia = dias.map((d) => Math.round((totByDia.get(d)?.vendas ?? 0) * 100) / 100);
+    const grandQtde = itens.reduce((s, it) => s + it.totalQtde, 0);
+    const grandVendas = Math.round(itens.reduce((s, it) => s + it.totalVendas, 0) * 100) / 100;
+    // Linha 1: TOTAL de QUANTIDADE por dia. Linha 2: TOTAL de VENDAS (R$) por dia.
+    aoa.push(["TOTAL QTDE / dia", `${itens.length} itens`, "", "", "", "", grandQtde, "", ...qtdePorDia]);
+    aoa.push(["TOTAL VENDAS (R$) / dia", "", "", "", "", "", "", grandVendas, ...vendasPorDia]);
     for (const it of itens) {
       aoa.push([
         it.produto.trim(),

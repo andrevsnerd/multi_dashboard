@@ -3695,13 +3695,13 @@
     "semantic_hash": ""
   },
   "components/stock/ProdutoGiroPage.tsx": {
-    "mtime": 1784746900.844029,
-    "ast_hash": "454f901249fe4f0199cb4a578df47aa2",
+    "mtime": 1784747661.3810673,
+    "ast_hash": "f4032bb9412b70194e3c60c4489b00c1",
     "semantic_hash": ""
   },
   "lib/utils/exportProdutoGiroXlsx.ts": {
-    "mtime": 1784743854.9363377,
-    "ast_hash": "536edf3ce0e7cc1129f5b9e2da3e1f78",
+    "mtime": 1784747612.7166445,
+    "ast_hash": "dc66ccf56cf0bccdc5ed6cc308c47e74",
     "semantic_hash": ""
   },
   "app/api/produto-giro/performance/route.ts": {
@@ -3730,8 +3730,8 @@
     "semantic_hash": ""
   },
   "app/api/produto-giro/diario/route.ts": {
-    "mtime": 1784746894.6070268,
-    "ast_hash": "09394b6e6ef37c63f4ec69d9f0576751",
+    "mtime": 1784747529.4558425,
+    "ast_hash": "68f6197dcf29161da252a21efeb0603f",
     "semantic_hash": ""
   },
   "app/api/produto-giro/filiais/route.ts": {

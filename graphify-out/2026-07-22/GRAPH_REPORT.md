@@ -1,16 +1,16 @@
 # Graph Report - multi_dashboard  (2026-07-22)
 
 ## Corpus Check
-- 743 files · ~823,908 words
+- 744 files · ~824,194 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 5915 nodes · 14845 edges · 448 communities (275 shown, 173 thin omitted)
+- 5919 nodes · 14848 edges · 467 communities (294 shown, 173 thin omitted)
 - Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 300 edges (avg confidence: 0.74)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `2866dcc5`
+- Built from commit: `21aa7bf5`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -294,6 +294,7 @@
 - notificacoes-leitura-store.ts
 - relatorios.ts
 - exportCompraSugeridaAbcXlsx.ts
+- exportCompraSugeridaAbcXlsx.ts
 - RealizadasPanel.tsx
 - MultiSelectFilter.tsx
 - GoalsModal.tsx
@@ -441,8 +442,26 @@
 - vm-setup/install.sh
 - PM2 process manager
 - proxy-server (pm2 managed process)
+- isCompraTransitoDateActive
+- route.ts
+- giroCache.ts
+- route.ts
+- route.ts
+- page.tsx
+- page.tsx
 - page.tsx
 - inventory.ts
+- page.tsx
+- page.tsx
+- page.tsx
+- page.tsx
+- page.tsx
+- page.tsx
+- page.tsx
+- page.tsx
+- page.tsx
+- diag-giro-reconcile.mjs
+- fix-tipos-romaneio-acento.mjs
 
 ## God Nodes (most connected - your core abstractions)
 1. `resolveCompany()` - 273 edges
@@ -460,13 +479,13 @@
 - `Projeção de Produtos Março/2026 (por produto)` --semantically_similar_to--> `Projeção de Produtos Março/2026 (por produto e cor)`  [INFERRED] [semantically similar]
   projecao_produtos_2026-03-10.txt → projecao_produtos_2026-03-11.txt
 - `generateMetadata()` --calls--> `resolveCompany()`  [EXTRACTED]
+  app/(companies)/[company]/blackfriday/page.tsx → lib/config/company.ts
+- `BlackFridayPageRoute()` --calls--> `resolveCompany()`  [EXTRACTED]
+  app/(companies)/[company]/blackfriday/page.tsx → lib/config/company.ts
+- `generateMetadata()` --calls--> `resolveCompany()`  [EXTRACTED]
   app/(companies)/[company]/clientes/detalhe/page.tsx → lib/config/company.ts
 - `generateMetadata()` --calls--> `resolveCompany()`  [EXTRACTED]
   app/(companies)/[company]/clientes/page.tsx → lib/config/company.ts
-- `ClientesPageRoute()` --calls--> `resolveCompany()`  [EXTRACTED]
-  app/(companies)/[company]/clientes/page.tsx → lib/config/company.ts
-- `ControleGiroPageRoute()` --calls--> `resolveCompany()`  [EXTRACTED]
-  app/(companies)/[company]/controle-giro/page.tsx → lib/config/company.ts
 
 ## Import Cycles
 - 3-file cycle: `lib/config/company.ts -> lib/config/filial-config-builder.ts -> lib/config/filial-registry.ts -> lib/config/company.ts`
@@ -474,55 +493,55 @@
 ## Hyperedges (group relationships)
 - **Narrativa diagnóstica do relatório Poliéster** — tmp_scarfme_poliester_pages_curva_abc, tmp_scarfme_poliester_pages_ruptura_estoque, tmp_scarfme_poliester_pages_gargalos_reposicao, tmp_scarfme_poliester_pages_drift_curva [EXTRACTED 0.85]
 
-## Communities (448 total, 173 thin omitted)
+## Communities (467 total, 173 thin omitted)
 
 ### Community 0 - "Dashboard Page Routes"
-Cohesion: 0.13
-Nodes (24): chartDisp(), ColecaoConfig, ColecaoPanelItem, ColecaoPanelMonthPoint, COLECOES, fetchEcommerceVendasPorColecao(), fetchMonthsByGroup(), fetchSkusCadastradosPorCodigo() (+16 more)
+Cohesion: 0.09
+Nodes (34): GET(), normalizeFilialKey(), resolveCanonicalFilial(), chartDisp(), ColecaoConfig, ColecaoPanelItem, ColecaoPanelMonthPoint, COLECOES (+26 more)
 
 ### Community 1 - "Lista Loja Page & Estoque/Curva Utilities"
 Cohesion: 0.04
-Nodes (98): aggregateEstoqueRowsByDisplayLabel(), aggregateVendasRowsByDisplayLabel(), appendUserToListName(), BarcodeLookupRow, buildCompraIdealPorFilialRows(), buildDefaultListName(), buildEstoqueTooltipRows(), buildEstoqueTooltipText() (+90 more)
+Nodes (109): aggregateEstoqueRowsByDisplayLabel(), aggregateVendasRowsByDisplayLabel(), appendUserToListName(), BarcodeLookupRow, buildCompraIdealPorFilialRows(), buildDefaultListName(), buildEstoqueTooltipRows(), buildEstoqueTooltipText() (+101 more)
 
 ### Community 2 - "Estoque Control API & Filters"
-Cohesion: 0.09
-Nodes (71): GET(), POST(), GET(), GET(), GET(), GET(), GET(), buildCategoriaExcludeNerd() (+63 more)
+Cohesion: 0.10
+Nodes (72): GET(), POST(), GET(), GET(), GET(), GET(), GET(), buildCategoriaExcludeNerd() (+64 more)
 
 ### Community 3 - "Revenue Dashboard Routes & Components"
-Cohesion: 0.12
-Nodes (33): GET(), GET(), GET(), GET(), GET(), GET(), RequestLike, ControleEstoqueParams (+25 more)
+Cohesion: 0.08
+Nodes (44): GET(), GET(), GET(), GET(), GET(), GET(), GET(), GET() (+36 more)
 
 ### Community 4 - "Curva ABC Page & Purchase Suggestions"
 Cohesion: 0.05
-Nodes (74): buildCompraIdealPorFilialRowsCurvaAbc(), buildCurvaAbcMetricKey(), buildListaLojaHref(), buildPerFilialCompraSummary(), buildProductDetalhadoHref(), buildProductPerformanceHref(), calcQtdSugestaoEInfo(), calcQtdSugestaoS() (+66 more)
+Nodes (74): buildCompraIdealFromMetricRow(), buildCompraIdealPorFilialRowsCurvaAbc(), buildCurvaAbcMetricKey(), buildListaLojaHref(), buildPerFilialCompraSummary(), buildProductDetalhadoHref(), buildProductPerformanceHref(), calcQtdSugestaoEInfo() (+66 more)
 
 ### Community 5 - "Corporate Client Registration"
 Cohesion: 0.14
 Nodes (24): calcularCurvas(), CurvaRankedRow, normalizeFilialKey(), parseYmd(), POST(), RequestBody, resolveCanonicalFilial(), BarcodeLookupRow (+16 more)
 
 ### Community 6 - "Clientes API Routes"
-Cohesion: 0.02
-Nodes (134): AjusteEstoquePageProps, AjusteEstoquePageRoute(), generateMetadata(), AumentosDescontosPageProps, AumentosDescontosRoute(), generateMetadata(), BlackFridayPageProps, BlackFridayPageRoute() (+126 more)
+Cohesion: 0.04
+Nodes (54): GET(), GET(), AjusteEstoquePageProps, AjusteEstoquePageRoute(), generateMetadata(), AumentosDescontosPageProps, AumentosDescontosRoute(), generateMetadata() (+46 more)
 
 ### Community 7 - "Projeção de Estoque & Compra em Trânsito"
-Cohesion: 0.11
-Nodes (24): aggregateLogicalStock(), ControleTransferenciasFilialApi, ControleTransferenciasPermissao, ControleTransferenciasTable(), ControleTransferenciasTableProps, curvaLabelCurto(), fmtDiasPt(), fmtUnPt() (+16 more)
+Cohesion: 0.10
+Nodes (27): aggregateLogicalStock(), ControleTransferenciasFilialApi, ControleTransferenciasTable(), ControleTransferenciasTableProps, curvaLabelCurto(), fmtDiasPt(), fmtUnPt(), getFilialData() (+19 more)
 
 ### Community 8 - "Controle Estoque Métricas Cache"
 Cohesion: 0.06
-Nodes (59): GET(), POST(), GET(), GET(), buildCompraIdealFromMetricRow(), buildItemCacheKey(), buildScopeKey(), CacheEntry (+51 more)
+Nodes (60): GET(), POST(), GET(), buildItemCacheKey(), buildScopeKey(), CacheEntry, clientCache, flushPendingBatch() (+52 more)
 
 ### Community 9 - "Corporativo Products & Orders"
 Cohesion: 0.08
-Nodes (49): canManage(), DELETE(), GET(), POST(), DELETE(), GET(), isAdmin(), POST() (+41 more)
+Nodes (51): canManage(), DELETE(), GET(), POST(), DELETE(), GET(), isAdmin(), POST() (+43 more)
 
 ### Community 10 - "Compra Ideal Purchase Suggestion"
 Cohesion: 0.05
-Nodes (71): itemTemCompraAgora(), RupturaItem, CompraIdealCell(), CompraIdealCellProps, fmt(), MESES_PT, shortDate(), buildPerguntas() (+63 more)
+Nodes (70): buildListaLojaExportRow(), calcQtdSugeridaParaFilial(), itemTemCompraAgora(), RupturaItem, CompraIdealCell(), CompraIdealCellProps, fmt(), MESES_PT (+62 more)
 
 ### Community 11 - "Claude Report Generation"
 Cohesion: 0.07
-Nodes (56): POST(), RequestBody, AbcItem, addArrayFilter(), BranchProfileRow, BranchRankingRow, buildAuditSlides(), buildCollectionLabelMap() (+48 more)
+Nodes (55): POST(), RequestBody, AbcItem, addArrayFilter(), BranchProfileRow, BranchRankingRow, buildAuditSlides(), buildCollectionLabelMap() (+47 more)
 
 ### Community 12 - "Purchase Suggestion Calculation Logic"
 Cohesion: 0.10
@@ -530,7 +549,7 @@ Nodes (45): getSuggestionViewFromListaCompraRule(), getSuggestedQtyListaLojaRule
 
 ### Community 13 - "Report Registry & Presets"
 Cohesion: 0.09
-Nodes (42): buildClientesFilialPresets(), CLIENTES_FILIAL_COLUMNS, CLIENTES_FILIAL_PRESETS, clientesFilialMeta, col(), companyLeadingColumns(), buildCompraSugeridaAbcPresets(), col() (+34 more)
+Nodes (47): buildClientesFilialPresets(), CLIENTES_FILIAL_COLUMNS, CLIENTES_FILIAL_PRESETS, clientesFilialMeta, col(), ALL_DEFS, columnSource, getEditorExtraColumns() (+39 more)
 
 ### Community 14 - "App Shell: Auth, Layout & Admin Pages"
 Cohesion: 0.10
@@ -538,7 +557,7 @@ Nodes (39): baseParams(), buildDiferencaSheets(), buildProdutosSheets(), buildRe
 
 ### Community 15 - "Curva por Produto Page & Export"
 Cohesion: 0.08
-Nodes (39): calcDuracaoDias(), CurvaAbcResponse, diarioHeatClass(), DiarioItem, DiarioResponse, duraClass(), EstoqueFilialEntry, FiliaisResponse (+31 more)
+Nodes (37): calcDuracaoDias(), CurvaAbcResponse, diarioHeatClass(), DiarioItem, DiarioResponse, duraClass(), EstoqueFilialEntry, FiliaisResponse (+29 more)
 
 ### Community 16 - "E-commerce Report Export Script"
 Cohesion: 0.09
@@ -549,84 +568,84 @@ Cohesion: 0.07
 Nodes (48): buscar_empresa_filial(), buscar_estoque_produto(), buscar_info_produto(), buscar_produto_por_codigo_barras(), buscar_responsaveis_disponiveis(), buscar_tipos_romaneio_disponiveis(), buscar_todas_filiais(), conectar_banco() (+40 more)
 
 ### Community 18 - "Admin User Management API"
-Cohesion: 0.09
-Nodes (36): canAccessExtrato(), GET(), ProdutoAtivoItem, ProdutosAtivosResponse, sqlText(), trimValue(), canAccessExtrato(), corEqualsSql() (+28 more)
+Cohesion: 0.24
+Nodes (16): canAccessExtrato(), corEqualsSql(), ExtratoLinha, ExtratoResponse, fetchCoresDisponiveis(), fetchFiliaisDisponiveis(), GET(), ProdutoCorOption (+8 more)
 
 ### Community 19 - "Nova Filial Stock Comparison Page"
-Cohesion: 0.15
-Nodes (21): formatUtcDate(), GET(), getDefaultRange(), getMonthSpan(), getRequiredMonthlyUnits(), mergeModelRows(), mergeStockRows(), ModelAggRow (+13 more)
+Cohesion: 0.09
+Nodes (42): formatUtcDate(), GET(), getDefaultRange(), getMonthSpan(), getRequiredMonthlyUnits(), mergeModelRows(), mergeStockRows(), ModelAggRow (+34 more)
 
 ### Community 20 - "Product Detail & Stock Fetching"
-Cohesion: 0.07
-Nodes (67): GET(), GET(), GET(), GET(), POST(), RequestBody, GET(), ProductDetailKPIsProps (+59 more)
+Cohesion: 0.06
+Nodes (75): GET(), GET(), GET(), GET(), POST(), RequestBody, GET(), formatCurrency() (+67 more)
 
 ### Community 21 - "Products Listing Pages"
 Cohesion: 0.14
 Nodes (26): acumularEntry(), applyClusterCoverageBias(), buildTransferLensIndex(), calcDemandaPonderada(), calcDiaria(), calcDiasAlvo(), calcDiasCobertura(), calculateTransfers() (+18 more)
 
 ### Community 22 - "Faturamento & Notas Fiscais"
-Cohesion: 0.10
-Nodes (36): GET(), boolParam(), GET(), parseFiltro(), Aba, brl(), buildParams(), dia() (+28 more)
+Cohesion: 0.16
+Nodes (25): GET(), boolParam(), GET(), parseFiltro(), empresaFiscalSchema, filtroFrom(), listaOpc(), listaOuNull() (+17 more)
 
 ### Community 23 - "Estoque Detalhado Pages"
-Cohesion: 0.06
-Nodes (41): fetchDetalhes(), formatCurrency(), formatNumber(), MovimentoDetalhesModal(), MovimentoDetalhesModalProps, ProdutoDetalhe, formatCurrency(), formatInteger() (+33 more)
+Cohesion: 0.09
+Nodes (22): EstoqueDetalhado01Page(), EstoqueDetalhado01PageProps, formatCurrency(), formatNumber(), ProdutoDetalhesCompleto, ProdutoDetalhesResumo, ProdutoVariacaoDetalhes, EstoqueDetalhado01ProdutoPage() (+14 more)
 
 ### Community 24 - "Admin Users & Permissions"
-Cohesion: 0.23
-Nodes (14): computeWeightedAverage(), formatGroupedMemberColors(), formatGroupedMemberShortName(), getGroupedProductColorLabel(), getGroupedProductMembers(), getProductAttributes(), getSortableValue(), GroupedProductMemberDisplay (+6 more)
+Cohesion: 0.25
+Nodes (13): computeWeightedAverage(), formatGroupedMemberColors(), formatGroupedMemberShortName(), getGroupedProductColorLabel(), getGroupedProductMembers(), getProductAttributes(), getSortableValue(), GroupedProductMemberDisplay (+5 more)
 
 ### Community 25 - "Filial Registry & Resolver"
-Cohesion: 0.14
-Nodes (16): GET(), choosePreferredBarcode(), compareBarcodePreference(), GET(), normalizeBarcode(), baseConfig, DB_SERVERS, getErrorCodes() (+8 more)
+Cohesion: 0.33
+Nodes (5): GET(), fetchFiliaisDetalhadas(), isoDate(), num(), Row
 
 ### Community 26 - "Saidas/Entradas Products Page"
-Cohesion: 0.10
-Nodes (30): buscarProdutoPorCodigoBarras(), DEFEITO_FILIAL_SAIDA, executarOperacaoLote(), fetchFiliais(), fetchLogDetalhes(), fetchLogEntradas(), fetchLogSaidas(), Filial (+22 more)
+Cohesion: 0.09
+Nodes (31): buscarProdutoPorCodigoBarras(), DEFEITO_FILIAL_SAIDA, executarOperacaoLote(), fetchFiliais(), fetchLogDetalhes(), fetchLogEntradas(), fetchLogSaidas(), Filial (+23 more)
 
 ### Community 27 - "Compra Salva Detail & Destination Matching"
-Cohesion: 0.07
-Nodes (57): fetchVendasItemMetricas(), getNecessidadeMinimaQty(), BarcodeLookupRow, buildItemKey(), buildSuggestionRuleInput(), buscarPorCodigoBarras(), calcularSugestaoCompleto(), calcularSugestaoCompletoComTransito() (+49 more)
+Cohesion: 0.09
+Nodes (45): BarcodeLookupRow, buildItemKey(), buildSuggestionRuleInput(), buscarPorCodigoBarras(), calcularSugestaoCompleto(), calcularSugestaoCompletoComTransito(), CompraSalvaDetalhePage(), DESTINO_FILIAL_BADGE_THEMES (+37 more)
 
 ### Community 28 - "Lista de Compra Sugerida Page"
 Cohesion: 0.07
-Nodes (51): applyTransitToListaCompraSuggestion(), buildSuggestionKey(), calcQtdSugestaoEInfoFromListaCompraRule(), calcQtdSugestaoSFromListaCompraRule(), calcularCurvas(), Curva, CURVA_BADGE_CLASS, CURVA_BAR_CLASS (+43 more)
+Nodes (52): getNecessidadeMinimaQty(), applyTransitToListaCompraSuggestion(), buildSuggestionKey(), calcQtdSugestaoEInfoFromListaCompraRule(), calcQtdSugestaoSFromListaCompraRule(), calcularCurvas(), Curva, CURVA_BADGE_CLASS (+44 more)
 
 ### Community 29 - "Extrato de Produto Feature"
 Cohesion: 0.10
 Nodes (32): buildCurveBadgeLabel(), buildProductDetalhadoHref(), buildProductInfoLine(), calcQtdSugestaoEInfo(), calcQtdSugestaoS(), ComparisonMode, CurvaPorProdutoPage(), DisplayRow (+24 more)
 
 ### Community 30 - "Performance Control & Curva Categories"
-Cohesion: 0.19
-Nodes (22): enrichCadastro(), enrichEstoque(), enrichParados(), enrichVendas(), round2(), roundInt(), runEnricher(), canonicalCor() (+14 more)
+Cohesion: 0.10
+Nodes (42): GET(), VALID_SOURCES, SourceId, enrichCadastro(), enrichEstoque(), enrichParados(), EnrichResult, enrichVendas() (+34 more)
 
 ### Community 31 - "Transferências & Vendedores API Routes"
-Cohesion: 0.16
-Nodes (22): ApiData, CategoryRow, fmtBRL(), fmtDeltaPct(), fmtInt(), fmtPct(), fmtQty(), fmtSignedInt() (+14 more)
+Cohesion: 0.15
+Nodes (12): ListaLojaPageProps, Props, Props, Props, EMPTY_FORM, ProductSearchResult, ProdutoAgrupadoPageProps, ProductSearchResult (+4 more)
 
 ### Community 32 - "Dashboard Pages & Filters"
-Cohesion: 0.12
-Nodes (17): ClienteDetalhePageRoute(), generateMetadata(), Props, ClientesPageProps, ClientesPageRoute(), generateMetadata(), ClienteDetalhePage(), ClienteDetalhePageProps (+9 more)
+Cohesion: 0.24
+Nodes (8): ClientesPage(), ClientesPageProps, ClientesTableProps, ClienteCompraDetalheItem, ClienteDetalheInfo, ClienteRankingItem, exportClientesToExcel(), formatDateRange()
 
 ### Community 33 - "Report Generator Export/Formatting"
-Cohesion: 0.09
-Nodes (48): buildWorkingColumns(), colTypeOf(), formatCell(), formatKpi(), GeradorRelatoriosPage(), isNumericType(), SortDir, WorkingColumn (+40 more)
+Cohesion: 0.12
+Nodes (34): buildWorkingColumns(), colTypeOf(), formatCell(), formatKpi(), GeradorRelatoriosPage(), GeradorRelatoriosPageProps, isNumericType(), SortDir (+26 more)
 
 ### Community 34 - "MCP Tools Registry Setup"
-Cohesion: 0.18
-Nodes (28): registerAllTools(), dataSchema, empresaSchema, listaOpcional(), listaOuNull(), texto(), registerComprasTools(), STATUS_LABEL (+20 more)
+Cohesion: 0.19
+Nodes (26): registerAllTools(), dataSchema, empresaSchema, listaOpcional(), listaOuNull(), texto(), registerComprasTools(), STATUS_LABEL (+18 more)
 
 ### Community 35 - "Claude Sales Report Page"
 Cohesion: 0.09
-Nodes (20): AbcItem, BranchProfileRow, BranchRankingRow, ChannelMixSummary, ClaudeReportPage(), ClaudeReportPageProps, ClaudeReportPayload, ClosingSummary (+12 more)
+Nodes (34): AbcItem, BarList(), BranchProfileRow, BranchRankingRow, ChannelMixSummary, ClaudeReportPage(), ClaudeReportPageProps, ClaudeReportPayload (+26 more)
 
 ### Community 36 - "Project Dependencies (package.json)"
 Cohesion: 0.09
 Nodes (22): dependencies, date-fns, exceljs, html2canvas, jspdf-autotable, mcp-handler, @modelcontextprotocol/sdk, mssql (+14 more)
 
 ### Community 37 - "MCP Product Filter Tools"
-Cohesion: 0.11
-Nodes (39): GET(), GET(), GET(), GET(), GET(), GET(), registerCategoriasTools(), buildFilialFilter() (+31 more)
+Cohesion: 0.12
+Nodes (37): GET(), GET(), GET(), GET(), GET(), GET(), registerCategoriasTools(), fetchMultipleProductsStock() (+29 more)
 
 ### Community 38 - "Compras Salvas (Saved Purchases)"
 Cohesion: 0.15
@@ -637,12 +656,12 @@ Cohesion: 0.12
 Nodes (30): DELETE(), PUT(), GET(), POST(), slugify(), EMPTY_FORM, Props, SearchResult (+22 more)
 
 ### Community 40 - "Collection Sales Report"
-Cohesion: 0.15
-Nodes (29): ColecaoDetalheCanal, ColecaoDetalheDestaque, GET(), isEcommerceFilial(), buildEcommerceCollectionFilter(), buildEcommerceFilialFilter(), buildSalesFilialFilter(), CollectionComparativeExtras (+21 more)
+Cohesion: 0.11
+Nodes (36): ColecaoDetalheCanal, ColecaoDetalheDestaque, GET(), isEcommerceFilial(), buildEcommerceCollectionFilter(), buildEcommerceFilialFilter(), buildSalesFilialFilter(), CollectionComparativeExtras (+28 more)
 
 ### Community 41 - "Product Performance & Coverage"
-Cohesion: 0.17
-Nodes (16): AumentosDescontosPage(), AumentosDescontosPageProps, BRL(), Column, DetResult, INT(), OptKind, PCT() (+8 more)
+Cohesion: 0.09
+Nodes (33): AggResult, AumentosDescontosPage(), AumentosDescontosPageProps, BRL(), Column, DetResult, INT(), OptKind (+25 more)
 
 ### Community 42 - "Stock Entries Investigation Scripts"
 Cohesion: 0.09
@@ -653,8 +672,8 @@ Cohesion: 0.11
 Nodes (32): buscar_custos_produto(), buscar_info_produto(), buscar_tabelas_disponiveis_produtos(), buscar_valores_tabela_produtos(), conectar_banco(), descobrir_tabela_precos(), executar_update(), executar_update_massa() (+24 more)
 
 ### Community 44 - "Filial Stock Fetching APIs"
-Cohesion: 0.12
-Nodes (20): CarrinhoPage(), CartContext, CartContextValue, CartItem, CartProvider(), formatBRL(), keyOf(), useCart() (+12 more)
+Cohesion: 0.10
+Nodes (22): CarrinhoPage(), CartContext, CartContextValue, CartItem, CartProvider(), formatBRL(), keyOf(), useCart() (+14 more)
 
 ### Community 45 - "Notifications & Confirmation Lock"
 Cohesion: 0.28
@@ -665,20 +684,20 @@ Cohesion: 0.12
 Nodes (29): GET(), GET(), POST(), GET(), GET(), buildInsertBatch(), buscarClientePorDocumento(), criarClienteCorporativo() (+21 more)
 
 ### Community 47 - "Ajuste de Estoque por Contagem"
-Cohesion: 0.14
-Nodes (21): GET(), POST(), PreviewRequest, GET(), AjusteDetalheItem, AjusteRecente, calcularDiferencas(), ContagemItem (+13 more)
+Cohesion: 0.12
+Nodes (26): GET(), POST(), PreviewRequest, GET(), adivinharEmpresaPorNome(), AjusteDetalheItem, AjusteRecente, calcularDiferencas() (+18 more)
 
 ### Community 48 - "Grouped Product Management"
-Cohesion: 0.15
-Nodes (26): DELETE(), GET(), getCompany(), POST(), EMPTY_FORM, ProductSearchResult, ProdutoAgrupadoPageProps, FilialProdutoSalesRow (+18 more)
+Cohesion: 0.24
+Nodes (19): DELETE(), GET(), getCompany(), POST(), assertGroupConflicts(), deleteProdutoAgrupadoGroup(), ensureDataDir(), ensureTable() (+11 more)
 
 ### Community 49 - "Sales & Entries Filter Builders"
-Cohesion: 0.08
-Nodes (44): GET(), GET(), GET(), getFilialGroupMembers(), buildEcomVendasFilter(), buildEntradaFilialFilter(), buildScarfmeEcommerceFaturamentoFilialFilter(), normalizeFilialListForMatch() (+36 more)
+Cohesion: 0.09
+Nodes (40): GET(), GET(), getFilialGroupMembers(), buildEcomVendasFilter(), buildEntradaFilialFilter(), buildScarfmeEcommerceFaturamentoFilialFilter(), normalizeFilialListForMatch(), restrictFiliaisToAllowed() (+32 more)
 
 ### Community 50 - "Transfer Calculation & Allocation"
-Cohesion: 0.11
-Nodes (26): buildUrl(), Modo, PreviewItem, PreviewResponse, RomaneioDeleteModal(), RomaneioDeleteModalProps, Tipo, cleanDestinoValue() (+18 more)
+Cohesion: 0.17
+Nodes (19): cleanDestinoValue(), DEFEITO_FILIAL_DESTINO, editarQtdRomaneio(), executarEntradaEstoqueLote(), fetchConfirmados(), fetchDestinoRomaneio(), fetchDetalhes(), fetchFiliais() (+11 more)
 
 ### Community 51 - "Product Projection Export Script"
 Cohesion: 0.12
@@ -689,88 +708,88 @@ Cohesion: 0.10
 Nodes (29): conectar_banco(), investigar_campos_obrigatorios(), investigar_campos_transferencia(), investigar_estrutura_tabela_entrada(), investigar_estrutura_tabela_entrada_item(), investigar_estrutura_tabela_saida(), investigar_estrutura_tabela_saida_item(), investigar_exemplos_transferencias() (+21 more)
 
 ### Community 53 - "Transfer Permissions & Log"
-Cohesion: 0.16
-Nodes (23): DELETE(), GET(), isAdmin(), POST(), GET(), GET(), buildSearchConfig(), fetchLogTransito() (+15 more)
+Cohesion: 0.14
+Nodes (25): DELETE(), GET(), isAdmin(), POST(), isAdmin(), POST(), GET(), GET() (+17 more)
 
 ### Community 54 - "Transferência Pendente Storage"
 Cohesion: 0.11
 Nodes (28): formatLongDate(), formatShortDate(), isSameSelection(), lastNDaysRange(), nf0, nf2, periodLabel(), ProductPerformancePage() (+20 more)
 
 ### Community 55 - "Loja Corporativa E-commerce"
-Cohesion: 0.19
-Nodes (13): registerProdutoTools(), resolveCores(), buscaSchema, DEFEITO_FILIAL_DESTINO, diasSchema, filiaisDaEmpresa(), filiaisSchema, limiteSchema (+5 more)
+Cohesion: 0.15
+Nodes (18): resolveCompanyDynamic(), EMPRESAS, empresaSchema, registerDiscoveryTools(), texto(), registerProdutoTools(), resolveCores(), buscaSchema (+10 more)
 
 ### Community 56 - "Entries/Sales/Stock Report Script"
 Cohesion: 0.12
 Nodes (28): carregar_dados_csv(), carregar_entradas_csv(), conectar_banco(), _configurar_log(), estoque_atual_por_produto_cor(), fetch_entradas_banco(), _filiais_por_empresa(), _log() (+20 more)
 
 ### Community 57 - "Data Pipeline & Transformation"
-Cohesion: 0.13
-Nodes (34): GET(), estoqueSeries, INVENTORY_COLUMNS_TO_DROP, PRODUCT_COLUMNS_TO_DROP, SALES_COLUMNS_TO_DROP, query(), fetchEntries(), fetchAllRaw() (+26 more)
+Cohesion: 0.17
+Nodes (23): GET(), estoqueSeries, INVENTORY_COLUMNS_TO_DROP, PRODUCT_COLUMNS_TO_DROP, SALES_COLUMNS_TO_DROP, AnyRecord, buildProductsMap(), processAllData() (+15 more)
 
 ### Community 58 - "Product Detail KPIs & Page"
 Cohesion: 0.19
-Nodes (19): GET(), AumentosDescontosDetalheResult, AumentosDescontosFilters, AumentosDescontosPorTicketResult, AumentosDescontosResult, fetchAumentosDescontos(), fetchAumentosDescontosDetalhe(), fetchAumentosDescontosPorTicket() (+11 more)
+Nodes (20): GET(), AumentosDescontosDetalheResult, AumentosDescontosFilters, AumentosDescontosPorTicketResult, AumentosDescontosResult, fetchAumentosDescontos(), fetchAumentosDescontosDetalhe(), fetchAumentosDescontosPorTicket() (+12 more)
 
 ### Community 59 - "Romaneio Detail & Deletion"
-Cohesion: 0.09
-Nodes (37): NotificacoesPage(), NotificationBell(), subtituloNotificacao(), tituloNotificacao(), NotificationGate(), COMPANIES, getCompanyFromPath(), isRomaneiosPath() (+29 more)
+Cohesion: 0.12
+Nodes (27): NotificacoesPage(), NotificationBell(), subtituloNotificacao(), tituloNotificacao(), NotificationGate(), COMPANIES, getCompanyFromPath(), isRomaneiosPath() (+19 more)
 
 ### Community 60 - "Saidas Investigation Scripts"
 Cohesion: 0.11
 Nodes (27): buscar_estoque_atual(), buscar_saidas_estoque_prod_sai(), buscar_tabelas_saidas(), buscar_transferencias(), buscar_trocas_devolucoes(), buscar_ultima_saida_por_filial(), buscar_vendas_ecommerce(), buscar_vendas_loja() (+19 more)
 
 ### Community 61 - "Report Generator Modules"
-Cohesion: 0.08
-Nodes (41): AdminPage(), buildGroupedPermissions(), ClienteBusca, Filial, _filialLabelOverrides, filialOptionLabel(), getFilialLabel(), PERMISSION_GROUPS (+33 more)
+Cohesion: 0.07
+Nodes (49): AdminPage(), buildGroupedPermissions(), ClienteBusca, Filial, _filialLabelOverrides, filialOptionLabel(), getFilialLabel(), PERMISSION_GROUPS (+41 more)
 
 ### Community 62 - "Curva Por Produto Picker"
-Cohesion: 0.17
-Nodes (18): buildDerivedFilialConfig(), DerivedFilialConfig, NameOf, staticNameOf(), BY_ID, BY_NORM_ID, COMPANY_LEAD_TIME_DEFAULT, ESTOQUE_FILIAL_ORDER (+10 more)
+Cohesion: 0.15
+Nodes (21): GET(), buildDerivedFilialConfig(), DerivedFilialConfig, NameOf, staticNameOf(), BY_ID, BY_NORM_ID, COMPANY_LEAD_TIME_DEFAULT (+13 more)
 
 ### Community 63 - "Report Presets Management"
-Cohesion: 0.15
-Nodes (17): POST(), RequestBody, MiniAreaChartProps, CollectionPalette, paletteForIndex(), PALETTES, ComparativoColecaoSlide, buildOneCard() (+9 more)
+Cohesion: 0.23
+Nodes (11): POST(), RequestBody, buildOneCard(), chartDisp(), ComparativoResumidoParams, fetchComparativoResumido(), fetchSkusCadastradosPorCodigo(), mapPool() (+3 more)
 
 ### Community 65 - "Transfer Proxy & Estorno Routes"
-Cohesion: 0.39
-Nodes (10): GET(), POST(), ensureGoalsFile(), getRedis(), getRedisEnv(), GoalData, GOALS_FILE_PATH, readGoals() (+2 more)
+Cohesion: 0.23
+Nodes (17): GET(), normalizeFilialKey(), resolveCanonicalFilial(), GET(), normalizeFilialKey(), resolveCanonicalFilial(), GET(), POST() (+9 more)
 
 ### Community 66 - "Barcode & DB Connection Utilities"
-Cohesion: 0.18
-Nodes (15): GET(), VALID_SOURCES, SourceId, appendCodigoBarra(), CODIGO_BARRA_COL, FETCHERS, getReportFetcher(), ReportFetcher (+7 more)
+Cohesion: 0.04
+Nodes (42): ClientesPageProps, ClientesPageRoute(), generateMetadata(), CompanyPageProps, EstoqueDetalhado01PageRoute(), CompanyPageProps, EstoqueDetalhado01ProdutoPageRoute(), CompanyPageProps (+34 more)
 
 ### Community 67 - "Stock Control Dashboard Page"
-Cohesion: 0.19
-Nodes (14): DELETE(), PATCH(), sanitizeColumns(), GET(), POST(), sanitizeColumns(), ALL_DEFS, columnSource (+6 more)
+Cohesion: 0.11
+Nodes (26): GET(), GET(), GET(), GET(), GET(), defaultRange(), ordenarPorSchema, registerProdutosVendidosTools() (+18 more)
 
 ### Community 68 - "Vendedores Filters & Table"
 Cohesion: 0.16
 Nodes (24): buildEntriesTitle(), calcDaysUntilReceipt(), choosePreferredBarcode(), compareBarcodePreference(), ComprasTransitoPage(), fetchCodigoBarraProduto(), fetchCompra(), fetchCompras() (+16 more)
 
 ### Community 69 - "Compras em Trânsito Page"
-Cohesion: 0.14
-Nodes (9): CategoriaEstoque, ControleEstoquePage(), ControleEstoquePageProps, EstoqueKPI, EvolucaoEstoqueData, formatCurrency(), formatNumber(), PrevisaoEstoque (+1 more)
+Cohesion: 0.08
+Nodes (22): CategoriaEstoque, ControleEstoquePage(), ControleEstoquePageProps, EstoqueKPI, EvolucaoEstoqueData, formatCurrency(), formatNumber(), PrevisaoEstoque (+14 more)
 
 ### Community 70 - "Report Enrichment Pipeline"
-Cohesion: 0.11
-Nodes (19): DailyRevenueChart(), DailyRevenueChartProps, DailyRevenueData, formatCurrency(), formatDate(), GoalCard(), GoalCardProps, fmtBRL() (+11 more)
+Cohesion: 0.10
+Nodes (21): metadata, AuthProvider(), DailyRevenueChart(), DailyRevenueChartProps, DailyRevenueData, formatCurrency(), formatDate(), GoalCard() (+13 more)
 
 ### Community 71 - "Grouped Product Aggregation"
-Cohesion: 0.27
-Nodes (14): GET(), GET(), GET(), hasPostgres(), contadoresPorOrigemDestino(), countByDestino(), ensureTable(), getCooldownKeys() (+6 more)
+Cohesion: 0.14
+Nodes (22): GET(), GET(), parseDias(), POST(), GET(), fetchTransferenciasExternasLinx(), TransferenciaExternaDetectada, coletarEscopoFiliais() (+14 more)
 
 ### Community 72 - "Export Estoque Histórico Script"
 Cohesion: 0.21
 Nodes (23): carregar_entradas_apos_data(), carregar_estoque_atual(), carregar_saidas_apos_data(), carregar_vendas_ecommerce_apos_data(), carregar_vendas_varejo_apos_data(), conectar_banco(), enriquecer_com_codigo_barra(), main() (+15 more)
 
 ### Community 73 - "Romaneio Adjustment & Admin Routes"
-Cohesion: 0.06
-Nodes (59): GET(), GET(), GET(), GET(), GET(), GET(), GET(), GET() (+51 more)
+Cohesion: 0.13
+Nodes (27): GET(), GET(), GET(), GET(), GET(), GET(), POST(), runFetchDetalhes() (+19 more)
 
 ### Community 74 - "Active Filial Detection & Groups"
-Cohesion: 0.22
-Nodes (20): DELETE(), PUT(), GET(), POST(), slugify(), idForFilialRef(), idsForFilialRefs(), invalidateActiveFilialCache() (+12 more)
+Cohesion: 0.29
+Nodes (15): DELETE(), PUT(), invalidateActiveFilialCache(), deleteFilialGrupo(), ensureDataDir(), ensureTable(), FilialGrupo, GRUPOS_FILE (+7 more)
 
 ### Community 75 - "Transfer Item & Destino Store"
 Cohesion: 0.40
@@ -781,16 +800,16 @@ Cohesion: 0.14
 Nodes (14): buscarProdutoPorCodigoBarras(), executarTransferencia(), fetchLogDetalhes(), fetchLogEntradas(), fetchLogSaidas(), Filial, LogDetalheItem, Produto (+6 more)
 
 ### Community 77 - "Sidebar & Layout Navigation"
-Cohesion: 0.21
-Nodes (12): DetalheClienteCorporativoPage(), fmtData(), ClienteCorporativoForm(), ComercialOptions, emptyEndereco, detalheToFormState(), detalheToViewOptions(), INDICADOR_FISCAL_LABELS (+4 more)
+Cohesion: 0.31
+Nodes (8): DetalheClienteCorporativoPage(), fmtData(), ClienteCorporativoForm(), detalheToFormState(), detalheToViewOptions(), isPlaceholderRgIe(), mapEndereco(), ClienteCorporativoDetalhe
 
 ### Community 78 - "Coleções Panel & Export"
-Cohesion: 0.14
-Nodes (20): ColecaoPanelItem, ColecaoPanelMonthPoint, ColecoesPanelPage(), ColecoesPanelPageProps, coverRefFor(), DetalheState, fetchDetalhe(), fetchPanel() (+12 more)
+Cohesion: 0.12
+Nodes (22): ColecaoPanelItem, ColecaoPanelMonthPoint, ColecoesPanelPage(), ColecoesPanelPageProps, coverRefFor(), DetalheState, fetchDetalhe(), fetchPanel() (+14 more)
 
 ### Community 79 - "Stock Projection History Storage"
-Cohesion: 0.38
-Nodes (14): POST(), key(), COLS_REMOVER, converterDatas(), enriquecerComCodigoBarra(), enriquecerComCodigoBarraAtualizado(), processarEcommerce(), processarEntradas() (+6 more)
+Cohesion: 0.39
+Nodes (13): POST(), COLS_REMOVER, converterDatas(), enriquecerComCodigoBarra(), enriquecerComCodigoBarraAtualizado(), processarEcommerce(), processarEntradas(), processarEstoque() (+5 more)
 
 ### Community 80 - "Collection Comparison Presentation"
 Cohesion: 0.15
@@ -809,16 +828,16 @@ Cohesion: 0.12
 Nodes (17): determinarTipoEntrada(), executeTransfer(), getDbNowString(), _idemCache, _idemGet(), _idemSet(), sql, app (+9 more)
 
 ### Community 84 - "Compra em Trânsito Store"
-Cohesion: 0.11
-Nodes (28): isAdmin(), POST(), GET(), isAdmin(), isAdmin(), POST(), GET(), POST() (+20 more)
+Cohesion: 0.23
+Nodes (11): isAdmin(), POST(), GET(), isAdmin(), podeEditarQtdRomaneio(), PUT(), AjusteHistoricoRow, AjusteItem (+3 more)
 
 ### Community 85 - "Coleções Panel & Sales Totals"
 Cohesion: 0.13
 Nodes (28): COMPANIES, GET(), isAdmin(), POST(), buildHref(), GET(), POST(), TRAVA_DATA_INICIO (+20 more)
 
 ### Community 86 - "Produtos Novos Page"
-Cohesion: 0.16
-Nodes (11): CompanyPageProps, ControleMovimentoPageRoute(), FilialFilter(), FilialFilterProps, calculateChangePercentage(), ControleMovimentoKPIs, ControleMovimentoPage(), ControleMovimentoPageProps (+3 more)
+Cohesion: 0.17
+Nodes (14): calculateChangePercentage(), ControleMovimentoKPIs, ControleMovimentoPage(), ControleMovimentoPageProps, formatCurrency(), formatNumber(), fetchDetalhes(), formatCurrency() (+6 more)
 
 ### Community 87 - "App Logic Documentation Runbook"
 Cohesion: 0.10
@@ -833,16 +852,16 @@ Cohesion: 0.19
 Nodes (16): POST(), RequestBody, ColecaoPresentationParams, fetchColecaoPresentation(), fetchNetStock(), fmtCurrency(), fmtDateShort(), fmtInt() (+8 more)
 
 ### Community 90 - "Filial Options & Active Rules"
-Cohesion: 0.25
-Nodes (13): AprovarCadastroPage(), EMPTY_OPTIONS, ClienteCorporativoFormProps, EnderecoFields, FormState, formStateToInput(), initialForm, inputToFormState() (+5 more)
+Cohesion: 0.18
+Nodes (19): AprovarCadastroPage(), EMPTY_OPTIONS, ClienteCorporativoFormProps, ComercialOptions, emptyEndereco, EnderecoFields, FormState, formStateToInput() (+11 more)
 
 ### Community 91 - "Estoque Consulta Item Page"
-Cohesion: 0.17
-Nodes (14): buildItemMeta(), DEFAULT_SORT_STATE, DetalhesPorFilialResponse, EstoqueItemPage(), EstoqueItemPageProps, fetchDetalhesPorFilial(), formatInt(), getHighlightedFiliais() (+6 more)
+Cohesion: 0.13
+Nodes (20): buildItemMeta(), DEFAULT_SORT_STATE, DetalhesPorFilialResponse, EstoqueItemPage(), EstoqueItemPageProps, fetchDetalhesPorFilial(), formatInt(), getHighlightedFiliais() (+12 more)
 
 ### Community 92 - "Clientes Pages & Types"
-Cohesion: 0.24
-Nodes (15): GET(), GET(), buildColecaoFilter(), buildExclusionFilter(), buildFilialFilterEntradas(), buildGradeFilter(), buildGrupoFilter(), buildLinhaFilter() (+7 more)
+Cohesion: 0.18
+Nodes (16): GET(), GET(), ProxyRequest, RequestLike, buildColecaoFilter(), buildExclusionFilter(), buildGradeFilter(), buildGrupoFilter() (+8 more)
 
 ### Community 93 - "Users & Transfer Persistence Docs"
 Cohesion: 0.07
@@ -865,20 +884,20 @@ Cohesion: 0.09
 Nodes (34): BadgeInfo, Bucket, ComparacaoData, ComparacaoProdutoItem, deltaText(), fmtAcabaEm(), fmtCurrency(), fmtNum() (+26 more)
 
 ### Community 98 - "Presentation Deck Components"
-Cohesion: 0.22
-Nodes (12): brl0(), brlCompact(), Card(), ComparativoResumidoDeckProps, Cover(), hex(), intBR(), hex() (+4 more)
+Cohesion: 0.31
+Nodes (8): brl0(), brlCompact(), Card(), ComparativoResumidoDeckProps, Cover(), hex(), intBR(), ComparativoResumidoPayload
 
 ### Community 99 - "Collection Report Page"
-Cohesion: 0.16
-Nodes (16): DistribuicaoMatrizPage(), DistribuicaoMatrizPageProps, EMPTY_RESULT, fetchDistribuicao(), normalize(), STATUS_CLASS, classificarStatus(), DistribuicaoItem (+8 more)
+Cohesion: 0.15
+Nodes (17): DistribuicaoMatrizPage(), DistribuicaoMatrizPageProps, EMPTY_RESULT, fetchDistribuicao(), normalize(), STATUS_CLASS, classificarStatus(), DistribuicaoItem (+9 more)
 
 ### Community 100 - "Compra Ideal UI Cells"
-Cohesion: 0.08
-Nodes (50): GET(), janelaLabel(), linhasEscopo(), melhorMesDosUltimos(), MESES_ABREV, metricFromTotals(), resumoVendedores(), round2() (+42 more)
+Cohesion: 0.09
+Nodes (45): GET(), janelaLabel(), linhasEscopo(), melhorMesDosUltimos(), MESES_ABREV, metricFromTotals(), resumoVendedores(), round2() (+37 more)
 
 ### Community 101 - "Performance Export to Excel"
-Cohesion: 0.16
-Nodes (19): todayYmd(), formatDateForQuery(), autoWidth(), buildProdutoVendedorIndex(), ComparisonMode, ControlePerformanceSummaryResponse, exportControlePerformanceXlsx(), ExportControlePerformanceXlsxOptions (+11 more)
+Cohesion: 0.18
+Nodes (17): formatDateForQuery(), autoWidth(), buildProdutoVendedorIndex(), ComparisonMode, ControlePerformanceSummaryResponse, exportControlePerformanceXlsx(), fetchFilial(), fetchFilialProdutosVendedores() (+9 more)
 
 ### Community 102 - "Transfer Adjustment Script"
 Cohesion: 0.17
@@ -889,12 +908,12 @@ Cohesion: 0.20
 Nodes (16): assinaturaDosItens(), finalizarGrupo(), GET(), getRomaneiosConfirmados(), GrupoPlano, ItemSaida, lerSaidas(), MembroPlano (+8 more)
 
 ### Community 104 - "Barcode & Recebimento Resolution"
-Cohesion: 0.25
-Nodes (13): POST(), formatDefaultTitle(), GET(), POST(), BarcodeItemLike, canonicalCor(), choosePreferredBarcode(), compareBarcodePreference() (+5 more)
+Cohesion: 0.40
+Nodes (8): POST(), BarcodeItemLike, canonicalCor(), choosePreferredBarcode(), compareBarcodePreference(), fillMissingBarcodes(), resolveBarcodesMap(), temBarcode()
 
 ### Community 105 - "Vendedor Detail & Export"
-Cohesion: 0.26
-Nodes (11): fetchClientes(), fetchProdutos(), TabKey, VendedorDetalhePage(), VendedorDetalhePageProps, VendedorClienteItem, VendedorProdutoItem, exportVendedoresToExcel() (+3 more)
+Cohesion: 0.17
+Nodes (14): fetchClientes(), fetchProdutos(), TabKey, VendedorDetalhePage(), VendedorDetalhePageProps, parseDateRangeFromSearchParams(), VendedoresPage(), VendedoresPageProps (+6 more)
 
 ### Community 106 - "Fix Romaneio Records Script"
 Cohesion: 0.18
@@ -905,12 +924,12 @@ Cohesion: 0.12
 Nodes (15): devDependencies, baseline-browser-mapping, eslint, eslint-config-next, @types/node, @types/react, @types/xlsx, name (+7 more)
 
 ### Community 108 - "Saida Group Planning Routes"
-Cohesion: 0.16
-Nodes (25): GET(), normalizeFilialKey(), produtoAggKey(), resolveCanonicalFilial(), GET(), DELETE(), GET(), getCompany() (+17 more)
+Cohesion: 0.21
+Nodes (22): GET(), normalizeFilialKey(), produtoAggKey(), resolveCanonicalFilial(), GET(), DELETE(), GET(), getCompany() (+14 more)
 
 ### Community 109 - "Controle de Movimento Feature"
-Cohesion: 0.05
-Nodes (40): generateMetadata(), StockByFilialPageProps, StockByFilialPageRoute(), generateMetadata(), VendedoresPageProps, VendedoresPageRoute(), DateRangeFilter(), DateRangeFilterProps (+32 more)
+Cohesion: 0.10
+Nodes (20): generateMetadata(), StockByFilialPageProps, StockByFilialPageRoute(), SelectFilterProps, StockByFilialPage(), StockByFilialPageProps, ActionRecommendation, calculateActionRecommendation() (+12 more)
 
 ### Community 110 - "Curva ABC Observations Store"
 Cohesion: 0.26
@@ -922,43 +941,43 @@ Nodes (15): GET(), isDataUrl(), POST(), VALID_KINDS, ensureDataFile(), ensureTab
 
 ### Community 112 - "Redis Transfer Storage"
 Cohesion: 0.12
-Nodes (29): GET(), PUT(), cleanDestino(), GET(), getDestinoSalvo(), matchFilial(), normalizeDigits(), normalizeFilialValue() (+21 more)
+Nodes (33): GET(), PUT(), cleanDestino(), GET(), getDestinoSalvo(), cleanDestino(), GET(), getDestinoSalvo() (+25 more)
 
 ### Community 113 - "Stagnant Products Page & Export"
-Cohesion: 0.19
-Nodes (15): diasColorClass(), diasLabel(), fetchParados(), formatDate(), MIN_DIAS_OPTIONS, ProdutosParadosPage(), ProdutosParadosPageProps, SortDir (+7 more)
+Cohesion: 0.15
+Nodes (18): generateMetadata(), PageProps, ProdutosParadosRoute(), diasColorClass(), diasLabel(), fetchParados(), formatDate(), MIN_DIAS_OPTIONS (+10 more)
 
 ### Community 114 - "Stock By Filial Table & PDF"
-Cohesion: 0.27
-Nodes (19): aggregateFilialProdutoSalesWithGroups(), aggregateProductDetailsWithGroups(), aggregateProdutoEstoquePorFilialWithGroups(), aggregateProdutoQtdePorFilialWithGroups(), buildEstoqueRowKey(), buildGroupAggregationKey(), buildGroupedMembers(), buildGroupedMembersWithSales() (+11 more)
+Cohesion: 0.21
+Nodes (23): FilialProdutoSalesRow, aggregateFilialProdutoSalesWithGroups(), aggregateProductDetailsWithGroups(), aggregateProdutoEstoquePorFilialWithGroups(), aggregateProdutoQtdePorFilialWithGroups(), buildEstoqueRowKey(), buildGroupAggregationKey(), buildGroupedMembers() (+15 more)
 
 ### Community 115 - "Product Extract Investigation Script"
 Cohesion: 0.39
 Nodes (16): conectar(), investigar_coluna_90x90(), investigar_entrada_saida_normal(), investigar_entradas_romaneio(), investigar_estoque_atual(), investigar_filial(), investigar_loja_saida(), investigar_movimentos_estoque() (+8 more)
 
 ### Community 116 - "Saída/Entrada Executor"
-Cohesion: 0.15
-Nodes (24): ControleTransferenciaItemMeta, getActiveFilialForRequest(), isDisplayOnlyFilialInput(), isTransferenciaEntreLojas(), ItemOperacao, normalizeFilialKey(), POST(), SaidaEntradaRequest (+16 more)
+Cohesion: 0.26
+Nodes (15): determinarTipoEntrada(), executeEntrada(), executeEntradaLote(), executeSaida(), executeSaidaLote(), getDbNowString(), getTamanhoBase(), montarUpdateEntradaConferida() (+7 more)
 
 ### Community 117 - "Compra Trânsito Reconciliation"
-Cohesion: 0.29
-Nodes (12): GET(), POST(), GET(), POST(), getRedis(), getRedisEnv(), isRedisConfigured(), itemKey() (+4 more)
+Cohesion: 0.30
+Nodes (11): GET(), POST(), GET(), POST(), getRedis(), getRedisEnv(), isRedisConfigured(), ensureTable() (+3 more)
 
 ### Community 118 - "Company/Filial Resolution"
-Cohesion: 0.25
-Nodes (11): CadastroPublicoPage(), CadastroState, initial, regiaoFromUf(), norm(), pickByLabelIncludes(), pickByValue(), RegistroComercialPadrao (+3 more)
+Cohesion: 0.20
+Nodes (14): bad(), conflict(), onlyDigits(), POST(), CadastroPublicoPage(), CadastroState, initial, regiaoFromUf() (+6 more)
 
 ### Community 119 - "Filial Sync Status Page"
 Cohesion: 0.24
 Nodes (12): GET(), SincronizacaoPage(), SincronizacaoPayload, STATUS_LABEL, classificarStatus(), fetchSincronizacaoFiliais(), formatarDelta(), normalizarFilial() (+4 more)
 
 ### Community 120 - "Compras Transito Picker Modal"
-Cohesion: 0.08
-Nodes (29): COMPANIES, CompanyKey, PrazoBloqueioPage(), AlterarSenhaPage(), BuscaResult, CatalogoAdminPage(), CatalogoItem, CorProduto (+21 more)
+Cohesion: 0.09
+Nodes (24): COMPANIES, CompanyKey, PrazoBloqueioPage(), AlterarSenhaPage(), BuscaResult, CatalogoAdminPage(), CatalogoItem, CorProduto (+16 more)
 
 ### Community 121 - "Customer Map & Date Utilities"
-Cohesion: 0.19
-Nodes (17): GET(), FILIAIS, FilialDef, MatrizEntryRow, matrizIdForCompany(), matrizNameForCompany(), buildFallbackCache(), getIdToNameMap() (+9 more)
+Cohesion: 0.24
+Nodes (14): FILIAIS, MatrizEntryRow, matrizIdForCompany(), matrizNameForCompany(), buildFallbackCache(), getIdToNameMap(), idForName(), loadCache() (+6 more)
 
 ### Community 122 - "Investigate Stock Entries Script"
 Cohesion: 0.18
@@ -977,12 +996,12 @@ Cohesion: 0.22
 Nodes (15): addDiasHojeIso(), BarcodeLookupRow, buscarPorCodigoBarras(), ComprasTransitoPickerModal(), fetchProdutosPorColecao(), fetchProdutosPorGrade(), ImportacaoOption, isSomenteDigitosCodigoBarras() (+7 more)
 
 ### Community 126 - "Romaneio Confirmation Store"
-Cohesion: 0.17
-Nodes (26): DELETE(), GET(), PUT(), CompraTransito, CompraTransitoItemReconciledRow, CompraTransitoItemReconciliacao, CompraTransitoListEntry, CompraTransitoStatus (+18 more)
+Cohesion: 0.29
+Nodes (19): formatDefaultTitle(), GET(), POST(), getCompraTransitoStatusFromItems(), createCompraTransito(), deleteCompraTransito(), ensureDataFile(), ensureTable() (+11 more)
 
 ### Community 127 - "Destino & Log Entradas"
-Cohesion: 0.24
-Nodes (13): AggResult, AumentoDescontoRow, AumentosDescontosResumo, buildDashboardSheet(), buildDetailSheet(), colLetter(), DetailColumn, DetailSheetOpts (+5 more)
+Cohesion: 0.09
+Nodes (18): CompraSalvaOperacoesDetalheRoute(), Props, CompanyPageProps, EstoqueDetalhado02PageRoute(), ListaCompraSugeridaRoute(), Props, CompanyPageProps, ControleMovimentoPageRoute() (+10 more)
 
 ### Community 128 - "NERD Monthly Entries Report"
 Cohesion: 0.18
@@ -993,8 +1012,8 @@ Cohesion: 0.20
 Nodes (14): buscar_exemplos_com_observacao(), buscar_registro_completo(), conectar_banco(), investigar_estrutura_tabelas(), investigar_romaneio_especifico(), listar_colunas_com_observacao(), listar_todas_colunas(), main() (+6 more)
 
 ### Community 130 - "Product Labels Store"
-Cohesion: 0.15
-Nodes (22): GET(), GET(), fetchMatrizEntriesByColor(), buildReconciliacaoResposta(), reconcileCompanyCompras(), CompraTransitoReconciliacaoResposta, CompraTransitoStatusReal, AllocatedEntry (+14 more)
+Cohesion: 0.19
+Nodes (16): CompraTransitoStatusReal, AllocatedEntry, applyAllocation(), buildReconcileKey(), dayDiff(), dayKey(), dayKeyFromDate(), deriveItemStatusReal() (+8 more)
 
 ### Community 131 - "Node Proxy Package Config"
 Cohesion: 0.13
@@ -1002,15 +1021,15 @@ Nodes (14): dependencies, cors, dotenv, express, mssql, description, devDependen
 
 ### Community 132 - "Compra Trânsito Reconciliation"
 Cohesion: 0.24
-Nodes (14): BarList(), Donut(), fmtCurrency(), fmtDriftPp(), fmtDriftSignal(), fmtInt(), fmtPct(), fmtPp() (+6 more)
+Nodes (20): POST(), POST(), GET(), GET(), APPROVE_CADASTRO_ROLES, canApproveCadastro(), normalizeRole(), aprovarRegistro() (+12 more)
 
 ### Community 133 - "Compra Data Fixa Store"
-Cohesion: 0.17
-Nodes (20): CategoryData, ControlePerformancePage(), FilialRow, formatCompactSignedPctForBadge(), formatCurrency(), formatSignedPct(), getCategoryHeaderLabel(), getCombinedCategoryMetrics() (+12 more)
+Cohesion: 0.10
+Nodes (36): CategoryData, ControlePerformancePage(), FilialRow, formatCompactSignedPctForBadge(), formatCurrency(), formatSignedPct(), getCategoryHeaderLabel(), getCombinedCategoryMetrics() (+28 more)
 
 ### Community 134 - "Presentation Generator & Filters"
-Cohesion: 0.11
-Nodes (45): DELETE(), GET(), isAdmin(), PATCH(), GET(), isAdmin(), POST(), POST() (+37 more)
+Cohesion: 0.19
+Nodes (23): DELETE(), GET(), isAdmin(), PATCH(), GET(), isAdmin(), POST(), POST() (+15 more)
 
 ### Community 135 - "Romaneio Generation Investigation"
 Cohesion: 0.21
@@ -1026,11 +1045,11 @@ Nodes (16): 1️⃣ ESTOQUE_PROD_SAI (Cabeçalho de Saída), 2️⃣ ESTOQUE_PRO
 
 ### Community 138 - "Stock Entry/Exit History Page"
 Cohesion: 0.16
-Nodes (18): calcularCurvas(), Curva, CURVA_BADGE_CLASS, CURVA_BAR_CLASS, CURVA_LABEL, FilialData, FilialPerformancePage(), fmt() (+10 more)
+Nodes (14): DateRangeFilter(), DateRangeFilterProps, DateRangeValue, formatDisplay(), parseYmdToLocalDate(), VendedorFilterProps, VendedorOption, Props (+6 more)
 
 ### Community 139 - "Transfer Control Page"
-Cohesion: 0.14
-Nodes (9): CompanyPageProps, ControleGiroPageRoute(), CategoriaGiro, CategoriaParados, ControleGiroPage(), ControleGiroPageProps, formatNumber(), GiroKPI (+1 more)
+Cohesion: 0.12
+Nodes (12): CompanyPageProps, ControleGiroPageRoute(), FilialFilter(), FilialFilterProps, CategoriaGiro, CategoriaParados, ControleGiroPage(), ControleGiroPageProps (+4 more)
 
 ### Community 140 - "Tecido Estoque Matching Script"
 Cohesion: 0.26
@@ -1041,24 +1060,24 @@ Cohesion: 0.23
 Nodes (12): conectar_banco(), investigar_empresas_filiais(), investigar_regra_empresa_diferente(), investigar_saidas_do_estoque(), investigar_saidas_por_transferencia(), listar_colunas_tabela(), main(), Investiga saídas que aparecem na tabela 'Saída de produto acabado do estoque'. (+4 more)
 
 ### Community 142 - "Goals Storage"
-Cohesion: 0.33
-Nodes (10): applyTransitToSuggestion(), computeCoverageDeficit(), daysUntil(), groupEntriesByDay(), normalizeDate(), startOfLocalDay(), summarizeTransitAdjustment(), TransitAdjustmentResult (+2 more)
+Cohesion: 0.27
+Nodes (12): CompraTransitoIndexEntry, CompraIdealInput, applyTransitToSuggestion(), computeCoverageDeficit(), daysUntil(), groupEntriesByDay(), normalizeDate(), startOfLocalDay() (+4 more)
 
 ### Community 143 - "Filial Consulta Client"
-Cohesion: 0.10
-Nodes (35): GET(), isValidYmd(), listDays(), mapWithConcurrency(), MATRIZ_FILIAIS, GET(), isValidYmd(), mapWithConcurrency() (+27 more)
+Cohesion: 0.15
+Nodes (17): GET(), isValidYmd(), listDays(), mapWithConcurrency(), MATRIZ_FILIAIS, GET(), isValidYmd(), mapWithConcurrency() (+9 more)
 
 ### Community 144 - "Colecao Presentation Deck"
-Cohesion: 0.16
-Nodes (23): GET(), POST(), GET(), cleanDestino(), GET(), getDestinoSalvo(), GET(), getActiveFilial() (+15 more)
+Cohesion: 0.17
+Nodes (20): GET(), POST(), GET(), GET(), buildSearchConfig(), fetchLogEntradas(), LogEntradaRow, ProductEntryRow (+12 more)
 
 ### Community 145 - "Report Export Page"
-Cohesion: 0.21
-Nodes (10): ArquivoGerado, ArquivoInfo, criarRelatoriosIniciais(), ExportarRelatoriosPage(), formatarTamanho(), formatarTempo(), RELATORIO_INFO, RelatorioExportavel (+2 more)
+Cohesion: 0.15
+Nodes (13): ExportarRelatoriosPageProps, ExportarRelatoriosPageRoute(), generateMetadata(), ArquivoGerado, ArquivoInfo, criarRelatoriosIniciais(), ExportarRelatoriosPage(), formatarTamanho() (+5 more)
 
 ### Community 146 - "Giro/Parados Control Page"
-Cohesion: 0.36
-Nodes (13): normalizePermissionKeys(), authenticate(), createUser(), deleteUser(), ensureTable(), findUserById(), findUserByUsername(), hashPassword() (+5 more)
+Cohesion: 0.24
+Nodes (17): LEGACY_PERMISSION_ALIASES, normalizePermissionKeys(), normalizeRawPermission(), VALID_PERMISSION_KEYS, authenticate(), createUser(), deleteUser(), ensureTable() (+9 more)
 
 ### Community 147 - "Cloudflare/AWS Tunnel Setup Docs"
 Cohesion: 0.06
@@ -1089,8 +1108,8 @@ Cohesion: 0.24
 Nodes (11): conectar_banco(), main(), Valida se a tabela SEQUENCIAIS precisa ser atualizada, Conecta ao SQL Server, Valida se há triggers que podem interferir, Valida campos obrigatórios (NOT NULL) das tabelas, Valida se um SQL de exemplo funcionaria, validar_campos_obrigatorios() (+3 more)
 
 ### Community 154 - "Stock Adjustment Page"
-Cohesion: 0.19
-Nodes (9): AprovacoesPage(), STATUS_LABEL, ClienteCorporativoCriado, ClienteCorporativoInput, ClienteCorporativoListItem, EnderecoBloco, RegistroPendente, RegistroStatus (+1 more)
+Cohesion: 0.21
+Nodes (8): AprovacoesPage(), STATUS_LABEL, ClienteCorporativoInput, ClienteCorporativoListItem, EnderecoBloco, RegistroPendente, RegistroStatus, CriarRegistroInput
 
 ### Community 155 - "Saida Completa Investigation Script"
 Cohesion: 0.31
@@ -1105,12 +1124,12 @@ Cohesion: 0.31
 Nodes (9): conectar(), get_db_config(), main(), Estoque da categoria: produtos que NÃO venderam nos últimos GIRO_OBSOLETO_DIAS d, Estoque (para a categoria) de produtos que:     - venderam no período [dias_fim, Estoque total por categoria (GRUPO_PRODUTO), sem filtro de giro.     Se categor, run_estoque_giro_faixa_disjunta(), run_estoque_obsoleto() (+1 more)
 
 ### Community 158 - "Brazil Map Component"
-Cohesion: 0.09
-Nodes (42): EstornarRequest, pad(), POST(), ExecutarRequest, isValidDate(), POST(), PATCH(), LiberarTransitoRequest (+34 more)
+Cohesion: 0.10
+Nodes (41): EstornarRequest, pad(), POST(), ExecutarRequest, isValidDate(), POST(), GET(), POST() (+33 more)
 
 ### Community 159 - "Vendedor Produto Detalhe Page"
-Cohesion: 0.21
-Nodes (14): addDaysFormatted(), CurvaAbcResponse, diffDays(), endOfYearYmd(), fmt(), fmtDec(), PickerRow, ProdutoProjecaoCompraPage() (+6 more)
+Cohesion: 0.20
+Nodes (15): addDaysFormatted(), CurvaAbcResponse, diffDays(), endOfYearYmd(), fmt(), fmtDec(), PickerRow, ProdutoProjecaoCompraPage() (+7 more)
 
 ### Community 160 - "Collection Comparison Slide Deck"
 Cohesion: 0.38
@@ -1141,8 +1160,8 @@ Cohesion: 0.29
 Nodes (9): conectar_banco(), investigar_estrutura_entrada(), investigar_estrutura_saida(), investigar_valores_tipo(), main(), Investiga estrutura de ESTOQUE_PROD_SAI procurando campos de tipo, Investiga valores únicos de campos de tipo nas tabelas, Conecta ao SQL Server com timeout e fallback (+1 more)
 
 ### Community 167 - "Raw Data Fetchers"
-Cohesion: 0.44
-Nodes (11): createReportPreset(), deleteReportPreset(), ensureDataFile(), ensureTable(), FILE_PATH, listReportPresets(), normalizeColumns(), readFileAll() (+3 more)
+Cohesion: 0.19
+Nodes (23): DELETE(), PATCH(), sanitizeColumns(), GET(), POST(), sanitizeColumns(), CROSS_COLUMN_KEYS, getReportMeta() (+15 more)
 
 ### Community 168 - "Compra Sugerida ABC Report"
 Cohesion: 0.12
@@ -1157,8 +1176,8 @@ Cohesion: 0.31
 Nodes (9): conectar_banco(), exibir_dataframe(), exibir_estoque_por_filial(), formatar_valor(), main(), Exibe estoque agrupado por produto e filial de forma organizada, Conecta ao SQL Server com timeout e fallback, Formata valores para exibição (+1 more)
 
 ### Community 171 - "Lista Compra Response Cache"
-Cohesion: 0.52
-Nodes (6): resolveCicloCompra(), addDaysIso(), applyAutoRecebimento(), pad2(), RecebimentoItemLike, resolveProducaoDiasByProduto()
+Cohesion: 0.31
+Nodes (8): DELETE(), GET(), PUT(), addDaysIso(), applyAutoRecebimento(), pad2(), RecebimentoItemLike, resolveProducaoDiasByProduto()
 
 ### Community 172 - "Python Report Export Runner"
 Cohesion: 0.31
@@ -1185,8 +1204,8 @@ Cohesion: 0.33
 Nodes (8): comparar_com_romaneios_que_aparecem(), conectar_banco(), investigar_loja_saidas(), investigar_romaneio_problema(), main(), Compara com romaneios que aparecem corretamente na planilha., Investiga LOJA_SAIDAS para o romaneio., Investiga o romaneio 028964 que não aparece na planilha.
 
 ### Community 179 - "Report Query Route"
-Cohesion: 0.25
-Nodes (13): ControleTransferenciasPage(), ControleTransferenciasPageProps, detectarTransferenciasExternas(), fetchControleTransferencias(), fetchCooldownKeys(), fetchFiliais(), fetchPermissoes(), fetchRealizadasContadores() (+5 more)
+Cohesion: 0.23
+Nodes (14): ControleTransferenciasPage(), ControleTransferenciasPageProps, detectarTransferenciasExternas(), fetchControleTransferencias(), fetchCooldownKeys(), fetchFiliais(), fetchPermissoes(), fetchRealizadasContadores() (+6 more)
 
 ### Community 181 - "Romaneio Type Correction Script"
 Cohesion: 0.36
@@ -1201,8 +1220,8 @@ Cohesion: 0.36
 Nodes (5): applyInlineStyles(), exportElementToHtml(), ExportOptions, getAllCssRules(), getComputedStylesString()
 
 ### Community 184 - "CurvaPorProdutoPickerModal.tsx"
-Cohesion: 0.09
-Nodes (31): GET(), POST(), runFetchDetalhes(), GET(), normalizeFilialKey(), resolveCanonicalFilial(), GET(), normalizeFilialKey() (+23 more)
+Cohesion: 0.21
+Nodes (12): buildNormalizedFilialSqlExpr(), fetchProdutoEstoqueDetalhadoPorFilial(), fetchProdutoEstoquePorFilial(), filialProdutoMergeKey(), FilialProdutoVendedorSalesRow, MATRIZ_FILIAIS, normalizeFilialFilterValue(), PerformanceCategoryRow (+4 more)
 
 ### Community 185 - "Galeao Entradas Confirmation Script"
 Cohesion: 0.36
@@ -1233,12 +1252,12 @@ Cohesion: 0.13
 Nodes (14): 1) Inventário geral, 2) Matriz de páginas (todas), 3.1 Curva ABC, 3.2 Compras salvas, 3.3 Compra final, 3.4 Produtos comprados e listas, 3.5 Saídas e entradas, 3.6 Controle de estoque e projeção (+6 more)
 
 ### Community 193 - "users-store-neon.ts"
-Cohesion: 0.27
-Nodes (9): autoWidth(), CategoriaEstoque, ExportEstoqueConsultaOptions, exportEstoqueConsultaXlsx(), fetchProdutosParados(), fetchProdutosPorFilial(), ProdutoDetalhesPorFilial, ProdutoParado (+1 more)
+Cohesion: 0.17
+Nodes (14): badge(), DARK, ExtratoProdutoPage(), ExtratoProdutoPageProps, fmtDate(), fmtNum(), LIGHT, makeInputStyle() (+6 more)
 
 ### Community 194 - "pedidoVendaLinx.ts"
-Cohesion: 0.30
-Nodes (12): POST(), marcarPedidoEfetivado(), PedidoItem, CadastroResolvido, criarPedidoVendaLinx(), LinhaVenda, montarLinhas(), PedidoVendaLinxResult (+4 more)
+Cohesion: 0.29
+Nodes (12): POST(), Pedido, PedidoItem, CadastroResolvido, criarPedidoVendaLinx(), LinhaVenda, montarLinhas(), PedidoVendaLinxResult (+4 more)
 
 ### Community 195 - "Compras Salvas List Panel"
 Cohesion: 0.13
@@ -1261,8 +1280,8 @@ Cohesion: 0.31
 Nodes (8): CacheEntry, GET(), getCachedResponse(), inFlightRequests, ListaCompraResponseData, normalizeSearchParams(), responseCache, setCachedResponse()
 
 ### Community 200 - "detectar-transferencias-externas.ts"
-Cohesion: 0.24
-Nodes (10): parseDias(), POST(), formatLogRoute(), getFilialLabelForDisplay(), fetchTransferenciasExternasLinx(), TransferenciaExternaDetectada, coletarEscopoFiliais(), detectarERegistrarTransferenciasExternas() (+2 more)
+Cohesion: 0.23
+Nodes (15): Agg, chunk(), ClienteCadastro, EXCLUDED_FILIAL_LABELS, fetchCadastroPorNome(), fetchClientesFilial(), fetchPrimeiraUltimaCompra(), isExcludedLabel() (+7 more)
 
 ### Community 201 - "Alternative Stock Search Script"
 Cohesion: 0.53
@@ -1309,12 +1328,12 @@ Cohesion: 0.28
 Nodes (8): APPROVE_ROLES, brl(), Endereco, Pedido, PedidoItem, PedidosAdminPage(), STATUS, STATUS_LABEL
 
 ### Community 214 - "giroCache.ts"
-Cohesion: 0.31
-Nodes (8): fetchDetalhes(), fetchHistorico(), formatDate(), HistoricoResponse, HistoricoSaidasEntradasPage(), LogDetalheItem, TipoOperacao, TransferenciaLog
+Cohesion: 0.13
+Nodes (16): generateMetadata(), HistoricoSaidasEntradasRoute(), PageProps, fetchDetalhes(), fetchHistorico(), formatDate(), HistoricoResponse, HistoricoSaidasEntradasPage() (+8 more)
 
 ### Community 215 - "reportCompraSugeridaAbc.ts"
-Cohesion: 0.09
-Nodes (33): getOperationalFilials(), ReportRunContext, ReportResult, ReportSummaryMetric, applyColecaoLabels(), fetchColecaoCodeByProduto(), EstoqueRedeItemRow, Agg (+25 more)
+Cohesion: 0.13
+Nodes (26): FilialOption, GET(), getFiliaisCanonicas(), getFilialAliases(), getGroupMembers(), normFilialKey(), toFilialOption(), getOperationalFilials() (+18 more)
 
 ### Community 216 - "Stock Movement Reconciliation Investigation"
 Cohesion: 0.70
@@ -1325,8 +1344,8 @@ Cohesion: 0.70
 Nodes (4): conectar(), main(), scalar(), secao()
 
 ### Community 218 - "resolveCanonicalFilial"
-Cohesion: 0.39
-Nodes (7): addAutoWidths(), ExportCompraIdealPorFilialOptions, exportCompraIdealPorFilialToXlsx(), ExportListaLojaOptions, exportListaLojaToXlsx(), getHeaders(), XlsxCellValue
+Cohesion: 0.26
+Nodes (11): GET(), GET(), fetchMatrizEntriesByColor(), buildReconciliacaoResposta(), reconcileCompanyCompras(), CompraTransito, CompraTransitoItemReconciledRow, CompraTransitoItemReconciliacao (+3 more)
 
 ### Community 219 - "Stuck Entradas Investigation"
 Cohesion: 0.60
@@ -1365,32 +1384,32 @@ Cohesion: 0.43
 Nodes (7): brl(), config, ecomSql(), main(), num(), one(), posSql()
 
 ### Community 228 - "fix-tipos-romaneio-acento.mjs"
-Cohesion: 0.08
-Nodes (45): BASES_PERMITIDAS, GET(), getDataDir(), TIPOS, applyTransitToProjectionSuggestion(), buildProdutoCorKey(), calcDiasAteAcabar(), computeReposicaoScope() (+37 more)
+Cohesion: 0.09
+Nodes (42): applyTransitToProjectionSuggestion(), buildProdutoCorKey(), calcDiasAteAcabar(), computeReposicaoScope(), ExcelJSCell, fetchProjecao(), fmt(), fmtBRL() (+34 more)
 
 ### Community 229 - "ComprasTransitoPickerModal.tsx"
 Cohesion: 0.27
 Nodes (8): generateMetadata(), Props, VendedorProdutoDetalhePageRoute(), fetchVendas(), formatDate(), VendedorProdutoDetalhePage(), VendedorProdutoDetalhePageProps, VendedorProdutoVendaItem
 
 ### Community 230 - "package.json"
-Cohesion: 0.20
-Nodes (9): generateMetadata(), MapaClientesPageProps, MapaClientesPageRoute(), BrazilMap, fetchMapaClientes(), MapaClientesPage(), MapaClientesPageProps, UF_NAMES (+1 more)
+Cohesion: 0.18
+Nodes (11): Aba, brl(), buildParams(), dia(), EmpresaFiltro, FaturamentoPage(), FaturamentoPageProps, FaturamentoDimensoes (+3 more)
 
 ### Community 231 - "executeQueryWithParams"
-Cohesion: 0.29
-Nodes (9): StateData, BrazilMap(), BrazilMapProps, getHoverColor(), getStateColor(), IBGE_TO_UF, resolveUF(), TooltipState (+1 more)
+Cohesion: 0.15
+Nodes (15): StateData, BrazilMap(), BrazilMapProps, getHoverColor(), getStateColor(), IBGE_TO_UF, resolveUF(), TooltipState (+7 more)
 
 ### Community 232 - "page.tsx"
-Cohesion: 0.43
-Nodes (6): GET(), adivinharEmpresaPorNome(), carregarFiliaisComEstoque(), carregarFiliaisComVendaRecente(), listarFiliaisParaAjuste(), normNome()
+Cohesion: 0.37
+Nodes (10): GET(), POST(), slugify(), detectActiveFilialIdsByCompany(), idForFilialRef(), idsForFilialRefs(), liveNameForFilialRef(), liveNamesForFilialRefs() (+2 more)
 
 ### Community 233 - "discovery.ts"
 Cohesion: 0.30
 Nodes (12): GET(), POST(), bucketKey(), CompraDataFixaUpsert, ensureDataFile(), ensureTable(), FILE_PATH, FileShape (+4 more)
 
 ### Community 236 - "AjusteEstoquePage.tsx"
-Cohesion: 0.19
-Nodes (13): AjusteDetalheItem, AjusteEstoquePage(), AjusteRecente, DiferencaLinha, FilialAjuste, hojeISO(), Modo, PreviewResposta (+5 more)
+Cohesion: 0.22
+Nodes (10): AjusteDetalheItem, AjusteEstoquePage(), AjusteRecente, DiferencaLinha, FilialAjuste, hojeISO(), Modo, PreviewResposta (+2 more)
 
 ### Community 237 - "ComprasSalvasListPanel.tsx"
 Cohesion: 0.52
@@ -1417,16 +1436,16 @@ Cohesion: 0.67
 Nodes (3): config, main(), q()
 
 ### Community 247 - "giroCache.ts"
-Cohesion: 0.38
-Nodes (6): colLetter(), EstoqueConsultaExportRow, ExcelJSCell, ExportEstoqueConsultaItemOptions, exportEstoqueConsultaItemXlsx(), safeFilenamePart()
+Cohesion: 0.32
+Nodes (11): AjusteContagemParams, AjusteContagemResult, aplicarContagem(), carregarSaldoESlots(), carregarSlots(), escapeLike(), estornarContagem(), EstornoResult (+3 more)
 
 ### Community 248 - "Product Precos Route"
 Cohesion: 0.20
 Nodes (9): 1. **Padrão de Romaneios de SAÍDA (ESTOQUE_PROD_SAI)**, 2. **Padrão de Romaneios de ENTRADA (ESTOQUE_PROD_ENT)**, 3. **Tabela SEQUENCIAIS - Controle de Numeração**, 📊 DESCOBERTAS, INVESTIGAÇÃO: PADRÃO DE ROMANEIOS NO LINX, Possíveis causas:, ⚠️ PROBLEMA IDENTIFICADO, 🔍 PRÓXIMOS PASSOS (+1 more)
 
 ### Community 251 - "page.tsx"
-Cohesion: 0.38
-Nodes (5): APPLY, log(), main(), sql, url
+Cohesion: 0.22
+Nodes (10): authHeaders(), FilaItem, GrupoPlano, ItemSaida, MembroPlano, PreviewResponse, resumoItens(), RomaneiosDuplicadosPanel() (+2 more)
 
 ### Community 289 - "fetchFilialProdutoSales"
 Cohesion: 0.25
@@ -1437,8 +1456,8 @@ Cohesion: 0.22
 Nodes (8): 1. Deploy do código, 2.1 Descobrir o nome da constraint (se precisar), 2.2 Atualizar a constraint, 2. Banco Neon (PostgreSQL), 3. Atribuir a função Gestor aos usuários, O que é a função Gestor, Produção: função Gestor e usuários, Resumo
 
 ### Community 291 - "page.tsx"
-Cohesion: 0.07
-Nodes (28): generateMetadata(), ProductsPageProps, ProductsPageRoute(), generateMetadata(), ProductsRecentPageProps, ProductsRecentPageRoute(), formatCurrency(), formatInteger() (+20 more)
+Cohesion: 0.09
+Nodes (23): formatCurrency(), formatInteger(), MetricFormatter, resolveChangeBadge(), SummaryCards(), SummaryCardsProps, EMPTY_SUMMARY, ProductsPage() (+15 more)
 
 ### Community 292 - "🚀 Início Rápido: Cloudflare Tunnel"
 Cohesion: 0.22
@@ -1453,8 +1472,8 @@ Cohesion: 0.25
 Nodes (7): 1. Verificar se os dados aparecem, 2. Se os dados NÃO aparecerem, 3. Fazer backup (opcional), ✅ O QUE JÁ FOI FEITO, 📋 O QUE VOCÊ PRECISA FAZER, Passos - Recuperar Dados de Transferências, ⚠️ SE AINDA NÃO FUNCIONAR
 
 ### Community 295 - "notificacoes-leitura-store.ts"
-Cohesion: 0.47
-Nodes (5): dataSchema, empresaSchema, listaOpcional(), metrica(), registerVendasTools()
+Cohesion: 0.44
+Nodes (10): query(), fetchAllRaw(), fetchCoreColors(), fetchEcommerce(), fetchInventory(), fetchInventoryEntries(), fetchProductBarcodes(), fetchProducts() (+2 more)
 
 ### Community 296 - "relatorios.ts"
 Cohesion: 0.36
@@ -1464,13 +1483,17 @@ Nodes (6): GET(), executarQueryRelatorio(), FILIAIS_CONSIDERADAS, RELATORIO_QUER
 Cohesion: 0.43
 Nodes (7): ColecaoDetalheResponse, ColecaoDetalhePanel(), ColecaoDetalhePanelProps, formatCurrency(), formatCurrencyRounded(), formatInt(), formatPct()
 
+### Community 298 - "exportCompraSugeridaAbcXlsx.ts"
+Cohesion: 0.27
+Nodes (10): CellValue, colLetter(), CompraLojaRole, CompraPorLojaExportOptions, ExcelJSCell, exportCompraPorLojaXlsx(), exportCompraSugeridaAbcXlsx(), formatDateRange() (+2 more)
+
 ### Community 299 - "RealizadasPanel.tsx"
 Cohesion: 0.50
 Nodes (4): formatarData(), RealizadasPanel(), RealizadasPanelProps, RealizadasPanelRow
 
 ### Community 300 - "MultiSelectFilter.tsx"
-Cohesion: 0.50
-Nodes (4): MultiSelectFilter(), MultiSelectFilterProps, MultiSelectOption, normalizeOption()
+Cohesion: 0.29
+Nodes (7): ClienteDetalhePageRoute(), generateMetadata(), Props, ClienteDetalhePage(), ClienteDetalhePageProps, fetchClienteResumo(), parseSemCadastroChave()
 
 ### Community 301 - "GoalsModal.tsx"
 Cohesion: 0.47
@@ -1481,40 +1504,112 @@ Cohesion: 0.60
 Nodes (4): exportToCSV(), exportToExcel(), formatarDataParaCSV(), formatarNumeroParaCSV()
 
 ### Community 303 - "TransferenciaConfirmModal.tsx"
-Cohesion: 0.50
-Nodes (3): TransferenciaConfirmModal(), TransferenciaConfirmModalItem, TransferenciaConfirmModalProps
+Cohesion: 0.47
+Nodes (8): choosePreferredBarcode(), compareBarcodePreference(), GET(), normalizeBarcode(), getErrorCodes(), getPublicDatabaseErrorMessage(), isDatabaseConnectionError(), getMappedColorDescription()
 
 ### Community 304 - "verif-produto-giro-filiais.mjs"
 Cohesion: 0.67
 Nodes (3): brl(), config, main()
 
+### Community 305 - "page.tsx"
+Cohesion: 0.33
+Nodes (8): hex(), MiniAreaChart(), MiniAreaChartPoint, MiniAreaChartProps, withAlpha(), CollectionPalette, ComparativoColecaoSlide, ResumoColecaoCard
+
+### Community 447 - "isCompraTransitoDateActive"
+Cohesion: 0.36
+Nodes (7): buildCompraTransitIndex(), resolveTransit(), transitDescKey(), getCompraTransitoItemStatus(), isCompraTransitoDateActive(), normalizeDate(), startOfLocalDay()
+
+### Community 448 - "route.ts"
+Cohesion: 0.52
+Nodes (6): DELETE(), GET(), isAdmin(), lerItensComEstoque(), PreviewItem, PUT()
+
+### Community 449 - "giroCache.ts"
+Cohesion: 0.47
+Nodes (5): cache, cacheKey(), getGiroCache(), GiroCacheEntry, setGiroCache()
+
+### Community 450 - "route.ts"
+Cohesion: 0.60
+Nodes (4): BASES_PERMITIDAS, GET(), getDataDir(), TIPOS
+
+### Community 451 - "route.ts"
+Cohesion: 0.83
+Nodes (3): isAdmin(), PATCH(), updateProductColorRegistration()
+
+### Community 452 - "page.tsx"
+Cohesion: 0.50
+Nodes (3): BlackFridayPageProps, BlackFridayPageRoute(), generateMetadata()
+
+### Community 453 - "page.tsx"
+Cohesion: 0.50
+Nodes (3): ComprasSalvasRoute(), generateMetadata(), Props
+
 ### Community 454 - "page.tsx"
 Cohesion: 0.10
-Nodes (24): CompanyDashboardPage(), CompanyPageProps, generateMetadata(), BlackFridayPage(), BlackFridayPageProps, CompanyDashboardProps, DailyRevenueData, DashboardData (+16 more)
+Nodes (26): BlackFridayPage(), BlackFridayPageProps, CompanyDashboardProps, DailyRevenueData, DashboardData, DEFAULT_SUMMARY, EMPTY_METRIC, aggregateByDisplayName() (+18 more)
 
 ### Community 455 - "inventory.ts"
 Cohesion: 0.28
 Nodes (7): ClienteDetalhePageRoute(), generateMetadata(), Props, ClienteDetalhePage(), ClienteDetalhePageProps, fetchProdutos(), ClienteProdutoItem
 
+### Community 456 - "page.tsx"
+Cohesion: 0.50
+Nodes (3): EstoqueConsultaRoute(), generateMetadata(), Props
+
+### Community 457 - "page.tsx"
+Cohesion: 0.50
+Nodes (3): generateMetadata(), GeradorApresentacoesPageProps, GeradorApresentacoesPageRoute()
+
+### Community 458 - "page.tsx"
+Cohesion: 0.50
+Nodes (3): generateMetadata(), GeradorRelatoriosPageProps, GeradorRelatoriosPageRoute()
+
+### Community 459 - "page.tsx"
+Cohesion: 0.50
+Nodes (3): generateMetadata(), ListaLojaPageProps, ListaLojaRoute()
+
+### Community 460 - "page.tsx"
+Cohesion: 0.50
+Nodes (3): generateMetadata(), PainelColecoesPageProps, PainelColecoesPageRoute()
+
+### Community 461 - "page.tsx"
+Cohesion: 0.50
+Nodes (3): generateMetadata(), ProdutoAgrupadoRoute(), ProdutoAgrupadoRouteProps
+
+### Community 462 - "page.tsx"
+Cohesion: 0.50
+Nodes (3): generateMetadata(), ProductDetailPageRoute(), ProductDetailPageRouteProps
+
+### Community 463 - "page.tsx"
+Cohesion: 0.50
+Nodes (3): generateMetadata(), RomaneioDetalheRoute(), RomaneioDetalheRouteProps
+
+### Community 464 - "page.tsx"
+Cohesion: 0.50
+Nodes (3): generateMetadata(), VendedoresPageProps, VendedoresPageRoute()
+
+### Community 466 - "fix-tipos-romaneio-acento.mjs"
+Cohesion: 0.50
+Nodes (3): headers, targets, withAccents
+
 ## Knowledge Gaps
-- **1364 isolated node(s):** `AjusteEstoquePageProps`, `AumentosDescontosPageProps`, `BlackFridayPageProps`, `Props`, `ClientesPageProps` (+1359 more)
+- **1365 isolated node(s):** `AjusteEstoquePageProps`, `AumentosDescontosPageProps`, `BlackFridayPageProps`, `Props`, `ClientesPageProps` (+1360 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **173 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `CompanyKey` connect `AjusteEstoquePage.tsx` to `Dashboard Page Routes`, `Lista Loja Page & Estoque/Curva Utilities`, `Revenue Dashboard Routes & Components`, `Curva ABC Page & Purchase Suggestions`, `Corporate Client Registration`, `Clientes API Routes`, `Projeção de Estoque & Compra em Trânsito`, `Controle Estoque Métricas Cache`, `Compra Ideal Purchase Suggestion`, `Report Registry & Presets`, `App Shell: Auth, Layout & Admin Pages`, `Curva por Produto Page & Export`, `Admin User Management API`, `Nova Filial Stock Comparison Page`, `Product Detail & Stock Fetching`, `Products Listing Pages`, `Faturamento & Notas Fiscais`, `Estoque Detalhado Pages`, `Saidas/Entradas Products Page`, `Compra Salva Detail & Destination Matching`, `Lista de Compra Sugerida Page`, `Extrato de Produto Feature`, `Performance Control & Curva Categories`, `Transferências & Vendedores API Routes`, `Dashboard Pages & Filters`, `Report Generator Export/Formatting`, `MCP Tools Registry Setup`, `Claude Sales Report Page`, `Compras Salvas (Saved Purchases)`, `Fornecedores Management`, `Collection Sales Report`, `Product Performance & Coverage`, `Ajuste de Estoque por Contagem`, `Grouped Product Management`, `Transferência Pendente Storage`, `Report Generator Modules`, `Curva Por Produto Picker`, `Vendedores Filters & Table`, `Compras em Trânsito Page`, `Report Enrichment Pipeline`, `Transfer Item & Destino Store`, `Transfer Products Page`, `Coleções Panel & Export`, `Produtos Novos Page`, `Collection Presentation Data`, `Estoque Consulta Item Page`, `Produto Curva & Filial Performance Data`, `Revenue Chart & Theme Context`, `Collection Report Page`, `Compra Ideal UI Cells`, `Performance Export to Excel`, `Vendedor Detail & Export`, `Saida Group Planning Routes`, `Controle de Movimento Feature`, `Curva ABC Observations Store`, `Stagnant Products Page & Export`, `Compras Transito Picker Modal`, `Customer Map & Date Utilities`, `Relatórios Processing Pipeline`, `Product Labels Store`, `Compra Data Fixa Store`, `Presentation Generator & Filters`, `Stock Entry/Exit History Page`, `Transfer Control Page`, `Filial Consulta Client`, `Giro/Parados Control Page`, `Vendedor Produto Detalhe Page`, `Historico Transferencias Page`, `Report Query Route`, `CurvaPorProdutoPickerModal.tsx`, `giroCache.ts`, `reportCompraSugeridaAbc.ts`, `fix-tipos-romaneio-acento.mjs`, `ComprasTransitoPickerModal.tsx`, `package.json`, `fetchFilialProdutoSales`, `page.tsx`, `GeradorApresentacoesPage.tsx`, `GoalsModal.tsx`, `page.tsx`, `inventory.ts`?**
+- **Why does `CompanyKey` connect `Transferências & Vendedores API Routes` to `Dashboard Page Routes`, `Lista Loja Page & Estoque/Curva Utilities`, `Revenue Dashboard Routes & Components`, `Curva ABC Page & Purchase Suggestions`, `Corporate Client Registration`, `Projeção de Estoque & Compra em Trânsito`, `Controle Estoque Métricas Cache`, `Compra Ideal Purchase Suggestion`, `Report Registry & Presets`, `App Shell: Auth, Layout & Admin Pages`, `Curva por Produto Page & Export`, `Nova Filial Stock Comparison Page`, `Product Detail & Stock Fetching`, `Products Listing Pages`, `Estoque Detalhado Pages`, `Saidas/Entradas Products Page`, `Compra Salva Detail & Destination Matching`, `Lista de Compra Sugerida Page`, `Extrato de Produto Feature`, `Performance Control & Curva Categories`, `Dashboard Pages & Filters`, `Report Generator Export/Formatting`, `Claude Sales Report Page`, `Compras Salvas (Saved Purchases)`, `Fornecedores Management`, `Collection Sales Report`, `Product Performance & Coverage`, `Ajuste de Estoque por Contagem`, `Grouped Product Management`, `Transferência Pendente Storage`, `Report Generator Modules`, `Curva Por Produto Picker`, `Transfer Proxy & Estorno Routes`, `Stock Control Dashboard Page`, `Vendedores Filters & Table`, `Compras em Trânsito Page`, `Report Enrichment Pipeline`, `Transfer Item & Destino Store`, `Transfer Products Page`, `Coleções Panel & Export`, `Produtos Novos Page`, `Collection Presentation Data`, `Estoque Consulta Item Page`, `Produto Curva & Filial Performance Data`, `Revenue Chart & Theme Context`, `Collection Report Page`, `Compra Ideal UI Cells`, `Performance Export to Excel`, `Vendedor Detail & Export`, `Saida Group Planning Routes`, `Controle de Movimento Feature`, `Curva ABC Observations Store`, `Stagnant Products Page & Export`, `Stock By Filial Table & PDF`, `Compras Transito Picker Modal`, `Customer Map & Date Utilities`, `Relatórios Processing Pipeline`, `Destino & Log Entradas`, `Compra Data Fixa Store`, `Presentation Generator & Filters`, `Stock Entry/Exit History Page`, `Transfer Control Page`, `Filial Consulta Client`, `Giro/Parados Control Page`, `Vendedor Produto Detalhe Page`, `Historico Transferencias Page`, `Report Query Route`, `CurvaPorProdutoPickerModal.tsx`, `users-store-neon.ts`, `giroCache.ts`, `reportCompraSugeridaAbc.ts`, `resolveCanonicalFilial`, `fix-tipos-romaneio-acento.mjs`, `ComprasTransitoPickerModal.tsx`, `package.json`, `executeQueryWithParams`, `AjusteEstoquePage.tsx`, `fetchFilialProdutoSales`, `page.tsx`, `GeradorApresentacoesPage.tsx`, `MultiSelectFilter.tsx`, `GoalsModal.tsx`, `page.tsx`, `inventory.ts`?**
   _High betweenness centrality (0.072) - this node is a cross-community bridge._
-- **Why does `resolveCompany()` connect `Clientes API Routes` to `Dashboard Page Routes`, `Lista Loja Page & Estoque/Curva Utilities`, `Estoque Control API & Filters`, `Revenue Dashboard Routes & Components`, `Curva ABC Page & Purchase Suggestions`, `Projeção de Estoque & Compra em Trânsito`, `Controle Estoque Métricas Cache`, `Transfer Control Page`, `Nova Filial Stock Comparison Page`, `Product Detail & Stock Fetching`, `Products Listing Pages`, `Estoque Detalhado Pages`, `Saidas/Entradas Products Page`, `Compra Salva Detail & Destination Matching`, `Lista de Compra Sugerida Page`, `Extrato de Produto Feature`, `Transferências & Vendedores API Routes`, `Dashboard Pages & Filters`, `fetchFilialProdutoSales`, `Report Generator Export/Formatting`, `page.tsx`, `Claude Sales Report Page`, `Collection Sales Report`, `GoalsModal.tsx`, `Sales & Entries Filter Builders`, `Report Query Route`, `Curva Por Produto Picker`, `Compras em Trânsito Page`, `page.tsx`, `inventory.ts`, `Transfer Item & Destino Store`, `Transfer Products Page`, `Coleções Panel & Export`, `Produtos Novos Page`, `giroCache.ts`, `Estoque Consulta Item Page`, `Clientes Pages & Types`, `Produto Curva & Filial Performance Data`, `Revenue Chart & Theme Context`, `fix-tipos-romaneio-acento.mjs`, `ComprasTransitoPickerModal.tsx`, `package.json`, `page.tsx`, `Controle de Movimento Feature`, `Compras Transito Picker Modal`?**
-  _High betweenness centrality (0.055) - this node is a cross-community bridge._
-- **Why does `withRequest()` connect `Romaneio Adjustment & Admin Routes` to `Dashboard Page Routes`, `Product Labels Store`, `Estoque Control API & Filters`, `Revenue Dashboard Routes & Components`, `Controle Estoque Métricas Cache`, `Corporativo Products & Orders`, `Comparativo Resumido Report`, `Claude Report Generation`, `Filial Consulta Client`, `Colecao Presentation Deck`, `Product Detail & Stock Fetching`, `Faturamento & Notas Fiscais`, `Filial Registry & Resolver`, `Brazil Map Component`, `Performance Control & Curva Categories`, `MCP Tools Registry Setup`, `MCP Product Filter Tools`, `Compras Salvas (Saved Purchases)`, `Collection Sales Report`, `Lista Compra Response Cache`, `Notifications & Romaneio Duplicates`, `Sales & Entries Filter Builders`, `Transfer Permissions & Log`, `Loja Corporativa E-commerce`, `CurvaPorProdutoPickerModal.tsx`, `Data Pipeline & Transformation`, `Product Detail KPIs & Page`, `Report Presets Management`, `pedidoVendaLinx.ts`, `Barcode & DB Connection Utilities`, `detectar-transferencias-externas.ts`, `Compra em Trânsito Store`, `reportCompraSugeridaAbc.ts`, `Collection Presentation Data`, `Clientes Pages & Types`, `Produto Curva & Filial Performance Data`, `Compra Ideal UI Cells`, `Stock Count Adjustment Executor`, `Barcode & Recebimento Resolution`, `ComprasSalvasListPanel.tsx`, `Redis Transfer Storage`, `Filial Sync Status Page`, `Customer Map & Date Utilities`?**
-  _High betweenness centrality (0.035) - this node is a cross-community bridge._
+- **Why does `resolveCompany()` connect `Clientes API Routes` to `Dashboard Page Routes`, `Lista Loja Page & Estoque/Curva Utilities`, `Estoque Control API & Filters`, `Revenue Dashboard Routes & Components`, `Curva ABC Page & Purchase Suggestions`, `Projeção de Estoque & Compra em Trânsito`, `Controle Estoque Métricas Cache`, `Stock Entry/Exit History Page`, `Transfer Control Page`, `Report Export Page`, `Nova Filial Stock Comparison Page`, `Product Detail & Stock Fetching`, `Products Listing Pages`, `Saidas/Entradas Products Page`, `Compra Salva Detail & Destination Matching`, `Lista de Compra Sugerida Page`, `Extrato de Produto Feature`, `fetchFilialProdutoSales`, `Report Generator Export/Formatting`, `Claude Sales Report Page`, `Collection Sales Report`, `MultiSelectFilter.tsx`, `GoalsModal.tsx`, `Sales & Entries Filter Builders`, `Report Query Route`, `Curva Por Produto Picker`, `Barcode & DB Connection Utilities`, `page.tsx`, `page.tsx`, `page.tsx`, `inventory.ts`, `page.tsx`, `page.tsx`, `page.tsx`, `page.tsx`, `page.tsx`, `page.tsx`, `page.tsx`, `page.tsx`, `page.tsx`, `Transfer Item & Destino Store`, `Coleções Panel & Export`, `Transfer Products Page`, `giroCache.ts`, `Produtos Novos Page`, `Estoque Consulta Item Page`, `Compras em Trânsito Page`, `Clientes Pages & Types`, `Produto Curva & Filial Performance Data`, `Revenue Chart & Theme Context`, `fix-tipos-romaneio-acento.mjs`, `ComprasTransitoPickerModal.tsx`, `page.tsx`, `Controle de Movimento Feature`, `Stagnant Products Page & Export`, `Compras Transito Picker Modal`, `Destino & Log Entradas`?**
+  _High betweenness centrality (0.056) - this node is a cross-community bridge._
+- **Why does `withRequest()` connect `Revenue Dashboard Routes & Components` to `Dashboard Page Routes`, `Estoque Control API & Filters`, `Comparativo Resumido Report`, `Corporativo Products & Orders`, `Controle Estoque Métricas Cache`, `Claude Report Generation`, `Filial Consulta Client`, `Colecao Presentation Deck`, `Product Detail & Stock Fetching`, `Faturamento & Notas Fiscais`, `Performance Control & Curva Categories`, `Brazil Map Component`, `MCP Tools Registry Setup`, `MCP Product Filter Tools`, `Compras Salvas (Saved Purchases)`, `notificacoes-leitura-store.ts`, `Collection Sales Report`, `Lista Compra Response Cache`, `Notifications & Romaneio Duplicates`, `TransferenciaConfirmModal.tsx`, `Sales & Entries Filter Builders`, `Transfer Permissions & Log`, `Loja Corporativa E-commerce`, `CurvaPorProdutoPickerModal.tsx`, `Product Detail KPIs & Page`, `Report Presets Management`, `route.ts`, `Transfer Proxy & Estorno Routes`, `pedidoVendaLinx.ts`, `route.ts`, `Stock Control Dashboard Page`, `Grouped Product Aggregation`, `detectar-transferencias-externas.ts`, `Romaneio Adjustment & Admin Routes`, `Compra em Trânsito Store`, `reportCompraSugeridaAbc.ts`, `Collection Presentation Data`, `resolveCanonicalFilial`, `Clientes Pages & Types`, `Produto Curva & Filial Performance Data`, `Compra Ideal UI Cells`, `Stock Count Adjustment Executor`, `Barcode & Recebimento Resolution`, `ComprasSalvasListPanel.tsx`, `Redis Transfer Storage`, `Filial Sync Status Page`, `Customer Map & Date Utilities`?**
+  _High betweenness centrality (0.034) - this node is a cross-community bridge._
 - **What connects `Busca responsáveis já utilizados em ESTOQUE_PROD_ENT (Nerd / Scarfme).`, `Permite escolher um responsável real, mostrando o valor atual.`, `Busca combinações (TIPO_ENTRADA, CM_OPERACAO) usadas para um TIPO_ROMANEIO.` to the rest of the system?**
-  _1690 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _1691 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Dashboard Page Routes` be split into smaller, more focused modules?**
-  _Cohesion score 0.12535612535612536 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.08658536585365853 - nodes in this community are weakly interconnected._
 - **Should `Lista Loja Page & Estoque/Curva Utilities` be split into smaller, more focused modules?**
-  _Cohesion score 0.0422615648201028 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.03829138062547673 - nodes in this community are weakly interconnected._
 - **Should `Estoque Control API & Filters` be split into smaller, more focused modules?**
-  _Cohesion score 0.09423909423909424 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.09746835443037975 - nodes in this community are weakly interconnected._
