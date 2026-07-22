@@ -118,6 +118,21 @@ interface DiarioResponse {
   itens: DiarioItem[];
 }
 
+interface FilialVendaRow {
+  key: string;
+  label: string;
+  ecommerce: boolean;
+  vendas: number;
+  qtde: number;
+  pct: number;
+}
+
+interface FiliaisResponse {
+  totalVendas: number;
+  totalQtde: number;
+  filiais: FilialVendaRow[];
+}
+
 // ─── Formatação ──────────────────────────────────────────────────────────────
 
 function fmt(n: number): string {
@@ -395,6 +410,10 @@ export default function ProdutoGiroPage({ companyKey }: ProdutoGiroPageProps) {
   const [diarioLoading, setDiarioLoading] = useState(false);
   const [diarioError, setDiarioError] = useState<string | null>(null);
 
+  // Painel "Vendas por filial" (quebra do total do período por filial + %).
+  const [filiais, setFiliais] = useState<FiliaisResponse | null>(null);
+  const [filiaisLoading, setFiliaisLoading] = useState(false);
+
   const catraca = useCatracaDataCompra(companyKey, selectedFilial ?? "");
 
   // Debounce da busca (evita refazer filtro/métricas a cada tecla).
@@ -612,6 +631,40 @@ export default function ProdutoGiroPage({ companyKey }: ProdutoGiroPageProps) {
     return { dias: json.dias ?? [], itens: json.itens ?? [] };
   };
 
+  // Vendas por filial — mesmo escopo/filtros da tela. Reusado pelo painel e pelo export.
+  const fetchFiliaisData = async (): Promise<FiliaisResponse> => {
+    const params = new URLSearchParams({
+      company: companyKey,
+      start: formatDateForQuery(range.startDate),
+      end: formatDateForQuery(range.endDate),
+    });
+    if (selectedFilial) params.set("filial", selectedFilial);
+    chartProdutoIds.forEach((p) => params.append("produto", p));
+    const res = await fetch(`/api/produto-giro/filiais?${params.toString()}`, { cache: "no-store" });
+    const json = (await res.json()) as FiliaisResponse & { error?: string };
+    if (json.error) throw new Error(json.error);
+    return { totalVendas: json.totalVendas ?? 0, totalQtde: json.totalQtde ?? 0, filiais: json.filiais ?? [] };
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    setFiliaisLoading(true);
+    fetchFiliaisData()
+      .then((d) => {
+        if (!cancelled) setFiliais(d);
+      })
+      .catch(() => {
+        if (!cancelled) setFiliais(null);
+      })
+      .finally(() => {
+        if (!cancelled) setFiliaisLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyKey, selectedFilial, range.startDate, range.endDate, chartProdutoKey]);
+
   useEffect(() => {
     if (view !== "diario") return;
     let cancelled = false;
@@ -828,12 +881,19 @@ export default function ProdutoGiroPage({ companyKey }: ProdutoGiroPageProps) {
   };
 
   const handleExportXlsx = async () => {
-    // Puxa performance semanal + matriz diária em paralelo (mesmo escopo da tela).
-    const [performance, diarioExport] = await Promise.all([
+    // Puxa performance semanal + matriz diária + vendas por filial em paralelo (mesmo escopo).
+    const [performance, diarioExport, filiaisExport] = await Promise.all([
       fetchPerformanceParaExport(),
       (async () => {
         try {
           return await fetchDiarioData();
+        } catch {
+          return null;
+        }
+      })(),
+      (async () => {
+        try {
+          return await fetchFiliaisData();
         } catch {
           return null;
         }
@@ -873,6 +933,15 @@ export default function ProdutoGiroPage({ companyKey }: ProdutoGiroPageProps) {
       filialLabel: data?.displayName ?? null,
       performance,
       performanceLabel: "Performance semanal",
+      filiais: filiaisExport
+        ? filiaisExport.filiais.map((f) => ({
+            FILIAL: f.label,
+            TIPO: f.ecommerce ? "E-commerce" : "Loja física",
+            VENDAS: f.vendas,
+            QTDE: f.qtde,
+            PCT: Math.round(f.pct * 10) / 10,
+          }))
+        : null,
       diario: diarioExport
         ? {
             dias: diarioExport.dias,
@@ -924,6 +993,22 @@ export default function ProdutoGiroPage({ companyKey }: ProdutoGiroPageProps) {
   })();
 
   const metricasPct = metricsLoading && metricsLoading.total > 0 ? Math.round((metricsLoading.feito / metricsLoading.total) * 100) : 100;
+
+  // Vendas por filial com arredondamento por MAIOR RESTO: os reais inteiros exibidos somam
+  // exatamente o total (sem o "some R$1" de arredondar cada um e depois somar).
+  const filiaisDisplay = useMemo(() => {
+    if (!filiais || filiais.filiais.length === 0) return null;
+    const items = filiais.filiais;
+    const alvo = Math.round(filiais.totalVendas);
+    const floors = items.map((f) => Math.floor(f.vendas));
+    const resto = alvo - floors.reduce((s, v) => s + v, 0);
+    const ordem = items
+      .map((f, i) => ({ i, frac: f.vendas - Math.floor(f.vendas) }))
+      .sort((a, b) => b.frac - a.frac);
+    const disp = floors.slice();
+    for (let k = 0; k < resto && k < ordem.length; k++) disp[ordem[k].i] += 1;
+    return items.map((f, i) => ({ ...f, vendasDisplay: disp[i] }));
+  }, [filiais]);
 
   // Total geral por dia (agregado de TODOS os itens filtrados) — linha de topo da matriz diária.
   const diarioTotais = useMemo(() => {
@@ -1076,6 +1161,47 @@ export default function ProdutoGiroPage({ companyKey }: ProdutoGiroPageProps) {
             </>
           )}
         </div>
+      </div>
+
+      {/* Vendas por filial (quebra do total do período + %) */}
+      <div className={styles.filialCard}>
+        <div className={styles.filialHeader}>
+          <h3 className={styles.filialTitle}>Vendas por filial</h3>
+          <span className={styles.filialSub}>
+            {filiaisLoading
+              ? "Calculando…"
+              : filiais
+                ? `${fmt(filiais.filiais.length)} filial(is) · total ${fmtBRLc(filiais.totalVendas)}`
+                : ""}
+          </span>
+        </div>
+        {filiaisLoading && !filiaisDisplay ? (
+          <div className={styles.filialEmpty}>Carregando…</div>
+        ) : !filiaisDisplay ? (
+          <div className={styles.filialEmpty}>Sem vendas no período para os filtros selecionados.</div>
+        ) : (
+          <div className={styles.filialList}>
+            {filiaisDisplay.map((f) => (
+              <div key={f.key} className={styles.filialRow}>
+                <div className={styles.filialRowLabel}>
+                  <span className={styles.filialName}>{f.label}</span>
+                  {f.ecommerce && <span className={styles.filialTag}>online</span>}
+                </div>
+                <div className={styles.filialBarTrack}>
+                  <div
+                    className={`${styles.filialBar} ${f.ecommerce ? styles.filialBarEcom : ""}`}
+                    style={{ width: `${Math.max(1.5, f.pct)}%` }}
+                  />
+                </div>
+                <div className={styles.filialRowVal}>
+                  <span className={styles.filialVal}>{fmtBRL(f.vendasDisplay)}</span>
+                  <span className={styles.filialPct}>{f.pct.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%</span>
+                  <span className={styles.filialQtd}>{fmt(f.qtde)} un</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Performance semanal/mensal (comparação de crescimento) */}

@@ -60,6 +60,15 @@ export interface ProdutoGiroDiarioSheet {
   }>;
 }
 
+/** Linha da aba "Vendas por filial". */
+export interface ProdutoGiroFilialXlsxRow {
+  FILIAL: string;
+  TIPO: string;
+  VENDAS: number;
+  QTDE: number;
+  PCT: number;
+}
+
 function diaHeader(iso: string): string {
   const p = iso.split("-");
   return p.length === 3 ? `${p[2]}/${p[1]}` : iso;
@@ -78,6 +87,7 @@ export function exportProdutoGiroXlsx(
     performance?: ProdutoGiroPerfXlsxRow[];
     performanceLabel?: string;
     diario?: ProdutoGiroDiarioSheet | null;
+    filiais?: ProdutoGiroFilialXlsxRow[] | null;
   }
 ): void {
   if (rows.length === 0) {
@@ -125,6 +135,13 @@ export function exportProdutoGiroXlsx(
       { wch: 34 }, // BASE_COMPARACAO
     ];
     XLSX.utils.book_append_sheet(workbook, perfSheet, options.performanceLabel ?? "Performance");
+  }
+
+  // Aba extra: vendas por filial (+ % do total).
+  if (options.filiais && options.filiais.length > 0) {
+    const filialSheet = XLSX.utils.json_to_sheet(options.filiais);
+    filialSheet["!cols"] = [{ wch: 28 }, { wch: 12 }, { wch: 14 }, { wch: 10 }, { wch: 8 }];
+    XLSX.utils.book_append_sheet(workbook, filialSheet, "Vendas por filial");
   }
 
   // Aba extra: matriz de vendas por dia (item×cor nas linhas, um dia por coluna).

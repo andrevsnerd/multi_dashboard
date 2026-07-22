@@ -3695,13 +3695,13 @@
     "semantic_hash": ""
   },
   "components/stock/ProdutoGiroPage.tsx": {
-    "mtime": 1784740664.6355603,
-    "ast_hash": "a223f74f47d1b6b83fe8b016f64d74e2",
+    "mtime": 1784743870.9336824,
+    "ast_hash": "f68a3435761839ba9cf708e426f44900",
     "semantic_hash": ""
   },
   "lib/utils/exportProdutoGiroXlsx.ts": {
-    "mtime": 1784740683.677071,
-    "ast_hash": "f649f7ae92d7b960a3f6d3e572579170",
+    "mtime": 1784743854.9363377,
+    "ast_hash": "536edf3ce0e7cc1129f5b9e2da3e1f78",
     "semantic_hash": ""
   },
   "app/api/produto-giro/performance/route.ts": {
@@ -3732,6 +3732,26 @@
   "app/api/produto-giro/diario/route.ts": {
     "mtime": 1784739790.0661712,
     "ast_hash": "4ac033e19d6de1180024dc62004e5e72",
+    "semantic_hash": ""
+  },
+  "app/api/produto-giro/filiais/route.ts": {
+    "mtime": 1784743748.5597117,
+    "ast_hash": "aee8dc0eafe36ed9e19cbb9acde933a4",
+    "semantic_hash": ""
+  },
+  "scripts/diag-galeao-dup.mjs": {
+    "mtime": 1784744183.3445475,
+    "ast_hash": "e81caaee6fad0151ac242d4794b82a91",
+    "semantic_hash": ""
+  },
+  "scripts/verif-produto-giro-filiais.mjs": {
+    "mtime": 1784744038.51305,
+    "ast_hash": "988c1648c567dd75d7057b06d635a1f1",
+    "semantic_hash": ""
+  },
+  "scripts/verif-produto-giro-viscose.mjs": {
+    "mtime": 1784742023.337838,
+    "ast_hash": "9a3b213cc5e00a15927b36ab842c2926",
     "semantic_hash": ""
   }
 }
