@@ -116,9 +116,11 @@ export async function GET(request: Request) {
         const prev = base[idx - 1];
         let deltaPct: number | null = null;
         let deltaBase: "cheio" | "parcial-equivalente" | null = null;
+        let deltaBaseVendas: number | null = null;
 
         if (prev) {
           if (cur.b.partial) {
+            // Compara SÓ os dias já corridos contra os MESMOS dias da semana anterior.
             const prevStart = prev.b.start;
             const prevEndEquivalente = new Date(
               prevStart.getFullYear(),
@@ -126,13 +128,17 @@ export async function GET(request: Request) {
               prevStart.getDate() + (cur.b.dias - 1)
             );
             const prevEquivalente = await somaVendas(prevStart, prevEndEquivalente);
+            deltaBase = "parcial-equivalente";
+            deltaBaseVendas = prevEquivalente.vendas;
             if (prevEquivalente.vendas > 0) {
               deltaPct = ((cur.vendas - prevEquivalente.vendas) / prevEquivalente.vendas) * 100;
             }
-            deltaBase = "parcial-equivalente";
-          } else if (prev.vendas > 0) {
-            deltaPct = ((cur.vendas - prev.vendas) / prev.vendas) * 100;
+          } else {
             deltaBase = "cheio";
+            deltaBaseVendas = prev.vendas;
+            if (prev.vendas > 0) {
+              deltaPct = ((cur.vendas - prev.vendas) / prev.vendas) * 100;
+            }
           }
         }
 
@@ -146,6 +152,7 @@ export async function GET(request: Request) {
           partial: cur.b.partial,
           deltaPct,
           deltaBase,
+          deltaBaseVendas,
         };
       })
     );

@@ -97,6 +97,27 @@ interface CurvaAbcResponse {
 
 type SortKey = "dura" | "vendas" | "qtde" | "estoque" | "mediaDiaria";
 
+type GiroView = "resumo" | "diario";
+
+interface DiarioItem {
+  produto: string;
+  cor: string;
+  corDescricao: string;
+  descricao: string;
+  codigoBarra: string;
+  subgrupo: string;
+  colecao: string;
+  grade: string;
+  porDia: Record<string, number>;
+  totalQtde: number;
+  totalVendas: number;
+}
+
+interface DiarioResponse {
+  dias: string[];
+  itens: DiarioItem[];
+}
+
 // ─── Formatação ──────────────────────────────────────────────────────────────
 
 function fmt(n: number): string {
@@ -115,6 +136,13 @@ function fmtBRLc(n: number): string {
 const MESES_PT = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 function fmtDataCurta(d: Date): string {
   return `${String(d.getDate()).padStart(2, "0")}/${MESES_PT[d.getMonth()]}/${String(d.getFullYear()).slice(2)}`;
+}
+
+/** 'yyyy-MM-dd' → 'dd/mm' (cabeçalho das colunas de dia). */
+function fmtDiaCurto(iso: string): string {
+  const parts = iso.split("-");
+  if (parts.length !== 3) return iso;
+  return `${parts[2]}/${parts[1]}`;
 }
 
 function getCurrentMonthRange(): DateRangeValue {
@@ -145,6 +173,21 @@ function calcDuracaoDias(estoque: number, mediaDiaria: number): number | null {
   if (mediaDiaria <= 0) return null;
   if (estoque <= 0) return 0;
   return estoque / mediaDiaria;
+}
+
+/**
+ * Heatmap sequencial (azul, claro→escuro) da matriz diária: o fundo carrega a magnitude,
+ * o número fica em tinta. Zero recua pro fundo; negativo (net trocas) vira vermelho.
+ * Buckets fixos porque os valores por dia são inteiros pequenos.
+ */
+function diarioHeatClass(q: number): string {
+  if (q < 0) return styles.diarioNeg;
+  if (q === 0) return styles.diarioZero;
+  if (q === 1) return styles.diarioL1;
+  if (q <= 3) return styles.diarioL2;
+  if (q <= 6) return styles.diarioL3;
+  if (q <= 9) return styles.diarioL4;
+  return styles.diarioL5;
 }
 
 function duraClass(dias: number | null): string {
@@ -346,6 +389,12 @@ export default function ProdutoGiroPage({ companyKey }: ProdutoGiroPageProps) {
   const [sortKey, setSortKey] = useState<SortKey>("dura");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
+  // Aba "Vendas por dia" (matriz item×cor × dias do período).
+  const [view, setView] = useState<GiroView>("resumo");
+  const [diario, setDiario] = useState<DiarioResponse | null>(null);
+  const [diarioLoading, setDiarioLoading] = useState(false);
+  const [diarioError, setDiarioError] = useState<string | null>(null);
+
   const catraca = useCatracaDataCompra(companyKey, selectedFilial ?? "");
 
   // Debounce da busca (evita refazer filtro/métricas a cada tecla).
@@ -545,6 +594,48 @@ export default function ProdutoGiroPage({ companyKey }: ProdutoGiroPageProps) {
     for (const p of produtosFiltrados) s.add(p.produto);
     return Array.from(s).slice(0, 1500); // teto de segurança p/ a cláusula IN
   }, [selectedProdutos, hasClientFilter, produtosFiltrados]);
+  const chartProdutoKey = useMemo(() => [...chartProdutoIds].sort().join(","), [chartProdutoIds]);
+
+  // Matriz "vendas por dia" (item×cor × cada dia do período), no MESMO escopo/filtros da tela.
+  // Reusada pela aba e pelo export. Uma consulta por dia à lógica canônica (bate com o total).
+  const fetchDiarioData = async (): Promise<DiarioResponse> => {
+    const params = new URLSearchParams({
+      company: companyKey,
+      start: formatDateForQuery(range.startDate),
+      end: formatDateForQuery(range.endDate),
+    });
+    if (selectedFilial) params.set("filial", selectedFilial);
+    chartProdutoIds.forEach((p) => params.append("produto", p));
+    const res = await fetch(`/api/produto-giro/diario?${params.toString()}`, { cache: "no-store" });
+    const json = (await res.json()) as DiarioResponse & { error?: string };
+    if (json.error) throw new Error(json.error);
+    return { dias: json.dias ?? [], itens: json.itens ?? [] };
+  };
+
+  useEffect(() => {
+    if (view !== "diario") return;
+    let cancelled = false;
+    setDiarioLoading(true);
+    setDiarioError(null);
+    fetchDiarioData()
+      .then((d) => {
+        if (!cancelled) setDiario(d);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDiario(null);
+          setDiarioError("Não foi possível carregar as vendas por dia.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setDiarioLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // fetchDiarioData lê os primitivos abaixo do closure; chartProdutoKey resume a seleção.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, companyKey, selectedFilial, range.startDate, range.endDate, chartProdutoKey]);
 
   // ── Carrega as métricas (ritmo/estoque) dos itens visíveis, em lotes, com cache.
   //    Mesma fonte da Curva ABC (/api/controle-estoque/metricas-itens) → compra ideal idêntica.
@@ -705,15 +796,31 @@ export default function ProdutoGiroPage({ companyKey }: ProdutoGiroPageProps) {
       chartProdutoIds.forEach((p) => params.append("produto", p));
       const res = await fetch(`/api/produto-giro/performance?${params.toString()}`, { cache: "no-store" });
       const json = (await res.json()) as {
-        points?: Array<{ label: string; startIso: string; endIso: string; vendas: number; qtde: number; deltaPct: number | null }>;
+        points?: Array<{
+          label: string;
+          startIso: string;
+          endIso: string;
+          dias: number;
+          vendas: number;
+          qtde: number;
+          deltaPct: number | null;
+          deltaBase: "cheio" | "parcial-equivalente" | null;
+        }>;
       };
       return (json.points ?? []).map((pt) => ({
         PERIODO: pt.label,
         INICIO: pt.startIso,
         FIM: pt.endIso,
+        DIAS: pt.dias,
         VENDAS: pt.vendas,
         QTDE: pt.qtde,
         VAR_PCT_VS_ANTERIOR: pt.deltaPct == null ? "" : Math.round(pt.deltaPct * 10) / 10,
+        BASE_COMPARACAO:
+          pt.deltaPct == null
+            ? "—"
+            : pt.deltaBase === "parcial-equivalente"
+              ? `mesmos ${pt.dias} ${pt.dias === 1 ? "dia" : "dias"} da semana passada`
+              : "semana anterior",
       }));
     } catch {
       return [];
@@ -721,7 +828,17 @@ export default function ProdutoGiroPage({ companyKey }: ProdutoGiroPageProps) {
   };
 
   const handleExportXlsx = async () => {
-    const performance = await fetchPerformanceParaExport();
+    // Puxa performance semanal + matriz diária em paralelo (mesmo escopo da tela).
+    const [performance, diarioExport] = await Promise.all([
+      fetchPerformanceParaExport(),
+      (async () => {
+        try {
+          return await fetchDiarioData();
+        } catch {
+          return null;
+        }
+      })(),
+    ]);
     const rows: ProdutoGiroXlsxRow[] = sortedRows.map(({ p, estoque, mediaDiariaUn, duraDias, acabaEm }) => {
       const { ideal } = computeIdealFor(p);
       const lente =
@@ -756,6 +873,22 @@ export default function ProdutoGiroPage({ companyKey }: ProdutoGiroPageProps) {
       filialLabel: data?.displayName ?? null,
       performance,
       performanceLabel: "Performance semanal",
+      diario: diarioExport
+        ? {
+            dias: diarioExport.dias,
+            itens: diarioExport.itens.map((it) => ({
+              produto: it.produto,
+              descricao: it.descricao || it.produto.trim(),
+              cor: it.corDescricao || it.cor || "",
+              subgrupo: it.subgrupo,
+              colecao: it.colecao,
+              grade: it.grade,
+              totalQtde: it.totalQtde,
+              totalVendas: it.totalVendas,
+              porDia: it.porDia,
+            })),
+          }
+        : null,
     });
   };
 
@@ -791,6 +924,20 @@ export default function ProdutoGiroPage({ companyKey }: ProdutoGiroPageProps) {
   })();
 
   const metricasPct = metricsLoading && metricsLoading.total > 0 ? Math.round((metricsLoading.feito / metricsLoading.total) * 100) : 100;
+
+  // Total geral por dia (agregado de TODOS os itens filtrados) — linha de topo da matriz diária.
+  const diarioTotais = useMemo(() => {
+    if (!diario || diario.itens.length === 0) return null;
+    const porDia: Record<string, number> = {};
+    let totalQtde = 0;
+    let totalVendas = 0;
+    for (const it of diario.itens) {
+      totalQtde += it.totalQtde;
+      totalVendas += it.totalVendas;
+      for (const d of diario.dias) porDia[d] = (porDia[d] ?? 0) + (it.porDia[d] ?? 0);
+    }
+    return { porDia, totalQtde, totalVendas };
+  }, [diario]);
 
   return (
     <div className={styles.wrapper}>
@@ -952,7 +1099,26 @@ export default function ProdutoGiroPage({ companyKey }: ProdutoGiroPageProps) {
         </div>
       )}
 
-      {/* Tabela */}
+      {/* Abas */}
+      <div className={styles.tabBar}>
+        <button
+          type="button"
+          className={`${styles.tabBtn} ${view === "resumo" ? styles.tabBtnActive : ""}`}
+          onClick={() => setView("resumo")}
+        >
+          Resumo (item × cor)
+        </button>
+        <button
+          type="button"
+          className={`${styles.tabBtn} ${view === "diario" ? styles.tabBtnActive : ""}`}
+          onClick={() => setView("diario")}
+        >
+          Vendas por dia
+        </button>
+      </div>
+
+      {/* Tabela — Resumo */}
+      {view === "resumo" && (
       <div className={styles.tableCard}>
         {metricsLoading && metricsLoading.feito < metricsLoading.total && (
           <div className={styles.progressBar}>
@@ -1081,6 +1247,80 @@ export default function ProdutoGiroPage({ companyKey }: ProdutoGiroPageProps) {
           {" "}Compra sugerida usa o mesmo motor da Curva A,B,C (ritmo dos últimos 12 meses + trânsito).
         </div>
       </div>
+      )}
+
+      {/* Tabela — Vendas por dia (matriz item×cor × dias) */}
+      {view === "diario" && (
+      <div className={styles.tableCard}>
+        {diarioLoading ? (
+          <div className={styles.emptyState}>Carregando vendas por dia… (uma consulta por dia do período)</div>
+        ) : diarioError ? (
+          <div className={styles.emptyState}>{diarioError}</div>
+        ) : !diario || diario.itens.length === 0 ? (
+          <div className={styles.emptyState}>Sem vendas no período para os filtros selecionados.</div>
+        ) : (
+          <>
+            <div className={styles.tableScroll}>
+              <table className={`${styles.table} ${styles.diarioTable}`}>
+                <thead>
+                  <tr>
+                    <th className={`${styles.thLeft} ${styles.diarioStickyProduto}`}>Produto</th>
+                    {porCor && <th className={`${styles.thLeft} ${styles.diarioStickyCor}`}>Cor</th>}
+                    <th className={styles.diarioTotalCol}>Total</th>
+                    {diario.dias.map((d) => (
+                      <th key={d} className={styles.diarioDiaCol}>{fmtDiaCurto(d)}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {diarioTotais && (
+                    <tr className={styles.diarioTotalRow}>
+                      <td className={`${styles.tdProduto} ${styles.diarioStickyProduto}`}>
+                        <div className={styles.produtoName}>TOTAL GERAL</div>
+                        <div className={styles.produtoCode}>{fmt(diario.itens.length)} itens · {fmtBRL(diarioTotais.totalVendas)}</div>
+                      </td>
+                      {porCor && <td className={`${styles.tdCor} ${styles.diarioStickyCor}`}>—</td>}
+                      <td className={`${styles.num} ${styles.strong} ${styles.diarioTotalCol}`}>{fmt(diarioTotais.totalQtde)}</td>
+                      {diario.dias.map((d) => {
+                        const q = diarioTotais.porDia[d] ?? 0;
+                        return (
+                          <td key={d} className={`${styles.num} ${styles.diarioDiaCol} ${q === 0 ? styles.diarioZero : ""}`}>
+                            {q === 0 ? "·" : fmt(q)}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  )}
+                  {diario.itens.map((it) => (
+                    <tr key={`${it.produto}||${it.cor}`}>
+                      <td className={`${styles.tdProduto} ${styles.diarioStickyProduto}`}>
+                        <div className={styles.produtoName}>{it.descricao || it.produto.trim()}</div>
+                        <div className={styles.produtoCode}>{(it.codigoBarra || it.produto).trim()}</div>
+                      </td>
+                      {porCor && <td className={`${styles.tdCor} ${styles.diarioStickyCor}`}>{it.corDescricao || it.cor || "—"}</td>}
+                      <td className={`${styles.num} ${styles.strong} ${styles.diarioTotalCol}`}>{fmt(it.totalQtde)}</td>
+                      {diario.dias.map((d) => {
+                        const q = it.porDia[d] ?? 0;
+                        return (
+                          <td key={d} className={`${styles.num} ${styles.diarioDiaCol} ${diarioHeatClass(q)}`}>
+                            {q === 0 ? "·" : fmt(q)}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className={styles.footNote}>
+              {fmt(diario.itens.length)} item(ns) × {fmt(diario.dias.length)} dia(s). Quantidade líquida vendida por dia
+              (venda − trocas), da mesma lógica validada — a soma dos dias bate com o total do período.
+              {chartProdutoIds.length === 0 ? " Sem filtro: mostra os itens mais vendidos da rede (top 2.000)." : " Escopo = filtros/seleção da tela."}
+            </div>
+          </>
+        )}
+      </div>
+      )}
     </div>
   );
 }

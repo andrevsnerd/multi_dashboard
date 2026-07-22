@@ -27,9 +27,11 @@ interface PerfPoint {
   /** Dias já decorridos no período (7 numa semana fechada; <7 na parcial). */
   dias: number;
   partial: boolean;
-  /** Variação vs período anterior (%). Na parcial, compara os mesmos dias decorridos. */
+  /** Variação vs período anterior (%). Na em-curso, compara os mesmos dias decorridos. */
   deltaPct: number | null;
   deltaBase: "cheio" | "parcial-equivalente" | null;
+  /** Valor (R$) usado como base da comparação (período anterior cheio ou mesmos N dias). */
+  deltaBaseVendas: number | null;
 }
 
 interface ProdutoGiroPerformanceChartProps {
@@ -228,6 +230,7 @@ export default function ProdutoGiroPerformanceChart({
                         <div style={{ fontWeight: 700, marginBottom: 4 }}>
                           {mode === "week" ? "Semana de " : ""}
                           {p.label}
+                          {p.partial ? ` · ${p.dias} ${p.dias === 1 ? "dia corrido" : "dias corridos"}` : ""}
                         </div>
                         <div>
                           Vendido: <strong>{fmtBRL(p.vendas)}</strong>
@@ -235,15 +238,27 @@ export default function ProdutoGiroPerformanceChart({
                         <div style={{ opacity: 0.75 }}>Quantidade: {p.qtde.toLocaleString("pt-BR")} un</div>
                         <div style={{ marginTop: 5, paddingTop: 5, borderTop: `1px solid ${c.tooltipBorder}` }}>
                           {p.deltaPct == null ? (
-                            <span style={{ opacity: 0.6 }}>sem {periodo} anterior p/ comparar</span>
+                            <span style={{ opacity: 0.6 }}>
+                              {p.deltaBaseVendas === 0
+                                ? `${periodo} anterior sem venda p/ comparar`
+                                : `sem ${periodo} anterior p/ comparar`}
+                            </span>
                           ) : (
-                            <>
+                            <div>
                               <span style={{ color: deltaUp ? "#22c55e" : "#ef4444", fontWeight: 700 }}>
                                 {deltaUp ? "▲" : "▼"}{" "}
                                 {Math.abs(p.deltaPct).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%
                               </span>{" "}
-                              <span style={{ opacity: 0.7 }}>vs {periodo} anterior</span>
-                            </>
+                              <span style={{ opacity: 0.7 }}>
+                                vs{" "}
+                                {p.deltaBase === "parcial-equivalente"
+                                  ? `os mesmos ${p.dias} ${p.dias === 1 ? "dia" : "dias"} da ${periodo} passada`
+                                  : `${periodo} anterior`}
+                              </span>
+                              {p.deltaBaseVendas != null && p.deltaBaseVendas > 0 && (
+                                <span style={{ opacity: 0.55 }}> ({fmtBRL(p.deltaBaseVendas)})</span>
+                              )}
+                            </div>
                           )}
                         </div>
                       </div>

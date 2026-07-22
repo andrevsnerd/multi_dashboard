@@ -36,14 +36,38 @@ export interface ProdutoGiroPerfXlsxRow {
   PERIODO: string;
   INICIO: string;
   FIM: string;
+  DIAS: number;
   VENDAS: number;
   QTDE: number;
   VAR_PCT_VS_ANTERIOR: number | "";
+  /** Base da % (ex.: "semana anterior" ou "mesmos 3 dias da semana passada"). */
+  BASE_COMPARACAO: string;
+}
+
+/** Matriz "vendas por dia": cada linha é um item×cor; colunas de dia são dinâmicas (dd/mm). */
+export interface ProdutoGiroDiarioSheet {
+  dias: string[]; // ISO yyyy-MM-dd, na ordem das colunas
+  itens: Array<{
+    produto: string;
+    descricao: string;
+    cor: string;
+    subgrupo: string;
+    colecao: string;
+    grade: string;
+    totalQtde: number;
+    totalVendas: number;
+    porDia: Record<string, number>;
+  }>;
+}
+
+function diaHeader(iso: string): string {
+  const p = iso.split("-");
+  return p.length === 3 ? `${p[2]}/${p[1]}` : iso;
 }
 
 /**
- * Exporta a tabela (item × cor) numa aba e, opcionalmente, a performance por período
- * numa segunda aba. Ambas já refletem os filtros/escopo da tela (quem monta as linhas é a página).
+ * Exporta a tabela (item × cor) numa aba e, opcionalmente, a performance por período e a
+ * matriz de vendas por dia em abas extras. Todas já refletem os filtros/escopo da tela.
  */
 export function exportProdutoGiroXlsx(
   rows: ProdutoGiroXlsxRow[],
@@ -53,6 +77,7 @@ export function exportProdutoGiroXlsx(
     filialLabel?: string | null;
     performance?: ProdutoGiroPerfXlsxRow[];
     performanceLabel?: string;
+    diario?: ProdutoGiroDiarioSheet | null;
   }
 ): void {
   if (rows.length === 0) {
@@ -93,11 +118,70 @@ export function exportProdutoGiroXlsx(
       { wch: 16 }, // PERIODO
       { wch: 12 }, // INICIO
       { wch: 12 }, // FIM
+      { wch: 7 }, // DIAS
       { wch: 14 }, // VENDAS
       { wch: 10 }, // QTDE
       { wch: 18 }, // VAR_PCT_VS_ANTERIOR
+      { wch: 34 }, // BASE_COMPARACAO
     ];
     XLSX.utils.book_append_sheet(workbook, perfSheet, options.performanceLabel ?? "Performance");
+  }
+
+  // Aba extra: matriz de vendas por dia (item×cor nas linhas, um dia por coluna).
+  if (options.diario && options.diario.itens.length > 0 && options.diario.dias.length > 0) {
+    const { dias, itens } = options.diario;
+    const aoa: (string | number)[][] = [];
+    // Cabeçalho
+    aoa.push([
+      "PRODUTO",
+      "DESCRICAO",
+      "COR",
+      "SUBGRUPO",
+      "COLECAO",
+      "GRADE",
+      "TOTAL_QTDE",
+      "TOTAL_VENDAS",
+      ...dias.map(diaHeader),
+    ]);
+    // Linha de TOTAL GERAL (agregado de todos os itens por dia), logo após o cabeçalho.
+    const totalPorDia = dias.map((d) => itens.reduce((s, it) => s + (it.porDia[d] ?? 0), 0));
+    aoa.push([
+      "TOTAL GERAL",
+      `${itens.length} itens`,
+      "",
+      "",
+      "",
+      "",
+      itens.reduce((s, it) => s + it.totalQtde, 0),
+      itens.reduce((s, it) => s + it.totalVendas, 0),
+      ...totalPorDia,
+    ]);
+    for (const it of itens) {
+      aoa.push([
+        it.produto.trim(),
+        it.descricao,
+        it.cor,
+        it.subgrupo,
+        it.colecao,
+        it.grade,
+        it.totalQtde,
+        it.totalVendas,
+        ...dias.map((d) => it.porDia[d] ?? 0),
+      ]);
+    }
+    const diarioSheet = XLSX.utils.aoa_to_sheet(aoa);
+    diarioSheet["!cols"] = [
+      { wch: 14 },
+      { wch: 40 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 16 },
+      { wch: 10 },
+      { wch: 12 },
+      { wch: 14 },
+      ...dias.map(() => ({ wch: 7 })),
+    ];
+    XLSX.utils.book_append_sheet(workbook, diarioSheet, "Vendas por dia");
   }
 
   const filialPart = options.filialLabel ? `-${safeFilenamePart(options.filialLabel)}` : "";

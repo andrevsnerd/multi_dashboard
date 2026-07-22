@@ -5,6 +5,110 @@
   padding: 4px 2px 48px;
 }
 
+/* ── Abas ───────────────────────────────────────────────────────────────── */
+.tabBar {
+  display: flex;
+  gap: 6px;
+  margin-bottom: -8px;
+}
+.tabBtn {
+  height: 36px;
+  padding: 0 16px;
+  border: 1px solid var(--b-200);
+  border-bottom: none;
+  border-radius: 10px 10px 0 0;
+  background: var(--s-50);
+  color: var(--t-500);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.tabBtn:hover {
+  color: var(--t-800);
+}
+.tabBtnActive {
+  background: var(--s-white);
+  color: var(--t-900);
+  border-color: var(--b-200);
+}
+
+/* ── Matriz vendas por dia ──────────────────────────────────────────────── */
+.diarioTable td,
+.diarioTable th {
+  border-right: 1px solid var(--b-subtle);
+}
+.diarioDiaCol {
+  min-width: 46px;
+  text-align: right;
+}
+.diarioTotalCol {
+  min-width: 60px;
+  background: var(--s-50);
+}
+/* Célula zero: recua pro fundo. */
+.diarioZero {
+  color: var(--t-400);
+  font-weight: 400;
+}
+
+/* Heatmap sequencial (azul, claro→escuro). Texto fica em tinta; o fundo dá a magnitude.
+   Passos claros da rampa validada — tinta escura lê bem em todos exceto o topo (branco). */
+.diarioL1 { background: #eef5fd; color: #1e3a5f; }
+.diarioL2 { background: #d3e5fb; color: #1a3556; }
+.diarioL3 { background: #aecdf5; color: #14304f; }
+.diarioL4 { background: #86b6ef; color: #10294a; }
+.diarioL5 { background: #256abf; color: #ffffff; font-weight: 700; }
+
+/* Negativo (net de trocas > vendas no dia) = vermelho. */
+.diarioNeg {
+  background: rgba(208, 59, 59, 0.09);
+  color: #c0392b;
+  font-weight: 700;
+}
+
+/* Dark mode: mesma ideia, mas os passos partem do fundo navy e clareiam com a magnitude
+   (não é um "flip" automático — tons próprios pro fundo escuro). */
+:global(:root[data-theme="dark"]) .diarioL1 { background: rgba(57, 135, 229, 0.12); color: var(--t-700); }
+:global(:root[data-theme="dark"]) .diarioL2 { background: rgba(57, 135, 229, 0.22); color: var(--t-800); }
+:global(:root[data-theme="dark"]) .diarioL3 { background: rgba(57, 135, 229, 0.36); color: #eaf2fe; }
+:global(:root[data-theme="dark"]) .diarioL4 { background: rgba(57, 135, 229, 0.54); color: #ffffff; }
+:global(:root[data-theme="dark"]) .diarioL5 { background: rgba(57, 135, 229, 0.78); color: #ffffff; }
+:global(:root[data-theme="dark"]) .diarioNeg { background: rgba(230, 103, 103, 0.14); color: #f8a3a3; }
+.diarioStickyProduto {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background: var(--s-white);
+  min-width: 220px;
+  max-width: 220px;
+}
+.diarioStickyCor {
+  position: sticky;
+  left: 220px;
+  z-index: 3;
+  background: var(--s-white);
+  min-width: 130px;
+  max-width: 130px;
+}
+/* Cabeçalho: cantos fixos ficam acima das colunas de dia (sticky top + left). */
+.diarioTable thead .diarioStickyProduto,
+.diarioTable thead .diarioStickyCor {
+  z-index: 5;
+  background: var(--s-50);
+}
+
+/* Linha de TOTAL GERAL — destaque no topo do corpo. */
+.diarioTotalRow td {
+  background: var(--s-blue50);
+  font-weight: 700;
+  color: var(--t-900);
+  border-bottom: 2px solid var(--b-300);
+}
+.diarioTotalRow .produtoCode {
+  font-weight: 500;
+  color: var(--t-600);
+}
+
 /* ── Header ─────────────────────────────────────────────────────────────── */
 .headerCard {
   background: var(--s-white);
@@ -309,8 +413,13 @@
   color: var(--t-800);
   white-space: nowrap;
 }
-.table tbody tr:hover td {
+.table:not(.diarioTable) tbody tr:hover td {
   background: var(--s-50);
+}
+/* Matriz diária: o hover destaca só as colunas de rótulo (Produto/Cor) pra não apagar o heatmap. */
+.diarioTable tbody tr:hover .diarioStickyProduto,
+.diarioTable tbody tr:hover .diarioStickyCor {
+  background: var(--s-100);
 }
 .tdProduto {
   text-align: left;

@@ -3695,23 +3695,23 @@
     "semantic_hash": ""
   },
   "components/stock/ProdutoGiroPage.tsx": {
-    "mtime": 1784738548.5333705,
-    "ast_hash": "3f7c614536e670cc15ed29fce00e2170",
+    "mtime": 1784741093.4625933,
+    "ast_hash": "d4bee837c9fa8bc770f7f791c6df77aa",
     "semantic_hash": ""
   },
   "lib/utils/exportProdutoGiroXlsx.ts": {
-    "mtime": 1784738495.264167,
-    "ast_hash": "b6f46c60b92f2c2a5154224373235603",
+    "mtime": 1784740683.677071,
+    "ast_hash": "f649f7ae92d7b960a3f6d3e572579170",
     "semantic_hash": ""
   },
   "app/api/produto-giro/performance/route.ts": {
-    "mtime": 1784731772.1512868,
-    "ast_hash": "0bf71977bc3adbdb833501028bd8b7c3",
+    "mtime": 1784739272.6275232,
+    "ast_hash": "7d6ded0f9338e3e3437ccb841aac28a0",
     "semantic_hash": ""
   },
   "components/stock/ProdutoGiroPerformanceChart.tsx": {
-    "mtime": 1784738117.5956945,
-    "ast_hash": "88b7b451ceaea11cf47d52c5f35343dd",
+    "mtime": 1784739297.9098055,
+    "ast_hash": "e48292e9283b760353e6d013a66f26f2",
     "semantic_hash": ""
   },
   "app/(companies)/[company]/produto-projecao-compra/page.tsx": {
@@ -3727,6 +3727,11 @@
   "components/stock/ProdutoProjecaoCompraPage.tsx": {
     "mtime": 1784730668.5220857,
     "ast_hash": "a97be4856367a14b4878484326e888e3",
+    "semantic_hash": ""
+  },
+  "app/api/produto-giro/diario/route.ts": {
+    "mtime": 1784739790.0661712,
+    "ast_hash": "4ac033e19d6de1180024dc62004e5e72",
     "semantic_hash": ""
   }
 }
