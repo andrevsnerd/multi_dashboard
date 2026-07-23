@@ -2101,7 +2101,7 @@
 /* Âmbar (item parado) */
 :global(:root[data-theme="dark"]) .tooltipParado,
 :global(:root[data-theme="dark"]) .tooltipParado strong {
-  color: #fbbf24;
+  color: #c4b5fd;
 }
 
 /* Foco do input de quantidade real → azul */
