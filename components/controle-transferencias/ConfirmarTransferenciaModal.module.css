@@ -322,3 +322,42 @@
   cursor: not-allowed;
   transform: none;
 }
+
+/* ── DARK — acentos na paleta do app (superfícies já são tokens) ── */
+:global(:root[data-theme="dark"]) .confirmarTransferenciaBoxIcon {
+  color: #c4b5fd;
+}
+:global(:root[data-theme="dark"]) .confirmarTransferenciaHouseIcon.origemIcon {
+  color: #60a5fa;
+}
+:global(:root[data-theme="dark"]) .confirmarTransferenciaHouseIcon.destinoIcon {
+  color: #c4b5fd;
+}
+:global(:root[data-theme="dark"]) .confirmarTransferenciaFilialBadge.origemBadge {
+  background: rgba(59, 130, 246, 0.16);
+  color: #93c5fd;
+}
+:global(:root[data-theme="dark"]) .confirmarTransferenciaFilialBadge.destinoBadge {
+  background: rgba(196, 181, 253, 0.2);
+  color: #c4b5fd;
+}
+:global(:root[data-theme="dark"]) .confirmarTransferenciaInfoCard {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.28);
+}
+:global(:root[data-theme="dark"]) .confirmarTransferenciaQuantidadeInput:focus {
+  border-color: #60a5fa;
+}
+:global(:root[data-theme="dark"]) .confirmarTransferenciaError {
+  background: rgba(244, 63, 94, 0.14);
+  color: #fb7185;
+  border-color: rgba(244, 63, 94, 0.35);
+}
+:global(:root[data-theme="dark"]) .confirmarTransferenciaFooterHint {
+  color: #fb7185;
+}
+:global(:root[data-theme="dark"]) .confirmarTransferenciaConfirm {
+  background: #c4b5fd;
+  color: #1b1630;
+  box-shadow: none;
+}

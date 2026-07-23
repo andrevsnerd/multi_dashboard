@@ -1884,13 +1884,29 @@
 
 /* ── TEMA NOTURNO ── overrides escopados; tema claro intacto ── */
 
-/* Tabs do destinationHeader / pílula ativa */
+/* Tabs do destinationHeader — grupo/pílula recalibrados p/ o header neutro dark */
+:global(:root[data-theme="dark"]) .destinationTabs {
+  background: rgba(255, 255, 255, 0.06);
+}
+:global(:root[data-theme="dark"]) .destinationTab {
+  color: var(--t-500);
+}
+:global(:root[data-theme="dark"]) .destinationTab:hover:not(.destinationTabActive) {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--t-800);
+}
+:global(:root[data-theme="dark"]) .destinationTabBadge {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--t-600);
+}
 :global(:root[data-theme="dark"]) .destinationTabActive {
-  color: #4ade80;
+  background: rgba(196, 181, 253, 0.18);
+  color: #c4b5fd;
+  box-shadow: none;
 }
 :global(:root[data-theme="dark"]) .destinationTabActive .destinationTabBadge {
-  background: rgba(34, 197, 94, 0.12);
-  color: #4ade80;
+  background: rgba(196, 181, 253, 0.28);
+  color: #c4b5fd;
 }
 
 /* Aba Realizadas: status */
@@ -1899,16 +1915,16 @@
   color: #fbbf24;
 }
 :global(:root[data-theme="dark"]) .realizadasStatusConfirmada {
-  background: rgba(34, 197, 94, 0.12);
-  color: #4ade80;
+  background: rgba(45, 212, 191, 0.14);
+  color: #5eead4;
 }
 :global(:root[data-theme="dark"]) .realizadasFooterLink {
   color: #5eead4;
 }
 
-/* Botão de transferência em lote (texto verde) */
+/* Botão de transferência em lote → lavanda da marca */
 :global(:root[data-theme="dark"]) .bulkTransferBtn {
-  color: #4ade80;
+  color: #c4b5fd;
 }
 
 /* Lista de itens do modal */
@@ -1916,20 +1932,20 @@
   color: var(--b-300);
 }
 :global(:root[data-theme="dark"]) .modalItemQtyNumber {
-  color: #4ade80;
+  color: #93c5fd;
 }
 :global(:root[data-theme="dark"]) .modalItemQtyUnit {
-  color: #4ade80;
+  color: #93c5fd;
 }
 
 /* Modal de confirmação: quantidade / erro / sucesso */
 :global(:root[data-theme="dark"]) .modalQuantidade {
-  background: rgba(34, 197, 94, 0.12);
-  border: 1px solid rgba(34, 197, 94, 0.35);
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.35);
 }
 :global(:root[data-theme="dark"]) .modalQuantidadeNumber,
 :global(:root[data-theme="dark"]) .modalQuantidadeLabel {
-  color: #4ade80;
+  color: #93c5fd;
 }
 :global(:root[data-theme="dark"]) .modalError {
   background: rgba(244, 63, 94, 0.12);
@@ -1937,15 +1953,15 @@
   color: #fb7185;
 }
 :global(:root[data-theme="dark"]) .modalSuccess {
-  background: rgba(34, 197, 94, 0.12);
-  border: 1px solid rgba(34, 197, 94, 0.35);
-  color: #4ade80;
+  background: rgba(45, 212, 191, 0.14);
+  border: 1px solid rgba(45, 212, 191, 0.35);
+  color: #5eead4;
 }
 
-/* Badge de grade (pílula amarela) */
+/* Badge de grade → chip neutro (era amarelo) */
 :global(:root[data-theme="dark"]) .gradeBadge {
-  background-color: rgba(234, 179, 8, 0.12);
-  color: #fbbf24;
+  background-color: rgba(148, 163, 184, 0.16);
+  color: #cbd5e1;
 }
 
 /* Tooltip de quantidade: status de urgência do destino */
@@ -1980,4 +1996,161 @@
 }
 :global(:root[data-theme="dark"]) .qttFooterSep {
   color: var(--b-300);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   DARK — mesma linguagem do Curva ABC: LAVANDA (marca) p/ ações, superfícies
+   NEUTRAS nos headers, azul só como tinta de info, rosa p/ negativo, âmbar p/
+   aviso. Sem verde, sem "azul-cinza". O tema claro fica intacto.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Headers de overlay (modal/tooltip) → superfície neutra elevada */
+:global(:root[data-theme="dark"]) .tooltipHeader,
+:global(:root[data-theme="dark"]) .modalHeader {
+  background: var(--s-100);
+}
+
+/* Header de ORIGEM (MATRIZ) → barra roxa sólida, claramente visível */
+:global(:root[data-theme="dark"]) .header {
+  background: linear-gradient(135deg, #3a3160 0%, #2c2548 100%);
+}
+:global(:root[data-theme="dark"]) .originIcon {
+  background-color: rgba(196, 181, 253, 0.28);
+}
+
+/* Sub-header de DESTINO ("Transferir para …") → barra roxa sólida (um pouco
+   mais clara que o card) que separa bem das linhas de item abaixo. */
+:global(:root[data-theme="dark"]) .destinationHeader {
+  background: #2c2547;
+}
+:global(:root[data-theme="dark"]) .destinationTotal {
+  background-color: rgba(196, 181, 253, 0.2);
+  color: #c4b5fd;
+}
+
+/* CTAs → lavanda sólida com texto escuro (igual Export/toggles do Curva ABC) */
+:global(:root[data-theme="dark"]) .exportButton,
+:global(:root[data-theme="dark"]) .exportButton:active,
+:global(:root[data-theme="dark"]) .transferirBtn,
+:global(:root[data-theme="dark"]) .modalBtnPrimary,
+:global(:root[data-theme="dark"]) .quantidadeRealSaveBtn {
+  background: #c4b5fd;
+  color: #1b1630;
+  box-shadow: none;
+}
+:global(:root[data-theme="dark"]) .exportButton:hover,
+:global(:root[data-theme="dark"]) .quantidadeRealSaveBtn:hover:not(:disabled) {
+  background: #b3a1fb;
+  box-shadow: none;
+}
+
+/* Negativo (destino negativo) → rosa translúcido */
+:global(:root[data-theme="dark"]) .transferirBtnDestinoNegativo,
+:global(:root[data-theme="dark"]) .transferirBtnDestinoNegativo:hover {
+  background: rgba(244, 63, 94, 0.16);
+  color: #fb7185;
+  box-shadow: none;
+}
+
+/* Origem = azul (fonte) · Destino = lavanda (alvo) */
+:global(:root[data-theme="dark"]) .origemBadge {
+  background-color: rgba(59, 130, 246, 0.18);
+  color: #93c5fd;
+}
+:global(:root[data-theme="dark"]) .destinoBadge {
+  background-color: rgba(196, 181, 253, 0.2);
+  color: #c4b5fd;
+}
+
+/* Quantidades → lavanda (igual à badge de destino) */
+:global(:root[data-theme="dark"]) .quantidadeBadge,
+:global(:root[data-theme="dark"]) .quantidadeBadge.quantidadeAjustada,
+:global(:root[data-theme="dark"]) .footerTotal,
+:global(:root[data-theme="dark"]) .quantidadeRealBadge {
+  background-color: rgba(196, 181, 253, 0.2);
+  color: #c4b5fd;
+}
+
+/* Contadores/seta/checkbox/link (antes verdes) → lavanda / neutro / azul */
+:global(:root[data-theme="dark"]) .bulkTransferCount {
+  background: rgba(196, 181, 253, 0.2);
+  color: #c4b5fd;
+}
+:global(:root[data-theme="dark"]) .modalItemsCount {
+  color: #c4b5fd;
+}
+:global(:root[data-theme="dark"]) .modalRouteArrow {
+  color: var(--t-500);
+}
+:global(:root[data-theme="dark"]) .selectCheckbox {
+  accent-color: #c4b5fd;
+}
+:global(:root[data-theme="dark"]) .realizadasFooterLink {
+  border-color: rgba(96, 165, 250, 0.4);
+}
+:global(:root[data-theme="dark"]) .realizadasFooterLink:hover {
+  background: rgba(59, 130, 246, 0.18);
+  color: #93c5fd;
+}
+
+/* Envio principal (roxo da marca) */
+:global(:root[data-theme="dark"]) .qttEnviarPrincipal strong {
+  color: #c4b5fd;
+}
+
+/* Âmbar (item parado) */
+:global(:root[data-theme="dark"]) .tooltipParado,
+:global(:root[data-theme="dark"]) .tooltipParado strong {
+  color: #fbbf24;
+}
+
+/* Foco do input de quantidade real → azul */
+:global(:root[data-theme="dark"]) .quantidadeRealInput:focus {
+  border-color: rgba(96, 165, 250, 0.55);
+  box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.45);
+}
+
+/* Desabilitados / badges neutros → neutros do app */
+:global(:root[data-theme="dark"]) .transferirBtn:disabled,
+:global(:root[data-theme="dark"]) .modalBtnPrimary:disabled {
+  background: var(--s-100);
+  color: var(--t-500);
+}
+:global(:root[data-theme="dark"]) .quantidadeBadge.quantidadeOverridden,
+:global(:root[data-theme="dark"]) .quantidadeBadge.quantidadeZero {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--t-500);
+}
+
+/* Linhas "realizada" (já transferido) → cinza neutro do app */
+:global(:root[data-theme="dark"]) .table tbody tr.rowRealizada {
+  border-left-color: var(--b-300);
+  background-color: rgba(255, 255, 255, 0.03);
+}
+:global(:root[data-theme="dark"]) .table tbody tr.rowRealizada:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+:global(:root[data-theme="dark"]) .rowRealizada .codigoBarraBadge,
+:global(:root[data-theme="dark"]) .rowRealizada .estoqueBadge,
+:global(:root[data-theme="dark"]) .rowRealizada .corBadge,
+:global(:root[data-theme="dark"]) .rowRealizada .quantidadeBadge,
+:global(:root[data-theme="dark"]) .rowRealizada .gradeBadge,
+:global(:root[data-theme="dark"]) .rowRealizada .destinoBadge {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: var(--t-600);
+}
+:global(:root[data-theme="dark"]) .realizadaTag {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--t-600);
+}
+:global(:root[data-theme="dark"]) .realizadaCheckbox {
+  accent-color: #64748b;
+}
+
+/* Tooltip de código de cor → superfície do app */
+:global(:root[data-theme="dark"]) .corCodigoTooltip {
+  background: var(--s-100);
+}
+:global(:root[data-theme="dark"]) .corCodigoTooltip::after {
+  border-top-color: var(--s-100);
 }

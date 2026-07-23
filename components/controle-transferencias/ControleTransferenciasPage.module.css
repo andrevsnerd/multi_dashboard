@@ -105,3 +105,21 @@
     font-size: 13px;
   }
 }
+
+/* ── DARK — acentos na paleta do app ── */
+:global(:root[data-theme="dark"]) .error {
+  color: #fb7185;
+}
+:global(:root[data-theme="dark"]) .infoBox {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: var(--b-200);
+}
+:global(:root[data-theme="dark"]) .infoIcon {
+  color: #c4b5fd;
+}
+:global(:root[data-theme="dark"]) .infoText {
+  color: var(--t-600);
+}
+:global(:root[data-theme="dark"]) .infoFilial {
+  color: #c4b5fd;
+}
