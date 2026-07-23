@@ -669,3 +669,17 @@
   font-size: 14px;
   border-radius: 8px;
 }
+
+/* DARK — pontos da legenda casam com as linhas dos gráficos (azul vivo / cinza-tracejado) */
+:global(:root[data-theme="dark"]) .chartLegendDotBlue {
+  background: #5b8cff;
+}
+
+:global(:root[data-theme="dark"]) .chartLegendDotGray {
+  background: #7a8699;
+}
+
+:global(:root[data-theme="dark"]) .modalError {
+  background: rgba(244, 63, 94, 0.14);
+  color: #fb7185;
+}

@@ -592,7 +592,7 @@ function Timeline({
   const [menu, setMenu] = useState<{ ym: string; label: string; x: number; y: number } | null>(null);
   const c =
     theme === "dark"
-      ? { grid: "rgba(148,163,184,0.16)", axisText: "#94a3b8", bar: "#3b4a63", tooltipBg: "#1a2433", tooltipBorder: "#29344b", tooltipText: "#cbd5e1" }
+      ? { grid: "rgba(255,255,255,0.06)", axisText: "#8b95a6", bar: "#4d7fff", tooltipBg: "#1b1f2a", tooltipBorder: "rgba(255,255,255,0.1)", tooltipText: "#cfd6e2" }
       : { grid: "#e2e8f0", axisText: "#64748b", bar: "#cbd5e1", tooltipBg: "#fff", tooltipBorder: "#e2e8f0", tooltipText: "#334155" };
   const COMPAR = "#22c55e";
   const ANALYZED = "#2563eb";

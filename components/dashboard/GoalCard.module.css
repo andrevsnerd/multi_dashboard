@@ -173,3 +173,40 @@
   color: #dc2626;
 }
 
+/* DARK — lift do card (sheen + highlight + sombra profunda). Não toca o claro. */
+:global(:root[data-theme="dark"]) .container {
+  background-image: var(--card-sheen);
+  border-color: var(--b-subtle);
+  box-shadow: var(--card-highlight), var(--elev-card);
+}
+
+/* DARK — número central (herói) mais brilhante */
+:global(:root[data-theme="dark"]) .percentage {
+  color: var(--t-900);
+}
+
+/* DARK — caixa "Meta": o fill/borda claros somem no escuro; usar superfície/hairline */
+:global(:root[data-theme="dark"]) .goalItem {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: var(--b-subtle);
+}
+
+/* DARK — status da projeção: texto claro sobre tinta translúcida */
+:global(:root[data-theme="dark"]) .projectionOnTrack .projectionBadge {
+  background: rgba(34, 197, 94, 0.16);
+  color: #4ade80;
+}
+
+:global(:root[data-theme="dark"]) .projectionOffTrack .projectionBadge {
+  background: rgba(244, 63, 94, 0.16);
+  color: #fb7185;
+}
+
+:global(:root[data-theme="dark"]) .projectionOnTrack .projectionIcon {
+  color: #4ade80;
+}
+
+:global(:root[data-theme="dark"]) .projectionOffTrack .projectionIcon {
+  color: #fb7185;
+}
+

@@ -326,8 +326,39 @@
 }
 
 :global(:root[data-theme="dark"]) .kpiTile {
-  background: var(--s-50);
-  border-color: var(--b-gray200);
+  background: #ffffff03;
+  border-color: #ffffff05;
+}
+
+/* Tile "Faturamento": no claro é bloco laranja sólido; no dark vira tinta coral
+   translúcida + hairline (regra do app), texto quase-branco + rótulo coral. */
+:global(:root[data-theme="dark"]) .kpiTileHero {
+  background: linear-gradient(135deg, rgba(251, 138, 114, 0.22) 0%, rgba(251, 138, 114, 0.1) 100%);
+  border: 1px solid rgba(251, 138, 114, 0.35);
+  box-shadow: none;
+}
+
+:global(:root[data-theme="dark"]) .kpiTileHero .kpiLabel {
+  color: #fca892;
+}
+
+:global(:root[data-theme="dark"]) .kpiTileHero .kpiValue {
+  color: var(--t-gray900);
+}
+
+:global(:root[data-theme="dark"]) .kpiTileHero .kpiHint {
+  color: var(--t-gray600);
+}
+
+/* Acentos coral: brilho maior p/ ler bem sobre o fundo escuro. */
+:global(:root[data-theme="dark"]) .destaqueRank,
+:global(:root[data-theme="dark"]) .destaquePct,
+:global(:root[data-theme="dark"]) .tdPct {
+  color: #fb8a72;
+}
+
+:global(:root[data-theme="dark"]) .destaqueBarFill {
+  background: linear-gradient(90deg, #fca892, #fb8a72);
 }
 
 :global(:root[data-theme="dark"]) .kpiLabel {

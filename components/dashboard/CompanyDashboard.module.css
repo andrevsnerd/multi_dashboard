@@ -189,5 +189,20 @@
   }
 }
 
+/* DARK — banner de loading: tinta suave + hairline + texto/spinner claros */
+:global(:root[data-theme="dark"]) .loadingBanner {
+  background: linear-gradient(135deg, rgba(91, 140, 255, 0.12) 0%, rgba(91, 140, 255, 0.05) 100%);
+  border: 1px solid rgba(91, 140, 255, 0.28);
+}
+
+:global(:root[data-theme="dark"]) .loadingText {
+  color: #9db8ff;
+}
+
+:global(:root[data-theme="dark"]) .loadingSpinner {
+  border-color: rgba(91, 140, 255, 0.25);
+  border-top-color: #9db8ff;
+}
+
 
 

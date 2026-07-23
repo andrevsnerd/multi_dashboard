@@ -3,9 +3,7 @@
   margin: 0 auto;
   padding: 1rem 1.25rem 2rem;
   color: var(--t-gray900);
-  background:
-    radial-gradient(circle at top left, rgba(16, 185, 129, 0.06), transparent 32%),
-    linear-gradient(180deg, #f7f7f4 0%, #f3f4f6 100%);
+  background: transparent;
   min-height: 100%;
 }
 
@@ -322,10 +320,10 @@
   gap: 0.4rem;
   padding: 0.5rem 0.9rem;
   font-size: 0.82rem;
-  font-weight: 600;
-  color: #15803d;
-  background: #f0fdf4;
-  border: 1px solid #bbf7d0;
+  font-weight: 700;
+  color: #047857;
+  background: #d1fae5;
+  border: 1px solid #6ee7b7;
   border-radius: 9px;
   cursor: pointer;
   transition:
@@ -335,8 +333,8 @@
 }
 
 .secondaryBtn:hover {
-  background: #dcfce7;
-  border-color: #86efac;
+  background: #a7f3d0;
+  border-color: #34d399;
 }
 
 .error {
@@ -378,23 +376,6 @@
   font-weight: 700;
   letter-spacing: -0.03em;
   color: var(--t-gray900);
-}
-
-.scopeNote {
-  margin: 0 0 0.65rem;
-  padding: 0.55rem 0.8rem;
-  font-size: 0.76rem;
-  line-height: 1.45;
-  color: var(--t-gray600);
-  background: rgba(243, 244, 246, 0.7);
-  border: 1px solid var(--b-gray200);
-  border-left: 3px solid #10b981;
-  border-radius: 8px;
-}
-
-.scopeNote strong {
-  color: var(--t-gray900);
-  font-weight: 700;
 }
 
 .tableWrap {
@@ -556,16 +537,18 @@
 
 .totalHeader {
   width: 9%;
-  background: linear-gradient(180deg, #dff5e8 0%, #c7edd9 100%) !important;
-  color: #166534;
-  border: 0.5px solid #10b981 !important;
+  background: rgba(99, 102, 241, 0.13) !important;
+  color: #4338ca;
+  border: none !important;
+  border-left: 2px solid rgba(99, 102, 241, 0.55) !important;
+  border-bottom: 0.5px solid var(--b-gray200) !important;
 }
 
 .totalCell {
-  background: linear-gradient(180deg, rgba(199, 237, 217, 0.98) 0%, rgba(180, 231, 206, 0.98) 100%) !important;
-  border-left: 0.5px solid #10b981 !important;
-  border-right: 0.5px solid #10b981 !important;
-  border-bottom: 0.5px solid #10b981 !important;
+  background: rgba(99, 102, 241, 0.11) !important;
+  border-left: 2px solid rgba(99, 102, 241, 0.5) !important;
+  border-right: none !important;
+  border-bottom: 0.5px solid var(--b-gray200) !important;
 }
 
 .totalValue {
@@ -573,7 +556,7 @@
   min-width: 0;
   font-size: 0.92rem;
   font-weight: 800;
-  color: #065f46;
+  color: #4f46e5;
 }
 
 .branchCell {
@@ -591,9 +574,10 @@
 }
 
 .branchCellHighlight {
-  background: linear-gradient(180deg, rgba(255, 241, 187, 0.98) 0%, rgba(255, 224, 120, 0.98) 100%) !important;
-  color: #9a4f13;
-  box-shadow: inset 0 0 0 1px #f59e0b;
+  background: rgba(13, 148, 136, 0.09) !important;
+  color: #0f766e;
+  box-shadow: inset 2px 0 0 rgba(13, 148, 136, 0.65);
+  font-weight: 700;
 }
 
 .zeroCell {
@@ -686,9 +670,7 @@
 
 /* Estrutura / fundo da página */
 :global(:root[data-theme="dark"]) .page {
-  background:
-    radial-gradient(circle at top left, rgba(16, 185, 129, 0.06), transparent 32%),
-    linear-gradient(180deg, var(--app-bg) 0%, var(--s-50) 100%);
+  background: transparent;
 }
 
 /* Filtros / inputs / botões */
@@ -717,14 +699,14 @@
 }
 
 :global(:root[data-theme="dark"]) .secondaryBtn {
-  color: #4ade80;
-  background: rgba(34, 197, 94, 0.12);
-  border-color: rgba(34, 197, 94, 0.35);
+  color: #6ee7b7;
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.3);
 }
 
 :global(:root[data-theme="dark"]) .secondaryBtn:hover {
-  background: rgba(34, 197, 94, 0.2);
-  border-color: rgba(34, 197, 94, 0.5);
+  background: rgba(16, 185, 129, 0.16);
+  border-color: rgba(16, 185, 129, 0.45);
 }
 
 /* Erro */
@@ -732,11 +714,6 @@
   background: rgba(244, 63, 94, 0.12);
   border-color: rgba(244, 63, 94, 0.35);
   color: #fb7185;
-}
-
-/* Nota de escopo */
-:global(:root[data-theme="dark"]) .scopeNote {
-  background: rgba(148, 163, 184, 0.08);
 }
 
 /* Tabela: bordas e superfícies */
@@ -748,23 +725,23 @@
 :global(:root[data-theme="dark"]) .table td {
   border-right-color: var(--b-200);
   border-bottom-color: var(--b-200);
-  background: rgba(20, 29, 45, 0.86);
+  background: #161922;
 }
 
 :global(:root[data-theme="dark"]) .table th {
-  background: linear-gradient(180deg, #1f2a3e 0%, #141d2d 100%);
+  background: linear-gradient(180deg, #1d212c 0%, #12141b 100%);
 }
 
 :global(:root[data-theme="dark"]) .table tbody tr:nth-child(even) td:not(.totalCell):not(.branchCellHighlight) {
-  background: rgba(34, 46, 69, 0.92);
+  background: #1b1f28;
 }
 
 :global(:root[data-theme="dark"]) .table tbody .itemColumn {
-  background: linear-gradient(180deg, #1a2433 0%, #111b2b 100%);
+  background: linear-gradient(180deg, #161922 0%, #0f1116 100%);
 }
 
 :global(:root[data-theme="dark"]) .table tbody tr:nth-child(even) .itemColumn {
-  background: linear-gradient(180deg, #202b40 0%, #1b2536 100%);
+  background: linear-gradient(180deg, #1d212c 0%, #161922 100%);
 }
 
 /* Badge de cor (item) */
@@ -775,22 +752,25 @@
 
 /* Coluna/linha de total (verde) */
 :global(:root[data-theme="dark"]) .totalHeader {
-  background: rgba(34, 197, 94, 0.12) !important;
-  color: #4ade80;
+  background: rgba(129, 140, 248, 0.14) !important;
+  color: #c7d2fe;
+  border-left-color: rgba(129, 140, 248, 0.6) !important;
 }
 
 :global(:root[data-theme="dark"]) .totalCell {
-  background: rgba(34, 197, 94, 0.12) !important;
+  background: rgba(129, 140, 248, 0.12) !important;
+  border-left-color: rgba(129, 140, 248, 0.5) !important;
 }
 
 :global(:root[data-theme="dark"]) .totalValue {
-  color: #4ade80;
+  color: #a5b4fc;
 }
 
-/* Destaque de filial (âmbar) */
+/* Destaque de filial (célula de maior saldo) — teal sutil */
 :global(:root[data-theme="dark"]) .branchCellHighlight {
-  background: rgba(234, 179, 8, 0.14) !important;
-  color: #fbbf24;
+  background: rgba(45, 212, 191, 0.14) !important;
+  color: #5eead4;
+  box-shadow: inset 2px 0 0 rgba(45, 212, 191, 0.6);
 }
 
 /* Valor negativo */

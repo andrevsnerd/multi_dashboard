@@ -26,13 +26,24 @@ interface MiniAreaChartProps {
 
 const hex = (c: string) => (c.startsWith("#") ? c : `#${c}`);
 
-/** Tint pastel da paleta (feito p/ fundo claro) diluído sobre fundo escuro. */
-function withAlpha(c: string, alpha: number): string {
+function toRgb(c: string): { r: number; g: number; b: number } {
   const clean = hex(c).slice(1);
-  const r = parseInt(clean.slice(0, 2), 16);
-  const g = parseInt(clean.slice(2, 4), 16);
-  const b = parseInt(clean.slice(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  return {
+    r: parseInt(clean.slice(0, 2), 16),
+    g: parseInt(clean.slice(2, 4), 16),
+    b: parseInt(clean.slice(4, 6), 16),
+  };
+}
+
+/**
+ * Clareia uma cor em direção ao branco por `amt` (0–1). As paletas das coleções
+ * são tons jewel profundos, feitos p/ fundo claro; no dark ficam murchos, então
+ * clareamos a linha/rótulos p/ um tom vivo que "pula" sobre o fundo escuro.
+ */
+function lightenRgb(c: string, amt: number): { r: number; g: number; b: number } {
+  const { r, g, b } = toRgb(c);
+  const mix = (ch: number) => Math.round(ch + (255 - ch) * amt);
+  return { r: mix(r), g: mix(g), b: mix(b) };
 }
 
 export default function MiniAreaChart({
@@ -43,8 +54,12 @@ export default function MiniAreaChart({
   height = 92,
   dark = false,
 }: MiniAreaChartProps) {
-  const areaFill = dark ? withAlpha(p.primary, 0.18) : hex(p.chartTint);
-  const monthLabelColor = dark ? "#94a3b8" : hex(p.grey);
+  // No dark: cor viva (primary clareado) p/ linha, pontos e rótulos; fill sutil
+  // dessa mesma cor. No claro: mantém primary/chartTint originais do slide.
+  const lp = lightenRgb(p.primary, 0.5);
+  const accent = dark ? `rgb(${lp.r}, ${lp.g}, ${lp.b})` : hex(p.primary);
+  const areaFill = dark ? `rgba(${lp.r}, ${lp.g}, ${lp.b}, 0.14)` : hex(p.chartTint);
+  const monthLabelColor = dark ? "#8b95a6" : hex(p.grey);
   const n = months.length;
   const padT = 18;
   const padB = 20;
@@ -86,13 +101,13 @@ export default function MiniAreaChart({
   return (
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ display: "block" }}>
       <path d={areaPath} fill={areaFill} stroke="none" />
-      {n > 1 && <path d={linePath} fill="none" stroke={hex(p.primary)} strokeWidth={2.4} strokeLinejoin="round" />}
+      {n > 1 && <path d={linePath} fill="none" stroke={accent} strokeWidth={2.4} strokeLinejoin="round" />}
       {pts.map((q, i) => {
         const anchor = i === 0 ? "start" : i === pts.length - 1 ? "end" : "middle";
         const lx = i === 0 ? q.x - 2 : i === pts.length - 1 ? q.x + 2 : q.x;
         return (
           <g key={i}>
-            <circle cx={q.x} cy={q.y} r={3.2} fill={hex(p.primary)} />
+            <circle cx={q.x} cy={q.y} r={3.2} fill={accent} />
             <text
               x={lx}
               y={q.y - 8}
@@ -100,7 +115,7 @@ export default function MiniAreaChart({
               fontFamily="Arial, sans-serif"
               fontWeight={700}
               fontSize={11}
-              fill={hex(p.primary)}
+              fill={accent}
             >
               {q.disp}
             </text>

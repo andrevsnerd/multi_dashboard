@@ -21,8 +21,8 @@ export default function GoalCard({
 }: GoalCardProps) {
   const [mounted, setMounted] = useState(false);
   const { theme } = useTheme();
-  const ringFilled = theme === "dark" ? "#cbd5e1" : "#475569";
-  const ringTrack = theme === "dark" ? "#29344b" : "#e2e8f0";
+  const ringFilled = theme === "dark" ? "url(#goalRingFill)" : "#475569";
+  const ringTrack = theme === "dark" ? "rgba(120, 134, 158, 0.22)" : "#e2e8f0";
 
   useEffect(() => {
     setMounted(true);
@@ -88,6 +88,12 @@ export default function GoalCard({
         {mounted && (
           <ResponsiveContainer width="100%" height={200}>
             <PieChart>
+            <defs>
+              <linearGradient id="goalRingFill" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor="#5b8cff" />
+                <stop offset="100%" stopColor="#9b6bff" />
+              </linearGradient>
+            </defs>
             <Pie
               data={chartData}
               cx="50%"
@@ -98,6 +104,7 @@ export default function GoalCard({
               endAngle={-270}
               dataKey="value"
               isAnimationActive={false}
+              stroke="none"
             >
               <Cell key="completed" fill={ringFilled} />
               <Cell key="remaining" fill={ringTrack} />

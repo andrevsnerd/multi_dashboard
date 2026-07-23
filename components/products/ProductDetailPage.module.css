@@ -1011,3 +1011,13 @@
     font-size: 20px;
   }
 }
+
+/* DARK — loading do produto: spinner e tag "Atualizando" no padrão azul claro do app */
+:global(:root[data-theme="dark"]) .loadingSpinner {
+  border-color: rgba(91, 140, 255, 0.25);
+  border-top-color: #9db8ff;
+}
+
+:global(:root[data-theme="dark"]) .inlineLoadingTag {
+  color: #9db8ff;
+}

@@ -66,59 +66,88 @@
   --nav-hover: rgba(255, 255, 255, 0.9);
   --nav-active: #ffffff;
   --submenu-bg: rgba(255, 255, 255, 0.58);
+
+  /*
+   * Elevação / profundidade (aditivos — usados no polish de cards).
+   * No claro mantêm o visual atual (sombra suave, sem sheen/highlight).
+   */
+  --elev-1: 0 1px 3px rgba(15, 23, 42, 0.06);
+  --elev-card: 0 18px 40px rgba(15, 23, 42, 0.08);
+  --elev-2: 0 24px 48px rgba(15, 23, 42, 0.12);
+  --card-highlight: inset 0 1px 0 rgba(255, 255, 255, 0);
+  --card-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0) 100%);
+  --ring-accent: rgba(37, 99, 235, 0.35);
 }
 
 :root[data-theme="dark"] {
-  --background: #0a111e;
-  --foreground: #e9eef7;
+  /*
+   * Paleta dark redesenhada (ref.: dashboard "Vortex").
+   * Regras:
+   *  - Base near-black cool-neutral (não navy leitoso) → cards contrastam.
+   *  - Escada de elevação: app-bg (mais escuro) < s-50 < s-white (card) < s-100 (raised).
+   *  - Bordas = hairlines luminosos translúcidos (branco 6–12%), nunca blocos sólidos.
+   *  - Texto mais brilhante; acentos/charts mais vivos sobre a base dessaturada.
+   */
+  --background: #0a0c11;
+  --foreground: #eef1f7;
 
-  --app-bg: #0a111e;
-  --s-white: #1a2433;
-  --s-50: #111b2b;
-  --s-gray50: #141d2d;
-  --s-gray100b: #141d2d;
-  --s-100: #222e45;
-  --s-gray100: #1f2a3e;
-  --s-blue50: rgba(37, 99, 235, 0.16);
+  --app-bg: #090a0e;      /* página — o mais escuro */
+  --s-white: #161922;     /* card / superfície elevada */
+  --s-50: #0f1116;        /* superfície recolhida */
+  --s-gray50: #12141b;
+  --s-gray100b: #12141b;
+  --s-100: #1d212c;       /* hover / raised */
+  --s-gray100: #191d26;
+  --s-blue50: rgba(59, 130, 246, 0.14);
 
-  --b-200: #29344b;
-  --b-gray200: #29344b;
-  --b-300: #38455f;
-  --b-gray300: #38455f;
-  --b-subtle: rgba(148, 163, 184, 0.15);
-  --b-subtle2: rgba(148, 163, 184, 0.22);
+  /* Bordas: hairlines luminosos (o segredo do visual "limpo") */
+  --b-200: rgba(255, 255, 255, 0.07);
+  --b-gray200: rgba(255, 255, 255, 0.07);
+  --b-300: rgba(255, 255, 255, 0.12);
+  --b-gray300: rgba(255, 255, 255, 0.12);
+  --b-subtle: rgba(255, 255, 255, 0.06);
+  --b-subtle2: rgba(255, 255, 255, 0.1);
 
-  --t-900: #eaf0f8;
-  --t-gray900: #eaf0f8;
-  --t-1a: #eaf0f8;
-  --t-800: #dde4ee;
-  --t-gray800: #dde4ee;
-  --t-700: #c7d1df;
-  --t-gray700: #c7d1df;
-  --t-333: #c7d1df;
-  --t-600: #aab6c8;
-  --t-gray600: #aab6c8;
-  --t-500: #94a3b8;
-  --t-gray500: #94a3b8;
-  --t-666: #98a5b6;
-  --t-555: #8a97a9;
-  --t-400: #74829a;
-  --t-gray400: #74829a;
+  --t-900: #f3f6fb;
+  --t-gray900: #f3f6fb;
+  --t-1a: #f3f6fb;
+  --t-800: #e5eaf2;
+  --t-gray800: #e5eaf2;
+  --t-700: #cfd6e2;
+  --t-gray700: #cfd6e2;
+  --t-333: #cfd6e2;
+  --t-600: #b0b9c8;
+  --t-gray600: #b0b9c8;
+  --t-500: #8b95a6;
+  --t-gray500: #8b95a6;
+  --t-666: #939dad;
+  --t-555: #858f9f;
+  --t-400: #69737f;
+  --t-gray400: #69737f;
 
   --brand-scarfme: #c4b5fd;
-  --brand-scarfme-tint: rgba(196, 181, 253, 0.12);
+  --brand-scarfme-tint: rgba(196, 181, 253, 0.14);
   --brand-scarfme-soft: rgb(223, 214, 254);
 
-  --chart-line: #cbd5e1;
-  --chart-grid: rgba(148, 163, 184, 0.16);
-  --chart-axis: #64748b;
-  --chart-axis-text: #94a3b8;
-  --chart-track: #29344b;
-  --chart-tooltip-bg: #1a2433;
+  --chart-line: #dbe3ef;
+  --chart-grid: rgba(255, 255, 255, 0.06);
+  --chart-axis: #4b5563;
+  --chart-axis-text: #8b95a6;
+  --chart-track: rgba(255, 255, 255, 0.08);
+  --chart-tooltip-bg: #1b1f2a;
 
-  --nav-hover: rgba(148, 163, 184, 0.1);
-  --nav-active: #26334e;
+  --nav-hover: rgba(255, 255, 255, 0.05);
+  --nav-active: #1e2431;
   --submenu-bg: rgba(255, 255, 255, 0.03);
+
+  /* Elevação: sombra escura profunda (visível no dark) + highlight superior + sheen */
+  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --elev-card: 0 1px 0 rgba(255, 255, 255, 0.04), 0 2px 6px rgba(0, 0, 0, 0.4),
+    0 16px 40px rgba(0, 0, 0, 0.55);
+  --elev-2: 0 8px 24px rgba(0, 0, 0, 0.5), 0 24px 56px rgba(0, 0, 0, 0.6);
+  --card-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --card-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0%, rgba(255, 255, 255, 0) 42%);
+  --ring-accent: rgba(96, 165, 250, 0.4);
 
   color-scheme: dark;
 }
@@ -151,4 +180,17 @@ body {
 a {
   color: inherit;
   text-decoration: none;
+}
+
+/*
+ * Atmosfera do dark: brilho radial sutil no fundo da página (azul + roxo da marca),
+ * fixo ao viewport. Dá profundidade sem tocar em nenhum componente. Só no dark.
+ */
+:root[data-theme="dark"] body {
+  background-color: var(--app-bg);
+  background-image:
+    radial-gradient(1200px 620px at 12% -8%, rgba(59, 130, 246, 0.08), transparent 60%),
+    radial-gradient(1000px 520px at 100% 0%, rgba(139, 92, 246, 0.07), transparent 55%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
 }

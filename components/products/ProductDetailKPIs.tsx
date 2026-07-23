@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useAuth } from "@/components/auth/AuthContext";
+import { useTheme } from "@/components/theme/ThemeContext";
 import { canSeeCusto, canMutate } from "@/lib/auth/permissions";
 import {
   LineChart,
@@ -85,6 +86,51 @@ export default function ProductDetailKPIs({
   onDetailUpdated,
 }: ProductDetailKPIsProps) {
   const { user } = useAuth();
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+  // Primitivas dos gráficos (grid/eixos/linhas) — hairlines e acentos claros no dark.
+  const chartC = {
+    grid: isDark ? "rgba(255,255,255,0.06)" : "#e2e8f0",
+    refLine: isDark ? "rgba(255,255,255,0.14)" : "#94a3b8",
+    axis: isDark ? "#4b5563" : "#94a3b8",
+    axisTick: isDark ? "#8b95a6" : "#64748b",
+    stockAxis: isDark ? "#93b4ff" : "#2563eb",
+    line: isDark ? "#5b8cff" : "#2563eb",
+    lineDash: isDark ? "#7a8699" : "#94a3b8",
+    dotStroke: isDark ? "#161922" : "#fff",
+  };
+  // Paleta dos tooltips — container dark, washes translúcidos, texto claro.
+  const tt = {
+    bg: isDark ? "#1b1f2a" : "#fff",
+    border: isDark ? "rgba(255,255,255,0.1)" : "#e2e8f0",
+    borderAlert: isDark ? "rgba(248,113,113,0.5)" : "#fca5a5",
+    divider: isDark ? "rgba(255,255,255,0.08)" : "#f1f5f9",
+    muted: isDark ? "#8b95a6" : "#64748b",
+    faint: isDark ? "#69737f" : "#94a3b8",
+    blueWash: isDark
+      ? "linear-gradient(135deg, rgba(59,130,246,0.16) 0%, rgba(59,130,246,0.08) 100%)"
+      : "linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%)",
+    blueBorderLeft: isDark ? "#5b8cff" : "#2563eb",
+    blueLabel: isDark ? "#93b4ff" : "#1d4ed8",
+    blueSub: isDark ? "#bcd0ff" : "#1e3a8a",
+    blueBig: isDark ? "#7ea6ff" : "#2563eb",
+    blueMid: isDark ? "#9db8ff" : "#1d4ed8",
+    blueFaint: isDark ? "#5f7fb8" : "#93c5fd",
+    blueDivider: isDark ? "rgba(91,140,255,0.25)" : "rgba(37, 99, 235, 0.2)",
+    blueHead: isDark ? "#9db8ff" : "#1e40af",
+    grayWash: isDark ? "rgba(255,255,255,0.04)" : "#f8fafc",
+    grayBorder: isDark ? "rgba(255,255,255,0.08)" : "#e2e8f0",
+    grayBig: isDark ? "#c7cdd8" : "#9ca3af",
+    graySub: isDark ? "#aab2be" : "#a8a29e",
+    grayFaint: isDark ? "#69737f" : "#cbd5e1",
+    green: isDark ? "#4ade80" : "#15803d",
+    red: isDark ? "#fb7185" : "#b91c1c",
+    pink: isDark ? "#f472b6" : "#db2777",
+    purple: isDark ? "#c4b5fd" : "#7c3aed",
+    redStrong: isDark ? "#fb7185" : "#dc2626",
+    blueSaldo: isDark ? "#93b4ff" : "#1d4ed8",
+    filialText: isDark ? "#aab6c8" : "#475569",
+  };
   const podeVerCusto = canSeeCusto(user);
   const podeEditar = canMutate(user);
   const [modalPrecoOpen, setModalPrecoOpen] = useState(false);
@@ -784,12 +830,12 @@ export default function ProductDetailKPIs({
           <div className={styles.chartWrapper}>
             <ResponsiveContainer width="100%" height={280}>
               <LineChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <CartesianGrid strokeDasharray="3 3" stroke={chartC.grid} />
                 {chartMonthBoundaryIsos.map((iso) => (
                   <ReferenceLine
                     key={iso}
                     x={iso}
-                    stroke="#94a3b8"
+                    stroke={chartC.refLine}
                     strokeWidth={1.5}
                     strokeDasharray="4 4"
                   />
@@ -798,9 +844,9 @@ export default function ProductDetailKPIs({
                   dataKey="isoDay"
                   type="category"
                   ticks={chartTickIsos}
-                  stroke="#94a3b8"
+                  stroke={chartC.axis}
                   style={{ fontSize: "11px" }}
-                  tick={{ fill: "#64748b" }}
+                  tick={{ fill: chartC.axisTick }}
                   tickFormatter={(iso) =>
                     format(new Date(`${iso}T12:00:00`), isMultiMonthRange ? "dd/MM" : "dd", {
                       locale: ptBR,
@@ -808,9 +854,9 @@ export default function ProductDetailKPIs({
                   }
                 />
                 <YAxis
-                  stroke="#94a3b8"
+                  stroke={chartC.axis}
                   style={{ fontSize: "12px" }}
-                  tick={{ fill: "#64748b" }}
+                  tick={{ fill: chartC.axisTick }}
                   tickFormatter={(v) => (v >= 1000 ? `R$ ${(v / 1000).toFixed(0)}k` : `R$ ${v}`)}
                 />
                 <Tooltip
@@ -831,17 +877,18 @@ export default function ProductDetailKPIs({
                     return (
                       <div
                         style={{
-                          backgroundColor: "#fff",
-                          border: "1px solid #e2e8f0",
+                          backgroundColor: tt.bg,
+                          border: `1px solid ${tt.border}`,
                           borderRadius: "8px",
                           padding: "12px 14px",
                           fontSize: "12px",
                           minWidth: 440,
                           maxWidth: 620,
                           width: "max-content",
+                          boxShadow: isDark ? "0 12px 32px rgba(0,0,0,0.55)" : "0 8px 24px rgba(15,23,42,0.12)",
                         }}
                       >
-                        <p style={{ margin: "0 0 10px 0", fontWeight: 600, color: "#64748b", fontSize: "11px" }}>
+                        <p style={{ margin: "0 0 10px 0", fontWeight: 600, color: tt.muted, fontSize: "11px" }}>
                           {data.dateLong}
                         </p>
 
@@ -859,35 +906,35 @@ export default function ProductDetailKPIs({
                           style={{
                             flex: "1 1 220px",
                             minWidth: 220,
-                            background: "linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%)",
-                            borderLeft: "3px solid #2563eb",
+                            background: tt.blueWash,
+                            borderLeft: `3px solid ${tt.blueBorderLeft}`,
                             borderRadius: "8px",
                             padding: "10px 10px 8px 12px",
                           }}
                         >
-                          <p style={{ margin: "0 0 6px 0", fontSize: "10px", fontWeight: 700, color: "#1d4ed8", letterSpacing: "0.04em", textTransform: "uppercase" as const }}>
+                          <p style={{ margin: "0 0 6px 0", fontSize: "10px", fontWeight: 700, color: tt.blueLabel, letterSpacing: "0.04em", textTransform: "uppercase" as const }}>
                             Período atual
                           </p>
-                          <p style={{ margin: "0 0 4px 0", fontSize: "11px", fontWeight: 600, color: "#1e3a8a" }}>
+                          <p style={{ margin: "0 0 4px 0", fontSize: "11px", fontWeight: 600, color: tt.blueSub }}>
                             Neste dia
                           </p>
                           {data.hasSales && unitsThisDay > 0 ? (
                             <>
-                              <p style={{ margin: "0 0 2px 0", fontSize: "18px", fontWeight: 700, color: "#2563eb" }}>
+                              <p style={{ margin: "0 0 2px 0", fontSize: "18px", fontWeight: 700, color: tt.blueBig }}>
                                 {formatCurrency(revenueThisDay)}
                               </p>
-                              <p style={{ margin: "0 0 8px 0", fontSize: "13px", fontWeight: 600, color: "#1d4ed8" }}>
+                              <p style={{ margin: "0 0 8px 0", fontSize: "13px", fontWeight: 600, color: tt.blueMid }}>
                                 {unitsThisDay} {unitsThisDay === 1 ? "unidade" : "unidades"}
                               </p>
                             </>
                           ) : (
-                            <p style={{ margin: "0 0 8px 0", fontSize: "14px", fontWeight: 600, color: "#93c5fd" }}>
+                            <p style={{ margin: "0 0 8px 0", fontSize: "14px", fontWeight: 600, color: tt.blueFaint }}>
                               Sem venda
                             </p>
                           )}
                           {data.hasSales && data.salesByFilial && data.salesByFilial.length > 0 ? (
-                            <div style={{ paddingTop: "6px", borderTop: "1px solid rgba(37, 99, 235, 0.2)" }}>
-                              <p style={{ margin: "0 0 4px 0", fontSize: "10px", fontWeight: 700, color: "#1e40af" }}>
+                            <div style={{ paddingTop: "6px", borderTop: `1px solid ${tt.blueDivider}` }}>
+                              <p style={{ margin: "0 0 4px 0", fontSize: "10px", fontWeight: 700, color: tt.blueHead }}>
                                 Onde vendeu
                               </p>
                               {data.salesByFilial.map(
@@ -907,7 +954,7 @@ export default function ProductDetailKPIs({
                                       gap: "12px",
                                       marginBottom: "3px",
                                       fontSize: "11px",
-                                      color: "#1e3a8a",
+                                      color: tt.blueSub,
                                     }}
                                   >
                                     <span>{s.filialDisplayName}</span>
@@ -925,33 +972,33 @@ export default function ProductDetailKPIs({
                           style={{
                             flex: "1 1 220px",
                             minWidth: 220,
-                            background: "#f8fafc",
-                            border: "1px solid #e2e8f0",
+                            background: tt.grayWash,
+                            border: `1px solid ${tt.grayBorder}`,
                             borderRadius: "8px",
                             padding: "10px 10px 8px 12px",
                           }}
                         >
-                          <p style={{ margin: "0 0 6px 0", fontSize: "10px", fontWeight: 700, color: "#94a3b8", letterSpacing: "0.04em", textTransform: "uppercase" as const }}>
+                          <p style={{ margin: "0 0 6px 0", fontSize: "10px", fontWeight: 700, color: tt.faint, letterSpacing: "0.04em", textTransform: "uppercase" as const }}>
                             Mês anterior
                           </p>
                           {data.comparisonDayQuantity > 0 || data.comparisonDayRevenue > 0 ? (
                             <>
-                              <p style={{ margin: "0 0 2px 0", fontSize: "16px", fontWeight: 700, color: "#9ca3af" }}>
+                              <p style={{ margin: "0 0 2px 0", fontSize: "16px", fontWeight: 700, color: tt.grayBig }}>
                                 {formatCurrency(data.comparisonDayRevenue)}
                               </p>
-                              <p style={{ margin: "0 0 8px 0", fontSize: "12px", fontWeight: 600, color: "#a8a29e" }}>
+                              <p style={{ margin: "0 0 8px 0", fontSize: "12px", fontWeight: 600, color: tt.graySub }}>
                                 {data.comparisonDayQuantity}{" "}
                                 {data.comparisonDayQuantity === 1 ? "unidade" : "unidades"}
                               </p>
                             </>
                           ) : (
-                            <p style={{ margin: "0 0 8px 0", fontSize: "13px", fontWeight: 600, color: "#cbd5e1" }}>
+                            <p style={{ margin: "0 0 8px 0", fontSize: "13px", fontWeight: 600, color: tt.grayFaint }}>
                               Sem venda
                             </p>
                           )}
                           {data.comparisonSalesByFilial && data.comparisonSalesByFilial.length > 0 ? (
-                            <div style={{ paddingTop: "6px", borderTop: "1px solid #e2e8f0" }}>
-                              <p style={{ margin: "0 0 4px 0", fontSize: "10px", fontWeight: 700, color: "#94a3b8" }}>
+                            <div style={{ paddingTop: "6px", borderTop: `1px solid ${tt.grayBorder}` }}>
+                              <p style={{ margin: "0 0 4px 0", fontSize: "10px", fontWeight: 700, color: tt.faint }}>
                                 Onde vendeu
                               </p>
                               {data.comparisonSalesByFilial.map(
@@ -971,7 +1018,7 @@ export default function ProductDetailKPIs({
                                       gap: "12px",
                                       marginBottom: "3px",
                                       fontSize: "11px",
-                                      color: "#9ca3af",
+                                      color: tt.grayBig,
                                     }}
                                   >
                                     <span>{s.filialDisplayName}</span>
@@ -989,12 +1036,12 @@ export default function ProductDetailKPIs({
                         <div
                           style={{
                             paddingTop: "8px",
-                            borderTop: "1px solid #f1f5f9",
+                            borderTop: `1px solid ${tt.divider}`,
                             display: "flex",
                             flexWrap: "wrap",
                             gap: "12px 20px",
                             fontSize: "10px",
-                            color: "#94a3b8",
+                            color: tt.faint,
                             fontWeight: 500,
                           }}
                         >
@@ -1015,12 +1062,12 @@ export default function ProductDetailKPIs({
                   type="monotone"
                   dataKey="vendasReais"
                   name="Vendas no período"
-                  stroke="#2563eb"
+                  stroke={chartC.line}
                   strokeWidth={2}
                   dot={(props) => {
                     const { cx, cy, payload } = props;
                     if (!payload.hasSales || cy == null) return null;
-                    return <circle cx={cx} cy={cy} r={3} fill="#2563eb" />;
+                    return <circle cx={cx} cy={cy} r={3} fill={chartC.line} />;
                   }}
                   connectNulls
                 />
@@ -1028,7 +1075,7 @@ export default function ProductDetailKPIs({
                   type="monotone"
                   dataKey="projecao"
                   name={comparisonLegendLabel}
-                  stroke="#94a3b8"
+                  stroke={chartC.lineDash}
                   strokeWidth={1.5}
                   strokeDasharray="4 4"
                   dot={false}
@@ -1074,17 +1121,17 @@ export default function ProductDetailKPIs({
             <div className={styles.chartWrapper}>
               <ResponsiveContainer width="100%" height={300}>
                 <ComposedChart data={stockProgressChart} margin={{ top: 8, right: 12, left: 0, bottom: 8 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartC.grid} />
                   {chartMonthBoundaryIsos.map((iso) => (
-                    <ReferenceLine key={`st-${iso}`} x={iso} stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="4 4" />
+                    <ReferenceLine key={`st-${iso}`} x={iso} stroke={chartC.refLine} strokeWidth={1.5} strokeDasharray="4 4" />
                   ))}
                   <XAxis
                     dataKey="isoDay"
                     type="category"
                     ticks={chartTickIsos}
-                    stroke="#94a3b8"
+                    stroke={chartC.axis}
                     style={{ fontSize: "11px" }}
-                    tick={{ fill: "#64748b" }}
+                    tick={{ fill: chartC.axisTick }}
                     tickFormatter={(iso) =>
                       format(new Date(`${iso}T12:00:00`), isMultiMonthRange ? "dd/MM" : "dd", {
                         locale: ptBR,
@@ -1100,9 +1147,9 @@ export default function ProductDetailKPIs({
                   <YAxis
                     yAxisId="stock"
                     orientation="left"
-                    stroke="#2563eb"
+                    stroke={chartC.stockAxis}
                     style={{ fontSize: "11px" }}
-                    tick={{ fill: "#2563eb" }}
+                    tick={{ fill: chartC.stockAxis }}
                     tickFormatter={(v) => formatInteger(v)}
                   />
                   <Tooltip
@@ -1141,47 +1188,48 @@ export default function ProductDetailKPIs({
                       return (
                         <div
                           style={{
-                            backgroundColor: "#fff",
-                            border: `1px solid ${raw.outOfStock ? "#fca5a5" : "#e2e8f0"}`,
+                            backgroundColor: tt.bg,
+                            border: `1px solid ${raw.outOfStock ? tt.borderAlert : tt.border}`,
                             borderRadius: "8px",
                             padding: "12px 14px",
                             fontSize: "12px",
                             minWidth: 320,
                             maxWidth: 480,
+                            boxShadow: isDark ? "0 12px 32px rgba(0,0,0,0.55)" : "0 8px 24px rgba(15,23,42,0.12)",
                           }}
                         >
-                          <p style={{ margin: "0 0 8px 0", fontWeight: 600, color: "#64748b", fontSize: "11px" }}>
+                          <p style={{ margin: "0 0 8px 0", fontWeight: 600, color: tt.muted, fontSize: "11px" }}>
                             {p.dateLong}
                           </p>
                           {raw.outOfStock && (
-                            <p style={{ margin: "0 0 8px 0", fontWeight: 700, color: "#dc2626", fontSize: "11px" }}>
+                            <p style={{ margin: "0 0 8px 0", fontWeight: 700, color: tt.redStrong, fontSize: "11px" }}>
                               Sem estoque neste dia
                             </p>
                           )}
-                          <p style={{ margin: "0 4px 4px 0", color: "#15803d", fontWeight: 600 }}>
+                          <p style={{ margin: "0 4px 4px 0", color: tt.green, fontWeight: 600 }}>
                             +{formatInteger(raw.entries)} entradas
                           </p>
-                          <p style={{ margin: "0 4px 2px 0", color: "#b91c1c", fontWeight: 600 }}>
+                          <p style={{ margin: "0 4px 2px 0", color: tt.red, fontWeight: 600 }}>
                             −{formatInteger(raw.sales)} saídas (vendas)
                           </p>
                           {raw.stockExits > 0 && (
-                            <p style={{ margin: `0 4px ${raw.adjustments !== 0 ? "4px" : "10px"} 0`, color: "#db2777", fontWeight: 600 }}>
+                            <p style={{ margin: `0 4px ${raw.adjustments !== 0 ? "4px" : "10px"} 0`, color: tt.pink, fontWeight: 600 }}>
                               −{formatInteger(raw.stockExits)} saídas (mov. estoque)
                             </p>
                           )}
                           {raw.adjustments !== 0 && (
-                            <p style={{ margin: "0 4px 10px 0", color: "#7c3aed", fontWeight: 600 }}>
+                            <p style={{ margin: "0 4px 10px 0", color: tt.purple, fontWeight: 600 }}>
                               {raw.adjustments > 0 ? "+" : "−"}
                               {formatInteger(Math.abs(raw.adjustments))} ajuste de estoque
                             </p>
                           )}
                           {raw.stockExits === 0 && raw.adjustments === 0 && <div style={{ marginBottom: "10px" }} />}
-                          <p style={{ margin: "0 0 8px 0", fontWeight: 700, color: raw.outOfStock ? "#dc2626" : "#1d4ed8" }}>
+                          <p style={{ margin: "0 0 8px 0", fontWeight: 700, color: raw.outOfStock ? tt.redStrong : tt.blueSaldo }}>
                             Saldo geral (fim do dia): {formatInteger(raw.stockGeral)} un.
                           </p>
                           {filialRows.length > 0 && (
-                            <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: "8px" }}>
-                              <p style={{ margin: "0 0 6px 0", fontSize: "10px", fontWeight: 700, color: "#94a3b8" }}>
+                            <div style={{ borderTop: `1px solid ${tt.divider}`, paddingTop: "8px" }}>
+                              <p style={{ margin: "0 0 6px 0", fontSize: "10px", fontWeight: 700, color: tt.faint }}>
                                 Saldo por filial · <span style={{ fontWeight: 600 }}>+</span> entrada ·{" "}
                                 <span style={{ fontWeight: 600 }}>−</span> venda ·{" "}
                                 <span style={{ fontWeight: 600 }}>−</span> mov. estoque ·{" "}
@@ -1203,7 +1251,7 @@ export default function ProductDetailKPIs({
                                       gap: "10px",
                                       marginBottom: "4px",
                                       fontSize: "11px",
-                                      color: "#475569",
+                                      color: tt.filialText,
                                     }}
                                   >
                                     <span style={{ flex: "1 1 auto", minWidth: 0 }}>{f.filialDisplayName}</span>
@@ -1216,16 +1264,16 @@ export default function ProductDetailKPIs({
                                       }}
                                     >
                                       {ent > 0 ? (
-                                        <span style={{ color: "#15803d", fontWeight: 700 }}>+{formatInteger(ent)}</span>
+                                        <span style={{ color: tt.green, fontWeight: 700 }}>+{formatInteger(ent)}</span>
                                       ) : null}
                                       {sai > 0 ? (
-                                        <span style={{ color: "#b91c1c", fontWeight: 700 }}>−{formatInteger(sai)}</span>
+                                        <span style={{ color: tt.red, fontWeight: 700 }}>−{formatInteger(sai)}</span>
                                       ) : null}
                                       {ext > 0 ? (
-                                        <span style={{ color: "#db2777", fontWeight: 700 }}>−{formatInteger(ext)}</span>
+                                        <span style={{ color: tt.pink, fontWeight: 700 }}>−{formatInteger(ext)}</span>
                                       ) : null}
                                       {adj !== 0 ? (
-                                        <span style={{ color: "#7c3aed", fontWeight: 700 }}>
+                                        <span style={{ color: tt.purple, fontWeight: 700 }}>
                                           ⇅{adj > 0 ? "+" : "−"}{formatInteger(Math.abs(adj))}
                                         </span>
                                       ) : null}
@@ -1251,14 +1299,14 @@ export default function ProductDetailKPIs({
                     type="monotone"
                     dataKey="stockGeral"
                     name="Saldo geral"
-                    stroke="#2563eb"
+                    stroke={chartC.line}
                     strokeWidth={2}
                     dot={(dotProps) => {
                       const { cx, cy, payload } = dotProps as { cx: number; cy: number; payload: (typeof stockProgressChart)[0] };
                       if (payload.outOfStock) {
-                        return <circle key={`dot-${payload.isoDay}`} cx={cx} cy={cy} r={4} fill="#dc2626" stroke="#fff" strokeWidth={1.5} />;
+                        return <circle key={`dot-${payload.isoDay}`} cx={cx} cy={cy} r={4} fill="#dc2626" stroke={chartC.dotStroke} strokeWidth={1.5} />;
                       }
-                      return <circle key={`dot-${payload.isoDay}`} cx={cx} cy={cy} r={2} fill="#2563eb" />;
+                      return <circle key={`dot-${payload.isoDay}`} cx={cx} cy={cy} r={2} fill={chartC.line} />;
                     }}
                   />
                 </ComposedChart>

@@ -854,12 +854,6 @@ export default function EstoqueItemPage({
         </div>
       </header>
 
-      <p className={styles.scopeNote}>
-        O <strong>Estoque total</strong> e a soma das colunas exibidas (lojas oficiais),
-        contando apenas saldo positivo. Nao inclui bazar/outlet, depositos de defeito nem
-        saldos negativos (mostrados em vermelho apenas como referencia).
-      </p>
-
       <div className={styles.card}>
         <div className={filtersGridClass}>
           <div>
