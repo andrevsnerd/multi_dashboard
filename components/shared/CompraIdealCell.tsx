@@ -68,12 +68,12 @@ export default function CompraIdealCell({ ideal, loading, semDados, style, descr
   // Paleta da célula. No tema claro é idêntica à original; no escuro usa tons
   // vivos com contraste sobre o navy (laranja/verde/vermelho escuros somem no dark).
   const C = {
-    pcs: dark ? "#fdba74" : "#b45309",
+    pcs: dark ? "#fbbf24" : "#b45309",
     suficiente: dark ? "#94a3b8" : "#64748b",
-    transitoBg: dark ? "rgba(34, 197, 94, 0.18)" : "#dcfce7",
+    transitoBg: dark ? "rgba(34, 197, 94, 0.12)" : "#dcfce7",
     transitoText: dark ? "#4ade80" : "#166534",
-    transitoBorder: dark ? "rgba(34, 197, 94, 0.55)" : "#22c55e",
-    comprarAgora: dark ? "#f87171" : "#b91c1c",
+    transitoBorder: dark ? "rgba(34, 197, 94, 0.3)" : "#22c55e",
+    comprarAgora: dark ? "#fb7185" : "#b91c1c",
     essaSemana: dark ? "#fbbf24" : "#b45309",
     data: dark ? "#5eead4" : "#0f766e",
   };

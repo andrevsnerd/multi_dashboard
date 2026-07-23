@@ -305,7 +305,7 @@ function renderEstoqueTooltip(
 /** Tooltip da coluna Transferência: painel com as lojas de origem e quanto cada uma cede. */
 function renderTransferenciaTooltip(lente: TransferLensResult, fmtUn: (value: number) => string): ReactNode {
   const trigger = (
-    <span style={{ color: "#7c3aed", fontWeight: 600 }}>{fmtUn(lente.disponivelTransferir)} un</span>
+    <span className={styles.transferValue}>{fmtUn(lente.disponivelTransferir)} un</span>
   );
   if (lente.doadoras.length === 0) return trigger;
 

@@ -90,12 +90,19 @@
 }
 
 .toggleBtnActive {
-  background: var(--s-accent, #2563eb);
+  background: var(--brand-scarfme);
   color: #fff;
 }
 
 .toggleBtnActive:hover {
-  background: var(--s-accent, #2563eb);
+  background: var(--brand-scarfme);
+}
+
+/* DARK — brand vira lavanda clara; texto branco some. Fill lavanda + texto escuro. */
+:global(:root[data-theme="dark"]) .toggleBtnActive,
+:global(:root[data-theme="dark"]) .toggleBtnActive:hover {
+  background: #c4b5fd;
+  color: #1b1630;
 }
 
 .chartWrapper {

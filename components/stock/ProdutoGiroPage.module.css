@@ -392,6 +392,20 @@
   color: #fff;
 }
 
+/* DARK — brand-scarfme vira lavanda clara; texto branco some. Export = fill sólido
+   com texto escuro; toggles ativos = tinta lavanda translúcida (regra do app). */
+:global(:root[data-theme="dark"]) .exportBtn {
+  background: #c4b5fd;
+  border-color: #c4b5fd;
+  color: #1b1630;
+}
+
+:global(:root[data-theme="dark"]) .toggleBtnActive {
+  background: rgba(196, 181, 253, 0.16);
+  border-color: rgba(196, 181, 253, 0.5);
+  color: #c4b5fd;
+}
+
 .filterSpacer {
   flex: 1 1 auto;
 }
@@ -634,6 +648,12 @@
   color: #cbd5e1;
 }
 
+/* Valor da coluna Transferência (gatilho do tooltip) — roxo da marca. */
+.transferValue {
+  color: #7c3aed;
+  font-weight: 600;
+}
+
 .inlineTooltipWrapper {
   position: relative;
   display: inline-flex;
@@ -765,6 +785,28 @@
   font-size: 11px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+
+/* DARK — coluna Transferência: roxo escuro (#7c3aed/#1e3a8a/#1d4ed8) some no escuro.
+   Tudo passa pro roxo canônico (#c4b5fd) legível; bordas/placeholder em hairline. */
+:global(:root[data-theme="dark"]) .transferValue {
+  color: #c4b5fd;
+}
+
+:global(:root[data-theme="dark"]) .inlineTooltipTitle {
+  color: #c4b5fd;
+}
+
+:global(:root[data-theme="dark"]) .inlineTooltipValue {
+  color: #c4b5fd;
+}
+
+:global(:root[data-theme="dark"]) .inlineTooltipRow {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+:global(:root[data-theme="dark"]) .noData {
+  color: var(--t-500);
 }
 
 /* Número do estoque com tooltip de rede (dica visual de que é interativo). */
