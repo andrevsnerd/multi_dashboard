@@ -871,6 +871,8 @@ function buildProductDetalhadoHref(
   return `/${companyKey}/produto-detalhado?${params.toString()}`;
 }
 
+/* Builders dos botões "produto performance" e "LL" (lista loja) — comentados
+   junto com os botões (ver renderRowActionIcons). Reativar os dois juntos.
 function buildProductPerformanceHref(
   companyKey: CompanyKey,
   p: Pick<ProdutoRow, "produto" | "descricao" | "cor">
@@ -886,10 +888,6 @@ function buildProductPerformanceHref(
   return `/${companyKey}/produto-performance?${params.toString()}`;
 }
 
-/**
- * Link para a Lista Loja que abre uma nova lista já com este produto adicionado
- * (como se o usuário criasse a lista e incluísse o item para analisar lá).
- */
 function buildListaLojaHref(
   companyKey: CompanyKey,
   p: Pick<ProdutoRow, "produto" | "descricao" | "cor" | "corDescricao">,
@@ -905,18 +903,16 @@ function buildListaLojaHref(
   if (cor) params.set("addCor", cor);
   const corDesc = (p.corDescricao ?? "").trim();
   if (corDesc) params.set("addCorDesc", corDesc);
-  // Abre a Lista Loja no MESMO escopo de filial da Curva ABC (nome canônico) para que
-  // ritmo/Compra Ideal batam com o que está sendo visto aqui. Sem isto, a lista abre em
-  // TODAS e o ritmo (medido por escopo) pode divergir. Vazio ⇒ TODAS (visão geral).
   const filial = (selectedFilial ?? "").trim();
   if (filial) params.set("addFilial", filial);
   return `/${companyKey}/lista-loja?${params.toString()}`;
 }
+*/
 
 function renderRowActionIcons(
   companyKey: CompanyKey,
   p: Pick<ProdutoRow, "produto" | "descricao" | "cor" | "corDescricao">,
-  selectedFilial: string | null
+  _selectedFilial: string | null
 ): React.ReactNode {
   const name = p.descricao || p.produto;
   return (
@@ -940,6 +936,7 @@ function renderRowActionIcons(
           <circle cx="10" cy="10" r="2.4" stroke="currentColor" strokeWidth="1.8" />
         </svg>
       </Link>
+      {/* Botão "produto performance" removido a pedido — manter comentado.
       <Link
         href={buildProductPerformanceHref(companyKey, p)}
         className={`${styles.productDetailIcon} ${styles.productPerformanceIcon}`}
@@ -966,6 +963,8 @@ function renderRowActionIcons(
           <circle cx="10" cy="10" r="1.4" fill="currentColor" />
         </svg>
       </Link>
+      */}
+      {/* Botão "LL" (lista de loja) removido a pedido — manter comentado.
       <Link
         href={buildListaLojaHref(companyKey, p, selectedFilial)}
         className={`${styles.productDetailIcon} ${styles.productListaLojaIcon}`}
@@ -976,6 +975,7 @@ function renderRowActionIcons(
       >
         <span className={styles.productListaLojaIconText} aria-hidden="true">LL</span>
       </Link>
+      */}
     </>
   );
 }
@@ -1067,7 +1067,7 @@ function renderTransferenciaTooltip(
   fmt: (value: number) => string
 ): React.ReactNode {
   const trigger = (
-    <span style={{ color: "#7c3aed", fontWeight: 600 }}>{fmt(lente.disponivelTransferir)} un</span>
+    <span className={styles.transferValue}>{fmt(lente.disponivelTransferir)} un</span>
   );
   if (lente.doadoras.length === 0) return trigger;
 
@@ -2189,7 +2189,6 @@ export default function CurvaAbcPage({ companyKey, month, year, compare: initial
     return produtosComCurvaComFiltroEstoque.filter((p) => selectedCurvas.has(p.curva));
   }, [produtosComCurvaComFiltroEstoque, selectedCurvas]);
 
-  const maxPerc = produtosComCurvaExibidos.length > 0 ? produtosComCurvaExibidos[0].percParticipacao : 1;
   const groups: Curva[] = ["A", "B", "C"];
   const filteredCurve = selectedCurvas.size === 1 ? Array.from(selectedCurvas)[0] : null;
   const curveStockSummary = groups.map((curva) => {
@@ -3194,8 +3193,8 @@ const handleBadgeClick = (cat: string) => {
       {activeTab === "produtos" && !loading && data && (
         <div ref={captureRef}>
 
-          {/* Category section */}
-          {displayedCategories.length > 0 && (
+          {/* Faixa de categorias (Lenços/India/Pashmina/…) removida a pedido. */}
+          {false && displayedCategories.length > 0 && (
             <div className={styles.categorySection}>
               <div className={styles.categoryBadgesRow} style={{ marginBottom: 0 }}>
               {selectedCategory && (
@@ -3319,7 +3318,6 @@ const handleBadgeClick = (cat: string) => {
                     </th>
                     <th className={styles.obsHeader}>Obs.</th>
                     <>
-                      <th className={styles.right}>Participação</th>
                       <th className={styles.right}>Faturamento no período</th>
                       <th className={styles.right}>Qtd vendida</th>
                       <th className={styles.right}>Estoque</th>
@@ -3338,7 +3336,7 @@ const handleBadgeClick = (cat: string) => {
                     return (
                       <React.Fragment key={curva}>
                         <tr className={`${styles.sectionRow} ${styles[`sectionRow${curva}`]}`}>
-                          <td colSpan={(showEstoqueRede ? 10 : 9) + (verTransferencias ? 2 : 0)}>
+                          <td colSpan={(showEstoqueRede ? 9 : 8) + (verTransferencias ? 2 : 0)}>
                             <div className={styles.sectionLabel}>
                               <span className={`${styles.curvaBadge} ${CURVA_BADGE_CLASS[curva]}`}>{curva}</span>
                               <span className={styles.sectionTitle}>{CURVA_LABEL[curva]}</span>
@@ -3502,17 +3500,6 @@ const handleBadgeClick = (cat: string) => {
                                 />
                               </td>
                               <>
-                              <td className={styles.percCell}>
-                                <div className={styles.percBar}>
-                                  <div className={styles.percBarTrack}>
-                                    <div
-                                      className={`${styles.percBarFill} ${CURVA_BAR_CLASS[curva]}`}
-                                      style={{ width: `${Math.min(100, (p.percParticipacao / maxPerc) * 100)}%` }}
-                                    />
-                                  </div>
-                                  <span className={styles.percText}>{p.percParticipacao.toFixed(1)}%</span>
-                                </div>
-                              </td>
                               <td className={styles.vendas}>
                                 {renderGroupedMetricTooltip(
                                   p,
@@ -3658,7 +3645,7 @@ const handleBadgeClick = (cat: string) => {
         <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, tableLayout: "fixed" }}>
           <thead>
             <tr>
-              {["", "Produto", "Obs.", "Participação", "Faturamento no período", "Qtd vendida", "Estoque", ...(showEstoqueRede ? ["Estoque rede"] : []), "Markup", "Compra ideal", ...(verTransferencias ? ["Transferência", "Compra líquida"] : [])].map((label, i) => (
+              {["", "Produto", "Obs.", "Faturamento no período", "Qtd vendida", "Estoque", ...(showEstoqueRede ? ["Estoque rede"] : []), "Markup", "Compra ideal", ...(verTransferencias ? ["Transferência", "Compra líquida"] : [])].map((label, i) => (
                 <th key={i} className={styles.stickyTableHeaderTh} style={{ textAlign: i >= 3 ? "right" : "left" }}>
                   {label}
                 </th>

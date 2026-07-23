@@ -188,20 +188,19 @@
 
 .exportMenuTrigger {
   padding: 8px 16px;
-  background: #16a34a;
+  background: var(--brand-scarfme);
   border: none;
   border-radius: 8px;
   font-size: 13px;
   font-weight: 600;
   color: #fff;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: opacity 0.15s;
   white-space: nowrap;
 }
 
 .exportMenuTrigger:hover {
-  background: #15803d;
-  color: #fff;
+  opacity: 0.92;
 }
 
 .exportMenuDropdown {
@@ -266,13 +265,13 @@
 }
 
 .toggleBtnActive {
-  background: #1e293b;
+  background: var(--brand-scarfme);
   color: #fff;
   font-weight: 600;
 }
 
 .toggleBtnActive:hover {
-  background: #0f172a;
+  background: var(--brand-scarfme);
   color: #fff;
 }
 
@@ -835,9 +834,9 @@
   font-weight: 700;
 }
 
-.textA { color: #15803d; }
-.textB { color: #92400e; }
-.textC { color: #991b1b; }
+.textA { color: #6d28d9; }
+.textB { color: #1d4ed8; }
+.textC { color: #475569; }
 
 .summaryDivider {
   width: 1px;
@@ -875,6 +874,11 @@
   white-space: nowrap;
 }
 
+:global(:root[data-theme="dark"]) .stickyTableHeaderTh {
+  background: var(--s-50);
+  color: var(--t-600);
+}
+
 .table {
   width: 100%;
   border-collapse: separate;
@@ -902,6 +906,13 @@
   text-align: right;
 }
 
+/* DARK — cabeçalho sem fundo (transparente), só os rótulos sobre o fundo da
+   tabela; sem o navy azulado. */
+:global(:root[data-theme="dark"]) .table thead th {
+  background: transparent;
+  color: var(--t-600);
+}
+
 .table tbody td {
   padding: 12px 16px;
   font-size: 13px;
@@ -924,9 +935,9 @@
   border-bottom: none !important;
 }
 
-.sectionRowA td { background: #f0fdf4; border-top: 2px solid #86efac; }
-.sectionRowB td { background: #fefce8; border-top: 2px solid #fde047; }
-.sectionRowC td { background: #fff1f2; border-top: 2px solid #fca5a5; }
+.sectionRowA td { background: #f5f3ff; border-top: 2px solid #ddd6fe; }
+.sectionRowB td { background: #eff6ff; border-top: 2px solid #bfdbfe; }
+.sectionRowC td { background: #f8fafc; border-top: 2px solid #e2e8f0; }
 
 .sectionLabel {
   display: flex;
@@ -946,9 +957,13 @@
   flex-shrink: 0;
 }
 
-.badgeA { background: #16a34a; color: #ffffff; }
-.badgeB { background: #ca8a04; color: #ffffff; }
-.badgeC { background: #dc2626; color: #ffffff; }
+.badgeA { background: #7c3aed; color: #ffffff; }
+.badgeB { background: #2563eb; color: #ffffff; }
+.badgeC { background: #64748b; color: #ffffff; }
+
+/* Valor da coluna Transferência (gatilho do tooltip) — roxo. */
+.transferValue { color: #7c3aed; font-weight: 600; }
+:global(:root[data-theme="dark"]) .transferValue { color: #af9bf9; }
 
 .sectionTitle {
   font-size: 13px;
@@ -993,8 +1008,8 @@
 }
 
 .rank.top {
-  background: #fef9c3;
-  color: #854d0e;
+  background: var(--brand-scarfme-tint);
+  color: var(--brand-scarfme);
 }
 
 /* ── Product name ── */
@@ -1059,14 +1074,15 @@
 
 .productNameRow {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 6px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .productName {
   font-weight: 600;
   color: var(--t-900);
+  min-width: 0;
 }
 
 .prodCompareBadge {
@@ -1078,6 +1094,7 @@
   border-radius: 10px;
   white-space: nowrap;
   line-height: 1.5;
+  flex-shrink: 0;
 }
 
 .productMeta {
@@ -1556,9 +1573,7 @@
   white-space: nowrap;
 }
 
-.descontinuadoRow td {
-  background: #fef2f2 !important;
-}
+/* Descontinuado: só a badge sinaliza — sem tingir a linha inteira. */
 
 .groupedTooltipWrapper {
   position: relative;
@@ -2153,9 +2168,9 @@
   color: #fff;
 }
 
-.curvaCheckDot[data-curva="A"] { background: #22c55e; }
-.curvaCheckDot[data-curva="B"] { background: #f59e0b; }
-.curvaCheckDot[data-curva="C"] { background: #f43f5e; }
+.curvaCheckDot[data-curva="A"] { background: #7c3aed; }
+.curvaCheckDot[data-curva="B"] { background: #3b82f6; }
+.curvaCheckDot[data-curva="C"] { background: #94a3b8; }
 
 .filterStripDivider {
   display: inline-block;
@@ -2192,6 +2207,10 @@
   margin: 0;
 }
 
+:global(:root[data-theme="dark"]) .checkboxLabel input[type="checkbox"] {
+  accent-color: #c4b5fd;
+}
+
 /* ── KPI cards standalone row ── */
 .kpiCardsRow {
   display: grid;
@@ -2201,9 +2220,7 @@
 }
 
 .kpiCardVendas {
-  background: #f0fdf4 !important;
-  border-color: #bbf7d0 !important;
-  border-left: 4px solid #22c55e !important;
+  border-left: 3px solid var(--brand-scarfme) !important;
 }
 
 .kpiValueCents {
@@ -2371,9 +2388,9 @@
   padding: 0 7px;
 }
 
-.stockBucketCountZero { background: #fee2e2; color: #dc2626; }
-.stockBucketCountLow  { background: #fef3c7; color: #d97706; }
-.stockBucketCountHigh { background: #dcfce7; color: #16a34a; }
+.stockBucketCountZero { background: #ffe4e6; color: #e11d48; }
+.stockBucketCountLow  { background: #dbeafe; color: #2563eb; }
+.stockBucketCountHigh { background: #ccfbf1; color: #0f766e; }
 
 .stockBucketInline {
   display: flex;
@@ -2403,38 +2420,38 @@
 
 /* hover por bucket */
 .stockBucketInlineRow[data-bucket="zero"]:hover {
-  border-color: #fca5a5;
+  border-color: #fda4af;
   background: #fff1f2;
-  color: #dc2626;
+  color: #e11d48;
 }
 .stockBucketInlineRow[data-bucket="low"]:hover {
-  border-color: #fcd34d;
-  background: #fffbeb;
-  color: #d97706;
+  border-color: #93c5fd;
+  background: #eff6ff;
+  color: #2563eb;
 }
 .stockBucketInlineRow[data-bucket="high"]:hover {
-  border-color: #86efac;
-  background: #f0fdf4;
-  color: #16a34a;
+  border-color: #5eead4;
+  background: #f0fdfa;
+  color: #0f766e;
 }
 
 /* active (selecionado) por bucket */
 .stockBucketInlineRow[data-bucket="zero"][data-active="true"] {
-  border-color: #ef4444;
-  background: #fee2e2;
-  color: #dc2626;
+  border-color: #fb7185;
+  background: #ffe4e6;
+  color: #e11d48;
   font-weight: 600;
 }
 .stockBucketInlineRow[data-bucket="low"][data-active="true"] {
-  border-color: #f59e0b;
-  background: #fef3c7;
-  color: #d97706;
+  border-color: #60a5fa;
+  background: #dbeafe;
+  color: #2563eb;
   font-weight: 600;
 }
 .stockBucketInlineRow[data-bucket="high"][data-active="true"] {
-  border-color: #22c55e;
-  background: #dcfce7;
-  color: #16a34a;
+  border-color: #2dd4bf;
+  background: #ccfbf1;
+  color: #0f766e;
   font-weight: 600;
 }
 
@@ -2466,9 +2483,9 @@
   flex-shrink: 0;
 }
 
-.abcCurveDotA { background: #22c55e; }
-.abcCurveDotB { background: #f59e0b; }
-.abcCurveDotC { background: #f43f5e; }
+.abcCurveDotA { background: #7c3aed; }
+.abcCurveDotB { background: #3b82f6; }
+.abcCurveDotC { background: #94a3b8; }
 
 .abcCurveBarTrack {
   width: 100%;
@@ -2477,9 +2494,9 @@
   overflow: hidden;
 }
 
-.abcCurveBarTrackA { background: #dcfce7; }
-.abcCurveBarTrackB { background: #fef9c3; }
-.abcCurveBarTrackC { background: #ffe4e6; }
+.abcCurveBarTrackA { background: #ede9fe; }
+.abcCurveBarTrackB { background: #dbeafe; }
+.abcCurveBarTrackC { background: #eef2f6; }
 
 .abcCurveBarFill {
   height: 100%;
@@ -2549,9 +2566,9 @@
   padding: 0 10px;
 }
 
-.alertasValueZero { background: #fee2e2; color: #dc2626; }
-.alertasValueLow { background: #fef3c7; color: #d97706; }
-.alertasValueHigh { background: #dcfce7; color: #16a34a; }
+.alertasValueZero { background: #ffe4e6; color: #e11d48; }
+.alertasValueLow { background: #dbeafe; color: #2563eb; }
+.alertasValueHigh { background: #ccfbf1; color: #0f766e; }
 
 /* ── Category section wrapper ── */
 .categorySection {
@@ -2632,8 +2649,12 @@
 }
 :global(:root[data-theme="dark"]) .toggleBtnActive,
 :global(:root[data-theme="dark"]) .toggleBtnActive:hover {
-  background: #2563eb;
-  color: #fff;
+  background: #c4b5fd;
+  color: #1b1630;
+}
+:global(:root[data-theme="dark"]) .exportMenuTrigger {
+  background: #c4b5fd;
+  color: #1b1630;
 }
 :global(:root[data-theme="dark"]) .tabBtnActive {
   color: #60a5fa;
@@ -2642,9 +2663,7 @@
 
 /* ── KPIs / variações / metas ── */
 :global(:root[data-theme="dark"]) .kpiCardVendas {
-  background: rgba(34, 197, 94, 0.1) !important;
-  border-color: rgba(34, 197, 94, 0.3) !important;
-  border-left: 4px solid #22c55e !important;
+  border-left: 3px solid var(--brand-scarfme) !important;
 }
 :global(:root[data-theme="dark"]) .variationPos,
 :global(:root[data-theme="dark"]) .badgeGreen {
@@ -2681,33 +2700,32 @@
 :global(:root[data-theme="dark"]) .curveDetailPanel {
   border-color: var(--b-200);
 }
-:global(:root[data-theme="dark"]) .textA { color: #4ade80; }
-:global(:root[data-theme="dark"]) .textB { color: #fbbf24; }
-:global(:root[data-theme="dark"]) .textC { color: #fb7185; }
+/* ABC dark = escada tonal paralela: cada curva no tom "-300" da sua cor
+   (A violeta / B azul / C ardósia), mesma leveza do roxo que você fixou em A. */
+:global(:root[data-theme="dark"]) .textA { color: #c4b5fd; }
+:global(:root[data-theme="dark"]) .textB { color: #93c5fd; }
+:global(:root[data-theme="dark"]) .textC { color: #cbd5e1; }
 
 /* ── Linhas de seção (cabeçalhos de Curva A/B/C) ── */
 :global(:root[data-theme="dark"]) .sectionRowA td {
-  background: rgba(34, 197, 94, 0.1);
-  border-top-color: rgba(34, 197, 94, 0.45);
+  background: #684ba91c;
+  border-top-color: #19005366;
 }
 :global(:root[data-theme="dark"]) .sectionRowB td {
-  background: rgba(234, 179, 8, 0.1);
-  border-top-color: rgba(234, 179, 8, 0.45);
+  background: #4b6fc91c;
+  border-top-color: #001a4d66;
 }
 :global(:root[data-theme="dark"]) .sectionRowC td {
-  background: rgba(244, 63, 94, 0.1);
-  border-top-color: rgba(244, 63, 94, 0.45);
+  background: #64748b1c;
+  border-top-color: #0f172a66;
 }
 :global(:root[data-theme="dark"]) .sectionNote {
   color: #4ade80;
   background: rgba(34, 197, 94, 0.16);
 }
-:global(:root[data-theme="dark"]) .descontinuadoRow td {
-  background: rgba(244, 63, 94, 0.1) !important;
-}
 :global(:root[data-theme="dark"]) .rank.top {
-  background: rgba(234, 179, 8, 0.18);
-  color: #fcd34d;
+  background: rgba(196, 181, 253, 0.18);
+  color: #c4b5fd;
 }
 
 /* ── Ícones de ação da linha ── */
@@ -2809,30 +2827,30 @@
   color: #fb7185;
 }
 :global(:root[data-theme="dark"]) .stockBucketCountLow {
-  background: rgba(234, 179, 8, 0.16);
-  color: #fbbf24;
+  background: rgba(59, 130, 246, 0.16);
+  color: #60a5fa;
 }
 :global(:root[data-theme="dark"]) .stockBucketCountHigh {
-  background: rgba(34, 197, 94, 0.16);
-  color: #4ade80;
+  background: rgba(45, 212, 191, 0.16);
+  color: #5eead4;
 }
 :global(:root[data-theme="dark"]) .alertasValueZero {
   background: rgba(244, 63, 94, 0.16);
   color: #fb7185;
 }
 :global(:root[data-theme="dark"]) .alertasValueLow {
-  background: rgba(234, 179, 8, 0.16);
-  color: #fbbf24;
+  background: rgba(59, 130, 246, 0.16);
+  color: #60a5fa;
 }
 :global(:root[data-theme="dark"]) .alertasValueHigh {
-  background: rgba(34, 197, 94, 0.16);
-  color: #4ade80;
+  background: rgba(45, 212, 191, 0.16);
+  color: #5eead4;
 }
 
 /* ── Barras de curva (card ABC legado) ── */
-:global(:root[data-theme="dark"]) .abcCurveBarTrackA { background: rgba(34, 197, 94, 0.18); }
-:global(:root[data-theme="dark"]) .abcCurveBarTrackB { background: rgba(234, 179, 8, 0.18); }
-:global(:root[data-theme="dark"]) .abcCurveBarTrackC { background: rgba(244, 63, 94, 0.18); }
+:global(:root[data-theme="dark"]) .abcCurveBarTrackA { background: rgba(139, 92, 246, 0.2); }
+:global(:root[data-theme="dark"]) .abcCurveBarTrackB { background: rgba(59, 130, 246, 0.2); }
+:global(:root[data-theme="dark"]) .abcCurveBarTrackC { background: rgba(148, 163, 184, 0.14); }
 
 /* ── Linhas inline de bucket: hover ── */
 :global(:root[data-theme="dark"]) .stockBucketInlineRow[data-bucket="zero"]:hover {
@@ -2841,29 +2859,29 @@
   color: #fb7185;
 }
 :global(:root[data-theme="dark"]) .stockBucketInlineRow[data-bucket="low"]:hover {
-  border-color: rgba(234, 179, 8, 0.5);
-  background: rgba(234, 179, 8, 0.12);
-  color: #fbbf24;
+  border-color: rgba(59, 130, 246, 0.5);
+  background: rgba(59, 130, 246, 0.12);
+  color: #60a5fa;
 }
 :global(:root[data-theme="dark"]) .stockBucketInlineRow[data-bucket="high"]:hover {
-  border-color: rgba(34, 197, 94, 0.5);
-  background: rgba(34, 197, 94, 0.12);
-  color: #4ade80;
+  border-color: rgba(45, 212, 191, 0.5);
+  background: rgba(45, 212, 191, 0.12);
+  color: #5eead4;
 }
 
 /* ── Linhas inline de bucket: ativo ── */
 :global(:root[data-theme="dark"]) .stockBucketInlineRow[data-bucket="zero"][data-active="true"] {
-  border-color: #ef4444;
+  border-color: #fb7185;
   background: rgba(244, 63, 94, 0.18);
   color: #fb7185;
 }
 :global(:root[data-theme="dark"]) .stockBucketInlineRow[data-bucket="low"][data-active="true"] {
-  border-color: #f59e0b;
-  background: rgba(234, 179, 8, 0.18);
-  color: #fbbf24;
+  border-color: #60a5fa;
+  background: rgba(59, 130, 246, 0.18);
+  color: #60a5fa;
 }
 :global(:root[data-theme="dark"]) .stockBucketInlineRow[data-bucket="high"][data-active="true"] {
-  border-color: #22c55e;
-  background: rgba(34, 197, 94, 0.18);
-  color: #4ade80;
+  border-color: #2dd4bf;
+  background: rgba(45, 212, 191, 0.18);
+  color: #5eead4;
 }

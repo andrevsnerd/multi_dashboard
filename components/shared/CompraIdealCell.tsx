@@ -78,7 +78,7 @@ export default function CompraIdealCell({ ideal, loading, semDados, style, descr
     transitoBorder: dark ? "rgba(59, 130, 246, 0.42)" : "#bfdbfe",
     comprarAgora: dark ? "#4ade80" : "#059669",
     essaSemana: dark ? "#5eead4" : "#0f766e",
-    data: dark ? "#60a5fa" : "#2563eb",
+    data: dark ? "#c4b5fd" : "#6d28d9",
   };
 
   // Estados de carregamento — IGUAIS em todas as telas (antes só a Curva ABC tinha).
