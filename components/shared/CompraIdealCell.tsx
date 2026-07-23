@@ -65,17 +65,20 @@ export default function CompraIdealCell({ ideal, loading, semDados, style, descr
     return <span style={{ color: dark ? "#94a3b8" : "#64748b", fontWeight: 600, fontStyle: "italic", whiteSpace: "nowrap" }}>Descontinuado</span>;
   }
 
-  // Paleta da célula. No tema claro é idêntica à original; no escuro usa tons
-  // vivos com contraste sobre o navy (laranja/verde/vermelho escuros somem no dark).
+  // Paleta da célula. A QUANTIDADE é neutra forte (dado limpo, como as outras
+  // colunas numéricas) — cor só na linha de status, pra não virar um borrão azul.
+  // Escalada de urgência (paleta fria do app, sem rosa/âmbar): azul (agendada) →
+  // teal (essa semana) → verde (comprar agora = "go"). "Suficiente" recua no cinza;
+  // chip de trânsito é um pill azul discreto e legível.
   const C = {
-    pcs: dark ? "#fbbf24" : "#b45309",
-    suficiente: dark ? "#94a3b8" : "#64748b",
-    transitoBg: dark ? "rgba(34, 197, 94, 0.12)" : "#dcfce7",
-    transitoText: dark ? "#4ade80" : "#166534",
-    transitoBorder: dark ? "rgba(34, 197, 94, 0.3)" : "#22c55e",
-    comprarAgora: dark ? "#fb7185" : "#b91c1c",
-    essaSemana: dark ? "#fbbf24" : "#b45309",
-    data: dark ? "#5eead4" : "#0f766e",
+    pcs: dark ? "#eaf0f8" : "#1e293b",
+    suficiente: dark ? "#6b7688" : "#94a3b8",
+    transitoBg: dark ? "rgba(59, 130, 246, 0.16)" : "#eff6ff",
+    transitoText: dark ? "#93c5fd" : "#2563eb",
+    transitoBorder: dark ? "rgba(59, 130, 246, 0.42)" : "#bfdbfe",
+    comprarAgora: dark ? "#4ade80" : "#059669",
+    essaSemana: dark ? "#5eead4" : "#0f766e",
+    data: dark ? "#60a5fa" : "#2563eb",
   };
 
   // Estados de carregamento — IGUAIS em todas as telas (antes só a Curva ABC tinha).
@@ -142,7 +145,21 @@ export default function CompraIdealCell({ ideal, loading, semDados, style, descr
             color: ideal.comprarAgora ? C.comprarAgora : essaSemana ? C.essaSemana : C.data,
           }}
         >
-          📅{" "}
+          <svg
+            width="11"
+            height="11"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ flexShrink: 0 }}
+            aria-hidden
+          >
+            <rect x="3" y="4.5" width="18" height="17" rx="2.5" />
+            <path d="M3 9.5h18M8 2.5v4M16 2.5v4" />
+          </svg>
           {ideal.comprarAgora
             ? "comprar agora"
             : essaSemana
