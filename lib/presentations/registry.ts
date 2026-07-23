@@ -12,7 +12,8 @@ export type PresentationFilterKey =
   | "colecao"
   | "subgrupo"
   | "grade"
-  | "grupo";
+  | "grupo"
+  | "produto";
 
 export interface PresentationTypeMeta {
   id: string;
@@ -24,11 +25,14 @@ export interface PresentationTypeMeta {
   requiresCover: boolean;
   /** Deck é sobre UMA coleção (título/capa usam a coleção selecionada). */
   singleCollection: boolean;
+  /** Empresas onde o tipo aparece (slug). Ausente = todas. */
+  companies?: string[];
 }
 
 export const COLECAO_COMPLETA_ID = "colecao-completa";
 export const COMPARATIVO_COLECOES_ID = "comparativo-colecoes";
 export const COMPARATIVO_RESUMIDO_ID = "comparativo-resumido";
+export const PRODUTO_GIRO_ID = "produto-giro";
 
 export const PRESENTATION_TYPES: PresentationTypeMeta[] = [
   {
@@ -40,6 +44,7 @@ export const PRESENTATION_TYPES: PresentationTypeMeta[] = [
     supportedFilters: ["colecao", "periodo", "filial"],
     requiresCover: true,
     singleCollection: true,
+    companies: ["scarfme"],
   },
   {
     id: COMPARATIVO_COLECOES_ID,
@@ -51,6 +56,7 @@ export const PRESENTATION_TYPES: PresentationTypeMeta[] = [
     supportedFilters: ["colecao", "periodo", "filial"],
     requiresCover: true,
     singleCollection: false,
+    companies: ["scarfme"],
   },
   {
     id: COMPARATIVO_RESUMIDO_ID,
@@ -62,9 +68,27 @@ export const PRESENTATION_TYPES: PresentationTypeMeta[] = [
     supportedFilters: ["colecao", "periodo", "filial"],
     requiresCover: true,
     singleCollection: false,
+    companies: ["scarfme"],
+  },
+  {
+    id: PRODUTO_GIRO_ID,
+    label: "Relatório Giro de Produtos (com imagens)",
+    description:
+      "Deck de 10 slides de performance no padrão do exemplo: capa com foto, KPIs, " +
+      "ritmo diário, ritmo semanal, salto dos últimos 3 dias, top cores/itens, mix (donut), " +
+      "vendas por filial, heatmap cor×dia e síntese. Selecione produtos específicos e os " +
+      "filtros da empresa (mesmas regras da página Produto Giro). Exporta em PDF.",
+    supportedFilters: ["produto", "periodo", "filial", "grupo", "subgrupo", "colecao", "grade"],
+    requiresCover: true,
+    singleCollection: false,
   },
 ];
 
 export function getPresentationMeta(id: string): PresentationTypeMeta | undefined {
   return PRESENTATION_TYPES.find((t) => t.id === id);
+}
+
+/** Tipos visíveis para uma empresa (slug). Tipos sem `companies` valem para todas. */
+export function getPresentationTypesForCompany(company: string): PresentationTypeMeta[] {
+  return PRESENTATION_TYPES.filter((t) => !t.companies || t.companies.includes(company));
 }

@@ -9,6 +9,8 @@ import {
 // Capa base64 pode passar de 1MB; deixamos folga mas evitamos abuso.
 const MAX_DATA_URL_LENGTH = 12 * 1024 * 1024; // ~12MB de string base64
 const VALID_KINDS: PresentationAssetKind[] = ["logo", "cover"];
+// Logo vale p/ NERD e ScarfMe; capas por coleção seguem ScarfMe (fluxo de coleção).
+const ALLOWED_COMPANIES = new Set(["scarfme", "nerd"]);
 
 function isDataUrl(value: unknown): value is string {
   return typeof value === "string" && /^data:image\/[a-zA-Z0-9.+-]+;base64,/.test(value);
@@ -23,9 +25,9 @@ export async function GET(request: Request) {
   const company = searchParams.get("company") ?? "";
   const colecao = searchParams.get("colecao");
 
-  if (company !== "scarfme") {
+  if (!ALLOWED_COMPANIES.has(company)) {
     return NextResponse.json(
-      { error: "Gerador de Apresentações disponível apenas para ScarfMe." },
+      { error: "Gerador de Apresentações indisponível para esta empresa." },
       { status: 400 }
     );
   }
@@ -67,9 +69,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Body JSON inválido." }, { status: 400 });
   }
 
-  if (body.company !== "scarfme") {
+  if (!body.company || !ALLOWED_COMPANIES.has(body.company)) {
     return NextResponse.json(
-      { error: "Gerador de Apresentações disponível apenas para ScarfMe." },
+      { error: "Gerador de Apresentações indisponível para esta empresa." },
       { status: 400 }
     );
   }

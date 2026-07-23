@@ -3417,7 +3417,7 @@
       "source_location": "L75",
       "_origin": "ast",
       "id": "app_admin_page_userrow",
-      "community": 134,
+      "community": 61,
       "norm_label": "userrow"
     },
     {
@@ -29399,7 +29399,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_auth_permission_normalizer",
-      "community": 174,
+      "community": 134,
       "norm_label": "permission-normalizer.ts"
     },
     {
@@ -29409,7 +29409,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "lib_auth_permission_normalizer_valid_permission_keys",
-      "community": 174,
+      "community": 134,
       "norm_label": "valid_permission_keys"
     },
     {
@@ -29419,7 +29419,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "lib_auth_permission_normalizer_legacy_permission_aliases",
-      "community": 174,
+      "community": 134,
       "norm_label": "legacy_permission_aliases"
     },
     {
@@ -29429,7 +29429,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "lib_auth_permission_normalizer_normalizerawpermission",
-      "community": 174,
+      "community": 134,
       "norm_label": "normalizerawpermission()"
     },
     {
@@ -29439,7 +29439,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "lib_auth_permission_normalizer_normalizepermissionkeys",
-      "community": 174,
+      "community": 134,
       "norm_label": "normalizepermissionkeys()"
     },
     {
@@ -33119,7 +33119,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "lib_reports_enrich_server_enrichresult",
-      "community": 215,
+      "community": 33,
       "norm_label": "enrichresult"
     },
     {
@@ -33599,7 +33599,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_reports_types",
-      "community": 13,
+      "community": 30,
       "norm_label": "types.ts"
     },
     {
@@ -33649,7 +33649,7 @@
       "source_location": "L62",
       "_origin": "ast",
       "id": "lib_reports_types_reportfilterkey",
-      "community": 13,
+      "community": 30,
       "norm_label": "reportfilterkey"
     },
     {
@@ -33679,7 +33679,7 @@
       "source_location": "L93",
       "_origin": "ast",
       "id": "lib_reports_types_reportrow",
-      "community": 215,
+      "community": 33,
       "norm_label": "reportrow"
     },
     {
@@ -33709,7 +33709,7 @@
       "source_location": "L145",
       "_origin": "ast",
       "id": "lib_reports_types_reportresult",
-      "community": 215,
+      "community": 30,
       "norm_label": "reportresult"
     },
     {
@@ -36869,7 +36869,7 @@
       "source_location": "L8788",
       "_origin": "ast",
       "id": "lib_repositories_controleestoque_estoqueredeitemrow",
-      "community": 215,
+      "community": 30,
       "norm_label": "estoqueredeitemrow"
     },
     {
@@ -41159,7 +41159,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_reportprodutoscadastro",
-      "community": 215,
+      "community": 30,
       "norm_label": "reportprodutoscadastro.ts"
     },
     {
@@ -41169,7 +41169,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "lib_repositories_reportprodutoscadastro_roundint",
-      "community": 215,
+      "community": 30,
       "norm_label": "roundint()"
     },
     {
@@ -41179,7 +41179,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "lib_repositories_reportprodutoscadastro_fetchprodutoscadastro",
-      "community": 215,
+      "community": 30,
       "norm_label": "fetchprodutoscadastro()"
     },
     {
@@ -41189,7 +41189,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_reportprodutosparados",
-      "community": 215,
+      "community": 30,
       "norm_label": "reportprodutosparados.ts"
     },
     {
@@ -41199,7 +41199,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "lib_repositories_reportprodutosparados_up",
-      "community": 215,
+      "community": 30,
       "norm_label": "up()"
     },
     {
@@ -41209,7 +41209,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "lib_repositories_reportprodutosparados_normalizeset",
-      "community": 215,
+      "community": 30,
       "norm_label": "normalizeset()"
     },
     {
@@ -41219,7 +41219,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "lib_repositories_reportprodutosparados_roundint",
-      "community": 215,
+      "community": 30,
       "norm_label": "roundint()"
     },
     {
@@ -41229,7 +41229,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "lib_repositories_reportprodutosparados_fetchprodutosparados",
-      "community": 215,
+      "community": 30,
       "norm_label": "fetchprodutosparados()"
     },
     {
@@ -53989,7 +53989,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "types_auth_rolekey",
-      "community": 134,
+      "community": 61,
       "norm_label": "rolekey"
     },
     {
@@ -53999,7 +53999,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "types_auth_permissionkey",
-      "community": 134,
+      "community": 61,
       "norm_label": "permissionkey"
     },
     {
@@ -104087,7 +104087,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/gerador-apresentacoes/ProdutoGiroDeck.tsx",
-      "source_location": "L697",
+      "source_location": "L651",
       "weight": 1.0,
       "source": "components_gerador_apresentacoes_produtogirodeck_produtogirodeck",
       "target": "components_gerador_apresentacoes_produtogirodeck_heatcolor",

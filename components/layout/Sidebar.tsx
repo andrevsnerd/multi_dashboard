@@ -550,7 +550,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
           isActive: (currentPathname) =>
             matchesSegment(currentPathname, "/aumentos-descontos", aumentosDescontosHref),
         },
-        ...(isScarfme
+        ...(isScarfme || isNerd
           ? [
               {
                 key: "gerador-apresentacoes",

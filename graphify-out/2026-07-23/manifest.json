@@ -3765,8 +3765,8 @@
     "semantic_hash": ""
   },
   "components/gerador-apresentacoes/ProdutoGiroDeck.tsx": {
-    "mtime": 1784811492.2472508,
-    "ast_hash": "d2671cb20f4ae809f5a44627a0976f75",
+    "mtime": 1784810399.3550315,
+    "ast_hash": "4ce62495279e13c75eadd9519f7891ff",
     "semantic_hash": ""
   },
   "lib/repositories/produtoGiroPresentation.ts": {

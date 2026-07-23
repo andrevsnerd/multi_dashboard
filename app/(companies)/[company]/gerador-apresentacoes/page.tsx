@@ -5,6 +5,9 @@ import PageLayout from "@/components/layout/PageLayout";
 import GeradorApresentacoesPage from "@/components/gerador-apresentacoes/GeradorApresentacoesPage";
 import { resolveCompany } from "@/lib/config/company";
 
+// Coleção segue ScarfMe-only; o tipo "Giro de Produtos" também vale para NERD.
+const ALLOWED_COMPANIES = new Set(["scarfme", "nerd"]);
+
 interface GeradorApresentacoesPageProps {
   params: Promise<{ company: string }>;
 }
@@ -15,7 +18,7 @@ export async function generateMetadata({
   const { company: companySlug } = await params;
   const company = resolveCompany(companySlug);
 
-  if (!company || company.key !== "scarfme") {
+  if (!company || !ALLOWED_COMPANIES.has(company.key)) {
     return { title: "Gerador de Apresentações" };
   }
 
@@ -28,7 +31,7 @@ export default async function GeradorApresentacoesPageRoute({
   const { company: companySlug } = await params;
   const company = resolveCompany(companySlug);
 
-  if (!company || company.key !== "scarfme") {
+  if (!company || !ALLOWED_COMPANIES.has(company.key)) {
     notFound();
   }
 

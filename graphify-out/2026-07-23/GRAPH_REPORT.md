@@ -1,7 +1,7 @@
 # Graph Report - multi_dashboard  (2026-07-23)
 
 ## Corpus Check
-- 747 files · ~832,315 words
+- 747 files · ~832,163 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -536,8 +536,8 @@ Cohesion: 0.10
 Nodes (43): getSuggestedQtyListaLojaRule(), applyDisponibilidadeCap(), buildDisponibilidadeResumo(), calcQtdSugestaoEInfo(), calcQtdSugestaoPOInfo(), calcQtdSugestaoS(), clamp(), getDiasComEstoquePositivo() (+35 more)
 
 ### Community 13 - "Report Registry & Presets"
-Cohesion: 0.09
-Nodes (47): buildClientesFilialPresets(), CLIENTES_FILIAL_COLUMNS, CLIENTES_FILIAL_PRESETS, clientesFilialMeta, col(), ALL_DEFS, columnSource, getEditorExtraColumns() (+39 more)
+Cohesion: 0.08
+Nodes (46): buildClientesFilialPresets(), CLIENTES_FILIAL_COLUMNS, CLIENTES_FILIAL_PRESETS, clientesFilialMeta, col(), ALL_DEFS, columnSource, getEditorExtraColumns() (+38 more)
 
 ### Community 14 - "App Shell: Auth, Layout & Admin Pages"
 Cohesion: 0.10
@@ -604,8 +604,8 @@ Cohesion: 0.06
 Nodes (57): calcularCurvas(), CurvaRankedRow, normalizeFilialKey(), parseYmd(), POST(), RequestBody, resolveCanonicalFilial(), buildCurveBadgeLabel() (+49 more)
 
 ### Community 30 - "Performance Control & Curva Categories"
-Cohesion: 0.16
-Nodes (23): GET(), VALID_SOURCES, SourceId, enrichCadastro(), enrichEstoque(), enrichParados(), enrichVendas(), round2() (+15 more)
+Cohesion: 0.12
+Nodes (32): GET(), VALID_SOURCES, SourceId, enrichCadastro(), enrichEstoque(), enrichParados(), enrichVendas(), round2() (+24 more)
 
 ### Community 31 - "Transferências & Vendedores API Routes"
 Cohesion: 0.32
@@ -617,7 +617,7 @@ Nodes (28): formatLongDate(), formatShortDate(), isSameSelection(), lastNDaysRan
 
 ### Community 33 - "Report Generator Export/Formatting"
 Cohesion: 0.12
-Nodes (34): buildWorkingColumns(), colTypeOf(), formatCell(), formatKpi(), GeradorRelatoriosPage(), GeradorRelatoriosPageProps, isNumericType(), SortDir (+26 more)
+Nodes (36): buildWorkingColumns(), colTypeOf(), formatCell(), formatKpi(), GeradorRelatoriosPage(), GeradorRelatoriosPageProps, isNumericType(), SortDir (+28 more)
 
 ### Community 34 - "MCP Tools Registry Setup"
 Cohesion: 0.17
@@ -725,7 +725,7 @@ Nodes (27): buscar_estoque_atual(), buscar_saidas_estoque_prod_sai(), buscar_tab
 
 ### Community 61 - "Report Generator Modules"
 Cohesion: 0.07
-Nodes (46): AdminPage(), buildGroupedPermissions(), ClienteBusca, Filial, _filialLabelOverrides, filialOptionLabel(), getFilialLabel(), PERMISSION_GROUPS (+38 more)
+Nodes (49): AdminPage(), buildGroupedPermissions(), ClienteBusca, Filial, _filialLabelOverrides, filialOptionLabel(), getFilialLabel(), PERMISSION_GROUPS (+41 more)
 
 ### Community 62 - "Curva Por Produto Picker"
 Cohesion: 0.15
@@ -1012,8 +1012,8 @@ Cohesion: 0.06
 Nodes (55): CategoryData, ControlePerformancePage(), FilialRow, formatCompactSignedPctForBadge(), formatCurrency(), formatSignedPct(), getCategoryHeaderLabel(), getCombinedCategoryMetrics() (+47 more)
 
 ### Community 134 - "Presentation Generator & Filters"
-Cohesion: 0.18
-Nodes (25): UserRow, DELETE(), GET(), isAdmin(), PATCH(), GET(), isAdmin(), POST() (+17 more)
+Cohesion: 0.16
+Nodes (26): DELETE(), GET(), isAdmin(), PATCH(), GET(), isAdmin(), POST(), POST() (+18 more)
 
 ### Community 135 - "Romaneio Generation Investigation"
 Cohesion: 0.21
@@ -1172,8 +1172,8 @@ Cohesion: 0.29
 Nodes (14): buildProdutoLabelLookupKey(), ensureDataDir(), ensureTable(), listProdutoLabelLookupKeys(), listProdutoLabels(), makeCompositeKey(), normalizeIncomingKeys(), normalizeValue() (+6 more)
 
 ### Community 174 - "FilialConsultaClient.tsx"
-Cohesion: 0.12
-Nodes (34): GET(), POST(), DELETE(), ensureTable(), GET(), PUT(), ensureTable(), GET() (+26 more)
+Cohesion: 0.14
+Nodes (30): GET(), POST(), DELETE(), ensureTable(), GET(), PUT(), ensureTable(), GET() (+22 more)
 
 ### Community 175 - "Contagem Inventory Investigation"
 Cohesion: 0.47
@@ -1316,8 +1316,8 @@ Cohesion: 0.19
 Nodes (11): generateMetadata(), HistoricoSaidasEntradasRoute(), PageProps, fetchDetalhes(), fetchHistorico(), formatDate(), HistoricoResponse, HistoricoSaidasEntradasPage() (+3 more)
 
 ### Community 215 - "reportCompraSugeridaAbc.ts"
-Cohesion: 0.11
-Nodes (35): filialLabel(), getFilialLabelForDisplay(), getOperationalFilials(), EnrichResult, ReportRunContext, ReportResult, ReportRow, applyColecaoLabels() (+27 more)
+Cohesion: 0.15
+Nodes (25): filialLabel(), getFilialLabelForDisplay(), getOperationalFilials(), ReportRunContext, applyColecaoLabels(), fetchColecaoCodeByProduto(), buildTransitIndex(), fetchCompraSugeridaAbc() (+17 more)
 
 ### Community 216 - "Stock Movement Reconciliation Investigation"
 Cohesion: 0.70

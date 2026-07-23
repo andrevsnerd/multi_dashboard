@@ -11,17 +11,25 @@ import {
   COLECAO_COMPLETA_ID,
   COMPARATIVO_COLECOES_ID,
   COMPARATIVO_RESUMIDO_ID,
-  PRESENTATION_TYPES,
+  PRODUTO_GIRO_ID,
   getPresentationMeta,
+  getPresentationTypesForCompany,
 } from "@/lib/presentations/registry";
 import type { ColecaoPresentationPayload } from "@/lib/repositories/colecaoPresentation";
 import type { ComparativoColecoesPayload } from "@/lib/repositories/comparativoColecoes";
 import type { ComparativoResumidoPayload } from "@/lib/repositories/comparativoResumido";
+import type { ProdutoGiroPresentationPayload } from "@/lib/repositories/produtoGiroPresentation";
 
 import ColecaoDeck from "./ColecaoDeck";
 import ComparativoDeck from "./ComparativoDeck";
 import ComparativoResumidoDeck from "./ComparativoResumidoDeck";
+import ProdutoGiroDeck from "./ProdutoGiroDeck";
 import styles from "./GeradorApresentacoesPage.module.css";
+
+interface ProductPick {
+  id: string;
+  name: string;
+}
 
 interface GeradorApresentacoesPageProps {
   companyKey: CompanyKey;
@@ -46,8 +54,18 @@ export default function GeradorApresentacoesPage({
     return { startDate: r.start, endDate: r.end };
   }, []);
 
-  const [presentationTypeId, setPresentationTypeId] = useState<string>(COLECAO_COMPLETA_ID);
+  const availableTypes = useMemo(() => getPresentationTypesForCompany(companyKey), [companyKey]);
+  const [presentationTypeId, setPresentationTypeId] = useState<string>(
+    () => availableTypes[0]?.id ?? PRODUTO_GIRO_ID
+  );
+  // Se a empresa não tem o tipo selecionado (ex.: NERD só tem Giro), cai no primeiro válido.
+  useEffect(() => {
+    if (!availableTypes.some((t) => t.id === presentationTypeId)) {
+      setPresentationTypeId(availableTypes[0]?.id ?? PRODUTO_GIRO_ID);
+    }
+  }, [availableTypes, presentationTypeId]);
   const meta = useMemo(() => getPresentationMeta(presentationTypeId), [presentationTypeId]);
+  const isGiro = presentationTypeId === PRODUTO_GIRO_ID;
 
   // Filtros
   const [range, setRange] = useState<DateRangeValue>(initialRange);
@@ -67,10 +85,29 @@ export default function GeradorApresentacoesPage({
   const logoInputRef = useRef<HTMLInputElement | null>(null);
   const coverInputRef = useRef<HTMLInputElement | null>(null);
 
+  // ---- Filtros do tipo Giro (mesmas regras da página Produto Giro) ----
+  const [porCor, setPorCor] = useState(true);
+  const [giroProdutos, setGiroProdutos] = useState<ProductPick[]>([]);
+  const [giroSearch, setGiroSearch] = useState("");
+  const [giroSearchResults, setGiroSearchResults] = useState<ProductPick[]>([]);
+  const [giroSearchOpen, setGiroSearchOpen] = useState(false);
+  const [giroGrupos, setGiroGrupos] = useState<string[]>([]);
+  const [giroSubgrupos, setGiroSubgrupos] = useState<string[]>([]);
+  const [giroColecoes, setGiroColecoes] = useState<string[]>([]);
+  const [giroGrades, setGiroGrades] = useState<string[]>([]);
+  const [optGrupos, setOptGrupos] = useState<string[]>([]);
+  const [optSubgrupos, setOptSubgrupos] = useState<string[]>([]);
+  const [optGiroGrades, setOptGiroGrades] = useState<string[]>([]);
+  const [optGiroColecoes, setOptGiroColecoes] = useState<string[]>([]);
+  // Capa do Giro fica só em memória (escolhida a cada geração; não persiste).
+  const [giroCoverDataUrl, setGiroCoverDataUrl] = useState<string | null>(null);
+  const giroCoverInputRef = useRef<HTMLInputElement | null>(null);
+
   // Resultado
   const [report, setReport] = useState<ColecaoPresentationPayload | null>(null);
   const [comparativo, setComparativo] = useState<ComparativoColecoesPayload | null>(null);
   const [resumido, setResumido] = useState<ComparativoResumidoPayload | null>(null);
+  const [giro, setGiro] = useState<ProdutoGiroPresentationPayload | null>(null);
   const [coversByCode, setCoversByCode] = useState<Record<string, string | null>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -130,6 +167,89 @@ export default function GeradorApresentacoesPage({
   useEffect(() => {
     void loadAssets();
   }, [loadAssets]);
+
+  // ---- opções dos filtros do Giro (mesmo escopo da página Produto Giro) ----
+  useEffect(() => {
+    if (!isGiro) return;
+    let cancelled = false;
+    const params = new URLSearchParams({ company: companyKey, start: startStr, end: endStr });
+    if (filial) params.set("filial", filial);
+    const qs = params.toString();
+    const load = (path: string, setter: (v: string[]) => void) =>
+      fetch(`/api/products/${path}?${qs}`, { cache: "no-store" })
+        .then((r) => r.json())
+        .then((json: { data?: string[] }) => {
+          if (!cancelled) setter(Array.isArray(json.data) ? json.data : []);
+        })
+        .catch(() => {
+          if (!cancelled) setter([]);
+        });
+
+    setOptGrupos([]);
+    setOptSubgrupos([]);
+    setOptGiroGrades([]);
+    setOptGiroColecoes([]);
+    void load("subgrupos", setOptSubgrupos);
+    if (companyKey === "nerd") {
+      void load("grupos", setOptGrupos);
+    } else {
+      void load("colecoes", setOptGiroColecoes);
+      void load("grades", setOptGiroGrades);
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [isGiro, companyKey, filial, startStr, endStr]);
+
+  // ---- busca de produtos (picker) — debounce + /api/products/search ----
+  useEffect(() => {
+    if (!isGiro) return;
+    const term = giroSearch.trim();
+    if (term.length < 2) {
+      setGiroSearchResults([]);
+      return;
+    }
+    let cancelled = false;
+    const t = setTimeout(() => {
+      fetch(`/api/products/search?q=${encodeURIComponent(term)}`, { cache: "no-store" })
+        .then((r) => r.json())
+        .then((json: { data?: Array<{ productId: string; productName: string }> }) => {
+          if (cancelled) return;
+          setGiroSearchResults(
+            (json.data ?? []).map((d) => ({ id: d.productId.trim(), name: d.productName || d.productId }))
+          );
+        })
+        .catch(() => {
+          if (!cancelled) setGiroSearchResults([]);
+        });
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [isGiro, giroSearch]);
+
+  const addGiroProduto = useCallback((p: ProductPick) => {
+    setGiroProdutos((prev) => (prev.some((x) => x.id === p.id) ? prev : [...prev, p]));
+    setGiroSearch("");
+    setGiroSearchResults([]);
+    setGiroSearchOpen(false);
+  }, []);
+  const removeGiroProduto = useCallback((id: string) => {
+    setGiroProdutos((prev) => prev.filter((x) => x.id !== id));
+  }, []);
+
+  const onPickGiroCover = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      setGiroCoverDataUrl(dataUrl);
+    } catch {
+      setError("Não foi possível ler a imagem.");
+    } finally {
+      if (giroCoverInputRef.current) giroCoverInputRef.current.value = "";
+    }
+  };
 
   // Comparativo: carrega as capas (recortes) de TODAS as coleções selecionadas
   // — reusa as imagens já enviadas por coleção; serve tanto ao preview do
@@ -261,6 +381,41 @@ export default function GeradorApresentacoesPage({
 
   // ---- gerar ----
   const handleGenerate = useCallback(async () => {
+    if (isGiro) {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch("/api/gerador-apresentacoes/produto-giro", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            company: companyKey,
+            filial,
+            porCor,
+            produtoIds: giroProdutos.map((p) => p.id),
+            grupos: giroGrupos,
+            subgrupos: giroSubgrupos,
+            colecoes: giroColecoes,
+            grades: giroGrades,
+            coverTitle: coverTitle || undefined,
+            range: { start: startStr, end: endStr },
+          }),
+        });
+        const json = (await res.json()) as { data?: ProdutoGiroPresentationPayload; error?: string };
+        if (!res.ok) throw new Error(json.error ?? "Erro ao gerar a apresentação.");
+        setGiro(json.data ?? null);
+        setReport(null);
+        setComparativo(null);
+        setResumido(null);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Erro ao gerar a apresentação.");
+        setGiro(null);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     if (colecoes.length === 0) {
       setError("Selecione ao menos uma coleção.");
       return;
@@ -285,6 +440,7 @@ export default function GeradorApresentacoesPage({
         setComparativo(data);
         setReport(null);
         setResumido(null);
+        setGiro(null);
         // Carrega as capas de todas as coleções do deck.
         if (data) {
           const entries = await Promise.all(
@@ -324,6 +480,7 @@ export default function GeradorApresentacoesPage({
         setResumido(data);
         setReport(null);
         setComparativo(null);
+        setGiro(null);
         // Carrega as fotos (recortes) de todas as coleções do resumo.
         if (data) {
           const entries = await Promise.all(
@@ -362,6 +519,7 @@ export default function GeradorApresentacoesPage({
       setReport(json.data ?? null);
       setComparativo(null);
       setResumido(null);
+      setGiro(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao gerar a apresentação.");
       setReport(null);
@@ -370,12 +528,29 @@ export default function GeradorApresentacoesPage({
     } finally {
       setLoading(false);
     }
-  }, [colecoes, companyKey, filial, singleColecaoLabel, startStr, endStr, presentationTypeId, labelForCode]);
+  }, [
+    isGiro,
+    colecoes,
+    companyKey,
+    filial,
+    porCor,
+    giroProdutos,
+    giroGrupos,
+    giroSubgrupos,
+    giroColecoes,
+    giroGrades,
+    coverTitle,
+    singleColecaoLabel,
+    startStr,
+    endStr,
+    presentationTypeId,
+    labelForCode,
+  ]);
 
   // ---- export PDF (mesmo pipeline do Relatório Claude) ----
   const handleExportPdf = useCallback(async () => {
     const deckElement = deckRef.current;
-    if ((!report && !comparativo && !resumido) || !deckElement) return;
+    if ((!report && !comparativo && !resumido && !giro) || !deckElement) return;
     const slideElements = Array.from(deckElement.querySelectorAll<HTMLElement>("[data-pdf-slide]"));
     if (slideElements.length === 0) return;
 
@@ -393,7 +568,9 @@ export default function GeradorApresentacoesPage({
       // (min-height 720 preserva o layout padrão) e cada página do PDF nasce com
       // o tamanho exato do slide (full-bleed), então nada é cortado nem sai
       // desproporcional entre os slides.
-      const marginMm = 8;
+      // Full-bleed: sem margem. A página do PDF nasce com o tamanho exato do
+      // slide e a imagem cobre 100% dela — nada de moldura branca em volta.
+      const marginMm = 0;
       const pageWidthMm = 297;
       const usableWidthMm = pageWidthMm - marginMm * 2;
 
@@ -477,11 +654,13 @@ export default function GeradorApresentacoesPage({
         canvas.height = 0;
       }
 
-      const baseName = comparativo
-        ? `comparativo-colecoes-${comparativo.period.start}-${comparativo.period.end}`
-        : resumido
-          ? `comparativo-resumido-${resumido.period.start}-${resumido.period.end}`
-          : `apresentacao-${report?.collection.code || "colecao"}-${report?.period.start}-${report?.period.end}`;
+      const baseName = giro
+        ? `giro-${(giro.title || "produtos").toLowerCase()}-${giro.period.start}-${giro.period.end}`
+        : comparativo
+          ? `comparativo-colecoes-${comparativo.period.start}-${comparativo.period.end}`
+          : resumido
+            ? `comparativo-resumido-${resumido.period.start}-${resumido.period.end}`
+            : `apresentacao-${report?.collection.code || "colecao"}-${report?.period.start}-${report?.period.end}`;
       const safeName = baseName.replace(/[^\w-]+/g, "_").slice(0, 100);
       doc.save(`${safeName}.pdf`);
     } catch (e) {
@@ -489,14 +668,14 @@ export default function GeradorApresentacoesPage({
     } finally {
       setExportingPdf(false);
     }
-  }, [report, comparativo, resumido]);
+  }, [report, comparativo, resumido, giro]);
 
   const isColecaoType = presentationTypeId === COLECAO_COMPLETA_ID;
   const isComparativo = presentationTypeId === COMPARATIVO_COLECOES_ID;
   const isResumido = presentationTypeId === COMPARATIVO_RESUMIDO_ID;
   // Tipos multi-coleção usam uma foto (recorte) por coleção selecionada.
   const isMultiCover = isComparativo || isResumido;
-  const hasResult = Boolean(report || comparativo || resumido);
+  const hasResult = Boolean(report || comparativo || resumido || giro);
 
   return (
     <div className={styles.wrapper}>
@@ -517,7 +696,7 @@ export default function GeradorApresentacoesPage({
             value={presentationTypeId}
             onChange={(e) => setPresentationTypeId(e.target.value)}
           >
-            {PRESENTATION_TYPES.map((t) => (
+            {availableTypes.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.label}
               </option>
@@ -531,7 +710,7 @@ export default function GeradorApresentacoesPage({
       <section className={styles.panel}>
         <h2 className={styles.panelTitle}>Filtros</h2>
         <div className={styles.filtersGrid}>
-          {meta?.supportedFilters.includes("colecao") && (
+          {!isGiro && meta?.supportedFilters.includes("colecao") && (
             <MultiSelectFilter
               label="Coleção"
               value={colecoes}
@@ -547,18 +726,79 @@ export default function GeradorApresentacoesPage({
           {meta?.supportedFilters.includes("filial") && (
             <FilialFilter companyKey={companyKey} value={filial} onChange={setFilial} module="sales" />
           )}
-          {isColecaoType && (
+          {isGiro && companyKey === "nerd" && optGrupos.length > 0 && (
+            <MultiSelectFilter label="Grupo" value={giroGrupos} options={optGrupos} onChange={setGiroGrupos} />
+          )}
+          {isGiro && optSubgrupos.length > 0 && (
+            <MultiSelectFilter label="Subgrupo" value={giroSubgrupos} options={optSubgrupos} onChange={setGiroSubgrupos} />
+          )}
+          {isGiro && companyKey !== "nerd" && optGiroColecoes.length > 0 && (
+            <MultiSelectFilter label="Coleção" value={giroColecoes} options={optGiroColecoes} onChange={setGiroColecoes} />
+          )}
+          {isGiro && companyKey !== "nerd" && optGiroGrades.length > 0 && (
+            <MultiSelectFilter label="Grade" value={giroGrades} options={optGiroGrades} onChange={setGiroGrades} />
+          )}
+          {(isColecaoType || isGiro) && (
             <div className={styles.field}>
               <label className={styles.fieldLabel}>Título da capa (opcional)</label>
               <input
                 className={styles.input}
                 value={coverTitle}
-                placeholder={singleColecaoLabel || "Ex.: Copa Galisteu"}
+                placeholder={isGiro ? "Ex.: Pashminas Lisas" : singleColecaoLabel || "Ex.: Copa Galisteu"}
                 onChange={(e) => setCoverTitle(e.target.value)}
               />
             </div>
           )}
         </div>
+
+        {isGiro && (
+          <div className={styles.field} style={{ marginTop: 16 }}>
+            <label className={styles.fieldLabel}>Produtos específicos (opcional)</label>
+            <div style={{ position: "relative" }}>
+              <input
+                className={styles.input}
+                value={giroSearch}
+                placeholder="Busque por nome, código ou código de barras…"
+                onChange={(e) => {
+                  setGiroSearch(e.target.value);
+                  setGiroSearchOpen(true);
+                }}
+                onFocus={() => setGiroSearchOpen(true)}
+              />
+              {giroSearchOpen && giroSearchResults.length > 0 && (
+                <div className={styles.searchResults}>
+                  {giroSearchResults.slice(0, 30).map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className={styles.searchResultItem}
+                      onClick={() => addGiroProduto(p)}
+                    >
+                      <span className={styles.searchResultName}>{p.name}</span>
+                      <span className={styles.searchResultId}>{p.id}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {giroProdutos.length > 0 && (
+              <div className={styles.chips}>
+                {giroProdutos.map((p) => (
+                  <span key={p.id} className={styles.chip}>
+                    {p.name}
+                    <button type="button" className={styles.chipX} onClick={() => removeGiroProduto(p.id)} aria-label="Remover">
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <label className={styles.checkboxRow}>
+              <input type="checkbox" checked={porCor} onChange={(e) => setPorCor(e.target.checked)} />
+              Detalhar por cor (cada item vira produto × cor)
+            </label>
+          </div>
+        )}
         {isColecaoType && colecoes.length > 1 && (
           <p className={styles.hint}>
             Selecione apenas uma coleção para vincular a imagem de capa e o título. Com várias, os
@@ -579,6 +819,13 @@ export default function GeradorApresentacoesPage({
             líquida. Use o recorte (fundo transparente) de cada coleção — envie/troque abaixo.
           </p>
         )}
+        {isGiro && (
+          <p className={styles.hint}>
+            Mesmas regras da página Produto Giro: selecione produtos específicos e/ou os filtros da
+            empresa. Sem seleção, o deck cobre todo o escopo (empresa/filial/período). O ritmo semanal
+            e o salto dos últimos 3 dias são relativos a hoje (como na Produto Giro).
+          </p>
+        )}
       </section>
 
       {/* Imagens */}
@@ -586,11 +833,51 @@ export default function GeradorApresentacoesPage({
         <section className={styles.panel}>
           <h2 className={styles.panelTitle}>Imagens</h2>
           <p className={styles.hint}>
-            Use imagens com <strong>fundo transparente</strong> (PNG recortado) — elas aparecem
-            &quot;flutuando&quot; sobre o círculo da coleção, como no modelo. Reenviar substitui a
-            anterior; o que já foi enviado aparece no preview.
+            {isGiro
+              ? "Escolha a imagem principal (capa/hero) deste relatório — ela fica só nesta geração (não é salva). O logo abaixo é salvo e vale para todas as apresentações."
+              : "Use imagens com fundo transparente (PNG recortado) — elas aparecem “flutuando” sobre o círculo da coleção, como no modelo. Reenviar substitui a anterior; o que já foi enviado aparece no preview."}
           </p>
           <div className={styles.uploadGrid}>
+            {/* Capa (hero) do Giro — só em memória, escolhida a cada geração */}
+            {isGiro && (
+              <div className={styles.uploadCard}>
+                <div className={styles.uploadPreview}>
+                  {giroCoverDataUrl ? (
+                    <img src={giroCoverDataUrl} alt="Capa do relatório" />
+                  ) : (
+                    <span className={styles.uploadEmpty}>Sem capa</span>
+                  )}
+                </div>
+                <div className={styles.uploadBody}>
+                  <span className={styles.uploadTitle}>Imagem principal (capa)</span>
+                  <span className={giroCoverDataUrl ? `${styles.uploadStatus} ${styles.uploadStatusOk}` : styles.uploadStatus}>
+                    {giroCoverDataUrl ? "Imagem selecionada (só nesta geração)" : "Nenhuma imagem selecionada"}
+                  </span>
+                  <div className={styles.uploadActions}>
+                    <button
+                      type="button"
+                      className={styles.fileBtn}
+                      onClick={() => giroCoverInputRef.current?.click()}
+                    >
+                      {giroCoverDataUrl ? "Trocar imagem" : "Escolher imagem"}
+                    </button>
+                    {giroCoverDataUrl && (
+                      <button type="button" className={styles.fileBtn} onClick={() => setGiroCoverDataUrl(null)}>
+                        Remover
+                      </button>
+                    )}
+                    <input
+                      ref={giroCoverInputRef}
+                      type="file"
+                      accept="image/*"
+                      className={styles.hiddenInput}
+                      onChange={(e) => void onPickGiroCover(e.target.files?.[0])}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Capa da coleção (tipo #1: coleção âncora única) */}
             {isColecaoType && (
               <div className={styles.uploadCard}>
@@ -734,6 +1021,11 @@ export default function GeradorApresentacoesPage({
             {resumido.totals.colecoes} coleções · {resumido.period.label}
           </span>
         )}
+        {giro && !loading && (
+          <span className={styles.resultMeta}>
+            {giro.kpis.coresComVenda} {giro.dimensao} · {giro.kpis.unidades.toLocaleString("pt-BR")} un · {giro.period.label}
+          </span>
+        )}
       </section>
 
       {error && <div className={styles.error}>{error}</div>}
@@ -767,10 +1059,23 @@ export default function GeradorApresentacoesPage({
             deckRef={deckRef}
           />
         </div>
+      ) : giro ? (
+        <div className={styles.deckWrap}>
+          <ProdutoGiroDeck
+            report={giro}
+            logoDataUrl={logoDataUrl}
+            coverDataUrl={giroCoverDataUrl}
+            coverTitle={coverTitle}
+            companyName={companyName}
+            deckRef={deckRef}
+          />
+        </div>
       ) : (
         !loading && (
           <div className={styles.empty}>
-            Escolha as coleções e clique em “Gerar apresentação” para montar os slides.
+            {isGiro
+              ? "Ajuste os filtros e clique em “Gerar apresentação” para montar os slides."
+              : "Escolha as coleções e clique em “Gerar apresentação” para montar os slides."}
           </div>
         )
       )}
