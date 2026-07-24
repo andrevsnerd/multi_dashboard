@@ -530,17 +530,14 @@
   font-weight: 700;
   white-space: nowrap;
 }
+/* Só o estoque ZERADO (0) tem cor de alerta (vermelho). */
 .numSemEstoque {
   color: var(--dm-danger-fg);
 }
-.numCritico {
-  color: var(--dm-critico-fg);
-}
-.numBaixo {
-  color: var(--dm-baixo-fg);
-}
+/* Todo estoque POSITIVO fica neutro (cinza) — o verde é reservado só pro badge de envio. */
+.numCritico,
+.numBaixo,
 .numOk {
-  /* Estoque no mínimo/acima = neutro (o verde fica reservado só pro badge de envio). */
   color: var(--t-700);
 }
 .numSemVenda {
