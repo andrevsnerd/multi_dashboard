@@ -1357,7 +1357,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_companies_company_controle_estoque_projecao_lista_compra_page",
-      "community": 86,
+      "community": 66,
       "norm_label": "page.tsx"
     },
     {
@@ -1367,7 +1367,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "app_companies_company_controle_estoque_projecao_lista_compra_page_props",
-      "community": 86,
+      "community": 66,
       "norm_label": "props"
     },
     {
@@ -1377,7 +1377,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "app_companies_company_controle_estoque_projecao_lista_compra_page_listacomprasugeridaroute",
-      "community": 86,
+      "community": 66,
       "norm_label": "listacomprasugeridaroute()"
     },
     {
@@ -1387,7 +1387,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_companies_company_controle_estoque_projecao_page",
-      "community": 86,
+      "community": 66,
       "norm_label": "page.tsx"
     },
     {
@@ -1397,7 +1397,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "app_companies_company_controle_estoque_projecao_page_companypageprops",
-      "community": 86,
+      "community": 66,
       "norm_label": "companypageprops"
     },
     {
@@ -1407,7 +1407,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "app_companies_company_controle_estoque_projecao_page_projecaoestoquepageroute",
-      "community": 86,
+      "community": 66,
       "norm_label": "projecaoestoquepageroute()"
     },
     {
@@ -1537,7 +1537,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_companies_company_controle_transferencias_page",
-      "community": 66,
+      "community": 86,
       "norm_label": "page.tsx"
     },
     {
@@ -1547,7 +1547,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "app_companies_company_controle_transferencias_page_controletransferenciaspageprops",
-      "community": 66,
+      "community": 86,
       "norm_label": "controletransferenciaspageprops"
     },
     {
@@ -1557,7 +1557,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "app_companies_company_controle_transferencias_page_generatemetadata",
-      "community": 66,
+      "community": 86,
       "norm_label": "generatemetadata()"
     },
     {
@@ -1567,7 +1567,7 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "app_companies_company_controle_transferencias_page_controletransferenciaspageroute",
-      "community": 66,
+      "community": 86,
       "norm_label": "controletransferenciaspageroute()"
     },
     {
@@ -1607,7 +1607,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_companies_company_curva_por_produto_page",
-      "community": 66,
+      "community": 86,
       "norm_label": "page.tsx"
     },
     {
@@ -1617,7 +1617,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "app_companies_company_curva_por_produto_page_props",
-      "community": 66,
+      "community": 86,
       "norm_label": "props"
     },
     {
@@ -1627,7 +1627,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "app_companies_company_curva_por_produto_page_curvaporprodutoroute",
-      "community": 66,
+      "community": 86,
       "norm_label": "curvaporprodutoroute()"
     },
     {
@@ -7197,7 +7197,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_painel_colecoes_detalhe_route",
-      "community": 300,
+      "community": 80,
       "norm_label": "route.ts"
     },
     {
@@ -7207,7 +7207,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "app_api_painel_colecoes_detalhe_route_colecaodetalhedestaque",
-      "community": 300,
+      "community": 80,
       "norm_label": "colecaodetalhedestaque"
     },
     {
@@ -7217,7 +7217,7 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "app_api_painel_colecoes_detalhe_route_colecaodetalhecanal",
-      "community": 300,
+      "community": 80,
       "norm_label": "colecaodetalhecanal"
     },
     {
@@ -7237,7 +7237,7 @@
       "source_location": "L57",
       "_origin": "ast",
       "id": "app_api_painel_colecoes_detalhe_route_get",
-      "community": 300,
+      "community": 80,
       "norm_label": "get()"
     },
     {
@@ -12376,7 +12376,7 @@
       "label": "ItemRow()",
       "file_type": "code",
       "source_file": "components/distribuicao-matriz/DistribuicaoMatrizPage.tsx",
-      "source_location": "L455",
+      "source_location": "L513",
       "_origin": "ast",
       "id": "components_distribuicao_matriz_distribuicaomatrizpage_itemrow",
       "community": 99,
@@ -31629,7 +31629,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_corporativo_regioes",
-      "community": 54,
+      "community": 46,
       "norm_label": "regioes.ts"
     },
     {
@@ -32049,7 +32049,7 @@
       "source_location": "L281",
       "_origin": "ast",
       "id": "lib_db_proxy_requestlike",
-      "community": 49,
+      "community": 3,
       "norm_label": "requestlike"
     },
     {
@@ -32069,7 +32069,7 @@
       "source_location": "L283",
       "_origin": "ast",
       "id": "lib_db_proxy_requestlike_query",
-      "community": 49,
+      "community": 3,
       "norm_label": ".query()"
     },
     {
@@ -38859,7 +38859,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_inventory",
-      "community": 300,
+      "community": 3,
       "norm_label": "inventory.ts"
     },
     {
@@ -38869,7 +38869,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "lib_repositories_inventory_buildfilialfilter",
-      "community": 300,
+      "community": 3,
       "norm_label": "buildfilialfilter()"
     },
     {
@@ -38879,7 +38879,7 @@
       "source_location": "L109",
       "_origin": "ast",
       "id": "lib_repositories_inventory_productstockparams",
-      "community": 300,
+      "community": 3,
       "norm_label": "productstockparams"
     },
     {
@@ -38889,7 +38889,7 @@
       "source_location": "L116",
       "_origin": "ast",
       "id": "lib_repositories_inventory_productstock",
-      "community": 300,
+      "community": 3,
       "norm_label": "productstock"
     },
     {
@@ -38899,7 +38899,7 @@
       "source_location": "L126",
       "_origin": "ast",
       "id": "lib_repositories_inventory_fetchproductstock",
-      "community": 300,
+      "community": 3,
       "norm_label": "fetchproductstock()"
     },
     {
@@ -38919,7 +38919,7 @@
       "source_location": "L286",
       "_origin": "ast",
       "id": "lib_repositories_inventory_fetchmultipleproductsstockbycolor",
-      "community": 300,
+      "community": 37,
       "norm_label": "fetchmultipleproductsstockbycolor()"
     },
     {
@@ -38929,7 +38929,7 @@
       "source_location": "L435",
       "_origin": "ast",
       "id": "lib_repositories_inventory_filialstockbreakdown",
-      "community": 300,
+      "community": 3,
       "norm_label": "filialstockbreakdown"
     },
     {
@@ -38939,7 +38939,7 @@
       "source_location": "L450",
       "_origin": "ast",
       "id": "lib_repositories_inventory_fetchmultipleproductsstockbycolorporfilial",
-      "community": 300,
+      "community": 3,
       "norm_label": "fetchmultipleproductsstockbycolorporfilial()"
     },
     {
@@ -38949,7 +38949,7 @@
       "source_location": "L560",
       "_origin": "ast",
       "id": "lib_repositories_inventory_stocksummaryparams",
-      "community": 300,
+      "community": 3,
       "norm_label": "stocksummaryparams"
     },
     {
@@ -38959,7 +38959,7 @@
       "source_location": "L580",
       "_origin": "ast",
       "id": "lib_repositories_inventory_stocksummary",
-      "community": 300,
+      "community": 3,
       "norm_label": "stocksummary"
     },
     {
@@ -38969,7 +38969,7 @@
       "source_location": "L590",
       "_origin": "ast",
       "id": "lib_repositories_inventory_fetchstocksummary",
-      "community": 300,
+      "community": 80,
       "norm_label": "fetchstocksummary()"
     },
     {
@@ -40589,7 +40589,7 @@
       "source_location": "L1265",
       "_origin": "ast",
       "id": "lib_repositories_products_fetchproductswithdetailsecommerce",
-      "community": 300,
+      "community": 37,
       "norm_label": "fetchproductswithdetailsecommerce()"
     },
     {
@@ -45729,7 +45729,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "lib_utils_destino_romaneio_store_key",
-      "community": 300,
+      "community": 37,
       "norm_label": "key()"
     },
     {
@@ -47129,7 +47129,7 @@
       "source_location": "L65",
       "_origin": "ast",
       "id": "lib_utils_exportlojaraioxxlsx_round2",
-      "community": 179,
+      "community": 14,
       "norm_label": "round2()"
     },
     {
@@ -47139,7 +47139,7 @@
       "source_location": "L71",
       "_origin": "ast",
       "id": "lib_utils_exportlojaraioxxlsx_shortdate",
-      "community": 179,
+      "community": 14,
       "norm_label": "shortdate()"
     },
     {
@@ -47149,7 +47149,7 @@
       "source_location": "L78",
       "_origin": "ast",
       "id": "lib_utils_exportlojaraioxxlsx_transitocell",
-      "community": 179,
+      "community": 14,
       "norm_label": "transitocell()"
     },
     {
@@ -47389,7 +47389,7 @@
       "source_location": "L697",
       "_origin": "ast",
       "id": "lib_utils_exportlojaraioxxlsx_builddiferencasheets",
-      "community": 179,
+      "community": 14,
       "norm_label": "builddiferencasheets()"
     },
     {
@@ -47399,7 +47399,7 @@
       "source_location": "L769",
       "_origin": "ast",
       "id": "lib_utils_exportlojaraioxxlsx_buildprodutossheets",
-      "community": 179,
+      "community": 14,
       "norm_label": "buildprodutossheets()"
     },
     {
@@ -47419,7 +47419,7 @@
       "source_location": "L895",
       "_origin": "ast",
       "id": "lib_utils_exportlojaraioxxlsx_buildrupturassheet",
-      "community": 179,
+      "community": 14,
       "norm_label": "buildrupturassheet()"
     },
     {
@@ -51949,7 +51949,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "proxy_server_proxy_helpers",
-      "community": 300,
+      "community": 37,
       "norm_label": "proxy-helpers.js"
     },
     {
@@ -51959,7 +51959,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "proxy_server_proxy_helpers_executequerywithparams",
-      "community": 300,
+      "community": 37,
       "norm_label": "executequerywithparams()"
     },
     {
@@ -51969,7 +51969,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "proxy_server_proxy_helpers_getsqltype",
-      "community": 300,
+      "community": 37,
       "norm_label": "getsqltype()"
     },
     {
@@ -101686,7 +101686,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/distribuicao-matriz/DistribuicaoMatrizPage.tsx",
-      "source_location": "L455",
+      "source_location": "L513",
       "weight": 1.0,
       "source": "components_distribuicao_matriz_distribuicaomatrizpage",
       "target": "components_distribuicao_matriz_distribuicaomatrizpage_itemrow",
@@ -101814,7 +101814,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/distribuicao-matriz/DistribuicaoMatrizPage.tsx",
-      "source_location": "L244",
+      "source_location": "L299",
       "weight": 1.0,
       "source": "components_distribuicao_matriz_distribuicaomatrizpage_distribuicaomatrizpage",
       "target": "components_distribuicao_matriz_distribuicaomatrizpage_normalize",
@@ -101825,7 +101825,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/distribuicao-matriz/DistribuicaoMatrizPage.tsx",
-      "source_location": "L413",
+      "source_location": "L450",
       "weight": 1.0,
       "source": "components_distribuicao_matriz_distribuicaomatrizpage_distribuicaomatrizpage",
       "target": "components_distribuicao_matriz_distribuicaomatrizpage_storeicon",
@@ -101836,7 +101836,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/distribuicao-matriz/DistribuicaoMatrizPage.tsx",
-      "source_location": "L220",
+      "source_location": "L275",
       "weight": 1.0,
       "source": "components_distribuicao_matriz_distribuicaomatrizpage_distribuicaomatrizpage",
       "target": "components_distribuicao_matriz_distribuicaomatrizpage_fetchdistribuicao",

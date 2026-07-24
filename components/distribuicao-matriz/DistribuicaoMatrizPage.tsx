@@ -208,6 +208,16 @@ export default function DistribuicaoMatrizPage({ companyKey }: DistribuicaoMatri
   const [material, setMaterial] = useState("todos");
   const [soZeradas, setSoZeradas] = useState(false);
   const [limite, setLimite] = useState(PAGE_STEP);
+  // Ordenação por coluna: col = 'produto' | 'matriz' | <filial>. Clique cicla desc → asc → padrão.
+  const [sort, setSort] = useState<{ col: string; dir: "asc" | "desc" } | null>(null);
+
+  const toggleSort = useCallback((col: string) => {
+    setSort((prev) => {
+      if (!prev || prev.col !== col) return { col, dir: "desc" };
+      if (prev.dir === "desc") return { col, dir: "asc" };
+      return null;
+    });
+  }, []);
 
   const inFlightRef = useRef(false);
   const tableRef = useRef<HTMLTableElement | null>(null);
@@ -328,12 +338,30 @@ export default function DistribuicaoMatrizPage({ companyKey }: DistribuicaoMatri
     };
   }, [itensFiltrados]);
 
+  const itensOrdenados = useMemo(() => {
+    if (!sort) return itensFiltrados;
+    const arr = [...itensFiltrados];
+    const dir = sort.dir === "asc" ? 1 : -1;
+    if (sort.col === "produto") {
+      arr.sort((a, b) => dir * (a.descricao || a.produto).localeCompare(b.descricao || b.produto, "pt-BR"));
+      return arr;
+    }
+    const valor = (item: DistribuicaoItem) => {
+      if (sort.col === "matriz") return item.matrizEstoque;
+      return item.lojas.find((l) => l.filial === sort.col)?.estoqueAtual ?? 0;
+    };
+    arr.sort((a, b) => dir * (valor(a) - valor(b)));
+    return arr;
+  }, [itensFiltrados, sort]);
+
   useEffect(() => {
     setLimite(PAGE_STEP);
   }, [busca, material, soZeradas]);
 
-  const visiveis = itensFiltrados.slice(0, limite);
+  const visiveis = itensOrdenados.slice(0, limite);
   const fmt = (n: number) => n.toLocaleString("pt-BR");
+  const sortArrow = (col: string) =>
+    sort?.col === col ? <span className={styles.sortArrow}>{sort.dir === "desc" ? "▼" : "▲"}</span> : null;
 
   return (
     <div className={styles.container}>
@@ -443,18 +471,37 @@ export default function DistribuicaoMatrizPage({ companyKey }: DistribuicaoMatri
           <table ref={tableRef} className={styles.table}>
             <thead>
               <tr>
-                <th className={`${styles.stickyProduto} ${styles.th} ${styles.thProduto}`}>Produto</th>
-                <th className={`${styles.stickyMatriz} ${styles.th} ${styles.center}`}>Matriz</th>
+                <th
+                  className={`${styles.stickyProduto} ${styles.th} ${styles.thProduto} ${styles.thSortable}`}
+                  onClick={() => toggleSort("produto")}
+                  title="Ordenar por nome"
+                >
+                  Produto {sortArrow("produto")}
+                </th>
+                <th
+                  className={`${styles.stickyMatriz} ${styles.th} ${styles.center} ${styles.thSortable}`}
+                  onClick={() => toggleSort("matriz")}
+                  title="Ordenar pelo estoque da Matriz"
+                >
+                  Matriz {sortArrow("matriz")}
+                </th>
                 {distribuicao.filiaisDestino.map((filial) => {
                   const label = distribuicao.filialLabels[filial];
                   const StoreIcon = storeIcon(label);
                   return (
-                    <th key={filial} className={`${styles.th} ${styles.center} ${styles.filialTh}`}>
+                    <th
+                      key={filial}
+                      className={`${styles.th} ${styles.center} ${styles.filialTh} ${styles.thSortable}`}
+                      onClick={() => toggleSort(filial)}
+                      title={`Ordenar pelo estoque de ${label}`}
+                    >
                       <span className={styles.thStore}>
                         <span className={styles.thIcon}>
                           <StoreIcon />
                         </span>
-                        {label}
+                        <span>
+                          {label} {sortArrow(filial)}
+                        </span>
                       </span>
                     </th>
                   );
@@ -482,11 +529,25 @@ export default function DistribuicaoMatrizPage({ companyKey }: DistribuicaoMatri
           >
             <thead>
               <tr>
-                <th className={`${styles.stickyTableHeaderTh} ${styles.thProduto}`}>Produto</th>
-                <th className={`${styles.stickyTableHeaderTh} ${styles.center}`}>Matriz</th>
+                <th
+                  className={`${styles.stickyTableHeaderTh} ${styles.thProduto} ${styles.thSortable}`}
+                  onClick={() => toggleSort("produto")}
+                >
+                  Produto {sortArrow("produto")}
+                </th>
+                <th
+                  className={`${styles.stickyTableHeaderTh} ${styles.center} ${styles.thSortable}`}
+                  onClick={() => toggleSort("matriz")}
+                >
+                  Matriz {sortArrow("matriz")}
+                </th>
                 {distribuicao.filiaisDestino.map((filial) => (
-                  <th key={filial} className={`${styles.stickyTableHeaderTh} ${styles.center}`}>
-                    {distribuicao.filialLabels[filial]}
+                  <th
+                    key={filial}
+                    className={`${styles.stickyTableHeaderTh} ${styles.center} ${styles.thSortable}`}
+                    onClick={() => toggleSort(filial)}
+                  >
+                    {distribuicao.filialLabels[filial]} {sortArrow(filial)}
                   </th>
                 ))}
               </tr>

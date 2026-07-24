@@ -376,6 +376,19 @@
 .filialTh {
   min-width: 78px;
 }
+.thSortable {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.12s;
+}
+.thSortable:hover {
+  color: var(--dm-switch-on);
+}
+.sortArrow {
+  font-size: 0.65rem;
+  color: var(--dm-switch-on);
+  vertical-align: middle;
+}
 .thStore {
   display: flex;
   flex-direction: column;
