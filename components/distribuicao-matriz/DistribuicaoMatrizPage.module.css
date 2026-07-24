@@ -540,7 +540,8 @@
   color: var(--dm-baixo-fg);
 }
 .numOk {
-  color: var(--dm-ok-fg);
+  /* Estoque no mínimo/acima = neutro (o verde fica reservado só pro badge de envio). */
+  color: var(--t-700);
 }
 .numSemVenda {
   color: var(--t-400);
