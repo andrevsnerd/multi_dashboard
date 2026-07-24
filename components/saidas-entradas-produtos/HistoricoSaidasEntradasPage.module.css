@@ -10,20 +10,62 @@
 .input { border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; min-width: 260px; }
 .searchBtn { border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 12px; background: var(--s-white); cursor: pointer; }
 .list { display: flex; flex-direction: column; gap: 8px; }
-.item { text-align: left; border: 1px solid var(--b-200); background: var(--s-white); border-radius: 10px; padding: 12px; cursor: pointer; }
-.itemTop { display: flex; justify-content: space-between; font-size: 14px; color: var(--t-700); }
-.itemMeta { margin-top: 4px; font-size: 14px; color: var(--t-500); }
+.item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-align: left;
+  border: 1px solid var(--b-200);
+  background: var(--s-white);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.itemMain { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+
+.itemTopLine { display: flex; align-items: baseline; gap: 8px; }
+.itemRomaneio { font-size: 14px; font-weight: 700; color: var(--t-900); font-family: monospace; }
+.itemCount { font-size: 13px; color: var(--t-500); }
+
+.itemSub { font-size: 13px; color: var(--t-500); }
+
+/* rota (filiais) + ícone "abrir romaneio detalhado" */
+.itemRoute { display: flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 600; color: var(--t-900); min-width: 0; }
+.itemRouteText { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.itemOpenLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: 5px;
+  color: var(--t-500);
+  transition: background 120ms, color 120ms;
+}
+.itemOpenLink svg { width: 14px; height: 14px; }
+.itemOpenLink:hover { background: var(--s-100); }
+
+/* coluna direita: status + data */
+.itemRight { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+.itemStatusPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 3px 9px 3px 7px;
+  border-radius: 20px;
+  background: #dcfce7;
+  color: #166534;
+}
+.itemStatusPill svg { width: 13px; height: 13px; }
+.itemDate { font-size: 13px; color: var(--t-500); white-space: nowrap; }
+
 .empty { border: 1px dashed #cbd5e1; border-radius: 10px; padding: 20px; text-align: center; color: var(--t-500); }
 .pagination { display: flex; justify-content: center; align-items: center; gap: 12px; }
 .pagination button { border: 1px solid #e2e8f0; background: var(--s-white); border-radius: 8px; padding: 6px 10px; cursor: pointer; }
 .pagination button:disabled { opacity: .5; cursor: not-allowed; }
-.modalOverlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 2000; }
-.modal { background: #fff; border-radius: 12px; max-width: 700px; width: 100%; max-height: 80vh; overflow: auto; }
-.modalHeader { display: flex; justify-content: space-between; align-items: center; padding: 14px; border-bottom: 1px solid var(--b-200); }
-.modalHeader h2 { margin: 0; font-size: 20px; }
-.modalHeader button { border: none; background: transparent; font-size: 24px; cursor: pointer; }
-.detailList { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
-.detailItem { border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; font-size: 14px; color: var(--t-700); }
 
 /* ── TEMA NOTURNO ── overrides escopados; tema claro intacto ── */
 :global(:root[data-theme="dark"]) .backLink {
@@ -31,13 +73,16 @@
 }
 :global(:root[data-theme="dark"]) .input,
 :global(:root[data-theme="dark"]) .searchBtn,
-:global(:root[data-theme="dark"]) .pagination button,
-:global(:root[data-theme="dark"]) .detailItem {
+:global(:root[data-theme="dark"]) .pagination button {
   border-color: var(--b-200);
 }
 :global(:root[data-theme="dark"]) .empty {
   border-color: var(--b-300);
 }
-:global(:root[data-theme="dark"]) .modal {
-  background: var(--s-white);
+:global(:root[data-theme="dark"]) .itemStatusPill {
+  background: rgba(34, 197, 94, 0.16);
+  color: #4ade80;
+}
+:global(:root[data-theme="dark"]) .itemOpenLink:hover {
+  background: var(--s-100);
 }

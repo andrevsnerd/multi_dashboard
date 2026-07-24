@@ -57,19 +57,6 @@ interface TransferenciaLog {
   status: string;
 }
 
-interface LogDetalheItem {
-  produto: string;
-  corProduto: string | null;
-  descProduto: string;
-  descCor: string;
-  codigoBarra: string | null;
-  qtde: number;
-  estoqueOrigem: number;
-  estoqueDestino: number;
-  filialOrigem?: string;
-  filialDestino?: string;
-}
-
 const DEFEITO_FILIAL_SAIDA: Partial<Record<string, Filial>> = {
   nerd: { codFilial: 'NERD DEFEITOS', filial: 'NERD DEFEITOS' },
   scarfme: { codFilial: 'BAZAR SCARF ME', filial: 'BAZAR SCARF ME' },
@@ -154,6 +141,16 @@ function formatLogDateTime(value: string): string {
     year: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
+  });
+}
+
+function formatLogDate(value: string): string {
+  const d = parseBackendDateTime(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
   });
 }
 
@@ -452,26 +449,6 @@ async function fetchLogEntradas(): Promise<TransferenciaLog[]> {
   return json.data || [];
 }
 
-async function fetchLogDetalhes(
-  tipo: "saida" | "entrada",
-  romaneio: string,
-  filialOrigem: string,
-  filialDestino: string
-): Promise<LogDetalheItem[]> {
-  const params = new URLSearchParams({
-    tipo,
-    romaneio,
-    filialOrigem,
-    filialDestino,
-  });
-  const response = await fetch(`/api/transferencia-produtos/log-detalhes?${params.toString()}`, {
-    cache: "no-store",
-  });
-  if (!response.ok) return [];
-  const json = (await response.json()) as { data: LogDetalheItem[] };
-  return json.data || [];
-}
-
 async function salvarDestinoRomaneio(
   companyKey: string,
   romaneioId: string,
@@ -524,9 +501,6 @@ export default function SaidasEntradasProdutosPage({
   const [permissoesCarregadas, setPermissoesCarregadas] = useState(false);
 
   const notificacaoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
-  const [detalhesCache, setDetalhesCache] = useState<Record<string, LogDetalheItem[]>>({});
-  const [loadingDetalhesKey, setLoadingDetalhesKey] = useState<string | null>(null);
   const [modalEdicaoAberto, setModalEdicaoAberto] = useState(false);
   const [logEditando, setLogEditando] = useState<TransferenciaLog | null>(null);
   const [observacaoEditando, setObservacaoEditando] = useState("");
@@ -811,8 +785,6 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
   const trocarTipoOperacao = useCallback((next: TipoOperacao) => {
     setTipoOperacao(next);
     // evitar "cadeia" de updates pós-clique
-    setHoveredLogKey(null);
-    setLoadingDetalhesKey(null);
     setProdutosSelecionados([]);
     setProdutosSelecionadosModal([]);
     setSearchTerm("");
@@ -1270,7 +1242,6 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
       }
 
       setProdutosSelecionados([]);
-      setDetalhesCache({}); // Limpa cache de hover para refletir estoques atualizados
 
       const [novoSaidas, novoEntradas] = await Promise.all([fetchLogSaidas(), fetchLogEntradas()]);
       setLogSaidas(novoSaidas);
@@ -1284,36 +1255,6 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
       setProcessandoOperacao(false);
     }
   }, [processandoOperacao, filialSelecionada, tipoOperacao, tipoRomaneioSelecionado, responsavelFinal, user?.username, filialDestinoSaida, companyKey, mostrarNotificacao]);
-
-  useEffect(() => {
-    if (!hoveredLogKey) return;
-    if (detalhesCache[hoveredLogKey]) return;
-    let cancelled = false;
-    setLoadingDetalhesKey(hoveredLogKey);
-    const parts = hoveredLogKey.split("|");
-    const [tipo, romaneio, fo, fd] = parts;
-    if (tipo && romaneio && (fo || fd)) {
-      fetchLogDetalhes(tipo as "saida" | "entrada", romaneio, fo, fd).then((data) => {
-        if (!cancelled) {
-          setDetalhesCache((prev) => ({ ...prev, [hoveredLogKey]: data }));
-          setLoadingDetalhesKey((prev) => (prev === hoveredLogKey ? null : prev));
-        }
-      }).catch(() => {
-        if (!cancelled) setLoadingDetalhesKey((prev) => (prev === hoveredLogKey ? null : prev));
-      });
-    } else {
-      setLoadingDetalhesKey(null);
-    }
-    return () => { cancelled = true; };
-  }, [hoveredLogKey]);
-
-  const onLogCardEnter = useCallback((key: string) => {
-    setHoveredLogKey(key);
-  }, []);
-
-  const onLogCardLeave = useCallback(() => {
-    setHoveredLogKey(null);
-  }, []);
 
   const abrirModalEdicao = useCallback((log: TransferenciaLog) => {
     setLogEditando(log);
@@ -1687,88 +1628,7 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
             </div>
           </div>
 
-          {/* Responsável */}
-          <div className={styles.configSegment}>
-            <div className={styles.configIcon} aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none">
-                <path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z" stroke="currentColor" strokeWidth="2" />
-                <path d="M4 20a8 8 0 0 1 16 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-            </div>
-            <div className={styles.configBody}>
-              <span className={styles.configBarLabel}>Responsável</span>
-              {permissoes?.responsavelFixo ? (
-                <span className={styles.configBarText}>{permissoes.responsavelPadrao || "LOGISTICA"}</span>
-              ) : responsaveis.length === 1 ? (
-                <span className={styles.configBarText}>{responsaveis[0].responsavel}</span>
-              ) : !mostrarInputResponsavel ? (
-                <>
-                  <div className={styles.selectWrap}>
-                    <input
-                      type="text"
-                      list="responsaveis-list"
-                      className={styles.configBarInput}
-                      value={responsavelSelecionado}
-                      onChange={(e) => setResponsavelSelecionado(e.target.value.toUpperCase())}
-                      onBlur={(e) => {
-                        const value = e.target.value.trim().toUpperCase();
-                        if (value && !responsaveis.some(r => r.responsavel.toUpperCase() === value)) {
-                          mostrarNotificacao("Responsável deve existir na lista de responsáveis disponíveis", "error");
-                          if (responsaveis.length > 0) setResponsavelSelecionado(responsaveis[0].responsavel);
-                        }
-                      }}
-                      placeholder="Selecione ou digite"
-                    />
-                    <span className={styles.selectChevron} aria-hidden="true">
-                      <svg viewBox="0 0 24 24" fill="none">
-                        <path d="M7 10l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </span>
-                  </div>
-                  <datalist id="responsaveis-list">
-                    {responsaveis.map((resp, idx) => (
-                      <option key={idx} value={resp.responsavel}>
-                        {resp.responsavel}{resp.qtd > 0 ? ` (${resp.qtd})` : ""}
-                      </option>
-                    ))}
-                  </datalist>
-                </>
-              ) : (
-                <div className={styles.customInputRow}>
-                  <input
-                    type="text"
-                    list="responsaveis-list"
-                    className={styles.configBarInput}
-                    placeholder="Digite o responsável"
-                    value={inputResponsavelCustomizado}
-                    onChange={(e) => setInputResponsavelCustomizado(e.target.value)}
-                    onBlur={() => {
-                      if (inputResponsavelCustomizado.trim()) {
-                        const value = inputResponsavelCustomizado.trim().toUpperCase();
-                        if (responsaveis.some(r => r.responsavel.toUpperCase() === value)) {
-                          setResponsavelSelecionado(value);
-                          setMostrarInputResponsavel(false);
-                          setInputResponsavelCustomizado("");
-                        } else {
-                          mostrarNotificacao("Responsável deve existir na lista de responsáveis disponíveis", "error");
-                          setInputResponsavelCustomizado("");
-                        }
-                      }
-                    }}
-                  />
-                  <datalist id="responsaveis-list">
-                    {responsaveis.map((resp, idx) => (
-                      <option key={idx} value={resp.responsavel} />
-                    ))}
-                  </datalist>
-                  <button
-                    className={styles.cancelCustomBtn}
-                    onClick={() => { setMostrarInputResponsavel(false); setInputResponsavelCustomizado(""); }}
-                  >×</button>
-                </div>
-              )}
-            </div>
-          </div>
+          {/* Responsável removido do layout — implícito pelo usuário logado; valor ainda é registrado no romaneio */}
         </div>
       </div>
 
@@ -1789,12 +1649,16 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
                 Histórico de {tipoOperacao === "saida" ? "Saídas" : "Entradas"}
               </span>
               {logsFiltrados.length > 0 && (
-                <span className={styles.badgeMuted}>{logsFiltrados.length}</span>
+                <span className={styles.badgeMuted}>
+                  {logsFiltrados.length} {tipoOperacao === "saida"
+                    ? (logsFiltrados.length === 1 ? "saída" : "saídas")
+                    : (logsFiltrados.length === 1 ? "entrada" : "entradas")}
+                </span>
               )}
             </div>
             <div className={styles.historicoActionRow}>
               <Link href={historicoCompletoHref} className={styles.historicoActionLink}>
-                Ver histórico completo
+                Ver histórico completo →
               </Link>
             </div>
 
@@ -1809,21 +1673,16 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
               <div className={styles.logScrollContainer}>
                 <div className={styles.logList}>
                   {logsFiltrados.map((log, index) => {
-                    const logKey = `${tipoOperacao}|${log.romaneio}|${log.filialOrigem}|${log.filialDestino}`;
-                    const show = hoveredLogKey === logKey;
-                    const detalhes = show ? detalhesCache[logKey] : undefined;
-                    const loadingDet = loadingDetalhesKey === logKey;
+                    const detailUrl = `/${companyKey}/romaneios/${encodeURIComponent(log.romaneio)}?tipo=${tipoOperacao}&filialOrigem=${encodeURIComponent(log.filialOrigem)}&filialDestino=${encodeURIComponent(log.filialDestino)}&dataEmissao=${encodeURIComponent(log.dataEmissao)}&responsavel=${encodeURIComponent(log.responsavel || "")}&tipoRomaneio=`;
                     return (
-                      <div
-                        key={index}
-                        className={styles.logItemWrapper}
-                        onMouseEnter={() => onLogCardEnter(logKey)}
-                        onMouseLeave={onLogCardLeave}
-                      >
+                      <div key={index} className={styles.logItemWrapper}>
                         <div className={styles.logItem}>
-                          <div className={styles.logHeader}>
-                            <span className={styles.logRomaneio}>#{log.romaneio}</span>
-                            <div className={styles.logActions}>
+                          <div className={styles.logMain}>
+                            <div className={styles.logTopLine}>
+                              <span className={styles.logRomaneio}>#{log.romaneio}</span>
+                              <span className={styles.logCount}>
+                                {log.qtdProdutos} prod · {log.qtdItens} {log.qtdItens === 1 ? "item" : "itens"}
+                              </span>
                               {isAdmin && (
                                 <button
                                   className={styles.logEditBtn}
@@ -1831,67 +1690,39 @@ const [hoveredLogKey, setHoveredLogKey] = useState<string | null>(null);
                                   title="Editar"
                                 >✏️</button>
                               )}
-                              <span className={styles.logStatusPill}>{log.status}</span>
                             </div>
+                            <div className={styles.logRoute}>
+                              <span className={styles.logRouteText}>
+                                {formatLogRoute(log.filialOrigem, log.filialDestino, companyConfig)}
+                              </span>
+                              <Link
+                                href={detailUrl}
+                                className={styles.logOpenLink}
+                                title="Abrir romaneio detalhado"
+                                aria-label={`Abrir romaneio #${log.romaneio}`}
+                              >
+                                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                  <path d="m10 4 8-1m0 0 1 8m-1-8-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                              </Link>
+                            </div>
+                            {log.responsavel && (
+                              <div className={styles.logResponsavel}>{log.responsavel}</div>
+                            )}
                           </div>
-                          <div className={styles.logRoute}>
-                            {formatLogRoute(log.filialOrigem, log.filialDestino, companyConfig)}
-                          </div>
-                          {log.responsavel && (
-                            <div className={styles.logResponsavel}>{log.responsavel}</div>
-                          )}
-                          <div className={styles.logFooter}>
-                            <span className={styles.logMeta}>
-                              {log.qtdProdutos} prod · {log.qtdItens} itens
+                          <div className={styles.logRight}>
+                            <span className={styles.logStatusPill}>
+                              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <path d="M20 6 9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                              {log.status}
                             </span>
                             <span className={styles.logDate}>
-                              {formatLogDateTime(log.dataEmissao)}
+                              {formatLogDate(log.dataEmissao)}
                             </span>
                           </div>
                         </div>
-
-                        {show && (
-                          <div className={styles.logPopover}>
-                            <div className={styles.logPopoverTitle}>Produtos deste romaneio</div>
-                            {loadingDet ? (
-                              <div className={styles.logPopoverLoad}>Carregando…</div>
-                            ) : detalhes?.length ? (
-                              <div className={styles.logPopoverList}>
-                                {detalhes.map((it, i) => {
-                                  const lojaO = it.filialOrigem ?? log.filialOrigem;
-                                  const lojaD = it.filialDestino ?? log.filialDestino;
-                                  const hasLojaO = Boolean(lojaO && lojaO !== "—");
-                                  const hasLojaD = Boolean(lojaD && lojaD !== "—");
-                                  return (
-                                    <div key={i} className={styles.logPopoverRow}>
-                                      <div className={styles.logPopoverNome}>{it.descProduto || it.produto}</div>
-                                      <div className={styles.logPopoverMeta}>
-                                        {it.produto}{it.descCor ? ` · ${it.descCor}` : ""}{it.codigoBarra ? ` · ${it.codigoBarra}` : ""}
-                                      </div>
-                                      <div className={styles.logPopoverEstoque}>
-                                        <span className={styles.logPopoverEstoqueItem}>
-                                          Qtd: <strong>{it.qtde}</strong>
-                                        </span>
-                                        {hasLojaO && (
-                                          <span className={styles.logPopoverEstoqueItem}>
-                                            <strong>{filialLabel(lojaO)}</strong>: {it.estoqueOrigem}
-                                          </span>
-                                        )}
-                                        {hasLojaD && (
-                                          <span className={styles.logPopoverEstoqueItem}>
-                                            <strong>{filialLabel(lojaD)}</strong>: {it.estoqueDestino}
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            ) : (
-                              <div className={styles.logPopoverLoad}>Sem detalhes</div>
-                            )}
-                          </div>
-                        )}
                       </div>
                     );
                   })}

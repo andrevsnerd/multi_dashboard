@@ -413,157 +413,120 @@
 .logItemWrapper { position: relative; }
 
 .logItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   padding: 12px 14px;
   background: var(--s-white);
-  border-radius: 0;
   border: none;
   border-top: 1px solid var(--s-100);
   cursor: default;
-  transition: border-color 120ms, background 120ms;
+  transition: background 120ms;
 }
 .logItemWrapper:first-child .logItem { border-top: none; }
 .logItemWrapper:hover .logItem {
   background: var(--s-50);
 }
 
-.logHeader {
+/* Coluna principal (esquerda) */
+.logMain {
+  flex: 1;
+  min-width: 0;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 4px;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.logTopLine {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
 }
 
 .logRomaneio {
   font-size: 14px;
   font-weight: 700;
-  color: var(--text-2);
+  color: var(--text);
   font-family: monospace;
 }
 
-.logActions {
-  display: flex;
-  align-items: center;
-  gap: 5px;
+.logCount {
+  font-size: 13px;
+  color: var(--text-3);
 }
 
 .logEditBtn {
   background: none;
   border: none;
-  font-size: 14px;
+  font-size: 13px;
   cursor: pointer;
-  padding: 2px 4px;
+  padding: 1px 4px;
   border-radius: 4px;
   opacity: 0.4;
   transition: background 120ms, opacity 120ms;
 }
 .logEditBtn:hover { background: rgba(0,0,0,.07); opacity: 1; }
 
-.logStatusPill {
-  font-size: 13px;
-  font-weight: 700;
-  padding: 2px 7px;
-  border-radius: 20px;
-  background: #dcfce7;
-  color: #166534;
+.logRoute {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  min-width: 0;
 }
 
-.logRoute {
-  font-size: 15px;
-  color: var(--text-2);
-  margin-bottom: 2px;
+.logRouteText {
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ícone "abrir romaneio detalhado" ao lado da filial */
+.logOpenLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: 5px;
+  color: var(--text-3);
+  transition: background 120ms, color 120ms;
+}
+.logOpenLink svg { width: 14px; height: 14px; }
+.logOpenLink:hover { background: var(--s-100); }
 
 .logResponsavel {
   font-size: 13px;
   color: var(--text-3);
-  margin-bottom: 3px;
 }
 
-.logFooter {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.logMeta { font-size: 13px; color: var(--text-3); }
-.logDate { font-size: 13px; color: var(--text-3); }
-
-/* popover inline */
-.logPopover {
-  margin-top: 4px;
-  background: var(--s-white);
-  border-radius: 8px;
-  border: 1px solid var(--b-200);
-  box-shadow: 0 6px 16px rgba(0,0,0,.10);
-  padding: 10px 12px;
-  max-height: 240px;
-  overflow-y: auto;
-}
-
-.logPopoverTitle {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-3);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 7px;
-}
-
-.logPopoverLoad {
-  font-size: 15px;
-  color: var(--text-3);
-  text-align: center;
-  padding: 6px 0;
-}
-
-.logPopoverList {
+/* Coluna direita (status + data) */
+.logRight {
   display: flex;
   flex-direction: column;
+  align-items: flex-end;
   gap: 6px;
+  flex-shrink: 0;
 }
 
-.logPopoverRow {
-  padding: 7px 9px;
-  background: var(--s-50);
-  border-radius: 6px;
-  border: 1px solid var(--b-200);
+.logStatusPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 3px 9px 3px 7px;
+  border-radius: 20px;
+  background: #dcfce7;
+  color: #166534;
 }
+.logStatusPill svg { width: 13px; height: 13px; }
 
-.logPopoverNome {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text);
-  margin-bottom: 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.logPopoverMeta {
-  font-size: 14px;
-  color: var(--t-500);
-  margin-bottom: 4px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.logPopoverEstoque {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.logPopoverEstoqueItem {
-  font-size: 14px;
-  color: var(--t-600);
-  background: var(--b-200);
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-.logPopoverEstoqueItem strong { color: var(--text); font-weight: 600; }
+.logDate { font-size: 13px; color: var(--text-3); }
 
 /* empty in log */
 .emptyLog {
@@ -1343,8 +1306,8 @@
   --text: var(--t-900);
   --text-2: var(--t-500);
   --text-3: var(--t-400);
-  --saida-bg: rgba(244, 63, 94, 0.12);
-  --saida-border: rgba(244, 63, 94, 0.35);
+  --saida-bg: rgba(196, 181, 253, 0.16);
+  --saida-border: rgba(196, 181, 253, 0.4);
   --entrada-bg: rgba(59, 130, 246, 0.14);
   --entrada-border: rgba(59, 130, 246, 0.35);
 }
@@ -1394,6 +1357,7 @@
   color: #4ade80;
 }
 
+
 /* ── Hover de item de produto / modal ── */
 :global(:root[data-theme="dark"]) .produtoItem:hover,
 :global(:root[data-theme="dark"]) .produtoModalItem:hover {
@@ -1413,10 +1377,10 @@
 
 /* ── Botões "adicionar produto" saída/entrada (texto sobre a tinta) ── */
 :global(:root[data-theme="dark"]) .addProductBtnSaida {
-  color: #fb7185;
+  color: #c4b5fd;
 }
 :global(:root[data-theme="dark"]) .addProductBtnSaida:hover:not(:disabled) {
-  background: rgba(244, 63, 94, 0.22);
+  background: rgba(196, 181, 253, 0.24);
 }
 :global(:root[data-theme="dark"]) .addProductBtnEntrada {
   color: #60a5fa;
@@ -1466,4 +1430,52 @@
 }
 :global(:root[data-theme="dark"]) .btnPrimary:hover:not(:disabled) {
   background: #1d4ed8;
+}
+
+/* ── Fundo do card de produto na lista: era --s-50 (quase preto), agora igual ao card geral ── */
+:global(:root[data-theme="dark"]) .produtoItem,
+:global(:root[data-theme="dark"]) .produtoModalItem {
+  background: var(--card);
+}
+
+/* ── Marca "Saída": vermelho vira o lavanda do tema escuro (mesma cor dos Romaneios) ── */
+:global(:root[data-theme="dark"]) .segBtnSaidaActive {
+  background: #c4b5fd;
+  color: #1b1630;
+  box-shadow: none;
+}
+:global(:root[data-theme="dark"]) .segBtnSaidaActive:hover {
+  background: #ddd6fe;
+  color: #1b1630;
+}
+:global(:root[data-theme="dark"]) .badgeSaida {
+  background: #c4b5fd;
+  color: #1b1630;
+}
+:global(:root[data-theme="dark"]) .submitBtnSaida {
+  background: #c4b5fd;
+  color: #1b1630;
+  box-shadow: none;
+}
+:global(:root[data-theme="dark"]) .submitBtnSaida:hover:not(:disabled) {
+  background: #ddd6fe;
+  box-shadow: none;
+}
+:global(:root[data-theme="dark"]) .addModalBtnSaida {
+  background: #c4b5fd;
+  color: #1b1630;
+}
+:global(:root[data-theme="dark"]) .addModalBtnSaida:hover:not(:disabled) {
+  background: #ddd6fe;
+}
+:global(:root[data-theme="dark"]) .colorChipSaida {
+  background: #c4b5fd;
+  color: #1b1630;
+}
+:global(:root[data-theme="dark"]) .btnConfirmarSaida {
+  background: #c4b5fd;
+  color: #1b1630;
+}
+:global(:root[data-theme="dark"]) .btnConfirmarSaida:hover {
+  background: #ddd6fe;
 }
