@@ -70,6 +70,9 @@ export default function ZerarItemPanel({ companyKey, username, onExecuted }: Pro
   const [confirmando, setConfirmando] = useState(false);
   const [confirmCheck, setConfirmCheck] = useState(false);
   const [executando, setExecutando] = useState(false);
+  const [progresso, setProgresso] = useState<{ atual: number; total: number; filial: string } | null>(
+    null
+  );
   const [resultado, setResultado] = useState<ResultadoZerar | null>(null);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -82,6 +85,7 @@ export default function ZerarItemPanel({ companyKey, username, onExecuted }: Pro
     setBuscando(true);
     setBuscaErro(null);
     setBuscou(true);
+    setResultado(null); // some o card de sucesso ao iniciar uma nova busca
     try {
       const r = await fetch(
         `/api/ajuste-estoque/zerar-item/buscar?company=${companyKey}&q=${encodeURIComponent(q)}`
@@ -181,37 +185,77 @@ export default function ZerarItemPanel({ companyKey, username, onExecuted }: Pro
   const podeZerar = previa.linhas.length > 0 && !executando;
 
   const executar = useCallback(async () => {
+    // Filiais no escopo: uma específica ou todas onde os itens existem.
+    const alvos = filialAlvoValida
+      ? filiaisDisponiveis.filter((f) => f.cod === filialAlvoValida)
+      : filiaisDisponiveis;
+    if (alvos.length === 0) return;
+
+    const payloadItens = itensSelecionados.map((i) => ({ produto: i.produto, cor: i.cor }));
     setExecutando(true);
     setErro(null);
-    try {
-      const r = await fetch("/api/ajuste-estoque/zerar-item/executar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-auth-username": username },
-        body: JSON.stringify({
-          company: companyKey,
-          itens: itensSelecionados.map((i) => ({ produto: i.produto, cor: i.cor })),
-          filialCod: filialAlvoValida || null,
-          dataContagem,
-          obs: obs.trim() || null,
-        }),
-      });
-      const d = await r.json();
-      if (!r.ok) {
-        setErro(d?.error ?? "Erro ao zerar itens.");
-        setConfirmando(false);
-        return;
+    setProgresso({ atual: 0, total: alvos.length, filial: alvos[0].nome });
+
+    const detalhes: DetalheFilial[] = [];
+    const falhas: Array<{ filial: string; erro: string }> = [];
+    let itensZerados = 0;
+    let somaDelta = 0;
+
+    // Uma filial por vez → dá pra mostrar progresso real.
+    for (let i = 0; i < alvos.length; i++) {
+      const f = alvos[i];
+      setProgresso({ atual: i, total: alvos.length, filial: f.nome });
+      try {
+        const r = await fetch("/api/ajuste-estoque/zerar-item/executar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-auth-username": username },
+          body: JSON.stringify({
+            company: companyKey,
+            itens: payloadItens,
+            filialCod: f.cod,
+            dataContagem,
+            obs: obs.trim() || null,
+          }),
+        });
+        const d = await r.json();
+        if (!r.ok) {
+          falhas.push({ filial: f.nome, erro: d?.error ?? "Erro ao zerar." });
+        } else {
+          if (Array.isArray(d.detalhes)) detalhes.push(...d.detalhes);
+          if (Array.isArray(d.falhas)) falhas.push(...d.falhas);
+          itensZerados += Number(d.itensZerados) || 0;
+          somaDelta += Number(d.somaDelta) || 0;
+        }
+      } catch {
+        falhas.push({ filial: f.nome, erro: "Erro de conexão." });
       }
-      setResultado(d as ResultadoZerar);
-      setConfirmando(false);
-      setSelecionados(new Map());
-      onExecuted();
-    } catch {
-      setErro("Erro de conexão ao zerar itens.");
-    } finally {
-      setExecutando(false);
-      setConfirmCheck(false);
+      setProgresso({ atual: i + 1, total: alvos.length, filial: f.nome });
     }
-  }, [username, companyKey, itensSelecionados, filialAlvoValida, dataContagem, obs, onExecuted]);
+
+    setExecutando(false);
+    setProgresso(null);
+    setConfirmCheck(false);
+
+    if (detalhes.length === 0) {
+      setErro(falhas[0]?.erro ?? "Não foi possível zerar os itens.");
+      setConfirmando(false);
+      return;
+    }
+
+    setResultado({ filiaisAjustadas: detalhes.length, itensZerados, somaDelta, detalhes, falhas });
+    setConfirmando(false);
+    setSelecionados(new Map());
+    onExecuted();
+  }, [
+    username,
+    companyKey,
+    itensSelecionados,
+    filialAlvoValida,
+    filiaisDisponiveis,
+    dataContagem,
+    obs,
+    onExecuted,
+  ]);
 
   return (
     <>
@@ -475,6 +519,7 @@ export default function ZerarItemPanel({ companyKey, username, onExecuted }: Pro
                   <th>Descrição (extrato)</th>
                   <th className={styles.num}>Itens</th>
                   <th className={styles.num}>Variação</th>
+                  <th className={styles.num}>Estoque final</th>
                 </tr>
               </thead>
               <tbody>
@@ -487,6 +532,7 @@ export default function ZerarItemPanel({ companyKey, username, onExecuted }: Pro
                       {d.soma > 0 ? "+" : ""}
                       {d.soma}
                     </td>
+                    <td className={`${styles.num} ${styles.final}`}>0</td>
                   </tr>
                 ))}
               </tbody>
@@ -528,14 +574,34 @@ export default function ZerarItemPanel({ companyKey, username, onExecuted }: Pro
               Zera o estoque desses itens (fica 0) e registra no extrato. Dá pra desfazer depois em
               “Ajustes recentes”.
             </p>
-            <label className={styles.confirmCheck}>
-              <input
-                type="checkbox"
-                checked={confirmCheck}
-                onChange={(e) => setConfirmCheck(e.target.checked)}
-              />
-              Confirmo que desejo zerar esses itens no escopo acima.
-            </label>
+            {executando && progresso ? (
+              <div className={styles.progressWrap}>
+                <div className={styles.progressTrack}>
+                  <div
+                    className={styles.progressFill}
+                    style={{
+                      width: `${
+                        (progresso.total ? progresso.atual / progresso.total : 0) * 100
+                      }%`,
+                    }}
+                  />
+                </div>
+                <span className={styles.progressText}>
+                  Zerando filial {Math.min(progresso.atual + 1, progresso.total)} de{" "}
+                  {progresso.total}
+                  {progresso.filial ? ` — ${progresso.filial}` : ""}…
+                </span>
+              </div>
+            ) : (
+              <label className={styles.confirmCheck}>
+                <input
+                  type="checkbox"
+                  checked={confirmCheck}
+                  onChange={(e) => setConfirmCheck(e.target.checked)}
+                />
+                Confirmo que desejo zerar esses itens no escopo acima.
+              </label>
+            )}
             <div className={styles.modalActions}>
               <button
                 type="button"
@@ -551,7 +617,11 @@ export default function ZerarItemPanel({ companyKey, username, onExecuted }: Pro
                 onClick={executar}
                 disabled={!confirmCheck || executando}
               >
-                {executando ? "Aplicando…" : "Zerar itens"}
+                {executando && progresso
+                  ? `Aplicando… ${progresso.atual}/${progresso.total}`
+                  : executando
+                  ? "Aplicando…"
+                  : "Zerar itens"}
               </button>
             </div>
           </div>

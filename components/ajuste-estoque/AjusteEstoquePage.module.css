@@ -444,6 +444,30 @@
   color: var(--ae-red);
 }
 
+/* Barra de progresso (Zerar item) */
+.progressWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+.progressTrack {
+  height: 8px;
+  background: var(--s-100);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.progressFill {
+  height: 100%;
+  background: var(--ae-blue);
+  border-radius: 999px;
+  transition: width 0.25s ease;
+}
+.progressText {
+  font-size: 13px;
+  color: var(--ae-text-2);
+}
+
 /* ── TEMA NOTURNO ── overrides escopados; tema claro intacto ──
    Este módulo define tokens locais (--ae-bg,--ae-card,--ae-border,--ae-text,
    --ae-text-2,--ae-text-3,--ae-blue-bg,--ae-red-bg,--ae-green,--ae-amber-bg,
