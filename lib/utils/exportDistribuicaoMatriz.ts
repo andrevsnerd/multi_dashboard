@@ -1,10 +1,10 @@
-// Export da Distribuição Matriz — Excel (ExcelJS, colorido por status) e PDF (jsPDF + autoTable).
+// Export da Distribuição Matriz — Excel (ExcelJS) e PDF (jsPDF + autoTable).
 //
-// Reflete a tela: uma coluna por loja com a QUANTIDADE A ENVIAR, célula colorida pelo status
-// (zerada=vermelho, bem abaixo=laranja, abaixo=amarelo, no mínimo=verde, não estoca=cinza).
-// Colunas fixas: Produto, Código, Cor, Material, Grade, Matriz e Total a enviar.
+// Pick-list de envio: cada coluna de loja é preenchida SOMENTE quando há algo a enviar,
+// com o valor em VERDE. Loja que não recebe fica em branco. Colunas de contexto:
+// Produto, Código, Cor, Material, Grade, Matriz (estoque) e Total a enviar.
 
-import type { DistribuicaoItem, LojaDistStatus } from "@/lib/utils/distribuicao-matriz";
+import type { DistribuicaoItem } from "@/lib/utils/distribuicao-matriz";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyCell = any;
@@ -17,18 +17,12 @@ export interface ExportDistribuicaoInput {
   matrizLabel?: string;
 }
 
-/** Paleta por status — argb para Excel, rgb para PDF. */
-const STATUS_COLORS: Record<
-  LojaDistStatus,
-  { fillArgb: string; fontArgb: string; fillRgb: [number, number, number]; fontRgb: [number, number, number] }
-> = {
-  SEM_ESTOQUE: { fillArgb: "FFFDE8E8", fontArgb: "FFB91C1C", fillRgb: [253, 232, 232], fontRgb: [185, 28, 28] },
-  CRITICO: { fillArgb: "FFFFEDD5", fontArgb: "FFC2410C", fillRgb: [255, 237, 213], fontRgb: [194, 65, 12] },
-  BAIXO: { fillArgb: "FFFEF9C3", fontArgb: "FFA16207", fillRgb: [254, 249, 195], fontRgb: [161, 98, 7] },
-  OK: { fillArgb: "FFEAF7EE", fontArgb: "FF166534", fillRgb: [234, 247, 238], fontRgb: [22, 101, 52] },
-  SEM_VENDA: { fillArgb: "FFF1F5F9", fontArgb: "FF94A3B8", fillRgb: [241, 245, 249], fontRgb: [148, 163, 184] },
-  NOVO: { fillArgb: "FFEAF7EE", fontArgb: "FF166534", fillRgb: [234, 247, 238], fontRgb: [22, 101, 52] },
-};
+// Verde do "enviar" (mesmo tom da badge da tela).
+const GREEN_FILL_ARGB = "FFDCFCE7";
+const GREEN_FONT_ARGB = "FF16A34A";
+const GREEN_FILL_RGB: [number, number, number] = [220, 252, 231];
+const GREEN_FONT_RGB: [number, number, number] = [22, 163, 74];
+const ZEBRA_ARGB = "FFF6F8FB";
 
 function today(): string {
   return new Date().toLocaleDateString("pt-BR").replace(/\//g, "-");
@@ -63,8 +57,8 @@ export async function exportDistribuicaoMatrizXlsx({
   const totalCol = firstFilialCol + filiais.length;
 
   const titleLines = [
-    "Distribuição Matriz — sugestão de envio por loja",
-    `Gerado em ${today()}  ·  ${items.length.toLocaleString("pt-BR")} item(ns)  ·  valor por loja = unidades a enviar (célula colorida pelo status do estoque)`,
+    "Distribuição Matriz — o que enviar para cada loja",
+    `Gerado em ${today()}  ·  ${items.length.toLocaleString("pt-BR")} item(ns)  ·  células verdes = unidades a enviar (em branco = não enviar)`,
   ];
   const headerRowNum = titleLines.length + 1;
   const firstDataRow = headerRowNum + 1;
@@ -74,7 +68,7 @@ export async function exportDistribuicaoMatrizXlsx({
   });
 
   ws.columns = headers.map((h, i) => {
-    if (i === 0) return { width: 34 }; // Produto
+    if (i === 0) return { width: 34 };
     if (i < fixed.length) return { width: Math.max(10, h.length + 2) };
     return { width: Math.max(9, h.length + 2) };
   });
@@ -113,6 +107,7 @@ export async function exportDistribuicaoMatrizXlsx({
     const r = firstDataRow + i;
     const xrow = ws.getRow(r);
     xrow.height = 16;
+    const zebra = i % 2 === 1;
     const lojaBy = new Map(item.lojas.map((l) => [l.filial, l]));
 
     const setText = (col: number, value: string | number) => {
@@ -121,7 +116,7 @@ export async function exportDistribuicaoMatrizXlsx({
       cell.font = { size: 10 };
       cell.alignment = { horizontal: typeof value === "number" ? "right" : "left", vertical: "middle" };
       cell.border = HAIR;
-      if (i % 2 === 1) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF6F8FB" } };
+      if (zebra) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ZEBRA_ARGB } };
     };
 
     setText(1, nomeProduto(item));
@@ -129,36 +124,39 @@ export async function exportDistribuicaoMatrizXlsx({
     setText(3, item.cor);
     setText(4, item.subgrupo ?? "");
     setText(5, item.grade ?? "");
-    // Matriz (estoque) em destaque
+    // Matriz (estoque) — contexto, em destaque
     const mcell = xrow.getCell(6);
     mcell.value = item.matrizEstoque;
     mcell.numFmt = "#,##0";
     mcell.font = { size: 10, bold: true, color: { argb: "FF1E293B" } };
     mcell.alignment = { horizontal: "right", vertical: "middle" };
     mcell.border = HAIR;
+    if (zebra) mcell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ZEBRA_ARGB } };
 
-    // Filiais — valor = enviar, cor por status
+    // Filiais — SÓ preenche (verde) quando há envio; senão fica em branco.
     filiais.forEach((filial, fi) => {
       const cell = xrow.getCell(firstFilialCol + fi);
-      const loja = lojaBy.get(filial);
-      const enviar = loja?.enviar ?? 0;
-      const status = (loja?.status ?? "SEM_VENDA") as LojaDistStatus;
-      const tone = STATUS_COLORS[status];
-      cell.value = enviar;
-      cell.numFmt = "#,##0";
+      const enviar = lojaBy.get(filial)?.enviar ?? 0;
       cell.alignment = { horizontal: "center", vertical: "middle" };
-      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: tone.fillArgb } };
-      cell.font = { size: 10, bold: enviar > 0, color: { argb: tone.fontArgb } };
       cell.border = HAIR;
+      if (enviar > 0) {
+        cell.value = enviar;
+        cell.numFmt = "#,##0";
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: GREEN_FILL_ARGB } };
+        cell.font = { size: 10, bold: true, color: { argb: GREEN_FONT_ARGB } };
+      } else if (zebra) {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ZEBRA_ARGB } };
+      }
     });
 
     // Total a enviar
     const tcell = xrow.getCell(totalCol);
     tcell.value = item.totalEnviar;
     tcell.numFmt = "#,##0";
-    tcell.font = { size: 10, bold: true, color: { argb: "FF166534" } };
+    tcell.font = { size: 10, bold: true, color: { argb: GREEN_FONT_ARGB } };
     tcell.alignment = { horizontal: "right", vertical: "middle" };
     tcell.border = HAIR;
+    if (zebra) tcell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ZEBRA_ARGB } };
   });
 
   // Rodapé TOTAL
@@ -202,10 +200,7 @@ export async function exportDistribuicaoMatrizPdf({
     return;
   }
 
-  const [{ default: jsPDF }, autoTableMod] = await Promise.all([
-    import("jspdf"),
-    import("jspdf-autotable"),
-  ]);
+  const [{ default: jsPDF }, autoTableMod] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const autoTable = (autoTableMod as any).default ?? autoTableMod;
 
@@ -219,21 +214,11 @@ export async function exportDistribuicaoMatrizPdf({
   doc.setFontSize(9);
   doc.setTextColor(107, 114, 128);
   doc.setFont("helvetica", "normal");
-  doc.text(
-    `Gerado em ${today()}  ·  ${items.length} item(ns)  ·  valor por loja = unidades a enviar`,
-    margin,
-    17
-  );
+  doc.text(`Gerado em ${today()}  ·  ${items.length} item(ns)  ·  verde = unidades a enviar`, margin, 17);
 
   const head = [["Produto", "Código", "Cor", matrizLabel, ...filiais.map((f) => labels[f] ?? f), "Total"]];
   const fixedCount = 4; // Produto, Código, Cor, Matriz
   const totalColIdx = fixedCount + filiais.length;
-
-  // Grid de status por linha × filial (para colorir no didParseCell).
-  const statusGrid: LojaDistStatus[][] = items.map((item) => {
-    const by = new Map(item.lojas.map((l) => [l.filial, l]));
-    return filiais.map((f) => (by.get(f)?.status ?? "SEM_VENDA") as LojaDistStatus);
-  });
 
   const body = items.map((item) => {
     const by = new Map(item.lojas.map((l) => [l.filial, l]));
@@ -242,7 +227,10 @@ export async function exportDistribuicaoMatrizPdf({
       item.codigo,
       item.cor,
       String(item.matrizEstoque),
-      ...filiais.map((f) => String(by.get(f)?.enviar ?? 0)),
+      ...filiais.map((f) => {
+        const e = by.get(f)?.enviar ?? 0;
+        return e > 0 ? String(e) : ""; // em branco quando não envia
+      }),
       String(item.totalEnviar),
     ];
   });
@@ -259,20 +247,18 @@ export async function exportDistribuicaoMatrizPdf({
       1: { cellWidth: 20, halign: "left" },
       2: { cellWidth: 22, halign: "left", overflow: "ellipsize" },
       3: { cellWidth: 14, halign: "center", fontStyle: "bold" },
-      [totalColIdx]: { cellWidth: 14, halign: "center", fontStyle: "bold", textColor: [22, 101, 52] },
+      [totalColIdx]: { cellWidth: 14, halign: "center", fontStyle: "bold", textColor: GREEN_FONT_RGB },
     },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     didParseCell: (data: AnyCell) => {
       if (data.section !== "body") return;
       const col = data.column.index;
       if (col >= fixedCount && col < totalColIdx) {
-        const status = statusGrid[data.row.index]?.[col - fixedCount];
-        if (status) {
-          const tone = STATUS_COLORS[status];
-          data.cell.styles.fillColor = tone.fillRgb;
-          data.cell.styles.textColor = tone.fontRgb;
-          data.cell.styles.halign = "center";
-          if (Number(data.cell.raw) > 0) data.cell.styles.fontStyle = "bold";
+        data.cell.styles.halign = "center";
+        if (String(data.cell.raw ?? "").trim() !== "") {
+          data.cell.styles.fillColor = GREEN_FILL_RGB;
+          data.cell.styles.textColor = GREEN_FONT_RGB;
+          data.cell.styles.fontStyle = "bold";
         }
       }
     },
