@@ -68,6 +68,37 @@
   letter-spacing: -0.02em;
 }
 
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.exportBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--b-300);
+  background: var(--s-white);
+  color: var(--t-700);
+  border-radius: 10px;
+  padding: 9px 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.exportBtn svg {
+  width: 15px;
+  height: 15px;
+}
+.exportBtn:hover:not(:disabled) {
+  background: var(--s-100);
+}
+.exportBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
 .refreshBtn {
   flex-shrink: 0;
   display: inline-flex;

@@ -5,6 +5,7 @@ import type { ReactElement, ReactNode } from "react";
 
 import type { CompanyKey } from "@/lib/config/company";
 import type { DistribuicaoItem, DistribuicaoResult, LojaDistStatus } from "@/lib/utils/distribuicao-matriz";
+import { exportDistribuicaoMatrizPdf, exportDistribuicaoMatrizXlsx } from "@/lib/utils/exportDistribuicaoMatriz";
 
 import styles from "./DistribuicaoMatrizPage.module.css";
 
@@ -144,6 +145,13 @@ const Icons = {
   plane: svg(
     <>
       <path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z" />
+    </>
+  ),
+  download: svg(
+    <>
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <path d="M7 10l5 5 5-5" />
+      <path d="M12 15V3" />
     </>
   ),
 };
@@ -360,6 +368,17 @@ export default function DistribuicaoMatrizPage({ companyKey }: DistribuicaoMatri
 
   const visiveis = itensOrdenados.slice(0, limite);
   const fmt = (n: number) => n.toLocaleString("pt-BR");
+
+  const exportArgs = useMemo(
+    () => ({
+      items: itensOrdenados,
+      filiais: distribuicao.filiaisDestino,
+      labels: distribuicao.filialLabels,
+      companyKey,
+      matrizLabel: distribuicao.matrizLabel,
+    }),
+    [itensOrdenados, distribuicao.filiaisDestino, distribuicao.filialLabels, distribuicao.matrizLabel, companyKey]
+  );
   const sortArrow = (col: string) =>
     sort?.col === col ? <span className={styles.sortArrow}>{sort.dir === "desc" ? "▼" : "▲"}</span> : null;
 
@@ -369,10 +388,32 @@ export default function DistribuicaoMatrizPage({ companyKey }: DistribuicaoMatri
         <div className={styles.headerLeft}>
           <h1 className={styles.title}>Distribuição Matriz</h1>
         </div>
-        <button type="button" className={styles.refreshBtn} onClick={loadData} disabled={loading}>
-          <Icons.refresh />
-          {loading ? "Carregando…" : "Atualizar"}
-        </button>
+        <div className={styles.headerActions}>
+          <button
+            type="button"
+            className={styles.exportBtn}
+            onClick={() => exportDistribuicaoMatrizXlsx(exportArgs)}
+            disabled={itensFiltrados.length === 0}
+            title="Exportar Excel (colorido por status)"
+          >
+            <Icons.download />
+            Excel
+          </button>
+          <button
+            type="button"
+            className={styles.exportBtn}
+            onClick={() => exportDistribuicaoMatrizPdf(exportArgs)}
+            disabled={itensFiltrados.length === 0}
+            title="Exportar PDF"
+          >
+            <Icons.download />
+            PDF
+          </button>
+          <button type="button" className={styles.refreshBtn} onClick={loadData} disabled={loading}>
+            <Icons.refresh />
+            {loading ? "Carregando…" : "Atualizar"}
+          </button>
+        </div>
       </header>
 
       <section className={styles.tiles}>
