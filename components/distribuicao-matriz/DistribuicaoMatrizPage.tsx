@@ -57,7 +57,6 @@ export default function DistribuicaoMatrizPage({
 
   const [busca, setBusca] = useState("");
   const [material, setMaterial] = useState("todos");
-  const [soComEnvio, setSoComEnvio] = useState(true);
   const [soZeradas, setSoZeradas] = useState(false);
   const [limite, setLimite] = useState(PAGE_STEP);
 
@@ -95,7 +94,7 @@ export default function DistribuicaoMatrizPage({
   const itensFiltrados = useMemo(() => {
     const termo = normalize(busca.trim());
     return distribuicao.itens.filter((item) => {
-      if (soComEnvio && item.totalEnviar <= 0) return false;
+      if (item.totalEnviar <= 0) return false; // envio sugerido é sempre o padrão
       if (soZeradas && item.lojasSemEstoque <= 0) return false;
       if (material !== "todos" && item.material !== material) return false;
       if (termo) {
@@ -106,7 +105,7 @@ export default function DistribuicaoMatrizPage({
       }
       return true;
     });
-  }, [distribuicao.itens, busca, material, soComEnvio, soZeradas]);
+  }, [distribuicao.itens, busca, material, soZeradas]);
 
   const resumo = useMemo(() => {
     let lojasZeradas = 0;
@@ -127,7 +126,7 @@ export default function DistribuicaoMatrizPage({
 
   useEffect(() => {
     setLimite(PAGE_STEP);
-  }, [busca, material, soComEnvio, soZeradas]);
+  }, [busca, material, soZeradas]);
 
   const visiveis = itensFiltrados.slice(0, limite);
 
@@ -136,12 +135,6 @@ export default function DistribuicaoMatrizPage({
       <header className={styles.header}>
         <div>
           <h1 className={styles.title}>Distribuição Matriz</h1>
-          <p className={styles.subtitle}>
-            Estoque da <strong>{distribuicao.matrizLabel}</strong> e quanto enviar para cada loja
-            atingir o <strong>mínimo</strong> definido por loja × item (planilha de divisão). Loja
-            abaixo do mínimo recebe a diferença; no mínimo ou acima, não recebe. Mínimo por
-            estampa/cor, com sazonal (PANNEAUX) e exceções por coleção/cor. {companyName}
-          </p>
         </div>
         <button type="button" className={styles.refreshBtn} onClick={loadData} disabled={loading}>
           {loading ? "Carregando…" : "Atualizar"}
@@ -187,14 +180,6 @@ export default function DistribuicaoMatrizPage({
             </option>
           ))}
         </select>
-        <label className={styles.toggle}>
-          <input
-            type="checkbox"
-            checked={soComEnvio}
-            onChange={(e) => setSoComEnvio(e.target.checked)}
-          />
-          Só com envio sugerido
-        </label>
         <label className={styles.toggle}>
           <input type="checkbox" checked={soZeradas} onChange={(e) => setSoZeradas(e.target.checked)} />
           Só com loja zerada

@@ -3625,13 +3625,13 @@
     "semantic_hash": ""
   },
   "components/distribuicao-matriz/DistribuicaoMatrizPage.tsx": {
-    "mtime": 1784056112.9204338,
-    "ast_hash": "b972c1127085fc4bc7c44849b5fc9005",
+    "mtime": 1784904623.2920825,
+    "ast_hash": "96dcae6bc122b0ff3a50cacdf33ea3bb",
     "semantic_hash": ""
   },
   "lib/utils/distribuicao-matriz.ts": {
-    "mtime": 1784056555.7159216,
-    "ast_hash": "bf09a872bbd3a3701ce492d0ce2e02a4",
+    "mtime": 1784904376.8615713,
+    "ast_hash": "dccda2ad984bdbbec19d5affa9fbefcc",
     "semantic_hash": ""
   },
   "app/api/distribuicao-matriz/route.ts": {
@@ -3640,8 +3640,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/distribuicaoMatriz.ts": {
-    "mtime": 1784056358.3047101,
-    "ast_hash": "255c77ef480345e9104845c66697f6dc",
+    "mtime": 1784904509.3314536,
+    "ast_hash": "d4ac9ae13d05b2d4a3e6bc10b4b31fa9",
     "semantic_hash": ""
   },
   "app/(companies)/[company]/aumentos-descontos/page.tsx": {
@@ -3785,8 +3785,13 @@
     "semantic_hash": ""
   },
   "components/ajuste-estoque/ZerarItemPanel.tsx": {
-    "mtime": 1784894413.7761893,
-    "ast_hash": "26b7babf2571ecadb14c1f61c3bf6cb7",
+    "mtime": 1784895637.0097964,
+    "ast_hash": "070d3f2909db37572b62ca9de4485e0b",
+    "semantic_hash": ""
+  },
+  "lib/config/distribuicao-minimos.ts": {
+    "mtime": 1784904526.5229836,
+    "ast_hash": "9ff9b34450dfad3af10d74770db3c021",
     "semantic_hash": ""
   }
 }
