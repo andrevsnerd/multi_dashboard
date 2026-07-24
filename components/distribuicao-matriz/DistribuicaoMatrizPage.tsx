@@ -56,7 +56,7 @@ export default function DistribuicaoMatrizPage({
   const [error, setError] = useState<string | null>(null);
 
   const [busca, setBusca] = useState("");
-  const [subgrupo, setSubgrupo] = useState("todos");
+  const [material, setMaterial] = useState("todos");
   const [soComEnvio, setSoComEnvio] = useState(true);
   const [soZeradas, setSoZeradas] = useState(false);
   const [limite, setLimite] = useState(PAGE_STEP);
@@ -84,10 +84,10 @@ export default function DistribuicaoMatrizPage({
     loadData();
   }, [loadData]);
 
-  const subgrupos = useMemo(() => {
+  const materiais = useMemo(() => {
     const set = new Set<string>();
     distribuicao.itens.forEach((i) => {
-      if (i.subgrupo) set.add(i.subgrupo);
+      if (i.material) set.add(i.material);
     });
     return Array.from(set).sort();
   }, [distribuicao.itens]);
@@ -97,7 +97,7 @@ export default function DistribuicaoMatrizPage({
     return distribuicao.itens.filter((item) => {
       if (soComEnvio && item.totalEnviar <= 0) return false;
       if (soZeradas && item.lojasSemEstoque <= 0) return false;
-      if (subgrupo !== "todos" && item.subgrupo !== subgrupo) return false;
+      if (material !== "todos" && item.material !== material) return false;
       if (termo) {
         const hay = normalize(
           `${item.descricao} ${item.produto} ${item.codigo} ${item.codigoBarra ?? ""} ${item.cor}`
@@ -106,7 +106,7 @@ export default function DistribuicaoMatrizPage({
       }
       return true;
     });
-  }, [distribuicao.itens, busca, subgrupo, soComEnvio, soZeradas]);
+  }, [distribuicao.itens, busca, material, soComEnvio, soZeradas]);
 
   const resumo = useMemo(() => {
     let lojasZeradas = 0;
@@ -127,7 +127,7 @@ export default function DistribuicaoMatrizPage({
 
   useEffect(() => {
     setLimite(PAGE_STEP);
-  }, [busca, subgrupo, soComEnvio, soZeradas]);
+  }, [busca, material, soComEnvio, soZeradas]);
 
   const visiveis = itensFiltrados.slice(0, limite);
 
@@ -137,9 +137,10 @@ export default function DistribuicaoMatrizPage({
         <div>
           <h1 className={styles.title}>Distribuição Matriz</h1>
           <p className={styles.subtitle}>
-            Estoque da <strong>{distribuicao.matrizLabel}</strong> e quanto enviar para cada loja não
-            zerar. A missão da matriz é abastecer a rede — acabou o item na loja, manda; nunca deixa
-            com 1. Mesma Compra Ideal de Lista Loja/Curva ABC, aplicada por loja. {companyName}
+            Estoque da <strong>{distribuicao.matrizLabel}</strong> e quanto enviar para cada loja
+            atingir o <strong>mínimo</strong> definido por loja × item (planilha de divisão). Loja
+            abaixo do mínimo recebe a diferença; no mínimo ou acima, não recebe. Mínimo por
+            estampa/cor, com sazonal (PANNEAUX) e exceções por coleção/cor. {companyName}
           </p>
         </div>
         <button type="button" className={styles.refreshBtn} onClick={loadData} disabled={loading}>
@@ -176,11 +177,11 @@ export default function DistribuicaoMatrizPage({
         />
         <select
           className={styles.select}
-          value={subgrupo}
-          onChange={(e) => setSubgrupo(e.target.value)}
+          value={material}
+          onChange={(e) => setMaterial(e.target.value)}
         >
-          <option value="todos">Todos os subgrupos</option>
-          {subgrupos.map((s) => (
+          <option value="todos">Todos os materiais</option>
+          {materiais.map((s) => (
             <option key={s} value={s}>
               {s}
             </option>
@@ -201,12 +202,11 @@ export default function DistribuicaoMatrizPage({
       </section>
 
       <section className={styles.legend}>
-        <span className={`${styles.legendItem} ${styles.legendSemEstoque}`}>Loja zerada (0)</span>
-        <span className={`${styles.legendItem} ${styles.legendCritico}`}>Crítico (repor urgente)</span>
-        <span className={`${styles.legendItem} ${styles.legendBaixo}`}>Repor</span>
-        <span className={`${styles.legendItem} ${styles.legendOk}`}>OK</span>
-        <span className={`${styles.legendItem} ${styles.legendNovo}`}>Novo (sem histórico)</span>
-        <span className={`${styles.legendItem} ${styles.legendSemVenda}`}>Não vende</span>
+        <span className={`${styles.legendItem} ${styles.legendSemEstoque}`}>Zerada (estoca, tem 0)</span>
+        <span className={`${styles.legendItem} ${styles.legendCritico}`}>Bem abaixo do mínimo</span>
+        <span className={`${styles.legendItem} ${styles.legendBaixo}`}>Abaixo do mínimo</span>
+        <span className={`${styles.legendItem} ${styles.legendOk}`}>No mínimo ou acima</span>
+        <span className={`${styles.legendItem} ${styles.legendSemVenda}`}>Não estoca (mín. 0)</span>
         <span className={styles.legendEnviar}>➜ N = enviar N unidades</span>
       </section>
 
@@ -215,7 +215,7 @@ export default function DistribuicaoMatrizPage({
       {!error && loading && !loadedOnce && (
         <div className={styles.loadingBox}>
           <div className={styles.spinner} />
-          <span>Carregando estoque e Compra Ideal da rede…</span>
+          <span>Carregando estoque da rede e mínimos por loja…</span>
         </div>
       )}
 
@@ -310,18 +310,11 @@ function ItemRow({ item, filiais }: { item: DistribuicaoItem; filiais: string[] 
             </td>
           );
         }
-        const tooltip =
-          loja.status === "NOVO"
-            ? `${loja.filialLabel}\nSem histórico — abertura igual entre as lojas\nEstoque: ${loja.estoqueAtual}${
-                loja.enviar > 0 ? `\n➜ Enviar ${loja.enviar} (fica com ${loja.saldoAposEnvio})` : ""
-              }`
-            : loja.vende
-              ? `${loja.filialLabel}\nEstoque: ${loja.estoqueAtual}\nCobertura: ${
-                  loja.coberturaAtualDias == null ? "—" : `${loja.coberturaAtualDias}d`
-                }\nCompra Ideal: ${loja.idealStatusLabel} (alvo ${loja.idealAlvo})${
-                  loja.enviar > 0 ? `\n➜ Enviar ${loja.enviar} (fica com ${loja.saldoAposEnvio})` : ""
-                }`
-              : `${loja.filialLabel}\nNão vende o item`;
+        const tooltip = loja.vende
+          ? `${loja.filialLabel}\nMínimo: ${loja.idealAlvo}\nEstoque: ${loja.estoqueAtual}\n${loja.idealStatusLabel}${
+              loja.enviar > 0 ? `\n➜ Enviar ${loja.enviar} (fica com ${loja.saldoAposEnvio})` : ""
+            }`
+          : `${loja.filialLabel}\nNão estoca este item (mínimo 0)`;
         return (
           <td
             key={filial}

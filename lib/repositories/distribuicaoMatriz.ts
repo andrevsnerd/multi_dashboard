@@ -1,255 +1,228 @@
-// Distribuição da Matriz → Lojas — repositório server-side.
+// Distribuição da Matriz → Lojas — repositório server-side (regra de MÍNIMO por loja).
 //
-// Reusa a MESMA pipeline de "Compra sugerida por Curva ABC" (reportCompraSugeridaAbc.ts):
-// métricas por loja em lote (`getControleEstoqueMetricasItensBatched`, 1 chamada por loja, nunca
-// N+1 por item) + `calcCompraIdealFromResumo` — a fonte única de "quanto uma loja precisa" usada
-// em Lista Loja, Curva ABC, Compras Salvas e no Gerador de Relatórios. Assim os números desta
-// página (estoque, cobertura, Repor/OK) batem com os das outras telas para o mesmo produto×loja.
+// Substitui a lógica antiga (Compra Ideal por ritmo). Agora a fonte de "quanto cada loja deve ter"
+// é a planilha "DIVISÃO LOJAS NOVO" codificada em lib/config/distribuicao-minimos.ts: um estoque
+// MÍNIMO por loja × material × tamanho, no grão produto×cor, com sazonal (PANNEAUX) e overrides
+// de coleção/cor. A origem é sempre a MATRIZ (depósito), que cede o que tem; o rateio de
+// distribuicao-matriz.ts serve primeiro as lojas mais descobertas.
 //
-// A ORIGEM aqui é sempre a Matriz: consultamos a métrica dela como só mais uma "filial" (mesma
-// fonte de estoque/vendas), depois aplicamos o rateio puro de distribuicao-matriz.ts.
+// SÓ ESTOQUE — nenhuma query de venda/faturamento (a regra do CLAUDE.md não se aplica aqui).
+// Estoque vem de ESTOQUE_PRODUTOS (só saldos positivos), filial resolvida por COD_FILIAL
+// (join FILIAIS) para ser robusto a rename de filial no ERP.
 
-import { fetchControleTransferencias } from "@/lib/repositories/controleTransferencias";
-import { fetchProductsWithDetails } from "@/lib/repositories/products";
-import { getControleEstoqueMetricasItensBatched } from "@/lib/server/controle-estoque-metricas";
+import { query } from "@/lib/db/connection";
+import { getFiliaisByCompany } from "@/lib/config/filial-registry";
+import type { CompanyKey } from "@/lib/config/company";
 import {
-  buildControleEstoqueItemKey,
-  dedupeControleEstoqueItens,
-  type ControleEstoqueItemMetricas,
-} from "@/lib/utils/controle-estoque-metricas";
-import { calcCompraIdealFromResumo } from "@/lib/utils/compra-ideal";
-import { listComprasTransitoFull } from "@/lib/utils/compra-transito-store";
-import { isCompraTransitoDateActive } from "@/lib/utils/compra-transito-status";
-import { canonicalKey } from "@/lib/reports/keys";
-import { getMappedColorDescription } from "@/lib/utils/colorMapping";
-import { isMainMatrizFilial, isBlockedDestinationFilial } from "@/lib/utils/transferencia-regras";
-import {
-  resolveCompany,
-  getOperationalFilials,
-  getFilialLabelForDisplay,
-  compareFilialDisplayOrder,
-  isEcommerceFilial,
-  type CompanyKey,
-} from "@/lib/config/company";
+  DISTRIBUICAO_FILIAIS,
+  getMateriaisForCompany,
+  isInverno,
+  minimoEfetivo,
+  produtoCasaMaterial,
+  type MaterialDef,
+  type ProdutoContexto,
+} from "@/lib/config/distribuicao-minimos";
 import {
   montarDistribuicaoItem,
   type DistribuicaoResult,
   type LojaDistribuicaoInput,
 } from "@/lib/utils/distribuicao-matriz";
-import type { CompraTransitoIndexEntry } from "@/lib/client/compras-transito";
 
-/** Quantas filiais calcular em paralelo (cada uma já batcheia os itens internamente). */
-const FILIAL_CONCURRENCY = 3;
+const up = (s: string | null | undefined) => (s ?? "").trim().toUpperCase();
+const esc = (s: string) => s.replace(/'/g, "''");
+const inList = (values: string[]) => values.map((v) => `'${esc(up(v))}'`).join(", ");
 
-async function mapWithConcurrency<T, R>(
-  items: T[],
-  limit: number,
-  mapper: (item: T, index: number) => Promise<R>
-): Promise<R[]> {
-  if (items.length === 0) return [];
-  const results = new Array<R>(items.length);
-  let next = 0;
-  async function worker() {
-    while (true) {
-      const i = next;
-      next += 1;
-      if (i >= items.length) return;
-      results[i] = await mapper(items[i]!, i);
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
-  return results;
+/** Cláusula SQL que reconhece os produtos de UM material (mesmos matchers do config). */
+function materialClause(m: MaterialDef, pfx = "p"): string {
+  const parts: string[] = [];
+  const { grupo, subgrupo, grade, gradeStartsWith, descContains } = m.match;
+  if (grupo?.length) parts.push(`UPPER(LTRIM(RTRIM(ISNULL(${pfx}.GRUPO_PRODUTO,'')))) IN (${inList(grupo)})`);
+  if (subgrupo?.length) parts.push(`UPPER(LTRIM(RTRIM(ISNULL(${pfx}.SUBGRUPO_PRODUTO,'')))) IN (${inList(subgrupo)})`);
+  if (grade?.length)
+    parts.push(`UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR,${pfx}.GRADE),'')))) IN (${inList(grade)})`);
+  if (gradeStartsWith?.length)
+    parts.push(
+      `(${gradeStartsWith
+        .map((g) => `UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR,${pfx}.GRADE),'')))) LIKE '${esc(up(g))}%'`)
+        .join(" OR ")})`
+    );
+  if (descContains?.length)
+    parts.push(`(${descContains.map((d) => `UPPER(${pfx}.DESC_PRODUTO) LIKE '%${esc(up(d))}%'`).join(" OR ")})`);
+  return parts.length ? `(${parts.join(" AND ")})` : "(1=0)";
 }
 
-const TRANSIT_DESC_PREFIX = " desc ";
-
-/** Espelha lib/repositories/reportCompraSugeridaAbc.ts: casa trânsito por descrição de cor quando o código diverge. */
-function transitDescKey(
-  produto: string | null | undefined,
-  corProduto: string | null | undefined,
-  corDescricao?: string | null
-): string | null {
-  const doProduto = (corDescricao ?? "").trim();
-  const base = doProduto || getMappedColorDescription(corProduto);
-  const raw = base
-    .trim()
-    .toUpperCase()
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "");
-  if (!raw) return null;
-  return `${TRANSIT_DESC_PREFIX}${String(produto ?? "").trim()}||${raw}`;
+interface AttrRow {
+  PRODUTO: string;
+  GRUPO: string;
+  SUBGRUPO: string;
+  GRADE: string;
+  DESC_PRODUTO: string;
+  TIPO: string;
+  COLECAO_DESC: string;
 }
 
-/** Índice de compras em trânsito ativas por (produto × cor canônica) — mesma fonte da Compra Ideal em todo o app. */
-async function buildTransitIndex(
-  company: string | undefined
-): Promise<Map<string, CompraTransitoIndexEntry[]>> {
-  const idx = new Map<string, CompraTransitoIndexEntry[]>();
-  if (!company) return idx;
-  const compras = await listComprasTransitoFull(company).catch(() => []);
-  const today = new Date();
-  for (const c of compras) {
-    for (const it of c.items ?? []) {
-      if (!isCompraTransitoDateActive(it.dataRecebimento, today)) continue;
-      const entry: CompraTransitoIndexEntry = {
-        itemKey: it.itemKey ?? "",
-        produto: it.produto,
-        corProduto: it.corProduto ?? null,
-        quantidade: Number(it.quantidade ?? 0),
-        dataRecebimento: it.dataRecebimento,
-        title: c.title ?? "",
-        confirmedAt: c.confirmedAt ?? "",
-      };
-      const k = canonicalKey(it.produto, it.corProduto ?? null);
-      idx.set(k, [...(idx.get(k) ?? []), entry]);
-      const dk = transitDescKey(it.produto, it.corProduto, it.corDescricao);
-      if (dk) idx.set(dk, [...(idx.get(dk) ?? []), entry]);
-    }
-  }
-  return idx;
+interface StockRow {
+  COD_FILIAL: string;
+  PRODUTO: string;
+  COR: string;
+  DESC_COR: string;
+  ESTOQUE: number | null;
 }
-
-function resolveTransit(
-  transitIndex: Map<string, CompraTransitoIndexEntry[]>,
-  produto: string,
-  codigoCor: string | null | undefined,
-  corDescricao: string | null | undefined
-): CompraTransitoIndexEntry[] {
-  let transit = transitIndex.get(canonicalKey(produto, codigoCor ?? null)) ?? [];
-  if (transit.length === 0) {
-    const dk = transitDescKey(produto, codigoCor, corDescricao);
-    if (dk) transit = transitIndex.get(dk) ?? [];
-  }
-  return transit;
-}
-
-type MetricasMap = Record<string, ControleEstoqueItemMetricas>;
 
 /**
- * Monta o board Matriz → Lojas: estoque da Matriz + Compra Ideal de cada loja (mesma fórmula
- * canônica de Lista Loja/Curva ABC) + rateio com piso anti-zero. Últimos 30 dias como janela
- * de referência para o universo de itens (mesma janela do Controle de Transferências).
+ * Monta o board Matriz → Lojas pela regra de MÍNIMO por loja (planilha).
  */
 export async function fetchDistribuicaoMatriz(company: CompanyKey): Promise<DistribuicaoResult> {
-  const end = new Date();
-  const start = new Date(end);
-  start.setDate(start.getDate() - 30);
-
-  const network = await fetchControleTransferencias({
-    company,
-    range: { start: start.toISOString(), end: end.toISOString() },
-  });
-
-  const companyCfg = resolveCompany(company);
-
-  // Filiais SEMPRE resolvidas para a canônica ATIVA e deduplicadas (getOperationalFilials) — a
-  // MESMA base do Gerador de Compra Sugerida ABC. Isso colapsa grupos de filial (ex.: Morumbi que
-  // trocou de CNPJ) numa única coluna, evitando dois "MORUMBI 1" e divergência de estoque/venda.
-  const matriz =
-    getOperationalFilials(companyCfg, "inventory").find((f) => isMainMatrizFilial(company, f)) ?? null;
-
-  if (!matriz) {
+  const materiais = getMateriaisForCompany(company);
+  if (materiais.length === 0) {
     return { matrizLabel: "Matriz", filiaisDestino: [], filialLabels: {}, itens: [] };
   }
 
-  const matrizLabel = companyCfg ? getFilialLabelForDisplay(companyCfg, matriz) : matriz;
+  // Filiais por ID (registry é fonte de verdade). Matriz = origem; destinos = as 9 da planilha.
+  const defs = getFiliaisByCompany(company).filter((f) => f.modules.includes("inventory"));
+  const matrizIds = defs.filter((f) => f.display === "MATRIZ").map((f) => f.id);
+  const idsByDisplay = new Map<string, string[]>();
+  for (const f of defs) {
+    if ((DISTRIBUICAO_FILIAIS as readonly string[]).includes(f.display)) {
+      idsByDisplay.set(f.display, [...(idsByDisplay.get(f.display) ?? []), f.id]);
+    }
+  }
+  if (matrizIds.length === 0 || idsByDisplay.size === 0) {
+    return { matrizLabel: "MATRIZ", filiaisDestino: [], filialLabels: {}, itens: [] };
+  }
 
-  // Destinos: lojas operacionais de venda, menos Matriz / e-commerce / bloqueadas, ordenadas
-  // pela ordem de exibição do app e deduplicadas por rótulo (uma coluna por loja).
-  const destinosOrdenados = getOperationalFilials(companyCfg, "sales")
-    .filter((f) => !isMainMatrizFilial(company, f))
-    .filter((f) => !isBlockedDestinationFilial(f))
-    .filter((f) => !isEcommerceFilial(company, f))
-    .sort((a, b) => compareFilialDisplayOrder(a, b, companyCfg));
-
-  const filiaisDestino: string[] = [];
+  // Colunas destino: na ordem da planilha, só as que existem no registry.
+  const destinos = DISTRIBUICAO_FILIAIS.filter((d) => idsByDisplay.has(d));
   const filialLabels: Record<string, string> = {};
-  const labelsVistos = new Set<string>();
-  for (const f of destinosOrdenados) {
-    const label = companyCfg ? getFilialLabelForDisplay(companyCfg, f) : f;
-    if (labelsVistos.has(label)) continue; // colapsa colunas com o mesmo rótulo
-    labelsVistos.add(label);
-    filiaisDestino.push(f);
-    filialLabels[f] = label;
-  }
+  destinos.forEach((d) => (filialLabels[d] = d));
 
-  // Universo: itens com estoque positivo na Matriz (o que há para distribuir).
-  const candidatos = network.filter((item) => {
-    const m = item.filiais.find((f) => isMainMatrizFilial(company, f.filial));
-    return Math.max(0, Math.round(m?.stock ?? 0)) > 0;
-  });
-  if (candidatos.length === 0) {
-    return { matrizLabel, filiaisDestino, filialLabels, itens: [] };
-  }
+  // COD_FILIAL → display (para agregar grupos PAULISTA / E-COMMERCE por rótulo).
+  const displayByCod = new Map<string, string>();
+  matrizIds.forEach((id) => displayByCod.set(id, "MATRIZ"));
+  for (const [display, ids] of idsByDisplay) ids.forEach((id) => displayByCod.set(id, display));
 
-  // Metadados canônicos de produto (linha/subgrupo) — mesma fonte de vendas/produto do app
-  // (fetchProductsWithDetails), necessários para a cobertura-alvo por linha da Compra Ideal.
-  const details = await fetchProductsWithDetails({
-    company,
-    range: { start, end },
-    filial: null,
-    groupByColor: true,
-  }).catch(() => []);
-  const metaByKey = new Map<string, { linha: string | null; subgrupo: string | null }>();
-  details.forEach((d) => {
-    metaByKey.set(buildControleEstoqueItemKey(d.productId, d.corProduto), {
-      linha: d.linha ?? null,
-      subgrupo: d.subgrupo ?? null,
-    });
-  });
+  const allIds = [...matrizIds, ...destinos.flatMap((d) => idsByDisplay.get(d)!)];
+  const codList = allIds.map((id) => `'${esc(id)}'`).join(", ");
+  const materialWhere = materiais.map((m) => materialClause(m, "p")).join("\n        OR ");
 
-  const itensInput = dedupeControleEstoqueItens(
-    candidatos.map((item) => ({ produto: item.produto, corProduto: item.codigoCor ?? item.cor }))
-  );
+  // Atributos por produto (uma linha por PRODUTO).
+  const attrSql = `
+    SELECT
+      RTRIM(p.PRODUTO) AS PRODUTO,
+      UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO,'')))) AS GRUPO,
+      UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO,'')))) AS SUBGRUPO,
+      UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR,p.GRADE),'')))) AS GRADE,
+      LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO,''))) AS DESC_PRODUTO,
+      UPPER(LTRIM(RTRIM(ISNULL(p.TIPO_PRODUTO,'')))) AS TIPO,
+      UPPER(LTRIM(RTRIM(ISNULL(col.DESC_COLECAO,'')))) AS COLECAO_DESC
+    FROM PRODUTOS p WITH (NOLOCK)
+    LEFT JOIN COLECOES col WITH (NOLOCK) ON col.COLECAO = p.COLECAO
+    WHERE ${materialWhere}
+  `;
 
-  // Métricas em lote: Matriz + cada loja destino, todas na MESMA pipeline (1 chamada por filial).
-  const todasFiliais = [matriz, ...filiaisDestino];
-  const [metricasPorFilial, transitIndex] = await Promise.all([
-    mapWithConcurrency(todasFiliais, FILIAL_CONCURRENCY, (name) =>
-      getControleEstoqueMetricasItensBatched({ company, filial: name, itens: itensInput }).catch(
-        () => ({} as MetricasMap)
-      )
-    ),
-    buildTransitIndex(company),
+  // Estoque positivo por COD_FILIAL × produto × cor (só as filiais que importam).
+  const stockSql = `
+    SELECT
+      RTRIM(f.COD_FILIAL) AS COD_FILIAL,
+      RTRIM(e.PRODUTO) AS PRODUTO,
+      RTRIM(CONVERT(VARCHAR, e.COR_PRODUTO)) AS COR,
+      ISNULL(MAX(c.DESC_COR), '') AS DESC_COR,
+      SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS ESTOQUE
+    FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+    JOIN FILIAIS f WITH (NOLOCK) ON f.FILIAL = e.FILIAL
+    JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = e.PRODUTO
+    LEFT JOIN (
+      SELECT PRODUTO, COR_PRODUTO, MAX(DESC_COR_PRODUTO) AS DESC_COR
+      FROM PRODUTO_CORES WITH (NOLOCK)
+      GROUP BY PRODUTO, COR_PRODUTO
+    ) c ON RTRIM(LTRIM(c.PRODUTO)) = RTRIM(LTRIM(e.PRODUTO))
+       AND (RTRIM(LTRIM(CAST(c.COR_PRODUTO AS VARCHAR(20)))) = RTRIM(LTRIM(CAST(e.COR_PRODUTO AS VARCHAR(20))))
+            OR TRY_CONVERT(INT, c.COR_PRODUTO) = TRY_CONVERT(INT, e.COR_PRODUTO))
+    WHERE RTRIM(f.COD_FILIAL) IN (${codList})
+      AND (${materialWhere})
+    GROUP BY RTRIM(f.COD_FILIAL), RTRIM(e.PRODUTO), RTRIM(CONVERT(VARCHAR, e.COR_PRODUTO))
+  `;
+
+  const [attrRows, stockRows] = await Promise.all([
+    query<AttrRow>(attrSql),
+    query<StockRow>(stockSql),
   ]);
-  const metricasMatriz = metricasPorFilial[0] ?? ({} as MetricasMap);
-  const metricasLojas = filiaisDestino.map((_, i) => metricasPorFilial[i + 1] ?? ({} as MetricasMap));
+
+  const attrByProduto = new Map<string, AttrRow>();
+  attrRows.forEach((r) => attrByProduto.set(r.PRODUTO.trim(), r));
+
+  // produto×cor → estoque por display + desc da cor.
+  interface Agg {
+    produto: string;
+    cor: string;
+    descCor: string;
+    matriz: number;
+    porDisplay: Map<string, number>;
+  }
+  const aggByKey = new Map<string, Agg>();
+  for (const row of stockRows) {
+    const produto = row.PRODUTO.trim();
+    const cor = (row.COR ?? "").trim();
+    const key = `${produto}|${cor}`;
+    const display = displayByCod.get(row.COD_FILIAL.trim());
+    if (!display) continue;
+    let agg = aggByKey.get(key);
+    if (!agg) {
+      agg = { produto, cor, descCor: (row.DESC_COR ?? "").trim(), matriz: 0, porDisplay: new Map() };
+      aggByKey.set(key, agg);
+    }
+    if (!agg.descCor && row.DESC_COR) agg.descCor = row.DESC_COR.trim();
+    const est = Math.max(0, Math.round(Number(row.ESTOQUE ?? 0)));
+    if (display === "MATRIZ") agg.matriz += est;
+    else agg.porDisplay.set(display, (agg.porDisplay.get(display) ?? 0) + est);
+  }
+
+  const inverno = isInverno(new Date());
 
   const itens = [];
-  for (const item of candidatos) {
-    const itemKey = buildControleEstoqueItemKey(item.produto, item.codigoCor ?? item.cor);
-    const meta = metaByKey.get(itemKey) ?? { linha: null, subgrupo: item.subgrupo ?? null };
+  for (const agg of aggByKey.values()) {
+    if (agg.matriz <= 0) continue; // só distribui o que a Matriz tem
+    const attr = attrByProduto.get(agg.produto);
+    if (!attr) continue;
 
-    const matrizResumo = metricasMatriz[itemKey]?.resumo ?? null;
-    const matrizEstoque = Math.max(0, Math.round(matrizResumo?.estoqueTotal ?? 0));
-    if (matrizEstoque <= 0) continue; // fonte canônica não confirma estoque na Matriz
+    const ctx: ProdutoContexto = {
+      grupo: attr.GRUPO,
+      subgrupo: attr.SUBGRUPO,
+      grade: attr.GRADE,
+      descricao: attr.DESC_PRODUTO,
+      colecaoDesc: attr.COLECAO_DESC,
+      tipo: attr.TIPO,
+      corCodigo: agg.cor,
+    };
+    const material = materiais.find((m) => produtoCasaMaterial(m, ctx));
+    if (!material) continue;
 
-    const transit = resolveTransit(transitIndex, item.produto, item.codigoCor, item.cor);
-
-    const lojasInput: LojaDistribuicaoInput[] = filiaisDestino.map((filial, idx) => {
-      const resumo = metricasLojas[idx]?.[itemKey]?.resumo ?? null;
-      const estoqueAtual = Math.max(0, Math.round(resumo?.estoqueTotal ?? 0));
-      const vende = (resumo?.qtde12m ?? 0) > 0;
-      const ideal = calcCompraIdealFromResumo(resumo, transit, {
-        linha: meta.linha,
-        subgrupo: meta.subgrupo,
-        company,
-      });
-      return { filial, filialLabel: filialLabels[filial], estoqueAtual, vende, ideal };
+    const lojasInput: LojaDistribuicaoInput[] = destinos.map((display) => {
+      const filialIndex = DISTRIBUICAO_FILIAIS.indexOf(display);
+      const minimo = minimoEfetivo(material, filialIndex, ctx, inverno);
+      return {
+        filial: display,
+        filialLabel: display,
+        estoqueAtual: agg.porDisplay.get(display) ?? 0,
+        minimo,
+      };
     });
+
+    // Item sem nenhum mínimo > 0 (nenhuma loja estoca) → nada a distribuir.
+    if (lojasInput.every((l) => l.minimo <= 0)) continue;
 
     itens.push(
       montarDistribuicaoItem(
         {
-          produto: item.produto,
-          cor: item.cor,
-          codigoCor: item.codigoCor,
-          descricao: item.descricao,
-          codigo: item.codigo,
-          codigoBarra: item.codigoBarra,
-          subgrupo: item.subgrupo,
-          grade: item.grade,
-          matrizEstoque,
+          produto: agg.produto,
+          cor: agg.descCor || agg.cor,
+          codigoCor: agg.cor,
+          descricao: attr.DESC_PRODUTO,
+          codigo: agg.produto,
+          subgrupo: attr.SUBGRUPO,
+          grade: attr.GRADE,
+          material: material.label,
+          matrizEstoque: agg.matriz,
         },
         lojasInput
       )
@@ -261,5 +234,5 @@ export async function fetchDistribuicaoMatriz(company: CompanyKey): Promise<Dist
     return b.totalNecessidade - a.totalNecessidade;
   });
 
-  return { matrizLabel, filiaisDestino, filialLabels, itens };
+  return { matrizLabel: "MATRIZ", filiaisDestino: destinos.slice(), filialLabels, itens };
 }
