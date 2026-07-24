@@ -5,6 +5,7 @@ import type { CompanyKey } from "@/lib/config/company";
 import { useAuth } from "@/components/auth/AuthContext";
 
 import styles from "./AjusteEstoquePage.module.css";
+import ZerarItemPanel from "./ZerarItemPanel";
 
 interface FilialAjuste {
   cod: string;
@@ -99,6 +100,7 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
   const [carregandoFiliais, setCarregandoFiliais] = useState(true);
   const [filialCod, setFilialCod] = useState("");
   const [modo, setModo] = useState<Modo>("inventario");
+  const [view, setView] = useState<"contagem" | "zerarItem">("contagem");
   const [dataContagem, setDataContagem] = useState(hojeISO());
   const [nomeContagem, setNomeContagem] = useState("");
   const [nomeEditado, setNomeEditado] = useState(false);
@@ -349,29 +351,58 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
         <p className={styles.subtitle}>
           Ajuste registrado de estoque — {companyName}. Cria uma contagem nativa no Linx
           (aparece no extrato do produto, com descrição, responsável e histórico). Por
-          inventário (arquivo) ou zerando a filial.
+          inventário (arquivo), zerando a filial inteira ou zerando itens específicos em
+          todas as filiais.
         </p>
       </header>
 
-      {/* ── Configuração ── */}
-      <section className={styles.card}>
-        <div className={styles.modoTabs}>
-          <button
-            type="button"
-            className={`${styles.modoTab} ${modo === "inventario" ? styles.modoTabAtivo : ""}`}
-            onClick={() => setModo("inventario")}
-          >
-            📋 Inventário (arquivo)
-          </button>
-          <button
-            type="button"
-            className={`${styles.modoTab} ${modo === "zerar" ? styles.modoTabAtivo : ""}`}
-            onClick={() => setModo("zerar")}
-          >
-            🧹 Zerar filial
-          </button>
-        </div>
+      {/* ── Abas ── */}
+      <div className={styles.modoTabs}>
+        <button
+          type="button"
+          className={`${styles.modoTab} ${
+            view === "contagem" && modo === "inventario" ? styles.modoTabAtivo : ""
+          }`}
+          onClick={() => {
+            setView("contagem");
+            setModo("inventario");
+          }}
+        >
+          📋 Inventário (arquivo)
+        </button>
+        <button
+          type="button"
+          className={`${styles.modoTab} ${
+            view === "contagem" && modo === "zerar" ? styles.modoTabAtivo : ""
+          }`}
+          onClick={() => {
+            setView("contagem");
+            setModo("zerar");
+          }}
+        >
+          🧹 Zerar filial
+        </button>
+        <button
+          type="button"
+          className={`${styles.modoTab} ${view === "zerarItem" ? styles.modoTabAtivo : ""}`}
+          onClick={() => {
+            setView("zerarItem");
+            setPreview(null);
+            setResultado(null);
+            setErro(null);
+          }}
+        >
+          🎯 Zerar item
+        </button>
+      </div>
 
+      {view === "zerarItem" && (
+        <ZerarItemPanel companyKey={companyKey} username={username} onExecuted={fetchRecentes} />
+      )}
+
+      {/* ── Configuração ── */}
+      {view === "contagem" && (
+      <section className={styles.card}>
         <div className={styles.grid}>
           <label className={styles.field}>
             <span className={styles.label}>Filial</span>
@@ -497,6 +528,7 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
           {erro && <span className={styles.erro}>{erro}</span>}
         </div>
       </section>
+      )}
 
       {/* ── Resultado da execução ── */}
       {resultado && (

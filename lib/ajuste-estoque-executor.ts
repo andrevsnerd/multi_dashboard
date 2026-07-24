@@ -139,6 +139,28 @@ async function nomeJaExiste(pool: PoolLike, nome: string): Promise<boolean> {
 }
 
 /**
+ * Gera um NOME_CONTAGEM livre (≤25 chars) a partir de uma base, sufixando com um
+ * número quando a base já existir. Usado quando uma operação cria várias contagens
+ * (ex.: Zerar Item em N filiais) e cada uma precisa de uma PK única.
+ */
+export async function encontrarNomeContagemLivre(pool: PoolLike, base: string): Promise<string> {
+  const limpa = (base || '')
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^A-Z0-9]/g, '')
+    .slice(0, NOME_MAX);
+  const inicial = limpa || 'ZERITEM';
+  if (!(await nomeJaExiste(pool, inicial))) return inicial;
+  for (let i = 2; i <= 999; i++) {
+    const sufixo = String(i);
+    const cand = inicial.slice(0, NOME_MAX - sufixo.length) + sufixo;
+    if (!(await nomeJaExiste(pool, cand))) return cand;
+  }
+  throw new Error('Não foi possível gerar uma descrição única de contagem.');
+}
+
+/**
  * Insere a contagem (header + itens com deltas já calculados). A trigger
  * LXI_ESTOQUE_PROD_CTG_AJUSTE aplica o estoque a cada INSERT (soma A1..A48 →
  * ESTOQUE/ESx). QTDE_AJUSTE guarda o delta; A{slot} dirige o movimento.

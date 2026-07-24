@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { query } from '@/lib/db/connection';
-import { getFilialById } from '@/lib/config/filial-registry';
+import { getFilialById, normalizeFilialId } from '@/lib/config/filial-registry';
 import type { CompanyKey } from '@/lib/config/company';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -554,4 +554,209 @@ export async function calcularDiferencas(opts: {
   };
 
   return { linhas, totais, naoEncontrados, ambiguos, invalidas };
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+ *  ZERAR ITEM — zerar um ou mais itens (produto×cor) em todas as filiais
+ *  onde há estoque (ou numa filial específica). Cada filial vira uma contagem
+ *  nativa independente (mesmo mecanismo/trigger do resto da tela), então cada
+ *  ajuste aparece no extrato e pode ser desfeito individualmente.
+ * ════════════════════════════════════════════════════════════════════════ */
+
+/** true se a filial (por COD/nome) pertence à empresa e está operacional (não desativada). */
+function filialPertenceEmpresa(cod: string, nome: string, company: CompanyKey): boolean {
+  const def = getFilialById(cod);
+  // Filial desativada (modules vazio, ex.: IBIRAPUERA) fica fora — coerente com o app.
+  if (def && def.modules.length === 0) return false;
+  const empresa = def?.company ?? adivinharEmpresaPorNome(nome);
+  return empresa === company;
+}
+
+export interface ZerarItemFilial {
+  cod: string;
+  nome: string;
+  estoque: number;
+}
+
+export interface ZerarItemCandidato {
+  produto: string;
+  cor: string;
+  descProduto: string;
+  descCor: string;
+  codigoBarra: string | null;
+  /** Soma dos saldos positivos nas filiais da empresa (referência de exibição). */
+  estoquePositivo: number;
+  /** Filiais (da empresa) onde o item tem estoque ≠ 0. */
+  filiais: ZerarItemFilial[];
+}
+
+interface EstoqueItemRow {
+  PRODUTO: string;
+  COR: string;
+  ESTOQUE: number;
+  COD: string;
+  FILIAL: string;
+  DESC_PRODUTO: string;
+  DESC_COR: string;
+  CODIGO_BARRA: string | null;
+}
+
+const ESTOQUE_ITENS_SELECT = `
+  SELECT RTRIM(ep.PRODUTO) AS PRODUTO,
+         RTRIM(ISNULL(ep.COR_PRODUTO, '')) AS COR,
+         ep.ESTOQUE AS ESTOQUE,
+         RTRIM(ISNULL(f.COD_FILIAL, '')) AS COD,
+         RTRIM(ep.FILIAL) AS FILIAL,
+         RTRIM(ISNULL(p.DESC_PRODUTO, '')) AS DESC_PRODUTO,
+         RTRIM(ISNULL(cb.DESC_COR, '')) AS DESC_COR,
+         bc.CODIGO_BARRA AS CODIGO_BARRA
+  FROM ESTOQUE_PRODUTOS ep WITH (NOLOCK)
+  LEFT JOIN FILIAIS f WITH (NOLOCK) ON RTRIM(f.FILIAL) = RTRIM(ep.FILIAL)
+  LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = ep.PRODUTO
+  LEFT JOIN (
+    SELECT PRODUTO, COR_PRODUTO, MAX(DESC_COR_PRODUTO) AS DESC_COR
+    FROM PRODUTO_CORES WITH (NOLOCK)
+    GROUP BY PRODUTO, COR_PRODUTO
+  ) cb ON RTRIM(LTRIM(cb.PRODUTO)) = RTRIM(LTRIM(ep.PRODUTO))
+     AND (RTRIM(LTRIM(CAST(cb.COR_PRODUTO AS VARCHAR(20)))) = RTRIM(LTRIM(CAST(ep.COR_PRODUTO AS VARCHAR(20)))) OR TRY_CONVERT(INT, cb.COR_PRODUTO) = TRY_CONVERT(INT, ep.COR_PRODUTO))
+  OUTER APPLY (
+    SELECT MIN(RTRIM(pb.CODIGO_BARRA)) AS CODIGO_BARRA
+    FROM PRODUTOS_BARRA pb WITH (NOLOCK)
+    WHERE pb.PRODUTO = ep.PRODUTO
+      AND RTRIM(ISNULL(pb.COR_PRODUTO, '')) = RTRIM(ISNULL(ep.COR_PRODUTO, ''))
+  ) bc`;
+
+/**
+ * Busca itens (produto×cor) pelo termo (código do produto, descrição ou código de
+ * barra) e devolve, para cada um, as filiais da empresa onde há estoque ≠ 0.
+ */
+export async function buscarItensParaZerar(
+  company: CompanyKey,
+  termo: string,
+  limite = 400
+): Promise<ZerarItemCandidato[]> {
+  const t = (termo ?? '').trim();
+  if (t.length < 2) return [];
+  const tEsc = esc(t);
+  const tUpper = esc(t.toUpperCase());
+  const soDigitos = t.replace(/\D/g, '');
+
+  // 1) Resolver os produtos que casam com o termo.
+  const produtoRows = await query<{ PRODUTO: string }>(`
+    SELECT DISTINCT PRODUTO FROM (
+      SELECT RTRIM(p.PRODUTO) AS PRODUTO
+      FROM PRODUTOS p WITH (NOLOCK)
+      WHERE RTRIM(p.PRODUTO) = '${tEsc}'
+         OR RTRIM(p.PRODUTO) LIKE '${tEsc}%'
+         OR UPPER(p.DESC_PRODUTO) LIKE '%${tUpper}%'
+      ${
+        soDigitos.length >= 4
+          ? `UNION
+      SELECT RTRIM(pb.PRODUTO) AS PRODUTO
+      FROM PRODUTOS_BARRA pb WITH (NOLOCK)
+      WHERE LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100)))) = '${tEsc}'
+         OR TRY_CONVERT(BIGINT, LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100))))) = TRY_CONVERT(BIGINT, '${esc(soDigitos)}')`
+          : ''
+      }
+    ) x
+  `);
+  const produtos = [...new Set(produtoRows.map((r) => r.PRODUTO?.trim()).filter(Boolean) as string[])].slice(0, 150);
+  if (produtos.length === 0) return [];
+
+  // 2) Estoque por filial/cor para esses produtos (só saldos ≠ 0).
+  const porItem = new Map<string, ZerarItemCandidato>();
+  for (let i = 0; i < produtos.length; i += 400) {
+    const chunk = produtos.slice(i, i + 400);
+    const inList = chunk.map((p) => `'${esc(p)}'`).join(',');
+    const rows = await query<EstoqueItemRow>(`
+      ${ESTOQUE_ITENS_SELECT}
+      WHERE ep.PRODUTO IN (${inList}) AND ep.ESTOQUE <> 0
+      ORDER BY ep.PRODUTO, ep.COR_PRODUTO
+    `);
+    for (const r of rows) {
+      const produto = r.PRODUTO?.trim() ?? '';
+      const cor = r.COR?.trim() ?? '';
+      const cod = r.COD?.trim() ?? '';
+      const filialNome = r.FILIAL?.trim() ?? '';
+      if (!filialPertenceEmpresa(cod, filialNome, company)) continue;
+      const key = `${produto}|${cor}`;
+      let item = porItem.get(key);
+      if (!item) {
+        item = {
+          produto,
+          cor,
+          descProduto: r.DESC_PRODUTO?.trim() ?? '',
+          descCor: r.DESC_COR?.trim() ?? '',
+          codigoBarra: r.CODIGO_BARRA?.toString().trim() ?? null,
+          estoquePositivo: 0,
+          filiais: [],
+        };
+        porItem.set(key, item);
+      }
+      const estoque = Number(r.ESTOQUE) || 0;
+      item.filiais.push({ cod, nome: filialNome, estoque });
+      if (estoque > 0) item.estoquePositivo += estoque;
+    }
+  }
+
+  const candidatos = [...porItem.values()].filter((c) => c.filiais.length > 0);
+  for (const c of candidatos) c.filiais.sort((a, b) => a.nome.localeCompare(b.nome));
+  candidatos.sort((a, b) =>
+    a.produto === b.produto ? a.cor.localeCompare(b.cor) : a.produto.localeCompare(b.produto)
+  );
+  return candidatos.slice(0, limite);
+}
+
+export interface FilialItensZerar {
+  cod: string;
+  nome: string;
+  itens: Array<{ produto: string; cor: string; estoque: number }>;
+}
+
+/**
+ * Saldo ATUAL (≠ 0) dos itens selecionados por filial (da empresa). Se `filialCod`
+ * for informado, restringe àquela filial. É a fonte autoritativa para a execução.
+ */
+export async function estoqueDeItensPorFilial(
+  itens: Array<{ produto: string; cor: string }>,
+  company: CompanyKey,
+  filialCod?: string | null
+): Promise<FilialItensZerar[]> {
+  if (!itens || itens.length === 0) return [];
+  const produtos = [...new Set(itens.map((i) => (i.produto ?? '').trim()).filter(Boolean))];
+  if (produtos.length === 0) return [];
+  const keySet = new Set(itens.map((i) => `${(i.produto ?? '').trim()}|${(i.cor ?? '').trim()}`));
+  const alvoNorm = filialCod ? normalizeFilialId(filialCod) : null;
+
+  const porFilial = new Map<string, FilialItensZerar>();
+  for (let i = 0; i < produtos.length; i += 400) {
+    const chunk = produtos.slice(i, i + 400);
+    const inList = chunk.map((p) => `'${esc(p)}'`).join(',');
+    const rows = await query<{ PRODUTO: string; COR: string; ESTOQUE: number; COD: string; FILIAL: string }>(`
+      SELECT RTRIM(ep.PRODUTO) AS PRODUTO,
+             RTRIM(ISNULL(ep.COR_PRODUTO, '')) AS COR,
+             ep.ESTOQUE AS ESTOQUE,
+             RTRIM(ISNULL(f.COD_FILIAL, '')) AS COD,
+             RTRIM(ep.FILIAL) AS FILIAL
+      FROM ESTOQUE_PRODUTOS ep WITH (NOLOCK)
+      LEFT JOIN FILIAIS f WITH (NOLOCK) ON RTRIM(f.FILIAL) = RTRIM(ep.FILIAL)
+      WHERE ep.PRODUTO IN (${inList}) AND ep.ESTOQUE <> 0
+    `);
+    for (const r of rows) {
+      const produto = r.PRODUTO?.trim() ?? '';
+      const cor = r.COR?.trim() ?? '';
+      if (!keySet.has(`${produto}|${cor}`)) continue;
+      const cod = r.COD?.trim() ?? '';
+      const filialNome = r.FILIAL?.trim() ?? '';
+      if (alvoNorm && normalizeFilialId(cod) !== alvoNorm) continue;
+      if (!filialPertenceEmpresa(cod, filialNome, company)) continue;
+      let f = porFilial.get(filialNome);
+      if (!f) {
+        f = { cod, nome: filialNome, itens: [] };
+        porFilial.set(filialNome, f);
+      }
+      f.itens.push({ produto, cor, estoque: Number(r.ESTOQUE) || 0 });
+    }
+  }
+  return [...porFilial.values()];
 }
