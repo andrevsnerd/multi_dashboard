@@ -1370,9 +1370,9 @@
     "semantic_hash": "b9f7b7fcdefff148bdd07d9a15eb20fa"
   },
   "components/filters/DateRangeFilter.tsx": {
-    "mtime": 1781270654.3903089,
-    "ast_hash": "86762273645bea0cfa7cfac408c23314",
-    "semantic_hash": "86762273645bea0cfa7cfac408c23314"
+    "mtime": 1785161426.0031328,
+    "ast_hash": "56710a192215b513a95ba80c3876d0ba",
+    "semantic_hash": ""
   },
   "components/filters/FilialFilter.tsx": {
     "mtime": 1780073682.6960843,
@@ -1530,8 +1530,8 @@
     "semantic_hash": "3a1ac7d9dac7349b3338e8b433eb5031"
   },
   "components/performance/CurvaAbcPage.tsx": {
-    "mtime": 1784831201.265951,
-    "ast_hash": "e8acc179573517c88782fab0b1b15bbe",
+    "mtime": 1785165950.102261,
+    "ast_hash": "1addfa09b228f89c667d40ba52d2a318",
     "semantic_hash": ""
   },
   "components/performance/CurvaPorProdutoPage.tsx": {
@@ -1560,9 +1560,9 @@
     "semantic_hash": "9cdf84835c0aea6502a496a59c222273"
   },
   "components/products-new/ProductsNewPage.tsx": {
-    "mtime": 1780073682.7336936,
-    "ast_hash": "c5ba620decf1e42e8739a6367f885096",
-    "semantic_hash": "c5ba620decf1e42e8739a6367f885096"
+    "mtime": 1785179133.5079215,
+    "ast_hash": "48cd9b7fa252eb310022903b39f4abff",
+    "semantic_hash": ""
   },
   "components/products/ProductDetailKPIs.tsx": {
     "mtime": 1785149069.355022,
@@ -2565,8 +2565,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/produtosNovos.ts": {
-    "mtime": 1783520719.204431,
-    "ast_hash": "5c60f2c34904e470b0b1098b10066b58",
+    "mtime": 1785179104.4815183,
+    "ast_hash": "2e0270e95ad56c84e8fc0824ad0b574d",
     "semantic_hash": ""
   },
   "lib/repositories/projecaoEstoqueHistorico.ts": {

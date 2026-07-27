@@ -1290,9 +1290,9 @@
     "semantic_hash": "6de25c24105504e4a95fc8b791443d45"
   },
   "components/clientes/ClientesTable.tsx": {
-    "mtime": 1780919191.493253,
-    "ast_hash": "449272410cd0760b8617315cfa867c54",
-    "semantic_hash": "449272410cd0760b8617315cfa867c54"
+    "mtime": 1785152512.735628,
+    "ast_hash": "0c394f94cd27ca83360f1dde218c5d49",
+    "semantic_hash": ""
   },
   "components/controle-transferencias/ConfirmarTransferenciaModal.tsx": {
     "mtime": 1770317637.3565967,
@@ -1360,8 +1360,8 @@
     "semantic_hash": "1f13894059c7c73365fb5303040f3f5a"
   },
   "components/extrato-produto/ExtratoProdutoPage.tsx": {
-    "mtime": 1784816464.1765952,
-    "ast_hash": "537fef660923cfb03f83979e72a2f032",
+    "mtime": 1785149001.118961,
+    "ast_hash": "030a6e4e7874760728c31c093be62182",
     "semantic_hash": ""
   },
   "components/faturamento/FaturamentoPage.tsx": {
@@ -1565,8 +1565,8 @@
     "semantic_hash": "c5ba620decf1e42e8739a6367f885096"
   },
   "components/products/ProductDetailKPIs.tsx": {
-    "mtime": 1784817692.6756873,
-    "ast_hash": "eacd6117d4c322156dbb971bf034aa63",
+    "mtime": 1785149069.355022,
+    "ast_hash": "c026b931bf14498d63c85d00779a245a",
     "semantic_hash": ""
   },
   "components/products/ProductDetailPage.tsx": {
@@ -2150,9 +2150,9 @@
     "semantic_hash": "cbe3b7e3830bcd95b2c1ac6967755860"
   },
   "lib/clientes/cliente-types.ts": {
-    "mtime": 1776094110.0772696,
-    "ast_hash": "2309b461708f7a628a5c632149d58731",
-    "semantic_hash": "2309b461708f7a628a5c632149d58731"
+    "mtime": 1785152465.7206726,
+    "ast_hash": "21aee007b75d9c57ccdac8ede148c671",
+    "semantic_hash": ""
   },
   "lib/clientes/sem-cadastro-chave.ts": {
     "mtime": 1776094109.2708328,
@@ -2445,9 +2445,9 @@
     "semantic_hash": "d66e91e487a17360afb5bf1e395d50d3"
   },
   "lib/repositories/clientes.ts": {
-    "mtime": 1783350329.32614,
-    "ast_hash": "8e055a77e96d584d0da1f9a2f75e2ba1",
-    "semantic_hash": "8e055a77e96d584d0da1f9a2f75e2ba1"
+    "mtime": 1785152482.6367211,
+    "ast_hash": "b6101545d95290da8cf73aab62dfeca4",
+    "semantic_hash": ""
   },
   "lib/repositories/colecao.ts": {
     "mtime": 1783086640.3944857,
@@ -2800,9 +2800,9 @@
     "semantic_hash": ""
   },
   "lib/utils/exportClientes.ts": {
-    "mtime": 1776098249.075949,
-    "ast_hash": "cdd870df7b70d536c9d528e8765a8380",
-    "semantic_hash": "cdd870df7b70d536c9d528e8765a8380"
+    "mtime": 1785152575.2484577,
+    "ast_hash": "f657a8e6b7709955a41618850c2f5401",
+    "semantic_hash": ""
   },
   "lib/utils/exportClientesFilialXlsx.ts": {
     "mtime": 1783355346.9212315,
@@ -3625,8 +3625,8 @@
     "semantic_hash": ""
   },
   "components/distribuicao-matriz/DistribuicaoMatrizPage.tsx": {
-    "mtime": 1784908400.1164963,
-    "ast_hash": "191b28f4d538762389141d819450fda6",
+    "mtime": 1784908968.1717112,
+    "ast_hash": "f1ac470aa12b08b42560c3edaa8dd840",
     "semantic_hash": ""
   },
   "lib/utils/distribuicao-matriz.ts": {
@@ -3792,6 +3792,11 @@
   "lib/config/distribuicao-minimos.ts": {
     "mtime": 1784906357.0403469,
     "ast_hash": "290827211676f5e69999440cc5ef6096",
+    "semantic_hash": ""
+  },
+  "lib/utils/exportDistribuicaoMatriz.ts": {
+    "mtime": 1784910040.354352,
+    "ast_hash": "9ea366314a208985487eef67594bafe0",
     "semantic_hash": ""
   }
 }
