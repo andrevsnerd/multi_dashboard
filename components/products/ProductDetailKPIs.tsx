@@ -882,8 +882,8 @@ export default function ProductDetailKPIs({
                           borderRadius: "8px",
                           padding: "12px 14px",
                           fontSize: "12px",
-                          minWidth: 440,
-                          maxWidth: 620,
+                          minWidth: "min(440px, calc(100vw - 32px))",
+                          maxWidth: "min(620px, calc(100vw - 24px))",
                           width: "max-content",
                           boxShadow: isDark ? "0 12px 32px rgba(0,0,0,0.55)" : "0 8px 24px rgba(15,23,42,0.12)",
                         }}
@@ -1193,8 +1193,8 @@ export default function ProductDetailKPIs({
                             borderRadius: "8px",
                             padding: "12px 14px",
                             fontSize: "12px",
-                            minWidth: 320,
-                            maxWidth: 480,
+                            minWidth: "min(320px, calc(100vw - 32px))",
+                            maxWidth: "min(480px, calc(100vw - 24px))",
                             boxShadow: isDark ? "0 12px 32px rgba(0,0,0,0.55)" : "0 8px 24px rgba(15,23,42,0.12)",
                           }}
                         >

@@ -370,4 +370,46 @@
   border-top-color: #9db8ff;
 }
 
+/* ─────────────────────────────────────────────────────────────
+ * MOBILE (≤768px) — o módulo não tinha nenhum breakpoint.
+ * As colunas de métricas (min-width:200px) espremiam o nome do
+ * produto/filial. No celular deixamos as métricas encolherem para
+ * o conteúdo e reduzimos padding/fontes p/ um cartão agradável.
+ * ───────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .grid {
+    gap: 16px;
+  }
+  .card {
+    padding: 16px;
+    border-radius: 16px;
+    gap: 12px;
+  }
+  .listItem {
+    gap: 10px;
+  }
+  .itemName {
+    font-size: 14px;
+  }
+  .listHeaderRight {
+    min-width: 0;
+    gap: 8px;
+  }
+  /* deixa a coluna do nome respirar: métricas encolhem ao conteúdo */
+  .itemMetrics {
+    min-width: 0;
+    gap: 2px;
+  }
+  .metricRow {
+    gap: 8px;
+  }
+  .metricValue {
+    font-size: 14px;
+  }
+  .stockBadge {
+    width: 40px;
+    padding: 6px 8px;
+  }
+}
+
 

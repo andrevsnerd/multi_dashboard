@@ -2885,3 +2885,59 @@
   background: rgba(45, 212, 191, 0.18);
   color: #5eead4;
 }
+
+/* ─────────────────────────────────────────────────────────────
+ * MOBILE (≤768px) — só afeta telas pequenas; desktop intacto.
+ * Regras mobile-only (o módulo não tinha breakpoints <768), então
+ * não há conflito de cascata com o layout desktop existente.
+ * ───────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .wrapper {
+    padding: 12px;
+  }
+
+  /* Cabeçalho: título e ações empilham e as ações podem quebrar linha */
+  .header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 14px 16px;
+  }
+  .headerRight {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+  .title {
+    font-size: 19px;
+  }
+
+  /* KPIs: 4 colunas fixas → 2 no celular, com valores/padding menores */
+  .kpiCardsRow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .kpiCard {
+    padding: 12px 14px;
+  }
+  .kpiValue {
+    font-size: 20px;
+  }
+  .abcAlertsRow {
+    grid-template-columns: 1fr;
+  }
+
+  /* Tabela ABC (até 11 colunas): rola na horizontal em vez de estourar
+     a largura da página. Escopado ao mobile p/ não quebrar o cabeçalho
+     sticky (position:sticky) do desktop, que exige overflow visível. */
+  .tableCard {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .table {
+    min-width: 860px;
+  }
+  /* O clone fixo do cabeçalho não acompanha o scroll horizontal → esconde no mobile */
+  .stickyTableHeader {
+    display: none !important;
+  }
+}

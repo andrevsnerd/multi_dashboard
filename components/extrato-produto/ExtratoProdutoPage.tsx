@@ -232,6 +232,17 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
   const filialInputRef = useRef<HTMLInputElement>(null);
   const filialDropdownRef = useRef<HTMLDivElement>(null);
 
+  // ── Responsivo ── esta página usa estilos inline (sem CSS module), então o
+  // "mobile" é detectado por JS. ≤768px ativa o layout compacto de celular.
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 768px)");
+    const apply = () => setIsMobile(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+
   // ── Lista de produtos por filial ───────────────────────────────────────────
   const [listaPage, setListaPage] = useState(1);
   const [listaLoading, setListaLoading] = useState(false);
@@ -495,11 +506,19 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
     };
   });
 
-  const inputStyle = makeInputStyle(t);
+  const inputStyle = makeInputStyle(t, isMobile);
   const th = makeTh(t);
+  const labelStyle: React.CSSProperties = {
+    display: "flex",
+    flexDirection: "column",
+    gap: 4,
+    fontSize: 12,
+    color: t.subMuted,
+    ...(isMobile ? { width: "100%" } : {}),
+  };
 
   return (
-    <main style={{ padding: "24px 32px", fontFamily: "var(--font-mono, monospace)", minHeight: "100vh", background: t.pageBg, color: t.text }}>
+    <main style={{ padding: isMobile ? "16px 12px" : "24px 32px", fontFamily: "var(--font-mono, monospace)", minHeight: "100vh", background: t.pageBg, color: t.text }}>
       {/* ── Cabeçalho ── */}
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ margin: "8px 0 4px", fontSize: 22, color: t.heading }}>
@@ -513,7 +532,7 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
 
       {/* ── Formulário ── */}
       <form onSubmit={buscar} style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24, alignItems: "flex-end" }}>
-        <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: t.subMuted }}>
+        <label style={labelStyle}>
           Produto ou código de barras *
           <input
             type="text"
@@ -527,13 +546,13 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
             style={inputStyle}
           />
         </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: t.subMuted }}>
+        <label style={labelStyle}>
           Cor *
           {coresDisponiveis.length > 0 ? (
             <select
               value={cor}
               onChange={(e) => setCor(e.target.value)}
-              style={{ ...inputStyle, width: 220 }}
+              style={{ ...inputStyle, width: isMobile ? "100%" : 220 }}
             >
               <option value="">Selecione</option>
               {coresDisponiveis.map((item) => (
@@ -548,13 +567,13 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
               value={cor}
               onChange={(e) => setCor(e.target.value)}
               placeholder="Ex: 03"
-              style={{ ...inputStyle, width: 80 }}
+              style={{ ...inputStyle, width: isMobile ? "100%" : 80 }}
             />
           )}
         </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: t.subMuted }}>
+        <label style={labelStyle}>
           Filial
-          <div style={{ position: "relative" }}>
+          <div style={{ position: "relative", ...(isMobile ? { width: "100%" } : {}) }}>
             <input
               ref={filialInputRef}
               type="text"
@@ -638,6 +657,7 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
             fontSize: 13,
             fontWeight: 600,
             height: 38,
+            ...(isMobile ? { width: "100%" } : {}),
           }}
         >
           {loading ? "Buscando..." : "Buscar"}
@@ -668,7 +688,7 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
             </div>
           )}
 
-          <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 10, color: t.subMuted, fontSize: 12 }}>
+          <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", marginBottom: 10, color: t.subMuted, fontSize: 12 }}>
             <span>
               {listaDados.total} produto(s) com movimento em <strong style={{ color: t.text }}>{listaDados.filial}</strong> · página {listaDados.page}
             </span>
@@ -836,7 +856,7 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
           </div>
 
           {/* Filtros extras */}
-          <div style={{ display: "flex", gap: 16, marginBottom: 14, alignItems: "center", fontSize: 12, color: t.subMuted }}>
+          <div style={{ display: "flex", gap: 16, marginBottom: 14, alignItems: "center", flexWrap: "wrap", fontSize: 12, color: t.subMuted }}>
             <label style={{ display: "flex", gap: 6, cursor: "pointer" }}>
               <input
                 type="checkbox"
@@ -863,7 +883,7 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
             ref={tableRef}
             style={{ overflowX: "auto", borderRadius: 8, border: `1px solid ${t.border}` }}
           >
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+            <table style={{ width: "100%", minWidth: 760, borderCollapse: "collapse", fontSize: 12 }}>
               <thead>
                 <tr style={{ background: t.tableHeaderBg, color: t.tableHeaderText }}>
                   <th style={th}>Data</th>
@@ -954,7 +974,7 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
           {/* Legenda */}
           <div style={{ marginTop: 20, padding: 16, background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 8, fontSize: 12, color: t.muted }}>
             <p style={{ margin: "0 0 8px", color: t.subMuted, fontWeight: 600 }}>Legenda</p>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 8 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(300px, 1fr))", gap: 8 }}>
               <div>
                 <strong style={{ color: t.heading }}>QTDE</strong> — campo total declarado no romaneio
               </div>
@@ -1014,7 +1034,7 @@ function InfoCard({ label, value, highlight, t }: { label: string; value: string
 
 // ── Estilos inline ──────────────────────────────────────────────────────────
 
-function makeInputStyle(t: Palette): React.CSSProperties {
+function makeInputStyle(t: Palette, isMobile = false): React.CSSProperties {
   return {
     padding: "8px 10px",
     background: t.inputBg,
@@ -1022,7 +1042,7 @@ function makeInputStyle(t: Palette): React.CSSProperties {
     borderRadius: 6,
     color: t.inputText,
     fontSize: 13,
-    width: 180,
+    width: isMobile ? "100%" : 180,
     outline: "none",
   };
 }

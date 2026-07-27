@@ -335,6 +335,28 @@
   opacity: 0.5;
 }
 
+/* ── MOBILE (≤768px) ── as linhas de pills/abas/rodapé não tinham quebra;
+   no celular passam a quebrar para não estourar a largura do cartão. */
+@media (max-width: 768px) {
+  .wrapper {
+    padding: 16px 14px;
+  }
+  .title {
+    font-size: 22px;
+  }
+  .tabs {
+    flex-wrap: wrap;
+  }
+  .cardHeader {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .cardFooter {
+    flex-wrap: wrap;
+    gap: 6px 12px;
+  }
+}
+
 /* ── TEMA NOTURNO ── overrides escopados; tema claro intacto ── */
 
 :global(:root[data-theme="dark"]) .searchInput::placeholder {

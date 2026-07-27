@@ -379,7 +379,8 @@
 }
 
 .tableWrap {
-  overflow-x: hidden;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   border: 1px solid #dfe4ea;
   border-radius: 14px;
   background: var(--s-white);
@@ -645,8 +646,17 @@
     grid-template-columns: 1fr;
   }
 
+  /* No mobile a tabela pivô (1 coluna por filial) rola na horizontal em vez
+     de espremer as colunas até ficarem ilegíveis. table-layout: auto +
+     min-width dá largura mínima legível e ativa o scroll do .tableWrap. */
+  .table {
+    table-layout: auto;
+    min-width: 620px;
+  }
+
   .itemColumn {
-    width: 40%;
+    width: auto;
+    min-width: 150px;
   }
 
   .itemName {
