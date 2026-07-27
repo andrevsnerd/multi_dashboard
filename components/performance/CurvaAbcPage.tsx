@@ -2671,8 +2671,38 @@ const handleBadgeClick = (cat: string) => {
           }
         }
       }
-      const universo = calcularCurvas(Array.from(universoMap.values()));
-      if (universo.length === 0) return;
+      // Espelha os filtros estruturais da tela (grupo/subgrupo/grade/coleção/fornecedor) no
+      // universo do export. Antes o export reconstruía o universo do zero e só reaplicava
+      // ELETRONICOS + comprar-agora, IGNORANDO o filtro de fornecedor (e os demais) — então
+      // escolher "fornecedor centro" na tela não surtia efeito no arquivo (vinha item externo).
+      // Mesma lógica de `produtosFiltrados` para o arquivo bater com o que está filtrado na tela.
+      let universoItens = Array.from(universoMap.values());
+      if (companyKey === "nerd" && selectedGrupos.length > 0) {
+        universoItens = universoItens.filter((p) => selectedGrupos.includes((p.categoria ?? "").trim()));
+      }
+      if (selectedSubgrupos.length > 0) {
+        universoItens = universoItens.filter((p) => selectedSubgrupos.includes((p.subgrupo ?? "").trim()));
+      }
+      if (selectedGrades.length > 0) {
+        universoItens = universoItens.filter((p) => selectedGrades.includes((p.grade ?? "").trim()));
+      }
+      if (companyKey !== "nerd" && selectedColecoes.length > 0) {
+        universoItens = universoItens.filter((p) => selectedColecoes.includes((p.colecao ?? "").trim()));
+      }
+      if (companyKey === "nerd" && fornecedorFiltro && fornecedoresOpts.length > 0) {
+        universoItens = universoItens.filter((p) =>
+          productMatchesFornecedor(fornecedoresOpts, fornecedorFiltro, {
+            produto: p.produto,
+            cor: p.cor,
+            descricao: p.descricao,
+          })
+        );
+      }
+      const universo = calcularCurvas(universoItens);
+      if (universo.length === 0) {
+        alert("Nenhum item no universo após os filtros da tela (fornecedor/grupo/etc.).");
+        return;
+      }
 
       // Espelha o filtro da tela: só "Comprar agora" (o checkbox "Sugeridos" foi removido).
       const gating: "none" | "sugeridos" | "comprar-agora" = filtrarComprarAgora
@@ -2716,10 +2746,25 @@ const handleBadgeClick = (cat: string) => {
         gating === "comprar-agora"
           ? " · só comprar agora/essa semana"
           : "";
+      const fornecedorNome =
+        companyKey === "nerd" && fornecedorFiltro
+          ? (fornecedoresOpts.find((f) => f.id === fornecedorFiltro)?.nome ?? null)
+          : null;
+      const estruturaisLabel = [
+        companyKey === "nerd" && selectedGrupos.length > 0 ? `grupos: ${selectedGrupos.join(", ")}` : null,
+        selectedSubgrupos.length > 0 ? `subgrupos: ${selectedSubgrupos.join(", ")}` : null,
+        selectedGrades.length > 0 ? `grades: ${selectedGrades.join(", ")}` : null,
+        companyKey !== "nerd" && selectedColecoes.length > 0 ? `coleções: ${selectedColecoes.join(", ")}` : null,
+      ]
+        .filter(Boolean)
+        .map((s) => ` · ${s}`)
+        .join("");
       const filtroAplicado =
         `Todas as lojas · união das curvas ABC por loja` +
         (porCor ? " · por cor" : "") +
         (companyKey === "nerd" && filtrarEletronicos ? " · só ELETRONICOS" : "") +
+        (fornecedorNome ? ` · fornecedor: ${fornecedorNome}` : "") +
+        estruturaisLabel +
         gatingLabel;
 
       // Mesmo visual + fórmulas dinâmicas do Gerador de Relatórios: identidade → custo unit.

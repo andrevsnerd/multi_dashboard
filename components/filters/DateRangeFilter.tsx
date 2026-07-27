@@ -208,6 +208,17 @@ export default function DateRangeFilter({
         },
       },
       {
+        label: "45 dias",
+        resolve: () => {
+          const endDate = clampDate(new Date());
+          let startDate = clampStartToAvailable(subDays(endDate, 44));
+          if (startDate.getTime() > endDate.getTime()) {
+            startDate = new Date(endDate.getTime());
+          }
+          return { startDate, endDate };
+        },
+      },
+      {
         label: "60 dias",
         resolve: () => {
           const endDate = clampDate(new Date());
