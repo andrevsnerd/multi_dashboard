@@ -5,6 +5,10 @@ export interface ClienteRankingItem {
   totalGasto: number;
   tickets: number;
   cpf?: string;
+  /** Contato do cadastro (CLIENTES_VAREJO), casado por nome; vazio para "SEM CADASTRO". */
+  telefone?: string;
+  endereco?: string;
+  cidade?: string;
 }
 
 export interface ClienteDetalheInfo {

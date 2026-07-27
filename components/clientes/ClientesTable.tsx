@@ -131,6 +131,50 @@ export default function ClientesTable({
               </th>
               <th
                 className={`${styles.sortable} ${styles.textHeader}`}
+                onClick={() => handleSort("cpf")}
+              >
+                CPF
+                {sortColumn === "cpf" && (
+                  <span className={styles.sortIndicator}>
+                    {sortDirection === "asc" ? "↑" : "↓"}
+                  </span>
+                )}
+              </th>
+              <th
+                className={`${styles.sortable} ${styles.textHeader}`}
+                onClick={() => handleSort("telefone")}
+              >
+                TELEFONE
+                {sortColumn === "telefone" && (
+                  <span className={styles.sortIndicator}>
+                    {sortDirection === "asc" ? "↑" : "↓"}
+                  </span>
+                )}
+              </th>
+              <th
+                className={`${styles.sortable} ${styles.textHeader}`}
+                onClick={() => handleSort("endereco")}
+              >
+                ENDEREÇO
+                {sortColumn === "endereco" && (
+                  <span className={styles.sortIndicator}>
+                    {sortDirection === "asc" ? "↑" : "↓"}
+                  </span>
+                )}
+              </th>
+              <th
+                className={`${styles.sortable} ${styles.textHeader}`}
+                onClick={() => handleSort("cidade")}
+              >
+                CIDADE
+                {sortColumn === "cidade" && (
+                  <span className={styles.sortIndicator}>
+                    {sortDirection === "asc" ? "↑" : "↓"}
+                  </span>
+                )}
+              </th>
+              <th
+                className={`${styles.sortable} ${styles.textHeader}`}
                 onClick={() => handleSort("tickets")}
               >
                 TICKETS
@@ -169,6 +213,10 @@ export default function ClientesTable({
               >
                 <td className={styles.dateCell}>#{index + 1}</td>
                 <td className={styles.textCell}>{cliente.nomeCliente}</td>
+                <td className={styles.textCell}>{cliente.cpf || "—"}</td>
+                <td className={styles.textCell}>{cliente.telefone || "—"}</td>
+                <td className={styles.textCell}>{cliente.endereco || "—"}</td>
+                <td className={styles.textCell}>{cliente.cidade || "—"}</td>
                 <td className={styles.textCell}>{formatNumber(cliente.tickets)}</td>
                 <td className={styles.textCell}>{formatCurrency(cliente.totalGasto)}</td>
               </tr>
@@ -200,6 +248,30 @@ export default function ClientesTable({
                 <div className={styles.cardDate}>Tickets: {formatNumber(cliente.tickets)}</div>
               </div>
               <div className={styles.cardContent}>
+                {cliente.cpf && (
+                  <div className={styles.cardRow}>
+                    <span className={styles.cardLabel}>CPF:</span>
+                    <span className={styles.cardValue}>{cliente.cpf}</span>
+                  </div>
+                )}
+                {cliente.telefone && (
+                  <div className={styles.cardRow}>
+                    <span className={styles.cardLabel}>Telefone:</span>
+                    <span className={styles.cardValue}>{cliente.telefone}</span>
+                  </div>
+                )}
+                {cliente.endereco && (
+                  <div className={styles.cardRow}>
+                    <span className={styles.cardLabel}>Endereço:</span>
+                    <span className={styles.cardValue}>{cliente.endereco}</span>
+                  </div>
+                )}
+                {cliente.cidade && (
+                  <div className={styles.cardRow}>
+                    <span className={styles.cardLabel}>Cidade:</span>
+                    <span className={styles.cardValue}>{cliente.cidade}</span>
+                  </div>
+                )}
                 <div className={styles.cardRow}>
                   <span className={styles.cardLabel}>Total gasto:</span>
                   <span className={styles.cardValue}>{formatCurrency(cliente.totalGasto)}</span>

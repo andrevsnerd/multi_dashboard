@@ -1269,16 +1269,50 @@ export async function fetchClientesRankingCompras({
           ${filialFilter}
           ${vendedorFilter}
           ${searchFilter}
+      ),
+      cadastro_info AS (
+        SELECT nome, telefone, cpf, endereco, cidade
+        FROM (
+          SELECT
+            LTRIM(RTRIM(cv.CLIENTE_VAREJO)) AS nome,
+            CASE
+              WHEN cv.DDD IS NOT NULL AND LTRIM(RTRIM(ISNULL(cv.TELEFONE, ''))) <> ''
+              THEN LTRIM(RTRIM(cv.DDD)) + ' ' + LTRIM(RTRIM(cv.TELEFONE))
+              ELSE LTRIM(RTRIM(ISNULL(cv.TELEFONE, '')))
+            END AS telefone,
+            LTRIM(RTRIM(ISNULL(cv.CPF_CGC, ''))) AS cpf,
+            LTRIM(RTRIM(ISNULL(cv.ENDERECO, ''))) AS endereco,
+            LTRIM(RTRIM(ISNULL(cv.CIDADE, ''))) AS cidade,
+            ROW_NUMBER() OVER (
+              PARTITION BY LTRIM(RTRIM(cv.CLIENTE_VAREJO))
+              ORDER BY cv.CADASTRAMENTO DESC
+            ) AS rn
+          FROM CLIENTES_VAREJO cv WITH (NOLOCK)
+          WHERE LTRIM(RTRIM(ISNULL(cv.CLIENTE_VAREJO, ''))) <> ''
+        ) t
+        WHERE t.rn = 1
       )
       SELECT TOP (${limit})
-        nomeCliente,
-        chaveCliente,
-        COUNT(*) AS tickets,
-        SUM(totalTicket) AS totalGasto
-      FROM ticket_totals
-      WHERE totalTicket > 0
-      GROUP BY nomeCliente, chaveCliente
-      ORDER BY COUNT(*) DESC, SUM(totalTicket) DESC
+        agg.nomeCliente,
+        agg.chaveCliente,
+        agg.tickets,
+        agg.totalGasto,
+        ISNULL(ci.cpf, '') AS cpf,
+        ISNULL(ci.telefone, '') AS telefone,
+        ISNULL(ci.endereco, '') AS endereco,
+        ISNULL(ci.cidade, '') AS cidade
+      FROM (
+        SELECT
+          nomeCliente,
+          chaveCliente,
+          COUNT(*) AS tickets,
+          SUM(totalTicket) AS totalGasto
+        FROM ticket_totals
+        WHERE totalTicket > 0
+        GROUP BY nomeCliente, chaveCliente
+      ) agg
+      LEFT JOIN cadastro_info ci ON ci.nome = agg.nomeCliente
+      ORDER BY agg.tickets DESC, agg.totalGasto DESC
     `;
 
     const result = await request.query<{
@@ -1286,6 +1320,10 @@ export async function fetchClientesRankingCompras({
       chaveCliente: string;
       totalGasto: number;
       tickets: number;
+      cpf: string;
+      telefone: string;
+      endereco: string;
+      cidade: string;
     }>(query);
 
     return result.recordset.map((row) => ({
@@ -1293,7 +1331,10 @@ export async function fetchClientesRankingCompras({
       chaveCliente: (row.chaveCliente?.trim() || row.nomeCliente?.trim()) ?? "",
       totalGasto: row.totalGasto ?? 0,
       tickets: row.tickets ?? 0,
-      cpf: undefined,
+      cpf: row.cpf?.trim() || undefined,
+      telefone: row.telefone?.trim() || undefined,
+      endereco: row.endereco?.trim() || undefined,
+      cidade: row.cidade?.trim() || undefined,
     }));
   });
 }
