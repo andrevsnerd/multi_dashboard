@@ -211,22 +211,40 @@ export async function exportDistribuicaoMatrizPdf({
   doc.setFontSize(16);
   doc.setTextColor(30, 58, 95);
   doc.setFont("helvetica", "bold");
-  doc.text("Distribuição Matriz", margin, 12);
+  doc.text("Distribuição Matriz — o que enviar para cada loja", margin, 12);
   doc.setFontSize(9);
   doc.setTextColor(107, 114, 128);
   doc.setFont("helvetica", "normal");
-  doc.text(`Gerado em ${today()}  ·  ${items.length} item(ns)  ·  verde = unidades a enviar`, margin, 17);
+  doc.text(
+    `Gerado em ${today()}  ·  ${items.length.toLocaleString("pt-BR")} item(ns)  ·  células verdes = unidades a enviar (em branco = não enviar)`,
+    margin,
+    17
+  );
 
-  const head = [["Produto", "Código", "Cor", matrizLabel, ...filiais.map((f) => labels[f] ?? f), "Total"]];
-  const fixedCount = 4; // Produto, Código, Cor, Matriz
+  // Mesmas colunas do XLSX: código de barra (não o código do produto) + Subgrupo e Grade.
+  const head = [
+    [
+      "Produto",
+      "Código de barra",
+      "Cor",
+      "Subgrupo",
+      "Grade",
+      matrizLabel,
+      ...filiais.map((f) => labels[f] ?? f),
+      "Total a enviar",
+    ],
+  ];
+  const fixedCount = 6; // Produto, Código de barra, Cor, Subgrupo, Grade, Matriz
   const totalColIdx = fixedCount + filiais.length;
 
   const body = items.map((item) => {
     const by = new Map(item.lojas.map((l) => [l.filial, l]));
     return [
       nomeProduto(item),
-      item.codigo,
+      item.codigoBarra ?? "",
       item.cor,
+      item.subgrupo ?? "",
+      item.grade ?? "",
       String(item.matrizEstoque),
       ...filiais.map((f) => {
         const e = by.get(f)?.enviar ?? 0;
@@ -236,18 +254,38 @@ export async function exportDistribuicaoMatrizPdf({
     ];
   });
 
+  // Rodapé TOTAL — mesmo fechamento do XLSX (por loja + total geral).
+  const foot = [
+    [
+      "TOTAL",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ...filiais.map((f) =>
+        String(items.reduce((s, it) => s + (it.lojas.find((l) => l.filial === f)?.enviar ?? 0), 0))
+      ),
+      String(items.reduce((s, it) => s + it.totalEnviar, 0)),
+    ],
+  ];
+
   autoTable(doc, {
     head,
     body,
+    foot,
     startY: 21,
     margin: { left: margin, right: margin },
     styles: { fontSize: 6.5, cellPadding: 1.5, textColor: [31, 41, 55], lineColor: [226, 232, 240], lineWidth: 0.1 },
     headStyles: { fillColor: [30, 58, 95], textColor: [255, 255, 255], fontStyle: "bold", fontSize: 6.5, halign: "center" },
+    footStyles: { fillColor: [226, 232, 240], textColor: [30, 58, 95], fontStyle: "bold", fontSize: 6.5, halign: "center" },
     columnStyles: {
-      0: { cellWidth: 46, halign: "left", overflow: "ellipsize" },
-      1: { cellWidth: 20, halign: "left" },
-      2: { cellWidth: 22, halign: "left", overflow: "ellipsize" },
-      3: { cellWidth: 14, halign: "center", fontStyle: "bold" },
+      0: { cellWidth: 38, halign: "left", overflow: "ellipsize" },
+      1: { cellWidth: 19, halign: "left" },
+      2: { cellWidth: 19, halign: "left", overflow: "ellipsize" },
+      3: { cellWidth: 24, halign: "left", overflow: "ellipsize" },
+      4: { cellWidth: 12, halign: "left" },
+      5: { cellWidth: 12, halign: "center", fontStyle: "bold" },
       [totalColIdx]: { cellWidth: 14, halign: "center", fontStyle: "bold", textColor: GREEN_FONT_RGB },
     },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

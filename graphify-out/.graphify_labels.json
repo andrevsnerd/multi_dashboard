@@ -446,6 +446,11 @@
   "444": "vm-setup/install.sh",
   "445": "PM2 process manager",
   "446": "proxy-server (pm2 managed process)",
+  "447": "giroCache.ts",
+  "448": "RealizadasPanel.tsx",
+  "449": "compra-transito-status.ts",
+  "450": "page.tsx",
+  "451": "fetchUltimasEntradasPorFilial",
   "455": "inventory.ts",
   "462": "page.tsx",
   "465": "diag-giro-reconcile.mjs"

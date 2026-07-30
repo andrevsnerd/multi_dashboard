@@ -5,6 +5,7 @@ import { findUserByUsername } from "@/lib/auth/users-store";
 import { seesAllFiliais } from "@/lib/auth/permissions";
 import { getActiveFilial } from "@/lib/config/company";
 import { resolveCompanyDynamic } from "@/lib/config/company-server";
+import { comFilialDefeito } from "@/lib/config/filiais-especiais";
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,7 +21,11 @@ export async function GET(request: NextRequest) {
 
     const search = request.nextUrl.searchParams.get("search")?.trim() ?? "";
     const companyConfig = await resolveCompanyDynamic(companyKey);
-    const filiaisInventory = companyConfig?.filialFilters.inventory ?? [];
+    // + filial de defeito: destino real de romaneio, fora do registry (não é loja).
+    const filiaisInventory = comFilialDefeito(
+      companyKey,
+      companyConfig?.filialFilters.inventory ?? []
+    );
     const filiaisEmpresa = new Set(filiaisInventory.map((f) => f.toUpperCase()));
     // Filtra no SQL (antes do TOP) pelas filiais da empresa — teto por empresa, sem misturar.
     const transitos = await fetchLogTransito(1000, 3650, search, filiaisInventory);

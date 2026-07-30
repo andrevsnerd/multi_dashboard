@@ -6,6 +6,7 @@ import { seesAllFiliais } from "@/lib/auth/permissions";
 import { getActiveFilial } from "@/lib/config/company";
 import { resolveCompanyDynamic } from "@/lib/config/company-server";
 import { getContadorConfirmadosByCompany } from "@/lib/utils/romaneio-confirmacao-store";
+import { comFilialDefeito } from "@/lib/config/filiais-especiais";
 
 /**
  * GET /api/romaneios/entradas?company=nerd
@@ -28,7 +29,12 @@ export async function GET(request: NextRequest) {
 
     const search = request.nextUrl.searchParams.get("search")?.trim() ?? "";
     const companyConfig = await resolveCompanyDynamic(companyKey);
-    const filiaisInventory = companyConfig?.filialFilters.inventory ?? [];
+    // + filial de defeito: ela não está no registry (não é loja), mas é destino real de
+    // romaneio e a logística precisa consultar essas entradas aqui.
+    const filiaisInventory = comFilialDefeito(
+      companyKey,
+      companyConfig?.filialFilters.inventory ?? []
+    );
     const filiaisEmpresa = new Set(filiaisInventory.map((f) => f.toUpperCase()));
 
     // Filtra no SQL (antes do TOP) pelas filiais da empresa — teto por empresa, sem misturar.

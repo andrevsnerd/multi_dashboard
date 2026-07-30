@@ -930,8 +930,8 @@
     "semantic_hash": "3136877746d42feabbd7abeab02e36c2"
   },
   "app/api/romaneio-confirmar-entrada/route.ts": {
-    "mtime": 1783538251.3478346,
-    "ast_hash": "b26c2bc876e873ca1ddd1bb89fb749a2",
+    "mtime": 1785435636.5238895,
+    "ast_hash": "54172d14a47d89aaee4239fce958d515",
     "semantic_hash": ""
   },
   "app/api/romaneios/editar-qtd/route.ts": {
@@ -1600,9 +1600,9 @@
     "semantic_hash": "c1db24d3ffabe5b57c07dc935de08446"
   },
   "components/romaneios/RomaneioDetalhePage.tsx": {
-    "mtime": 1781205405.1763232,
-    "ast_hash": "f738515d18eebcd859111915a1430c3d",
-    "semantic_hash": "f738515d18eebcd859111915a1430c3d"
+    "mtime": 1785435673.830132,
+    "ast_hash": "1d5ddf0a29667ddfce88e2c48743ceef",
+    "semantic_hash": ""
   },
   "components/romaneios/RomaneiosDuplicadosPanel.tsx": {
     "mtime": 1783438290.8626285,
@@ -1620,8 +1620,8 @@
     "semantic_hash": ""
   },
   "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx": {
-    "mtime": 1784893673.3606608,
-    "ast_hash": "a73e9d65902fc0612f3d3e12aa2ea7e4",
+    "mtime": 1785435656.0502503,
+    "ast_hash": "d9537cb50944979f9385c162f5a18bb7",
     "semantic_hash": ""
   },
   "components/shared/CompraIdealCell.tsx": {
@@ -2075,8 +2075,8 @@
     "semantic_hash": "81efc3f077be8b7a4d9bf83f5dcc06e5"
   },
   "lib/auth/permissions.ts": {
-    "mtime": 1783952337.0571337,
-    "ast_hash": "029cea795737ddb6c01e80010531a9fa",
+    "mtime": 1785435618.4443648,
+    "ast_hash": "47395ef875a679dd2b851b8d977b83f0",
     "semantic_hash": ""
   },
   "lib/auth/users-store-neon.ts": {
@@ -2265,9 +2265,9 @@
     "semantic_hash": "d9aafc7b44ad3a062c65b3e87a917a3a"
   },
   "lib/mcp/tools/romaneios.ts": {
-    "mtime": 1780926520.9663382,
-    "ast_hash": "36b094d84935e7491062f7b36ec6a466",
-    "semantic_hash": "36b094d84935e7491062f7b36ec6a466"
+    "mtime": 1785435689.1466963,
+    "ast_hash": "e592452f4a4c628bdff7ca96efe9191c",
+    "semantic_hash": ""
   },
   "lib/mcp/tools/top-produtos.ts": {
     "mtime": 1780930095.774063,
@@ -3862,6 +3862,11 @@
   "scripts/normalizar-responsavel-linx.mjs": {
     "mtime": 1785427994.7014806,
     "ast_hash": "a475e954b9257c5d13387470948d5943",
+    "semantic_hash": ""
+  },
+  "lib/config/filiais-especiais.ts": {
+    "mtime": 1785435603.6688533,
+    "ast_hash": "798d99211e0acf3afaa116b5ab20296d",
     "semantic_hash": ""
   }
 }

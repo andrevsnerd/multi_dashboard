@@ -28,6 +28,25 @@ function normalizeNome(value: string | null | undefined): string {
   return (value || '').trim().replace(/\s+/g, ' ').toUpperCase();
 }
 
+/**
+ * Acrescenta a filial de defeito a uma lista de filiais de DESTINO de romaneio.
+ * Usado pelas listas de Entradas/Trânsito: sem isso o romaneio de defeito é
+ * descartado (destino fora do registry) e a logística não consegue consultá-lo.
+ *
+ * Só acrescenta se a lista base já tiver algo: lista vazia significa
+ * "sem filtro / todas as filiais", e devolver `['NERD DEFEITOS']` inverteria
+ * o sentido, restringindo tudo à filial de defeito.
+ */
+export function comFilialDefeito(
+  companyKey: string | null | undefined,
+  filiais: string[]
+): string[] {
+  const defeito = getDefeitoFilial(companyKey);
+  if (!defeito || filiais.length === 0) return filiais;
+  const jaTem = filiais.some((f) => normalizeNome(f) === normalizeNome(defeito));
+  return jaTem ? filiais : [...filiais, defeito];
+}
+
 /** True se `filial` é a filial de defeito da empresa informada. */
 export function isFilialDefeito(
   companyKey: string | null | undefined,
