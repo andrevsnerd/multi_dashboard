@@ -622,7 +622,8 @@ function ItemRow({ item, filiais }: { item: DistribuicaoItem; filiais: string[] 
       <td className={`${styles.stickyProduto} ${styles.produtoCell}`}>
         <span className={styles.produtoNome}>{nome}</span>
         <span className={styles.produtoMeta}>
-          {item.codigo}
+          {/* Código de barra (menor/interno) — é o que se bipa. Cai no código do produto se faltar. */}
+          {item.codigoBarra || item.codigo}
           {item.cor ? ` • ${item.cor}` : ""}
         </span>
         {(item.subgrupo || item.grade) && (

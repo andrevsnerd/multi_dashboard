@@ -24,9 +24,11 @@ import {
 } from "@/lib/config/distribuicao-minimos";
 import {
   montarDistribuicaoItem,
+  type DistribuicaoItem,
   type DistribuicaoResult,
   type LojaDistribuicaoInput,
 } from "@/lib/utils/distribuicao-matriz";
+import { fetchMenorCodigoBarra } from "@/lib/repositories/products";
 
 const up = (s: string | null | undefined) => (s ?? "").trim().toUpperCase();
 const esc = (s: string) => s.replace(/'/g, "''");
@@ -179,7 +181,7 @@ export async function fetchDistribuicaoMatriz(company: CompanyKey): Promise<Dist
 
   const inverno = isInverno(new Date());
 
-  const itens = [];
+  const itens: DistribuicaoItem[] = [];
   for (const agg of aggByKey.values()) {
     if (agg.matriz <= 0) continue; // só distribui o que a Matriz tem
     const attr = attrByProduto.get(agg.produto);
@@ -227,6 +229,22 @@ export async function fetchDistribuicaoMatriz(company: CompanyKey): Promise<Dist
         lojasInput
       )
     );
+  }
+
+  // Código de barra (o MENOR/interno, não o EAN) por produto×cor — fonte canônica
+  // fetchMenorCodigoBarra, a mesma do Gerador de Relatórios. O código da cor chega
+  // como '06' ou '6' dependendo da fonte, então a chave é normalizada por número.
+  const corKey = (cor: string | undefined) => {
+    const t = (cor ?? "").trim();
+    const n = Number(t);
+    return t !== "" && Number.isFinite(n) ? String(n) : t.toUpperCase();
+  };
+  const barraByKey = new Map<string, string>();
+  for (const b of await fetchMenorCodigoBarra(itens.map((i) => i.produto))) {
+    barraByKey.set(`${b.produto}|${corKey(b.cor)}`, b.codigoBarra);
+  }
+  for (const it of itens) {
+    it.codigoBarra = barraByKey.get(`${it.produto}|${corKey(it.codigoCor)}`) ?? "";
   }
 
   itens.sort((a, b) => {

@@ -2,7 +2,8 @@
 //
 // Pick-list de envio: cada coluna de loja é preenchida SOMENTE quando há algo a enviar,
 // com o valor em VERDE. Loja que não recebe fica em branco. Colunas de contexto:
-// Produto, Código, Cor, Material, Grade, Matriz (estoque) e Total a enviar.
+// Produto, Código de barra, Cor, Subgrupo, Grade, Matriz (estoque) e Total a enviar.
+// O código do produto NÃO vai no export — quem bipa/confere usa o código de barra.
 
 import type { DistribuicaoItem } from "@/lib/utils/distribuicao-matriz";
 
@@ -51,7 +52,7 @@ export async function exportDistribuicaoMatrizXlsx({
   const ExcelJS = (excelJsMod as any).default ?? excelJsMod;
   const workbook = new ExcelJS.Workbook();
 
-  const fixed = ["Produto", "Código", "Cor", "Material", "Grade", matrizLabel];
+  const fixed = ["Produto", "Código de barra", "Cor", "Subgrupo", "Grade", matrizLabel];
   const headers = [...fixed, ...filiais.map((f) => labels[f] ?? f), "Total a enviar"];
   const firstFilialCol = fixed.length + 1; // 1-based
   const totalCol = firstFilialCol + filiais.length;
@@ -120,7 +121,7 @@ export async function exportDistribuicaoMatrizXlsx({
     };
 
     setText(1, nomeProduto(item));
-    setText(2, item.codigo);
+    setText(2, item.codigoBarra ?? "");
     setText(3, item.cor);
     setText(4, item.subgrupo ?? "");
     setText(5, item.grade ?? "");
