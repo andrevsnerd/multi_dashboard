@@ -10,6 +10,7 @@ export const PAGE_PERMISSION_DEFINITIONS = [
   { key: "produtos", label: "Produtos por Venda", routeSegments: ["produtos"] },
   { key: "produto-agrupado", label: "Produto Agrupado", routeSegments: ["produto-agrupado"] },
   { key: "produto-descontinuado", label: "Produto Descontinuado", routeSegments: ["produto-descontinuado"] },
+  { key: "vm", label: "VM (Visual Merchandising)", routeSegments: ["vm"] },
   { key: "produto-detalhado", label: "Produto Detalhado", routeSegments: ["produto-detalhado"] },
   { key: "produto-performance", label: "Produto Performance", routeSegments: ["produto-performance"] },
   { key: "produtos-recentes", label: "Produtos Recentes", routeSegments: ["produtos-recentes"] },

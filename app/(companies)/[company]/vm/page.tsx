@@ -2,27 +2,33 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import PageLayout from "@/components/layout/PageLayout";
-import NotificacoesPage from "@/components/notificacoes/NotificacoesPage";
+import VmPage from "@/components/vm/VmPage";
 import { resolveCompany } from "@/lib/config/company";
+import { isVmCompany } from "@/lib/utils/vm";
 
 import styles from "../page.module.css";
 
-interface NotificacoesPageRouteProps {
-  params: Promise<{ company: string }>;
+interface VmRouteProps {
+  params: Promise<{
+    company: string;
+  }>;
 }
 
-export async function generateMetadata({ params }: NotificacoesPageRouteProps): Promise<Metadata> {
-  const { company: companySlug } = await params;
-  const company = resolveCompany(companySlug);
-  if (!company) return { title: "Notificações" };
-  return { title: `Notificações | ${company.name}` };
-}
-
-export default async function NotificacoesRoute({ params }: NotificacoesPageRouteProps) {
+export async function generateMetadata({ params }: VmRouteProps): Promise<Metadata> {
   const { company: companySlug } = await params;
   const company = resolveCompany(companySlug);
 
-  if (!company) {
+  return {
+    title: company ? `VM | ${company.name}` : "VM",
+  };
+}
+
+export default async function VmRoute({ params }: VmRouteProps) {
+  const { company: companySlug } = await params;
+  const company = resolveCompany(companySlug);
+
+  // VM move estoque com ajuste tipo VM — habilitado só para NERD por enquanto.
+  if (!company || !isVmCompany(company.key)) {
     notFound();
   }
 
@@ -30,7 +36,7 @@ export default async function NotificacoesRoute({ params }: NotificacoesPageRout
     <PageLayout companyName={company.name}>
       <div className={styles.page}>
         <div className={styles.content}>
-          <NotificacoesPage />
+          <VmPage companyKey={company.key} companyName={company.name} />
         </div>
       </div>
     </PageLayout>

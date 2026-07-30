@@ -1,8 +1,11 @@
 import sql from "mssql";
 
+import { getFiliaisByCompany, type FilialDef } from "@/lib/config/filial-registry";
+import type { CompanyKey } from "@/lib/config/company";
 import { withRequest } from "@/lib/db/connection";
 import { ROW_COLECAO_COD_FIELD, ROW_COLECAO_DESC_FIELD } from "@/lib/reports/keys";
 import type { ReportRow } from "@/lib/reports/types";
+import { nameForId } from "@/lib/server/filial-resolver";
 
 /**
  * Rótulo de coleção no formato "DESCRIÇÃO (CÓDIGO)" (ex.: "PERMANENTE (01)") por produto,
@@ -42,6 +45,59 @@ export async function getColecaoDescMap(): Promise<Map<string, string>> {
 
   descCache = { expires: Date.now() + CACHE_TTL_MS, map };
   return map;
+}
+
+/**
+ * Data de INÍCIO de cada coleção = primeira entrada de estoque de um item dela na
+ * MATRIZ (`ESTOQUE_PROD_ENT`/`ESTOQUE_PROD1_ENT`, `MIN(EMISSAO)`), que é quando a
+ * coleção fisicamente chegou. Só a Matriz conta — entrada em loja é redistribuição
+ * do que já existe, não o começo da coleção.
+ *
+ * Devolve um mapa CÓDIGO → "YYYY-MM-DD" (só os códigos que têm entrada na Matriz).
+ */
+export async function getColecaoInicioMatrizMap(
+  codes: string[],
+  company: CompanyKey = "scarfme"
+): Promise<Map<string, string>> {
+  const uniq = [...new Set(codes.map((c) => c.trim().toUpperCase()).filter(Boolean))];
+  const out = new Map<string, string>();
+  if (uniq.length === 0) return out;
+
+  // Nome vivo da(s) filial(is) MATRIZ da empresa (auto-corrige rename no ERP).
+  const matrizDefs: FilialDef[] = getFiliaisByCompany(company).filter(
+    (f) => f.display === "MATRIZ"
+  );
+  const matrizNames = (
+    await Promise.all(matrizDefs.map(async (f) => (await nameForId(f.id)) ?? f.dbNameFallback))
+  ).filter(Boolean);
+  if (matrizNames.length === 0) return out;
+
+  return withRequest(async (req) => {
+    uniq.forEach((c, i) => req.input(`iniCol${i}`, sql.VarChar, c));
+    matrizNames.forEach((n, i) => req.input(`iniMat${i}`, sql.VarChar, n));
+    const colPh = uniq.map((_, i) => `@iniCol${i}`).join(", ");
+    const matPh = matrizNames.map((_, i) => `@iniMat${i}`).join(", ");
+
+    const r = await req.query<{ colecao: string; inicio: string | null }>(
+      `SELECT
+         UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) AS colecao,
+         CONVERT(VARCHAR(10), MIN(e.EMISSAO), 120) AS inicio
+       FROM ESTOQUE_PROD_ENT e WITH (NOLOCK)
+       JOIN ESTOQUE_PROD1_ENT pe WITH (NOLOCK)
+         ON pe.ROMANEIO_PRODUTO = e.ROMANEIO_PRODUTO
+       JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = pe.PRODUTO
+       WHERE UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) IN (${colPh})
+         AND LTRIM(RTRIM(e.FILIAL)) IN (${matPh})
+       GROUP BY UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, ''))))`
+    );
+
+    for (const row of r.recordset) {
+      const cod = (row.colecao ?? "").trim().toUpperCase();
+      const inicio = (row.inicio ?? "").trim();
+      if (cod && inicio) out.set(cod, inicio);
+    }
+    return out;
+  }).catch(() => out);
 }
 
 async function fetchColecaoCodeByProduto(produtos: string[]): Promise<Map<string, string>> {

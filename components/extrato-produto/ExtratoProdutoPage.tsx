@@ -13,6 +13,7 @@ import type {
 } from "@/app/api/extrato-produto/route";
 import type { ProdutosAtivosResponse } from "@/app/api/extrato-produto/produtos/route";
 import type { AdminFilialOption } from "@/app/api/extrato-produto/filiais/route";
+import { FILIAIS } from "@/lib/config/filial-registry";
 
 // ── Tema (segue o tema global do dashboard — botão único no cabeçalho) ────────
 
@@ -64,6 +65,8 @@ const TIPO_CORES_DARK: Record<string, string> = {
   "SAÍDA POR TRANSFERÊNCIA": "#f97316",
   "AJUSTE": "#a78bfa",
   "LOJA VENDAS": "#ef4444",
+  // VM (peça em exposição) — mesma família da etiqueta VM nas telas de estoque.
+  "VM": "#f87171",
 };
 
 const TIPO_CORES_LIGHT: Record<string, string> = {
@@ -73,6 +76,8 @@ const TIPO_CORES_LIGHT: Record<string, string> = {
   "SAÍDA POR TRANSFERÊNCIA": "#c2410c",
   "AJUSTE": "#7c3aed",
   "LOJA VENDAS": "#dc2626",
+  // VM (peça em exposição) — mesma família da etiqueta VM nas telas de estoque.
+  "VM": "#dc2626",
 };
 
 const LIGHT: Palette = {
@@ -159,6 +164,11 @@ const DARK: Palette = {
 
 // ── Constantes ──────────────────────────────────────────────────────────────
 
+// Filial em branco = sem filtro. É uma opção de verdade na lista ("TODAS") porque o
+// campo vazio parecia filtro aplicado — e a matriz da NERD, que no banco se chama só
+// "NERD", ainda vinha somada com a rede inteira.
+const TODAS_LABEL = "TODAS as filiais";
+
 const STATUS_TRANSITO: Record<number, string> = {
   0: "Aguardando",
   2: "Em trânsito",
@@ -177,6 +187,73 @@ function fmtDate(iso: string) {
 
 function fmtNum(n: number) {
   return n === 0 ? "0" : n > 0 ? `+${n}` : `${n}`;
+}
+
+/** Normaliza para busca: sem acento, sem pontuação, minúsculo. */
+function chaveBusca(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/**
+ * Apelido do registry por nome de banco: 'NERD' → "nerd matriz". Serve para achar a
+ * filial pelo nome que o pessoal usa, não só pelo que está gravado no Linx — a matriz
+ * da NERD se chama só "NERD" e ninguém a procura assim.
+ */
+const APELIDO_POR_NOME_DB: Record<string, string> = FILIAIS.reduce((acc, f) => {
+  if (f.dbNameFallback) acc[chaveBusca(f.dbNameFallback)] = chaveBusca(`${f.company} ${f.display}`);
+  return acc;
+}, {} as Record<string, string>);
+
+/** Rótulo curto do registry ("matriz", "e-commerce") para desempatar nomes crus do Linx. */
+const DISPLAY_POR_NOME_DB: Record<string, string> = FILIAIS.reduce((acc, f) => {
+  if (f.dbNameFallback) acc[chaveBusca(f.dbNameFallback)] = f.display;
+  return acc;
+}, {} as Record<string, string>);
+
+interface FilialSugestao {
+  filial: string;
+  /** Estoque do produto nesta filial; null quando a filial não tem cadastro do item. */
+  estoque: number | null;
+}
+
+/**
+ * Lista do dropdown de filial: as filiais do produto primeiro (com o saldo), depois
+ * TODAS as cadastradas — inclusive as sem cadastro do item. Antes o dropdown trocava
+ * uma lista pela outra, então escolher um produto tirava do alcance qualquer filial
+ * fora dele e não havia como abrir o extrato de uma loja que zerou.
+ */
+function montarSugestoesFilial(
+  doProduto: ProdutoFilialOption[],
+  todas: AdminFilialOption[],
+  termo: string
+): FilialSugestao[] {
+  const vistas = new Set<string>();
+  const lista: FilialSugestao[] = [];
+  for (const f of doProduto) {
+    const k = chaveBusca(f.filial);
+    if (vistas.has(k)) continue;
+    vistas.add(k);
+    lista.push({ filial: f.filial, estoque: f.estoqueAtual });
+  }
+  for (const f of todas) {
+    const k = chaveBusca(f.filial);
+    if (vistas.has(k)) continue;
+    vistas.add(k);
+    lista.push({ filial: f.filial, estoque: null });
+  }
+
+  const tokens = chaveBusca(termo).split(" ").filter(Boolean);
+  if (tokens.length === 0) return lista;
+  return lista.filter((f) => {
+    const k = chaveBusca(f.filial);
+    const alvo = `${k} ${APELIDO_POR_NOME_DB[k] ?? ""}`;
+    return tokens.every((tk) => alvo.includes(tk));
+  });
 }
 
 function badge(tipo: string, t: Palette) {
@@ -361,10 +438,15 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
           setCor("");
         }
 
+        // Só limpa a filial se ela não for uma filial de verdade. Antes bastava o
+        // produto não ter cadastro nela para o campo ser apagado — era o que tirava a
+        // matriz da NERD da mão do usuário logo depois de ele digitá-la.
+        const filialAtual = filial.trim();
         if (
-          filial.trim() &&
-          lookup.filiaisDisponiveis.length > 0 &&
-          !lookup.filiaisDisponiveis.some((item) => item.filial === filial.trim())
+          filialAtual &&
+          allFiliais.length > 0 &&
+          !allFiliais.some((f) => chaveBusca(f.filial) === chaveBusca(filialAtual)) &&
+          !allFiliais.some((f) => f.codFilial === filialAtual)
         ) {
           setFilial("");
         }
@@ -383,7 +465,7 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [produto, cor, filial, user, authHeader]);
+  }, [produto, cor, filial, user, authHeader, allFiliais]);
 
   async function buscarListaProdutos(targetPage?: number, overrideFilial?: string) {
     if (!user) return;
@@ -580,19 +662,27 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
               value={filial}
               onChange={(e) => { setFilial(e.target.value); setShowFilialDropdown(true); }}
               onFocus={() => setShowFilialDropdown(true)}
-              placeholder="Todas juntas ou Ex: GUARULHOS"
+              placeholder={TODAS_LABEL}
               style={inputStyle}
               autoComplete="off"
             />
             {showFilialDropdown && (() => {
-              const pool = filiaisDisponiveis.length > 0
-                ? filiaisDisponiveis.map((f) => ({ filial: f.filial, extra: ` (${f.estoqueAtual} un)` }))
-                : allFiliais.map((f) => ({ filial: f.filial, extra: "" }));
-              const q = filial.trim().toLowerCase();
-              const sugestoes = pool
-                .filter((f) => q === "" || f.filial.toLowerCase().includes(q))
-                .slice(0, 10);
-              if (sugestoes.length === 0) return null;
+              const q = filial.trim();
+              const sugestoes = montarSugestoesFilial(filiaisDisponiveis, allFiliais, q)
+                .slice(0, 12)
+                .map((f) => {
+                  const display = DISPLAY_POR_NOME_DB[chaveBusca(f.filial)];
+                  const rotulo = display && chaveBusca(display) !== chaveBusca(f.filial)
+                    ? ` · ${display.toLowerCase()}`
+                    : "";
+                  return {
+                    filial: f.filial,
+                    rotulo,
+                    extra: f.estoque === null ? " (sem cadastro do item)" : ` (${f.estoque} un)`,
+                  };
+                });
+              const mostrarTodas = q === "" || chaveBusca(TODAS_LABEL).includes(chaveBusca(q));
+              if (!mostrarTodas && sugestoes.length === 0) return null;
               return (
                 <div
                   ref={filialDropdownRef}
@@ -610,6 +700,35 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
                     boxShadow: "0 4px 16px #0000001f",
                   }}
                 >
+                  {mostrarTodas && (
+                    <button
+                      type="button"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        setFilial("");
+                        setShowFilialDropdown(false);
+                      }}
+                      style={{
+                        width: "100%",
+                        textAlign: "left",
+                        padding: "8px 10px",
+                        background: "none",
+                        border: "none",
+                        borderBottom: `1px solid ${t.borderStrong}`,
+                        color: filial.trim() ? t.muted : t.accent,
+                        cursor: "pointer",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        display: "flex",
+                        gap: 4,
+                      }}
+                      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = t.dropdownHover; }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "none"; }}
+                    >
+                      <span>{TODAS_LABEL}</span>
+                      <span style={{ color: t.muted, fontWeight: 400 }}>(rede inteira)</span>
+                    </button>
+                  )}
                   {sugestoes.map((s) => (
                     <button
                       key={s.filial}
@@ -635,7 +754,10 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
                       onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = t.dropdownHover; }}
                       onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "none"; }}
                     >
-                      <span>{s.filial}</span>
+                      <span>
+                        {s.filial}
+                        {s.rotulo && <span style={{ color: t.subMuted }}>{s.rotulo}</span>}
+                      </span>
                       {s.extra && <span style={{ color: t.muted }}>{s.extra}</span>}
                     </button>
                   ))}
@@ -669,7 +791,7 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
           {lookupLoading
             ? "Buscando cores e filiais disponíveis..."
             : lookupMsg ||
-              `${coresDisponiveis.length} cor${coresDisponiveis.length === 1 ? "" : "es"} e ${filiaisDisponiveis.length} ${filiaisDisponiveis.length === 1 ? "filial" : "filiais"} disponíveis para este produto.`}
+              `${coresDisponiveis.length} cor${coresDisponiveis.length === 1 ? "" : "es"} e ${filiaisDisponiveis.length} ${filiaisDisponiveis.length === 1 ? "filial" : "filiais"} com cadastro deste produto (${filiaisDisponiveis.filter((f) => f.estoqueAtual !== 0).length} com saldo). Qualquer outra filial também pode ser selecionada.`}
         </div>
       )}
 
@@ -897,6 +1019,7 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
                   <th style={{ ...th, color: t.saldo }}>Saldo</th>
                   <th style={th}>Preço</th>
                   <th style={th}>Status Trânsito</th>
+                  <th style={th}>Responsável</th>
                   <th style={th}>OBS</th>
                 </tr>
               </thead>
@@ -953,6 +1076,10 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
                           ? STATUS_TRANSITO[l.statusTransito] ?? l.statusTransito
                           : "—"}
                       </td>
+                      <td style={{ ...td, color: l.responsavel ? t.subMuted : t.muted, whiteSpace: "nowrap" }}
+                          title={l.responsavel ?? "Sem responsável registrado nesta fonte"}>
+                        {l.responsavel ?? "—"}
+                      </td>
                       <td style={{ ...td, color: t.muted, maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
                           title={l.obs ?? undefined}>
                         {l.obs ?? "—"}
@@ -962,7 +1089,7 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
                 })}
                 {linhasComSaldo.length === 0 && (
                   <tr>
-                    <td colSpan={12} style={{ ...td, textAlign: "center", color: t.muted, padding: 32 }}>
+                    <td colSpan={13} style={{ ...td, textAlign: "center", color: t.muted, padding: 32 }}>
                       Nenhum movimento encontrado com os filtros atuais.
                     </td>
                   </tr>

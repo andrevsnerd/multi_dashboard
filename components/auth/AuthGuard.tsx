@@ -4,8 +4,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 import { useAuth } from "./AuthContext";
 import { UserHeaderBar } from "./UserHeaderBar";
-import { NotificacoesProvider } from "@/components/notificacoes/useNotificacoes";
-import { NotificationGate } from "@/components/notificacoes/NotificationGate";
 import {
   canAccessPath,
   canAccessCompany,
@@ -89,10 +87,9 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   }
 
   return (
-    <NotificacoesProvider>
+    <>
       <UserHeaderBar />
       {children}
-      <NotificationGate />
-    </NotificacoesProvider>
+    </>
   );
 }

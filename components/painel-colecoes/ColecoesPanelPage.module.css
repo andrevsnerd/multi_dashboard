@@ -237,6 +237,23 @@
   border-radius: 6px;
 }
 
+/* Início da coleção (1ª entrada na Matriz) — serve aos dois temas; usa tokens,
+   então acompanha o modo escuro sem override. */
+.inicioTag {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--t-gray500);
+  background: var(--s-50);
+  border: 1px solid var(--b-gray200);
+  padding: 2px 7px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.photoNameBlock .inicioTag {
+  align-self: flex-start;
+}
+
 .codes {
   display: inline-flex;
   gap: 4px;

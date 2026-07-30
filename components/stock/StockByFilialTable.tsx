@@ -5,6 +5,8 @@ import { useMemo, useRef, useEffect } from "react";
 import { resolveCompany, type CompanyKey } from "@/lib/config/company";
 import type { StockByFilialItem } from "@/lib/repositories/stockByFilial";
 import type { DateRangeValue } from "@/components/filters/DateRangeFilter";
+import VmBadge from "@/components/shared/VmBadge";
+import { useVmMarcadores } from "@/lib/client/use-vm-marcadores";
 
 import styles from "./StockByFilialTable.module.css";
 
@@ -203,7 +205,10 @@ export default function StockByFilialTable({
     () => organizeFiliais(companyKey, data),
     [companyKey, data]
   );
-  
+  // Etiqueta VM: a peça em exposição já saiu do estoque, então a célula zerada está
+  // correta — o marcador só avisa que existe uma peça no manequim daquela loja.
+  const { isVm } = useVmMarcadores(companyKey);
+
   const filiaisCount = filiais.length;
 
   // Refs para sincronizar scroll
@@ -444,11 +449,14 @@ export default function StockByFilialTable({
                   )}
                   {filiais.map((filial) => {
                     const filialData = getFilialData(item, filial);
+                    // Só com estoque zerado: com saldo positivo o número já se explica.
+                    const temVm = filialData.stock === 0 && isVm(filial, item.produto, item.cor);
                     return (
                       <td key={filial} className={styles.filialCellContainer}>
                         <div className={`${styles.filialCell} ${getFilialCellClass(filialData.stock, filialData.sales, filialData.salesLast30Days, filialData.hasEntry)}`}>
                           <span className={styles.stockValue}>
                             {filialData.stock}
+                            {temVm && <VmBadge />}
                           </span>
                           <span className={styles.salesBadge}>
                             {filialData.sales}

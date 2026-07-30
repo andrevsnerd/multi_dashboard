@@ -44,7 +44,9 @@ import {
 } from "@/lib/utils/compra-ideal";
 import { resolveCicloCompra, hasCicloCompra, resolveGapAntigoDias, resolveRecenteHorizonteDias } from "@/lib/config/compra-ciclo";
 import { useCatracaDataCompra, type CatracaFreeze } from "@/lib/client/use-catraca-data-compra";
+import { useVmMarcadores } from "@/lib/client/use-vm-marcadores";
 import CompraIdealExplainCard from "@/components/shared/CompraIdealExplainCard";
+import VmBadge from "@/components/shared/VmBadge";
 import {
   partesDestinoCompraFinal,
   type DestinoCompraFinalParte,
@@ -1879,6 +1881,8 @@ function ListaLojaItensTable({
 }: ListaLojaItensTableProps) {
   const { user } = useAuth();
   const podeVerCusto = canSeeCusto(user);
+  // Marcadores de VM: etiqueta na coluna de estoque quando o saldo da filial é zero.
+  const { isVm } = useVmMarcadores(companyKey);
   const filialScopeKey = filialCod && filialCod.trim() ? filialCod.trim() : "__ALL__";
   // Catraca da data de compra (modo ciclo) — mesma lógica/persistência das demais telas.
   const { enabled: catracaEnabled, reconcile: catracaReconcile, persist: catracaPersist } =
@@ -2672,6 +2676,9 @@ function ListaLojaItensTable({
                 >
                   {estoqueFilial != null ? fmt(estoqueFilial) : "—"}
                 </span>
+                {/* Estoque zerado + peça em exposição: o zero está certo (o VM já saiu do
+                    estoque), a etiqueta só avisa que existe uma peça no manequim. */}
+                {estoqueFilial === 0 && isVm(filialCod, item.produto, item.corProduto) && <VmBadge />}
               </td>
               <td className={styles.colNumeric}>
                 {(() => {

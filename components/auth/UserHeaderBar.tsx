@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "./AuthContext";
 import { UserMenu } from "./UserMenu";
-import { NotificationBell } from "@/components/notificacoes/NotificationBell";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import styles from "./UserHeaderBar.module.css";
 
@@ -25,7 +24,6 @@ export function UserHeaderBar() {
           </Link>
         )}
         <ThemeToggle />
-        <NotificationBell />
         <span className={styles.userName}>{user.username}</span>
         <UserMenu />
       </div>

@@ -37,6 +37,8 @@ interface ColecaoPanelItem {
   vendas: number;
   qtdVendida: number;
   skus: number;
+  /** Início da coleção ("YYYY-MM-DD") = 1ª entrada de estoque na Matriz. */
+  inicio: string | null;
   months: ColecaoPanelMonthPoint[];
   maxV: number;
 }
@@ -100,6 +102,17 @@ function formatCurrencyCompact(value: number): string {
     });
   }
   return formatCurrency(value);
+}
+
+/**
+ * "YYYY-MM-DD" → "dd/mm/aaaa". Formata partindo a string (nada de `new Date`), que
+ * interpretaria a data como UTC e voltaria um dia no fuso do Brasil.
+ */
+function formatInicio(value: string | null): string | null {
+  if (!value) return null;
+  const [y, m, d] = value.split("-");
+  if (!y || !m || !d) return null;
+  return `${d}/${m}/${y}`;
 }
 
 function formatInt(value: number): string {
@@ -545,6 +558,14 @@ export default function ColecoesPanelPage({ companyKey }: ColecoesPanelPageProps
                   <span className={styles.photoName} style={{ color: hex(palette.ink) }}>
                     {item.label}
                   </span>
+                  {formatInicio(item.inicio) && (
+                    <span
+                      className={styles.inicioTag}
+                      title="Início da coleção: 1ª entrada de estoque na Matriz"
+                    >
+                      desde {formatInicio(item.inicio)}
+                    </span>
+                  )}
                   {item.subtitle && (
                     <span className={styles.photoSubtitle}>{item.subtitle}</span>
                   )}
@@ -624,6 +645,14 @@ export default function ColecoesPanelPage({ companyKey }: ColecoesPanelPageProps
                     <div className={styles.nameBlock}>
                       <div className={styles.nameRow}>
                         <h2 className={styles.name}>{item.label}</h2>
+                        {formatInicio(item.inicio) && (
+                          <span
+                            className={styles.inicioTag}
+                            title="Início da coleção: 1ª entrada de estoque na Matriz"
+                          >
+                            desde {formatInicio(item.inicio)}
+                          </span>
+                        )}
                         {isAggregate && (
                           <span className={styles.aggregateTag}>agregado</span>
                         )}

@@ -3,6 +3,7 @@ import { findUserByUsername } from "@/lib/auth/users-store";
 import { userHasPagePermission } from "@/lib/auth/permissions";
 import type { UserSession } from "@/types/auth";
 import { query } from "@/lib/db/connection";
+import { FILIAIS } from "@/lib/config/filial-registry";
 
 /** Acesso ao Extrato de Produto: admin sempre; logistica se a pagina for liberada. */
 async function canAccessExtrato(username: string): Promise<boolean> {
@@ -26,6 +27,12 @@ export interface ExtratoLinha {
   obs: string | null;
   atualizouEstoque: boolean | null;
   statusTransito: number | null;
+  /**
+   * Quem fez o movimento. Romaneios e contagem trazem o RESPONSAVEL do Linx (login,
+   * ex.: "ALECIO"); venda traz o apelido do vendedor (LOJA_VENDEDORES, mesmo join do
+   * relatório de vendedores); ajuste manual traz o usuário do dashboard.
+   */
+  responsavel: string | null;
 }
 
 export interface ProdutoCorOption {
@@ -102,10 +109,18 @@ function resolveLinxTipoMovimento(
   direction: "E" | "S",
   ...candidates: Array<string | number | null | undefined>
 ) {
-  const t = candidates
+  const lista = candidates
     .filter((v) => v != null && String(v).trim() !== "")
-    .map((v) => String(v).trim().toUpperCase())
-    .join(" | ");
+    .map((v) => String(v).trim().toUpperCase());
+  const t = lista.join(" | ");
+
+  // VM (peça em exposição): o tipo cadastrado no Linx é só 'VM' e é isso que aparece —
+  // sem isto cairia no genérico "SAÍDA NORMAL" e o VM ficaria indistinguível. Entrada e
+  // saída se diferenciam pelo sinal da QTDE, como nas outras linhas. Compara o candidato
+  // inteiro (não substring) para não pegar tipo que só contenha essas letras.
+  if (lista.includes("VM")) {
+    return "VM";
+  }
 
   const isAjuste =
     /AJUST/.test(t) ||
@@ -136,6 +151,110 @@ function produtoEqualsSql(column: string, produto: string) {
 
 function corEqualsSql(column: string, cor: string) {
   return `RTRIM(LTRIM(ISNULL(CAST(${column} AS VARCHAR(20)), ''))) = '${sqlText(cor)}'`;
+}
+
+/** Filtro de filial por NOME exato (nunca LIKE — ver resolveFilialExata). */
+function filialEqualsSql(column: string, valor: string) {
+  return `RTRIM(LTRIM(CAST(${column} AS VARCHAR(120)))) = '${sqlText(valor)}'`;
+}
+
+/** Normaliza nome de filial p/ casamento tolerante (espaços, hífen unicode, acento). */
+function normFilialKey(value: string) {
+  return value
+    .replace(/[‐-―−]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
+}
+
+interface FilialResolvida {
+  nome: string;
+  codFilial: string | null;
+}
+
+/** Compara ignorando espaços e pontuação: "SCARF ME MATRIZ" = "SCARFME MATRIZ". */
+function squeezeFilialKey(value: string) {
+  return normFilialKey(value).replace(/[^A-Z0-9]/g, "");
+}
+
+/**
+ * Traduz o apelido "EMPRESA DISPLAY" do registry (ex.: "NERD MATRIZ") nos COD_FILIAL
+ * correspondentes. A matriz da NERD se chama só 'NERD' no banco, então quem digitava
+ * "NERD MATRIZ" — o nome que todo mundo usa — não casava com nada e o extrato voltava
+ * vazio sem dizer por quê. Devolve mais de um código quando o display é compartilhado
+ * (E-COMMERCE, PAULISTA), para o chamador pedir a escolha em vez de adivinhar.
+ */
+function codFiliaisPorApelidoRegistry(termo: string): string[] {
+  const chave = squeezeFilialKey(termo);
+  if (!chave) return [];
+  return FILIAIS.filter((f) => squeezeFilialKey(`${f.company} ${f.display}`) === chave).map((f) => f.id);
+}
+
+/**
+ * Traduz o texto de filial (nome, nome parcial ou COD_FILIAL) para a UMA filial que
+ * ele designa. O filtro do extrato é de IGUALDADE, não LIKE: a matriz da NERD se
+ * chama só 'NERD' no banco, então `FILIAL LIKE '%NERD%'` casava também com NERD
+ * LEBLON, NERD ELDORADO e todas as outras — o extrato da matriz vinha somado com a
+ * rede inteira. Filial vazia = TODAS (sem filtro), e isso é explícito na tela.
+ *
+ * Texto parcial que casa com mais de uma filial devolve as candidatas para o chamador
+ * pedir a escolha: somar filiais em silêncio é justamente o bug que isto corrige.
+ */
+async function resolveFilialExata(
+  input: string
+): Promise<{ filial: FilialResolvida | null; ambiguas: string[] }> {
+  const termo = input.trim();
+  if (!termo) return { filial: null, ambiguas: [] };
+
+  let cadastradas: FilialResolvida[];
+  try {
+    const rows = await query<{ FILIAL: string | null; COD_FILIAL: string | null }>(`
+      SELECT DISTINCT
+        RTRIM(LTRIM(CAST(f.FILIAL AS VARCHAR(120)))) AS FILIAL,
+        RTRIM(LTRIM(CAST(f.COD_FILIAL AS VARCHAR(50)))) AS COD_FILIAL
+      FROM FILIAIS f WITH (NOLOCK)
+      WHERE f.FILIAL IS NOT NULL
+        AND RTRIM(LTRIM(CAST(f.FILIAL AS VARCHAR(120)))) <> ''
+    `);
+    cadastradas = rows
+      .map((r) => ({
+        nome: trimValue(r.FILIAL),
+        codFilial: trimValue(r.COD_FILIAL) || null,
+      }))
+      .filter((r) => r.nome);
+  } catch {
+    // Sem a lista de filiais: trata o texto como nome exato, nunca como LIKE.
+    return { filial: { nome: termo, codFilial: null }, ambiguas: [] };
+  }
+
+  const chave = normFilialKey(termo);
+
+  const porNome = cadastradas.find((f) => normFilialKey(f.nome) === chave);
+  if (porNome) return { filial: porNome, ambiguas: [] };
+
+  const porCodigo = cadastradas.find((f) => f.codFilial === termo);
+  if (porCodigo) return { filial: porCodigo, ambiguas: [] };
+
+  // Apelido do registry ("NERD MATRIZ" → COD 000069, cujo nome no banco é só 'NERD').
+  const codsApelido = codFiliaisPorApelidoRegistry(termo);
+  if (codsApelido.length > 0) {
+    const porApelido = cadastradas.filter((f) => f.codFilial && codsApelido.includes(f.codFilial));
+    if (porApelido.length === 1) return { filial: porApelido[0], ambiguas: [] };
+    if (porApelido.length > 1) {
+      return { filial: null, ambiguas: porApelido.map((f) => f.nome).sort() };
+    }
+  }
+
+  const parciais = cadastradas.filter((f) => normFilialKey(f.nome).includes(chave));
+  if (parciais.length === 1) return { filial: parciais[0], ambiguas: [] };
+  if (parciais.length > 1) {
+    return { filial: null, ambiguas: parciais.map((f) => f.nome).sort() };
+  }
+
+  // Nome que não está (mais) em FILIAIS, mas pode existir em movimento histórico.
+  return { filial: { nome: termo, codFilial: null }, ambiguas: [] };
 }
 
 async function resolveProdutoInput(input: string): Promise<ProdutoResolvido | null> {
@@ -206,8 +325,7 @@ async function resolveProdutoInput(input: string): Promise<ProdutoResolvido | nu
 }
 
 async function fetchCoresDisponiveis(produto: string, filial?: string | null): Promise<ProdutoCorOption[]> {
-  const filialSql = filial ? sqlText(filial) : "";
-  const filialFilter = filialSql ? `AND ep.FILIAL LIKE '%${filialSql}%'` : "";
+  const filialFilter = filial?.trim() ? `AND ${filialEqualsSql("ep.FILIAL", filial.trim())}` : "";
 
   const rows = await query<{
     COR_PRODUTO: string | null;
@@ -278,6 +396,14 @@ async function fetchCoresDisponiveis(produto: string, filial?: string | null): P
     .filter((row) => row.cor);
 }
 
+/**
+ * Filiais onde o produto tem cadastro de estoque — INCLUINDO as de saldo zero.
+ *
+ * Filial com estoque 0 é exatamente o caso em que se precisa do extrato ("pra onde
+ * foi tudo?"), então esconder era o pior default possível: a matriz da NERD (nome
+ * 'NERD' no banco) sumia do seletor sempre que o item zerava. Quem tem saldo vem
+ * primeiro na ordenação, porque o dropdown mostra só os primeiros da lista.
+ */
 async function fetchFiliaisDisponiveis(produto: string, cor?: string | null): Promise<ProdutoFilialOption[]> {
   const corFilter = cor ? `AND ${corEqualsSql("ep.COR_PRODUTO", cor)}` : "";
 
@@ -294,8 +420,9 @@ async function fetchFiliaisDisponiveis(produto: string, cor?: string | null): Pr
       AND ep.FILIAL IS NOT NULL
       AND RTRIM(LTRIM(CAST(ep.FILIAL AS VARCHAR(100)))) <> ''
     GROUP BY RTRIM(LTRIM(CAST(ep.FILIAL AS VARCHAR(100))))
-    HAVING SUM(ISNULL(ep.ESTOQUE, 0)) <> 0
-    ORDER BY FILIAL
+    ORDER BY
+      CASE WHEN SUM(ISNULL(ep.ESTOQUE, 0)) <> 0 THEN 0 ELSE 1 END,
+      FILIAL
   `);
 
   return rows
@@ -391,17 +518,39 @@ export async function GET(request: NextRequest) {
   const cor = corResolvida;
   const produtoSql = sqlText(produto);
   const corSql = sqlText(cor);
-  const filialSql = filial ? sqlText(filial) : "";
+
+  const { filial: filialResolvida, ambiguas } = await resolveFilialExata(filial ?? "");
+  if (ambiguas.length > 0) {
+    return NextResponse.json(
+      {
+        error:
+          `"${filial}" casa com ${ambiguas.length} filiais (${ambiguas.join(", ")}). ` +
+          `Escolha uma na lista ou deixe TODAS para ver a rede inteira.`,
+        coresDisponiveis,
+        filiaisDisponiveis,
+      },
+      { status: 400 }
+    );
+  }
+  const filialNome = filialResolvida?.nome ?? "";
 
   const erros: string[] = [];
   const linhas: ExtratoLinha[] = [];
 
-  // Filtro de filial para queries
-  const filialFilter = filialSql ? `AND le.FILIAL LIKE '%${filialSql}%'` : "";
-  const filialFilterEnt = filialSql ? `AND e.FILIAL LIKE '%${filialSql}%'` : "";
-  const filialFilterSai = filialSql ? `AND s.FILIAL LIKE '%${filialSql}%'` : "";
-  const filialFilterLs = filialSql ? `AND ls.FILIAL LIKE '%${filialSql}%'` : "";
-  const filialFilterV = filialSql ? `AND (f.FILIAL LIKE '%${filialSql}%' OR vp.CODIGO_FILIAL LIKE '%${filialSql}%')` : "";
+  // Filtro de filial para queries — igualdade exata; vazio = TODAS as filiais.
+  const filialFilter = filialNome ? `AND ${filialEqualsSql("le.FILIAL", filialNome)}` : "";
+  const filialFilterEnt = filialNome ? `AND ${filialEqualsSql("e.FILIAL", filialNome)}` : "";
+  const filialFilterSai = filialNome ? `AND ${filialEqualsSql("s.FILIAL", filialNome)}` : "";
+  const filialFilterLs = filialNome ? `AND ${filialEqualsSql("ls.FILIAL", filialNome)}` : "";
+  // LOJA_VENDA guarda só CODIGO_FILIAL; o nome vem do join com FILIAIS. Quando a
+  // filial tem código, casa pelos dois para não perder venda de nome divergente.
+  const filialFilterV = filialNome
+    ? `AND (${filialEqualsSql("f.FILIAL", filialNome)}${
+        filialResolvida?.codFilial
+          ? ` OR ${filialEqualsSql("vp.CODIGO_FILIAL", filialResolvida.codFilial)}`
+          : ""
+      })`
+    : "";
 
   // ── Info do produto ──
   let descProduto: string | null = null;
@@ -452,7 +601,7 @@ export async function GET(request: NextRequest) {
       FROM ESTOQUE_PRODUTOS ep WITH (NOLOCK)
       WHERE ${produtoEqualsSql("ep.PRODUTO", produto)}
         AND ${corEqualsSql("ep.COR_PRODUTO", cor)}
-        ${filialSql ? `AND ep.FILIAL LIKE '%${filialSql}%'` : ""}
+        ${filialNome ? `AND ${filialEqualsSql("ep.FILIAL", filialNome)}` : ""}
     `);
     if (prodInfo.length > 0) {
       const r = prodInfo[0];
@@ -489,11 +638,13 @@ export async function GET(request: NextRequest) {
       OBS: string | null;
       TIPO_ENTRADA_SAIDA: string | null;
       DESC_TIPO: string | null;
+      RESPONSAVEL: string | null;
     }>(`
       SELECT
         le.EMISSAO,
         le.FILIAL,
         le.FILIAL_ORIGEM,
+        NULLIF(LTRIM(RTRIM(CAST(le.RESPONSAVEL AS VARCHAR(50)))), '') AS RESPONSAVEL,
         lep.ROMANEIO_PRODUTO,
         lep.QTDE_ENTRADA,
         lep.EN1,
@@ -530,6 +681,7 @@ export async function GET(request: NextRequest) {
         obs: r.OBS?.trim() ?? null,
         atualizouEstoque: r.ATUALIZOU_ESTOQUE ?? null,
         statusTransito: r.STATUS_TRANSITO ?? null,
+        responsavel: r.RESPONSAVEL?.trim() ?? null,
       });
     }
   } catch (e) {
@@ -554,11 +706,13 @@ export async function GET(request: NextRequest) {
       OS: string | null;
       COMENTARIO: string | null;
       OBS: string | null;
+      RESPONSAVEL: string | null;
     }>(`
       SELECT
         e.EMISSAO,
         e.FILIAL,
         e.FILIAL_DESTINO,
+        NULLIF(LTRIM(RTRIM(CAST(e.RESPONSAVEL AS VARCHAR(50)))), '') AS RESPONSAVEL,
         e.ROMANEIO_PRODUTO,
         e.TIPO_ROMANEIO,
         e.TIPO_ENTRADA,
@@ -597,6 +751,7 @@ export async function GET(request: NextRequest) {
         obs: r.OBS?.trim() ?? null,
         atualizouEstoque: true,
         statusTransito: null,
+        responsavel: r.RESPONSAVEL?.trim() ?? null,
       });
     }
   } catch (e) {
@@ -618,11 +773,13 @@ export async function GET(request: NextRequest) {
       OP: string | null;
       COMENTARIO: string | null;
       OBS: string | null;
+      RESPONSAVEL: string | null;
     }>(`
       SELECT
         s.EMISSAO,
         s.FILIAL,
         s.FILIAL_DESTINO,
+        NULLIF(LTRIM(RTRIM(CAST(s.RESPONSAVEL AS VARCHAR(50)))), '') AS RESPONSAVEL,
         s.ROMANEIO_PRODUTO,
         s.TIPO_ROMANEIO,
         s.ROMANEIO_DESTINO,
@@ -657,6 +814,7 @@ export async function GET(request: NextRequest) {
         obs: r.OBS?.trim() ?? null,
         atualizouEstoque: true,
         statusTransito: null,
+        responsavel: r.RESPONSAVEL?.trim() ?? null,
       });
     }
   } catch (e) {
@@ -665,8 +823,8 @@ export async function GET(request: NextRequest) {
 
   // ── 4. LOJA VENDAS ──
   try {
-    // LOJA_VENDA usa CODIGO_FILIAL (código numérico, sem nome).
-    // Vendas são retornadas sem filtro de filial — o CODIGO_FILIAL é mostrado na tela.
+    // LOJA_VENDA usa CODIGO_FILIAL (código numérico, sem nome); o nome sai do join
+    // com FILIAIS e é por ele que o filtro de filial casa (ver filialFilterV).
     const rows = await query<{
       DATA_VENDA: Date;
       CODIGO_FILIAL: string;
@@ -675,6 +833,7 @@ export async function GET(request: NextRequest) {
       QTDE: number;
       PRECO_LIQUIDO: number;
       QTDE_CANCELADA: number;
+      VENDEDOR_NOME: string | null;
     }>(`
       SELECT
         v.DATA_VENDA,
@@ -683,11 +842,17 @@ export async function GET(request: NextRequest) {
         v.TICKET,
         vp.QTDE,
         vp.PRECO_LIQUIDO,
-        vp.QTDE_CANCELADA
+        vp.QTDE_CANCELADA,
+        NULLIF(ISNULL(
+          LTRIM(RTRIM(CAST(lv.VENDEDOR_APELIDO AS VARCHAR(60)))),
+          LTRIM(RTRIM(CAST(v.VENDEDOR AS VARCHAR(20))))
+        ), '') AS VENDEDOR_NOME
       FROM LOJA_VENDA v WITH (NOLOCK)
       JOIN LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
         ON v.CODIGO_FILIAL = vp.CODIGO_FILIAL AND v.TICKET = vp.TICKET
       LEFT JOIN FILIAIS f WITH (NOLOCK) ON f.COD_FILIAL = vp.CODIGO_FILIAL
+      LEFT JOIN LOJA_VENDEDORES lv WITH (NOLOCK)
+        ON LTRIM(RTRIM(CAST(v.VENDEDOR AS VARCHAR))) = LTRIM(RTRIM(CAST(lv.VENDEDOR AS VARCHAR)))
       WHERE vp.PRODUTO = '${produtoSql}'
         AND vp.COR_PRODUTO = '${corSql}'
         AND ISNULL(vp.NAO_MOVIMENTA_ESTOQUE, 0) = 0
@@ -712,6 +877,7 @@ export async function GET(request: NextRequest) {
         obs: null,
         atualizouEstoque: true,
         statusTransito: null,
+        responsavel: r.VENDEDOR_NOME?.trim() ?? null,
       });
     }
   } catch (e) {
@@ -730,11 +896,13 @@ export async function GET(request: NextRequest) {
       QTDE_SAIDA: number;
       EN1: number;
       OBS: string | null;
+      RESPONSAVEL: string | null;
     }>(`
       SELECT
         ls.EMISSAO,
         ls.FILIAL,
         ls.FILIAL_DESTINO,
+        NULLIF(LTRIM(RTRIM(CAST(ls.RESPONSAVEL AS VARCHAR(50)))), '') AS RESPONSAVEL,
         ls.ROMANEIO_PRODUTO,
         ls.TIPO_ENTRADA_SAIDA,
         t.DESC_TIPO_ENTRADA_SAIDA AS DESC_TIPO,
@@ -767,6 +935,7 @@ export async function GET(request: NextRequest) {
         obs: r.OBS?.trim() ?? null,
         atualizouEstoque: true,
         statusTransito: null,
+        responsavel: r.RESPONSAVEL?.trim() ?? null,
       });
     }
   } catch (e) {
@@ -777,7 +946,7 @@ export async function GET(request: NextRequest) {
   // Esses registros são ajustes gerados pelo módulo de contagem de estoque do Linx.
   // O "Documento" é NOME_CONTAGEM e o "Romaneio/Pedido" é RESPONSAVEL.
   try {
-    const filialFilterCtg = filialSql ? `AND c.FILIAL LIKE '%${filialSql}%'` : "";
+    const filialFilterCtg = filialNome ? `AND ${filialEqualsSql("c.FILIAL", filialNome)}` : "";
     const rows = await query<{
       EMISSAO: Date;
       FILIAL: string;
@@ -820,6 +989,7 @@ export async function GET(request: NextRequest) {
         obs: null,
         atualizouEstoque: true,
         statusTransito: null,
+        responsavel: r.RESPONSAVEL?.trim() ?? null,
       });
     }
   } catch (e) {
@@ -828,7 +998,7 @@ export async function GET(request: NextRequest) {
 
   // ── 7. AJUSTES MANUAIS (NERD_AJUSTE_HISTORICO) ──
   try {
-    const filialFilterNerd = filialSql ? `AND FILIAL LIKE '%${filialSql}%'` : "";
+    const filialFilterNerd = filialNome ? `AND ${filialEqualsSql("FILIAL", filialNome)}` : "";
     const ajustesNerd = await query<{
       ID: number;
       DATA_AJUSTE: Date;
@@ -863,6 +1033,7 @@ export async function GET(request: NextRequest) {
         obs: r.OBS?.trim() ?? null,
         atualizouEstoque: true,
         statusTransito: null,
+        responsavel: r.RESPONSAVEL?.trim() ?? null,
       });
     }
   } catch (e) {
@@ -879,7 +1050,7 @@ export async function GET(request: NextRequest) {
     descCor,
     codigoBarra: resolved?.codigoBarra ?? corOption?.codigoBarra ?? null,
     grade,
-    filial: filial ?? "Todas",
+    filial: filialNome || "TODAS",
     estoqueAtual,
     linha: linhaClassif,
     subgrupo,

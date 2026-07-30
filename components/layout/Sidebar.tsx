@@ -86,6 +86,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     basePath && basePath !== "/" ? `${basePath}/produto-agrupado` : "/produto-agrupado";
   const produtoDescontinuadoHref =
     basePath && basePath !== "/" ? `${basePath}/produto-descontinuado` : "/produto-descontinuado";
+  const vmHref = basePath && basePath !== "/" ? `${basePath}/vm` : "/vm";
   const produtosNovosHref =
     basePath && basePath !== "/" ? `${basePath}/produtos-novos` : "/produtos-novos";
   const painelColecoesHref =
@@ -196,6 +197,20 @@ export default function Sidebar({ companyName }: SidebarProps) {
       permission: "produto-descontinuado",
       isActive: (currentPathname) => !!currentPathname && currentPathname.includes("/produto-descontinuado"),
     },
+    // VM move estoque com ajuste tipo VM — habilitado só para NERD por enquanto.
+    ...(isNerd
+      ? [
+          {
+            key: "vm",
+            label: "VM (Visual Merchandising)",
+            href: vmHref,
+            permission: "vm" as PermissionKey,
+            isActive: (currentPathname: string | null) =>
+              !!currentPathname &&
+              (currentPathname.endsWith("/vm") || currentPathname.includes("/vm/")),
+          },
+        ]
+      : []),
     {
       key: "produto-detalhado",
       label: "Produto Detalhado",
@@ -245,6 +260,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     "/produtos-recentes",
     "/produto-agrupado",
     "/produto-descontinuado",
+    "/vm",
     "/produtos-novos",
     "/painel-colecoes",
     "/relatorio-claude",

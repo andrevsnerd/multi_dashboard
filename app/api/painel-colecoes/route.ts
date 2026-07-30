@@ -4,7 +4,7 @@ import sql from "mssql";
 import { withRequest } from "@/lib/db/connection";
 import { fetchSalesTotals } from "@/lib/services/salesTotals";
 import { fetchCollectionComparativeExtras } from "@/lib/repositories/collectionReport";
-import { getColecaoDescMap } from "@/lib/repositories/colecao";
+import { getColecaoDescMap, getColecaoInicioMatrizMap } from "@/lib/repositories/colecao";
 import { resolveCompanyLive } from "@/lib/server/company-live";
 import { VAREJO_VALUE, type CompanyKey } from "@/lib/config/company";
 import { normalizeRangeForQuery, type NormalizedRange } from "@/lib/utils/date";
@@ -79,6 +79,12 @@ export interface ColecaoPanelItem {
   vendas: number;
   qtdVendida: number;
   skus: number;
+  /**
+   * Início da coleção ("YYYY-MM-DD") = primeira entrada de estoque de um item dela
+   * na MATRIZ. Em agregados (ex.: Galisteu), a mais antiga entre os códigos.
+   * null quando nenhum código teve entrada na Matriz.
+   */
+  inicio: string | null;
   /** Evolução mensal da venda líquida (mesma métrica/escopo de `vendas`), para o
    * mini-gráfico do tema "Com fotos". Escalada para somar `vendas`. */
   months: ColecaoPanelMonthPoint[];
@@ -348,10 +354,21 @@ export async function GET(request: Request) {
       () => new Map<string, string>()
     );
 
+    // ── Início da coleção: primeira entrada na Matriz (independe de período/filial).
+    const inicioByCode = await getColecaoInicioMatrizMap(uniqueCodes, "scarfme").catch(
+      (err) => {
+        console.error("painel-colecoes: falha ao buscar início das coleções", err);
+        return new Map<string, string>();
+      }
+    );
+
     const baseData: Omit<ColecaoPanelItem, "months" | "maxV">[] = COLECOES.map((c) => {
       let vendas = 0;
       let qtd = 0;
       let skus = 0;
+      // Agregado começa na entrada mais antiga entre seus códigos (ordem lexicográfica
+      // de "YYYY-MM-DD" == ordem cronológica).
+      let inicio: string | null = null;
       for (const code of c.codes) {
         const bucket = perCode.get(code);
         if (bucket) {
@@ -361,6 +378,8 @@ export async function GET(request: Request) {
         // Agregados somam SKUs por código (um produto pertence a um só código →
         // conjuntos disjuntos, sem dupla contagem).
         skus += skusByCode.get(code.trim().toUpperCase()) ?? 0;
+        const codeInicio = inicioByCode.get(code.trim().toUpperCase());
+        if (codeInicio && (!inicio || codeInicio < inicio)) inicio = codeInicio;
       }
       const singleCode = c.codes.length === 1 ? c.codes[0].trim().toUpperCase() : null;
       const label =
@@ -373,6 +392,7 @@ export async function GET(request: Request) {
         vendas: round2(vendas),
         qtdVendida: Math.round(qtd),
         skus,
+        inicio,
       };
     });
 

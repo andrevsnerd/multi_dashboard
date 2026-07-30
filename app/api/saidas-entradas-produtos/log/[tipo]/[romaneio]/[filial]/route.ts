@@ -20,8 +20,8 @@ interface PreviewItem {
 
 /**
  * Lê os itens do romaneio (ESTOQUE_PROD1_SAI/ENT) e o estoque atual de cada um
- * na filial do romaneio. Usado tanto pelo preview (GET) quanto pela reversão
- * de estoque do DELETE (modo=retornar).
+ * na filial do romaneio. Usado pelo preview (GET), pela auditoria do DELETE e
+ * pela compensação de estoque do modo=apenas.
  *
  * @param sinal +1 para saída (devolver à origem soma estoque), -1 para entrada
  *              (remover do destino subtrai estoque).
@@ -75,6 +75,56 @@ async function lerItensComEstoque(
         estoqueFinal: estoqueAtual + sinal * qtde,
       };
     });
+  });
+}
+
+/**
+ * Repõe em ESTOQUE_PRODUTOS.ESTOQUE o que os triggers do Linx acabaram de mexer.
+ *
+ * Ao deletar os itens de um romaneio, os triggers LXD_ESTOQUE_PROD1_ENT/SAI já
+ * revertem o estoque sozinhos (`SUM(EN_n)/SUM(SA_n) * -1`). Quem quer o estoque
+ * INALTERADO (modo=apenas) precisa desfazer essa reversão — é isso que esta função
+ * faz, aplicando o efeito OPOSTO ao do trigger.
+ *
+ * Toca só a coluna ESTOQUE porque as colunas de grade (ES1..ES48) o trigger já
+ * deixou certas; mexer nelas aqui reintroduziria divergência entre saldo e grade.
+ *
+ * @param sinal o mesmo sinal da reversão (+1 saída, -1 entrada). A compensação usa
+ *              o operador contrário.
+ */
+async function compensarReversaoDeEstoque(
+  itens: PreviewItem[],
+  filial: string,
+  sinal: 1 | -1
+): Promise<void> {
+  const comQtde = itens.filter((i) => i.qtde !== 0);
+  if (comQtde.length === 0) return;
+
+  const escape = (v: string) => v.replace(/'/g, "''");
+  const values = comQtde
+    .map((i) => `('${escape(i.produto)}','${escape(i.cor)}',${Math.trunc(i.qtde)})`)
+    .join(',');
+
+  // Operador embutido, contrário ao da reversão do trigger — não vem de input do usuário.
+  const op = sinal === 1 ? '-' : '+';
+
+  await withRequest(async (req) => {
+    req.input('filial', sql.VarChar, filial);
+    await req.query(`
+      ;WITH agg(PRODUTO, COR, QTDE) AS (
+        SELECT * FROM (VALUES ${values}) v(PRODUTO, COR, QTDE)
+      )
+      UPDATE ep
+      SET ep.ESTOQUE = ep.ESTOQUE ${op} agg.QTDE
+      FROM ESTOQUE_PRODUTOS ep
+      INNER JOIN FILIAIS f WITH (NOLOCK)
+        ON LTRIM(RTRIM(ep.FILIAL)) = LTRIM(RTRIM(f.FILIAL))
+      INNER JOIN agg
+        ON ep.PRODUTO = agg.PRODUTO
+       AND ISNULL(ep.COR_PRODUTO, '') = agg.COR
+      WHERE (LTRIM(RTRIM(f.COD_FILIAL)) = LTRIM(RTRIM(@filial))
+             OR LTRIM(RTRIM(f.FILIAL)) = LTRIM(RTRIM(@filial)))
+    `);
   });
 }
 
@@ -241,8 +291,19 @@ export async function PUT(
 
 /**
  * DELETE /api/saidas-entradas-produtos/log/[tipo]/[romaneio]/[filial]
- * Remove completamente um log do sistema (apenas admin)
- * NOTA: NÃO reverte o estoque - apenas remove os registros do log
+ * Remove completamente um log do sistema (apenas admin).
+ *
+ * IMPORTANTE — quem reverte o estoque é o Linx, não esta rota. Os triggers
+ * LXD_ESTOQUE_PROD1_ENT / LXD_ESTOQUE_PROD1_SAI (e os equivalentes de
+ * LOJA_ENTRADAS_PRODUTO / LOJA_SAIDAS_PRODUTO) desfazem o movimento assim que os
+ * itens são deletados. Por isso:
+ *
+ *   modo=retornar → só deleta; a reversão vem do trigger.
+ *   modo=apenas   → deleta e DESFAZ a reversão do trigger, para o estoque ficar igual.
+ *
+ * Esta rota já fez um `UPDATE ESTOQUE_PRODUTOS` "de reversão" além do trigger, o que
+ * descontava/creditava DUAS vezes: o romaneio de entrada 834279 (NERD, 23/07/2026)
+ * deixou 50 itens negativos e 134 unidades a menos. Não reintroduzir esse UPDATE.
  */
 export async function DELETE(
   request: NextRequest,
@@ -267,51 +328,26 @@ export async function DELETE(
       );
     }
 
-    // modo=apenas (default): só remove os registros, não mexe no estoque.
-    // modo=retornar: reverte o efeito de estoque do romaneio antes de remover.
+    // modo=apenas (default): remove os registros e mantém o estoque como está.
+    // modo=retornar: remove os registros e deixa a reversão do trigger valer.
     const modo = request.nextUrl.searchParams.get('modo') === 'retornar'
       ? 'retornar'
       : 'apenas';
 
-    // Lê os itens (qtd + estoque atual) ANTES de qualquer delete, para auditoria.
-    // saída: itens saíram da origem → devolver soma estoque (+).
-    // entrada: itens entraram no destino → retornar remove estoque (-).
+    // Lê os itens (qtd + estoque atual) ANTES dos deletes: depois deles não há mais
+    // de onde ler. Serve para a auditoria e para a compensação do modo=apenas.
+    // saída: itens saíram da origem → o trigger devolve (+).
+    // entrada: itens entraram no destino → o trigger remove (-).
     const sinal: 1 | -1 = tipo === 'saida' ? 1 : -1;
-    const itensRevertidos: PreviewItem[] =
-      modo === 'retornar' ? await lerItensComEstoque(tipo, romaneio, filial, sinal) : [];
+    const itensDoRomaneio = await lerItensComEstoque(tipo, romaneio, filial, sinal);
 
-    // Reversão de estoque + deletes na mesma conexão, em ordem (reversão antes
-    // dos deletes, pois agrega a partir dos itens ainda presentes no banco).
     await withRequest(async (req) => {
       req.input('romaneio', sql.VarChar, romaneio);
       req.input('filial', sql.VarChar, filial);
 
-      if (modo === 'retornar') {
-        // Espelha o ajuste manual de ESTOQUE_PRODUTOS do editar-qtd.
-        // Operador embutido (+/-) conforme o tipo — não vem de input do usuário.
-        const op = tipo === 'saida' ? '+' : '-';
-        await req.query(`
-          UPDATE ep
-          SET ep.ESTOQUE = ep.ESTOQUE ${op} agg.QTDE
-          FROM ESTOQUE_PRODUTOS ep
-          INNER JOIN FILIAIS f WITH (NOLOCK)
-            ON LTRIM(RTRIM(ep.FILIAL)) = LTRIM(RTRIM(f.FILIAL))
-          INNER JOIN (
-            SELECT PRODUTO, ISNULL(COR_PRODUTO, '') AS COR, SUM(ISNULL(QTDE, 0)) AS QTDE
-            FROM ${tipo === 'saida' ? 'ESTOQUE_PROD1_SAI' : 'ESTOQUE_PROD1_ENT'} WITH (NOLOCK)
-            WHERE ROMANEIO_PRODUTO = @romaneio
-              AND LTRIM(RTRIM(FILIAL)) = LTRIM(RTRIM(@filial))
-            GROUP BY PRODUTO, ISNULL(COR_PRODUTO, '')
-          ) agg
-            ON ep.PRODUTO = agg.PRODUTO
-           AND ISNULL(ep.COR_PRODUTO, '') = agg.COR
-          WHERE (LTRIM(RTRIM(f.COD_FILIAL)) = LTRIM(RTRIM(@filial))
-                 OR LTRIM(RTRIM(f.FILIAL)) = LTRIM(RTRIM(@filial)))
-        `);
-      }
-
       if (tipo === 'saida') {
-        // Deletar registros relacionados (sem reverter estoque)
+        // Deletar registros relacionados. Cada DELETE dispara o trigger LXD do Linx,
+        // que já devolve o estoque à origem — não somar isso de novo aqui.
         await req.query(`
           DELETE FROM ESTOQUE_PROD1_SAI
           WHERE ROMANEIO_PRODUTO = @romaneio AND FILIAL = @filial
@@ -332,7 +368,8 @@ export async function DELETE(
           WHERE ROMANEIO_PRODUTO = @romaneio AND FILIAL = @filial
         `);
       } else {
-        // ENTRADA - Deletar registros relacionados (sem reverter estoque)
+        // ENTRADA - Deletar registros relacionados. Cada DELETE dispara o trigger LXD do
+        // Linx, que já retira o estoque do destino — não subtrair isso de novo aqui.
         await req.query(`
           DELETE FROM ESTOQUE_PROD1_ENT
           WHERE ROMANEIO_PRODUTO = @romaneio AND FILIAL = @filial
@@ -355,15 +392,39 @@ export async function DELETE(
       }
     });
 
-    // Auditoria (não-bloqueante). Saída devolve (+qtd), entrada remove (-qtd).
-    if (modo === 'retornar' && itensRevertidos.length > 0) {
+    // modo=apenas: desfaz a reversão que o trigger acabou de aplicar, para o estoque
+    // ficar exatamente como estava. Feito DEPOIS dos deletes — é o trigger deles que
+    // move o estoque.
+    if (modo === 'apenas') {
+      await compensarReversaoDeEstoque(itensDoRomaneio, filial, sinal);
+    }
+
+    // Auditoria (não-bloqueante) — é o ÚNICO rastro que sobra de um romaneio excluído:
+    // as tabelas de origem são apagadas e nenhuma outra guarda os itens.
+    //
+    // QTDE_AJUSTE é o efeito LÍQUIDO no estoque, porque é assim que o Extrato de Produto
+    // soma a linha:
+    //   retornar → 0: o romaneio saiu do histórico e o estoque caiu junto, então o saldo
+    //              do extrato já fecha sem esta linha. A quantidade fica na OBS.
+    //   apenas   → efeito contrário ao da reversão: o movimento desapareceu do histórico
+    //              mas o estoque foi mantido, e sem esta linha o extrato não fecharia.
+    if (itensDoRomaneio.length > 0) {
+      const rotulo = modo === 'retornar'
+        ? `Romaneio ${romaneio} excluído com retorno de estoque (${tipo})`
+        : `Romaneio ${romaneio} excluído sem alterar o estoque (${tipo})`;
       inserirAjuste({
         filial,
-        itens: itensRevertidos.map((i) => ({ produto: i.produto, cor: i.cor, qtde: sinal * i.qtde })),
+        itens: itensDoRomaneio.map((i) => ({
+          produto: i.produto,
+          cor: i.cor,
+          qtde: modo === 'retornar' ? 0 : -sinal * i.qtde,
+          obs: `${rotulo} — ${i.qtde} un no romaneio`,
+        })),
         romaneioRef: romaneio,
         tipoAjuste: tipo === 'saida' ? 'EXCLUSAO_ROMANEIO_SAIDA' : 'EXCLUSAO_ROMANEIO_ENTRADA',
         responsavel: username ?? undefined,
-        obs: `Romaneio ${romaneio} excluído com retorno de estoque (${tipo})`,
+        obs: rotulo,
+        registrarZerados: true,
       }).catch((err) => console.error('[ajuste-historico] Falha ao registrar auditoria de exclusão:', err));
     }
 
@@ -373,7 +434,7 @@ export async function DELETE(
         ? 'Romaneio removido e estoque revertido com sucesso'
         : 'Romaneio removido com sucesso',
       modo,
-      itensRevertidos: modo === 'retornar' ? itensRevertidos.length : 0,
+      itensRevertidos: modo === 'retornar' ? itensDoRomaneio.length : 0,
     });
   } catch (error) {
     console.error('Erro ao remover log', error);

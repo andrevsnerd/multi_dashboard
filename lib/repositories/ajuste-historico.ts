@@ -24,7 +24,15 @@ export async function ensureAjusteTableExists(): Promise<void> {
 export interface AjusteItem {
   produto: string;
   cor: string;
+  /**
+   * Efeito no estoque, e é assim que o Extrato de Produto soma a linha. Zero é um
+   * registro DOCUMENTAL (o romaneio deixou de existir mas o estoque não mudou de
+   * verdade) — nesse caso a quantidade do romaneio vive na `obs`, para não somar
+   * duas vezes no saldo. Ver `registrarZerados`.
+   */
   qtde: number;
+  /** OBS específica deste item; vence a `obs` do payload quando presente. */
+  obs?: string;
 }
 
 export interface AjustePayload {
@@ -34,12 +42,17 @@ export interface AjustePayload {
   tipoAjuste?: string;
   responsavel?: string;
   obs?: string;
+  /**
+   * Grava também itens com qtde = 0. Serve para registrar por que um romaneio
+   * desapareceu do histórico sem inventar movimento de estoque no Extrato.
+   */
+  registrarZerados?: boolean;
 }
 
 export async function inserirAjuste(payload: AjustePayload): Promise<void> {
   await ensureAjusteTableExists();
   for (const item of payload.itens) {
-    if (item.qtde === 0) continue;
+    if (item.qtde === 0 && !payload.registrarZerados) continue;
     await withRequest(async (req) => {
       req.input('filial', sql.VarChar, payload.filial);
       req.input('produto', sql.VarChar, item.produto);
@@ -48,7 +61,7 @@ export async function inserirAjuste(payload: AjustePayload): Promise<void> {
       req.input('romaneioRef', sql.VarChar, payload.romaneioRef ?? null);
       req.input('tipoAjuste', sql.VarChar, payload.tipoAjuste ?? null);
       req.input('responsavel', sql.VarChar, payload.responsavel ?? null);
-      req.input('obs', sql.VarChar, payload.obs ?? null);
+      req.input('obs', sql.VarChar, item.obs ?? payload.obs ?? null);
       await req.query(`
         INSERT INTO ${TABLE} (FILIAL, PRODUTO, COR_PRODUTO, QTDE_AJUSTE, ROMANEIO_REF, TIPO_AJUSTE, RESPONSAVEL, OBS)
         VALUES (@filial, @produto, @cor, @qtde, @romaneioRef, @tipoAjuste, @responsavel, @obs)
