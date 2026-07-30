@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { findUserByUsername } from '@/lib/auth/users-store';
 import { inserirAjuste, ensureAjusteTableExists } from '@/lib/repositories/ajuste-historico';
+import { resolveResponsavelLinx } from '@/lib/server/responsavel-linx';
 import { query } from '@/lib/db/connection';
 
 async function isAdmin(username: string | null): Promise<boolean> {
@@ -40,7 +41,7 @@ export async function GET(request: NextRequest) {
     itens,
     romaneioRef: '031100',
     tipoAjuste: 'EDICAO_ROMANEIO_SAIDA',
-    responsavel: username ?? 'admin',
+    responsavel: await resolveResponsavelLinx(username),
     obs,
   });
 

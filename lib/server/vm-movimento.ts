@@ -4,7 +4,7 @@ import { query } from "@/lib/db/connection";
 import { getConnectionPool } from "@/lib/db/connection";
 import { shouldUseProxy, ProxyPool } from "@/lib/db/proxy";
 import { resolverNomeFilial } from "@/lib/repositories/ajusteEstoque";
-import { getPermissaoByUsername } from "@/lib/utils/transferencia-permissoes-store";
+import { resolveResponsavelLinx } from "@/lib/server/responsavel-linx";
 import { executeSaidaLote, executeEntradaLote } from "@/lib/saida-entrada-executor";
 import type { CompanyKey } from "@/lib/config/company";
 import {
@@ -308,10 +308,9 @@ export async function executarMovimentoVm(
   const preview = await montarPreviewVm(pedido);
   const pool = shouldUseProxy() ? new ProxyPool() : await getConnectionPool();
 
-  // Responsável do romaneio: mesma convenção da tela Saídas e Entradas — o valor
-  // configurado pelo admin para o login. Quem fez a operação fica no nosso log e na OBS.
-  const permissao = await getPermissaoByUsername(usuario).catch(() => null);
-  const responsavel = permissao?.responsavelPadrao || "LOGISTICA";
+  // Responsável do romaneio: o usuário do LINX atrelado ao login, mesma regra de
+  // Saídas e Entradas. Quem fez a operação fica no nosso log e na OBS.
+  const responsavel = await resolveResponsavelLinx(usuario);
 
   const direcoes: VmMovimentoResultadoDirecao[] = [];
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withRequest } from '@/lib/db/connection';
 import { findUserByUsername } from '@/lib/auth/users-store';
 import { inserirAjuste } from '@/lib/repositories/ajuste-historico';
+import { resolveResponsavelLinx } from '@/lib/server/responsavel-linx';
 import sql from 'mssql';
 
 async function isAdmin(username: string | null): Promise<boolean> {
@@ -422,7 +423,7 @@ export async function DELETE(
         })),
         romaneioRef: romaneio,
         tipoAjuste: tipo === 'saida' ? 'EXCLUSAO_ROMANEIO_SAIDA' : 'EXCLUSAO_ROMANEIO_ENTRADA',
-        responsavel: username ?? undefined,
+        responsavel: await resolveResponsavelLinx(username),
         obs: rotulo,
         registrarZerados: true,
       }).catch((err) => console.error('[ajuste-historico] Falha ao registrar auditoria de exclusão:', err));

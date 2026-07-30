@@ -5,6 +5,7 @@ import { shouldUseProxy, ProxyPool } from '@/lib/db/proxy';
 import { findUserByUsername } from '@/lib/auth/users-store';
 import { isReadOnlyRole } from '@/lib/auth/permissions';
 import { estornarContagem } from '@/lib/ajuste-estoque-executor';
+import { resolveResponsavelLinx } from '@/lib/server/responsavel-linx';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,7 +52,7 @@ export async function POST(request: Request) {
       nomeOriginal,
       novoNome,
       emissao: `${dataHoje} 00:00:00`,
-      responsavel: username,
+      responsavel: await resolveResponsavelLinx(username),
     });
 
     return NextResponse.json(resultado);

@@ -5,6 +5,7 @@ import { shouldUseProxy, ProxyPool } from '@/lib/db/proxy';
 import { findUserByUsername } from '@/lib/auth/users-store';
 import { isReadOnlyRole } from '@/lib/auth/permissions';
 import { resolveCompany } from '@/lib/config/company';
+import { resolveResponsavelLinx } from '@/lib/server/responsavel-linx';
 import { estoqueDeItensPorFilial } from '@/lib/repositories/ajusteEstoque';
 import {
   executarAjusteContagem,
@@ -112,7 +113,7 @@ export async function POST(request: Request) {
           filialNome: f.nome,
           nomeContagem,
           emissao: `${body.dataContagem} 00:00:00`,
-          responsavel: username,
+          responsavel: await resolveResponsavelLinx(username),
           obs: obs ?? `ZERAR ITEM (${itens.length} SKU)`,
           itens: f.itens.map((it) => ({ produto: it.produto, cor: it.cor, contagem: 0 })),
         });

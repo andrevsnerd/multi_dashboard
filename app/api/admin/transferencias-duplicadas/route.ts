@@ -4,6 +4,7 @@ import sql from 'mssql';
 import { findUserByUsername } from '@/lib/auth/users-store';
 import { withRequest } from '@/lib/db/connection';
 import { inserirAjuste } from '@/lib/repositories/ajuste-historico';
+import { resolveResponsavelLinx } from '@/lib/server/responsavel-linx';
 import { getContadorConfirmadosByCompany } from '@/lib/utils/romaneio-confirmacao-store';
 import { resolveCompanyDynamic } from '@/lib/config/company-server';
 import { hasPostgres } from '@/lib/db/neon';
@@ -362,6 +363,9 @@ export async function POST(request: NextRequest) {
     const removidos: Array<{ romaneio: string; filial: string; itens: ItemSaida[] }> = [];
     const pulados: Array<{ romaneio: string; filial: string; motivo: string }> = [];
 
+    // Resolvido uma vez: o vínculo não muda no meio do lote.
+    const responsavelLinx = await resolveResponsavelLinx(auth.username);
+
     for (const alvo of remover) {
       const romaneio = (alvo.romaneio || '').trim();
       const filial = (alvo.filial || '').trim();
@@ -398,7 +402,7 @@ export async function POST(request: NextRequest) {
         itens: itens.map((i) => ({ produto: i.produto, cor: i.cor, qtde: i.qtde })),
         romaneioRef: romaneio,
         tipoAjuste: 'EXCLUSAO_DUPLICADA_SAIDA',
-        responsavel: auth.username,
+        responsavel: responsavelLinx,
         obs: `Duplicata removida (retorno à origem). Romaneio ${romaneio} / ${filial}.`,
       }).catch((err) => console.error('[transferencias-duplicadas] auditoria falhou:', err));
     }

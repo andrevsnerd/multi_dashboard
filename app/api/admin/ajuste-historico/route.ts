@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { findUserByUsername } from '@/lib/auth/users-store';
 import { inserirAjuste, AjustePayload } from '@/lib/repositories/ajuste-historico';
+import { resolveResponsavelLinx } from '@/lib/server/responsavel-linx';
 
 async function isAdmin(username: string | null): Promise<boolean> {
   if (!username) return false;
@@ -59,7 +60,9 @@ export async function POST(request: NextRequest) {
       itens,
       romaneioRef: body.romaneioRef,
       tipoAjuste: body.tipoAjuste ?? 'AJUSTE_MANUAL',
-      responsavel: body.responsavel ?? username ?? undefined,
+      // Sempre o usuário do Linx atrelado ao login — nem o do dashboard, nem o que o
+      // cliente mandou no body.
+      responsavel: await resolveResponsavelLinx(username),
       obs: body.obs,
     });
     return NextResponse.json({ success: true, inseridos: itens.length });

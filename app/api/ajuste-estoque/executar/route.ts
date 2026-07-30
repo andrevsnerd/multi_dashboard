@@ -6,6 +6,7 @@ import { findUserByUsername } from '@/lib/auth/users-store';
 import { isReadOnlyRole } from '@/lib/auth/permissions';
 import { resolverNomeFilial } from '@/lib/repositories/ajusteEstoque';
 import { executarAjusteContagem, type AjusteContagemItem } from '@/lib/ajuste-estoque-executor';
+import { resolveResponsavelLinx } from '@/lib/server/responsavel-linx';
 
 export const dynamic = 'force-dynamic';
 
@@ -75,7 +76,7 @@ export async function POST(request: Request) {
       filialNome,
       nomeContagem: nomeContagem.trim(),
       emissao: `${dataContagem} 00:00:00`,
-      responsavel: username,
+      responsavel: await resolveResponsavelLinx(username),
       obs: obs ?? null,
       itens,
     });

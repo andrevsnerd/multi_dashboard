@@ -4,6 +4,7 @@ import { shouldUseProxy, ProxyPool } from '@/lib/db/proxy';
 import { findUserByUsername } from '@/lib/auth/users-store';
 import { readOnlyBlock } from '@/lib/auth/route-guards';
 import { getPermissaoByUsername } from '@/lib/utils/transferencia-permissoes-store';
+import { resolveResponsavelLinx } from '@/lib/server/responsavel-linx';
 import { setDestinoRomaneio } from '@/lib/utils/destino-romaneio-store';
 import {
   insertTransferenciasPendentes,
@@ -227,9 +228,9 @@ export async function POST(request: Request) {
       }
     }
 
-    // Responsável: sempre usa o configurado pelo admin para aquele login.
+    // Responsável: sempre o usuário do LINX atrelado ao login (resolveResponsavelLinx).
     // O valor enviado pelo cliente é completamente ignorado.
-    const responsavelFinal = permissao?.responsavelPadrao || 'LOGISTICA';
+    const responsavelFinal = await resolveResponsavelLinx(username);
 
     const pool = shouldUseProxy() ? new ProxyPool() : await getConnectionPool();
     const result = tipoOperacao === 'saida'

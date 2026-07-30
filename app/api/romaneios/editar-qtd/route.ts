@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withRequest } from '@/lib/db/connection';
 import { findUserByUsername } from '@/lib/auth/users-store';
 import { inserirAjuste } from '@/lib/repositories/ajuste-historico';
+import { resolveResponsavelLinx } from '@/lib/server/responsavel-linx';
 import sql from 'mssql';
 
 async function podeEditarQtdRomaneio(username: string | null): Promise<boolean> {
@@ -144,7 +145,7 @@ export async function PUT(request: NextRequest) {
       itens: [{ produto, cor, qtde: qtdeAjuste }],
       romaneioRef: romaneio,
       tipoAjuste: tipo === 'saida' ? 'EDICAO_ROMANEIO_SAIDA' : 'EDICAO_ROMANEIO_ENTRADA',
-      responsavel: username ?? undefined,
+      responsavel: await resolveResponsavelLinx(username),
       obs: `Qtde ${tipo} ajustada: ${qtdeAtual} → ${qtdeNova}`,
     }).catch((err) => console.error('[ajuste-historico] Falha ao registrar auditoria:', err));
 

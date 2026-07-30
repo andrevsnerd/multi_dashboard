@@ -8,6 +8,7 @@ import { getConnectionPool } from '@/lib/db/connection';
 import { shouldUseProxy, forwardTransferToProxy } from '@/lib/db/proxy';
 import { executeTransfer } from '@/lib/transfer-executor';
 import { getPermissaoByUsername } from '@/lib/utils/transferencia-permissoes-store';
+import { resolveResponsavelLinx } from '@/lib/server/responsavel-linx';
 
 interface TransferenciaRequest {
   produto: string;
@@ -17,6 +18,11 @@ interface TransferenciaRequest {
   qtdeSaida: number;
   qtdeEntrada: number;
   tipoRomaneio?: string;
+  /**
+   * IGNORADO. O responsável gravado no Linx é sempre o usuário do Linx atrelado ao
+   * login (resolveResponsavelLinx) — o cliente não escolhe em nome de quem grava.
+   * Mantido no tipo só para não quebrar chamadores antigos que ainda mandam.
+   */
   responsavel?: string;
   observacao?: string | null;
   companyKey?: string;
@@ -58,7 +64,6 @@ export async function POST(request: Request) {
       qtdeSaida,
       qtdeEntrada,
       tipoRomaneio = 'TRANSFERENCIA',
-      responsavel = 'LOGISTICA',
       observacao = null,
       companyKey,
       idempotencyKey = null,
@@ -81,6 +86,9 @@ export async function POST(request: Request) {
         { status: 401 }
       );
     }
+
+    // Responsável gravado no Linx: o usuário do Linx atrelado a este login.
+    const responsavel = await resolveResponsavelLinx(username);
 
     {
       const user = await findUserByUsername(username);
