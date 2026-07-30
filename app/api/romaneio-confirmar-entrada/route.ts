@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { findUserByUsername } from "@/lib/auth/users-store";
-import { isReadOnlyRole } from "@/lib/auth/permissions";
+import { isReadOnlyRole, canConfirmarEntradaDefeito } from "@/lib/auth/permissions";
 import { getPermissaoByUsername } from "@/lib/utils/transferencia-permissoes-store";
 import {
   getConfirmados,
@@ -104,13 +104,18 @@ export async function POST(request: Request) {
       );
     }
 
-    // Verifica permissão da filialDestino
-    if (user.role !== "admin") {
+    // Verifica permissão da filialDestino.
+    // Exceção: a filial de DEFEITO (NERD DEFEITOS / BAZAR SCARF ME) é aprovada pela
+    // MATRIZ, então a logística confirma entrada nela mesmo estando atribuída a outra
+    // filial — e mesmo sem registro em transferencia_permissoes.
+    const fd = (filialDestinoAtiva || "").trim();
+    const ehDefeitoAprovadoPelaMatriz = canConfirmarEntradaDefeito(user, companyKey, fd);
+
+    if (user.role !== "admin" && !ehDefeitoAprovadoPelaMatriz) {
       const permissao = await getPermissaoByUsername(username);
       if (!permissao) {
         return NextResponse.json({ error: "Sem permissão configurada." }, { status: 403 });
       }
-      const fd = (filialDestinoAtiva || "").trim();
       const filialOk =
         !permissao.filialAtribuida ||
         permissao.filialAtribuida === "TODAS" ||

@@ -6,13 +6,8 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { fetchLogEntradas, fetchProductEntries } from '@/lib/repositories/logEntradas';
 import { fetchLogSaidas, fetchDefeitos } from '@/lib/repositories/logSaidas';
 import { resolveCompanyDynamic } from '@/lib/config/company-server';
+import { getDefeitoFilial } from '@/lib/config/filiais-especiais';
 import { empresaSchema, dataSchema, texto } from '@/lib/mcp/shared';
-
-/** Filial de destino que representa "defeito" em cada empresa. */
-const DEFEITO_FILIAL_DESTINO: Record<string, string> = {
-  nerd: 'NERD DEFEITOS',
-  scarfme: 'BAZAR SCARF ME',
-};
 
 function mesAtualRange(): { inicio: string; fim: string } {
   const hoje = new Date();
@@ -159,7 +154,7 @@ export function registerRomaneioTools(server: McpServer) {
       },
     },
     async ({ empresa, inicio, fim, filial, responsavel, produto, busca, porCor, limite }) => {
-      const destino = DEFEITO_FILIAL_DESTINO[empresa];
+      const destino = getDefeitoFilial(empresa);
       if (!destino) {
         return texto({ empresa, erro: `Empresa "${empresa}" não tem filial de defeito mapeada.` });
       }

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 
 import { useAuth } from "@/components/auth/AuthContext";
+import { getDefeitoFilial } from "@/lib/config/filiais-especiais";
 import { formatRomaneioDateTimeBrasilia } from "@/lib/utils/romaneios-date";
 import RomaneioDeleteModal from "./RomaneioDeleteModal";
 import styles from "./RomaneioDetalhePage.module.css";
@@ -223,11 +224,6 @@ async function saveDestinoRomaneio(
 
 // ---------- componente ----------
 
-const DEFEITO_FILIAL_DESTINO: Record<string, string> = {
-  nerd: 'NERD DEFEITOS',
-  scarfme: 'BAZAR SCARF ME',
-};
-
 const MATRIZ_EXCLUIDA_DESTINO: Record<string, string> = {
   nerd: 'NERD',
   scarfme: 'SCARF ME - MATRIZ',
@@ -393,7 +389,7 @@ export default function RomaneioDetalhePage({
 
   useEffect(() => {
     const matrizExcluida = MATRIZ_EXCLUIDA_DESTINO[companySlug];
-    const defeitoFilial = DEFEITO_FILIAL_DESTINO[companySlug];
+    const defeitoFilial = getDefeitoFilial(companySlug);
     const isDefeito = (tipoRomaneio || "").toUpperCase() === 'DEFEITO';
 
     const applyFilter = (data: FilialOption[]): FilialOption[] => {

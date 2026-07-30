@@ -446,7 +446,6 @@
   "444": "vm-setup/install.sh",
   "445": "PM2 process manager",
   "446": "proxy-server (pm2 managed process)",
-  "447": "isCompraTransitoDateActive",
   "455": "inventory.ts",
   "462": "page.tsx",
   "465": "diag-giro-reconcile.mjs"

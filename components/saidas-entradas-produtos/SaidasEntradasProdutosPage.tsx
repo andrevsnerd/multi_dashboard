@@ -8,6 +8,7 @@ import {
   resolveCompany,
   getFilialLabelForDisplay,
 } from "@/lib/config/company";
+import { getDefeitoFilial } from "@/lib/config/filiais-especiais";
 import { useAuth } from "@/components/auth/AuthContext";
 
 import styles from "./SaidasEntradasProdutosPage.module.css";
@@ -57,10 +58,10 @@ interface TransferenciaLog {
   status: string;
 }
 
-const DEFEITO_FILIAL_SAIDA: Partial<Record<string, Filial>> = {
-  nerd: { codFilial: 'NERD DEFEITOS', filial: 'NERD DEFEITOS' },
-  scarfme: { codFilial: 'BAZAR SCARF ME', filial: 'BAZAR SCARF ME' },
-};
+function defeitoFilialOption(companyKey: string): Filial | undefined {
+  const nome = getDefeitoFilial(companyKey);
+  return nome ? { codFilial: nome, filial: nome } : undefined;
+}
 
 // Tipos de romaneio que não possuem filial destino (igual a SAÍDA MKT)
 const TIPOS_SEM_FILIAL_DESTINO = [
@@ -527,7 +528,7 @@ export default function SaidasEntradasProdutosPage({
 
   const filiaisDestinoVisiveis = useMemo<Filial[]>(() => {
     const isDefeito = tipoRomaneioSelecionado.toUpperCase() === 'DEFEITO';
-    const defeitoFilial = DEFEITO_FILIAL_SAIDA[companyKey];
+    const defeitoFilial = defeitoFilialOption(companyKey);
     if (isDefeito && defeitoFilial) {
       return [defeitoFilial];
     }

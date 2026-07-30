@@ -1,5 +1,6 @@
 import { LEGACY_PERMISSION_FALLBACKS } from "@/lib/config/page-permissions";
 import { NAV_ROUTE_MAP } from "@/lib/config/nav-route-map";
+import { isFilialDefeito } from "@/lib/config/filiais-especiais";
 import type { CompanyKey, PermissionKey, RoleKey, UserSession } from "@/types/auth";
 
 const ALL_COMPANIES: CompanyKey[] = ["nerd", "scarfme", "corporativo"];
@@ -74,6 +75,25 @@ export const ALL_FILIAIS_ROLES: RoleKey[] = ["admin", "diretor", "supervisor", "
 /** True se a funcao ve todas as filiais em transferencias/romaneios. */
 export function seesAllFiliais(role: RoleKey | undefined | null): boolean {
   return !!role && ALL_FILIAIS_ROLES.includes(role);
+}
+
+/**
+ * Excecao pontual a filialAtribuida: quem aprova os romaneios de DEFEITO e a
+ * MATRIZ (logistica), nao a loja que enviou. Entao a logistica confirma entrada
+ * na filial de defeito da empresa (NERD DEFEITOS / BAZAR SCARF ME) ALEM da sua
+ * filial atribuida. Nao libera nenhuma outra filial.
+ */
+export const DEFEITO_ENTRADA_ROLES: RoleKey[] = ["admin", "logistica"];
+
+/** True se o usuario pode confirmar entrada nesta filial por ela ser a de defeito da empresa. */
+export function canConfirmarEntradaDefeito(
+  user: UserSession | null,
+  companyKey: string,
+  filialDestino: string | null | undefined
+): boolean {
+  if (!user || !DEFEITO_ENTRADA_ROLES.includes(user.role)) return false;
+  if (!canAccessCompany(user, companyKey)) return false;
+  return isFilialDefeito(companyKey, filialDestino);
 }
 
 /**
