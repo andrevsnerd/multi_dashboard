@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { findUserByUsername } from "@/lib/auth/users-store";
 import { isReadOnlyRole, canConfirmarEntradaDefeito } from "@/lib/auth/permissions";
 import { getPermissaoByUsername } from "@/lib/utils/transferencia-permissoes-store";
+import { operaNaFilial } from "@/lib/utils/transferencia-permissoes-filiais";
 import {
   getConfirmados,
   confirmarItem,
@@ -120,6 +121,8 @@ export async function POST(request: Request) {
         !permissao.filialAtribuida ||
         permissao.filialAtribuida === "TODAS" ||
         permissao.filialAtribuida === fd ||
+        // Filiais adicionais de operação (ex.: logística que também recebe em NERD DEFEITOS).
+        operaNaFilial(permissao, companyConfig, fd) ||
         permissao.filiaisDestino.length === 0 ||
         permissao.filiaisDestino.some((f) => getActiveFilial(companyConfig, f || "").trim() === fd);
       if (!filialOk) {

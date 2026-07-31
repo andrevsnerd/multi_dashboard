@@ -47,6 +47,48 @@ export function comFilialDefeito(
   return jaTem ? filiais : [...filiais, defeito];
 }
 
+/**
+ * Opção de filial especial no formato dos selects/checkboxes de filial.
+ * `codFilial` = o próprio nome: essas filiais não têm código no registry e o
+ * sistema inteiro já as identifica pelo nome (ver `defeitoFilialOption`).
+ */
+export interface FilialEspecialOption {
+  codFilial: string;
+  filial: string;
+  displayName: string;
+  /** Marca a opção como filial fora do registry (não é loja). */
+  especial: true;
+}
+
+/**
+ * Filiais especiais que podem ser atribuídas a um usuário no Admin (filial
+ * atribuída ou filial adicional de operação). Sem elas a logística não consegue
+ * receber/confirmar entrada de romaneio de DEFEITO, porque a filial de defeito
+ * não vem de `/api/transferencia-produtos/filiais` (fora do registry).
+ *
+ * `companyKey` vazio/null = as duas empresas (form em "Ambas").
+ */
+export function filiaisEspeciaisOptions(companyKey?: string | null): FilialEspecialOption[] {
+  const key = (companyKey || '').trim().toLowerCase();
+  const nomes = key
+    ? [DEFEITO_FILIAL_POR_EMPRESA[key]].filter(Boolean)
+    : Object.values(DEFEITO_FILIAL_POR_EMPRESA);
+
+  return nomes.map((nome) => ({
+    codFilial: nome,
+    filial: nome,
+    displayName: nome,
+    especial: true as const,
+  }));
+}
+
+/** True se `filial` é uma das filiais especiais (hoje: a filial de defeito). */
+export function isFilialEspecial(filial: string | null | undefined): boolean {
+  const alvo = normalizeNome(filial);
+  if (!alvo) return false;
+  return Object.values(DEFEITO_FILIAL_POR_EMPRESA).some((nome) => normalizeNome(nome) === alvo);
+}
+
 /** True se `filial` é a filial de defeito da empresa informada. */
 export function isFilialDefeito(
   companyKey: string | null | undefined,

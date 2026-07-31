@@ -96,6 +96,8 @@ interface TransferenciaPermissao {
   tipoRomaneioFixo: boolean;
   /** Filial atribuída ao usuário — usada como fallback quando filiaisOrigem/filiaisDestino está vazio. */
   filialAtribuida?: string | null;
+  /** Filiais extras onde o usuário também opera (ex.: NERD DEFEITOS para a logística). */
+  filiaisAdicionais?: string[];
 }
 
 type TipoOperacao = "saida" | "entrada";
@@ -595,19 +597,50 @@ export default function SaidasEntradasProdutosPage({
         // Aplicar filtros de permissão se existirem
         if (permissoes) {
           /**
+           * Filiais ADICIONAIS de operação: entram sempre, além do que a lista
+           * de origem/destino permite. A filial de defeito não vem da API de
+           * filiais (fora do registry), então é acrescentada como opção aqui —
+           * sem isso a logística não teria onde lançar a entrada do defeito.
+           */
+          const adicionais = permissoes.filiaisAdicionais ?? [];
+          const candidatas = (() => {
+            const defeito = defeitoFilialOption(companyKey);
+            const precisaDefeito =
+              defeito &&
+              adicionais.some((cod) => matchesFilialOption(defeito, cod)) &&
+              !data.some((f) => matchesFilialOption(f, defeito.codFilial));
+            return precisaDefeito && defeito ? [...data, defeito] : data;
+          })();
+
+          const extras = adicionais.length > 0
+            ? candidatas.filter((f) => adicionais.some((cod) => matchesFilialOption(f, cod)))
+            : [];
+
+          /**
            * Resolve a lista de filiais visíveis para a operação:
            * 1. Se há lista explícita (filiaisOrigem / filiaisDestino) → usa ela
            * 2. Se não há lista mas há filialAtribuida → restringe a essa filial
            * 3. Senão → todas as filiais
+           * Em 1 e 2 as filiais adicionais são somadas; em 3 já está tudo liberado.
            */
           const resolveFiliais = (lista: string[]) => {
+            const comExtras = (base: Filial[]) => {
+              const faltando = extras.filter(
+                (e) => !base.some((f) => f.codFilial === e.codFilial)
+              );
+              return faltando.length > 0 ? [...base, ...faltando] : base;
+            };
             if (lista.length > 0) {
-              return data.filter((f) => lista.some((cod) => matchesFilialOption(f, cod)));
+              return comExtras(
+                candidatas.filter((f) => lista.some((cod) => matchesFilialOption(f, cod)))
+              );
             }
             if (permissoes.filialAtribuida) {
-              return data.filter((f) => matchesFilialOption(f, permissoes.filialAtribuida));
+              return comExtras(
+                candidatas.filter((f) => matchesFilialOption(f, permissoes.filialAtribuida))
+              );
             }
-            return data;
+            return candidatas;
           };
 
           const filiaisPermitidas = tipoOperacao === "saida"

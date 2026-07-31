@@ -215,11 +215,22 @@ export async function POST(request: Request) {
           { status: 403 }
         );
       }
-      const filialOk = tipoOperacao === 'saida'
-        ? (permissao.filiaisOrigem.length === 0 ||
-           (await Promise.all(permissao.filiaisOrigem.map((p) => getActiveFilialForRequest(companyKey, (p || '').trim())))).some((a) => a === filialTrim))
-        : (permissao.filiaisDestino.length === 0 ||
-           (await Promise.all(permissao.filiaisDestino.map((p) => getActiveFilialForRequest(companyKey, (p || '').trim())))).some((a) => a === filialTrim));
+      const listaDaOperacao = tipoOperacao === 'saida'
+        ? permissao.filiaisOrigem
+        : permissao.filiaisDestino;
+      // Filiais adicionais valem para saída E entrada: são filiais onde o usuário opera
+      // (ex.: logística da NERD que também dá entrada/saída em NERD DEFEITOS).
+      const adicionaisAtivas = await Promise.all(
+        (permissao.filiaisAdicionais ?? []).map((p) =>
+          getActiveFilialForRequest(companyKey, (p || '').trim())
+        )
+      );
+      const filialOk =
+        listaDaOperacao.length === 0 ||
+        (await Promise.all(
+          listaDaOperacao.map((p) => getActiveFilialForRequest(companyKey, (p || '').trim()))
+        )).some((a) => a === filialTrim) ||
+        adicionaisAtivas.some((a) => a === filialTrim);
       if (!filialOk) {
         return NextResponse.json(
           { error: 'Sem permissão para esta filial.' },
