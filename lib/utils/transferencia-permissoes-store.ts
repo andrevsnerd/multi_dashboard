@@ -70,6 +70,7 @@ async function normalizePermissao(permissao: TransferenciaPermissao): Promise<Tr
     filiaisOrigem: normalizeFilialList(permissao.filiaisOrigem, configs),
     filiaisDestino: normalizeFilialList(permissao.filiaisDestino, configs),
     filiaisDestinoControle: normalizeFilialList(permissao.filiaisDestinoControle, configs),
+    filiaisAdicionais: normalizeFilialList(permissao.filiaisAdicionais, configs),
     filialAtribuida: permissao.filialAtribuida
       ? normalizeFilialAcrossCompanies(permissao.filialAtribuida, configs)
       : permissao.filialAtribuida ?? null,
@@ -119,6 +120,7 @@ async function ensureTable(sql: ReturnType<typeof getNeonSql>) {
   await sql`ALTER TABLE transferencia_permissoes ADD COLUMN IF NOT EXISTS pode_ver_outras_filiais BOOLEAN NOT NULL DEFAULT false`;
   await sql`ALTER TABLE transferencia_permissoes ADD COLUMN IF NOT EXISTS filial_atribuida TEXT`;
   await sql`ALTER TABLE transferencia_permissoes ADD COLUMN IF NOT EXISTS filiais_destino_controle JSONB NOT NULL DEFAULT '[]'::jsonb`;
+  await sql`ALTER TABLE transferencia_permissoes ADD COLUMN IF NOT EXISTS filiais_adicionais JSONB NOT NULL DEFAULT '[]'::jsonb`;
   tableChecked = true;
 }
 
@@ -138,6 +140,14 @@ export interface TransferenciaPermissao {
   podeVerOutrasFiliais?: boolean;
   /** Filial atribuída para filtro de romaneios: null/""/"TODAS" = vê todos; senão só vê romaneios cujo destino = este código. */
   filialAtribuida?: string | null;
+  /**
+   * Filiais ADICIONAIS onde o usuário também opera, além da `filialAtribuida`.
+   * Caso de uso: logística da NERD opera na NERD e também na NERD DEFEITOS
+   * (confirmar entrada dos romaneios de defeito). Somam-se à filial atribuída em
+   * tudo que é por filial: listas de romaneios, confirmação de entrada e
+   * saída/entrada direta. Vazio = só a filial atribuída.
+   */
+  filiaisAdicionais?: string[];
 }
 
 /**
@@ -162,6 +172,7 @@ export async function getPermissaoByUsername(username: string): Promise<Transfer
       filiais_origem,
       filiais_destino,
       COALESCE(filiais_destino_controle, '[]'::jsonb) as filiais_destino_controle,
+      COALESCE(filiais_adicionais, '[]'::jsonb) as filiais_adicionais,
       tipos_romaneio_permitidos,
       responsavel_padrao,
       tipo_romaneio_padrao,
@@ -190,6 +201,7 @@ export async function getPermissaoByUsername(username: string): Promise<Transfer
     filiaisOrigem: row.filiais_origem || [],
     filiaisDestino: row.filiais_destino || [],
     filiaisDestinoControle: row.filiais_destino_controle || [],
+    filiaisAdicionais: row.filiais_adicionais || [],
     tiposRomaneioPermitidos: row.tipos_romaneio_permitidos || [],
     responsavelPadrao: row.responsavel_padrao || undefined,
     tipoRomaneioPadrao: row.tipo_romaneio_padrao || undefined,
@@ -238,6 +250,7 @@ export async function savePermissao(permissao: TransferenciaPermissao): Promise<
       filiais_origem,
       filiais_destino,
       filiais_destino_controle,
+      filiais_adicionais,
       tipos_romaneio_permitidos,
       responsavel_padrao,
       tipo_romaneio_padrao,
@@ -252,6 +265,7 @@ export async function savePermissao(permissao: TransferenciaPermissao): Promise<
       ${JSON.stringify(permissaoNormalizada.filiaisOrigem)}::jsonb,
       ${JSON.stringify(permissaoNormalizada.filiaisDestino)}::jsonb,
       ${JSON.stringify(permissaoNormalizada.filiaisDestinoControle || [])}::jsonb,
+      ${JSON.stringify(permissaoNormalizada.filiaisAdicionais || [])}::jsonb,
       ${JSON.stringify(permissaoNormalizada.tiposRomaneioPermitidos || [])}::jsonb,
       ${permissaoNormalizada.responsavelPadrao || null},
       ${permissaoNormalizada.tipoRomaneioPadrao || null},
@@ -265,6 +279,7 @@ export async function savePermissao(permissao: TransferenciaPermissao): Promise<
       filiais_origem = EXCLUDED.filiais_origem,
       filiais_destino = EXCLUDED.filiais_destino,
       filiais_destino_controle = EXCLUDED.filiais_destino_controle,
+      filiais_adicionais = EXCLUDED.filiais_adicionais,
       tipos_romaneio_permitidos = EXCLUDED.tipos_romaneio_permitidos,
       responsavel_padrao = EXCLUDED.responsavel_padrao,
       tipo_romaneio_padrao = EXCLUDED.tipo_romaneio_padrao,
@@ -293,6 +308,7 @@ export async function listAllPermissoes(): Promise<TransferenciaPermissao[]> {
       filiais_origem,
       filiais_destino,
       COALESCE(filiais_destino_controle, '[]'::jsonb) as filiais_destino_controle,
+      COALESCE(filiais_adicionais, '[]'::jsonb) as filiais_adicionais,
       tipos_romaneio_permitidos,
       responsavel_padrao,
       tipo_romaneio_padrao,
@@ -309,6 +325,7 @@ export async function listAllPermissoes(): Promise<TransferenciaPermissao[]> {
     filiaisOrigem: row.filiais_origem || [],
     filiaisDestino: row.filiais_destino || [],
     filiaisDestinoControle: row.filiais_destino_controle || [],
+    filiaisAdicionais: row.filiais_adicionais || [],
     tiposRomaneioPermitidos: row.tipos_romaneio_permitidos || [],
     responsavelPadrao: row.responsavel_padrao || undefined,
     tipoRomaneioPadrao: row.tipo_romaneio_padrao || undefined,

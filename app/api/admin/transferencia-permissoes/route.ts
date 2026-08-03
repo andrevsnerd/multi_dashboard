@@ -54,6 +54,7 @@ export async function POST(request: NextRequest) {
       filiaisOrigem,
       filiaisDestino,
       filiaisDestinoControle,
+      filiaisAdicionais,
       tiposRomaneioPermitidos,
       responsavelPadrao,
       tipoRomaneioPadrao,
@@ -84,6 +85,12 @@ export async function POST(request: NextRequest) {
       filiaisOrigem: Array.isArray(filiaisOrigem) ? filiaisOrigem : [],
       filiaisDestino: Array.isArray(filiaisDestino) ? filiaisDestino : [],
       filiaisDestinoControle: Array.isArray(filiaisDestinoControle) ? filiaisDestinoControle : [],
+      // Filiais adicionais de operação (ex.: NERD DEFEITOS para a logística da NERD).
+      filiaisAdicionais: Array.isArray(filiaisAdicionais)
+        ? filiaisAdicionais
+            .map((f: unknown) => String(f ?? '').trim())
+            .filter((f: string) => f.length > 0)
+        : [],
       tiposRomaneioPermitidos: Array.isArray(tiposRomaneioPermitidos) ? tiposRomaneioPermitidos : [],
       responsavelPadrao: responsavelPadrao || undefined,
       tipoRomaneioPadrao: tipoRomaneioPadrao || undefined,

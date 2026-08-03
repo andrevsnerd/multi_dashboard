@@ -6,6 +6,11 @@ import { seesAllFiliais } from "@/lib/auth/permissions";
 import { getActiveFilial } from "@/lib/config/company";
 import { resolveCompanyDynamic } from "@/lib/config/company-server";
 import { comFilialDefeito } from "@/lib/config/filiais-especiais";
+import {
+  filiaisDeOperacao,
+  normalizeFilialCmp,
+  verTodasAsFiliais,
+} from "@/lib/utils/transferencia-permissoes-filiais";
 
 export async function GET(request: NextRequest) {
   try {
@@ -46,17 +51,16 @@ export async function GET(request: NextRequest) {
     }
 
     const permissao = await getPermissaoByUsername(username);
-    const filialAtribuida = getActiveFilial(companyConfig, permissao?.filialAtribuida ?? "").trim().toUpperCase();
-    const verTodas =
-      !filialAtribuida || filialAtribuida === "" || filialAtribuida === "TODAS";
 
-    if (verTodas) {
+    if (verTodasAsFiliais(permissao, companyConfig)) {
       return NextResponse.json({ data: transitosDaEmpresa });
     }
 
+    // Filial atribuída + adicionais (ex.: logística que também recebe em NERD DEFEITOS).
+    const filiaisPermitidas = filiaisDeOperacao(permissao, companyConfig);
     const filtered = transitosDaEmpresa.filter((t) => {
-      const destino = getActiveFilial(companyConfig, t.filialDestino ?? "").trim().toUpperCase();
-      return destino === filialAtribuida;
+      const destino = normalizeFilialCmp(getActiveFilial(companyConfig, t.filialDestino ?? ""));
+      return filiaisPermitidas.includes(destino);
     });
 
     return NextResponse.json({ data: filtered });

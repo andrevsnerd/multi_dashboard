@@ -7,6 +7,11 @@ import { getActiveFilial } from "@/lib/config/company";
 import { resolveCompanyDynamic } from "@/lib/config/company-server";
 import { getContadorConfirmadosByCompany } from "@/lib/utils/romaneio-confirmacao-store";
 import { comFilialDefeito } from "@/lib/config/filiais-especiais";
+import {
+  filiaisDeOperacao,
+  normalizeFilialCmp,
+  verTodasAsFiliais,
+} from "@/lib/utils/transferencia-permissoes-filiais";
 
 /**
  * GET /api/romaneios/entradas?company=nerd
@@ -14,6 +19,7 @@ import { comFilialDefeito } from "@/lib/config/filiais-especiais";
  * Header: x-auth-username
  * - Se usuário tem filialAtribuida = Todas: retorna todos.
  * - Se tem filialAtribuida = código X: retorna apenas entradas cujo destino (filial onde a entrada foi feita) = X.
+ * - As filiaisAdicionais do usuário contam junto com a atribuída (ex.: NERD DEFEITOS).
  */
 export async function GET(request: NextRequest) {
   try {
@@ -73,17 +79,16 @@ export async function GET(request: NextRequest) {
     }
 
     const permissao = await getPermissaoByUsername(username);
-    const filialAtribuida = getActiveFilial(companyConfig, permissao?.filialAtribuida ?? "").trim().toUpperCase();
-    const verTodas =
-      !filialAtribuida || filialAtribuida === "" || filialAtribuida === "TODAS";
 
-    if (verTodas) {
+    if (verTodasAsFiliais(permissao, companyConfig)) {
       return NextResponse.json({ data: entradasDaEmpresa });
     }
 
+    // Filial atribuída + adicionais (ex.: logística que também recebe em NERD DEFEITOS).
+    const filiaisPermitidas = filiaisDeOperacao(permissao, companyConfig);
     const filtered = entradasDaEmpresa.filter((e) => {
-      const destino = getActiveFilial(companyConfig, e.filialDestino ?? "").trim().toUpperCase();
-      return destino === filialAtribuida;
+      const destino = normalizeFilialCmp(getActiveFilial(companyConfig, e.filialDestino ?? ""));
+      return filiaisPermitidas.includes(destino);
     });
 
     return NextResponse.json({ data: filtered });

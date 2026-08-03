@@ -11,6 +11,7 @@ import {
   type PermissionKey,
 } from "@/types/auth";
 import { roleAllowsPermission } from "@/lib/auth/permissions";
+import { filiaisEspeciaisOptions } from "@/lib/config/filiais-especiais";
 import styles from "./page.module.css";
 const _filialLabelOverrides: Record<string, string> = {
   'NERD MORUMBI RDRRRJ': 'NERD MORUMBI RDRRRJ',
@@ -104,6 +105,8 @@ interface TransfPerm {
   tipoRomaneioFixo: boolean;
   podeVerOutrasFiliais?: boolean;
   filialAtribuida?: string | null;
+  /** Filiais extras onde o usuário também opera (ex.: NERD DEFEITOS para a logística). */
+  filiaisAdicionais?: string[];
 }
 
 interface Filial {
@@ -162,6 +165,7 @@ export default function AdminPage() {
 
   // Campos — filial e transferências
   const [formFilialPrincipal, setFormFilialPrincipal] = useState("");
+  const [formFiliaisAdicionais, setFormFiliaisAdicionais] = useState<string[]>([]);
   const [formAdvancedFiliais, setFormAdvancedFiliais] = useState(false);
   const [formFiliaisOrigem, setFormFiliaisOrigem] = useState<string[]>([]);
   const [formFiliaisDestino, setFormFiliaisDestino] = useState<string[]>([]);
@@ -261,6 +265,7 @@ export default function AdminPage() {
     setFormEmpresa("");
     setFormPermissions([]);
     setFormFilialPrincipal("");
+    setFormFiliaisAdicionais([]);
     setFormAdvancedFiliais(false);
     setFormFiliaisOrigem([]);
     setFormFiliaisDestino([]);
@@ -354,6 +359,7 @@ export default function AdminPage() {
     const tp = transfPerms.find((p) => p.username === username);
     if (tp) {
       setFormFilialPrincipal(tp.filialAtribuida ?? "");
+      setFormFiliaisAdicionais(tp.filiaisAdicionais ?? []);
       setFormFiliaisOrigem(tp.filiaisOrigem ?? []);
       setFormFiliaisDestino(tp.filiaisDestino ?? []);
       setFormFiliaisDestinoControle(tp.filiaisDestinoControle ?? []);
@@ -371,6 +377,7 @@ export default function AdminPage() {
       setFormAdvancedFiliais(tp.filiaisOrigem.length > 0 && !(mesmaOrigem && mesmaDestino));
     } else {
       setFormFilialPrincipal("");
+      setFormFiliaisAdicionais([]);
       setFormFiliaisOrigem([]);
       setFormFiliaisDestino([]);
       setFormFiliaisDestinoControle([]);
@@ -431,22 +438,45 @@ export default function AdminPage() {
       setFormFiliaisOrigem(cod ? [cod] : []);
       setFormFiliaisDestino(cod ? [cod] : []);
     }
-    if (!cod) setFormPodeVerOutras(false);
+    // A filial atribuída nunca fica repetida na lista de adicionais.
+    setFormFiliaisAdicionais((prev) => prev.filter((f) => f !== cod));
+    if (!cod) {
+      setFormPodeVerOutras(false);
+      setFormFiliaisAdicionais([]);
+    }
   }
 
-  /** Filiais disponíveis no form conforme a empresa escolhida (Ambas = união). */
+  function toggleFilialAdicional(cod: string) {
+    setFormFiliaisAdicionais((prev) =>
+      prev.includes(cod) ? prev.filter((f) => f !== cod) : [...prev, cod]
+    );
+  }
+
+  /**
+   * Filiais disponíveis no form conforme a empresa escolhida (Ambas = união),
+   * mais as filiais ESPECIAIS (NERD DEFEITOS / BAZAR SCARF ME). As especiais não
+   * vêm da API de filiais (ficam fora do registry), mas precisam ser atribuíveis:
+   * é nelas que a logística confirma a entrada dos romaneios de DEFEITO.
+   */
   function filiaisForEmpresa(emp: "" | CompanyKey): Filial[] {
-    if (emp === "nerd") return filiaisNerd;
-    if (emp === "scarfme") return filiaisScarf;
-    return filiais;
+    const base = emp === "nerd" ? filiaisNerd : emp === "scarfme" ? filiaisScarf : filiais;
+    const especiais = filiaisEspeciaisOptions(emp === "corporativo" ? "" : emp).filter(
+      (e) => !base.some((f) => f.codFilial.trim().toUpperCase() === e.codFilial.toUpperCase())
+    );
+    return [...base, ...especiais];
   }
 
   function handleEmpresaChange(emp: "" | CompanyKey) {
     setFormEmpresa(emp);
+    const disponiveis = filiaisForEmpresa(emp);
     // Se a filial atribuída não pertence à nova empresa, limpa para não ficar oculta.
-    if (formFilialPrincipal && !filiaisForEmpresa(emp).some((f) => f.codFilial === formFilialPrincipal)) {
+    if (formFilialPrincipal && !disponiveis.some((f) => f.codFilial === formFilialPrincipal)) {
       handleFilialPrincipalChange("");
     }
+    // Idem para as adicionais: nada de filial de outra empresa presa no cadastro.
+    setFormFiliaisAdicionais((prev) =>
+      prev.filter((cod) => disponiveis.some((f) => f.codFilial === cod))
+    );
   }
 
   function toggleGroup(label: string) {
@@ -524,6 +554,7 @@ export default function AdminPage() {
       //       usuário continua vendo o quadro completo).
       const temConfigTransf =
         formFilialPrincipal ||
+        formFiliaisAdicionais.length > 0 ||
         formFiliaisOrigem.length > 0 ||
         formFiliaisDestino.length > 0 ||
         formFiliaisDestinoControle.length > 0 ||
@@ -557,6 +588,10 @@ export default function AdminPage() {
           tipoRomaneioFixo: formTipoRomaneioFixo,
           podeVerOutrasFiliais: formPodeVerOutras,
           filialAtribuida: formFilialPrincipal || null,
+          // Só faz sentido com filial atribuída (é "além da principal").
+          filiaisAdicionais: formFilialPrincipal
+            ? formFiliaisAdicionais.filter((cod) => cod !== formFilialPrincipal)
+            : [],
         };
 
         const transfRes = await fetch("/api/admin/transferencia-permissoes", {
@@ -612,7 +647,11 @@ export default function AdminPage() {
   function getUserFilial(u: UserRow) {
     const tp = transfPerms.find((p) => p.username === u.username);
     if (!tp?.filialAtribuida) return "—";
-    return getFilialNome(tp.filialAtribuida);
+    const principal = getFilialNome(tp.filialAtribuida);
+    const adicionais = tp.filiaisAdicionais ?? [];
+    // Filiais adicionais aparecem junto: "NERD + NERD DEFEITOS".
+    if (adicionais.length === 0) return principal;
+    return [principal, ...adicionais.map(getFilialNome)].join(" + ");
   }
 
   /** Dropdown que lista usuários para copiar config. Renderizado sob o botão-gatilho. */
@@ -1160,6 +1199,35 @@ export default function AdminPage() {
                       Sem filial atribuída o usuário <strong>vê o quadro completo</strong> de
                       transferências, mas <strong>não executa</strong> saídas nem entradas (somente leitura).
                     </div>
+                  )}
+
+                  {/* Filiais ADICIONAIS de operação — além da atribuída.
+                      Caso real: logística da NERD opera na NERD e também na NERD DEFEITOS
+                      (confirmar entrada dos romaneios de defeito). */}
+                  {formFilialPrincipal && (
+                    <label className={styles.label}>
+                      Filiais adicionais onde também opera
+                      <span className={styles.hint}>
+                        Opcional. Somam-se à filial atribuída: o usuário passa a ver os romaneios
+                        e a confirmar entradas/saídas nessas filiais também. Ex.: logística da NERD
+                        marcando <strong>NERD DEFEITOS</strong> para receber os romaneios de defeito.
+                      </span>
+                      <div className={styles.checkboxList}>
+                        {formFiliais
+                          .filter((f) => f.codFilial !== formFilialPrincipal)
+                          .map((f) => (
+                            <label key={f.codFilial} className={styles.checkboxLabel}>
+                              <input
+                                type="checkbox"
+                                checked={formFiliaisAdicionais.includes(f.codFilial)}
+                                onChange={() => toggleFilialAdicional(f.codFilial)}
+                                disabled={saving}
+                              />
+                              {filialOptionLabel(f)}
+                            </label>
+                          ))}
+                      </div>
+                    </label>
                   )}
 
                   {/* Toggle avançado */}
