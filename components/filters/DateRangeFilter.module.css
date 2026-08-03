@@ -207,6 +207,117 @@
   z-index: 999;
 }
 
+/*
+ * ── DARK ──────────────────────────────────────────────────────────────────
+ * O react-date-range traz o próprio CSS com cores fixas (fundo #fff, dia
+ * #1d2429, setas #EFF2F7 com triângulo #34495e, seta do <select> em SVG
+ * escuro). Nada disso passa pelos tokens, então no dark o calendário ficava
+ * um bloco branco dentro do dropdown escuro. Abaixo, cada literal da lib
+ * ganha o equivalente do tema.
+ */
+:global(:root[data-theme="dark"]) .dropdown {
+  border-color: var(--b-subtle2);
+  box-shadow: var(--elev-2);
+}
+
+:global(:root[data-theme="dark"]) .dropdown :global(.rdrCalendarWrapper) {
+  background: transparent;
+  color: var(--t-900);
+}
+
+:global(:root[data-theme="dark"]) .dropdown :global(.rdrMonth),
+:global(:root[data-theme="dark"]) .dropdown :global(.rdrMonthsHorizontal),
+:global(:root[data-theme="dark"]) .dropdown :global(.rdrDateRangeWrapper) {
+  background: transparent;
+}
+
+:global(:root[data-theme="dark"]) .dropdown :global(.rdrDay) {
+  color: var(--t-800);
+}
+
+:global(:root[data-theme="dark"]) .dropdown :global(.rdrDayNumber span) {
+  color: var(--t-800);
+}
+
+:global(:root[data-theme="dark"]) .dropdown :global(.rdrWeekDay) {
+  color: var(--t-500);
+}
+
+/* Dias de fora do mês visível: apagados, mas ainda legíveis */
+:global(:root[data-theme="dark"]) .dropdown :global(.rdrDayPassive .rdrDayNumber span) {
+  color: rgba(255, 255, 255, 0.22);
+}
+
+:global(:root[data-theme="dark"]) .dropdown :global(.rdrDayDisabled) {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+:global(:root[data-theme="dark"]) .dropdown :global(.rdrDayDisabled .rdrDayNumber span) {
+  color: var(--t-400);
+}
+
+/* Marca do "hoje" */
+:global(:root[data-theme="dark"]) .dropdown :global(.rdrDayToday .rdrDayNumber span::after) {
+  background: #60a5fa;
+}
+
+/* Selects de mês/ano: texto claro + seta redesenhada em branco translúcido */
+:global(:root[data-theme="dark"]) .dropdown :global(.rdrMonthAndYearPickers select) {
+  color: var(--t-800);
+  background: url("data:image/svg+xml;utf8,<svg width='9' height='6' viewBox='0 0 9 6' xmlns='http://www.w3.org/2000/svg'><path d='M0.4 0.6 L4.5 5 L8.6 0.6' fill='none' stroke='rgba(255,255,255,0.55)' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/></svg>")
+    no-repeat;
+  background-position: right 8px center;
+}
+
+:global(:root[data-theme="dark"]) .dropdown :global(.rdrMonthAndYearPickers select:hover) {
+  background-color: rgba(255, 255, 255, 0.07);
+}
+
+:global(:root[data-theme="dark"]) .dropdown :global(.rdrMonthAndYearPickers select option) {
+  background: var(--s-100);
+  color: var(--t-800);
+}
+
+/* Setas de navegação de mês */
+:global(:root[data-theme="dark"]) .dropdown :global(.rdrNextPrevButton) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+:global(:root[data-theme="dark"]) .dropdown :global(.rdrNextPrevButton:hover) {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+:global(:root[data-theme="dark"]) .dropdown :global(.rdrPprevButton i) {
+  border-color: transparent var(--t-700) transparent transparent;
+}
+
+:global(:root[data-theme="dark"]) .dropdown :global(.rdrNextButton i) {
+  border-color: transparent transparent transparent var(--t-700);
+}
+
+/* Preview de arraste: um pouco mais visível sobre a superfície escura */
+:global(:root[data-theme="dark"]) .dropdown :global(.rdrDayStartPreview),
+:global(:root[data-theme="dark"]) .dropdown :global(.rdrDayInPreview),
+:global(:root[data-theme="dark"]) .dropdown :global(.rdrDayEndPreview) {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Inputs / botões do painel */
+:global(:root[data-theme="dark"]) .dateInput,
+:global(:root[data-theme="dark"]) .actionButton {
+  border-color: var(--b-300);
+}
+
+:global(:root[data-theme="dark"]) .presetButton {
+  border-color: var(--b-300);
+}
+
+:global(:root[data-theme="dark"]) .presetButton:hover,
+:global(:root[data-theme="dark"]) .actionButton:not(.actionPrimary):hover {
+  background: rgba(96, 165, 250, 0.14);
+  border-color: rgba(96, 165, 250, 0.45);
+}
+
 @media (max-width: 1024px) {
   .dropdown {
     grid-template-columns: 1fr;
