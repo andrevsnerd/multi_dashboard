@@ -87,6 +87,13 @@ export interface ColecaoPresentationPayload {
   };
   topProducts: PresentationProductRow[];
   products: PresentationProductRow[];
+  /**
+   * TODOS os SKUs (produto × cor) com id e quantidade — sem o corte de
+   * PRODUCTS_LIMIT que `products` aplica. Existe para quem consome este payload no
+   * servidor precisar da base completa (ex.: o comparativo entre coleções calcula
+   * custo/markup a partir daqui em vez de refazer a consulta de produtos).
+   */
+  skus: Array<{ productId: string; qtd: number }>;
   outros: { count: number; qtd: number; venda: number; estoque: number } | null;
   insightProdutos: { titulo: string; texto: string };
   stores: PresentationStoreRow[];
@@ -437,6 +444,7 @@ export async function fetchColecaoPresentation({
     },
     topProducts,
     products: shown,
+    skus: sortedSkus.map((s) => ({ productId: s.productId, qtd: s.qtd })),
     outros,
     insightProdutos,
     stores: storesSortedDesc,

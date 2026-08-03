@@ -119,16 +119,40 @@ function Cover({ payload, logoDataUrl }: { payload: ComparativoColecoesPayload; 
 }
 
 // ---------- SLIDE DE COLEÇÃO ----------
+/**
+ * Card por coleção. Carrega os MESMOS blocos do relatório de Coleção Completa —
+ * "Os números", "Destaques" e "Vendas por loja" — num único slide:
+ *
+ *   ┌ cabeçalho ─────────────────────────────────┬──────────┐
+ *   │ faixa de 5 KPIs                            │  capa    │
+ *   ├──────────────────┬─────────────────────────┤  ────────│
+ *   │ Destaques (top 5)│ Vendas por loja         │ destaque │
+ *   │                  │                         │ evolução │
+ *   └──────────────────┴─────────────────────────┴──────────┘
+ */
 function CollectionSlide({ c, logoDataUrl, cover }: { c: ComparativoColecaoSlide; logoDataUrl: string | null; cover: string | null }) {
   const p = c.palette;
-  const titleSize = c.title.length > 16 ? 44 : c.title.length > 10 ? 52 : 60;
+  const titleSize = c.title.length > 22 ? 26 : c.title.length > 14 ? 31 : 36;
 
-  // Painel direito
-  const PANEL_X = 9.5, PANEL_W = 3.35, bdY = 1.15, bdH = 4.6;
+  const brl0 = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+  const brl2 = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const int0 = (v: number) => Math.round(v).toLocaleString("pt-BR");
+  const pct1 = (v: number) => `${v.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
 
-  // Gráfico
+  // Painel direito (capa + destaque + evolução)
+  const PANEL_X = 10.35, PANEL_W = 2.3;
+
+  // Faixa de KPIs — 5 × 1.80 + 4 × 0.12 = 9.48in, de 0.70 a 10.18 (painel em 10.35).
+  const KPI_Y = 1.98, KPI_H = 0.94, KPI_W = 1.8, KPI_GAP = 0.12;
+
+  // Colunas de conteúdo — os dois cards têm a MESMA altura e terminam antes do rodapé (7.12).
+  const COL_Y = 3.24, CARD_H = 3.8;
+  const TOP_X = 0.7, TOP_W = 4.55;
+  const STO_X = 5.62, STO_W = 4.4;
+
+  // Mini-gráfico de evolução (dentro do painel direito)
   const n = c.months.length;
-  const gx = 0.95, gy = 5.62, gw = n > 4 ? 5.0 : 4.85, gh = 1.0;
+  const gx = PANEL_X + 0.16, gy = 6.28, gw = PANEL_W - 0.32, gh = 0.5;
   const baseY = (gy + gh) * IN;
   const pts = c.months.map((m, i) => ({
     x: (n <= 1 ? gx + gw / 2 : gx + gw * (i / (n - 1))) * IN,
@@ -141,176 +165,166 @@ function CollectionSlide({ c, logoDataUrl, cover }: { c: ComparativoColecaoSlide
       : "";
   const linePath = pts.map((q, i) => `${i === 0 ? "M" : "L"} ${q.x} ${q.y}`).join(" ");
 
+  // Os 5 números do relatório de Coleção Completa, na mesma ordem.
+  const nums = c.numbers;
+  const kpiCards = [
+    { big: brl0(nums.faturamento), lbl: "FATURAMENTO", sub: `${int0(nums.pecasVendidas)} peças`, hero: true },
+    { big: int0(nums.pecasVendidas), lbl: "PEÇAS VENDIDAS", sub: `em ${int0(nums.nSkus)} SKUs`, hero: false },
+    { big: brl0(nums.precoMedio), lbl: "PREÇO MÉDIO", sub: "ticket por peça", hero: false },
+    { big: int0(nums.estoqueRestante), lbl: "ESTOQUE RESTANTE", sub: "peças na rede", hero: false },
+    { big: int0(nums.canaisAtivos), lbl: "CANAIS ATIVOS", sub: "e-com + lojas", hero: false },
+  ];
+
+  // Vendas por loja: o card comporta 8 linhas + TOTAL; o excedente vira uma linha resumo.
+  const STORE_LIMIT = 7;
+  const storesShown = c.stores.slice(0, STORE_LIMIT);
+  const storesTail = c.stores.slice(STORE_LIMIT);
+  const tailRow =
+    storesTail.length > 0
+      ? {
+          nome: `+ ${storesTail.length} ${storesTail.length === 1 ? "canal" : "canais"}`,
+          venda: storesTail.reduce((s, r) => s + r.venda, 0),
+          qtd: storesTail.reduce((s, r) => s + r.qtd, 0),
+          participacaoPct: storesTail.reduce((s, r) => s + r.participacaoPct, 0),
+        }
+      : null;
+  const storeRows = tailRow ? [...storesShown, tailRow] : storesShown;
+  const storeRowH = 0.3;
+  const totalY = COL_Y + 0.74 + storeRows.length * storeRowH + 0.09;
+  // Trunca em vez de quebrar linha: o slide tem altura fixa, texto longo empurraria o resto.
+  const clip = { whiteSpace: "nowrap" as const, overflow: "hidden", textOverflow: "ellipsis" };
+
   return (
     <section className={styles.slide} data-pdf-slide="" style={{ background: "#FFFFFF" }}>
       <div className={styles.canvas}>
-        {/* painel direito */}
-        <Box x={PANEL_X} y={bdY} w={PANEL_W} h={bdH} bg={p.tint} radius={0.28} />
-        <Box x={PANEL_X + PANEL_W * 0.36} y={bdY + 0.6} w={1.45} h={1.45} bg={p.circ} radius={0.725} />
-        <Box x={PANEL_X + 0.15} y={bdY + 2.7} w={0.85} h={0.85} radius={0.425} border={{ color: p.circ, width: 2 }} />
-        {cover ? (
-          // Recorte de fundo transparente, ancorado na base do painel e centrado
-          // sobre o círculo — mesmo tratamento do fonte (imagem "flutuante", sem
-          // moldura). PNG transparente deixa o tint/círculo aparecerem atrás.
-          <img
-            src={cover}
-            alt={c.title}
-            className={styles.abs}
-            style={{
-              left: PANEL_X * IN, top: (5.75 - 4.55) * IN, width: PANEL_W * IN, height: 4.55 * IN,
-              objectFit: "contain", objectPosition: "center bottom",
-            }}
-          />
-        ) : null}
-        {/* highlight card */}
-        <Box x={PANEL_X} y={5.95} w={PANEL_W} h={0.95} bg={p.tint} radius={0.08} />
-        <Txt x={PANEL_X + 0.22} y={6.08} w={PANEL_W - 0.4} size={9} color={p.primary} bold spacing={1}>{c.hiLabel}</Txt>
-        <Txt x={PANEL_X + 0.22} y={6.35} w={PANEL_W - 0.4} size={15} color={p.ink} bold serif>{c.hiValue}</Txt>
-
-        {/* conteúdo esquerdo */}
-        <Txt x={0.7} y={0.55} w={6} size={11} color={p.primary} bold spacing={3}>{c.eyebrow}</Txt>
-        <Txt x={0.68} y={0.92} w={8.4} size={titleSize} color={p.ink} bold serif lineH={0.98}>{c.title}</Txt>
+        {/* ---------- cabeçalho ---------- */}
+        <Txt x={0.7} y={0.5} w={7} size={10.5} color={p.primary} bold spacing={3}>{c.eyebrow}</Txt>
+        <Txt x={0.68} y={0.83} w={9.3} size={titleSize} color={p.ink} bold serif lineH={1.0}>{c.title}</Txt>
         <div className={styles.abs} style={{ left: 10.95 * IN, top: 0.42 * IN }}>
           {logoDataUrl ? (
-            <img src={logoDataUrl} alt="SCARF·ME" style={{ height: 0.78 * IN, width: 1.55 * IN, objectFit: "contain", objectPosition: "right center" }} />
+            <img src={logoDataUrl} alt="SCARF·ME" style={{ height: 0.66 * IN, width: 1.55 * IN, objectFit: "contain", objectPosition: "right center" }} />
           ) : (
-            <Wordmark color={p.ink} dotColor="F96167" size={17} />
+            <Wordmark color={p.ink} dotColor="F96167" size={15} />
           )}
         </div>
-
-        <Txt x={0.7} y={2.18} w={8.4} size={12.5} color={p.bodyColor} lineH={1.2}>
+        <Txt x={0.7} y={1.48} w={9.3} size={11} color={p.bodyColor} lineH={1.15}>
           {c.subtitle.map((s, i) => (
             <span key={i} style={{ fontWeight: s.bold ? 700 : 400 }}>{s.text}</span>
           ))}
         </Txt>
 
-        {/* KPI cards */}
-        {c.kpis.map((k, i) => {
-          const cardW = 1.92, gap = 0.18, cardY = 3.6, cardH = 1.18;
-          const cx = 0.7 + i * (cardW + gap);
-          const subColor = i === 0 ? p.primary : i === 3 ? p.accent : p.grey;
-          const bigFs = k.big.length > 9 ? 19 : 21;
+        {/* ---------- faixa de números (Os números da coleção) ---------- */}
+        {kpiCards.map((k, i) => {
+          const cx = 0.7 + i * (KPI_W + KPI_GAP);
+          const bigFs = k.big.length > 10 ? 16 : k.big.length > 7 ? 18.5 : 21;
           return (
             <div key={k.lbl}>
-              <Box x={cx} y={cardY} w={cardW} h={cardH} bg={p.cardbg} radius={0.08} />
-              <Txt x={cx + 0.13} y={cardY + 0.1} w={cardW - 0.18} size={bigFs} color={p.ink} bold serif>{k.big}</Txt>
-              <Txt x={cx + 0.14} y={cardY + 0.6} w={cardW - 0.22} size={8} color={p.grey} bold spacing={1}>{k.lbl}</Txt>
-              <Txt x={cx + 0.14} y={cardY + 0.82} w={cardW - 0.22} size={8.5} color={subColor}>{k.sub}</Txt>
+              <Box x={cx} y={KPI_Y} w={KPI_W} h={KPI_H} bg={k.hero ? p.primary : p.cardbg} radius={0.08} />
+              <Txt x={cx + 0.13} y={KPI_Y + 0.09} w={KPI_W - 0.2} size={7.5} color={k.hero ? "FFFFFF" : p.grey} bold spacing={1}>
+                {k.lbl}
+              </Txt>
+              <Txt x={cx + 0.12} y={KPI_Y + 0.28} w={KPI_W - 0.18} size={bigFs} color={k.hero ? "FFFFFF" : p.ink} bold serif>
+                {k.big}
+              </Txt>
+              <Txt x={cx + 0.13} y={KPI_Y + 0.68} w={KPI_W - 0.2} size={8} color={k.hero ? "FFFFFF" : p.grey}>
+                {k.sub}
+              </Txt>
             </div>
           );
         })}
 
-        {/* chart */}
-        <Txt x={0.7} y={5.08} w={5} size={10} color={p.grey} bold spacing={1.5}>{c.chartTitle}</Txt>
+        {/* ---------- Destaques da coleção ---------- */}
+        <Box x={TOP_X - 0.14} y={COL_Y - 0.18} w={TOP_W + 0.28} h={CARD_H} bg={p.cardbg} radius={0.1} />
+        <Txt x={TOP_X} y={COL_Y} w={TOP_W} size={13} color={p.ink} bold serif>Destaques da coleção</Txt>
+        <Txt x={TOP_X} y={COL_Y + 0.24} w={TOP_W} size={8.5} color={p.grey}>
+          {`Top ${c.top.length} ${c.top.length === 1 ? "produto que puxou" : "produtos que puxaram"} o resultado`}
+        </Txt>
+        {c.top.map((t, i) => {
+          const ry = COL_Y + 0.52 + i * 0.6;
+          return (
+            <div key={`${t.rank}-${t.nome}`}>
+              <Txt x={TOP_X} y={ry + 0.02} w={0.28} size={13} color={p.primary} bold serif>{String(t.rank)}</Txt>
+              <Txt x={TOP_X + 0.3} y={ry} w={2.5} size={9.5} color={p.ink} bold style={clip}>{t.nome}</Txt>
+              <Txt x={TOP_X + 0.3} y={ry + 0.17} w={2.5} size={7.5} color={p.grey} style={clip}>{t.meta}</Txt>
+              <Box x={TOP_X + 0.3} y={ry + 0.36} w={TOP_W - 0.3} h={0.045} bg={p.chartTint} radius={0.022} />
+              <Box x={TOP_X + 0.3} y={ry + 0.36} w={Math.max(0.04, ((TOP_W - 0.3) * t.barWidthPct) / 100)} h={0.045} bg={p.primary} radius={0.022} />
+              <Txt x={TOP_X + 2.95} y={ry} w={1.6} size={10.5} color={p.ink} bold align="right">{brl0(t.venda)}</Txt>
+              <Txt x={TOP_X + 2.95} y={ry + 0.18} w={1.6} size={7.5} color={p.accent} align="right">
+                {`${pct1(t.participacaoPct)} do total`}
+              </Txt>
+            </div>
+          );
+        })}
+
+        {/* ---------- Vendas por loja ---------- */}
+        <Box x={STO_X - 0.14} y={COL_Y - 0.18} w={STO_W + 0.28} h={CARD_H} bg={p.cardbg} radius={0.1} />
+        <Txt x={STO_X} y={COL_Y} w={STO_W} size={13} color={p.ink} bold serif>Vendas por loja</Txt>
+        <Txt x={STO_X} y={COL_Y + 0.24} w={STO_W} size={8.5} color={p.grey}>Ranking de canais</Txt>
+        <Txt x={STO_X} y={COL_Y + 0.52} w={1.6} size={7.5} color={p.grey} bold spacing={1}>CANAL</Txt>
+        <Txt x={STO_X + 1.5} y={COL_Y + 0.52} w={1.35} size={7.5} color={p.grey} bold spacing={1} align="right">VENDA LÍQ.</Txt>
+        <Txt x={STO_X + 2.9} y={COL_Y + 0.52} w={0.6} size={7.5} color={p.grey} bold spacing={1} align="right">QTD</Txt>
+        <Txt x={STO_X + 3.55} y={COL_Y + 0.52} w={0.85} size={7.5} color={p.grey} bold spacing={1} align="right">%</Txt>
+        {storeRows.map((s, i) => {
+          const ry = COL_Y + 0.74 + i * storeRowH;
+          return (
+            <div key={s.nome}>
+              {i % 2 === 0 && <Box x={STO_X - 0.08} y={ry - 0.03} w={STO_W + 0.16} h={storeRowH} bg={p.chartTint} radius={0.03} />}
+              <Txt x={STO_X} y={ry} w={1.45} h={0.26} size={9} color={p.ink} bold valign="middle" style={clip}>{s.nome}</Txt>
+              <Txt x={STO_X + 1.5} y={ry} w={1.35} h={0.26} size={9} color={p.bodyColor} align="right" valign="middle">{brl2(s.venda)}</Txt>
+              <Txt x={STO_X + 2.9} y={ry} w={0.6} h={0.26} size={9} color={p.bodyColor} align="right" valign="middle">{int0(s.qtd)}</Txt>
+              <Txt x={STO_X + 3.55} y={ry} w={0.85} h={0.26} size={9} color={p.accent} bold align="right" valign="middle">{pct1(s.participacaoPct)}</Txt>
+            </div>
+          );
+        })}
+        <Box x={STO_X} y={totalY - 0.06} w={STO_W} h={0.012} bg={p.grey} />
+        <Txt x={STO_X} y={totalY} w={1.45} h={0.26} size={9} color={p.ink} bold valign="middle">TOTAL</Txt>
+        <Txt x={STO_X + 1.5} y={totalY} w={1.35} h={0.26} size={9} color={p.ink} bold align="right" valign="middle">{brl2(c.storesTotal.venda)}</Txt>
+        <Txt x={STO_X + 2.9} y={totalY} w={0.6} h={0.26} size={9} color={p.ink} bold align="right" valign="middle">{int0(c.storesTotal.qtd)}</Txt>
+        <Txt x={STO_X + 3.55} y={totalY} w={0.85} h={0.26} size={9} color={p.ink} bold align="right" valign="middle">100%</Txt>
+
+        {/* ---------- painel direito: capa, destaque e evolução ---------- */}
+        <Box x={PANEL_X} y={1.98} w={PANEL_W} h={2.85} bg={p.tint} radius={0.16} />
+        <Box x={PANEL_X + PANEL_W * 0.28} y={2.3} w={1.05} h={1.05} bg={p.circ} radius={0.525} />
+        {cover ? (
+          // Recorte de fundo transparente, ancorado na base do painel e centrado
+          // sobre o círculo — imagem "flutuante", sem moldura.
+          <img
+            src={cover}
+            alt={c.title}
+            className={styles.abs}
+            style={{
+              left: PANEL_X * IN, top: 2.05 * IN, width: PANEL_W * IN, height: 2.72 * IN,
+              objectFit: "contain", objectPosition: "center bottom",
+            }}
+          />
+        ) : null}
+        <Box x={PANEL_X} y={4.95} w={PANEL_W} h={0.78} bg={p.tint} radius={0.08} />
+        <Txt x={PANEL_X + 0.16} y={5.06} w={PANEL_W - 0.3} size={8} color={p.primary} bold spacing={1}>{c.hiLabel}</Txt>
+        <Txt x={PANEL_X + 0.16} y={5.28} w={PANEL_W - 0.3} size={12} color={p.ink} bold serif>{c.hiValue}</Txt>
+
+        <Txt x={PANEL_X} y={5.92} w={PANEL_W} size={8} color={p.grey} bold spacing={1.2}>{c.chartTitle}</Txt>
         <svg className={styles.abs} width={1280} height={720} viewBox="0 0 1280 720" style={{ left: 0, top: 0, pointerEvents: "none" }}>
           {areaPath && <path d={areaPath} fill={hex(p.chartTint)} stroke="none" />}
-          {pts.length > 1 && <path d={linePath} fill="none" stroke={hex(p.primary)} strokeWidth={pt(2.5)} strokeLinejoin="round" />}
+          {pts.length > 1 && <path d={linePath} fill="none" stroke={hex(p.primary)} strokeWidth={pt(1.8)} strokeLinejoin="round" />}
           {pts.map((q, i) => (
             <g key={i}>
-              <circle cx={q.x} cy={q.y} r={pt(3.2)} fill={hex(p.primary)} />
-              <text x={q.x} y={q.y - 0.24 * IN} textAnchor="middle" fontFamily="Arial, sans-serif" fontWeight={700} fontSize={pt(n > 4 ? 8 : 8.5)} fill={hex(p.primary)}>{q.disp}</text>
-              <text x={q.x} y={(gy + gh + 0.2) * IN} textAnchor="middle" fontFamily="Arial, sans-serif" fontSize={pt(8.5)} fill={hex(p.grey)}>{q.label}</text>
+              <circle cx={q.x} cy={q.y} r={pt(2.2)} fill={hex(p.primary)} />
+              {/* Muitos meses no painel estreito viram sopa de letrinhas: rotula só as pontas. */}
+              {(n <= 4 || i === 0 || i === n - 1) && (
+                <text x={q.x} y={(gy + gh + 0.17) * IN} textAnchor={i === 0 ? "start" : i === n - 1 ? "end" : "middle"} fontFamily="Arial, sans-serif" fontSize={pt(7)} fill={hex(p.grey)}>
+                  {q.label}
+                </text>
+              )}
             </g>
           ))}
         </svg>
+        {c.growthBig ? (
+          <Txt x={PANEL_X} y={6.92} w={PANEL_W} size={13} color={p.accent} bold serif>{`${c.growthBig} até o pico`}</Txt>
+        ) : null}
 
-        {/* growth */}
-        <Txt x={6.4} y={5.4} w={2.95} size={30} color={p.accent} bold serif>{c.growthBig}</Txt>
-        <Txt x={6.43} y={6.0} w={2.9} size={10.5} color={p.bodyColor} lineH={1.15}>{c.growthText}</Txt>
-
-        {/* footer */}
-        <Txt x={0.7} y={7.08} w={9.5} size={9} color={p.grey} spacing={1}>{c.footer}</Txt>
-        <Txt x={11.7} y={7.08} w={1.0} size={9} color={p.grey} bold align="right">{c.page}</Txt>
-      </div>
-    </section>
-  );
-}
-
-// ---------- SLIDE DE DECISÃO ----------
-function DecisionSlide({ payload }: { payload: ComparativoColecoesPayload }) {
-  const INKC = "13131A", GREY = "6B7280", GREEN = "1E7A46", AMBER = "B7791F", RED = "B4452F", CORAL = "F96167";
-  const brl0 = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
-  const brlCompact = (v: number) => {
-    const abs = Math.abs(v);
-    if (abs >= 1_000_000) return `R$ ${(v / 1_000_000).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} mi`;
-    if (abs >= 1_000) return `R$ ${Math.round(v / 1_000).toLocaleString("pt-BR")} mil`;
-    return brl0(v);
-  };
-  const rows = [...payload.slides].sort((a, b) => b.vlPorMes - a.vlPorMes);
-  const vcColor = (v: string) => (v === "RENOVAR" ? GREEN : v === "REAVALIAR" ? AMBER : RED);
-  const pageNum = String(payload.slides.length + 1).padStart(2, "0");
-
-  const tabX = 0.7, tabY = 2.45, tabW = 8.15, rh = 0.52;
-
-  const renovar = rows.filter((r) => r.veredito === "RENOVAR");
-  const reavaliar = rows.filter((r) => r.veredito === "REAVALIAR");
-  const encerrar = rows.filter((r) => r.veredito === "ENCERRAR");
-  const renovarMargem = renovar.reduce((s, r) => s + r.margemAbs, 0);
-  const renovarMinRitmo = renovar.length > 0 ? Math.min(...renovar.map((r) => r.vlPorMes)) : 0;
-  const listNames = (arr: ComparativoColecaoSlide[]) => arr.map((r) => r.title).join(", ");
-
-  const rcX = 9.15, rcW = 3.45;
-
-  return (
-    <section className={styles.slide} data-pdf-slide="" style={{ background: "#FFFFFF" }}>
-      <div className={styles.canvas}>
-        <Txt x={0.7} y={0.5} w={8} size={11} color={CORAL} bold spacing={3}>{`${pageNum} · DECISÃO DE PARCERIA`}</Txt>
-        <Txt x={0.68} y={0.85} w={9.5} size={38} color={INKC} bold serif>Vale a pena renovar?</Txt>
-        <Txt x={0.7} y={1.62} w={11.9} size={12} color="44464F" lineH={1.15}>
-          Parcerias têm custo fixo. O critério decisivo é o ritmo de geração de receita (venda líquida por mês ativo) somado à margem bruta absoluta. Coleções que sustentam volume alto por mês pagam a parceria; as de ritmo fraco, não.
-        </Txt>
-
-        {/* cabeçalho */}
-        <Txt x={tabX} y={tabY} w={2.2} size={8.5} color={GREY} bold spacing={1}>COLEÇÃO</Txt>
-        <Txt x={tabX + 2.05} y={tabY} w={1.1} size={8.5} color={GREY} bold spacing={1} align="right">VL TOTAL</Txt>
-        <Txt x={tabX + 3.35} y={tabY} w={1.1} size={8.5} color={GREY} bold spacing={1} align="right">MARGEM</Txt>
-        <Txt x={tabX + 4.55} y={tabY} w={0.7} size={8.5} color={GREY} bold spacing={1} align="right">MESES</Txt>
-        <Txt x={tabX + 5.45} y={tabY} w={1.1} size={8.5} color={GREY} bold spacing={1} align="right">VL / MÊS</Txt>
-        <Txt x={tabX + 6.85} y={tabY} w={1.3} size={8.5} color={GREY} bold spacing={1}>VEREDITO</Txt>
-
-        {rows.map((r, idx) => {
-          const ry = tabY + 0.35 + idx * rh;
-          return (
-            <div key={r.key}>
-              {idx % 2 === 0 && <Box x={tabX - 0.12} y={ry - 0.06} w={tabW + 0.1} h={rh} bg="F7F7F9" />}
-              <Txt x={tabX} y={ry} w={2.05} h={0.4} size={13} color={INKC} bold serif valign="middle">{r.title}</Txt>
-              <Txt x={tabX + 2.05} y={ry} w={1.1} h={0.4} size={11} color="44464F" align="right" valign="middle">{brl0(r.vlTotal)}</Txt>
-              <Txt x={tabX + 3.35} y={ry} w={1.1} h={0.4} size={11} color="44464F" align="right" valign="middle">{brl0(r.margemAbs)}</Txt>
-              <Txt x={tabX + 4.55} y={ry} w={0.7} h={0.4} size={11} color="44464F" align="right" valign="middle">{String(r.mesesAtivos)}</Txt>
-              <Txt x={tabX + 5.45} y={ry} w={1.1} h={0.4} size={12} color={INKC} bold serif align="right" valign="middle">{brl0(r.vlPorMes)}</Txt>
-              <Box x={tabX + 6.85} y={ry + 0.04} w={1.25} h={0.32} bg={vcColor(r.veredito)} radius={0.16} />
-              <Txt x={tabX + 6.85} y={ry + 0.04} w={1.25} h={0.32} size={8.5} color="FFFFFF" bold spacing={1} align="center" valign="middle">{r.veredito}</Txt>
-            </div>
-          );
-        })}
-        <Txt x={tabX} y={tabY + 0.35 + rows.length * rh + 0.05} w={8.0} size={8.5} color={GREY} style={{ fontStyle: "italic" }}>
-          VL/mês medido sobre os meses ativos de cada coleção no período selecionado.
-        </Txt>
-
-        {/* card lateral */}
-        <Box x={rcX} y={2.45} w={rcW} h={4.25} bg="13131A" radius={0.12} />
-        <Txt x={rcX + 0.3} y={2.65} w={rcW - 0.6} size={9} color={CORAL} bold spacing={2}>VEREDITO</Txt>
-        <Txt x={rcX + 0.3} y={2.94} w={rcW - 0.6} size={15} color="FFFFFF" bold serif>{`Renovar — ${renovar.length} ${renovar.length === 1 ? "coleção" : "coleções"}`}</Txt>
-        <Txt x={rcX + 0.3} y={3.26} w={rcW - 0.6} size={10} color="C8CAD2" lineH={1.15}>
-          {renovar.length > 0
-            ? `${listNames(renovar)}. Juntas, ${brlCompact(renovarMargem)} em margem bruta e ritmo de ${brl0(renovarMinRitmo)}/mês ou mais. São o núcleo rentável.`
-            : "Nenhuma coleção atingiu o ritmo de renovação no período."}
-        </Txt>
-        <Txt x={rcX + 0.3} y={4.42} w={rcW - 0.6} size={15} color="FFFFFF" bold serif>{`Reavaliar — ${reavaliar.length > 0 ? listNames(reavaliar) : "nenhuma"}`}</Txt>
-        <Txt x={rcX + 0.3} y={4.74} w={rcW - 0.6} size={10} color="C8CAD2" lineH={1.15}>
-          {reavaliar.length > 0
-            ? "Volume razoável, mas ritmo na metade do núcleo. Renovar só se o custo da parceria couber nessa margem."
-            : "Sem coleções em zona de reavaliação."}
-        </Txt>
-        <Txt x={rcX + 0.3} y={5.62} w={rcW - 0.6} size={15} color={CORAL} bold serif>{`Encerrar — ${encerrar.length > 0 ? listNames(encerrar) : "nenhuma"}`}</Txt>
-        <Txt x={rcX + 0.3} y={5.94} w={rcW - 0.6} size={10} color="C8CAD2" lineH={1.15}>
-          {encerrar.length > 0
-            ? "Menor volume e menor ritmo. Improvável que cubram o custo fixo de uma parceria."
-            : "Nenhuma coleção em zona de encerramento."}
-        </Txt>
-
-        <Txt x={0.7} y={7.08} w={9} size={9} color={GREY} spacing={1}>{`SCARF·ME  ·  DECISÃO DE PARCERIA  ·  ${payload.period.statLabel}`}</Txt>
-        <Txt x={11.7} y={7.08} w={1.0} size={9} color={GREY} bold align="right">{pageNum}</Txt>
+        {/* ---------- rodapé ---------- */}
+        <Txt x={0.7} y={7.12} w={9.5} size={8.5} color={p.grey} spacing={1}>{c.footer}</Txt>
+        <Txt x={11.7} y={7.12} w={1.0} size={8.5} color={p.grey} bold align="right">{c.page}</Txt>
       </div>
     </section>
   );
@@ -323,7 +337,6 @@ export default function ComparativoDeck({ payload, logoDataUrl, coversByCode, de
       {payload.slides.map((c) => (
         <CollectionSlide key={c.key} c={c} logoDataUrl={logoDataUrl} cover={coversByCode[c.code] ?? null} />
       ))}
-      <DecisionSlide payload={payload} />
     </div>
   );
 }

@@ -1,8 +1,9 @@
-import {
-  fetchCollectionReport,
-  fetchCollectionComparativeExtras,
-} from "@/lib/repositories/collectionReport";
+import { fetchCollectionComparativeExtras } from "@/lib/repositories/collectionReport";
 import { fetchProdutosCustoPrecoMestre } from "@/lib/repositories/products";
+import {
+  fetchColecaoPresentation,
+  type PresentationProductRow,
+} from "@/lib/repositories/colecaoPresentation";
 import { fetchSalesTotals } from "@/lib/services/salesTotals";
 import { normalizeRangeForQuery } from "@/lib/utils/date";
 import { paletteForIndex, type CollectionPalette } from "@/lib/presentations/palettes";
@@ -10,7 +11,9 @@ import { paletteForIndex, type CollectionPalette } from "@/lib/presentations/pal
 /**
  * Dados do "Relatório Comparativo entre Coleções". Uma entrada por coleção +
  * totais da rede. Reaproveita fontes já provadas:
- *  - `fetchCollectionReport`  → venda líquida, peças, qtd por SKU (base de custo).
+ *  - `fetchColecaoPresentation` → os MESMOS blocos do relatório de Coleção Completa
+ *    (venda líquida, peças, SKUs, estoque, canais, destaques e vendas por loja),
+ *    então os dois relatórios nunca divergem.
  *  - `fetchCollectionComparativeExtras` → série mensal + desconto (canal físico).
  *  - `fetchSalesTotals`       → tickets (contagem de transações).
  *  - `fetchProdutosCustoPrecoMestre` → custo (CUSTO_REPOSICAO1) p/ markup e margem.
@@ -33,6 +36,37 @@ export interface ComparativoMonthPoint {
 
 export type Veredito = "RENOVAR" | "REAVALIAR" | "ENCERRAR";
 
+/**
+ * Blocos "Os números / Destaques / Vendas por loja" — os MESMOS do relatório de
+ * Coleção Completa. Vêm de `fetchColecaoPresentation`, então os valores batem
+ * exatamente entre os dois relatórios (nada é recalculado aqui).
+ */
+export interface ComparativoNumbers {
+  faturamento: number;
+  pecasVendidas: number;
+  nSkus: number;
+  precoMedio: number;
+  estoqueRestante: number;
+  canaisAtivos: number;
+}
+
+export interface ComparativoTopProduct {
+  rank: number;
+  nome: string;
+  /** "PINK · 130X200 · 1 un · ticket R$ 1.898" */
+  meta: string;
+  venda: number;
+  participacaoPct: number;
+  barWidthPct: number;
+}
+
+export interface ComparativoStoreRow {
+  nome: string;
+  venda: number;
+  qtd: number;
+  participacaoPct: number;
+}
+
 export interface ComparativoColecaoSlide {
   key: string;
   code: string;
@@ -50,7 +84,12 @@ export interface ComparativoColecaoSlide {
   hiLabel: string;
   hiValue: string;
   footer: string;
-  // métricas cruas p/ o slide de decisão
+  /** Blocos do relatório de Coleção Completa, agora em cada card do comparativo. */
+  numbers: ComparativoNumbers;
+  top: ComparativoTopProduct[];
+  stores: ComparativoStoreRow[];
+  storesTotal: { venda: number; qtd: number };
+  // métricas cruas p/ ranking e totais
   vlTotal: number;
   margemAbs: number;
   mesesAtivos: number;
@@ -139,8 +178,19 @@ async function buildOneCollection(
   const palette = paletteForIndex(index);
   const norm = normalizeRangeForQuery({ start: range?.start, end: range?.end });
 
-  const [report, extras, totals] = await Promise.all([
-    fetchCollectionReport({ company, filial, range, colecoes: [col.code] }),
+  // `fetchColecaoPresentation` já entrega TUDO que o card precisa (venda líquida,
+  // peças, SKUs, estoque, canais, destaques e lojas) pela mesma lógica validada.
+  // Ele e `fetchCollectionReport` faziam exatamente as mesmas duas consultas
+  // pesadas (produtos + por filial); manter os dois estourava o pool de conexões
+  // (max 10) com 4 coleções em paralelo — "operation timed out". Ficou só um.
+  const [presentation, extras, totals] = await Promise.all([
+    fetchColecaoPresentation({
+      company,
+      filial,
+      colecoes: [col.code],
+      collectionLabel: col.label,
+      range: { start: range?.start, end: range?.end },
+    }),
     fetchCollectionComparativeExtras({ company, filial, range, colecoes: [col.code] }),
     fetchSalesTotals({
       company,
@@ -150,18 +200,16 @@ async function buildOneCollection(
     }),
   ]);
 
-  const vl = report.summary.totalRevenue;
-  const qtde = report.summary.totalQuantity;
+  const vl = presentation.kpis.faturamento;
+  const qtde = presentation.kpis.pecasVendidas;
   const tickets = totals.tickets;
   const ticketMedio = tickets > 0 ? vl / tickets : 0;
 
   // Custo (base de markup e margem): qtd por produto × CUSTO_REPOSICAO1.
   const qtyByProduct = new Map<string, number>();
-  for (const p of report.products) {
-    for (const d of p.details) {
-      const pid = d.productId.trim();
-      if (pid) qtyByProduct.set(pid, (qtyByProduct.get(pid) ?? 0) + d.quantity);
-    }
+  for (const s of presentation.skus) {
+    const pid = s.productId.trim();
+    if (pid) qtyByProduct.set(pid, (qtyByProduct.get(pid) ?? 0) + s.qtd);
   }
   const custoMap = await fetchProdutosCustoPrecoMestre(Array.from(qtyByProduct.keys()));
   let cost = 0;
@@ -195,10 +243,12 @@ async function buildOneCollection(
   const firstVal = firstActiveIdx >= 0 ? months[firstActiveIdx].val : 0;
   const peakVal = months[peakIdx]?.val ?? 0;
   const growthNum = firstVal > 0 && peakIdx !== firstActiveIdx ? ((peakVal - firstVal) / firstVal) * 100 : 0;
-  const growthBig = growthNum !== 0 ? `${growthNum > 0 ? "+" : "−"}${Math.abs(Math.round(growthNum))}%` : "estável";
+  // Sem variação não se escreve nada no lugar do número (antes saía "estável",
+  // que ficava com cara de rótulo quebrado no slide).
+  const growthBig = growthNum !== 0 ? `${growthNum > 0 ? "+" : "−"}${Math.abs(Math.round(growthNum))}%` : "";
   const peakMonthName = extras.monthly[peakIdx] ? MESES_LONGOS[extras.monthly[peakIdx].month - 1] : "";
   const isWeekly = months.length <= 1;
-  const chartTitle = isWeekly ? "VENDA LÍQUIDA NO PERÍODO" : "EVOLUÇÃO MENSAL · VENDA LÍQUIDA";
+  const chartTitle = isWeekly ? "EVOLUÇÃO" : "EVOLUÇÃO MENSAL";
   const growthText =
     growthNum > 0
       ? `de crescimento até o pico em ${peakMonthName || "seu melhor mês"}. ${
@@ -208,9 +258,25 @@ async function buildOneCollection(
         ? `de variação da abertura ao pico — coleção com curva concentrada no início do período.`
         : `Curva estável ao longo do período analisado.`;
 
+  // ---- Blocos vindos do relatório de Coleção Completa (sem recálculo) ----
+  const topMeta = (p: PresentationProductRow) =>
+    [p.colorDescription || "-", p.grade, `${intBR(p.qtd)} un`, `ticket ${brl0(p.precoMedio)}`]
+      .filter((s) => s && String(s).trim())
+      .join(" · ");
+
+  // Top 5 (o card do comparativo é mais alto que o "Top 3" da capa daquele relatório).
+  const top: ComparativoTopProduct[] = presentation.products.slice(0, 5).map((p) => ({
+    rank: p.rank,
+    nome: p.nome,
+    meta: topMeta(p),
+    venda: p.venda,
+    participacaoPct: p.participacaoPct,
+    barWidthPct: p.barWidthPct,
+  }));
+
   const name = col.label?.trim() || col.code;
-  const detectedStart = report.summary.detectedStartDate?.slice(0, 10) ?? range?.start ?? "";
-  const detectedEnd = report.summary.detectedEndDate?.slice(0, 10) ?? range?.end ?? "";
+  const detectedStart = presentation.period.start || range?.start || "";
+  const detectedEnd = presentation.period.end || range?.end || "";
   const fmtDMY = (iso: string) => {
     if (!iso) return "";
     const d = new Date(`${iso}T00:00:00`);
@@ -251,6 +317,10 @@ async function buildOneCollection(
       ? `${brl0(vl)}`
       : `${peakMonthName || "—"} · ${brl0(peakVal)}`,
     footer: `SCARF·ME  ·  COLEÇÃO ${name.toUpperCase()}  ·  ${fmtDMY(detectedStart)} — ${fmtDMY(detectedEnd)}`,
+    numbers: presentation.kpis,
+    top,
+    stores: presentation.stores,
+    storesTotal: presentation.storesTotal,
     vlTotal: vl,
     margemAbs,
     mesesAtivos,
