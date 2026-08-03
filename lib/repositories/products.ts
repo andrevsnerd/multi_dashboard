@@ -9,6 +9,7 @@ import { fetchMultipleProductsStock, fetchMultipleProductsStockByColor } from '@
 import {
   fetchTopProductsEcommerce,
 } from '@/lib/repositories/ecommerce';
+import { getColecaoDescMap } from '@/lib/repositories/colecao';
 import { getColorDescription } from '@/lib/utils/colorMapping';
 import type { ProdutoAgrupadoMember } from '@/lib/utils/produtos-agrupados';
 
@@ -2255,28 +2256,35 @@ export async function fetchAvailableColecoesWithDescriptions({
       GROUP BY UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, ''))))
     `);
 
-    const labelByCollection = new Map<string, string>();
+    // Descrição SEMPRE da tabela mestre COLECOES (ver [[colecao-fonte-mestre-COLECOES]]).
+    // Antes o rótulo só ganhava descrição quando a coleção tinha venda de E-COMMERCE no
+    // período e a linha do faturamento trazia DESC_COLECAO — no varejo o rótulo era o
+    // código pelado ("Y7"). Por isso várias coleções apareciam sem nome nos inputs.
+    // O faturamento continua como fallback (cobre código fora da COLECOES).
+    const descByCode = await getColecaoDescMap().catch(() => new Map<string, string>());
+
+    const codes = new Set<string>();
+    const fallbackDesc = new Map<string, string>();
 
     retailResult.recordset.forEach((row) => {
       const value = row.colecao?.trim().toUpperCase() || '';
-      if (!value || labelByCollection.has(value)) {
-        return;
-      }
-      labelByCollection.set(value, value);
+      if (value) codes.add(value);
     });
 
     ecommerceResult.recordset.forEach((row) => {
       const value = row.colecao?.trim().toUpperCase() || '';
-      if (!value) {
-        return;
-      }
-
+      if (!value) return;
+      codes.add(value);
       const descricao = row.descricao?.trim() || '';
+      if (descricao && descricao.toUpperCase() !== value) fallbackDesc.set(value, descricao);
+    });
+
+    const labelByCollection = new Map<string, string>();
+    codes.forEach((value) => {
+      const descricao = (descByCode.get(value) || fallbackDesc.get(value) || '').trim();
       labelByCollection.set(
         value,
-        descricao && descricao.toUpperCase() !== value
-          ? `${descricao} (${value})`
-          : value
+        descricao && descricao.toUpperCase() !== value ? `${descricao} (${value})` : value
       );
     });
 

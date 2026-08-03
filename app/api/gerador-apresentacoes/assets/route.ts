@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import {
   getPresentationAsset,
+  spreadCoverToCodes,
   upsertPresentationAsset,
   type PresentationAssetKind,
 } from "@/lib/utils/presentation-asset-store";
@@ -52,8 +53,12 @@ export async function GET(request: Request) {
 }
 
 /**
- * POST { company, kind: "logo"|"cover", ref?, dataUrl }
- * Insere ou substitui (upsert) a imagem.
+ * POST { company, kind: "logo"|"cover", ref?, dataUrl, spreadTo? }
+ *
+ * Insere ou substitui (upsert) a imagem. `spreadTo` só vale para capa e serve aos
+ * agregados do Painel de Coleções: a mesma foto preenche os códigos membros que
+ * ainda não têm capa própria (ver `spreadCoverToCodes`). Não é vínculo fixo —
+ * subir foto direto num código faz ele descolar do agregado.
  */
 export async function POST(request: Request) {
   let body: {
@@ -61,6 +66,7 @@ export async function POST(request: Request) {
     kind?: string;
     ref?: string | null;
     dataUrl?: string;
+    spreadTo?: string[];
   };
 
   try {
@@ -109,7 +115,24 @@ export async function POST(request: Request) {
       ref: body.ref ?? null,
       dataUrl: body.dataUrl,
     });
-    return NextResponse.json({ ok: true, updatedAt: asset.updatedAt });
+
+    // Agregado (ex.: Coleções Galisteu): preenche os códigos membros sem capa própria.
+    const spread =
+      kind === "cover" && Array.isArray(body.spreadTo) && body.spreadTo.length > 0
+        ? await spreadCoverToCodes({
+            companyKey: body.company,
+            sourceRef: asset.ref,
+            codes: body.spreadTo,
+            dataUrl: body.dataUrl,
+          })
+        : null;
+
+    return NextResponse.json({
+      ok: true,
+      updatedAt: asset.updatedAt,
+      applied: spread?.applied ?? [],
+      skipped: spread?.skipped ?? [],
+    });
   } catch (error) {
     console.error("Erro ao salvar asset da apresentação", error);
     return NextResponse.json({ error: "Erro ao salvar imagem." }, { status: 500 });

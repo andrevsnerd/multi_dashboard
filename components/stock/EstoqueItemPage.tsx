@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import FilialFilter from "@/components/filters/FilialFilter";
+import type { MultiSelectOption as ColecaoOption } from "@/components/filters/MultiSelectFilter";
 import {
   compareFilialDisplayOrder,
   getFilialLabelForDisplay,
@@ -260,7 +261,8 @@ export default function EstoqueItemPage({
   const [apiLinhas, setApiLinhas] = useState<string[]>([]);
   const [apiSubgrupos, setApiSubgrupos] = useState<string[]>([]);
   const [apiGrades, setApiGrades] = useState<string[]>([]);
-  const [apiColecoes, setApiColecoes] = useState<string[]>([]);
+  // { value: código, label: "DESCRIÇÃO (CÓDIGO)" } — o filtro segue pelo código.
+  const [apiColecoes, setApiColecoes] = useState<ColecaoOption[]>([]);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -391,6 +393,7 @@ export default function EstoqueItemPage({
           company: companyKey,
           start: range.startDate.toISOString(),
           end: range.endDate.toISOString(),
+          includeDescriptions: "1",
         });
 
         if (selectedFilial) searchParams.set("filial", selectedFilial);
@@ -403,7 +406,7 @@ export default function EstoqueItemPage({
         });
         if (!response.ok) return;
 
-        const json = (await response.json()) as { data: string[] };
+        const json = (await response.json()) as { data: ColecaoOption[] };
         if (active) setApiColecoes(json.data || []);
       } catch {
         /* ignore */
@@ -633,13 +636,18 @@ export default function EstoqueItemPage({
     return Array.from(seen).sort();
   }, [pivotRows, apiGrades]);
 
-  const availableColecoes = useMemo(() => {
+  // Códigos vêm da tabela (pivotRows) quando há dados; a descrição vem sempre do
+  // catálogo (apiColecoes), casada pelo código. Sem descrição conhecida, exibe o código.
+  const availableColecoes = useMemo<ColecaoOption[]>(() => {
     if (!pivotRows.length) return apiColecoes;
+    const labelByCode = new Map(apiColecoes.map((o) => [o.value.toUpperCase(), o.label]));
     const seen = new Set<string>();
     for (const row of pivotRows) {
       if (row.colecao?.trim()) seen.add(row.colecao.trim());
     }
-    return Array.from(seen).sort();
+    return Array.from(seen)
+      .map((code) => ({ value: code, label: labelByCode.get(code.toUpperCase()) ?? code }))
+      .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
   }, [pivotRows, apiColecoes]);
 
   const visibleFiliaisColumns = useMemo(
@@ -990,8 +998,8 @@ export default function EstoqueItemPage({
                 >
                   <option value="">Todas</option>
                   {availableColecoes.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
+                    <option key={item.value} value={item.value}>
+                      {item.label}
                     </option>
                   ))}
                 </select>

@@ -6,7 +6,7 @@ import DateRangeFilter, {
   type DateRangeValue,
 } from "@/components/filters/DateRangeFilter";
 import FilialFilter from "@/components/filters/FilialFilter";
-import MultiSelectFilter from "@/components/filters/MultiSelectFilter";
+import MultiSelectFilter, { type MultiSelectOption } from "@/components/filters/MultiSelectFilter";
 import SummaryCards from "@/components/dashboard/SummaryCards";
 import ProductsRecentTable from "@/components/products/ProductsRecentTable";
 import type { ProductDetail } from "@/lib/repositories/products";
@@ -232,7 +232,8 @@ export default function ProductsRecentPage({
 
   const [availableGrupos, setAvailableGrupos] = useState<string[]>([]);
   const [availableLinhas, setAvailableLinhas] = useState<string[]>([]);
-  const [availableColecoes, setAvailableColecoes] = useState<string[]>([]);
+  // Opções { value: código, label: "DESCRIÇÃO (CÓDIGO)" } — filtra por código.
+  const [availableColecoes, setAvailableColecoes] = useState<MultiSelectOption[]>([]);
   const [availableSubgrupos, setAvailableSubgrupos] = useState<string[]>([]);
   const [availableGrades, setAvailableGrades] = useState<string[]>([]);
 
@@ -347,6 +348,7 @@ export default function ProductsRecentPage({
           company: companyKey,
           start: range.startDate.toISOString(),
           end: range.endDate.toISOString(),
+          includeDescriptions: "1",
         });
 
         if (selectedFilial) {
@@ -362,7 +364,7 @@ export default function ProductsRecentPage({
         }
 
         const json = (await response.json()) as {
-          data: string[];
+          data: MultiSelectOption[];
         };
 
         if (active) {

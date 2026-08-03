@@ -22,7 +22,7 @@ import DateRangeFilter, {
   type DateRangeValue,
 } from "@/components/filters/DateRangeFilter";
 import FilialFilter from "@/components/filters/FilialFilter";
-import MultiSelectFilter from "@/components/filters/MultiSelectFilter";
+import MultiSelectFilter, { type MultiSelectOption } from "@/components/filters/MultiSelectFilter";
 import type { CompanyKey } from "@/lib/config/company";
 import { resolveCompany } from "@/lib/config/company";
 import { getCurrentMonthRange } from "@/lib/utils/date";
@@ -409,7 +409,8 @@ export default function ControleEstoquePage({
 
   const [availableGrupos, setAvailableGrupos] = useState<string[]>([]);
   const [availableLinhas, setAvailableLinhas] = useState<string[]>([]);
-  const [availableColecoes, setAvailableColecoes] = useState<string[]>([]);
+  // Opções { value: código, label: "DESCRIÇÃO (CÓDIGO)" } — filtra por código.
+  const [availableColecoes, setAvailableColecoes] = useState<MultiSelectOption[]>([]);
   const [availableSubgrupos, setAvailableSubgrupos] = useState<string[]>([]);
   const [availableGrades, setAvailableGrades] = useState<string[]>([]);
 
@@ -988,6 +989,7 @@ export default function ControleEstoquePage({
           company: companyKey,
           start: range.startDate.toISOString(),
           end: range.endDate.toISOString(),
+          includeDescriptions: "1",
         });
 
         if (selectedFilial) {
@@ -1008,7 +1010,7 @@ export default function ControleEstoquePage({
         }
 
         const json = (await response.json()) as {
-          data: string[];
+          data: MultiSelectOption[];
         };
 
         if (active) {

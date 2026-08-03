@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { getMonth, getYear } from "date-fns";
 
 import FilialFilter from "@/components/filters/FilialFilter";
-import MultiSelectFilter from "@/components/filters/MultiSelectFilter";
+import MultiSelectFilter, { type MultiSelectOption } from "@/components/filters/MultiSelectFilter";
 import type { CompanyKey } from "@/lib/config/company";
 import { resolveCompany } from "@/lib/config/company";
 import { useAuth } from "@/components/auth/AuthContext";
@@ -561,7 +561,8 @@ export default function ProjecaoEstoquePage({
 
   const [opcoesGrupos, setOpcoesGrupos] = useState<string[]>([]);
   const [opcoesLinhas, setOpcoesLinhas] = useState<string[]>([]);
-  const [opcoesColecoes, setOpcoesColecoes] = useState<string[]>([]);
+  // Opções { value: código, label: "DESCRIÇÃO (CÓDIGO)" } — filtra por código.
+  const [opcoesColecoes, setOpcoesColecoes] = useState<MultiSelectOption[]>([]);
   const [opcoesSubgrupos, setOpcoesSubgrupos] = useState<string[]>([]);
   const [opcoesGrades, setOpcoesGrades] = useState<string[]>([]);
 
@@ -630,7 +631,7 @@ export default function ProjecaoEstoquePage({
       setOpcoesColecoes([]);
       return;
     }
-    const q = new URLSearchParams({ company: companyKey });
+    const q = new URLSearchParams({ company: companyKey, includeDescriptions: "1" });
     if (filial) q.set("filial", filial);
     linhas.forEach((l) => q.append("linhas", l));
     fetch(`/api/products/colecoes?${q}`)

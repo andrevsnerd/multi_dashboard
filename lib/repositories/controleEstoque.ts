@@ -444,16 +444,20 @@ function buildLinhaFilter(
     return '';
   }
 
+  // Nome derivado do alias (ver buildGrupoFilter): o mesmo request constrói este
+  // filtro mais de uma vez (estoque 'p' e entradas 'pr') → sem isso dá EDUPEPARAM.
+  const paramBase = `linha_${prefix}`;
+
   if (linhasNormalizadas.length === 1) {
-    request.input('linha', sql.VarChar, linhasNormalizadas[0]);
-    return `AND UPPER(LTRIM(RTRIM(ISNULL(${prefix}.LINHA, '')))) = @linha`;
+    request.input(paramBase, sql.VarChar, linhasNormalizadas[0]);
+    return `AND UPPER(LTRIM(RTRIM(ISNULL(${prefix}.LINHA, '')))) = @${paramBase}`;
   }
 
   linhasNormalizadas.forEach((l, index) => {
-    request.input(`linha${index}`, sql.VarChar, l);
+    request.input(`${paramBase}${index}`, sql.VarChar, l);
   });
 
-  const placeholders = linhasNormalizadas.map((_, index) => `@linha${index}`).join(', ');
+  const placeholders = linhasNormalizadas.map((_, index) => `@${paramBase}${index}`).join(', ');
   return `AND UPPER(LTRIM(RTRIM(ISNULL(${prefix}.LINHA, '')))) IN (${placeholders})`;
 }
 
@@ -472,16 +476,23 @@ function buildColecaoFilter(
     return '';
   }
 
+  // Nome derivado do alias (ver buildGrupoFilter): `fetchEstoqueKPIs` monta este
+  // filtro DUAS vezes no mesmo request (estoque 'p' e entradas 'pr'). Com o nome
+  // fixo 'colecao' a segunda chamada estourava EDUPEPARAM — era o que quebrava o
+  // comparativo do Gerador de Apresentações (fetchSalesTotals → fetchEcommerceSummary
+  // → fetchEstoqueKPIs) sempre que havia filtro de coleção.
+  const paramBase = `colecao_${prefix}`;
+
   if (colecoesNormalizadas.length === 1) {
-    request.input('colecao', sql.VarChar, colecoesNormalizadas[0]);
-    return `AND UPPER(LTRIM(RTRIM(ISNULL(${prefix}.COLECAO, '')))) = @colecao`;
+    request.input(paramBase, sql.VarChar, colecoesNormalizadas[0]);
+    return `AND UPPER(LTRIM(RTRIM(ISNULL(${prefix}.COLECAO, '')))) = @${paramBase}`;
   }
 
   colecoesNormalizadas.forEach((c, index) => {
-    request.input(`colecao${index}`, sql.VarChar, c);
+    request.input(`${paramBase}${index}`, sql.VarChar, c);
   });
 
-  const placeholders = colecoesNormalizadas.map((_, index) => `@colecao${index}`).join(', ');
+  const placeholders = colecoesNormalizadas.map((_, index) => `@${paramBase}${index}`).join(', ');
   return `AND UPPER(LTRIM(RTRIM(ISNULL(${prefix}.COLECAO, '')))) IN (${placeholders})`;
 }
 
@@ -500,16 +511,19 @@ function buildSubgrupoFilter(
     return '';
   }
 
+  // Nome derivado do alias (ver buildGrupoFilter) — mesmo motivo: estoque 'p' e entradas 'pr'.
+  const paramBase = `subgrupo_${prefix}`;
+
   if (subgruposNormalizados.length === 1) {
-    request.input('subgrupo', sql.VarChar, subgruposNormalizados[0]);
-    return `AND UPPER(LTRIM(RTRIM(ISNULL(${prefix}.SUBGRUPO_PRODUTO, '')))) = @subgrupo`;
+    request.input(paramBase, sql.VarChar, subgruposNormalizados[0]);
+    return `AND UPPER(LTRIM(RTRIM(ISNULL(${prefix}.SUBGRUPO_PRODUTO, '')))) = @${paramBase}`;
   }
 
   subgruposNormalizados.forEach((s, index) => {
-    request.input(`subgrupo${index}`, sql.VarChar, s);
+    request.input(`${paramBase}${index}`, sql.VarChar, s);
   });
 
-  const placeholders = subgruposNormalizados.map((_, index) => `@subgrupo${index}`).join(', ');
+  const placeholders = subgruposNormalizados.map((_, index) => `@${paramBase}${index}`).join(', ');
   return `AND UPPER(LTRIM(RTRIM(ISNULL(${prefix}.SUBGRUPO_PRODUTO, '')))) IN (${placeholders})`;
 }
 

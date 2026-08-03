@@ -1,0 +1,473 @@
+/* Alterar Custo / Preço — layout enxuto, na leitura do script:
+   listas numeradas e densas, números alinhados à direita em monoespaçada.
+   Usa os tokens globais direto, então o tema noturno vem quase de graça. */
+
+.wrapper {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  color: var(--t-900);
+}
+
+/* ── cabeçalho ── */
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.title {
+  font-size: 26px;
+  font-weight: 700;
+  margin: 0;
+}
+.avisoTopo {
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(234, 179, 8, 0.4);
+  background: rgba(234, 179, 8, 0.1);
+  color: var(--t-700);
+}
+
+/* ── cards ── */
+
+.card {
+  background: var(--s-white);
+  border: 1px solid var(--b-200);
+  border-radius: 12px;
+  box-shadow: var(--elev-1);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.cardResultado {
+  border-color: rgba(34, 197, 94, 0.45);
+  background: rgba(34, 197, 94, 0.06);
+}
+.cardTitle {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ── abas ── */
+
+.tabs {
+  display: inline-flex;
+  gap: 6px;
+  background: var(--s-100);
+  padding: 4px;
+  border-radius: 10px;
+  align-self: flex-start;
+}
+.tab {
+  border: none;
+  background: transparent;
+  padding: 8px 18px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--t-500);
+  cursor: pointer;
+}
+.tabAtiva {
+  background: var(--s-white);
+  color: var(--t-900);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+/* ── filtros ── */
+
+.filtros {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+.campoTexto {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.campoLabel {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--t-500);
+}
+.input,
+.textarea,
+.inputValor {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--b-300);
+  border-radius: 8px;
+  font-size: 14px;
+  background: var(--s-white);
+  color: var(--t-900);
+  font-family: inherit;
+}
+.textarea {
+  resize: vertical;
+  min-height: 90px;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 13px;
+}
+.inputValor {
+  width: 150px;
+  text-align: right;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+.input:focus,
+.textarea:focus,
+.inputValor:focus {
+  outline: 2px solid var(--ring-accent);
+  outline-offset: 0;
+  border-color: transparent;
+}
+.codigosBox {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.dica {
+  font-size: 13px;
+  color: var(--t-500);
+  margin: 0;
+}
+.toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  color: var(--t-700);
+  cursor: pointer;
+}
+.badgeInativa {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: rgba(244, 63, 94, 0.12);
+  color: #dc2626;
+  margin-left: 6px;
+}
+
+/* ── ações ── */
+
+.acoes {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.btnPrimario,
+.btnPerigo {
+  border: none;
+  border-radius: 9px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btnPrimario {
+  background: #2563eb;
+  color: #ffffff;
+}
+.btnPerigo {
+  background: #dc2626;
+  color: #ffffff;
+}
+.btnPrimario:disabled,
+.btnPerigo:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btnTexto {
+  border: none;
+  background: transparent;
+  color: #2563eb;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 6px;
+}
+.btnTexto:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── barra "novo valor" (mesma pergunta que o script faz no fim) ── */
+
+.aplicarBar {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(37, 99, 235, 0.3);
+  background: var(--s-blue50);
+}
+.aplicarBar .campoLabel {
+  align-self: center;
+}
+
+/* ── listas numeradas (custos disponíveis, tabelas, preview) ── */
+
+.tabelaWrap {
+  overflow-x: auto;
+  border: 1px solid var(--b-200);
+  border-radius: 10px;
+  max-height: 620px;
+  overflow-y: auto;
+}
+.tabela,
+.tabelaFicha {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.tabelaFicha {
+  border: 1px solid var(--b-200);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.tabela thead th,
+.tabelaFicha thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--s-50);
+  border-bottom: 1px solid var(--b-200);
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--t-600);
+  white-space: nowrap;
+}
+.tabela tbody td,
+.tabelaFicha tbody td {
+  border-bottom: 1px solid var(--b-subtle);
+  padding: 5px 12px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.tabela tbody tr:hover,
+.tabelaFicha tbody tr:hover {
+  background: var(--s-50);
+}
+.tabelaFicha tbody tr {
+  cursor: default;
+}
+.trAlterada {
+  background: rgba(234, 179, 8, 0.1);
+}
+.trAlterada:hover {
+  background: rgba(234, 179, 8, 0.15);
+}
+.thCheck {
+  width: 34px;
+}
+.thFichaNum {
+  width: 46px;
+  text-align: right;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color: var(--t-400);
+}
+.thNum {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.tabelaFicha tbody td.thNum {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+.tdCodigo {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-weight: 600;
+  font-size: 12.5px;
+}
+.tdDesc {
+  max-width: 340px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tdMeta {
+  font-size: 12.5px;
+  color: var(--t-600);
+}
+.tdMetaSub {
+  display: block;
+  font-size: 11px;
+  color: var(--t-400);
+}
+
+/* ── identificação do produto ── */
+
+.fichaHead {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.fichaProduto {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 15px;
+  font-weight: 700;
+}
+.fichaDesc {
+  font-size: 14px;
+  color: var(--t-600);
+}
+
+/* ── distribuição de valores do modo em massa ── */
+
+.distribuicao {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--b-200);
+  background: var(--s-50);
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 13px;
+  align-items: flex-start;
+}
+.distribuicaoTitulo {
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.distribuicaoLinha {
+  color: var(--t-700);
+}
+.distribuicaoTotal {
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--b-200);
+  width: 100%;
+  color: var(--t-600);
+}
+
+/* ── resultado / histórico ── */
+
+.resumoLinha {
+  font-size: 14px;
+  color: var(--t-700);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.lote {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 12.5px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--s-100);
+}
+.listaErros {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 13px;
+  color: #dc2626;
+}
+.textoErro {
+  color: #dc2626;
+}
+.historicoToggle {
+  border: none;
+  background: transparent;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--t-900);
+  cursor: pointer;
+  text-align: left;
+  padding: 0;
+}
+
+.erroBox {
+  border: 1px solid rgba(244, 63, 94, 0.4);
+  background: rgba(244, 63, 94, 0.09);
+  color: #b91c1c;
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 13.5px;
+}
+.avisoBox {
+  border: 1px solid rgba(234, 179, 8, 0.4);
+  background: rgba(234, 179, 8, 0.1);
+  color: var(--t-700);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 13.5px;
+}
+
+/* ── modal de preview ── */
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 1000;
+}
+.modal {
+  background: var(--s-white);
+  border-radius: 14px;
+  box-shadow: var(--elev-2);
+  padding: 22px;
+  width: min(1000px, 100%);
+  max-height: 88vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.modalAviso {
+  margin: 0;
+  font-size: 14px;
+  color: var(--t-700);
+  line-height: 1.5;
+}
+.modalAcoes {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ── tema noturno: só as tintas que não vêm de token ── */
+
+:global(:root[data-theme="dark"]) .textoErro,
+:global(:root[data-theme="dark"]) .erroBox,
+:global(:root[data-theme="dark"]) .listaErros,
+:global(:root[data-theme="dark"]) .badgeInativa {
+  color: #fb7185;
+}
+:global(:root[data-theme="dark"]) .btnTexto {
+  color: #60a5fa;
+}
+:global(:root[data-theme="dark"]) .modalOverlay {
+  background: rgba(2, 6, 23, 0.7);
+}

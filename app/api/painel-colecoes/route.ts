@@ -7,6 +7,7 @@ import { fetchCollectionComparativeExtras } from "@/lib/repositories/collectionR
 import { getColecaoDescMap, getColecaoInicioMatrizMap } from "@/lib/repositories/colecao";
 import { resolveCompanyLive } from "@/lib/server/company-live";
 import { VAREJO_VALUE, type CompanyKey } from "@/lib/config/company";
+import { PAINEL_COLECOES, type PainelColecaoConfig } from "@/lib/config/painel-colecoes";
 import { normalizeRangeForQuery, type NormalizedRange } from "@/lib/utils/date";
 
 export const maxDuration = 300;
@@ -27,38 +28,10 @@ export const dynamic = "force-dynamic";
  * "Todas as filiais" (filial null) = varejo + e-commerce, exatamente como as
  * demais telas de scarfme.
  */
-interface ColecaoConfig {
-  key: string;
-  /**
-   * Rótulo fixo — usado para agregados de vários códigos (Galisteu, AG), que não
-   * têm correspondência 1:1 na tabela COLECOES, ou para sobrescrever visualmente
-   * o nome de uma coleção de 1 código (ex.: Pantanal). Quando ausente numa
-   * coleção de 1 código, o nome vem do banco (DESC_COLECAO), ver resolução em `GET`.
-   */
-  customLabel?: string;
-  /** Códigos de COLECAO que compõem a coleção (agregado = múltiplos). */
-  codes: string[];
-  subtitle?: string;
-}
-
-// Ordem fixa e intencional: "Coleções Galisteu" (agregado) SEMPRE em primeiro.
-const COLECOES: ColecaoConfig[] = [
-  {
-    key: "galisteu",
-    customLabel: "Coleções Galisteu",
-    codes: ["T6", "Y3", "U5"],
-    subtitle: "Adriane Galisteu 24 (T6) + Copa 26 (Y3) + Carnaval (U5)",
-  },
-  { key: "isabela", codes: ["X7"] },
-  { key: "astrid", codes: ["X15"] },
-  { key: "tarsila", codes: ["U7"] },
-  { key: "portinari", codes: ["X10"] },
-  { key: "toy", codes: ["Q6"] },
-  { key: "brasilidade", codes: ["P8"] },
-  { key: "origem", codes: ["O8"] },
-  { key: "seaside", codes: ["Y4"] },
-  { key: "pantanal", customLabel: "PANTANAL (CAIMAN)", codes: ["V9"] },
-];
+// A lista mora em lib/config/painel-colecoes.ts porque o preset "Coleções do
+// Painel" do Gerador de Apresentações consome exatamente a mesma definição.
+type ColecaoConfig = PainelColecaoConfig;
+const COLECOES = PAINEL_COLECOES;
 
 function round2(value: number): number {
   if (!Number.isFinite(value)) return 0;

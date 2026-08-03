@@ -6,7 +6,7 @@ import DateRangeFilter, {
   type DateRangeValue,
 } from "@/components/filters/DateRangeFilter";
 import FilialFilter from "@/components/filters/FilialFilter";
-import MultiSelectFilter from "@/components/filters/MultiSelectFilter";
+import MultiSelectFilter, { type MultiSelectOption } from "@/components/filters/MultiSelectFilter";
 import SummaryCards from "@/components/dashboard/SummaryCards";
 import ProductsTable from "@/components/products/ProductsTable";
 import type { ProductDetail } from "@/lib/repositories/products";
@@ -237,7 +237,9 @@ export default function ProductsPage({
 
   const [availableGrupos, setAvailableGrupos] = useState<string[]>([]);
   const [availableLinhas, setAvailableLinhas] = useState<string[]>([]);
-  const [availableColecoes, setAvailableColecoes] = useState<string[]>([]);
+  // Opções { value: código, label: "DESCRIÇÃO (CÓDIGO)" } — o filtro continua
+  // mandando o CÓDIGO; só o texto exibido ganha a descrição da tabela COLECOES.
+  const [availableColecoes, setAvailableColecoes] = useState<MultiSelectOption[]>([]);
   const [availableSubgrupos, setAvailableSubgrupos] = useState<string[]>([]);
   const [availableGrades, setAvailableGrades] = useState<string[]>([]);
 
@@ -352,6 +354,7 @@ export default function ProductsPage({
           company: companyKey,
           start: range.startDate.toISOString(),
           end: range.endDate.toISOString(),
+          includeDescriptions: "1",
         });
 
         if (selectedFilial) {
@@ -367,7 +370,7 @@ export default function ProductsPage({
         }
 
         const json = (await response.json()) as {
-          data: string[];
+          data: MultiSelectOption[];
         };
 
         if (active) {

@@ -15,17 +15,14 @@ export async function GET(request: Request) {
   const subgrupos = searchParams.getAll('subgrupos').filter(Boolean);
   const grades = searchParams.getAll('grades').filter(Boolean);
 
-  if (!startParam || !endParam) {
-    return NextResponse.json(
-      { error: 'Parâmetros start e end são obrigatórios' },
-      { status: 400 }
-    );
-  }
-
-  const range = {
-    start: startParam,
-    end: endParam,
-  };
+  // start/end opcionais: quando omitidos, o repositório usa o mês corrente — mesma
+  // regra de /api/products/linhas. Antes eram obrigatórios, e as telas que não
+  // mandavam período (Projeção de Estoque, Produtos Parados) tomavam 400 e ficavam
+  // com o filtro de coleção VAZIO.
+  const range =
+    startParam && endParam
+      ? { start: startParam, end: endParam }
+      : undefined;
 
   try {
     const data = includeDescriptions

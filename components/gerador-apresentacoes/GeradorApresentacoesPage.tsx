@@ -6,6 +6,7 @@ import DateRangeFilter, { type DateRangeValue } from "@/components/filters/DateR
 import FilialFilter from "@/components/filters/FilialFilter";
 import MultiSelectFilter, { type MultiSelectOption } from "@/components/filters/MultiSelectFilter";
 import type { CompanyKey } from "@/lib/config/company";
+import { PAINEL_COLECAO_CODES } from "@/lib/config/painel-colecoes";
 import { getCurrentMonthRange, formatDateForQuery } from "@/lib/utils/date";
 import {
   COLECAO_COMPLETA_ID,
@@ -117,15 +118,73 @@ export default function GeradorApresentacoesPage({
   const startStr = formatDateForQuery(range.startDate);
   const endStr = formatDateForQuery(range.endDate);
 
+  // ---- preset "Coleções do Painel" ----
+  // Mesma lista do Painel de Coleções (lib/config/painel-colecoes.ts). Um clique
+  // marca todas; o usuário segue livre para adicionar/remover no próprio filtro.
+  const isPainelPresetOn = useMemo(() => {
+    if (colecoes.length === 0) return false;
+    const selecionadas = new Set(colecoes.map((c) => c.trim().toUpperCase()));
+    return PAINEL_COLECAO_CODES.every((code) => selecionadas.has(code));
+  }, [colecoes]);
+
+  const togglePainelPreset = useCallback(() => {
+    setColecoes((prev) => {
+      const doPainel = new Set(PAINEL_COLECAO_CODES);
+      if (isPainelPresetOn) {
+        // Desliga: tira só os códigos do painel, preservando o que foi adicionado à mão.
+        return prev.filter((c) => !doPainel.has(c.trim().toUpperCase()));
+      }
+      const jaSelecionadas = new Set(prev.map((c) => c.trim().toUpperCase()));
+      return [...prev, ...PAINEL_COLECAO_CODES.filter((code) => !jaSelecionadas.has(code))];
+    });
+  }, [isPainelPresetOn]);
+
+  // Descrição de TODA coleção cadastrada (tabela mestre COLECOES), independente de
+  // venda. A lista de opções vem das VENDAS do período; sem este mapa, uma coleção
+  // sem venda na janela (ex.: SUELEN ARRIGO) apareceria só como "Y7".
+  const [descByCode, setDescByCode] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let active = true;
+    fetch(`/api/products/colecoes/descricoes?company=${companyKey}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: { data?: Record<string, string> } | null) => {
+        if (active && j?.data) setDescByCode(j.data);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [companyKey]);
+
+  /** Rótulo "DESCRIÇÃO (CÓDIGO)" a partir da tabela mestre; só o código se não houver. */
+  const labelFromMaster = useCallback(
+    (code: string) => {
+      const cod = code.trim().toUpperCase();
+      const desc = (descByCode[cod] ?? "").trim();
+      return desc && desc.toUpperCase() !== cod ? `${desc} (${cod})` : code;
+    },
+    [descByCode]
+  );
+
+  // Toda coleção selecionada entra na lista de opções, mesmo sem venda no período —
+  // senão o usuário não conseguiria enxergá-la nem desmarcá-la.
+  const colecaoOptions = useMemo<MultiSelectOption[]>(() => {
+    const conhecidas = new Set(optColecoes.map((o) => o.value.trim().toUpperCase()));
+    const extras = colecoes
+      .filter((code) => !conhecidas.has(code.trim().toUpperCase()))
+      .map((code) => ({ value: code, label: labelFromMaster(code) }));
+    return extras.length > 0 ? [...optColecoes, ...extras] : optColecoes;
+  }, [optColecoes, colecoes, labelFromMaster]);
+
   // Coleção "âncora" = a única selecionada (capa/título ligam a ela).
   const singleColecao = colecoes.length === 1 ? colecoes[0] : null;
   const singleColecaoLabel = useMemo(() => {
     if (!singleColecao) return "";
-    const opt = optColecoes.find((o) => o.value === singleColecao);
-    if (!opt) return singleColecao;
+    const opt = colecaoOptions.find((o) => o.value === singleColecao);
+    const label = opt?.label ?? labelFromMaster(singleColecao);
     // label vem como "descrição (código)" — usa a descrição pura no título.
-    return opt.label.replace(/\s*\([^)]*\)\s*$/, "").trim() || opt.label;
-  }, [singleColecao, optColecoes]);
+    return label.replace(/\s*\([^)]*\)\s*$/, "").trim() || label;
+  }, [singleColecao, colecaoOptions, labelFromMaster]);
 
   // ---- opções de coleção ----
   const loadColecoes = useCallback(async () => {
@@ -369,14 +428,15 @@ export default function GeradorApresentacoesPage({
     }
   };
 
-  // Descrição de uma coleção pelo código (para títulos do comparativo).
+  // Descrição de uma coleção pelo código (títulos do comparativo e cards de imagem).
+  // Cai na tabela mestre quando a coleção não vendeu no período (não está em optColecoes).
   const labelForCode = useCallback(
     (code: string) => {
       const opt = optColecoes.find((o) => o.value === code);
-      if (!opt) return code;
-      return opt.label.replace(/\s*\([^)]*\)\s*$/, "").trim() || opt.label;
+      const label = opt?.label ?? labelFromMaster(code);
+      return label.replace(/\s*\([^)]*\)\s*$/, "").trim() || label;
     },
-    [optColecoes]
+    [optColecoes, labelFromMaster]
   );
 
   // ---- gerar ----
@@ -711,14 +771,31 @@ export default function GeradorApresentacoesPage({
         <h2 className={styles.panelTitle}>Filtros</h2>
         <div className={styles.filtersGrid}>
           {!isGiro && meta?.supportedFilters.includes("colecao") && (
-            <MultiSelectFilter
-              label="Coleção"
-              value={colecoes}
-              options={optColecoes}
-              onChange={setColecoes}
-              onOpen={() => void loadColecoes()}
-              loading={loadingColecoes}
-            />
+            <div className={styles.field}>
+              <MultiSelectFilter
+                label="Coleção"
+                value={colecoes}
+                options={colecaoOptions}
+                onChange={setColecoes}
+                onOpen={() => void loadColecoes()}
+                loading={loadingColecoes}
+              />
+              {companyKey === "scarfme" && (
+                <button
+                  type="button"
+                  className={`${styles.presetBtn} ${isPainelPresetOn ? styles.presetBtnOn : ""}`}
+                  onClick={togglePainelPreset}
+                  aria-pressed={isPainelPresetOn}
+                  title={
+                    isPainelPresetOn
+                      ? "Remover as coleções do Painel da seleção"
+                      : "Selecionar as mesmas coleções do Painel de Coleções"
+                  }
+                >
+                  {isPainelPresetOn ? "✓" : "+"} Coleções do Painel ({PAINEL_COLECAO_CODES.length})
+                </button>
+              )}
+            </div>
           )}
           {meta?.supportedFilters.includes("periodo") && (
             <DateRangeFilter value={range} onChange={setRange} label="Período" />

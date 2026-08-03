@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import FilialFilter from "@/components/filters/FilialFilter";
-import MultiSelectFilter from "@/components/filters/MultiSelectFilter";
+import MultiSelectFilter, { type MultiSelectOption } from "@/components/filters/MultiSelectFilter";
 import type { CompanyKey } from "@/lib/config/company";
 import type { EntradaPorFilial, ProdutoParadoDetalhado } from "@/lib/repositories/controleEstoque";
 import { exportProdutosParadosXlsx } from "@/lib/utils/exportProdutosParadosXlsx";
@@ -85,7 +85,8 @@ export default function ProdutosParadosPage({ companyKey, companyName }: Produto
 
   const [availableGrupos, setAvailableGrupos] = useState<string[]>([]);
   const [availableLinhas, setAvailableLinhas] = useState<string[]>([]);
-  const [availableColecoes, setAvailableColecoes] = useState<string[]>([]);
+  // Opções { value: código, label: "DESCRIÇÃO (CÓDIGO)" } — filtra por código.
+  const [availableColecoes, setAvailableColecoes] = useState<MultiSelectOption[]>([]);
   const [availableSubgrupos, setAvailableSubgrupos] = useState<string[]>([]);
   const [availableGrades, setAvailableGrades] = useState<string[]>([]);
 
@@ -129,9 +130,9 @@ export default function ProdutosParadosPage({ companyKey, companyName }: Produto
   useEffect(() => {
     if (!isScarfme) { setAvailableColecoes([]); return; }
     let active = true;
-    fetch(`/api/products/colecoes?company=${companyKey}`, { cache: "no-store" })
+    fetch(`/api/products/colecoes?company=${companyKey}&includeDescriptions=1`, { cache: "no-store" })
       .then(r => r.json())
-      .then((json: { data: string[] }) => { if (active) setAvailableColecoes(json.data ?? []); })
+      .then((json: { data: MultiSelectOption[] }) => { if (active) setAvailableColecoes(json.data ?? []); })
       .catch(() => {});
     return () => { active = false; };
   }, [companyKey, isScarfme]);

@@ -204,6 +204,8 @@ export default function ColecoesPanelPage({ companyKey }: ColecoesPanelPageProps
   const [covers, setCovers] = useState<Record<string, string | null | undefined>>({});
   const [uploadingCoverRef, setUploadingCoverRef] = useState<string | null>(null);
   const [coverError, setCoverError] = useState<string | null>(null);
+  // Aviso de onde a foto de um agregado foi espalhada (e o que foi preservado).
+  const [coverInfo, setCoverInfo] = useState<string | null>(null);
 
   const captureRef = useRef<HTMLDivElement>(null);
 
@@ -268,20 +270,40 @@ export default function ColecoesPanelPage({ companyKey }: ColecoesPanelPageProps
     };
   }, [theme, items, companyKey, covers]);
 
-  const handleUploadCover = async (ref: string, file: File | undefined) => {
+  const handleUploadCover = async (item: ColecaoPanelItem, file: File | undefined) => {
     if (!file) return;
+    const ref = coverRefFor(item);
+    // Agregado (ex.: Galisteu): a foto também preenche os códigos membros, senão
+    // eles ficariam sem imagem no Gerador (que sempre busca por código).
+    const spreadTo = item.codes.length > 1 ? item.codes : [];
     setUploadingCoverRef(ref);
     setCoverError(null);
+    setCoverInfo(null);
     try {
       const dataUrl = await readFileAsDataUrl(file);
       const res = await fetch("/api/gerador-apresentacoes/assets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ company: companyKey, kind: "cover", ref, dataUrl }),
+        body: JSON.stringify({ company: companyKey, kind: "cover", ref, dataUrl, spreadTo }),
       });
-      const json = await res.json();
+      const json = (await res.json()) as {
+        error?: string;
+        applied?: string[];
+        skipped?: string[];
+      };
       if (!res.ok) throw new Error(json?.error || "Erro ao salvar imagem.");
       setCovers((prev) => ({ ...prev, [ref]: dataUrl }));
+
+      if (spreadTo.length > 0) {
+        const partes: string[] = [];
+        if (json.applied?.length) {
+          partes.push(`aplicada também em ${json.applied.join(", ")} no Gerador`);
+        }
+        if (json.skipped?.length) {
+          partes.push(`${json.skipped.join(", ")} mantiveram a foto própria`);
+        }
+        if (partes.length) setCoverInfo(`${item.label}: ${partes.join("; ")}.`);
+      }
     } catch (e) {
       setCoverError(e instanceof Error ? e.message : "Erro ao salvar a imagem.");
     } finally {
@@ -493,6 +515,12 @@ export default function ColecoesPanelPage({ companyKey }: ColecoesPanelPageProps
         </div>
       )}
 
+      {theme === "fotos" && coverInfo && (
+        <div className={styles.coverInfo} data-pdf-hide>
+          {coverInfo}
+        </div>
+      )}
+
       {error ? (
         <div className={styles.error}>{error}</div>
       ) : loading ? (
@@ -537,7 +565,7 @@ export default function ColecoesPanelPage({ companyKey }: ColecoesPanelPageProps
                     type="file"
                     accept="image/*"
                     className={styles.photoHiddenInput}
-                    onChange={(e) => void handleUploadCover(ref, e.target.files?.[0])}
+                    onChange={(e) => void handleUploadCover(item, e.target.files?.[0])}
                   />
                   <div className={styles.photoRing} style={{ borderColor: hex(palette.circ) }} />
                   {cover ? (

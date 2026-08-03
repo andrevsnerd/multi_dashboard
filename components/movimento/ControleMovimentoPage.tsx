@@ -8,7 +8,7 @@ import DateRangeFilter, {
   type DateRangeValue,
 } from "@/components/filters/DateRangeFilter";
 import FilialFilter from "@/components/filters/FilialFilter";
-import MultiSelectFilter from "@/components/filters/MultiSelectFilter";
+import MultiSelectFilter, { type MultiSelectOption } from "@/components/filters/MultiSelectFilter";
 import type { CompanyKey } from "@/lib/config/company";
 import { resolveCompany } from "@/lib/config/company";
 import { getCurrentMonthRange } from "@/lib/utils/date";
@@ -83,7 +83,7 @@ async function fetchKPIs(
 async function fetchFilterOptions(company: string, range: DateRangeValue): Promise<{
   grupos: string[];
   linhas: string[];
-  colecoes: string[];
+  colecoes: MultiSelectOption[];
   subgrupos: string[];
   grades: string[];
 }> {
@@ -103,10 +103,15 @@ async function fetchFilterOptions(company: string, range: DateRangeValue): Promi
   });
   const linhas = responseLinhas.ok ? ((await responseLinhas.json()) as { data: string[] }).data : [];
 
-  const responseColecoes = await fetch(`/api/products/colecoes?${searchParams.toString()}`, {
+  // includeDescriptions: rótulo "DESCRIÇÃO (CÓDIGO)"; o value continua sendo o código.
+  const colecoesParams = new URLSearchParams(searchParams);
+  colecoesParams.set("includeDescriptions", "1");
+  const responseColecoes = await fetch(`/api/products/colecoes?${colecoesParams.toString()}`, {
     cache: "no-store",
   });
-  const colecoes = responseColecoes.ok ? ((await responseColecoes.json()) as { data: string[] }).data : [];
+  const colecoes = responseColecoes.ok
+    ? ((await responseColecoes.json()) as { data: MultiSelectOption[] }).data
+    : [];
 
   const responseSubgrupos = await fetch(`/api/products/subgrupos?${searchParams.toString()}`, {
     cache: "no-store",
@@ -166,7 +171,7 @@ export default function ControleMovimentoPage({
 
   const [availableGrupos, setAvailableGrupos] = useState<string[]>([]);
   const [availableLinhas, setAvailableLinhas] = useState<string[]>([]);
-  const [availableColecoes, setAvailableColecoes] = useState<string[]>([]);
+  const [availableColecoes, setAvailableColecoes] = useState<MultiSelectOption[]>([]);
   const [availableSubgrupos, setAvailableSubgrupos] = useState<string[]>([]);
   const [availableGrades, setAvailableGrades] = useState<string[]>([]);
 
