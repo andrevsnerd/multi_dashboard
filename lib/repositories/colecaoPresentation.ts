@@ -23,9 +23,12 @@ import { fetchProdutoQtdePorFilial } from "@/lib/repositories/performance";
  * Antes usava `fetchCollectionReport` (tabela contábil W_CTB, desconto absoluto e
  * SEM trocas), o que divergia do relatório de vendas/produtos por venda.
  *
- * Estoque aqui é o SALDO LÍQUIDO da rede (inclui negativos), espelhando o
- * protótipo aprovado (o PDF de referência mostra -8, -5 e total = soma bruta).
- * É intencionalmente diferente da regra "só positivos" de outras telas.
+ * ESTOQUE segue a REGRA GLOBAL, igual ao resto do app: soma só saldos POSITIVOS
+ * ([[estoque-negativos-nunca-contam]]). A linha de um SKU pode aparecer negativa
+ * (quando ele não tem nenhum saldo positivo na rede — é informação real), mas
+ * negativo NUNCA entra numa soma (total da coleção e linha "Outros").
+ * Antes era saldo líquido cru, copiado do protótipo; estava errado — negativo de
+ * uma filial abatia o positivo de outra e o estoque saía menor que o real.
  */
 
 export interface ColecaoPresentationParams {
@@ -146,8 +149,20 @@ function fmtPct(value: number): string {
   return `${value.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
 }
 
-/** Estoque líquido da rede (SUM ESTOQUE, com negativos), por produto/cor. */
-async function fetchNetStock(productIds: string[]): Promise<Map<string, number>> {
+/**
+ * Estoque da rede por produto × cor pela REGRA GLOBAL ([[estoque-negativos-nunca-contam]]):
+ * soma só os saldos POSITIVOS das filiais; o negativo só aparece quando o SKU não
+ * tem nenhum saldo positivo (aí ele é exibido negativo, para o problema não virar
+ * um zero silencioso) — mesma lógica de `fetchMultipleProductsStockByColor`.
+ *
+ * Antes somava cru (`SUM(ESTOQUE)`), então um saldo negativo numa filial abatia o
+ * positivo de outra e o total do deck ficava menor que o real.
+ *
+ * O casamento de cor é feito aqui (chave `skuKey`, que normaliza '06'≡'6') em vez
+ * de no SQL porque venda e estoque divergem no formato do código de cor
+ * ([[cor-produto-formato-duas-fontes]]) — match exato perderia SKUs.
+ */
+async function fetchNetworkStock(productIds: string[]): Promise<Map<string, number>> {
   const uniqueIds = Array.from(new Set(productIds.map((id) => id.trim()).filter(Boolean)));
   const stock = new Map<string, number>();
   if (uniqueIds.length === 0) return stock;
@@ -156,17 +171,20 @@ async function fetchNetStock(productIds: string[]): Promise<Map<string, number>>
     uniqueIds.forEach((id, index) => request.input(`pid${index}`, sql.VarChar, id));
     const placeholders = uniqueIds.map((_, i) => `@pid${i}`).join(", ");
 
-    const stockRes = await request.query<{ PRODUTO: string; COR: string; NET_STOCK: number }>(`
+    const stockRes = await request.query<{ PRODUTO: string; COR: string; POS: number; NEG: number }>(`
       SELECT
         ISNULL(e.PRODUTO, '') AS PRODUTO,
         ISNULL(e.COR_PRODUTO, '') AS COR,
-        CAST(SUM(ISNULL(e.ESTOQUE, 0)) AS FLOAT) AS NET_STOCK
+        CAST(SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS FLOAT) AS POS,
+        CAST(SUM(CASE WHEN e.ESTOQUE < 0 THEN e.ESTOQUE ELSE 0 END) AS FLOAT) AS NEG
       FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
       WHERE e.PRODUTO IN (${placeholders})
       GROUP BY ISNULL(e.PRODUTO, ''), ISNULL(e.COR_PRODUTO, '')
     `);
     for (const row of stockRes.recordset) {
-      stock.set(skuKey(row.PRODUTO ?? "", row.COR ?? ""), Math.round(Number(row.NET_STOCK ?? 0)));
+      const pos = Number(row.POS ?? 0);
+      const neg = Number(row.NEG ?? 0);
+      stock.set(skuKey(row.PRODUTO ?? "", row.COR ?? ""), Math.round(pos > 0 ? pos : neg));
     }
   });
 
@@ -243,7 +261,7 @@ export async function fetchColecaoPresentation({
     }))
     .filter((s) => s.productId && (s.venda !== 0 || s.qtd !== 0));
 
-  const stock = await fetchNetStock(skus.map((s) => s.productId));
+  const stock = await fetchNetworkStock(skus.map((s) => s.productId));
 
   const totalRevenue = skus.reduce((s, r) => s + r.venda, 0);
   const totalQuantity = skus.reduce((s, r) => s + r.qtd, 0);
@@ -280,11 +298,14 @@ export async function fetchColecaoPresentation({
           count: tail.length,
           qtd: tail.reduce((s, r) => s + r.qtd, 0),
           venda: tail.reduce((s, r) => s + r.venda, 0),
-          estoque: tail.reduce((s, r) => s + r.estoque, 0),
+          // Agregado É soma → só positivos (negativo nunca soma).
+          estoque: tail.reduce((s, r) => s + Math.max(0, r.estoque), 0),
         }
       : null;
 
-  const estoqueRestante = productRows.reduce((s, r) => s + r.estoque, 0);
+  // Total da rede: soma só os SKUs positivos. A linha do SKU pode aparecer
+  // negativa (é informação real), mas negativo NUNCA entra numa soma.
+  const estoqueRestante = productRows.reduce((s, r) => s + Math.max(0, r.estoque), 0);
   const pecasVendidas = totalQuantity;
   const precoMedio = pecasVendidas > 0 ? totalRevenue / pecasVendidas : 0;
 
