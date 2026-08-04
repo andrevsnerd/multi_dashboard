@@ -29,6 +29,7 @@ export interface PresentationTypeMeta {
   companies?: string[];
 }
 
+export const TOP_PRODUTOS_ID = "top-produtos";
 export const COLECAO_COMPLETA_ID = "colecao-completa";
 export const COMPARATIVO_COLECOES_ID = "comparativo-colecoes";
 export const COMPARATIVO_RESUMIDO_ID = "comparativo-resumido";
@@ -81,6 +82,20 @@ export const PRESENTATION_TYPES: PresentationTypeMeta[] = [
     supportedFilters: ["produto", "periodo", "filial", "grupo", "subgrupo", "colecao", "grade"],
     requiresCover: true,
     singleCollection: false,
+  },
+  {
+    id: TOP_PRODUTOS_ID,
+    label: "Top Produtos (Campeões de Venda)",
+    description:
+      "Deck no padrão “Campeões de venda”: capa, os 10 maiores produtos do período, " +
+      "sumário de subgrupos e uma página com o top 10 de cada subgrupo (mais o " +
+      "complemento dos subgrupos menores). Ranking por item = produto × cor, " +
+      "critério único de faturamento. Filtra por período e filial. Exporta em PDF " +
+      "A4 paisagem (1280×905 por slide, igual ao modelo).",
+    supportedFilters: ["periodo", "filial"],
+    requiresCover: true,
+    singleCollection: false,
+    companies: ["scarfme"],
   },
 ];
 

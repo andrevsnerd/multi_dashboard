@@ -100,7 +100,8 @@ export async function getColecaoInicioMatrizMap(
   }).catch(() => out);
 }
 
-async function fetchColecaoCodeByProduto(produtos: string[]): Promise<Map<string, string>> {
+/** Mapa PRODUTO → código da coleção (tabela mestre PRODUTOS). */
+export async function fetchColecaoCodeByProduto(produtos: string[]): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   const uniq = [...new Set(produtos.map((p) => p.trim()).filter(Boolean))];
   const BATCH = 1000;

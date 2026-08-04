@@ -145,6 +145,33 @@ export async function getPresentationAsset(
 }
 
 /**
+ * Refs das capas já enviadas de uma empresa (só os códigos, sem a imagem).
+ *
+ * Serve ao Gerador quando o deck NÃO é de uma coleção específica (ex.: Top
+ * Produtos): a página lista as capas disponíveis, sorteia uma como padrão e
+ * deixa o usuário escolher outra — sem baixar todos os base64.
+ */
+export async function listPresentationCoverRefs(companyKey: string): Promise<string[]> {
+  if (hasPostgres()) {
+    await ensureTable();
+    const sql = getNeonSql();
+    const rows = await sql`
+      SELECT ref
+      FROM presentation_assets
+      WHERE company_key = ${companyKey} AND kind = 'cover' AND ref <> ''
+      ORDER BY ref
+    `;
+    return (rows as Array<{ ref: string }>).map((r) => r.ref);
+  }
+
+  const all = await readFileAll();
+  return all
+    .filter((a) => a.companyKey === companyKey && a.kind === "cover" && a.ref)
+    .map((a) => a.ref)
+    .sort((a, b) => a.localeCompare(b));
+}
+
+/**
  * Insere ou substitui (upsert) um asset.
  *
  * `sourceRef` omitido = capa própria (null). Passe o ref do agregado só quando a

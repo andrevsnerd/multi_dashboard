@@ -20,6 +20,7 @@ import {
   COMPARATIVO_COLECOES_ID,
   COMPARATIVO_RESUMIDO_ID,
   PRODUTO_GIRO_ID,
+  TOP_PRODUTOS_ID,
   getPresentationMeta,
   getPresentationTypesForCompany,
 } from "@/lib/presentations/registry";
@@ -27,11 +28,13 @@ import type { ColecaoPresentationPayload } from "@/lib/repositories/colecaoPrese
 import type { ComparativoColecoesPayload } from "@/lib/repositories/comparativoColecoes";
 import type { ComparativoResumidoPayload } from "@/lib/repositories/comparativoResumido";
 import type { ProdutoGiroPresentationPayload } from "@/lib/repositories/produtoGiroPresentation";
+import type { TopProdutosPayload } from "@/lib/repositories/topProdutosPresentation";
 
 import ColecaoDeck from "./ColecaoDeck";
 import ComparativoDeck from "./ComparativoDeck";
 import ComparativoResumidoDeck from "./ComparativoResumidoDeck";
 import ProdutoGiroDeck from "./ProdutoGiroDeck";
+import TopProdutosDeck from "./TopProdutosDeck";
 import styles from "./GeradorApresentacoesPage.module.css";
 
 interface ProductPick {
@@ -74,6 +77,7 @@ export default function GeradorApresentacoesPage({
   }, [availableTypes, presentationTypeId]);
   const meta = useMemo(() => getPresentationMeta(presentationTypeId), [presentationTypeId]);
   const isGiro = presentationTypeId === PRODUTO_GIRO_ID;
+  const isTopProdutos = presentationTypeId === TOP_PRODUTOS_ID;
 
   // Filtros
   const [range, setRange] = useState<DateRangeValue>(initialRange);
@@ -114,11 +118,22 @@ export default function GeradorApresentacoesPage({
   const [giroCoverDataUrl, setGiroCoverDataUrl] = useState<string | null>(null);
   const giroCoverInputRef = useRef<HTMLInputElement | null>(null);
 
+  // ---- Capa do Top Produtos ----
+  // O deck não é de uma coleção específica, então a capa PADRÃO é uma foto
+  // sorteada entre as capas de coleção já enviadas. O usuário pode escolher outra
+  // na lista, sortear de novo ou subir a própria imagem (essa fica só em memória).
+  const [topCoverRefs, setTopCoverRefs] = useState<string[]>([]);
+  const [topCoverRef, setTopCoverRef] = useState<string | null>(null);
+  const [topCoverDataUrl, setTopCoverDataUrl] = useState<string | null>(null);
+  const [topCoverUpload, setTopCoverUpload] = useState<string | null>(null);
+  const topCoverInputRef = useRef<HTMLInputElement | null>(null);
+
   // Resultado
   const [report, setReport] = useState<ColecaoPresentationPayload | null>(null);
   const [comparativo, setComparativo] = useState<ComparativoColecoesPayload | null>(null);
   const [resumido, setResumido] = useState<ComparativoResumidoPayload | null>(null);
   const [giro, setGiro] = useState<ProdutoGiroPresentationPayload | null>(null);
+  const [topProdutos, setTopProdutos] = useState<TopProdutosPayload | null>(null);
   const [coversByCode, setCoversByCode] = useState<Record<string, string | null>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -250,6 +265,80 @@ export default function GeradorApresentacoesPage({
   useEffect(() => {
     void loadAssets();
   }, [loadAssets]);
+
+  // ---- capa do Top Produtos: lista de capas disponíveis + sorteio inicial ----
+  useEffect(() => {
+    if (!isTopProdutos) return;
+    let cancelled = false;
+    fetch(`/api/gerador-apresentacoes/assets?company=${companyKey}&list=covers`, {
+      cache: "no-store",
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json: { covers?: string[] } | null) => {
+        if (cancelled) return;
+        const covers = json?.covers ?? [];
+        setTopCoverRefs(covers);
+        // Sorteia a capa padrão só na primeira carga; escolha do usuário manda.
+        setTopCoverRef((prev) => {
+          if (prev && covers.includes(prev)) return prev;
+          if (covers.length === 0) return null;
+          return covers[Math.floor(Math.random() * covers.length)];
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setTopCoverRefs([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isTopProdutos, companyKey]);
+
+  // Baixa o base64 da capa escolhida/sorteada.
+  useEffect(() => {
+    if (!isTopProdutos || !topCoverRef) {
+      if (!topCoverRef) setTopCoverDataUrl(null);
+      return;
+    }
+    let cancelled = false;
+    fetch(
+      `/api/gerador-apresentacoes/assets?company=${companyKey}&colecao=${encodeURIComponent(topCoverRef)}`,
+      { cache: "no-store" }
+    )
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json: { cover?: string | null } | null) => {
+        if (!cancelled) setTopCoverDataUrl(json?.cover ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setTopCoverDataUrl(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isTopProdutos, companyKey, topCoverRef]);
+
+  const sortearTopCover = useCallback(() => {
+    if (topCoverRefs.length === 0) return;
+    setTopCoverUpload(null);
+    setTopCoverRef((prev) => {
+      if (topCoverRefs.length === 1) return topCoverRefs[0];
+      const outras = topCoverRefs.filter((c) => c !== prev);
+      return outras[Math.floor(Math.random() * outras.length)];
+    });
+  }, [topCoverRefs]);
+
+  const onPickTopCover = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      setTopCoverUpload(await readFileAsDataUrl(file));
+    } catch {
+      setError("Não foi possível ler a imagem.");
+    } finally {
+      if (topCoverInputRef.current) topCoverInputRef.current.value = "";
+    }
+  };
+
+  /** Capa que vai pro deck: upload do usuário vence a capa sorteada/escolhida. */
+  const topCoverEffective = topCoverUpload ?? topCoverDataUrl;
 
   // ---- opções dos filtros do Giro (mesmo escopo da página Produto Giro) ----
   useEffect(() => {
@@ -465,6 +554,35 @@ export default function GeradorApresentacoesPage({
 
   // ---- gerar ----
   const handleGenerate = useCallback(async () => {
+    if (isTopProdutos) {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch("/api/gerador-apresentacoes/top-produtos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            company: companyKey,
+            filial,
+            range: { start: startStr, end: endStr },
+          }),
+        });
+        const json = (await res.json()) as { data?: TopProdutosPayload; error?: string };
+        if (!res.ok) throw new Error(json.error ?? "Erro ao gerar a apresentação.");
+        setTopProdutos(json.data ?? null);
+        setReport(null);
+        setComparativo(null);
+        setResumido(null);
+        setGiro(null);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Erro ao gerar a apresentação.");
+        setTopProdutos(null);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     if (isGiro) {
       setLoading(true);
       setError(null);
@@ -491,6 +609,7 @@ export default function GeradorApresentacoesPage({
         setReport(null);
         setComparativo(null);
         setResumido(null);
+        setTopProdutos(null);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Erro ao gerar a apresentação.");
         setGiro(null);
@@ -525,6 +644,7 @@ export default function GeradorApresentacoesPage({
         setReport(null);
         setResumido(null);
         setGiro(null);
+        setTopProdutos(null);
         // Carrega as capas de todas as coleções do deck.
         if (data) {
           const entries = await Promise.all(
@@ -565,6 +685,7 @@ export default function GeradorApresentacoesPage({
         setReport(null);
         setComparativo(null);
         setGiro(null);
+        setTopProdutos(null);
         // Carrega as fotos (recortes) de todas as coleções do resumo.
         if (data) {
           const entries = await Promise.all(
@@ -604,6 +725,7 @@ export default function GeradorApresentacoesPage({
       setComparativo(null);
       setResumido(null);
       setGiro(null);
+      setTopProdutos(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao gerar a apresentação.");
       setReport(null);
@@ -614,6 +736,7 @@ export default function GeradorApresentacoesPage({
     }
   }, [
     isGiro,
+    isTopProdutos,
     colecoes,
     companyKey,
     filial,
@@ -634,7 +757,7 @@ export default function GeradorApresentacoesPage({
   // ---- export PDF (mesmo pipeline do Relatório Claude) ----
   const handleExportPdf = useCallback(async () => {
     const deckElement = deckRef.current;
-    if ((!report && !comparativo && !resumido && !giro) || !deckElement) return;
+    if ((!report && !comparativo && !resumido && !giro && !topProdutos) || !deckElement) return;
     const slideElements = Array.from(deckElement.querySelectorAll<HTMLElement>("[data-pdf-slide]"));
     if (slideElements.length === 0) return;
 
@@ -660,7 +783,11 @@ export default function GeradorApresentacoesPage({
 
       // Fundo do canvas = "papel" do deck. No deck de coleção ele depende da
       // paleta ativa (o coral tinha #fffdfc fixo, que sujava as outras paletas).
-      const canvasBackground = report ? deckPaperColor(activePalette) : "#fffdfc";
+      const canvasBackground = report
+        ? deckPaperColor(activePalette)
+        : topProdutos
+          ? "#ffffff"
+          : "#fffdfc";
 
       const canvases: HTMLCanvasElement[] = [];
       for (const slideElement of slideElements) {
@@ -675,9 +802,20 @@ export default function GeradorApresentacoesPage({
           windowHeight: Math.max(slideElement.scrollHeight, 900),
           onclone: (cloneDoc) => {
             cloneDoc.querySelectorAll<HTMLElement>("[data-pdf-slide]").forEach((element) => {
-              element.style.width = "1280px";
-              element.style.minHeight = "720px";
-              element.style.height = "auto";
+              // Deck com tamanho FIXO (data-pdf-width/height, ex.: Top Produtos em
+              // 1280×905) sai no tamanho exato do modelo. Os demais mantêm a altura
+              // livre (min-height 720), porque o conteúdo varia por slide.
+              const fixedW = element.dataset.pdfWidth;
+              const fixedH = element.dataset.pdfHeight;
+              element.style.width = `${fixedW || 1280}px`;
+              if (fixedH) {
+                element.style.height = `${fixedH}px`;
+                element.style.minHeight = `${fixedH}px`;
+                element.style.maxHeight = `${fixedH}px`;
+              } else {
+                element.style.minHeight = "720px";
+                element.style.height = "auto";
+              }
               element.style.margin = "0";
               element.style.boxShadow = "none";
               element.style.borderRadius = "0";
@@ -755,7 +893,9 @@ export default function GeradorApresentacoesPage({
         canvas.height = 0;
       }
 
-      const baseName = giro
+      const baseName = topProdutos
+        ? `top-produtos-${topProdutos.period.start}-${topProdutos.period.end}`
+        : giro
         ? `giro-${(giro.title || "produtos").toLowerCase()}-${giro.period.start}-${giro.period.end}`
         : comparativo
           ? `comparativo-colecoes-${comparativo.period.start}-${comparativo.period.end}`
@@ -769,14 +909,14 @@ export default function GeradorApresentacoesPage({
     } finally {
       setExportingPdf(false);
     }
-  }, [report, comparativo, resumido, giro, activePalette]);
+  }, [report, comparativo, resumido, giro, topProdutos, activePalette]);
 
   const isColecaoType = presentationTypeId === COLECAO_COMPLETA_ID;
   const isComparativo = presentationTypeId === COMPARATIVO_COLECOES_ID;
   const isResumido = presentationTypeId === COMPARATIVO_RESUMIDO_ID;
   // Tipos multi-coleção usam uma foto (recorte) por coleção selecionada.
   const isMultiCover = isComparativo || isResumido;
-  const hasResult = Boolean(report || comparativo || resumido || giro);
+  const hasResult = Boolean(report || comparativo || resumido || giro || topProdutos);
 
   return (
     <div className={styles.wrapper}>
@@ -896,13 +1036,19 @@ export default function GeradorApresentacoesPage({
               </div>
             </div>
           )}
-          {(isColecaoType || isGiro) && (
+          {(isColecaoType || isGiro || isTopProdutos) && (
             <div className={styles.field}>
               <label className={styles.fieldLabel}>Título da capa (opcional)</label>
               <input
                 className={styles.input}
                 value={coverTitle}
-                placeholder={isGiro ? "Ex.: Pashminas Lisas" : singleColecaoLabel || "Ex.: Copa Galisteu"}
+                placeholder={
+                  isTopProdutos
+                    ? "Campeões de venda"
+                    : isGiro
+                      ? "Ex.: Pashminas Lisas"
+                      : singleColecaoLabel || "Ex.: Copa Galisteu"
+                }
                 onChange={(e) => setCoverTitle(e.target.value)}
               />
             </div>
@@ -984,6 +1130,15 @@ export default function GeradorApresentacoesPage({
             líquida. Use o recorte (fundo transparente) de cada coleção — envie/troque abaixo.
           </p>
         )}
+        {isTopProdutos && (
+          <p className={styles.hint}>
+            Ranking por item = <b>produto × cor</b>, critério único de faturamento (mesma lógica
+            validada do relatório “Vendas por faturamento”). O deck sai com capa, os 10 maiores
+            produtos do período, o sumário de subgrupos e uma página com o top 10 de cada subgrupo —
+            os subgrupos menores entram no complemento final. Filtre por período e filial; sem filial
+            a apresentação cobre a rede inteira.
+          </p>
+        )}
         {isGiro && (
           <p className={styles.hint}>
             Mesmas regras da página Produto Giro: selecione produtos específicos e/ou os filtros da
@@ -998,11 +1153,92 @@ export default function GeradorApresentacoesPage({
         <section className={styles.panel}>
           <h2 className={styles.panelTitle}>Imagens</h2>
           <p className={styles.hint}>
-            {isGiro
-              ? "Escolha a imagem principal (capa/hero) deste relatório — ela fica só nesta geração (não é salva). O logo abaixo é salvo e vale para todas as apresentações."
-              : "Use imagens com fundo transparente (PNG recortado) — elas aparecem “flutuando” sobre o círculo da coleção, como no modelo. Reenviar substitui a anterior; o que já foi enviado aparece no preview."}
+            {isTopProdutos
+              ? "A capa vem sorteada entre as fotos de coleção já enviadas — escolha outra na lista, sorteie de novo ou suba a sua (essa fica só nesta geração). O logo abaixo é salvo e vale para todas as apresentações."
+              : isGiro
+                ? "Escolha a imagem principal (capa/hero) deste relatório — ela fica só nesta geração (não é salva). O logo abaixo é salvo e vale para todas as apresentações."
+                : "Use imagens com fundo transparente (PNG recortado) — elas aparecem “flutuando” sobre o círculo da coleção, como no modelo. Reenviar substitui a anterior; o que já foi enviado aparece no preview."}
           </p>
           <div className={styles.uploadGrid}>
+            {/* Capa do Top Produtos — sorteada entre as capas de coleção existentes */}
+            {isTopProdutos && (
+              <div className={styles.uploadCard}>
+                <div className={styles.uploadPreview}>
+                  {topCoverEffective ? (
+                    <img src={topCoverEffective} alt="Capa da apresentação" />
+                  ) : (
+                    <span className={styles.uploadEmpty}>Sem capa</span>
+                  )}
+                </div>
+                <div className={styles.uploadBody}>
+                  <span className={styles.uploadTitle}>Imagem da capa</span>
+                  <span
+                    className={
+                      topCoverEffective
+                        ? `${styles.uploadStatus} ${styles.uploadStatusOk}`
+                        : styles.uploadStatus
+                    }
+                  >
+                    {topCoverUpload
+                      ? "Imagem enviada (só nesta geração)"
+                      : topCoverRef
+                        ? `Capa de ${labelFromMaster(topCoverRef)}`
+                        : "Nenhuma capa de coleção disponível — envie uma imagem"}
+                  </span>
+                  <select
+                    className={styles.select}
+                    value={topCoverUpload ? "" : topCoverRef ?? ""}
+                    onChange={(e) => {
+                      setTopCoverUpload(null);
+                      setTopCoverRef(e.target.value || null);
+                    }}
+                    disabled={topCoverRefs.length === 0}
+                  >
+                    {topCoverUpload && <option value="">Imagem enviada por você</option>}
+                    {topCoverRefs.length === 0 && <option value="">Nenhuma capa cadastrada</option>}
+                    {topCoverRefs.map((code) => (
+                      <option key={code} value={code}>
+                        {labelFromMaster(code)}
+                      </option>
+                    ))}
+                  </select>
+                  <div className={styles.uploadActions}>
+                    <button
+                      type="button"
+                      className={styles.fileBtn}
+                      onClick={sortearTopCover}
+                      disabled={topCoverRefs.length < 2}
+                    >
+                      Sortear outra
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.fileBtn}
+                      onClick={() => topCoverInputRef.current?.click()}
+                    >
+                      Enviar imagem
+                    </button>
+                    {topCoverUpload && (
+                      <button
+                        type="button"
+                        className={styles.fileBtn}
+                        onClick={() => setTopCoverUpload(null)}
+                      >
+                        Remover envio
+                      </button>
+                    )}
+                    <input
+                      ref={topCoverInputRef}
+                      type="file"
+                      accept="image/*"
+                      className={styles.hiddenInput}
+                      onChange={(e) => void onPickTopCover(e.target.files?.[0])}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Capa (hero) do Giro — só em memória, escolhida a cada geração */}
             {isGiro && (
               <div className={styles.uploadCard}>
@@ -1191,12 +1427,28 @@ export default function GeradorApresentacoesPage({
             {giro.kpis.coresComVenda} {giro.dimensao} · {giro.kpis.unidades.toLocaleString("pt-BR")} un · {giro.period.label}
           </span>
         )}
+        {topProdutos && !loading && (
+          <span className={styles.resultMeta}>
+            {topProdutos.totalPages} páginas · {topProdutos.slides.length} subgrupos ·{" "}
+            {topProdutos.totals.itensComVenda.toLocaleString("pt-BR")} itens · {topProdutos.period.label}
+          </span>
+        )}
       </section>
 
       {error && <div className={styles.error}>{error}</div>}
 
       {/* Deck */}
-      {report ? (
+      {topProdutos ? (
+        <div className={styles.deckWrap}>
+          <TopProdutosDeck
+            report={topProdutos}
+            logoDataUrl={logoDataUrl}
+            coverDataUrl={topCoverEffective}
+            coverTitle={coverTitle}
+            deckRef={deckRef}
+          />
+        </div>
+      ) : report ? (
         <div className={styles.deckWrap}>
           <ColecaoDeck
             report={report}
@@ -1239,7 +1491,7 @@ export default function GeradorApresentacoesPage({
       ) : (
         !loading && (
           <div className={styles.empty}>
-            {isGiro
+            {isGiro || isTopProdutos
               ? "Ajuste os filtros e clique em “Gerar apresentação” para montar os slides."
               : "Escolha as coleções e clique em “Gerar apresentação” para montar os slides."}
           </div>

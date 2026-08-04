@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import {
   getPresentationAsset,
+  listPresentationCoverRefs,
   spreadCoverToCodes,
   upsertPresentationAsset,
   type PresentationAssetKind,
@@ -18,19 +19,34 @@ function isDataUrl(value: unknown): value is string {
 }
 
 /**
- * GET ?company=scarfme[&colecao=CODIGO]
+ * GET ?company=scarfme[&colecao=CODIGO][&list=covers]
+ *
  * Retorna o logo da rede e (se `colecao` informado) a capa daquela coleção.
+ * Com `list=covers`, devolve também os códigos das capas já enviadas — usado
+ * pelos decks que não são de uma coleção (ex.: Top Produtos) para sortear/
+ * escolher uma capa existente sem baixar todos os base64.
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const company = searchParams.get("company") ?? "";
   const colecao = searchParams.get("colecao");
+  const wantsCoverList = searchParams.get("list") === "covers";
 
   if (!ALLOWED_COMPANIES.has(company)) {
     return NextResponse.json(
       { error: "Gerador de Apresentações indisponível para esta empresa." },
       { status: 400 }
     );
+  }
+
+  if (wantsCoverList) {
+    try {
+      const covers = await listPresentationCoverRefs(company);
+      return NextResponse.json({ covers }, { headers: { "Cache-Control": "no-store" } });
+    } catch (error) {
+      console.error("Erro ao listar capas da apresentação", error);
+      return NextResponse.json({ error: "Erro ao listar imagens." }, { status: 500 });
+    }
   }
 
   try {
