@@ -1,7 +1,8 @@
 "use client";
 
-import { type RefObject } from "react";
+import { type CSSProperties, type RefObject } from "react";
 
+import { deckThemeVars, type CollectionPalette } from "@/lib/presentations/palettes";
 import type {
   ColecaoPresentationPayload,
   PresentationProductRow,
@@ -15,6 +16,12 @@ interface ColecaoDeckProps {
   coverDataUrl: string | null;
   /** Título curto/estilizado da capa (ex.: "Copa Galisteu" ou "Copa\nGalisteu"). */
   coverTitle?: string;
+  /**
+   * Paleta do deck. Ausente = coral SCARF·ME (as variáveis do CSS valem).
+   * Quem chama resolve a paleta (`resolveDeckPalette`): escolha manual do usuário
+   * ou a mesma paleta que a coleção tem no Painel de Coleções.
+   */
+  palette?: CollectionPalette | null;
   deckRef?: RefObject<HTMLDivElement | null>;
 }
 
@@ -81,8 +88,12 @@ export default function ColecaoDeck({
   logoDataUrl,
   coverDataUrl,
   coverTitle,
+  palette,
   deckRef,
 }: ColecaoDeckProps) {
+  // Tema: aplicado no deck e repetido em cada slide, porque o export PDF
+  // rasteriza slide por slide.
+  const theme: CSSProperties | undefined = palette ? deckThemeVars(palette) : undefined;
   const displayTitleRaw = (coverTitle?.trim() || report.collection.fullName || report.collection.code || "Coleção");
   const lines = titleLines(displayTitleRaw);
   const displayName = displayTitleRaw.replace(/\r?\n/g, " ").trim();
@@ -99,9 +110,9 @@ export default function ColecaoDeck({
   );
 
   return (
-    <div ref={deckRef} className={styles.deck}>
+    <div ref={deckRef} className={styles.deck} style={theme}>
       {/* ============ SLIDE 1 — CAPA ============ */}
-      <section className={`${styles.slide} ${styles.hero}`} data-pdf-slide="">
+      <section className={`${styles.slide} ${styles.hero}`} data-pdf-slide="" style={theme}>
         <div className={styles.blob} style={{ width: 520, height: 520, background: "var(--accent-soft)", right: -120, top: -120 }} />
         <div className={styles.blob} style={{ width: 260, height: 260, background: "var(--accent-soft2)", right: 340, bottom: -110 }} />
         <div className={styles.left}>
@@ -139,7 +150,7 @@ export default function ColecaoDeck({
       </section>
 
       {/* ============ SLIDE 2 — NÚMEROS / VISÃO GERAL ============ */}
-      <section className={styles.slide} data-pdf-slide="">
+      <section className={styles.slide} data-pdf-slide="" style={theme}>
         <div className={styles.head}>
           <div>
             <div className={styles.eyebrow}>{eyebrowName} · Visão Geral</div>
@@ -209,7 +220,7 @@ export default function ColecaoDeck({
       </section>
 
       {/* ============ SLIDE 3 — PRODUTOS ============ */}
-      <section className={styles.slide} data-pdf-slide="">
+      <section className={styles.slide} data-pdf-slide="" style={theme}>
         <div className={styles.head}>
           <div>
             <div className={styles.eyebrow}>{eyebrowName} · Produtos</div>
@@ -279,7 +290,7 @@ export default function ColecaoDeck({
       </section>
 
       {/* ============ SLIDE 4 — VENDAS POR LOJA ============ */}
-      <section className={styles.slide} data-pdf-slide="">
+      <section className={styles.slide} data-pdf-slide="" style={theme}>
         <div className={styles.head}>
           <div>
             <div className={styles.eyebrow}>{eyebrowName} · Canais</div>
@@ -343,7 +354,7 @@ export default function ColecaoDeck({
       </section>
 
       {/* ============ SLIDE 5 — CONCLUSÃO ============ */}
-      <section className={styles.slide} data-pdf-slide="">
+      <section className={styles.slide} data-pdf-slide="" style={theme}>
         <div className={styles.head}>
           <div>
             <div className={styles.eyebrow}>{eyebrowName} · Conclusão</div>
@@ -357,7 +368,7 @@ export default function ColecaoDeck({
               <h4>{report.closing.insightA.titulo}</h4>
               <p>{report.closing.insightA.texto}</p>
             </div>
-            <div className={`${styles.ins} ${styles.closeCard}`} style={{ borderLeftColor: "var(--accent-d)" }}>
+            <div className={`${styles.ins} ${styles.closeCard}`} style={{ borderLeftColor: "var(--accent-2)" }}>
               <h4>{report.closing.insightB.titulo}</h4>
               <p>{report.closing.insightB.texto}</p>
             </div>

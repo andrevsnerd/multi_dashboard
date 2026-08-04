@@ -118,6 +118,28 @@
   color: #0369a1;
 }
 
+/* Prévia da paleta ativa do deck de coleção (primary · accent · tint · ink). */
+.paletteRow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.paletteSwatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  border: 1px solid var(--b-300);
+  flex: none;
+}
+
+.paletteName {
+  font-size: 11px;
+  color: var(--t-500);
+  margin-left: 3px;
+}
+
 /* ---- upload de imagens ---- */
 .uploadGrid {
   display: grid;

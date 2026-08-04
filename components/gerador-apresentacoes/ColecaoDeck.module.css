@@ -1,12 +1,18 @@
 /* Porte fiel do template copa-galisteu.hbs (Gerador de Apresentações).
-   Tema coral SCARF·ME, tipografia Fraunces (display) + Inter (texto).
-   Cada slide = 1280×720, vira uma página no export PDF (html2canvas+jsPDF). */
+   Tema coral SCARF·ME (padrão), tipografia Fraunces (display) + Inter (texto).
+   Cada slide = 1280×720, vira uma página no export PDF (html2canvas+jsPDF).
+
+   As cores vivem nas variáveis abaixo. O Gerador pode sobrescrevê-las inline
+   (`deckThemeVars` em lib/presentations/palettes.ts) para o deck sair na paleta
+   que a coleção tem no Painel de Coleções, ou numa paleta escolhida à mão. */
 
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,900&family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 .deck {
   --accent: #ff6f61;
   --accent-d: #e8554a;
+  /* Segunda cor da paleta (contraste quente): borda do 2º insight da conclusão. */
+  --accent-2: #e8554a;
   --accent-soft: #fff0ee;
   --accent-soft2: #ffe3de;
   --ink: #2b2024;

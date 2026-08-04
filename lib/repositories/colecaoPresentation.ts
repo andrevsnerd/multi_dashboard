@@ -107,8 +107,11 @@ export interface ColecaoPresentationPayload {
   };
 }
 
-const ACCENT = "#FF6F61";
-const ACCENT_DARK = "#E8554A";
+// Cores das barras: variáveis do tema do deck (ColecaoDeck.module.css), não hex
+// fixo — assim as barras seguem a paleta escolhida no Gerador (paleta do Painel
+// de Coleções ou manual) sem o payload saber qual é.
+const ACCENT = "var(--accent)";
+const ACCENT_DARK = "var(--accent-d)";
 const ECOMMERCE_BUCKET = "E-COMMERCE";
 const PRODUCTS_LIMIT = 12; // linhas antes de agrupar o restante em "Outros".
 

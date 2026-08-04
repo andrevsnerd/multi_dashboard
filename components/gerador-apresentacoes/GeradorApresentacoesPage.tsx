@@ -9,6 +9,13 @@ import type { CompanyKey } from "@/lib/config/company";
 import { PAINEL_COLECAO_CODES } from "@/lib/config/painel-colecoes";
 import { getCurrentMonthRange, formatDateForQuery } from "@/lib/utils/date";
 import {
+  DECK_PALETTE_AUTO,
+  DECK_PALETTE_OPTIONS,
+  deckPaperColor,
+  painelPaletteForColecao,
+  resolveDeckPalette,
+} from "@/lib/presentations/palettes";
+import {
   COLECAO_COMPLETA_ID,
   COMPARATIVO_COLECOES_ID,
   COMPARATIVO_RESUMIDO_ID,
@@ -75,6 +82,9 @@ export default function GeradorApresentacoesPage({
   const [optColecoes, setOptColecoes] = useState<MultiSelectOption[]>([]);
   const [loadingColecoes, setLoadingColecoes] = useState(false);
   const [coverTitle, setCoverTitle] = useState("");
+  // Paleta do deck de coleção: "auto" = a mesma que a coleção tem no Painel de
+  // Coleções; qualquer outro id = escolha manual do usuário.
+  const [paletteId, setPaletteId] = useState<string>(DECK_PALETTE_AUTO);
 
   // Imagens (assets salvos no banco)
   const [logoDataUrl, setLogoDataUrl] = useState<string | null>(null);
@@ -185,6 +195,20 @@ export default function GeradorApresentacoesPage({
     // label vem como "descrição (código)" — usa a descrição pura no título.
     return label.replace(/\s*\([^)]*\)\s*$/, "").trim() || label;
   }, [singleColecao, colecaoOptions, labelFromMaster]);
+
+  // ---- paleta do deck (Relatório Completo de Coleção) ----
+  // "Automática" = a MESMA paleta que a coleção tem no card do Painel de Coleções
+  // (mapeada pelo código, ver `painelPaletteForColecao`). Coleção fora do painel
+  // (ou seleção múltipla, sem coleção-âncora) cai no coral histórico.
+  const paletteColecaoCode = singleColecao ?? report?.collection.code ?? null;
+  const painelPalette = useMemo(
+    () => painelPaletteForColecao(paletteColecaoCode),
+    [paletteColecaoCode]
+  );
+  const activePalette = useMemo(
+    () => resolveDeckPalette(paletteId, paletteColecaoCode),
+    [paletteId, paletteColecaoCode]
+  );
 
   // ---- opções de coleção ----
   const loadColecoes = useCallback(async () => {
@@ -634,10 +658,14 @@ export default function GeradorApresentacoesPage({
       const pageWidthMm = 297;
       const usableWidthMm = pageWidthMm - marginMm * 2;
 
+      // Fundo do canvas = "papel" do deck. No deck de coleção ele depende da
+      // paleta ativa (o coral tinha #fffdfc fixo, que sujava as outras paletas).
+      const canvasBackground = report ? deckPaperColor(activePalette) : "#fffdfc";
+
       const canvases: HTMLCanvasElement[] = [];
       for (const slideElement of slideElements) {
         const canvas = await html2canvas(slideElement, {
-          backgroundColor: "#fffdfc",
+          backgroundColor: canvasBackground,
           scale: Math.min(window.devicePixelRatio || 1, 2),
           useCORS: true,
           logging: false,
@@ -741,7 +769,7 @@ export default function GeradorApresentacoesPage({
     } finally {
       setExportingPdf(false);
     }
-  }, [report, comparativo, resumido, giro]);
+  }, [report, comparativo, resumido, giro, activePalette]);
 
   const isColecaoType = presentationTypeId === COLECAO_COMPLETA_ID;
   const isComparativo = presentationTypeId === COMPARATIVO_COLECOES_ID;
@@ -828,6 +856,46 @@ export default function GeradorApresentacoesPage({
           {isGiro && companyKey !== "nerd" && optGiroGrades.length > 0 && (
             <MultiSelectFilter label="Grade" value={giroGrades} options={optGiroGrades} onChange={setGiroGrades} />
           )}
+          {isColecaoType && (
+            <div className={styles.field}>
+              <label className={styles.fieldLabel}>Paleta de cores (opcional)</label>
+              <select
+                className={styles.select}
+                value={paletteId}
+                onChange={(e) => setPaletteId(e.target.value)}
+              >
+                <option value={DECK_PALETTE_AUTO}>
+                  {painelPalette
+                    ? `Automática — ${painelPalette.name} (Painel de Coleções)`
+                    : "Automática — Coral SCARF·ME (fora do Painel)"}
+                </option>
+                {DECK_PALETTE_OPTIONS.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.palette.name}
+                  </option>
+                ))}
+              </select>
+              <div className={styles.paletteRow} aria-hidden="true">
+                <span
+                  className={styles.paletteSwatch}
+                  style={{ background: `#${activePalette.primary}` }}
+                />
+                <span
+                  className={styles.paletteSwatch}
+                  style={{ background: `#${activePalette.accent}` }}
+                />
+                <span
+                  className={styles.paletteSwatch}
+                  style={{ background: `#${activePalette.tint}` }}
+                />
+                <span
+                  className={styles.paletteSwatch}
+                  style={{ background: `#${activePalette.ink}` }}
+                />
+                <span className={styles.paletteName}>{activePalette.name}</span>
+              </div>
+            </div>
+          )}
           {(isColecaoType || isGiro) && (
             <div className={styles.field}>
               <label className={styles.fieldLabel}>Título da capa (opcional)</label>
@@ -888,6 +956,13 @@ export default function GeradorApresentacoesPage({
               Detalhar por cor (cada item vira produto × cor)
             </label>
           </div>
+        )}
+        {isColecaoType && (
+          <p className={styles.hint}>
+            A paleta sai por padrão igual à cor que a coleção tem no card do Painel de Coleções
+            (coral SCARF·ME para coleções fora do painel). Escolher uma paleta na lista re-tinge os
+            5 slides na hora — antes ou depois de gerar — e vale também no PDF.
+          </p>
         )}
         {isColecaoType && colecoes.length > 1 && (
           <p className={styles.hint}>
@@ -1128,6 +1203,7 @@ export default function GeradorApresentacoesPage({
             logoDataUrl={logoDataUrl}
             coverDataUrl={coverDataUrl}
             coverTitle={coverTitle || singleColecaoLabel}
+            palette={activePalette}
             deckRef={deckRef}
           />
         </div>
