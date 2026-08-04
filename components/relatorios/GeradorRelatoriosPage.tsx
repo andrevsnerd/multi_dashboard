@@ -13,7 +13,12 @@ import { exportCompraSugeridaAbcXlsx } from "@/lib/utils/exportCompraSugeridaAbc
 import { exportClientesFilialXlsx } from "@/lib/utils/exportClientesFilialXlsx";
 import { exportEstoqueRedeXlsx } from "@/lib/utils/exportEstoqueRedeXlsx";
 import { ESTOQUE_REDE_ID } from "@/lib/reports/estoque-rede";
-import { COMPRA_FILIAL_COL_PREFIX, COMPRA_SUGERIDA_ABC_ID, COMPRA_TRANSFER_LENS_COLUMNS } from "@/lib/reports/compra-sugerida-abc";
+import {
+  COMPRA_FILIAL_COL_PREFIX,
+  COMPRA_LENS_PRESET_COLUMNS,
+  COMPRA_SUGERIDA_ABC_ID,
+  COMPRA_TRANSFER_LENS_COLUMNS,
+} from "@/lib/reports/compra-sugerida-abc";
 import { CLIENTES_FILIAL_ID, FILIAL_COMPRAS_COL_PREFIX } from "@/lib/reports/clientes-filial";
 import { formatData, formatDataVenda, formatDiasParado } from "@/lib/reports/format";
 import { getDefaultPresets, getReportMeta, REPORT_TYPES, VENDAS_FATURAMENTO_ID } from "@/lib/reports/registry";
@@ -64,6 +69,31 @@ function buildWorkingColumns(
     .filter((c) => !presetKeys.includes(c.key))
     .map((c) => ({ key: c.key, label: c.defaultLabel, enabled: false }));
   return [...inPreset, ...rest];
+}
+
+/**
+ * Liga/desliga as colunas da lente de transferência (Transferência + Compra líquida) na
+ * estrutura de colunas. Desligada por padrão: o relatório sai só com a compra bruta por loja.
+ * Quando ligada, as colunas entram logo após "Custo total" (antes das colunas por loja).
+ */
+function withTransferLensColumns(cols: WorkingColumn[], on: boolean): WorkingColumn[] {
+  const lensPresetKeys = new Set(COMPRA_LENS_PRESET_COLUMNS.map((c) => c.key));
+  const without = cols.filter((c) => !lensPresetKeys.has(c.key));
+  if (!on) {
+    // Voltam para o fim da lista, desligadas (como qualquer coluna fora do preset).
+    return [
+      ...without,
+      ...COMPRA_LENS_PRESET_COLUMNS.map((c) => ({ key: c.key, label: c.label, enabled: false })),
+    ];
+  }
+  const lens: WorkingColumn[] = COMPRA_LENS_PRESET_COLUMNS.map((c) => ({
+    key: c.key,
+    label: c.label,
+    enabled: true,
+  }));
+  const anchor = without.findIndex((c) => c.key === "CUSTO_TOTAL");
+  const at = anchor >= 0 ? anchor + 1 : without.length;
+  return [...without.slice(0, at), ...lens, ...without.slice(at)];
 }
 
 function colTypeOf(catalog: ReportColumnDef[], key: string): ColumnType {
@@ -145,6 +175,9 @@ export default function GeradorRelatoriosPage({
   const [diasParadoModo, setDiasParadoModo] = useState<"lte" | "gte">("gte");
   const [incluirZerados, setIncluirZerados] = useState(false);
   const [incluirNegativos, setIncluirNegativos] = useState(false);
+  // Lente de transferência da Compra sugerida por Curva ABC (opt-in, sempre inicia desligada):
+  // adiciona as colunas "Transferência" e "Compra líquida" ao preset.
+  const [considerarTransferencias, setConsiderarTransferencias] = useState(false);
   // Filtro por grupo de fornecedor (só NERD).
   const [fornecedor, setFornecedor] = useState<string>("");
   const [fornecedoresOpts, setFornecedoresOpts] = useState<Array<{ id: string; nome: string }>>([]);
@@ -222,15 +255,26 @@ export default function GeradorRelatoriosPage({
   // Aplica um preset (builtin ou backend) à estrutura de colunas.
   const applyPreset = useCallback(
     (preset: { id: string; columns: { key: string; label: string }[]; sortBy?: string | null; sortDir?: SortDir | null }) => {
-      setWorkingColumns(buildWorkingColumns(editorCatalog, preset.columns));
+      const built = buildWorkingColumns(editorCatalog, preset.columns);
+      setWorkingColumns(
+        reportTypeId === COMPRA_SUGERIDA_ABC_ID
+          ? withTransferLensColumns(built, considerarTransferencias)
+          : built
+      );
       if (preset.sortBy) setSortBy(preset.sortBy);
       if (preset.sortDir) setSortDir(preset.sortDir);
       setActivePresetId(preset.id);
       // Limpa colunas dinâmicas de filial; serão repovoadas ao gerar, se a view pedir.
       setDynamicColumns([]);
     },
-    [editorCatalog]
+    [editorCatalog, reportTypeId, considerarTransferencias]
   );
+
+  // Liga/desliga as colunas de transferência sem perder o resto da estrutura.
+  const toggleConsiderarTransferencias = useCallback((on: boolean) => {
+    setConsiderarTransferencias(on);
+    setWorkingColumns((cols) => withTransferLensColumns(cols, on));
+  }, []);
 
   // Inicializa estrutura com o primeiro preset builtin quando muda de análise.
   useEffect(() => {
@@ -1045,6 +1089,21 @@ export default function GeradorRelatoriosPage({
                     onChange={(e) => setIncluirNegativos(e.target.checked)}
                   />
                   Incluir negativos
+                </label>
+              </div>
+            </div>
+          )}
+          {reportTypeId === COMPRA_SUGERIDA_ABC_ID && (
+            <div className={styles.searchField}>
+              <label className={styles.fieldLabel}>Transferências (opcional)</label>
+              <div className={styles.saldoRow}>
+                <label className={styles.checkLabel}>
+                  <input
+                    type="checkbox"
+                    checked={considerarTransferencias}
+                    onChange={(e) => toggleConsiderarTransferencias(e.target.checked)}
+                  />
+                  Incluir Transferência e Compra líquida
                 </label>
               </div>
             </div>

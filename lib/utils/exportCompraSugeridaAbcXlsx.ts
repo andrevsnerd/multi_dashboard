@@ -84,14 +84,21 @@ export async function exportCompraPorLojaXlsx(
     return;
   }
 
+  // Cor de destaque das células de loja com quantidade > 0 (facilita ler o que cada loja compra).
+  const FILIAL_HIGHLIGHT_ARGB = "FFDAEEF3";
+
   // Índices (1-based) das colunas especiais.
   const filialCols: number[] = [];
   let compraTotalCol = 0;
   let custoTotalCol = 0;
   let custoUnitCol = 0;
+  const filialColSet = new Set<number>();
   columns.forEach((c, i) => {
     const n = i + 1;
-    if (c.role === "filial") filialCols.push(n);
+    if (c.role === "filial") {
+      filialCols.push(n);
+      filialColSet.add(n);
+    }
     else if (c.role === "compraTotal") compraTotalCol = n;
     else if (c.role === "custoTotal") custoTotalCol = n;
     else if (c.role === "custoUnit") custoUnitCol = n;
@@ -194,6 +201,10 @@ export async function exportCompraPorLojaXlsx(
         top: { style: "hair" }, left: { style: "hair" },
         bottom: { style: "hair" }, right: { style: "hair" },
       };
+      // Célula de loja com quantidade > 0 ganha fundo destacado.
+      if (filialColSet.has(colNum) && Number(cell.value ?? 0) > 0) {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: FILIAL_HIGHLIGHT_ARGB } };
+      }
     });
   });
 

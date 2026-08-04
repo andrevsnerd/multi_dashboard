@@ -71,11 +71,19 @@ const COMPRA_SUGERIDA_ABC_PRESETS: ReportPresetDef[] = [
       col("CUSTO_UNITARIO", "Custo unit."),
       col("COMPRA_TOTAL", "Compra total"),
       col("CUSTO_TOTAL", "Custo total"),
-      // Lente de transferência: origens na mesma célula + compra líquida (após transferir).
-      col("TRANSFERIR_DE", "Transferência"),
-      col("COMPRA_LIQUIDA", "Compra líquida"),
+      // Lente de transferência (Transferência + Compra líquida) fica FORA do padrão — entra
+      // só pelo checkbox "Considerar transferências" no Gerador (ver COMPRA_LENS_PRESET_COLUMNS).
     ],
   },
+];
+
+/**
+ * Colunas anexadas ao preset quando o usuário liga a lente de transferência no Gerador
+ * (checkbox opcional, desligado por padrão). Ordem/labels iguais aos do antigo padrão.
+ */
+export const COMPRA_LENS_PRESET_COLUMNS: Array<{ key: string; label: string }> = [
+  { key: "TRANSFERIR_DE", label: "Transferência" },
+  { key: "COMPRA_LIQUIDA", label: "Compra líquida" },
 ];
 
 /**
