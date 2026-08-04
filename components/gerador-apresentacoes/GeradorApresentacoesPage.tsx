@@ -689,6 +689,19 @@ export default function GeradorApresentacoesPage({
                 div.style.display = cs.display === "inline" ? "block" : cs.display;
                 div.style.flexShrink = cs.flexShrink;
                 div.style.margin = cs.margin;
+                // A <img> pode estar POSICIONADA (ex.: a capa do comparativo é
+                // absoluta dentro do canvas do slide). Sem copiar position/left/top
+                // o div substituto virava estático e ia parar no canto superior
+                // esquerdo, por cima do título. left/top computados já são os
+                // valores usados em px; right/bottom são zerados para não conflitar.
+                div.style.position = cs.position;
+                if (cs.position !== "static") {
+                  div.style.left = cs.left;
+                  div.style.top = cs.top;
+                  div.style.right = "auto";
+                  div.style.bottom = "auto";
+                  div.style.zIndex = cs.zIndex;
+                }
                 img.parentNode?.replaceChild(div, img);
               });
             }
