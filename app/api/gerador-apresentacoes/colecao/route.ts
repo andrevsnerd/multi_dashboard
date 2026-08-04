@@ -10,6 +10,12 @@ type RequestBody = {
   colecoes?: string[];
   collectionLabel?: string;
   range?: { start?: string; end?: string };
+  /** Conjunto de produtos em destaque (slide extra opcional). */
+  destaque?: { termo?: string; nome?: string; produtoIds?: string[] };
+  /** Lista TODAS as linhas de produto (deck pagina) em vez do top 12 + "Outros". */
+  todosProdutos?: boolean;
+  /** Colapsa as cores: 1 linha por produto. */
+  produtoTotal?: boolean;
 };
 
 export async function POST(request: Request) {
@@ -43,6 +49,9 @@ export async function POST(request: Request) {
       colecoes,
       collectionLabel: body.collectionLabel,
       range: { start: body.range.start, end: body.range.end },
+      destaque: body.destaque,
+      todosProdutos: body.todosProdutos === true,
+      produtoTotal: body.produtoTotal === true,
     });
     return NextResponse.json({ data }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {

@@ -41,7 +41,9 @@ export const PRESENTATION_TYPES: PresentationTypeMeta[] = [
     label: "Relatório Completo de Coleção (com imagens)",
     description:
       "Deck de 5 slides no padrão SCARF·ME: capa com foto da coleção, números, " +
-      "performance por produto, vendas por canal/loja e conclusão. Exporta em PDF.",
+      "performance por produto, vendas por canal/loja e conclusão. Opcionalmente " +
+      "destaca um conjunto de produtos da coleção (ex.: “Dracena”) num slide extra. " +
+      "Exporta em PDF.",
     supportedFilters: ["colecao", "periodo", "filial"],
     requiresCover: true,
     singleCollection: true,

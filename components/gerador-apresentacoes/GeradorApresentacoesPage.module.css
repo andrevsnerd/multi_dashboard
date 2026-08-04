@@ -385,3 +385,78 @@
   margin-top: 12px;
   cursor: pointer;
 }
+
+/* Destaque de um conjunto de produtos (slide extra do Relatório de Coleção). */
+.destaqueBox {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border: 1px dashed var(--b-300);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.destaqueHead {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.destaqueTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t-900);
+}
+
+.destaqueSub {
+  font-size: 12px;
+  color: var(--t-500);
+}
+
+/* Chip clicável: marcado = entra no destaque; desmarcado = fica de fora. */
+.chipToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--s-white);
+  border: 1px dashed var(--b-300);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: var(--t-500);
+  cursor: pointer;
+  text-align: left;
+}
+
+.chipToggle:hover {
+  border-color: #0ea5e9;
+  color: #0284c7;
+}
+
+.chipToggleOn {
+  border-style: solid;
+  border-color: #0ea5e9;
+  background: #e0f2fe;
+  color: #0369a1;
+  font-weight: 600;
+}
+
+.chipCode {
+  font-size: 10.5px;
+  color: var(--t-500);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Checkboxes da tabela de produtos (Relatório de Coleção). */
+.optionsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin-top: 12px;
+}
+
+.optionsRow .checkboxRow {
+  margin-top: 0;
+}

@@ -514,6 +514,168 @@
   line-height: 1.55;
 }
 
+/* ============ DESTAQUE SLIDE (conjunto opcional de produtos) ============
+   Slide extra que entra depois da lista geral de produtos. Reaproveita os
+   cartões (.kpi), as linhas do pódio (.prow/.pinfo/.pval) e a caixa de insight
+   (.ins) — aqui ficam só o arranjo e a barra "conjunto × resto da coleção". */
+.dstKpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  flex-shrink: 0;
+}
+.dstKpis .kpi {
+  flex: none;
+  padding: 18px 22px;
+}
+.dstKpis .kpi .val {
+  font-size: 34px;
+}
+.dstKpis .kpi.accent .val {
+  font-size: 38px;
+}
+.dstBody {
+  display: grid;
+  grid-template-columns: 1.32fr 1fr;
+  gap: 24px;
+  flex: 1;
+  min-height: 0;
+  margin-top: 18px;
+}
+.dstCard {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 22px 26px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.dstCard h3 {
+  font-size: 19px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.dstSide {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-height: 0;
+}
+.dstSide .ins {
+  margin-top: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.dstStack {
+  display: flex;
+  height: 36px;
+  border-radius: 9px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+.dstStackA {
+  background: linear-gradient(135deg, var(--accent), var(--accent-d));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 3px;
+  flex-shrink: 0;
+}
+.dstStackA span {
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  padding: 0 8px;
+  white-space: nowrap;
+}
+.dstStackB {
+  background: var(--accent-soft);
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 3px;
+}
+.dstStackB span {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  padding: 0 8px;
+  white-space: nowrap;
+}
+.dstLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-top: 12px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.dstLegendItem {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.dstDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dstLegendItem b {
+  color: var(--ink);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.dstRows {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.dstOutros {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding-top: 12px;
+  margin-top: 4px;
+  border-top: 1px dashed var(--line);
+  font-size: 12px;
+  color: var(--muted);
+}
+.dstOutros b {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 15px;
+  color: var(--ink);
+  font-weight: 700;
+}
+.dstTotal {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  border-top: 2px solid var(--ink);
+  margin-top: 12px;
+  padding-top: 12px;
+}
+.dstTotalLbl {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--muted);
+}
+.dstTotalVal {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ===================== CSS BAR CHART ===================== */
 .hbarChart {
   display: flex;

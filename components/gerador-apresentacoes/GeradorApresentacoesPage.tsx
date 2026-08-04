@@ -78,6 +78,11 @@ export default function GeradorApresentacoesPage({
   const meta = useMemo(() => getPresentationMeta(presentationTypeId), [presentationTypeId]);
   const isGiro = presentationTypeId === PRODUTO_GIRO_ID;
   const isTopProdutos = presentationTypeId === TOP_PRODUTOS_ID;
+  const isColecaoType = presentationTypeId === COLECAO_COMPLETA_ID;
+  const isComparativo = presentationTypeId === COMPARATIVO_COLECOES_ID;
+  const isResumido = presentationTypeId === COMPARATIVO_RESUMIDO_ID;
+  // Tipos multi-coleção usam uma foto (recorte) por coleção selecionada.
+  const isMultiCover = isComparativo || isResumido;
 
   // Filtros
   const [range, setRange] = useState<DateRangeValue>(initialRange);
@@ -89,6 +94,22 @@ export default function GeradorApresentacoesPage({
   // Paleta do deck de coleção: "auto" = a mesma que a coleção tem no Painel de
   // Coleções; qualquer outro id = escolha manual do usuário.
   const [paletteId, setPaletteId] = useState<string>(DECK_PALETTE_AUTO);
+
+  // ---- Tabela de produtos do tipo #1 ----
+  // Ambos vêm do backend (as linhas mudam), então trocá-los exige gerar de novo —
+  // diferente da paleta, que re-tinge o deck na hora.
+  const [todosProdutos, setTodosProdutos] = useState(false);
+  const [produtoTotal, setProdutoTotal] = useState(false);
+
+  // ---- Destaque opcional (Relatório Completo de Coleção) ----
+  // Um termo (ex.: "Dracena") reconhece produtos DENTRO da coleção selecionada
+  // com a mesma regra do Gerador de Relatórios; a lista reconhecida vira chips
+  // que o usuário pode desmarcar antes de gerar.
+  const [destaqueTermo, setDestaqueTermo] = useState("");
+  const [destaqueNome, setDestaqueNome] = useState("");
+  const [destaqueMatches, setDestaqueMatches] = useState<ProductPick[]>([]);
+  const [destaqueOff, setDestaqueOff] = useState<string[]>([]);
+  const [destaqueLoading, setDestaqueLoading] = useState(false);
 
   // Imagens (assets salvos no banco)
   const [logoDataUrl, setLogoDataUrl] = useState<string | null>(null);
@@ -246,6 +267,59 @@ export default function GeradorApresentacoesPage({
   useEffect(() => {
     void loadColecoes();
   }, [loadColecoes]);
+
+  // ---- destaque: reconhecimento dos produtos DENTRO da coleção selecionada ----
+  // Mesmo endpoint/função que o deck usa para montar o slide, então a prévia
+  // abaixo é exatamente o conjunto que vai entrar na apresentação.
+  const colecoesKey = colecoes.join("|");
+  useEffect(() => {
+    if (!isColecaoType) return;
+    const termo = destaqueTermo.trim();
+    if (termo.length < 2 || colecoes.length === 0) {
+      setDestaqueMatches([]);
+      setDestaqueLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setDestaqueLoading(true);
+    const t = setTimeout(() => {
+      const params = new URLSearchParams({ company: companyKey, termo });
+      colecoes.forEach((c) => params.append("colecao", c));
+      fetch(`/api/gerador-apresentacoes/colecao-produtos?${params}`, { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((json: { data?: Array<{ productId: string; nome: string }> } | null) => {
+          if (cancelled) return;
+          setDestaqueMatches(
+            (json?.data ?? []).map((d) => ({ id: d.productId, name: d.nome || d.productId }))
+          );
+        })
+        .catch(() => {
+          if (!cancelled) setDestaqueMatches([]);
+        })
+        .finally(() => {
+          if (!cancelled) setDestaqueLoading(false);
+        });
+    }, 350);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+    // colecoesKey entra como dependência estável (o array muda de identidade a cada render).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isColecaoType, companyKey, destaqueTermo, colecoesKey, colecoes.length]);
+
+  // Trocar o termo (ou a coleção) recomeça com todos os reconhecidos marcados.
+  useEffect(() => {
+    setDestaqueOff([]);
+  }, [destaqueTermo, colecoesKey]);
+
+  const destaqueSelecionados = useMemo(
+    () => destaqueMatches.filter((m) => !destaqueOff.includes(m.id)),
+    [destaqueMatches, destaqueOff]
+  );
+  const toggleDestaqueProduto = useCallback((id: string) => {
+    setDestaqueOff((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }, []);
 
   // ---- assets (logo global + capa da coleção âncora) ----
   const loadAssets = useCallback(async () => {
@@ -708,6 +782,11 @@ export default function GeradorApresentacoesPage({
         return;
       }
 
+      // Destaque só viaja quando há termo E pelo menos um produto reconhecido
+      // marcado — desmarcar tudo equivale a não pedir destaque.
+      const termoDestaque = destaqueTermo.trim();
+      const pedeDestaque = termoDestaque.length >= 2 && destaqueSelecionados.length > 0;
+
       const res = await fetch("/api/gerador-apresentacoes/colecao", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -717,6 +796,15 @@ export default function GeradorApresentacoesPage({
           colecoes,
           collectionLabel: singleColecaoLabel || undefined,
           range: { start: startStr, end: endStr },
+          todosProdutos,
+          produtoTotal,
+          destaque: pedeDestaque
+            ? {
+                termo: termoDestaque,
+                nome: destaqueNome.trim() || undefined,
+                produtoIds: destaqueSelecionados.map((p) => p.id),
+              }
+            : undefined,
         }),
       });
       const json = (await res.json()) as { data?: ColecaoPresentationPayload; error?: string };
@@ -726,6 +814,13 @@ export default function GeradorApresentacoesPage({
       setResumido(null);
       setGiro(null);
       setTopProdutos(null);
+      // Produto reconhecido no cadastro mas sem venda no período não rende slide —
+      // avisa em vez de sumir com o destaque silenciosamente.
+      if (pedeDestaque && json.data && !json.data.destaque) {
+        setError(
+          `Nenhum dos produtos de “${termoDestaque}” teve venda na coleção nesse período — o slide de destaque não entrou no deck.`
+        );
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao gerar a apresentação.");
       setReport(null);
@@ -747,6 +842,11 @@ export default function GeradorApresentacoesPage({
     giroColecoes,
     giroGrades,
     coverTitle,
+    todosProdutos,
+    produtoTotal,
+    destaqueTermo,
+    destaqueNome,
+    destaqueSelecionados,
     singleColecaoLabel,
     startStr,
     endStr,
@@ -911,11 +1011,6 @@ export default function GeradorApresentacoesPage({
     }
   }, [report, comparativo, resumido, giro, topProdutos, activePalette]);
 
-  const isColecaoType = presentationTypeId === COLECAO_COMPLETA_ID;
-  const isComparativo = presentationTypeId === COMPARATIVO_COLECOES_ID;
-  const isResumido = presentationTypeId === COMPARATIVO_RESUMIDO_ID;
-  // Tipos multi-coleção usam uma foto (recorte) por coleção selecionada.
-  const isMultiCover = isComparativo || isResumido;
   const hasResult = Boolean(report || comparativo || resumido || giro || topProdutos);
 
   return (
@@ -1101,6 +1196,103 @@ export default function GeradorApresentacoesPage({
               <input type="checkbox" checked={porCor} onChange={(e) => setPorCor(e.target.checked)} />
               Detalhar por cor (cada item vira produto × cor)
             </label>
+          </div>
+        )}
+        {/* Tabela de produtos: quantas linhas e em que granularidade */}
+        {isColecaoType && (
+          <div className={styles.optionsRow}>
+            <label className={styles.checkboxRow}>
+              <input
+                type="checkbox"
+                checked={todosProdutos}
+                onChange={(e) => setTodosProdutos(e.target.checked)}
+              />
+              Todos os produtos (várias páginas em vez do top 12 + “Outros”)
+            </label>
+            <label className={styles.checkboxRow}>
+              <input
+                type="checkbox"
+                checked={produtoTotal}
+                onChange={(e) => setProdutoTotal(e.target.checked)}
+              />
+              Produto total (uma linha por produto, somando as cores)
+            </label>
+            <p className={styles.hint}>
+              As linhas vêm do backend: mudar um destes exige gerar a apresentação de novo (a paleta,
+              não — ela re-tinge na hora). Os dois combinam.
+            </p>
+          </div>
+        )}
+
+        {/* Destaque opcional: conjunto de produtos DA COLEÇÃO com slide próprio */}
+        {isColecaoType && (
+          <div className={styles.destaqueBox}>
+            <div className={styles.destaqueHead}>
+              <span className={styles.destaqueTitle}>Destacar um conjunto de produtos (opcional)</span>
+              <span className={styles.destaqueSub}>
+                Gera um slide extra logo depois da lista de produtos, só com esses itens.
+              </span>
+            </div>
+            <div className={styles.filtersGrid}>
+              <div className={styles.field}>
+                <label className={styles.fieldLabel}>Produtos com o nome</label>
+                <input
+                  className={styles.input}
+                  value={destaqueTermo}
+                  placeholder="Ex.: Dracena"
+                  onChange={(e) => setDestaqueTermo(e.target.value)}
+                />
+              </div>
+              <div className={styles.field}>
+                <label className={styles.fieldLabel}>Nome do conjunto (opcional)</label>
+                <input
+                  className={styles.input}
+                  value={destaqueNome}
+                  placeholder={destaqueTermo.trim() || "Ex.: Família Dracena"}
+                  onChange={(e) => setDestaqueNome(e.target.value)}
+                />
+              </div>
+            </div>
+            {destaqueTermo.trim().length >= 2 && colecoes.length === 0 && (
+              <p className={styles.hint}>Selecione a coleção para reconhecer os produtos.</p>
+            )}
+            {destaqueTermo.trim().length >= 2 && colecoes.length > 0 && (
+              <>
+                <p className={styles.hint}>
+                  {destaqueLoading
+                    ? "Reconhecendo produtos da coleção..."
+                    : destaqueMatches.length === 0
+                      ? `Nenhum produto da coleção selecionada tem “${destaqueTermo.trim()}” no nome.`
+                      : `${destaqueSelecionados.length} de ${destaqueMatches.length} produto(s) reconhecido(s) na coleção — clique para tirar do destaque.`}
+                </p>
+                {destaqueMatches.length > 0 && (
+                  <div className={styles.chips}>
+                    {destaqueMatches.map((p) => {
+                      const on = !destaqueOff.includes(p.id);
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          className={`${styles.chipToggle} ${on ? styles.chipToggleOn : ""}`}
+                          onClick={() => toggleDestaqueProduto(p.id)}
+                          aria-pressed={on}
+                        >
+                          {on ? "✓" : "+"} {p.name}
+                          {/* Produtos diferentes repetem o nome (muda a grade/material),
+                              então o código é o que separa um chip do outro. */}
+                          <span className={styles.chipCode}>{p.id}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            )}
+            <p className={styles.hint}>
+              O reconhecimento pelo nome é o mesmo do Gerador de Relatórios, mas sempre dentro da(s)
+              coleção(ões) selecionada(s) — e o slide usa exatamente os números da lista geral (venda
+              líquida com trocas). Sem nome do conjunto, o título sai do termo digitado.
+            </p>
           </div>
         )}
         {isColecaoType && (
@@ -1410,6 +1602,18 @@ export default function GeradorApresentacoesPage({
         {report && !loading && (
           <span className={styles.resultMeta}>
             {report.kpis.nSkus} SKUs · {report.kpis.canaisAtivos} canais · {report.period.label}
+            {` · tabela: ${report.products.length} de ${report.productsTotalCount} ${
+              report.productsPorProduto ? "produtos" : "SKUs"
+            }`}
+            {report.products.length > report.productsPerSlide
+              ? ` em ${Math.ceil(report.products.length / report.productsPerSlide)} páginas`
+              : ""}
+            {report.destaque
+              ? ` · destaque “${report.destaque.titulo}”: ${report.destaque.totals.skus} itens (${report.destaque.totals.participacaoPct.toLocaleString(
+                  "pt-BR",
+                  { minimumFractionDigits: 1, maximumFractionDigits: 1 }
+                )}%)`
+              : ""}
           </span>
         )}
         {comparativo && !loading && (
