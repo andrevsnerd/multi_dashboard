@@ -422,18 +422,28 @@ export default function ColecaoDeck({
               <div className={styles.dstSide}>
                 <div className={styles.dstCard}>
                   <div className={styles.ct}>Peso no faturamento da coleção</div>
-                  <div className={styles.dstStack}>
-                    <div
-                      className={styles.dstStackA}
-                      style={{ width: `${report.destaque.shareBar.destaquePct}%` }}
-                    >
-                      {report.destaque.shareBar.destaquePct >= 12 ? (
-                        <span>{fmtPct(report.destaque.shareBar.destaquePct)}%</span>
-                      ) : null}
+                  {/* O número em evidência é SEMPRE o do conjunto (a barra ativa).
+                      Conjunto estreito não caberia o rótulo dentro da barra, então
+                      ele vai logo ao lado — antes o slide acabava destacando o %
+                      do RESTO da coleção, que é justamente o que o conjunto não é.
+                      O % do resto continua visível, na legenda. */}
+                  <div className={styles.dstStackWrap}>
+                    <div className={styles.dstStack}>
+                      <div
+                        className={styles.dstStackA}
+                        style={{ width: `${report.destaque.shareBar.destaquePct}%` }}
+                      >
+                        {report.destaque.shareBar.destaquePct >= 12 ? (
+                          <span>{fmtPct(report.destaque.shareBar.destaquePct)}%</span>
+                        ) : null}
+                      </div>
+                      <div className={styles.dstStackB} />
                     </div>
-                    <div className={styles.dstStackB}>
-                      <span>{fmtPct(report.destaque.shareBar.restoPct)}%</span>
-                    </div>
+                    {report.destaque.shareBar.destaquePct < 12 ? (
+                      <span className={styles.dstStackOut}>
+                        {fmtPct(report.destaque.shareBar.destaquePct)}%
+                      </span>
+                    ) : null}
                   </div>
                   <div className={styles.dstLegend}>
                     <span className={styles.dstLegendItem}>
@@ -442,7 +452,8 @@ export default function ColecaoDeck({
                     </span>
                     <span className={styles.dstLegendItem}>
                       <i className={styles.dstDot} style={{ background: "var(--accent-soft2)" }} />
-                      Resto da coleção · <b>{fmtCurrency0(report.destaque.shareBar.restoVenda)}</b>
+                      Resto da coleção · <b>{fmtCurrency0(report.destaque.shareBar.restoVenda)}</b> (
+                      {fmtPct(report.destaque.shareBar.restoPct)}%)
                     </span>
                     {report.destaque.topCanal ? (
                       <span className={styles.dstLegendItem}>

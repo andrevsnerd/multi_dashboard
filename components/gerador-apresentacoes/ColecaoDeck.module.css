@@ -569,12 +569,28 @@
   flex-direction: column;
   justify-content: center;
 }
+.dstStackWrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
 .dstStack {
   display: flex;
+  flex: 1;
+  min-width: 0;
   height: 36px;
   border-radius: 9px;
   overflow: hidden;
-  margin-top: 4px;
+}
+/* Rótulo do conjunto quando ele é estreito demais para caber dentro da barra. */
+.dstStackOut {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--accent);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .dstStackA {
   background: linear-gradient(135deg, var(--accent), var(--accent-d));
@@ -598,13 +614,6 @@
   align-items: center;
   justify-content: center;
   min-width: 3px;
-}
-.dstStackB span {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--muted);
-  padding: 0 8px;
-  white-space: nowrap;
 }
 .dstLegend {
   display: flex;
