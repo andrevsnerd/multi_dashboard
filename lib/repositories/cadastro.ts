@@ -2230,10 +2230,46 @@ async function aplicarUpdateProduto(
 }
 
 /**
+ * UPDATE do PAR (grupo, subgrupo) num único statement.
+ *
+ * Obrigatório: a FK `XFK12602_PRODUTOS` valida as duas colunas juntas, então mover
+ * um produto de grupo NÃO pode ser feito em dois UPDATEs — cada metade é inválida
+ * sozinha. Trocar só o grupo deixa o subgrupo antigo (par inexistente no destino);
+ * trocar só o subgrupo deixa o grupo antigo (par inexistente na origem). Os dois
+ * estouram a FK mesmo quando o destino final é perfeitamente válido.
+ */
+async function aplicarUpdateParGrupoSubgrupo(
+  itens: Array<{ produto: string; grupo: string; subgrupo: string }>
+): Promise<void> {
+  for (const lote of chunk(itens, CHUNK)) {
+    await withRequest(async (request) => {
+      const values = lote.map((item, i) => {
+        request.input(`pp${i}`, sql.VarChar, item.produto);
+        request.input(`pg${i}`, sql.VarChar, item.grupo);
+        request.input(`ps${i}`, sql.VarChar, item.subgrupo);
+        return `(@pp${i}, @pg${i}, @ps${i})`;
+      });
+
+      await request.query(`
+        UPDATE p
+        SET p.GRUPO_PRODUTO = CAST(v.G AS VARCHAR(25)),
+            p.SUBGRUPO_PRODUTO = CAST(v.S AS VARCHAR(25))
+        FROM PRODUTOS p
+        INNER JOIN (VALUES ${values.join(', ')}) AS v(PRODUTO, G, S)
+          ON p.PRODUTO = v.PRODUTO
+      `);
+    });
+  }
+}
+
+/**
  * Aplica alterações de campo do produto. Mesmo fluxo do precos.ts: ler → alterar
  * → RELER para confirmar → histórico. Só entra no histórico o que o banco
  * confirmou; os triggers de ETL do Linx ficam ligados de propósito (é o que
  * mantém o resto do ERP em sincronia).
+ *
+ * Exceção ao "um bloco por coluna": quando grupo E subgrupo mudam no mesmo produto,
+ * as duas colunas vão juntas (ver `aplicarUpdateParGrupoSubgrupo`).
  */
 export async function executarAlteracaoCadastro(params: {
   company: CadastroCompany;
@@ -2280,80 +2316,146 @@ export async function executarAlteracaoCadastro(params: {
   erros.push(...validacao.erros);
 
   const lote = novoLoteId();
-  const resumo: ResumoCampoProduto[] = [];
   const paraHistorico: LinhaHistoricoInput[] = [];
 
-  // Um bloco por coluna: agrupar deixa o UPDATE em lote e a releitura baratos.
-  const porCampo = new Map<string, { def: CampoProdutoDef; itens: typeof itens }>();
+  const resumoPorCampo = new Map<string, ResumoCampoProduto>();
+  const resumoDe = (def: CampoProdutoDef): ResumoCampoProduto => {
+    let r = resumoPorCampo.get(def.campo);
+    if (!r) {
+      r = { campo: def.campo, label: def.label, aplicados: 0, semMudanca: 0, naoConfirmados: 0, invalidos: 0 };
+      resumoPorCampo.set(def.campo, r);
+    }
+    return r;
+  };
+
+  interface ItemAlterar {
+    produto: string;
+    def: CampoProdutoDef;
+    valor: string | number | boolean | null;
+    anterior: string | number | boolean | null;
+  }
+
+  const registrarHistorico = (item: ItemAlterar) => {
+    paraHistorico.push({
+      escopo: 'PRODUTO',
+      acao: 'CAMPO',
+      dimensao: null,
+      alvo: item.produto,
+      chave: item.produto,
+      pai: null,
+      campo: item.def.campo,
+      anterior: item.anterior === null ? null : String(item.anterior),
+      novo: item.valor === null ? null : String(item.valor),
+      produtos: null,
+    });
+  };
+
+  // Primeira passada: descarta inválido e sem-mudança, contabilizando por campo.
+  const aAlterar: ItemAlterar[] = [];
   for (const item of itens) {
+    const resumo = resumoDe(item.def);
+    if (validacao.invalidos.has(`${item.produto}||${item.def.campo}`)) {
+      resumo.invalidos += 1;
+      continue;
+    }
+    const atuais = antes.get(item.produto);
+    if (!atuais) {
+      resumo.invalidos += 1;
+      continue;
+    }
+    const atual = atuais[item.def.campo] ?? null;
+    if (mesmoValor(item.def, atual, item.valor)) {
+      resumo.semMudanca += 1;
+      continue;
+    }
+    aAlterar.push({ produto: item.produto, def: item.def, valor: item.valor, anterior: atual });
+  }
+
+  /** Índice produto → campo → item, para achar quem muda o par inteiro. */
+  const porProduto = new Map<string, Map<string, ItemAlterar>>();
+  for (const item of aAlterar) {
+    const mapa = porProduto.get(item.produto) ?? new Map<string, ItemAlterar>();
+    mapa.set(item.def.campo, item);
+    porProduto.set(item.produto, mapa);
+  }
+
+  const produtosDoPar = [...porProduto.entries()]
+    .filter(([, mapa]) => mapa.has('GRUPO_PRODUTO') && mapa.has('SUBGRUPO_PRODUTO'))
+    .map(([produto]) => produto);
+  const produtosDoParSet = new Set(produtosDoPar);
+
+  // ── bloco 1: o par (grupo, subgrupo) em um statement só ──
+  if (produtosDoPar.length > 0) {
+    const paresItens = produtosDoPar.map((produto) => {
+      const mapa = porProduto.get(produto)!;
+      return {
+        produto,
+        grupo: limpar(mapa.get('GRUPO_PRODUTO')!.valor),
+        subgrupo: limpar(mapa.get('SUBGRUPO_PRODUTO')!.valor),
+      };
+    });
+
+    const itensDoPar = produtosDoPar.flatMap((produto) => {
+      const mapa = porProduto.get(produto)!;
+      return [mapa.get('GRUPO_PRODUTO')!, mapa.get('SUBGRUPO_PRODUTO')!];
+    });
+
+    try {
+      await aplicarUpdateParGrupoSubgrupo(paresItens);
+
+      const depois = await carregarValoresProduto(produtosDoPar);
+      for (const item of itensDoPar) {
+        const resumo = resumoDe(item.def);
+        const atual = depois.get(item.produto)?.[item.def.campo] ?? null;
+        if (mesmoValor(item.def, atual, item.valor)) {
+          resumo.aplicados += 1;
+          registrarHistorico(item);
+        } else {
+          resumo.naoConfirmados += 1;
+        }
+      }
+    } catch (error) {
+      for (const item of itensDoPar) resumoDe(item.def).naoConfirmados += 1;
+      const detalhe = error instanceof Error ? error.message : String(error);
+      erros.push(`Falha ao mover de grupo (grupo + subgrupo juntos): ${detalhe}`);
+    }
+  }
+
+  // ── bloco 2: as demais colunas, uma por statement em lote ──
+  const porCampo = new Map<string, { def: CampoProdutoDef; itens: ItemAlterar[] }>();
+  for (const item of aAlterar) {
+    // As duas colunas do par já foram gravadas juntas acima.
+    if (
+      produtosDoParSet.has(item.produto) &&
+      (item.def.campo === 'GRUPO_PRODUTO' || item.def.campo === 'SUBGRUPO_PRODUTO')
+    ) {
+      continue;
+    }
     const bucket = porCampo.get(item.def.campo);
     if (bucket) bucket.itens.push(item);
     else porCampo.set(item.def.campo, { def: item.def, itens: [item] });
   }
 
   for (const { def, itens: itensCampo } of porCampo.values()) {
-    const aAlterar: Array<{
-      produto: string;
-      valor: string | number | boolean | null;
-      anterior: string | number | boolean | null;
-    }> = [];
-    let semMudanca = 0;
-    let invalidos = 0;
+    const resumo = resumoDe(def);
+    try {
+      await aplicarUpdateProduto(def, itensCampo.map((i) => ({ produto: i.produto, valor: i.valor })));
 
-    for (const item of itensCampo) {
-      if (validacao.invalidos.has(`${item.produto}||${def.campo}`)) {
-        invalidos += 1;
-        continue;
-      }
-      const atuais = antes.get(item.produto);
-      if (!atuais) {
-        invalidos += 1;
-        continue;
-      }
-      const atual = atuais[def.campo] ?? null;
-      if (mesmoValor(def, atual, item.valor)) {
-        semMudanca += 1;
-        continue;
-      }
-      aAlterar.push({ produto: item.produto, valor: item.valor, anterior: atual });
-    }
-
-    let aplicados = 0;
-    let naoConfirmados = 0;
-
-    if (aAlterar.length > 0) {
-      try {
-        await aplicarUpdateProduto(def, aAlterar.map((i) => ({ produto: i.produto, valor: i.valor })));
-
-        const depois = await carregarValoresProduto(aAlterar.map((i) => i.produto));
-        for (const item of aAlterar) {
-          const atual = depois.get(item.produto)?.[def.campo] ?? null;
-          if (mesmoValor(def, atual, item.valor)) {
-            aplicados += 1;
-            paraHistorico.push({
-              escopo: 'PRODUTO',
-              acao: 'CAMPO',
-              dimensao: null,
-              alvo: item.produto,
-              chave: item.produto,
-              pai: null,
-              campo: def.campo,
-              anterior: item.anterior === null ? null : String(item.anterior),
-              novo: item.valor === null ? null : String(item.valor),
-              produtos: null,
-            });
-          } else {
-            naoConfirmados += 1;
-          }
+      const depois = await carregarValoresProduto(itensCampo.map((i) => i.produto));
+      for (const item of itensCampo) {
+        const atual = depois.get(item.produto)?.[def.campo] ?? null;
+        if (mesmoValor(def, atual, item.valor)) {
+          resumo.aplicados += 1;
+          registrarHistorico(item);
+        } else {
+          resumo.naoConfirmados += 1;
         }
-      } catch (error) {
-        naoConfirmados += aAlterar.length;
-        const detalhe = error instanceof Error ? error.message : String(error);
-        erros.push(`Falha ao alterar ${def.label}: ${detalhe}`);
       }
+    } catch (error) {
+      resumo.naoConfirmados += itensCampo.length;
+      const detalhe = error instanceof Error ? error.message : String(error);
+      erros.push(`Falha ao alterar ${def.label}: ${detalhe}`);
     }
-
-    resumo.push({ campo: def.campo, label: def.label, aplicados, semMudanca, naoConfirmados, invalidos });
   }
 
   await gravarHistorico(
@@ -2364,6 +2466,8 @@ export async function executarAlteracaoCadastro(params: {
     params.reverteLote ?? null,
     paraHistorico
   );
+
+  const resumo = [...resumoPorCampo.values()];
 
   return {
     lote: paraHistorico.length > 0 ? lote : '',
