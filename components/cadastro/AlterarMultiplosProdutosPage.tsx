@@ -673,9 +673,10 @@ export default function AlterarMultiplosProdutosPage({ companyKey }: Props) {
               </label>
             )}
 
-            {/* Mover de grupo pede o subgrupo de destino: a FK valida o PAR. */}
+            {/* Mover de grupo pede o subgrupo de destino: a FK valida o PAR. Sem texto
+                explicativo — o botão fica travado até escolher, o que já é a explicação. */}
             {movendoGrupo && (
-              <label className={`${styles.campoTexto} ${!novoSubgrupo ? styles.campoAlterado : ""}`}>
+              <label className={styles.campoTexto}>
                 <span className={styles.campoLabel}>Subgrupo de destino *</span>
                 <select
                   className={styles.select}
@@ -695,10 +696,6 @@ export default function AlterarMultiplosProdutosPage({ companyKey }: Props) {
                     </option>
                   ))}
                 </select>
-                <span className={styles.campoNota}>
-                  No Linx o subgrupo pertence ao grupo, então mover de grupo é escolher o par de
-                  destino. {subgruposDoDestino.length} subgrupo(s) disponível(is).
-                </span>
               </label>
             )}
           </div>
@@ -720,13 +717,6 @@ export default function AlterarMultiplosProdutosPage({ companyKey }: Props) {
             </div>
           )}
 
-          {movendoGrupo && grupoDestino && !novoSubgrupo && subgruposDoDestino.length > 0 && (
-            <div className={styles.avisoBox}>
-              Escolha o <strong>subgrupo de destino</strong>. Trocar só o grupo é recusado pelo Linx:
-              o par (grupo, subgrupo) precisa existir, e o subgrupo atual dos itens não existe
-              necessariamente em <strong>{grupoDestino}</strong>.
-            </div>
-          )}
 
           {/* ─── distribuição dos valores atuais ─── */}
           {campoDef && distribuicao.length > 0 && (

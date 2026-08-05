@@ -136,6 +136,12 @@
   outline-offset: 0;
   border-color: transparent;
 }
+/* A lista nativa do <select> não herda os tokens: sem isto, no tema escuro as
+   opções abrem com o fundo padrão do sistema (branco) e texto claro. */
+.select option {
+  background: var(--s-white);
+  color: var(--t-900);
+}
 .input:disabled,
 .select:disabled {
   background: var(--s-50);
@@ -386,10 +392,14 @@
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 14px;
 }
+/* O destaque de "campo alterado" precisa ser OPACO no <select>: no Chromium a
+   lista nativa herda o background do elemento, e um valor semitransparente faz o
+   popup cair no padrão do navegador (branco) — no tema escuro vira texto claro
+   sobre fundo branco, ilegível. */
 .campoAlterado .input,
 .campoAlterado .select {
   border-color: #eab308;
-  background: rgba(234, 179, 8, 0.08);
+  background: #fefce8;
 }
 .campoNota {
   font-size: 11.5px;
@@ -552,6 +562,13 @@
 }
 :global(:root[data-theme="dark"]) .campoBloqueado {
   color: #fbbf24;
+}
+/* Mesmo destaque de campo alterado, na tinta do tema noturno — e opaco, pelo
+   mesmo motivo do popup do <select>. */
+:global(:root[data-theme="dark"]) .campoAlterado .input,
+:global(:root[data-theme="dark"]) .campoAlterado .select {
+  background: #2a2413;
+  border-color: #a16207;
 }
 :global(:root[data-theme="dark"]) .modalOverlay {
   background: rgba(2, 6, 23, 0.7);
