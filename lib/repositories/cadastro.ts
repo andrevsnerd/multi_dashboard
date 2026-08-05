@@ -248,6 +248,7 @@ export interface DimensaoMeta {
   codigoMax: number;
   codigoObrigatorio: boolean;
   temPai: boolean;
+  temInativo: boolean;
   podeCriar: boolean;
   renomeiaComUso: boolean;
 }
@@ -263,6 +264,7 @@ export function listarDimensoesMeta(): DimensaoMeta[] {
     codigoMax: d.codigoMax,
     codigoObrigatorio: d.codigoObrigatorio,
     temPai: d.colunaPai !== null,
+    temInativo: d.temInativo,
     podeCriar: d.podeCriar,
     renomeiaComUso: d.renomeiaComUso,
   }));
@@ -324,6 +326,15 @@ function filtroLista(
 
 // ───────────────────────── leitura de dimensões ─────────────────────────
 
+/** Um registro físico da mestre: no subgrupo, o par (grupo, subgrupo). */
+export interface DimensaoPar {
+  grupo: string;
+  codigo: string | null;
+  inativo: boolean;
+  produtos: number;
+  produtosEmpresa: number;
+}
+
 export interface DimensaoRow {
   nome: string;
   /**
@@ -332,10 +343,23 @@ export interface DimensaoRow {
    */
   chave: string;
   codigo: string | null;
-  /** Grupo do subgrupo (null nas demais dimensões). */
+  /**
+   * Grupo do subgrupo. `null` na linha AGRUPADA (um subgrupo que vive em vários
+   * grupos aparece como uma linha só) e nas dimensões que não têm pai.
+   */
   pai: string | null;
+  /**
+   * Os registros físicos que compõem esta linha. Na linha agregada de subgrupo é
+   * um par por grupo — é o que deixa claro que "CREPE DE SEDA" é UM subgrupo em 12
+   * grupos, e não 12 subgrupos diferentes, e o que alimenta a lista de detalhe com
+   * checkbox. Vazio nas dimensões globais (a própria linha já é o registro).
+   */
+  pares: DimensaoPar[];
+  /** `true` quando TODOS os pares estão inativos. */
   inativo: boolean;
-  /** Produtos que usam esse valor no cadastro inteiro. */
+  /** `true` quando só PARTE dos pares está inativa. */
+  inativoParcial: boolean;
+  /** Produtos que usam esse valor no cadastro inteiro (soma dos pares). */
   produtos: number;
   /** Produtos da empresa selecionada. */
   produtosEmpresa: number;
@@ -344,6 +368,8 @@ export interface DimensaoRow {
 export interface DimensaoListaResult {
   rows: DimensaoRow[];
   meta: DimensaoMeta;
+  /** `true` quando as linhas estão agregadas por nome (subgrupo sem filtro de grupo). */
+  agrupado: boolean;
 }
 
 /**
@@ -354,21 +380,42 @@ export interface DimensaoListaResult {
 export async function fetchDimensao(
   company: CadastroCompany,
   tipo: DimensaoTipo,
-  opts: { pai?: string | null; busca?: string | null; incluirInativos?: boolean } = {}
+  opts: {
+    pai?: string | null;
+    busca?: string | null;
+    incluirInativos?: boolean;
+    /**
+     * Força a lista par-a-par (uma linha por grupo) numa dimensão que normalmente
+     * agrega. Usado quando o usuário quer mexer num grupo específico.
+     */
+    porGrupo?: boolean;
+  } = {}
 ): Promise<DimensaoListaResult> {
   const def = DIMENSOES[tipo];
   const meta = listarDimensoesMeta().find((m) => m.tipo === tipo)!;
   const codes = EMPRESA_CODES[company] ?? [];
+  const pai = limpar(opts.pai);
+
+  /**
+   * Subgrupo sem filtro de grupo vem AGREGADO POR NOME. No Linx a PK é o par
+   * (grupo, subgrupo), então "CREPE DE SEDA" são 12 linhas físicas — mas para
+   * quem usa é UM subgrupo que está atrelado a 12 grupos. Listar as 12 linhas
+   * separadas dá a impressão errada de 12 subgrupos diferentes e obrigaria a
+   * renomear 12 vezes.
+   */
+  const agrupado = def.colunaPai !== null && !pai && !opts.porGrupo;
+
+  if (agrupado) {
+    const rows = await fetchDimensaoAgrupada(def, codes, opts);
+    return { meta, rows, agrupado: true };
+  }
 
   const rows = await withRequest(async (request) => {
     const where: string[] = [];
 
-    if (def.colunaPai) {
-      const pai = limpar(opts.pai);
-      if (pai) {
-        request.input('dimPai', sql.VarChar, pai);
-        where.push(`AND d.${def.colunaPai} = @dimPai`);
-      }
+    if (def.colunaPai && pai) {
+      request.input('dimPai', sql.VarChar, pai);
+      where.push(`AND d.${def.colunaPai} = @dimPai`);
     }
     if (!opts.incluirInativos && def.temInativo) {
       where.push('AND ISNULL(d.INATIVO, 0) = 0');
@@ -419,16 +466,120 @@ export async function fetchDimensao(
 
   return {
     meta,
+    agrupado: false,
     rows: rows.map((row) => ({
       nome: limpar(row.nome),
       chave: limpar(row.chave),
       codigo: limpar(row.codigo) || null,
       pai: limpar(row.pai) || null,
+      pares: [],
       inativo: Number(row.inativo ?? 0) === 1,
+      inativoParcial: false,
       produtos: Number(row.produtos ?? 0),
       produtosEmpresa: Number(row.produtosEmpresa ?? 0),
     })),
   };
+}
+
+/**
+ * Lista de subgrupos agregada por NOME: uma linha por subgrupo, com os grupos aos
+ * quais ele está atrelado. Lê os pares e agrega em JS — a agregação precisa da
+ * lista de grupos e dos códigos por grupo, que em SQL sairia como XML costurado.
+ */
+async function fetchDimensaoAgrupada(
+  def: DimensaoDef,
+  codes: number[],
+  opts: { busca?: string | null; incluirInativos?: boolean }
+): Promise<DimensaoRow[]> {
+  const pares = await withRequest(async (request) => {
+    const where: string[] = [];
+    if (!opts.incluirInativos && def.temInativo) where.push('AND ISNULL(d.INATIVO, 0) = 0');
+    const busca = limpar(opts.busca);
+    if (busca.length >= 2) {
+      request.input('agBusca', sql.VarChar, `%${busca}%`);
+      where.push(`AND d.${def.colunaNome} LIKE @agBusca`);
+    }
+
+    codes.forEach((c, i) => request.input(`agEmp${i}`, sql.Int, c));
+    const empresaIn = codes.length > 0 ? codes.map((_, i) => `@agEmp${i}`).join(', ') : 'NULL';
+    const joinUso = `p.${def.colunaProduto} = d.${def.colunaChave} AND p.${def.colunaPai} = d.${def.colunaPai}`;
+
+    const r = await request.query<{
+      nome: string;
+      pai: string;
+      codigo: string;
+      inativo: number;
+      produtos: number;
+      produtosEmpresa: number;
+    }>(`
+      SELECT
+        LTRIM(RTRIM(d.${def.colunaNome})) AS nome,
+        LTRIM(RTRIM(d.${def.colunaPai})) AS pai,
+        ${def.colunaCodigo ? `LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR(20), d.${def.colunaCodigo}), '')))` : `''`} AS codigo,
+        ${def.temInativo ? 'CAST(ISNULL(d.INATIVO, 0) AS INT)' : '0'} AS inativo,
+        (SELECT COUNT(*) FROM PRODUTOS p WITH (NOLOCK) WHERE ${joinUso}) AS produtos,
+        (SELECT COUNT(*) FROM PRODUTOS p WITH (NOLOCK)
+          WHERE ${joinUso} AND p.EMPRESA IN (${empresaIn})) AS produtosEmpresa
+      FROM ${def.tabela} d WITH (NOLOCK)
+      WHERE 1 = 1
+      ${where.join('\n      ')}
+      ORDER BY d.${def.colunaNome}, d.${def.colunaPai}
+    `);
+    return r.recordset;
+  });
+
+  const porNome = new Map<string, DimensaoRow & { ativos: number }>();
+
+  for (const par of pares) {
+    const nome = limpar(par.nome);
+    if (!nome) continue;
+    const grupo = limpar(par.pai);
+    const inativo = Number(par.inativo ?? 0) === 1;
+
+    let atual = porNome.get(nome);
+    if (!atual) {
+      atual = {
+        nome,
+        chave: nome,
+        codigo: null,
+        pai: null,
+        pares: [],
+        inativo: true,
+        inativoParcial: false,
+        produtos: 0,
+        produtosEmpresa: 0,
+        ativos: 0,
+      };
+      porNome.set(nome, atual);
+    }
+
+    atual.pares.push({
+      grupo,
+      codigo: limpar(par.codigo) || null,
+      inativo,
+      produtos: Number(par.produtos ?? 0),
+      produtosEmpresa: Number(par.produtosEmpresa ?? 0),
+    });
+    atual.produtos += Number(par.produtos ?? 0);
+    atual.produtosEmpresa += Number(par.produtosEmpresa ?? 0);
+    if (!inativo) {
+      atual.inativo = false;
+      atual.ativos += 1;
+    }
+  }
+
+  return [...porNome.values()]
+    .map(({ ativos, ...row }) => {
+      const codigos = [...new Set(row.pares.map((p) => p.codigo).filter(Boolean))];
+      return {
+        ...row,
+        // Um código só faz sentido exibir quando é o mesmo em todos os grupos;
+        // o código é por par, então normalmente difere.
+        codigo: codigos.length === 1 ? codigos[0]! : null,
+        inativoParcial: !row.inativo && ativos < row.pares.length,
+      };
+    })
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 }
 
 /** Grupos disponíveis para escopar a lista de subgrupos e os seletores do produto. */
@@ -460,6 +611,33 @@ export interface ImpactoDimensao {
   avisosCopia: string[];
   /** Renomear com produto em uso é rejeitado pelo banco nesta dimensão. */
   bloqueadoPorUso: boolean;
+  /**
+   * Grupos alcançados quando o rename de subgrupo é global (um por par a alterar).
+   * Vazio nas outras dimensões e no rename escopado num grupo só.
+   */
+  gruposAfetados: string[];
+  /**
+   * Grupos onde o nome de destino JÁ existe. Ali o rename seria mesclagem (viola a
+   * PK do par), então esses grupos bloqueiam a operação e são listados por nome.
+   */
+  colisoes: string[];
+}
+
+/** Grupos aos quais um nome de subgrupo está atrelado, em ordem alfabética. */
+async function listarGruposDoSubgrupo(def: DimensaoDef, nome: string): Promise<string[]> {
+  if (!def.colunaPai) return [];
+  const alvo = limpar(nome);
+  if (!alvo) return [];
+  return withRequest(async (request) => {
+    request.input('lgNome', sql.VarChar, alvo);
+    const r = await request.query<{ pai: string }>(`
+      SELECT LTRIM(RTRIM(d.${def.colunaPai})) AS pai
+      FROM ${def.tabela} d WITH (NOLOCK)
+      WHERE d.${def.colunaNome} = @lgNome
+      ORDER BY d.${def.colunaPai}
+    `);
+    return r.recordset.map((row) => limpar(row.pai)).filter(Boolean);
+  });
 }
 
 /**
@@ -477,6 +655,11 @@ export async function avaliarImpactoDimensao(
     codigoNovo?: string | null;
     /** Chave do registro; só é diferente do nome em coleção. */
     chave?: string | null;
+    /**
+     * Restringe os grupos-alvo a uma lista explícita. Usado pelo estorno, que tem
+     * de reverter exatamente os pares do lote — nunca mais que isso.
+     */
+    grupos?: string[] | null;
   }
 ): Promise<ImpactoDimensao> {
   const def = DIMENSOES[tipo];
@@ -487,20 +670,43 @@ export async function avaliarImpactoDimensao(
   const chave = def.nomeEhChave ? nomeAtual : limpar(params.chave);
   const codes = EMPRESA_CODES[company] ?? [];
 
+  /**
+   * Grupos que o rename vai tocar — resolvidos ANTES da contagem, porque é a
+   * contagem que depende deles. Lista explícita (a seleção da tela) vence; senão
+   * é o grupo pedido; senão todos os grupos que têm esse nome de subgrupo.
+   */
+  const gruposExplicitos = (params.grupos ?? []).map(limpar).filter(Boolean);
+  const gruposAfetados = !def.colunaPai
+    ? []
+    : gruposExplicitos.length > 0
+      ? gruposExplicitos
+      : pai
+        ? [pai]
+        : await listarGruposDoSubgrupo(def, nomeAtual);
+
   const contagens = await withRequest(async (request) => {
     // A contagem casa a coluna de PRODUTOS com a CHAVE, não com o nome exibido.
     request.input('impNome', sql.VarChar, chave);
-    if (def.colunaPai && pai) request.input('impPai', sql.VarChar, pai);
     codes.forEach((c, i) => request.input(`impEmp${i}`, sql.Int, c));
     const empresaIn = codes.length > 0 ? codes.map((_, i) => `@impEmp${i}`).join(', ') : 'NULL';
-    const wherePai = def.colunaPai && pai ? `AND p.${def.colunaPai} = @impPai` : '';
+
+    /**
+     * Restringe aos grupos-alvo. Sem isso, desmarcar um grupo na tela não mudaria o
+     * número de produtos — o preview prometeria uma cascata maior do que a real.
+     */
+    let whereGrupos = '';
+    if (def.colunaPai && gruposAfetados.length > 0) {
+      gruposAfetados.forEach((g, i) => request.input(`impGr${i}`, sql.VarChar, g));
+      const ph = gruposAfetados.map((_, i) => `@impGr${i}`).join(', ');
+      whereGrupos = `AND p.${def.colunaPai} IN (${ph})`;
+    }
 
     const r = await request.query<{ produtos: number; produtosEmpresa: number }>(`
       SELECT
         COUNT(*) AS produtos,
         SUM(CASE WHEN p.EMPRESA IN (${empresaIn}) THEN 1 ELSE 0 END) AS produtosEmpresa
       FROM PRODUTOS p WITH (NOLOCK)
-      WHERE p.${def.colunaProduto} = @impNome ${wherePai}
+      WHERE p.${def.colunaProduto} = @impNome ${whereGrupos}
     `);
     return r.recordset[0] ?? { produtos: 0, produtosEmpresa: 0 };
   });
@@ -508,17 +714,25 @@ export async function avaliarImpactoDimensao(
   // Colidir só é problema quando o nome É a chave (PK). Descrição de coleção pode
   // repetir sem quebrar nada, então nem checamos.
   let nomeJaExiste = false;
+  let colisoes: string[] = [];
   if (def.nomeEhChave && nomeNovo && nomeNovo.toUpperCase() !== nomeAtual.toUpperCase()) {
-    nomeJaExiste = await withRequest(async (request) => {
-      request.input('exNome', sql.VarChar, nomeNovo);
-      if (def.colunaPai && pai) request.input('exPai', sql.VarChar, pai);
-      const wherePai = def.colunaPai && pai ? `AND d.${def.colunaPai} = @exPai` : '';
-      const r = await request.query<{ n: number }>(`
-        SELECT COUNT(*) AS n FROM ${def.tabela} d WITH (NOLOCK)
-        WHERE d.${def.colunaNome} = @exNome ${wherePai}
-      `);
-      return Number(r.recordset[0]?.n ?? 0) > 0;
-    });
+    if (def.colunaPai) {
+      // Por par: o destino pode estar livre em 9 grupos e ocupado em 3. Listamos
+      // exatamente quais bloqueiam, em vez de um "já existe" que não diz onde.
+      const ocupados = await listarGruposDoSubgrupo(def, nomeNovo);
+      const alvo = new Set(gruposAfetados);
+      colisoes = ocupados.filter((g) => alvo.has(g));
+      nomeJaExiste = colisoes.length > 0;
+    } else {
+      nomeJaExiste = await withRequest(async (request) => {
+        request.input('exNome', sql.VarChar, nomeNovo);
+        const r = await request.query<{ n: number }>(`
+          SELECT COUNT(*) AS n FROM ${def.tabela} d WITH (NOLOCK)
+          WHERE d.${def.colunaNome} = @exNome
+        `);
+        return Number(r.recordset[0]?.n ?? 0) > 0;
+      });
+    }
   }
 
   let codigoJaExiste = false;
@@ -544,6 +758,8 @@ export async function avaliarImpactoDimensao(
     produtosEmpresa: Number(contagens.produtosEmpresa ?? 0),
     nomeJaExiste,
     codigoJaExiste,
+    gruposAfetados,
+    colisoes,
     avisosCodigo: def.chaveAviso ? avisosNomeSensivel(def.chaveAviso, nomeAtual) : [],
     avisosCopia: produtos > 0 ? AVISOS_COPIA_LOCAL[tipo] ?? [] : [],
     bloqueadoPorUso: !def.renomeiaComUso && produtos > 0,
@@ -837,17 +1053,40 @@ export interface ResultadoDimensao {
   ok: boolean;
   /** Produtos que a cascata do Linx alcançou (confirmado por releitura). */
   produtosAfetados: number;
+  /** Grupos efetivamente renomeados (subgrupo). Vazio nas outras dimensões. */
+  gruposRenomeados: string[];
   mensagem: string;
   avisos: string[];
 }
 
 /**
- * Renomeia uma dimensão: UM UPDATE na tabela mestre.
+ * Renomeia uma dimensão. Um UPDATE na tabela mestre POR REGISTRO — e o "por
+ * registro" não é preciosismo, é obrigatório no subgrupo. Ver abaixo.
  *
  * A cascata para PRODUTOS e para as filhas é do Linx (FK ON UPDATE CASCADE +
  * triggers LXU_*). Não tocamos PRODUTOS aqui de propósito — fazer isso aplicaria
- * o efeito duas vezes. A confirmação é por releitura: contamos os produtos com o
- * nome NOVO e checamos que ninguém sobrou com o antigo.
+ * o efeito duas vezes. A confirmação é por releitura.
+ *
+ * ── POR QUE NUNCA UM UPDATE DE VÁRIAS LINHAS ──────────────────────────────────
+ * O subgrupo tem PK (GRUPO, SUBGRUPO): "CREPE DE SEDA" são 12 linhas físicas, uma
+ * por grupo. Seria natural renomear as 12 num único
+ *   `UPDATE PRODUTOS_SUBGRUPO SET SUBGRUPO_PRODUTO=@novo WHERE SUBGRUPO_PRODUTO=@velho`
+ * — e isso é PERIGOSO. O trigger `LXU_PRODUTOS_SUBGRUPO` cascateia assim:
+ *
+ *   DECLARE CURI CURSOR FOR SELECT SUBGRUPO_PRODUTO, GRUPO_PRODUTO FROM INSERTED
+ *   DECLARE CURD CURSOR FOR SELECT SUBGRUPO_PRODUTO, GRUPO_PRODUTO FROM DELETED
+ *   -- avança os dois em paralelo, pareando por POSIÇÃO
+ *   UPDATE PRODUTOS SET SUBGRUPO=@ins, GRUPO=@insGrupo
+ *   WHERE SUBGRUPO=@del AND GRUPO=@delGrupo
+ *
+ * `INSERTED` e `DELETED` não têm ordem correlacionada. Com várias linhas, o par
+ * (novo de um grupo) × (velho de OUTRO grupo) é possível — e o UPDATE resultante
+ * moveria produtos de um grupo para outro, sem violar FK, sem erro, em silêncio.
+ * Com uma linha por statement o pareamento é inequívoco por construção.
+ *
+ * O preço é perder atomicidade entre os pares. Mitigado com pré-checagem de TODAS
+ * as colisões antes de começar (o único modo de falha realista) e histórico por
+ * par no mesmo lote — um lote parcial é revertível.
  */
 export async function renomearDimensao(params: {
   company: CadastroCompany;
@@ -858,6 +1097,12 @@ export async function renomearDimensao(params: {
   pai?: string | null;
   /** Chave do registro; só difere do nome em coleção. */
   chave?: string | null;
+  /**
+   * Grupos-alvo explícitos (subgrupo). Usado pelo estorno para reverter exatamente
+   * os pares do lote — sem isso um estorno global poderia pegar um grupo que já
+   * tinha o nome de destino antes do lote.
+   */
+  grupos?: string[] | null;
   obs?: string | null;
   reverteLote?: string | null;
 }): Promise<ResultadoDimensao> {
@@ -876,24 +1121,15 @@ export async function renomearDimensao(params: {
     throw new Error(`O nome novo tem ${nomeNovo.length} caracteres; o limite do Linx é ${def.maxNome}.`);
   }
   if (nomeNovo === nomeAtual) throw new Error('O nome novo é igual ao atual.');
-  if (def.colunaPai && !pai) {
-    throw new Error('Subgrupo pertence a um grupo: informe o grupo do subgrupo.');
-  }
 
   const impacto = await avaliarImpactoDimensao(params.company, params.tipo, {
     nomeAtual,
     nomeNovo,
     pai,
     chave,
+    grupos: params.grupos ?? null,
   });
 
-  if (impacto.nomeJaExiste) {
-    throw new Error(
-      `Já existe ${def.label.toLowerCase()} com o nome "${nomeNovo}". ` +
-        'Renomear para um nome existente seria uma MESCLAGEM (juntar dois cadastros em um), ' +
-        'que o Linx não faz por UPDATE — escolha outro nome.'
-    );
-  }
   if (impacto.bloqueadoPorUso) {
     throw new Error(
       `${def.label} em uso por ${impacto.produtos} produto(s). Nesta dimensão o banco ` +
@@ -902,96 +1138,184 @@ export async function renomearDimensao(params: {
     );
   }
 
-  const lote = novoLoteId();
-
-  // Um único statement. A cascata roda dentro dele, no SQL Server: é o que dá
-  // atomicidade sem transação (que não existe atrás do proxy HTTP).
-  await withRequest(async (request) => {
-    request.input('renNovo', sql.VarChar, nomeNovo);
-    request.input('renChave', sql.VarChar, chave);
-    const wherePai = def.colunaPai && pai ? `AND ${def.colunaPai} = @renPai` : '';
-    if (def.colunaPai && pai) request.input('renPai', sql.VarChar, pai);
-    await request.query(`
-      UPDATE ${def.tabela}
-      SET ${def.colunaNome} = @renNovo
-      WHERE ${def.colunaChave} = @renChave ${wherePai}
-    `);
-  });
-
-  /**
-   * Releitura de confirmação. Quando o nome É a chave, a prova é dupla: o nome
-   * antigo desapareceu da mestre e o novo apareceu. Quando é só descrição
-   * (coleção), a chave não mudou — a prova é a descrição estar com o valor novo.
-   */
-  const confirmacao = await withRequest(async (request) => {
-    request.input('cfAtual', sql.VarChar, nomeAtual);
-    request.input('cfNovo', sql.VarChar, nomeNovo);
-    request.input('cfChave', sql.VarChar, chave);
-    const wherePai = def.colunaPai && pai ? `AND d.${def.colunaPai} = @cfPai` : '';
-    const whereProdPai = def.colunaPai && pai ? `AND p.${def.colunaPai} = @cfPai` : '';
-    if (def.colunaPai && pai) request.input('cfPai', sql.VarChar, pai);
-
-    const chaveNova = def.nomeEhChave ? '@cfNovo' : '@cfChave';
-    const r = await request.query<{ antigos: number; novos: number; produtosNovo: number }>(`
-      SELECT
-        (SELECT COUNT(*) FROM ${def.tabela} d WITH (NOLOCK)
-          WHERE d.${def.colunaNome} = @cfAtual AND d.${def.colunaChave} = ${
-            def.nomeEhChave ? '@cfAtual' : '@cfChave'
-          } ${wherePai}) AS antigos,
-        (SELECT COUNT(*) FROM ${def.tabela} d WITH (NOLOCK)
-          WHERE d.${def.colunaNome} = @cfNovo AND d.${def.colunaChave} = ${chaveNova} ${wherePai}) AS novos,
-        (SELECT COUNT(*) FROM PRODUTOS p WITH (NOLOCK)
-          WHERE p.${def.colunaProduto} = ${chaveNova} ${whereProdPai}) AS produtosNovo
-    `);
-    return r.recordset[0] ?? { antigos: 0, novos: 0, produtosNovo: 0 };
-  });
-
-  const ok = Number(confirmacao.antigos ?? 0) === 0 && Number(confirmacao.novos ?? 0) > 0;
-  const produtosAfetados = Number(confirmacao.produtosNovo ?? 0);
-
-  if (!ok) {
+  if (impacto.nomeJaExiste) {
+    if (def.colunaPai && impacto.colisoes.length > 0) {
+      throw new Error(
+        `O nome "${nomeNovo}" já existe como ${def.label.toLowerCase()} em: ` +
+          `${impacto.colisoes.join(', ')}. Nesses grupos o rename seria uma MESCLAGEM ` +
+          '(dois subgrupos virando um), que o Linx não faz por UPDATE. Renomeie nos outros ' +
+          'grupos escolhendo o grupo específico, ou use outro nome.'
+      );
+    }
     throw new Error(
-      'O banco não confirmou o rename (o valor antigo continua na tabela mestre). ' +
-        'Nada foi registrado no histórico.'
+      `Já existe ${def.label.toLowerCase()} com o nome "${nomeNovo}". ` +
+        'Renomear para um nome existente seria uma MESCLAGEM (juntar dois cadastros em um), ' +
+        'que o Linx não faz por UPDATE — escolha outro nome.'
     );
   }
 
-  await gravarHistorico(lote, params.company, params.usuario, params.obs ?? null, params.reverteLote ?? null, [
-    {
-      escopo: 'DIMENSAO',
-      acao: 'RENOMEAR',
-      dimensao: params.tipo,
-      alvo: nomeNovo,
-      chave,
-      pai: pai || null,
-      campo: `${def.label} · nome`,
-      anterior: nomeAtual,
-      novo: nomeNovo,
-      produtos: produtosAfetados,
-    },
-  ]);
+  /**
+   * Alvos: no subgrupo, um por grupo (global) ou só o grupo pedido. Nas demais
+   * dimensões, um alvo só — a própria chave.
+   */
+  const alvos: Array<string | null> = def.colunaPai
+    ? impacto.gruposAfetados.length > 0
+      ? impacto.gruposAfetados
+      : []
+    : [null];
+
+  if (alvos.length === 0) {
+    throw new Error(
+      `Nenhum registro de ${def.label.toLowerCase()} "${nomeAtual}" foi encontrado para renomear.`
+    );
+  }
+
+  const lote = novoLoteId();
+  const linhasHistorico: LinhaHistoricoInput[] = [];
+  const gruposRenomeados: string[] = [];
+  const falhas: string[] = [];
+  let produtosAfetados = 0;
+
+  // Uma linha por statement, sempre. O motivo está no cabeçalho da função.
+  for (const grupo of alvos) {
+    try {
+      await withRequest(async (request) => {
+        request.input('renNovo', sql.VarChar, nomeNovo);
+        request.input('renChave', sql.VarChar, chave);
+        const wherePai = grupo ? `AND ${def.colunaPai} = @renPai` : '';
+        if (grupo) request.input('renPai', sql.VarChar, grupo);
+        await request.query(`
+          UPDATE ${def.tabela}
+          SET ${def.colunaNome} = @renNovo
+          WHERE ${def.colunaChave} = @renChave ${wherePai}
+        `);
+      });
+
+      /**
+       * Releitura de confirmação. Quando o nome É a chave, a prova é dupla: o nome
+       * antigo desapareceu e o novo apareceu. Quando é só descrição (coleção), a
+       * chave não mudou — a prova é a descrição estar com o valor novo.
+       */
+      const confirmacao = await withRequest(async (request) => {
+        request.input('cfAtual', sql.VarChar, nomeAtual);
+        request.input('cfNovo', sql.VarChar, nomeNovo);
+        request.input('cfChave', sql.VarChar, chave);
+        const wherePai = grupo ? `AND d.${def.colunaPai} = @cfPai` : '';
+        const whereProdPai = grupo ? `AND p.${def.colunaPai} = @cfPai` : '';
+        if (grupo) request.input('cfPai', sql.VarChar, grupo);
+
+        const chaveNova = def.nomeEhChave ? '@cfNovo' : '@cfChave';
+        const chaveAntiga = def.nomeEhChave ? '@cfAtual' : '@cfChave';
+        const r = await request.query<{ antigos: number; novos: number; produtosNovo: number }>(`
+          SELECT
+            (SELECT COUNT(*) FROM ${def.tabela} d WITH (NOLOCK)
+              WHERE d.${def.colunaNome} = @cfAtual
+                AND d.${def.colunaChave} = ${chaveAntiga} ${wherePai}) AS antigos,
+            (SELECT COUNT(*) FROM ${def.tabela} d WITH (NOLOCK)
+              WHERE d.${def.colunaNome} = @cfNovo
+                AND d.${def.colunaChave} = ${chaveNova} ${wherePai}) AS novos,
+            (SELECT COUNT(*) FROM PRODUTOS p WITH (NOLOCK)
+              WHERE p.${def.colunaProduto} = ${chaveNova} ${whereProdPai}) AS produtosNovo
+        `);
+        return r.recordset[0] ?? { antigos: 0, novos: 0, produtosNovo: 0 };
+      });
+
+      if (Number(confirmacao.antigos ?? 0) !== 0 || Number(confirmacao.novos ?? 0) === 0) {
+        falhas.push(grupo ? `${grupo} (banco não confirmou)` : 'banco não confirmou');
+        continue;
+      }
+
+      const produtos = Number(confirmacao.produtosNovo ?? 0);
+      produtosAfetados += produtos;
+      if (grupo) gruposRenomeados.push(grupo);
+
+      linhasHistorico.push({
+        escopo: 'DIMENSAO',
+        acao: 'RENOMEAR',
+        dimensao: params.tipo,
+        alvo: nomeNovo,
+        chave: def.nomeEhChave ? nomeNovo : chave,
+        pai: grupo,
+        campo: `${def.label} · nome`,
+        anterior: nomeAtual,
+        novo: nomeNovo,
+        produtos,
+      });
+    } catch (error) {
+      const detalhe = error instanceof Error ? error.message : String(error);
+      falhas.push(grupo ? `${grupo}: ${detalhe}` : detalhe);
+    }
+  }
+
+  // Só grava histórico do que o banco confirmou — nada de registrar intenção.
+  await gravarHistorico(
+    lote,
+    params.company,
+    params.usuario,
+    params.obs ?? null,
+    params.reverteLote ?? null,
+    linhasHistorico
+  );
+
+  if (linhasHistorico.length === 0) {
+    throw new Error(
+      `Nenhum registro foi renomeado. ${falhas.join(' · ')}. Nada foi gravado no histórico.`
+    );
+  }
+
+  const escopoTexto = def.colunaPai
+    ? gruposRenomeados.length === 1
+      ? ` no grupo ${gruposRenomeados[0]}`
+      : ` em ${gruposRenomeados.length} grupos`
+    : '';
+
+  const avisos = [...impacto.avisosCodigo, ...impacto.avisosCopia];
+  if (falhas.length > 0) {
+    avisos.unshift(
+      `Atenção: ${falhas.length} registro(s) NÃO foram renomeados — ${falhas.join(' · ')}. ` +
+        'O lote ficou parcial; desfazer reverte só o que entrou.'
+    );
+  }
 
   return {
     lote,
-    ok: true,
+    ok: falhas.length === 0,
     produtosAfetados,
+    gruposRenomeados,
     mensagem:
       produtosAfetados > 0
-        ? `"${nomeAtual}" virou "${nomeNovo}". A cascata do Linx atualizou ${produtosAfetados} produto(s).`
-        : `"${nomeAtual}" virou "${nomeNovo}". Nenhum produto usava esse valor.`,
-    avisos: [...impacto.avisosCodigo, ...impacto.avisosCopia],
+        ? `"${nomeAtual}" virou "${nomeNovo}"${escopoTexto}. A cascata do Linx atualizou ${produtosAfetados} produto(s).`
+        : `"${nomeAtual}" virou "${nomeNovo}"${escopoTexto}. Nenhum produto usava esse valor.`,
+    avisos,
   };
 }
 
-/** Liga/desliga o bit INATIVO da mestre. Não toca em nenhum produto. */
+/** Um alvo de ativo/inativo: o nome (+ chave) e os grupos em que ele deve mudar. */
+export interface AlvoInativo {
+  nome: string;
+  /** Chave do registro; só difere do nome em coleção. */
+  chave?: string | null;
+  /** Grupos escolhidos (subgrupo). Vazio = todos os grupos do nome. */
+  grupos?: string[] | null;
+}
+
+/**
+ * Liga/desliga o bit INATIVO da mestre. Não toca em nenhum produto.
+ *
+ * Aceita VÁRIOS alvos porque a tela permite marcar N dimensões e inativar todas de
+ * uma vez — e todas têm de cair no MESMO lote, senão desfazer viraria N estornos.
+ */
 export async function alternarInativoDimensao(params: {
   company: CadastroCompany;
   usuario: string;
   tipo: DimensaoTipo;
-  nome: string;
+  /** Alvo único (atalho). Ignorado quando `alvos` vem preenchido. */
+  nome?: string;
   pai?: string | null;
-  /** Chave do registro; só difere do nome em coleção. */
   chave?: string | null;
+  grupos?: string[] | null;
+  /** Vários alvos de uma vez. */
+  alvos?: AlvoInativo[] | null;
   inativo: boolean;
   obs?: string | null;
   reverteLote?: string | null;
@@ -999,73 +1323,143 @@ export async function alternarInativoDimensao(params: {
   const def = DIMENSOES[params.tipo];
   if (!def.temInativo) throw new Error(`${def.label} não tem controle de ativo/inativo no Linx.`);
 
-  const nome = limpar(params.nome);
   const pai = limpar(params.pai);
-  const chave = def.nomeEhChave ? nome : limpar(params.chave);
-  if (!nome) throw new Error('Informe a dimensão.');
-  if (!chave) throw new Error(`Informe o código da ${def.label.toLowerCase()}.`);
-  if (def.colunaPai && !pai) throw new Error('Informe o grupo do subgrupo.');
-
-  const impacto = await avaliarImpactoDimensao(params.company, params.tipo, {
-    nomeAtual: nome,
-    pai,
-    chave,
-  });
+  const alvosEntrada: AlvoInativo[] =
+    params.alvos && params.alvos.length > 0
+      ? params.alvos
+      : [
+          {
+            nome: limpar(params.nome),
+            chave: params.chave ?? null,
+            grupos: params.grupos ?? (pai ? [pai] : null),
+          },
+        ];
 
   const lote = novoLoteId();
+  const linhasHistorico: LinhaHistoricoInput[] = [];
+  const gruposAlterados: string[] = [];
+  const nomesAlterados = new Set<string>();
+  const falhas: string[] = [];
+  let produtosTocados = 0;
 
-  await withRequest(async (request) => {
-    request.input('inaChave', sql.VarChar, chave);
-    request.input('inaValor', sql.Bit, params.inativo);
-    const wherePai = def.colunaPai && pai ? `AND ${def.colunaPai} = @inaPai` : '';
-    if (def.colunaPai && pai) request.input('inaPai', sql.VarChar, pai);
-    await request.query(`
-      UPDATE ${def.tabela}
-      SET INATIVO = @inaValor
-      WHERE ${def.colunaChave} = @inaChave ${wherePai}
-    `);
-  });
+  for (const alvo of alvosEntrada) {
+    const nome = limpar(alvo.nome);
+    const chave = def.nomeEhChave ? nome : limpar(alvo.chave);
+    if (!nome) {
+      falhas.push('alvo sem nome');
+      continue;
+    }
+    if (!chave) {
+      falhas.push(`${nome}: sem código`);
+      continue;
+    }
 
-  const confirmado = await withRequest(async (request) => {
-    request.input('cfiChave', sql.VarChar, chave);
-    const wherePai = def.colunaPai && pai ? `AND d.${def.colunaPai} = @cfiPai` : '';
-    if (def.colunaPai && pai) request.input('cfiPai', sql.VarChar, pai);
-    const r = await request.query<{ inativo: number }>(`
-      SELECT CAST(ISNULL(d.INATIVO, 0) AS INT) AS inativo
-      FROM ${def.tabela} d WITH (NOLOCK)
-      WHERE d.${def.colunaChave} = @cfiChave ${wherePai}
-    `);
-    return Number(r.recordset[0]?.inativo ?? 0) === 1;
-  });
+    const impacto = await avaliarImpactoDimensao(params.company, params.tipo, {
+      nomeAtual: nome,
+      chave,
+      grupos: alvo.grupos ?? null,
+    });
+    produtosTocados += impacto.produtos;
 
-  if (confirmado !== params.inativo) {
-    throw new Error('O banco não confirmou a mudança de ativo/inativo. Nada foi registrado.');
+    // Um statement por registro, igual ao rename — mantém um só modelo de escopo.
+    const grupos: Array<string | null> = def.colunaPai ? impacto.gruposAfetados : [null];
+    if (grupos.length === 0) {
+      falhas.push(`${nome}: nenhum registro encontrado`);
+      continue;
+    }
+
+    for (const grupo of grupos) {
+      try {
+        await withRequest(async (request) => {
+          request.input('inaChave', sql.VarChar, chave);
+          request.input('inaValor', sql.Bit, params.inativo);
+          const wherePai = grupo ? `AND ${def.colunaPai} = @inaPai` : '';
+          if (grupo) request.input('inaPai', sql.VarChar, grupo);
+          await request.query(`
+            UPDATE ${def.tabela}
+            SET INATIVO = @inaValor
+            WHERE ${def.colunaChave} = @inaChave ${wherePai}
+          `);
+        });
+
+        const confirmado = await withRequest(async (request) => {
+          request.input('cfiChave', sql.VarChar, chave);
+          const wherePai = grupo ? `AND d.${def.colunaPai} = @cfiPai` : '';
+          if (grupo) request.input('cfiPai', sql.VarChar, grupo);
+          const r = await request.query<{ inativo: number }>(`
+            SELECT CAST(ISNULL(d.INATIVO, 0) AS INT) AS inativo
+            FROM ${def.tabela} d WITH (NOLOCK)
+            WHERE d.${def.colunaChave} = @cfiChave ${wherePai}
+          `);
+          return Number(r.recordset[0]?.inativo ?? 0) === 1;
+        });
+
+        if (confirmado !== params.inativo) {
+          falhas.push(grupo ? `${nome} / ${grupo} (não confirmou)` : `${nome} (não confirmou)`);
+          continue;
+        }
+
+        if (grupo) gruposAlterados.push(grupo);
+        nomesAlterados.add(nome);
+        linhasHistorico.push({
+          escopo: 'DIMENSAO',
+          acao: params.inativo ? 'INATIVAR' : 'REATIVAR',
+          dimensao: params.tipo,
+          alvo: nome,
+          chave,
+          pai: grupo,
+          campo: `${def.label} · INATIVO`,
+          anterior: params.inativo ? '0' : '1',
+          novo: params.inativo ? '1' : '0',
+          produtos: impacto.produtos,
+        });
+      } catch (error) {
+        const detalhe = error instanceof Error ? error.message : String(error);
+        falhas.push(grupo ? `${nome} / ${grupo}: ${detalhe}` : `${nome}: ${detalhe}`);
+      }
+    }
   }
 
-  await gravarHistorico(lote, params.company, params.usuario, params.obs ?? null, params.reverteLote ?? null, [
-    {
-      escopo: 'DIMENSAO',
-      acao: params.inativo ? 'INATIVAR' : 'REATIVAR',
-      dimensao: params.tipo,
-      alvo: nome,
-      chave,
-      pai: pai || null,
-      campo: `${def.label} · INATIVO`,
-      anterior: params.inativo ? '0' : '1',
-      novo: params.inativo ? '1' : '0',
-      produtos: impacto.produtos,
-    },
-  ]);
+  await gravarHistorico(
+    lote,
+    params.company,
+    params.usuario,
+    params.obs ?? null,
+    params.reverteLote ?? null,
+    linhasHistorico
+  );
+
+  if (linhasHistorico.length === 0) {
+    throw new Error(
+      `O banco não confirmou a mudança de ativo/inativo. ${falhas.join(' · ')}. Nada foi registrado.`
+    );
+  }
+
+  const quantos = linhasHistorico.length;
+  const nomes = [...nomesAlterados];
+  const alvoTexto =
+    nomes.length === 1
+      ? `"${nomes[0]}"`
+      : `${nomes.length} ${def.label.toLowerCase()}s`;
+  const escopoTexto = quantos > 1 ? ` (${quantos} registro(s))` : '';
+
+  const avisos = params.inativo && def.chaveAviso
+    ? nomes.flatMap((n) => avisosNomeSensivel(def.chaveAviso!, n))
+    : [];
+  if (falhas.length > 0) {
+    avisos.unshift(`Atenção: ${falhas.length} registro(s) não mudaram — ${falhas.join(' · ')}.`);
+  }
 
   return {
     lote,
-    ok: true,
+    ok: falhas.length === 0,
     produtosAfetados: 0,
+    gruposRenomeados: [...new Set(gruposAlterados)],
     mensagem: params.inativo
-      ? `"${nome}" foi inativado. Os ${impacto.produtos} produto(s) que já usam continuam intactos — ` +
-        'o inativo só impede escolher esse valor em cadastro novo.'
-      : `"${nome}" voltou a ficar ativo.`,
-    avisos: params.inativo && def.chaveAviso ? avisosNomeSensivel(def.chaveAviso, nome) : [],
+      ? `${alvoTexto} inativado${escopoTexto}. Os ${produtosTocados} produto(s) que já usam ` +
+        'continuam intactos — o inativo só impede escolher esse valor em cadastro novo.'
+      : `${alvoTexto} reativado${escopoTexto}.`,
+    avisos,
   };
 }
 
@@ -1192,7 +1586,10 @@ export async function criarDimensao(params: {
     lote,
     ok: true,
     produtosAfetados: 0,
-    mensagem: `${def.label} "${nome}" criado${codigo ? ` com o código ${codigo}` : ''}.`,
+    gruposRenomeados: pai ? [pai] : [],
+    mensagem: `${def.label} "${nome}" criado${codigo ? ` com o código ${codigo}` : ''}${
+      pai ? ` no grupo ${pai}` : ''
+    }.`,
     avisos: [
       'Criação não tem "desfazer": apagar a mestre arrastaria filhas por CASCADE. ' +
         'Se criou por engano, inative.',
@@ -1706,9 +2103,12 @@ async function validarDimensoes(
     const disponiveis = opcoes.subgruposPorGrupo[par.grupo] ?? [];
     const existe = disponiveis.some((s) => s.toUpperCase() === par.subgrupo.toUpperCase());
     if (!existe) {
+      // A mensagem tem de explicar que o problema é o PAR, senão quem pediu para
+      // trocar o GRUPO lê "subgrupo" e acha que a tela mexeu no campo errado.
       erros.push(
-        `${produto}: o grupo "${par.grupo}" não tem o subgrupo "${par.subgrupo}". ` +
-          'Escolha um subgrupo que exista nesse grupo (ou crie o subgrupo na aba Dimensões).'
+        `${produto}: o par "${par.grupo} / ${par.subgrupo}" não existe no cadastro. ` +
+          'No Linx o subgrupo pertence ao grupo, então mover de grupo exige escolher também um ' +
+          `subgrupo que exista no destino — ou criar "${par.subgrupo}" em "${par.grupo}" na aba Dimensões.`
       );
       invalidos.add(`${produto}||GRUPO_PRODUTO`);
       invalidos.add(`${produto}||SUBGRUPO_PRODUTO`);
@@ -2017,6 +2417,16 @@ export async function reverterLoteCadastro(
     }
     if (!primeira.dimensao) throw new Error('Lote de dimensão sem tipo registrado.');
 
+    /**
+     * Um rename global de subgrupo grava UMA LINHA POR GRUPO no mesmo lote. O
+     * estorno tem de desfazer exatamente esses pares — nem menos (deixaria metade
+     * renomeada) nem mais (um grupo que já tinha o nome de destino antes do lote
+     * não faz parte dele).
+     */
+    const gruposDoLote = [
+      ...new Set(linhas.map((l) => l.pai).filter((p): p is string => Boolean(p))),
+    ];
+
     if (primeira.acao === 'RENOMEAR') {
       const resultado = await renomearDimensao({
         company,
@@ -2024,21 +2434,40 @@ export async function reverterLoteCadastro(
         tipo: primeira.dimensao,
         nomeAtual: primeira.valorNovo ?? primeira.alvo,
         nomeNovo: primeira.valorAnterior ?? '',
-        pai: primeira.pai,
+        pai: null,
         chave: primeira.chave,
+        grupos: gruposDoLote.length > 0 ? gruposDoLote : null,
         obs: `Estorno do lote ${limpar(lote)}`,
         reverteLote: limpar(lote),
       });
       return { lote: resultado.lote, mensagem: resultado.mensagem, avisos: resultado.avisos };
     }
 
+    /**
+     * O lote pode ter vários nomes (inativar em massa). Reconstrói um alvo por
+     * nome, cada um com os grupos que realmente entraram — reverter "todos os
+     * grupos do nome" pegaria registros que não faziam parte do lote.
+     */
+    const porNome = new Map<string, { nome: string; chave: string | null; grupos: string[] }>();
+    for (const linha of linhas) {
+      const atual = porNome.get(linha.alvo) ?? {
+        nome: linha.alvo,
+        chave: linha.chave,
+        grupos: [],
+      };
+      if (linha.pai) atual.grupos.push(linha.pai);
+      porNome.set(linha.alvo, atual);
+    }
+
     const resultado = await alternarInativoDimensao({
       company,
       usuario,
       tipo: primeira.dimensao,
-      nome: primeira.alvo,
-      pai: primeira.pai,
-      chave: primeira.chave,
+      alvos: [...porNome.values()].map((a) => ({
+        nome: a.nome,
+        chave: a.chave,
+        grupos: a.grupos.length > 0 ? a.grupos : null,
+      })),
       inativo: primeira.acao !== 'INATIVAR',
       obs: `Estorno do lote ${limpar(lote)}`,
       reverteLote: limpar(lote),

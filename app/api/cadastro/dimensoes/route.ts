@@ -15,6 +15,12 @@ import {
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
+function lista(value: unknown): string[] | null {
+  if (!Array.isArray(value)) return null;
+  const out = value.map((v) => String(v ?? '').trim()).filter(Boolean);
+  return out.length > 0 ? out : null;
+}
+
 /** Lista uma dimensão com contagem de uso (+ grupos para escopar subgrupo). */
 export async function GET(request: Request) {
   const autorizacao = await autorizarCadastro(request);
@@ -27,17 +33,19 @@ export async function GET(request: Request) {
   if (!tipo) return NextResponse.json({ error: 'Dimensão inválida.' }, { status: 400 });
 
   try {
-    const [lista, grupos] = await Promise.all([
+    const [dimensao, grupos] = await Promise.all([
       fetchDimensao(company, tipo, {
         pai: searchParams.get('pai'),
         busca: searchParams.get('busca'),
         incluirInativos: searchParams.get('incluirInativos') === '1',
+        // Subgrupo vem agregado por nome; `porGrupo=1` mostra par a par.
+        porGrupo: searchParams.get('porGrupo') === '1',
       }),
       fetchGruposParaSelecao(),
     ]);
 
     return NextResponse.json({
-      ...lista,
+      ...dimensao,
       grupos,
       podeExecutar: autorizacao.auth.podeExecutar,
     });
@@ -62,6 +70,13 @@ interface Body {
   pai?: string | null;
   /** Chave do registro na mestre; só difere do nome em coleção (é o código). */
   chave?: string | null;
+  /**
+   * Grupos-alvo escolhidos na tela (subgrupo). Vazio/ausente = todos os grupos em
+   * que o nome existe. É o que a seleção por checkbox manda.
+   */
+  grupos?: string[] | null;
+  /** Vários alvos de inativar/reativar de uma vez (seleção de N nomes na tela). */
+  alvos?: Array<{ nome?: string; chave?: string | null; grupos?: string[] | null }> | null;
   obs?: string | null;
 }
 
@@ -97,6 +112,7 @@ export async function POST(request: Request) {
         pai: body.pai ?? null,
         codigoNovo: body.codigo ?? null,
         chave: body.chave ?? null,
+        grupos: lista(body.grupos),
       });
       return NextResponse.json({ impacto });
     }
@@ -119,6 +135,7 @@ export async function POST(request: Request) {
         nomeNovo: body.nomeNovo ?? '',
         pai: body.pai ?? null,
         chave: body.chave ?? null,
+        grupos: lista(body.grupos),
         obs: body.obs ?? null,
       });
       return NextResponse.json(resultado);
@@ -145,6 +162,16 @@ export async function POST(request: Request) {
         nome: body.nome ?? body.nomeAtual ?? '',
         pai: body.pai ?? null,
         chave: body.chave ?? null,
+        grupos: lista(body.grupos),
+        alvos: Array.isArray(body.alvos)
+          ? body.alvos
+              .map((a) => ({
+                nome: String(a?.nome ?? '').trim(),
+                chave: a?.chave ?? null,
+                grupos: lista(a?.grupos),
+              }))
+              .filter((a) => a.nome.length > 0)
+          : null,
         inativo: acao === 'inativar',
         obs: body.obs ?? null,
       });

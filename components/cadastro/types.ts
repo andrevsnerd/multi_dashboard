@@ -14,8 +14,18 @@ export interface DimensaoMeta {
   codigoMax: number;
   codigoObrigatorio: boolean;
   temPai: boolean;
+  temInativo: boolean;
   podeCriar: boolean;
   renomeiaComUso: boolean;
+}
+
+/** Um registro físico da mestre: no subgrupo, o par (grupo, subgrupo). */
+export interface DimensaoPar {
+  grupo: string;
+  codigo: string | null;
+  inativo: boolean;
+  produtos: number;
+  produtosEmpresa: number;
 }
 
 export interface DimensaoRow {
@@ -23,8 +33,14 @@ export interface DimensaoRow {
   /** Identifica o registro nas ações: o nome, ou o código quando o nome é descrição. */
   chave: string;
   codigo: string | null;
+  /** Grupo do subgrupo. `null` na linha agregada (o subgrupo vive em vários grupos). */
   pai: string | null;
+  /** Registros físicos da linha: um par por grupo no subgrupo. Vazio nas globais. */
+  pares: DimensaoPar[];
+  /** `true` quando todos os pares estão inativos. */
   inativo: boolean;
+  /** `true` quando só parte dos pares está inativa. */
+  inativoParcial: boolean;
   produtos: number;
   produtosEmpresa: number;
 }
@@ -37,12 +53,17 @@ export interface ImpactoDimensao {
   avisosCodigo: string[];
   avisosCopia: string[];
   bloqueadoPorUso: boolean;
+  /** Grupos que o rename vai tocar (subgrupo). */
+  gruposAfetados: string[];
+  /** Grupos onde o nome de destino já existe — esses bloqueiam. */
+  colisoes: string[];
 }
 
 export interface ResultadoDimensao {
   lote: string;
   ok: boolean;
   produtosAfetados: number;
+  gruposRenomeados: string[];
   mensagem: string;
   avisos: string[];
 }

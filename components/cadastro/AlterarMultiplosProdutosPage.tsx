@@ -64,9 +64,18 @@ export default function AlterarMultiplosProdutosPage({ companyKey }: Props) {
   // Alteração
   const [campoAlvo, setCampoAlvo] = useState("");
   const [novoValor, setNovoValor] = useState<ValorCampo>("");
+  /** Subgrupo de destino — só usado ao mover o produto de grupo (o par é validado junto). */
+  const [novoSubgrupo, setNovoSubgrupo] = useState("");
+  /** O usuário já escolheu o subgrupo à mão? Se sim, o palpite automático não mexe mais. */
+  const [subgrupoTocado, setSubgrupoTocado] = useState(false);
   const [valoresFiltro, setValoresFiltro] = useState<string[]>([]);
   const [distribuicaoExpandida, setDistribuicaoExpandida] = useState(false);
   const [verTodosDetalhes, setVerTodosDetalhes] = useState(false);
+  /**
+   * Produtos desmarcados na lista detalhada. Guardamos o que saiu, não o que ficou:
+   * o padrão é TODOS marcados, então uma busca nova já vem inteira selecionada.
+   */
+  const [desmarcados, setDesmarcados] = useState<string[]>([]);
 
   // Execução
   const [revisando, setRevisando] = useState(false);
@@ -180,6 +189,7 @@ export default function AlterarMultiplosProdutosPage({ companyKey }: Props) {
         setValoresFiltro([]);
         setDistribuicaoExpandida(false);
         setVerTodosDetalhes(false);
+        setDesmarcados([]);
         setNovoValor(campoDef?.tipo === "bool" ? false : "");
         setBuscouUmaVez(true);
       } catch {
@@ -232,16 +242,36 @@ export default function AlterarMultiplosProdutosPage({ companyKey }: Props) {
     return rows.filter((row) => valoresFiltro.includes(textoValor(row.valores[campoDef.campo] ?? null)));
   }, [rows, campoDef, filtroValorAtivo, valoresFiltro, textoValor]);
 
+  // ───────── camada de seleção (checkbox por produto) ─────────
+
+  /** Set derivado: `includes` num array seria O(n²) com 3.000 linhas. */
+  const desmarcadosSet = useMemo(() => new Set(desmarcados), [desmarcados]);
+
+  /** O que realmente vai ser alterado: passou pelo filtro de valor E está marcado. */
+  const selecionados = useMemo(
+    () => rowsFiltradas.filter((r) => !desmarcadosSet.has(r.produto)),
+    [rowsFiltradas, desmarcadosSet]
+  );
+
+  const todosMarcados = rowsFiltradas.length > 0 && selecionados.length === rowsFiltradas.length;
+
+  const alternarProduto = useCallback((produto: string) => {
+    setDesmarcados((prev) =>
+      prev.includes(produto) ? prev.filter((p) => p !== produto) : [...prev, produto]
+    );
+  }, []);
+
   // ───────── opções do valor novo ─────────
 
   /**
    * Grupos distintos na seleção. Importa porque o par (grupo, subgrupo) é validado
    * junto pela FK: para alterar SUBGRUPO em massa, o subgrupo escolhido tem que
-   * existir em TODOS os grupos presentes — daí a interseção.
+   * existir em TODOS os grupos presentes — daí a interseção. Sai dos SELECIONADOS:
+   * desmarcar o único item de um grupo tem de liberar mais subgrupos na lista.
    */
   const gruposNaSelecao = useMemo(
-    () => [...new Set(rowsFiltradas.map((r) => String(r.valores.GRUPO_PRODUTO ?? "")).filter(Boolean))],
-    [rowsFiltradas]
+    () => [...new Set(selecionados.map((r) => String(r.valores.GRUPO_PRODUTO ?? "")).filter(Boolean))],
+    [selecionados]
   );
 
   const opcoesValorNovo = useMemo(() => {
@@ -272,17 +302,45 @@ export default function AlterarMultiplosProdutosPage({ companyKey }: Props) {
   }, [campoDef, opcoes, gruposNaSelecao]);
 
   /**
-   * Ao trocar o GRUPO em massa, o subgrupo de cada item precisa existir no grupo
-   * destino. Contamos quantos itens ficariam órfãos — é o erro que a FK pegaria,
-   * mostrado antes em vez de virar "falha ao alterar".
+   * Mover produto de grupo é a única alteração que mexe em DOIS campos: a FK
+   * XFK12602 valida o PAR (grupo, subgrupo), então o subgrupo de destino faz parte
+   * da operação. Sem isso a alteração é um beco sem saída — trocar só o grupo é
+   * recusado pela FK, e trocar só o subgrupo antes também (o subgrupo de destino
+   * não existe no grupo de origem).
    */
-  const orfaosDoGrupoNovo = useMemo(() => {
-    if (!campoDef || campoDef.campo !== "GRUPO_PRODUTO" || !opcoes) return 0;
-    const destino = String(novoValor ?? "");
-    if (!destino) return 0;
-    const disponiveis = new Set(opcoes.subgruposPorGrupo[destino] ?? []);
-    return rowsFiltradas.filter((r) => !disponiveis.has(String(r.valores.SUBGRUPO_PRODUTO ?? ""))).length;
-  }, [campoDef, opcoes, novoValor, rowsFiltradas]);
+  const movendoGrupo = campoDef?.campo === "GRUPO_PRODUTO";
+  const grupoDestino = movendoGrupo ? String(novoValor ?? "").trim() : "";
+
+  const subgruposDoDestino = useMemo(
+    () => (grupoDestino && opcoes ? opcoes.subgruposPorGrupo[grupoDestino] ?? [] : []),
+    [grupoDestino, opcoes]
+  );
+
+  /**
+   * Se TODOS os selecionados já têm um subgrupo com o mesmo nome no grupo destino,
+   * pré-seleciona ele: o caso comum de reorganização mantém o subgrupo.
+   *
+   * `subgrupoTocado` existe para o palpite não atropelar a escolha do usuário —
+   * sem ele, desmarcar um produto depois de escolher o subgrupo zerava o campo.
+   */
+  useEffect(() => {
+    if (!movendoGrupo || !grupoDestino) {
+      setNovoSubgrupo("");
+      setSubgrupoTocado(false);
+      return;
+    }
+    if (subgrupoTocado) return;
+    const disponiveis = new Set(subgruposDoDestino);
+    const atuais = [
+      ...new Set(selecionados.map((r) => String(r.valores.SUBGRUPO_PRODUTO ?? "").trim())),
+    ];
+    setNovoSubgrupo(atuais.length === 1 && disponiveis.has(atuais[0]) ? atuais[0] : "");
+  }, [movendoGrupo, grupoDestino, subgruposDoDestino, selecionados, subgrupoTocado]);
+
+  // Trocar o grupo de destino devolve o palpite automático.
+  useEffect(() => {
+    setSubgrupoTocado(false);
+  }, [grupoDestino]);
 
   // ───────── alterações pendentes ─────────
 
@@ -290,10 +348,23 @@ export default function AlterarMultiplosProdutosPage({ companyKey }: Props) {
     if (!campoDef) return [];
     const alvo = campoDef.tipo === "bool" ? Boolean(novoValor) : String(novoValor ?? "").trim();
     if (campoDef.tipo !== "bool" && alvo === "") return [];
+    // Mover de grupo exige o subgrupo de destino escolhido.
+    if (movendoGrupo && !novoSubgrupo) return [];
 
-    return rowsFiltradas
-      .map((row) => ({ produto: row.produto, atual: row.valores[campoDef.campo] ?? null, novo: alvo }))
-      .filter(({ atual, novo }) => {
+    return selecionados
+      .map((row) => {
+        const subgrupoAtual = String(row.valores.SUBGRUPO_PRODUTO ?? "").trim();
+        return {
+          produto: row.produto,
+          atual: row.valores[campoDef.campo] ?? null,
+          novo: alvo,
+          subgrupoAtual: movendoGrupo ? subgrupoAtual : undefined,
+          subgrupoNovo: movendoGrupo ? novoSubgrupo : undefined,
+        };
+      })
+      .filter(({ atual, novo, subgrupoAtual, subgrupoNovo }) => {
+        // No movimento de grupo, mudar só o subgrupo já é uma alteração válida.
+        if (movendoGrupo && subgrupoAtual !== subgrupoNovo) return true;
         if (campoDef.tipo === "bool") return Boolean(atual) !== Boolean(novo);
         if (campoDef.tipo === "inteiro" || campoDef.tipo === "decimal") {
           const a = atual === null || atual === "" ? null : Number(atual);
@@ -302,7 +373,7 @@ export default function AlterarMultiplosProdutosPage({ companyKey }: Props) {
         }
         return String(atual ?? "").trim() !== String(novo).trim();
       });
-  }, [campoDef, novoValor, rowsFiltradas]);
+  }, [campoDef, novoValor, selecionados, movendoGrupo, novoSubgrupo]);
 
   const gravar = useCallback(async () => {
     if (!username || !campoDef || alteracoes.length === 0) return;
@@ -314,11 +385,19 @@ export default function AlterarMultiplosProdutosPage({ companyKey }: Props) {
         headers: { "Content-Type": "application/json", "x-auth-username": username },
         body: JSON.stringify({
           company: companyKey,
-          alteracoes: alteracoes.map((a) => ({
-            produto: a.produto,
-            campo: campoDef.campo,
-            valor: a.novo,
-          })),
+          // Mover de grupo vira DUAS alterações por produto: grupo e subgrupo. O
+          // backend valida o par resultante antes de tocar no banco.
+          alteracoes: alteracoes.flatMap((a) => {
+            const itens = [{ produto: a.produto, campo: campoDef.campo, valor: a.novo }];
+            if (a.subgrupoNovo !== undefined && a.subgrupoNovo !== a.subgrupoAtual) {
+              itens.push({
+                produto: a.produto,
+                campo: "SUBGRUPO_PRODUTO",
+                valor: a.subgrupoNovo,
+              });
+            }
+            return itens;
+          }),
           obs: obs.trim() || null,
         }),
       });
@@ -593,6 +672,35 @@ export default function AlterarMultiplosProdutosPage({ companyKey }: Props) {
                 {campoDef.nota && <span className={styles.campoNota}>{campoDef.nota}</span>}
               </label>
             )}
+
+            {/* Mover de grupo pede o subgrupo de destino: a FK valida o PAR. */}
+            {movendoGrupo && (
+              <label className={`${styles.campoTexto} ${!novoSubgrupo ? styles.campoAlterado : ""}`}>
+                <span className={styles.campoLabel}>Subgrupo de destino *</span>
+                <select
+                  className={styles.select}
+                  value={novoSubgrupo}
+                  onChange={(e) => {
+                    setNovoSubgrupo(e.target.value);
+                    setSubgrupoTocado(true);
+                  }}
+                  disabled={!grupoDestino}
+                >
+                  <option value="">
+                    {grupoDestino ? "escolha o subgrupo…" : "escolha o grupo primeiro"}
+                  </option>
+                  {subgruposDoDestino.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+                <span className={styles.campoNota}>
+                  No Linx o subgrupo pertence ao grupo, então mover de grupo é escolher o par de
+                  destino. {subgruposDoDestino.length} subgrupo(s) disponível(is).
+                </span>
+              </label>
+            )}
           </div>
 
           {campoDef?.campo === "SUBGRUPO_PRODUTO" && gruposNaSelecao.length > 1 && (
@@ -600,15 +708,23 @@ export default function AlterarMultiplosProdutosPage({ companyKey }: Props) {
               A seleção tem {gruposNaSelecao.length} grupos diferentes. Como o par grupo + subgrupo é
               validado junto no Linx, a lista acima mostra só os subgrupos que existem em{" "}
               <strong>todos</strong> eles ({opcoesValorNovo.length} opção(ões)). Para mais liberdade,
-              filtre por um grupo só.
+              filtre por um grupo só — ou use o campo <strong>Grupo</strong>, que move o par inteiro.
             </div>
           )}
 
-          {orfaosDoGrupoNovo > 0 && (
+          {movendoGrupo && grupoDestino && subgruposDoDestino.length === 0 && (
             <div className={styles.avisoBox}>
-              <strong>{orfaosDoGrupoNovo}</strong> item(ns) têm subgrupo que não existe no grupo{" "}
-              &quot;{String(novoValor)}&quot;. O Linx recusaria esses — ou crie o subgrupo nesse grupo (aba
-              Dimensões da tela Alterar Cadastro), ou altere o subgrupo desses itens primeiro.
+              O grupo <strong>{grupoDestino}</strong> não tem nenhum subgrupo cadastrado, então não há
+              par de destino possível. Crie um subgrupo nesse grupo na aba <strong>Dimensões</strong> da
+              tela Alterar Cadastro.
+            </div>
+          )}
+
+          {movendoGrupo && grupoDestino && !novoSubgrupo && subgruposDoDestino.length > 0 && (
+            <div className={styles.avisoBox}>
+              Escolha o <strong>subgrupo de destino</strong>. Trocar só o grupo é recusado pelo Linx:
+              o par (grupo, subgrupo) precisa existir, e o subgrupo atual dos itens não existe
+              necessariamente em <strong>{grupoDestino}</strong>.
             </div>
           )}
 
@@ -657,27 +773,50 @@ export default function AlterarMultiplosProdutosPage({ companyKey }: Props) {
               </div>
 
               <div className={styles.resumoLinha}>
-                Vão ser alterados: <strong>{alteracoes.length.toLocaleString("pt-BR")}</strong> item(ns)
+                <strong>{selecionados.length.toLocaleString("pt-BR")}</strong> de{" "}
+                {rowsFiltradas.length.toLocaleString("pt-BR")} marcado(s) ·{" "}
+                <strong>{alteracoes.length.toLocaleString("pt-BR")}</strong> vão mudar de valor
                 {filtroValorAtivo && (
                   <>
                     {" "}
-                    · filtro de valor ativo ({rowsFiltradas.length.toLocaleString("pt-BR")} no filtro)
+                    · filtro de valor ativo
                     <button type="button" className={styles.btnTexto} onClick={() => setValoresFiltro([])}>
                       limpar filtro
                     </button>
                   </>
                 )}
-                {alteracoes.length < rowsFiltradas.length && (
+                {alteracoes.length < selecionados.length && (
                   <span className={styles.dica}>
-                    ({(rowsFiltradas.length - alteracoes.length).toLocaleString("pt-BR")} já estão no valor)
+                    ({(selecionados.length - alteracoes.length).toLocaleString("pt-BR")} já estão no valor)
                   </span>
                 )}
+                {desmarcados.length > 0 && (
+                  <button type="button" className={styles.btnTexto} onClick={() => setDesmarcados([])}>
+                    marcar todos de novo
+                  </button>
+                )}
               </div>
+
+              <p className={styles.dica}>
+                Desmarque na lista os itens que não devem mudar. Só os marcados entram na alteração —
+                e a contagem, os grupos ofertados e o preview acompanham a seleção.
+              </p>
 
               <div className={styles.tabelaWrap}>
                 <table className={styles.tabelaFicha}>
                   <thead>
                     <tr>
+                      <th className={styles.thCheck}>
+                        <input
+                          type="checkbox"
+                          checked={todosMarcados}
+                          onChange={() =>
+                            // Marcar/desmarcar vale para TODOS os filtrados, não só os visíveis.
+                            setDesmarcados(todosMarcados ? rowsFiltradas.map((r) => r.produto) : [])
+                          }
+                          aria-label="Marcar todos os produtos"
+                        />
+                      </th>
                       <th className={styles.thFichaNum}>#</th>
                       <th>Produto</th>
                       <th>Descrição</th>
@@ -688,18 +827,36 @@ export default function AlterarMultiplosProdutosPage({ companyKey }: Props) {
                   </thead>
                   <tbody>
                     {(verTodosDetalhes ? rowsFiltradas : rowsFiltradas.slice(0, LIMITE_DETALHE)).map(
-                      (r, i) => (
-                        <tr key={r.produto}>
-                          <td className={styles.thFichaNum}>{i + 1}</td>
-                          <td className={styles.tdCodigo}>{r.produto}</td>
-                          <td className={styles.tdDesc}>{String(r.valores.DESC_PRODUTO ?? "")}</td>
-                          <td className={styles.tdDesc}>{String(r.valores.GRUPO_PRODUTO ?? "")}</td>
-                          <td className={styles.tdDesc}>{String(r.valores.SUBGRUPO_PRODUTO ?? "")}</td>
-                          <td className={styles.tdDesc}>
-                            {textoValor(r.valores[campoDef.campo] ?? null)}
-                          </td>
-                        </tr>
-                      )
+                      (r, i) => {
+                        const marcado = !desmarcadosSet.has(r.produto);
+                        return (
+                          <tr
+                            key={r.produto}
+                            className={marcado ? styles.trAlterada : ""}
+                            onClick={() => alternarProduto(r.produto)}
+                          >
+                            <td className={styles.thCheck}>
+                              <input
+                                type="checkbox"
+                                checked={marcado}
+                                onChange={() => alternarProduto(r.produto)}
+                                onClick={(e) => e.stopPropagation()}
+                                aria-label={`Marcar ${r.produto}`}
+                              />
+                            </td>
+                            <td className={styles.thFichaNum}>{i + 1}</td>
+                            <td className={styles.tdCodigo}>{r.produto}</td>
+                            <td className={styles.tdDesc}>{String(r.valores.DESC_PRODUTO ?? "")}</td>
+                            <td className={styles.tdDesc}>{String(r.valores.GRUPO_PRODUTO ?? "")}</td>
+                            <td className={styles.tdDesc}>
+                              {String(r.valores.SUBGRUPO_PRODUTO ?? "")}
+                            </td>
+                            <td className={styles.tdDesc}>
+                              {textoValor(r.valores[campoDef.campo] ?? null)}
+                            </td>
+                          </tr>
+                        );
+                      }
                     )}
                   </tbody>
                 </table>
@@ -717,14 +874,23 @@ export default function AlterarMultiplosProdutosPage({ companyKey }: Props) {
                   >
                     {verTodosDetalhes ? "mostrar menos" : "mostrar todos"}
                   </button>
-                  A alteração vale para os {alteracoes.length.toLocaleString("pt-BR")} itens, não só para
-                  os visíveis.
+                  O &quot;marcar todos&quot; do cabeçalho vale para os{" "}
+                  {rowsFiltradas.length.toLocaleString("pt-BR")} filtrados, não só para os visíveis —
+                  e a alteração vale para os {alteracoes.length.toLocaleString("pt-BR")} marcados.
                 </p>
               )}
 
               <div className={styles.aplicarBar}>
                 <span className={styles.campoLabel}>
-                  {campoDef.label} → {campoDef.tipo === "bool" ? (novoValor ? "Sim" : "Não") : String(novoValor ?? "") || "—"}
+                  {campoDef.label} →{" "}
+                  {campoDef.tipo === "bool"
+                    ? novoValor
+                      ? "Sim"
+                      : "Não"
+                    : String(novoValor ?? "") || "—"}
+                  {movendoGrupo && <> / {novoSubgrupo || "—"}</>}
+                  {" · "}
+                  {selecionados.length.toLocaleString("pt-BR")} item(ns) marcado(s)
                 </span>
                 <button
                   type="button"
@@ -763,12 +929,25 @@ export default function AlterarMultiplosProdutosPage({ companyKey }: Props) {
           <div className={styles.modal}>
             <h2 className={styles.cardTitle}>Preview das alterações</h2>
             <p className={styles.modalAviso}>
-              <strong>{alteracoes.length.toLocaleString("pt-BR")}</strong> produto(s) vão ter{" "}
-              <strong>{campoDef.label}</strong> gravado como{" "}
-              <strong>
-                {campoDef.tipo === "bool" ? (novoValor ? "Sim" : "Não") : String(novoValor ?? "")}
-              </strong>{" "}
-              no cadastro do Linx.
+              {movendoGrupo ? (
+                <>
+                  <strong>{alteracoes.length.toLocaleString("pt-BR")}</strong> produto(s) vão para{" "}
+                  <strong>
+                    {String(novoValor ?? "")} / {novoSubgrupo}
+                  </strong>{" "}
+                  no cadastro do Linx. Grupo e subgrupo são gravados juntos — a FK do Linx valida o
+                  par.
+                </>
+              ) : (
+                <>
+                  <strong>{alteracoes.length.toLocaleString("pt-BR")}</strong> produto(s) vão ter{" "}
+                  <strong>{campoDef.label}</strong> gravado como{" "}
+                  <strong>
+                    {campoDef.tipo === "bool" ? (novoValor ? "Sim" : "Não") : String(novoValor ?? "")}
+                  </strong>{" "}
+                  no cadastro do Linx.
+                </>
+              )}
             </p>
 
             <table className={styles.tabelaFicha}>
@@ -776,8 +955,8 @@ export default function AlterarMultiplosProdutosPage({ companyKey }: Props) {
                 <tr>
                   <th className={styles.thFichaNum}>#</th>
                   <th>Produto</th>
-                  <th>Valor atual</th>
-                  <th>Valor novo</th>
+                  <th>{movendoGrupo ? "Grupo / subgrupo atual" : "Valor atual"}</th>
+                  <th>{movendoGrupo ? "Grupo / subgrupo novo" : "Valor novo"}</th>
                 </tr>
               </thead>
               <tbody>
@@ -785,9 +964,15 @@ export default function AlterarMultiplosProdutosPage({ companyKey }: Props) {
                   <tr key={a.produto}>
                     <td className={styles.thFichaNum}>{i + 1}</td>
                     <td className={styles.tdCodigo}>{a.produto}</td>
-                    <td className={styles.tdDesc}>{textoValor(a.atual)}</td>
                     <td className={styles.tdDesc}>
-                      <strong>{campoDef.tipo === "bool" ? (a.novo ? "Sim" : "Não") : String(a.novo)}</strong>
+                      {textoValor(a.atual)}
+                      {movendoGrupo && <> / {a.subgrupoAtual || "—"}</>}
+                    </td>
+                    <td className={styles.tdDesc}>
+                      <strong>
+                        {campoDef.tipo === "bool" ? (a.novo ? "Sim" : "Não") : String(a.novo)}
+                        {movendoGrupo && <> / {a.subgrupoNovo}</>}
+                      </strong>
                     </td>
                   </tr>
                 ))}
