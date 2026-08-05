@@ -118,6 +118,11 @@ export const ROLE_RESTRICTED_PERMISSIONS: Partial<Record<PermissionKey, RoleKey[
   // Alterar Custo / Preco mexe em custo: mesma regra de CUSTO_VISIBLE_ROLES
   // (gerente e supervisor nunca veem custo). Diretor abre, mas e somente-leitura.
   "alterar-precos": ["admin", "diretor", "logistica"],
+  // Alterar Cadastro renomeia dimensao (grupo/subgrupo/linha), o que cascateia para
+  // milhares de produtos e desalinha regras que casam por nome. Ato estrutural:
+  // mesmo conjunto restrito, com diretor entrando somente-leitura.
+  "alterar-cadastro": ["admin", "diretor", "logistica"],
+  "alterar-produtos-massa": ["admin", "diretor", "logistica"],
   // Área corporativo é exclusiva do admin, diretor e do cliente_corporativo. Supervisor/gerente/logística
   // nunca acessam, pois roleAllowsPermission barra.
   "clientes-corporativos": ["admin", "diretor", "cliente_corporativo"],

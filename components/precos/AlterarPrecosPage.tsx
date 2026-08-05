@@ -126,6 +126,9 @@ interface LinhaTabela {
 
 // ───────────────────────── helpers ─────────────────────────
 
+/** Linhas visíveis da lista detalhada antes de pedir "mostrar todos". */
+const LIMITE_DETALHE = 300;
+
 function parseValor(texto: string): number | null {
   const t = (texto ?? "").trim();
   if (!t) return null;
@@ -150,6 +153,11 @@ function separarCodigos(texto: string): string[] {
     .split(/[\s,;]+/)
     .map((t) => t.trim())
     .filter(Boolean);
+}
+
+/** Chave do filtro de valor: `T::01::PRECO1||148.00`. */
+function chaveValor(campoKey: string, valor: number): string {
+  return `${campoKey}||${valor.toFixed(2)}`;
 }
 
 function dataCurta(iso: string): string {
@@ -200,7 +208,22 @@ export default function AlterarPrecosPage({ companyKey }: Props) {
   // O script só aceitava UMA tabela por vez; aqui dá para marcar quantas quiser.
   const [tabelasEscolhidas, setTabelasEscolhidas] = useState<string[]>([]);
   const [novoValorMassa, setNovoValorMassa] = useState("");
-  const [detalhar, setDetalhar] = useState(false);
+
+  /**
+   * Filtro por faixa de valor: chaves `campoKey||valor`. Marcar "493 itens: R$ 148,00"
+   * restringe a lista detalhada e a alteração APENAS a esses 493 itens.
+   */
+  const [valoresFiltro, setValoresFiltro] = useState<string[]>([]);
+  /** Tabelas cuja distribuição está com todos os valores à vista (a lista corta em 8). */
+  const [valoresExpandidos, setValoresExpandidos] = useState<string[]>([]);
+  /** A lista detalhada mostra as 300 primeiras linhas até pedirem o resto. */
+  const [verTodosDetalhes, setVerTodosDetalhes] = useState(false);
+  /**
+   * Última camada de filtro: item a item na lista detalhada. Guardamos quem foi
+   * DESMARCADO (e não quem está marcado) para o padrão ser sempre "todos ligados",
+   * inclusive quando a lista muda de tamanho.
+   */
+  const [produtosExcluidos, setProdutosExcluidos] = useState<string[]>([]);
 
   /**
    * Por padrão a lista mostra o mesmo que a aba "Tabela de Preços" do Linx: só tabelas
@@ -353,7 +376,10 @@ export default function AlterarPrecosPage({ companyKey }: Props) {
         setNovoValor("");
         setTabelasEscolhidas([]);
         setNovoValorMassa("");
-        setDetalhar(false);
+        setValoresFiltro([]);
+        setValoresExpandidos([]);
+        setVerTodosDetalhes(false);
+        setProdutosExcluidos([]);
         setBuscouUmaVez(true);
       } catch {
         setErro("Falha de conexão ao buscar produtos.");
@@ -470,7 +496,11 @@ export default function AlterarPrecosPage({ companyKey }: Props) {
     [linhasTabela, tabelasEscolhidas]
   );
 
-  /** Distribuição de valores de cada tabela marcada (ex.: "80 itens: R$ 198,00"). */
+  /**
+   * Distribuição de valores de cada tabela marcada (ex.: "80 itens: R$ 198,00").
+   * A contagem é sempre sobre TODOS os itens carregados — é o universo de escolha,
+   * senão marcar um valor zeraria os outros e não daria para trocar de faixa.
+   */
   const distribuicoes = useMemo(() => {
     return tabelasAtuais.map((tabela) => {
       const mapa = new Map<number, number>();
@@ -480,11 +510,58 @@ export default function AlterarPrecosPage({ companyKey }: Props) {
         mapa.set(v, (mapa.get(v) ?? 0) + 1);
       }
       const valores = [...mapa.entries()]
-        .map(([valor, qtd]) => ({ valor, qtd }))
+        .map(([valor, qtd]) => ({ valor, qtd, chave: chaveValor(tabela.campoKey, valor) }))
         .sort((a, b) => b.valor - a.valor);
       return { tabela, valores };
     });
   }, [tabelasAtuais, rows, temRegistro, valorDe]);
+
+  /** Valores marcados, agrupados por tabela — só das tabelas que continuam marcadas. */
+  const filtroPorTabela = useMemo(() => {
+    const mapa = new Map<string, Set<string>>();
+    for (const chave of valoresFiltro) {
+      const corte = chave.lastIndexOf("||");
+      if (corte < 0) continue;
+      const campoKey = chave.slice(0, corte);
+      if (!tabelasEscolhidas.includes(campoKey)) continue;
+      const atual = mapa.get(campoKey) ?? new Set<string>();
+      atual.add(chave.slice(corte + 2));
+      mapa.set(campoKey, atual);
+    }
+    return mapa;
+  }, [valoresFiltro, tabelasEscolhidas]);
+
+  const filtroValorAtivo = filtroPorTabela.size > 0;
+
+  /** Itens que passam pelo filtro de valor. Sem filtro, é a lista inteira. */
+  const rowsFiltradas = useMemo(() => {
+    if (!filtroValorAtivo) return rows;
+    const entradas = [...filtroPorTabela.entries()];
+    return rows.filter((row) =>
+      entradas.every(([campoKey, valores]) => {
+        if (!temRegistro(row, campoKey)) return false;
+        const v = Math.round((valorDe(row, campoKey) ?? 0) * 100) / 100;
+        return valores.has(v.toFixed(2));
+      })
+    );
+  }, [rows, filtroValorAtivo, filtroPorTabela, temRegistro, valorDe]);
+
+  // Trocar de tabela ou de faixa de valor recompõe a lista: a seleção item a item
+  // volta ao padrão (todos marcados) em vez de arrastar exclusões de outra lista.
+  useEffect(() => {
+    setProdutosExcluidos([]);
+  }, [valoresFiltro, tabelasEscolhidas]);
+
+  const excluidosSet = useMemo(() => new Set(produtosExcluidos), [produtosExcluidos]);
+
+  /** Itens que passam pelo filtro de valor E continuam marcados na lista detalhada. */
+  const rowsSelecionadas = useMemo(
+    () => (excluidosSet.size === 0 ? rowsFiltradas : rowsFiltradas.filter((r) => !excluidosSet.has(r.produto))),
+    [rowsFiltradas, excluidosSet]
+  );
+
+  const todosItensMarcados = rowsFiltradas.length > 0 && rowsSelecionadas.length === rowsFiltradas.length;
+  const nenhumItemMarcado = rowsSelecionadas.length === 0;
 
   // ───────── alterações pendentes ─────────
 
@@ -521,7 +598,8 @@ export default function AlterarPrecosPage({ companyKey }: Props) {
     const valor = parseValor(novoValorMassa);
     if (valor === null) return lista;
     for (const tabela of tabelasAtuais) {
-      for (const row of rows) {
+      // rowsSelecionadas: faixa de valor marcada, menos os itens desmarcados na lista.
+      for (const row of rowsSelecionadas) {
         if (!temRegistro(row, tabela.campoKey)) continue;
         const atual = valorDe(row, tabela.campoKey);
         if (mesmoValor(atual, valor)) continue;
@@ -538,7 +616,7 @@ export default function AlterarPrecosPage({ companyKey }: Props) {
     return lista;
   }, [
     produtoUnico, novoValor, linhasCusto, linhasSelecionadas,
-    tabelasAtuais, novoValorMassa, rows, temRegistro, valorDe,
+    tabelasAtuais, novoValorMassa, rowsSelecionadas, temRegistro, valorDe,
   ]);
 
   // ───────── execução ─────────
@@ -620,9 +698,30 @@ export default function AlterarPrecosPage({ companyKey }: Props) {
     linhasTabela.length > 0 && linhasTabela.every((t) => tabelasEscolhidas.includes(t.campoKey));
 
   const alternarTabela = (campoKey: string) => {
-    setTabelasEscolhidas((prev) =>
-      prev.includes(campoKey) ? prev.filter((k) => k !== campoKey) : [...prev, campoKey]
+    setTabelasEscolhidas((prev) => {
+      if (!prev.includes(campoKey)) return [...prev, campoKey];
+      // Desmarcar a tabela leva embora o filtro de valor dela.
+      setValoresFiltro((valores) => valores.filter((v) => !v.startsWith(`${campoKey}||`)));
+      return prev.filter((k) => k !== campoKey);
+    });
+  };
+
+  const alternarValor = (chave: string) => {
+    setValoresFiltro((prev) =>
+      prev.includes(chave) ? prev.filter((k) => k !== chave) : [...prev, chave]
     );
+    setVerTodosDetalhes(false);
+  };
+
+  const alternarItem = (produto: string) => {
+    setProdutosExcluidos((prev) =>
+      prev.includes(produto) ? prev.filter((p) => p !== produto) : [...prev, produto]
+    );
+  };
+
+  /** Cabeçalho da lista: liga todos ou desliga todos (inclusive os fora das 300 visíveis). */
+  const alternarTodosItens = () => {
+    setProdutosExcluidos(todosItensMarcados ? rowsFiltradas.map((r) => r.produto) : []);
   };
 
   return (
@@ -860,6 +959,7 @@ export default function AlterarPrecosPage({ companyKey }: Props) {
 
           <p className={styles.dica}>
             Marque uma, várias ou todas as tabelas. O mesmo valor vai para todas as marcadas.
+            Depois, se quiser, marque uma faixa de preço na distribuição para alterar só aqueles itens.
           </p>
 
           <table className={styles.tabelaFicha}>
@@ -869,9 +969,10 @@ export default function AlterarPrecosPage({ companyKey }: Props) {
                   <input
                     type="checkbox"
                     checked={todasTabelasMarcadas}
-                    onChange={() =>
-                      setTabelasEscolhidas(todasTabelasMarcadas ? [] : linhasTabela.map((t) => t.campoKey))
-                    }
+                    onChange={() => {
+                      setTabelasEscolhidas(todasTabelasMarcadas ? [] : linhasTabela.map((t) => t.campoKey));
+                      if (todasTabelasMarcadas) setValoresFiltro([]);
+                    }}
                     aria-label="Marcar todas as tabelas"
                   />
                 </th>
@@ -915,65 +1016,174 @@ export default function AlterarPrecosPage({ companyKey }: Props) {
 
           {tabelasAtuais.length > 0 && (
             <>
-              {distribuicoes.map(({ tabela, valores }) => (
-                <div key={tabela.campoKey} className={styles.distribuicao}>
-                  <div className={styles.distribuicaoTitulo}>
-                    TABELA: {tabela.desc} ({tabela.cod}) · {tabela.tipo}
-                  </div>
-                  {valores.slice(0, 8).map((d) => (
-                    <div key={d.valor} className={styles.distribuicaoLinha}>
-                      {d.qtd.toLocaleString("pt-BR")} itens: R$ {fmt(d.valor)}
+              {distribuicoes.map(({ tabela, valores }) => {
+                const expandido = valoresExpandidos.includes(tabela.campoKey);
+                const visiveis = expandido ? valores : valores.slice(0, 8);
+                const marcadosAqui = valores.filter((d) => valoresFiltro.includes(d.chave));
+                return (
+                  <div key={tabela.campoKey} className={styles.distribuicao}>
+                    <div className={styles.distribuicaoTitulo}>
+                      TABELA: {tabela.desc} ({tabela.cod}) · {tabela.tipo}
                     </div>
-                  ))}
-                  {valores.length > 8 && (
-                    <div className={styles.distribuicaoLinha}>… mais {valores.length - 8} valor(es)</div>
-                  )}
-                  <div className={styles.distribuicaoTotal}>
-                    Total: {tabela.itens.toLocaleString("pt-BR")} itens
+                    {visiveis.map((d) => {
+                      const marcado = valoresFiltro.includes(d.chave);
+                      return (
+                        <label
+                          key={d.chave}
+                          className={`${styles.distribuicaoLinha} ${styles.distribuicaoCheck} ${
+                            marcado ? styles.distribuicaoMarcada : ""
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={marcado}
+                            onChange={() => alternarValor(d.chave)}
+                          />
+                          {d.qtd.toLocaleString("pt-BR")} itens: R$ {fmt(d.valor)}
+                        </label>
+                      );
+                    })}
+                    {valores.length > 8 && (
+                      <button
+                        type="button"
+                        className={styles.btnTexto}
+                        onClick={() =>
+                          setValoresExpandidos((prev) =>
+                            prev.includes(tabela.campoKey)
+                              ? prev.filter((k) => k !== tabela.campoKey)
+                              : [...prev, tabela.campoKey]
+                          )
+                        }
+                      >
+                        {expandido
+                          ? "mostrar só os 8 maiores"
+                          : `… mais ${valores.length - 8} valor(es)`}
+                      </button>
+                    )}
+                    <div className={styles.distribuicaoTotal}>
+                      Total: {tabela.itens.toLocaleString("pt-BR")} itens
+                      {marcadosAqui.length > 0 && (
+                        <>
+                          {" "}
+                          · filtrando {marcadosAqui.length} valor(es):{" "}
+                          <strong>
+                            {marcadosAqui
+                              .reduce((acc, d) => acc + d.qtd, 0)
+                              .toLocaleString("pt-BR")}{" "}
+                            itens
+                          </strong>
+                        </>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
 
-              <button type="button" className={styles.btnTexto} onClick={() => setDetalhar((v) => !v)}>
-                {detalhar ? "ocultar lista detalhada" : "detalhar"}
-              </button>
+              <div className={styles.resumoLinha}>
+                Lista detalhada:{" "}
+                <strong>{rowsSelecionadas.length.toLocaleString("pt-BR")}</strong> de{" "}
+                {rowsFiltradas.length.toLocaleString("pt-BR")} item(ns) marcado(s)
+                {filtroValorAtivo && (
+                  <>
+                    {" "}
+                    · filtro de valor ativo ({rows.length.toLocaleString("pt-BR")} carregados)
+                    <button type="button" className={styles.btnTexto} onClick={() => setValoresFiltro([])}>
+                      limpar filtro de valor
+                    </button>
+                  </>
+                )}
+                {excluidosSet.size > 0 && (
+                  <button type="button" className={styles.btnTexto} onClick={() => setProdutosExcluidos([])}>
+                    marcar todos de novo
+                  </button>
+                )}
+              </div>
 
-              {detalhar && (
-                <div className={styles.tabelaWrap}>
-                  <table className={styles.tabelaFicha}>
-                    <thead>
-                      <tr>
-                        <th className={styles.thFichaNum}>#</th>
-                        <th>Produto</th>
-                        <th>Descrição</th>
-                        {tabelasAtuais.map((t) => (
-                          <th key={t.campoKey} className={styles.thNum}>
-                            {t.cod} · {t.tipo}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rows.map((r, i) => (
-                        <tr key={r.produto}>
-                          <td className={styles.thFichaNum}>{i + 1}</td>
-                          <td className={styles.tdCodigo}>{r.produto}</td>
-                          <td className={styles.tdDesc}>{r.descricao}</td>
-                          {tabelasAtuais.map((t) => (
-                            <td key={t.campoKey} className={styles.thNum}>
-                              {temRegistro(r, t.campoKey) ? `R$ ${fmt(valorDe(r, t.campoKey))}` : "—"}
-                            </td>
-                          ))}
-                        </tr>
+              <div className={styles.tabelaWrap}>
+                <table className={styles.tabelaFicha}>
+                  <thead>
+                    <tr>
+                      <th className={styles.thCheck}>
+                        <input
+                          type="checkbox"
+                          checked={todosItensMarcados}
+                          ref={(el) => {
+                            if (el) el.indeterminate = !todosItensMarcados && !nenhumItemMarcado;
+                          }}
+                          onChange={alternarTodosItens}
+                          aria-label="Marcar ou desmarcar todos os itens"
+                        />
+                      </th>
+                      <th className={styles.thFichaNum}>#</th>
+                      <th>Produto</th>
+                      <th>Descrição</th>
+                      {tabelasAtuais.map((t) => (
+                        <th key={t.campoKey} className={styles.thNum}>
+                          {t.cod} · {t.tipo}
+                        </th>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(verTodosDetalhes ? rowsFiltradas : rowsFiltradas.slice(0, LIMITE_DETALHE)).map(
+                      (r, i) => {
+                        const marcado = !excluidosSet.has(r.produto);
+                        return (
+                          <tr key={r.produto} className={marcado ? "" : styles.trDesmarcada}>
+                            <td className={styles.thCheck}>
+                              <input
+                                type="checkbox"
+                                checked={marcado}
+                                onChange={() => alternarItem(r.produto)}
+                                aria-label={`Alterar ${r.produto}`}
+                              />
+                            </td>
+                            <td className={styles.thFichaNum}>{i + 1}</td>
+                            <td className={styles.tdCodigo}>{r.produto}</td>
+                            <td className={styles.tdDesc}>{r.descricao}</td>
+                            {tabelasAtuais.map((t) => (
+                              <td key={t.campoKey} className={styles.thNum}>
+                                {temRegistro(r, t.campoKey) ? `R$ ${fmt(valorDe(r, t.campoKey))}` : "—"}
+                              </td>
+                            ))}
+                          </tr>
+                        );
+                      }
+                    )}
+                    {rowsFiltradas.length === 0 && (
+                      <tr>
+                        <td colSpan={4 + tabelasAtuais.length} className={styles.dica}>
+                          Nenhum item nesse filtro de valor.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {rowsFiltradas.length > LIMITE_DETALHE && (
+                <p className={styles.dica}>
+                  {verTodosDetalhes
+                    ? `Mostrando todos os ${rowsFiltradas.length.toLocaleString("pt-BR")} itens.`
+                    : `Mostrando os ${LIMITE_DETALHE} primeiros de ${rowsFiltradas.length.toLocaleString("pt-BR")}.`}
+                  <button
+                    type="button"
+                    className={styles.btnTexto}
+                    onClick={() => setVerTodosDetalhes((v) => !v)}
+                  >
+                    {verTodosDetalhes ? "mostrar menos" : "mostrar todos"}
+                  </button>
+                  {" "}A alteração vale para os {rowsSelecionadas.length.toLocaleString("pt-BR")} itens
+                  marcados, não só para os visíveis.
+                </p>
               )}
 
               <div className={styles.aplicarBar}>
                 <span className={styles.campoLabel}>
-                  Novo valor para {tabelasAtuais.length === 1 ? "a tabela marcada" : `as ${tabelasAtuais.length} tabelas marcadas`}
+                  Novo valor para{" "}
+                  {tabelasAtuais.length === 1 ? "a tabela marcada" : `as ${tabelasAtuais.length} tabelas marcadas`}
+                  {(filtroValorAtivo || excluidosSet.size > 0) &&
+                    ` · ${rowsSelecionadas.length.toLocaleString("pt-BR")} item(ns) marcado(s)`}
                 </span>
                 <input
                   className={styles.inputValor}

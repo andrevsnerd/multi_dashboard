@@ -1,6 +1,6 @@
-/* Alterar Custo / Preço — layout enxuto, na leitura do script:
-   listas numeradas e densas, números alinhados à direita em monoespaçada.
-   Usa os tokens globais direto, então o tema noturno vem quase de graça. */
+/* Alterar Cadastro / Alterar Múltiplos Produtos.
+   Mesma linguagem visual da tela Alterar Custo / Preço: listas densas, números em
+   monoespaçada, tokens globais direto (o tema noturno vem quase de graça). */
 
 .wrapper {
   width: 100%;
@@ -21,6 +21,13 @@
   font-size: 26px;
   font-weight: 700;
   margin: 0;
+}
+.subtitulo {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--t-600);
+  max-width: 900px;
 }
 .avisoTopo {
   font-size: 13px;
@@ -65,6 +72,7 @@
   padding: 4px;
   border-radius: 10px;
   align-self: flex-start;
+  flex-wrap: wrap;
 }
 .tab {
   border: none;
@@ -82,7 +90,7 @@
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
 }
 
-/* ── filtros ── */
+/* ── campos ── */
 
 .filtros {
   display: grid;
@@ -94,6 +102,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
 }
 .campoLabel {
   font-size: 12px;
@@ -104,7 +113,7 @@
 }
 .input,
 .textarea,
-.inputValor {
+.select {
   width: 100%;
   padding: 9px 11px;
   border: 1px solid var(--b-300);
@@ -120,17 +129,23 @@
   font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
   font-size: 13px;
 }
-.inputValor {
-  width: 150px;
-  text-align: right;
-  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
-}
 .input:focus,
 .textarea:focus,
-.inputValor:focus {
+.select:focus {
   outline: 2px solid var(--ring-accent);
   outline-offset: 0;
   border-color: transparent;
+}
+.input:disabled,
+.select:disabled {
+  background: var(--s-50);
+  color: var(--t-500);
+  cursor: not-allowed;
+}
+.inputCurto {
+  width: 110px;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  text-transform: uppercase;
 }
 .codigosBox {
   display: flex;
@@ -141,6 +156,12 @@
   font-size: 13px;
   color: var(--t-500);
   margin: 0;
+  line-height: 1.5;
+}
+.contador {
+  font-size: 11.5px;
+  color: var(--t-400);
+  font-variant-numeric: tabular-nums;
 }
 .toggles {
   display: flex;
@@ -163,7 +184,15 @@
   border-radius: 5px;
   background: rgba(244, 63, 94, 0.12);
   color: #dc2626;
-  margin-left: 6px;
+}
+.badgeNeutro {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--s-100);
+  color: var(--t-600);
 }
 
 /* ── ações ── */
@@ -176,7 +205,8 @@
   flex-wrap: wrap;
 }
 .btnPrimario,
-.btnPerigo {
+.btnPerigo,
+.btnSecundario {
   border: none;
   border-radius: 9px;
   padding: 10px 20px;
@@ -192,8 +222,14 @@
   background: #dc2626;
   color: #ffffff;
 }
+.btnSecundario {
+  background: var(--s-100);
+  color: var(--t-900);
+  border: 1px solid var(--b-300);
+}
 .btnPrimario:disabled,
-.btnPerigo:disabled {
+.btnPerigo:disabled,
+.btnSecundario:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -210,8 +246,17 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+.btnTextoPerigo {
+  color: #dc2626;
+}
+.acoesLinha {
+  display: flex;
+  gap: 2px;
+  justify-content: flex-end;
+  white-space: nowrap;
+}
 
-/* ── barra "novo valor" (mesma pergunta que o script faz no fim) ── */
+/* ── barra de aplicação ── */
 
 .aplicarBar {
   display: flex;
@@ -227,7 +272,7 @@
   align-self: center;
 }
 
-/* ── listas numeradas (custos disponíveis, tabelas, preview) ── */
+/* ── tabelas ── */
 
 .tabelaWrap {
   overflow-x: auto;
@@ -274,19 +319,14 @@
 .tabelaFicha tbody tr:hover {
   background: var(--s-50);
 }
-.tabelaFicha tbody tr {
-  cursor: default;
-}
 .trAlterada {
   background: rgba(234, 179, 8, 0.1);
 }
 .trAlterada:hover {
   background: rgba(234, 179, 8, 0.15);
 }
-/* item desmarcado na lista detalhada: fica visível, mas fora da alteração */
-.trDesmarcada {
-  opacity: 0.45;
-  text-decoration: line-through;
+.trInativa td {
+  color: var(--t-500);
 }
 .thCheck {
   width: 34px;
@@ -324,7 +364,7 @@
   color: var(--t-400);
 }
 
-/* ── identificação do produto ── */
+/* ── ficha do produto (aba 2) ── */
 
 .fichaHead {
   display: flex;
@@ -341,56 +381,60 @@
   font-size: 14px;
   color: var(--t-600);
 }
+.fichaGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+.campoAlterado .input,
+.campoAlterado .select {
+  border-color: #eab308;
+  background: rgba(234, 179, 8, 0.08);
+}
+.campoNota {
+  font-size: 11.5px;
+  color: var(--t-500);
+  line-height: 1.45;
+}
+.campoBloqueado {
+  font-size: 11.5px;
+  color: #b45309;
+  line-height: 1.45;
+}
 
-/* ── distribuição de valores do modo em massa ── */
+/* ── caixa de impacto do rename ── */
 
-.distribuicao {
+.impacto {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding: 12px 14px;
+  gap: 8px;
+  padding: 14px;
   border-radius: 10px;
   border: 1px solid var(--b-200);
   background: var(--s-50);
-  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
-  font-size: 13px;
-  align-items: flex-start;
-}
-.distribuicaoTitulo {
-  font-weight: 700;
-  margin-bottom: 4px;
-}
-.distribuicaoLinha {
+  font-size: 13.5px;
   color: var(--t-700);
 }
-/* linha da distribuição virou filtro: checkbox + faixa de valor clicável */
-.distribuicaoCheck {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  padding: 2px 6px;
-  margin-left: -6px;
-  border-radius: 6px;
-}
-.distribuicaoCheck:hover {
-  background: var(--s-blue50);
-}
-.distribuicaoCheck input {
-  cursor: pointer;
-  margin: 0;
-}
-.distribuicaoMarcada {
-  background: var(--s-blue50);
-  color: var(--t-900);
+.impactoNumero {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
   font-weight: 700;
+  color: var(--t-900);
 }
-.distribuicaoTotal {
-  margin-top: 4px;
-  padding-top: 6px;
-  border-top: 1px solid var(--b-200);
-  width: 100%;
-  color: var(--t-600);
+.impactoLista {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.impactoBloqueio {
+  border-color: rgba(244, 63, 94, 0.4);
+  background: rgba(244, 63, 94, 0.08);
+  color: #b91c1c;
+}
+.impactoAlerta {
+  border-color: rgba(234, 179, 8, 0.45);
+  background: rgba(234, 179, 8, 0.1);
+  color: var(--t-700);
 }
 
 /* ── resultado / histórico ── */
@@ -437,6 +481,7 @@
   border-radius: 10px;
   padding: 12px 14px;
   font-size: 13.5px;
+  line-height: 1.5;
 }
 .avisoBox {
   border: 1px solid rgba(234, 179, 8, 0.4);
@@ -445,9 +490,10 @@
   border-radius: 10px;
   padding: 12px 14px;
   font-size: 13.5px;
+  line-height: 1.5;
 }
 
-/* ── modal de preview ── */
+/* ── modal ── */
 
 .modalOverlay {
   position: fixed;
@@ -483,17 +529,29 @@
   align-items: center;
   gap: 12px;
 }
+.confirmacaoTexto {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 
 /* ── tema noturno: só as tintas que não vêm de token ── */
 
 :global(:root[data-theme="dark"]) .textoErro,
 :global(:root[data-theme="dark"]) .erroBox,
 :global(:root[data-theme="dark"]) .listaErros,
+:global(:root[data-theme="dark"]) .impactoBloqueio,
 :global(:root[data-theme="dark"]) .badgeInativa {
   color: #fb7185;
 }
 :global(:root[data-theme="dark"]) .btnTexto {
   color: #60a5fa;
+}
+:global(:root[data-theme="dark"]) .btnTextoPerigo {
+  color: #fb7185;
+}
+:global(:root[data-theme="dark"]) .campoBloqueado {
+  color: #fbbf24;
 }
 :global(:root[data-theme="dark"]) .modalOverlay {
   background: rgba(2, 6, 23, 0.7);

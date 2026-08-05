@@ -108,6 +108,10 @@ export default function Sidebar({ companyName }: SidebarProps) {
     basePath && basePath !== "/" ? `${basePath}/aumentos-descontos` : "/aumentos-descontos";
   const alterarPrecosHref =
     basePath && basePath !== "/" ? `${basePath}/alterar-precos` : "/alterar-precos";
+  const alterarCadastroHref =
+    basePath && basePath !== "/" ? `${basePath}/alterar-cadastro` : "/alterar-cadastro";
+  const alterarProdutosMassaHref =
+    basePath && basePath !== "/" ? `${basePath}/alterar-produtos-massa` : "/alterar-produtos-massa";
   const geradorApresentacoesHref =
     basePath && basePath !== "/" ? `${basePath}/gerador-apresentacoes` : "/gerador-apresentacoes";
   const fornecedoresHref =
@@ -275,6 +279,8 @@ export default function Sidebar({ companyName }: SidebarProps) {
     "/gerador-relatorios",
     "/aumentos-descontos",
     "/alterar-precos",
+    "/alterar-cadastro",
+    "/alterar-produtos-massa",
     "/gerador-apresentacoes",
     "/mapa-clientes",
     "/sincronizacao",
@@ -577,6 +583,30 @@ export default function Sidebar({ companyName }: SidebarProps) {
           isActive: (currentPathname) =>
             matchesSegment(currentPathname, "/alterar-precos", alterarPrecosHref),
         },
+        ...(isScarfme || isNerd
+          ? [
+              {
+                key: "alterar-cadastro",
+                label: "Alterar Cadastro",
+                href: alterarCadastroHref,
+                permission: "alterar-cadastro" as const,
+                isActive: (currentPathname: string | null) =>
+                  matchesSegment(currentPathname, "/alterar-cadastro", alterarCadastroHref),
+              },
+              {
+                key: "alterar-produtos-massa",
+                label: "Alterar Múltiplos Produtos",
+                href: alterarProdutosMassaHref,
+                permission: "alterar-produtos-massa" as const,
+                isActive: (currentPathname: string | null) =>
+                  matchesSegment(
+                    currentPathname,
+                    "/alterar-produtos-massa",
+                    alterarProdutosMassaHref
+                  ),
+              },
+            ]
+          : []),
         ...(isScarfme || isNerd
           ? [
               {
