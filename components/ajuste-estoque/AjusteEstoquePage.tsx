@@ -5,7 +5,7 @@ import type { CompanyKey } from "@/lib/config/company";
 import { useAuth } from "@/components/auth/AuthContext";
 
 import styles from "./AjusteEstoquePage.module.css";
-import ZerarItemPanel from "./ZerarItemPanel";
+import AjustarItemPanel from "./AjustarItemPanel";
 
 interface FilialAjuste {
   cod: string;
@@ -100,7 +100,7 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
   const [carregandoFiliais, setCarregandoFiliais] = useState(true);
   const [filialCod, setFilialCod] = useState("");
   const [modo, setModo] = useState<Modo>("inventario");
-  const [view, setView] = useState<"contagem" | "zerarItem">("contagem");
+  const [view, setView] = useState<"contagem" | "item">("item");
   const [dataContagem, setDataContagem] = useState(hojeISO());
   const [nomeContagem, setNomeContagem] = useState("");
   const [nomeEditado, setNomeEditado] = useState(false);
@@ -350,9 +350,9 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
         <h1 className={styles.title}>Ajuste de Estoque</h1>
         <p className={styles.subtitle}>
           Ajuste registrado de estoque — {companyName}. Cria uma contagem nativa no Linx
-          (aparece no extrato do produto, com descrição, responsável e histórico). Por
-          inventário (arquivo), zerando a filial inteira ou zerando itens específicos em
-          todas as filiais.
+          (aparece no extrato do produto, com descrição, responsável e histórico). Item a
+          item, definindo a quantidade exata por filial (zerar = quantidade 0), zerando a
+          filial inteira ou por inventário (arquivo).
         </p>
       </header>
 
@@ -360,15 +360,15 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
       <div className={styles.modoTabs}>
         <button
           type="button"
-          className={`${styles.modoTab} ${
-            view === "contagem" && modo === "inventario" ? styles.modoTabAtivo : ""
-          }`}
+          className={`${styles.modoTab} ${view === "item" ? styles.modoTabAtivo : ""}`}
           onClick={() => {
-            setView("contagem");
-            setModo("inventario");
+            setView("item");
+            setPreview(null);
+            setResultado(null);
+            setErro(null);
           }}
         >
-          📋 Inventário (arquivo)
+          🎯 Ajustar item
         </button>
         <button
           type="button"
@@ -384,20 +384,20 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
         </button>
         <button
           type="button"
-          className={`${styles.modoTab} ${view === "zerarItem" ? styles.modoTabAtivo : ""}`}
+          className={`${styles.modoTab} ${
+            view === "contagem" && modo === "inventario" ? styles.modoTabAtivo : ""
+          }`}
           onClick={() => {
-            setView("zerarItem");
-            setPreview(null);
-            setResultado(null);
-            setErro(null);
+            setView("contagem");
+            setModo("inventario");
           }}
         >
-          🎯 Zerar item
+          📋 Inventário (arquivo)
         </button>
       </div>
 
-      {view === "zerarItem" && (
-        <ZerarItemPanel companyKey={companyKey} username={username} onExecuted={fetchRecentes} />
+      {view === "item" && (
+        <AjustarItemPanel companyKey={companyKey} username={username} onExecuted={fetchRecentes} />
       )}
 
       {/* ── Configuração ── */}

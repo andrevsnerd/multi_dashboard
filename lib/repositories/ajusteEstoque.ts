@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { query } from '@/lib/db/connection';
-import { getFilialById, normalizeFilialId } from '@/lib/config/filial-registry';
+import { getFilialById } from '@/lib/config/filial-registry';
 import type { CompanyKey } from '@/lib/config/company';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -557,10 +557,11 @@ export async function calcularDiferencas(opts: {
 }
 
 /* ════════════════════════════════════════════════════════════════════════
- *  ZERAR ITEM — zerar um ou mais itens (produto×cor) em todas as filiais
- *  onde há estoque (ou numa filial específica). Cada filial vira uma contagem
- *  nativa independente (mesmo mecanismo/trigger do resto da tela), então cada
- *  ajuste aparece no extrato e pode ser desfeito individualmente.
+ *  AJUSTAR ITEM — define o saldo de um ou mais itens (produto×cor) por filial
+ *  para a quantidade escolhida. Zerar é só o caso quantidade = 0 (não existe
+ *  fluxo separado). Cada filial vira uma contagem nativa independente (mesmo
+ *  mecanismo/trigger do resto da tela), então cada ajuste aparece no extrato e
+ *  pode ser desfeito individualmente.
  * ════════════════════════════════════════════════════════════════════════ */
 
 /** true se a filial (por COD/nome) pertence à empresa e está operacional (não desativada). */
@@ -572,13 +573,13 @@ function filialPertenceEmpresa(cod: string, nome: string, company: CompanyKey): 
   return empresa === company;
 }
 
-export interface ZerarItemFilial {
+export interface AjusteItemFilial {
   cod: string;
   nome: string;
   estoque: number;
 }
 
-export interface ZerarItemCandidato {
+export interface AjusteItemCandidato {
   produto: string;
   cor: string;
   descProduto: string;
@@ -586,8 +587,8 @@ export interface ZerarItemCandidato {
   codigoBarra: string | null;
   /** Soma dos saldos positivos nas filiais da empresa (referência de exibição). */
   estoquePositivo: number;
-  /** Filiais (da empresa) onde o item tem estoque ≠ 0. */
-  filiais: ZerarItemFilial[];
+  /** Filiais (da empresa) onde o item tem linha de estoque. */
+  filiais: AjusteItemFilial[];
 }
 
 interface EstoqueItemRow {
@@ -628,13 +629,18 @@ const ESTOQUE_ITENS_SELECT = `
 
 /**
  * Busca itens (produto×cor) pelo termo (código do produto, descrição ou código de
- * barra) e devolve, para cada um, as filiais da empresa onde há estoque ≠ 0.
+ * barra) e devolve, para cada um, as filiais da empresa com linha de estoque.
+ *
+ * `incluirZerados` traz também as linhas com saldo 0 — a aba de ajuste precisa
+ * delas, porque o item pode estar zerado e a intenção ser subir a quantidade.
  */
-export async function buscarItensParaZerar(
+export async function buscarItensParaAjuste(
   company: CompanyKey,
   termo: string,
-  limite = 400
-): Promise<ZerarItemCandidato[]> {
+  opts: { limite?: number; incluirZerados?: boolean } = {}
+): Promise<AjusteItemCandidato[]> {
+  const limite = opts.limite ?? 400;
+  const filtroEstoque = opts.incluirZerados ? '' : 'AND ep.ESTOQUE <> 0';
   const t = (termo ?? '').trim();
   if (t.length < 2) return [];
   const tEsc = esc(t);
@@ -663,14 +669,14 @@ export async function buscarItensParaZerar(
   const produtos = [...new Set(produtoRows.map((r) => r.PRODUTO?.trim()).filter(Boolean) as string[])].slice(0, 150);
   if (produtos.length === 0) return [];
 
-  // 2) Estoque por filial/cor para esses produtos (só saldos ≠ 0).
-  const porItem = new Map<string, ZerarItemCandidato>();
+  // 2) Estoque por filial/cor para esses produtos.
+  const porItem = new Map<string, AjusteItemCandidato>();
   for (let i = 0; i < produtos.length; i += 400) {
     const chunk = produtos.slice(i, i + 400);
     const inList = chunk.map((p) => `'${esc(p)}'`).join(',');
     const rows = await query<EstoqueItemRow>(`
       ${ESTOQUE_ITENS_SELECT}
-      WHERE ep.PRODUTO IN (${inList}) AND ep.ESTOQUE <> 0
+      WHERE ep.PRODUTO IN (${inList}) ${filtroEstoque}
       ORDER BY ep.PRODUTO, ep.COR_PRODUTO
     `);
     for (const r of rows) {
@@ -707,32 +713,38 @@ export async function buscarItensParaZerar(
   return candidatos.slice(0, limite);
 }
 
-export interface FilialItensZerar {
-  cod: string;
-  nome: string;
-  itens: Array<{ produto: string; cor: string; estoque: number }>;
+export interface SaldoItemFilialLinha {
+  produto: string;
+  cor: string;
+  filialCod: string;
+  filialNome: string;
+  estoque: number;
 }
 
 /**
- * Saldo ATUAL (≠ 0) dos itens selecionados por filial (da empresa). Se `filialCod`
- * for informado, restringe àquela filial. É a fonte autoritativa para a execução.
+ * Saldo ATUAL dos itens em TODAS as filiais da empresa, incluindo saldo 0 e
+ * negativo — é a matriz item × filial que a aba de ajuste edita.
  */
-export async function estoqueDeItensPorFilial(
+export async function saldoItensTodasFiliais(
   itens: Array<{ produto: string; cor: string }>,
-  company: CompanyKey,
-  filialCod?: string | null
-): Promise<FilialItensZerar[]> {
+  company: CompanyKey
+): Promise<SaldoItemFilialLinha[]> {
   if (!itens || itens.length === 0) return [];
   const produtos = [...new Set(itens.map((i) => (i.produto ?? '').trim()).filter(Boolean))];
   if (produtos.length === 0) return [];
   const keySet = new Set(itens.map((i) => `${(i.produto ?? '').trim()}|${(i.cor ?? '').trim()}`));
-  const alvoNorm = filialCod ? normalizeFilialId(filialCod) : null;
 
-  const porFilial = new Map<string, FilialItensZerar>();
+  const linhas: SaldoItemFilialLinha[] = [];
   for (let i = 0; i < produtos.length; i += 400) {
     const chunk = produtos.slice(i, i + 400);
     const inList = chunk.map((p) => `'${esc(p)}'`).join(',');
-    const rows = await query<{ PRODUTO: string; COR: string; ESTOQUE: number; COD: string; FILIAL: string }>(`
+    const rows = await query<{
+      PRODUTO: string;
+      COR: string;
+      ESTOQUE: number;
+      COD: string;
+      FILIAL: string;
+    }>(`
       SELECT RTRIM(ep.PRODUTO) AS PRODUTO,
              RTRIM(ISNULL(ep.COR_PRODUTO, '')) AS COR,
              ep.ESTOQUE AS ESTOQUE,
@@ -740,7 +752,7 @@ export async function estoqueDeItensPorFilial(
              RTRIM(ep.FILIAL) AS FILIAL
       FROM ESTOQUE_PRODUTOS ep WITH (NOLOCK)
       LEFT JOIN FILIAIS f WITH (NOLOCK) ON RTRIM(f.FILIAL) = RTRIM(ep.FILIAL)
-      WHERE ep.PRODUTO IN (${inList}) AND ep.ESTOQUE <> 0
+      WHERE ep.PRODUTO IN (${inList})
     `);
     for (const r of rows) {
       const produto = r.PRODUTO?.trim() ?? '';
@@ -748,15 +760,31 @@ export async function estoqueDeItensPorFilial(
       if (!keySet.has(`${produto}|${cor}`)) continue;
       const cod = r.COD?.trim() ?? '';
       const filialNome = r.FILIAL?.trim() ?? '';
-      if (alvoNorm && normalizeFilialId(cod) !== alvoNorm) continue;
       if (!filialPertenceEmpresa(cod, filialNome, company)) continue;
-      let f = porFilial.get(filialNome);
-      if (!f) {
-        f = { cod, nome: filialNome, itens: [] };
-        porFilial.set(filialNome, f);
-      }
-      f.itens.push({ produto, cor, estoque: Number(r.ESTOQUE) || 0 });
+      linhas.push({
+        produto,
+        cor,
+        filialCod: cod,
+        filialNome,
+        estoque: Number(r.ESTOQUE) || 0,
+      });
     }
   }
-  return [...porFilial.values()];
+  return linhas;
+}
+
+/**
+ * Resolve o alvo da escrita a partir do COD_FILIAL, garantindo que a filial
+ * pertence à empresa e não está desativada. Devolve null se não servir.
+ */
+export async function resolverFilialAlvo(
+  cod: string,
+  company: CompanyKey
+): Promise<{ cod: string; nome: string } | null> {
+  const codLimpo = (cod ?? '').trim();
+  if (!codLimpo) return null;
+  const nome = await resolverNomeFilial(codLimpo);
+  if (!nome) return null;
+  if (!filialPertenceEmpresa(codLimpo, nome, company)) return null;
+  return { cod: codLimpo, nome };
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { buscarItensParaZerar } from '@/lib/repositories/ajusteEstoque';
+import { buscarItensParaAjuste } from '@/lib/repositories/ajusteEstoque';
 import { resolveCompany } from '@/lib/config/company';
 
 export const dynamic = 'force-dynamic';
@@ -19,10 +19,12 @@ export async function GET(request: Request) {
       return NextResponse.json({ itens: [] });
     }
 
-    const itens = await buscarItensParaZerar(company.key, termo);
+    // Zerados incluídos: a aba de ajuste também sobe quantidade, então item sem
+    // saldo tem que aparecer na busca.
+    const itens = await buscarItensParaAjuste(company.key, termo, { incluirZerados: true });
     return NextResponse.json({ itens });
   } catch (error) {
-    console.error('[ajuste-estoque/zerar-item/buscar] erro', error);
+    console.error('[ajuste-estoque/item/buscar] erro', error);
     return NextResponse.json({ error: 'Erro ao buscar itens.' }, { status: 500 });
   }
 }

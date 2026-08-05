@@ -397,7 +397,7 @@
   gap: 10px;
 }
 
-/* Zerar Item — busca e chips */
+/* Ajustar item — busca e chips */
 .searchRow {
   display: flex;
   align-items: center;
@@ -444,7 +444,25 @@
   color: var(--ae-red);
 }
 
-/* Barra de progresso (Zerar item) */
+/* Ajustar item — input de quantidade por linha */
+.qtyInput {
+  border: 1px solid var(--ae-border);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 14px;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--ae-text);
+  background: var(--s-white);
+  width: 92px;
+}
+.qtyInputErro {
+  border-color: var(--ae-red);
+  background: var(--ae-red-bg);
+}
+
+/* Barra de progresso (Ajustar item) */
 .progressWrap {
   display: flex;
   flex-direction: column;
