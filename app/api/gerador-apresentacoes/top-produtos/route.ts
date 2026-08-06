@@ -18,9 +18,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Body JSON inválido." }, { status: 400 });
   }
 
-  if (body.company !== "scarfme") {
+  // Mesmo deck nas duas: ScarfMe quebra por subgrupo, NERD por grupo
+  // (a dimensão sai de `fetchTopProdutosPresentation`).
+  if (body.company !== "scarfme" && body.company !== "nerd") {
     return NextResponse.json(
-      { error: "Top Produtos disponível apenas para ScarfMe." },
+      { error: "Top Produtos disponível apenas para ScarfMe e NERD." },
       { status: 400 }
     );
   }

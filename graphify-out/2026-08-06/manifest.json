@@ -4060,13 +4060,13 @@
     "semantic_hash": ""
   },
   "components/etiquetas/ImprimirEtiquetasPage.tsx": {
-    "mtime": 1786018872.1269395,
-    "ast_hash": "d2ad4127a2c4d6fc2b917be864ddbd3c",
+    "mtime": 1786021673.4870923,
+    "ast_hash": "9d0f7d397f8a9b086946eddbec10b98d",
     "semantic_hash": ""
   },
   "components/etiquetas/zebra-browser-print.ts": {
-    "mtime": 1786018604.0493207,
-    "ast_hash": "477d1c36e9215d84491ddf59e473d5e7",
+    "mtime": 1786020640.6082401,
+    "ast_hash": "ffd9d58d6196b4952bad034e98786714",
     "semantic_hash": ""
   },
   "lib/auth/etiquetas-guard.ts": {
@@ -4085,18 +4085,23 @@
     "semantic_hash": ""
   },
   "lib/etiquetas/zpl.ts": {
-    "mtime": 1786018852.161461,
-    "ast_hash": "01044c3cd4da620be80443953af187be",
+    "mtime": 1786021049.8013742,
+    "ast_hash": "be18c334350a28fe87f0982cb8e32ceb",
     "semantic_hash": ""
   },
   "lib/repositories/etiquetas.ts": {
-    "mtime": 1786017654.6614728,
-    "ast_hash": "6991e7e65fe6b387b77a7c9befa52f4c",
+    "mtime": 1786021486.7403648,
+    "ast_hash": "7bd46f1839fe1ee9d1a4332bd94ce3c7",
     "semantic_hash": ""
   },
   "lib/utils/etiquetas-config-store.ts": {
     "mtime": 1786017675.2298787,
     "ast_hash": "c539c0e3ed8efad89fe523407bef4eed",
+    "semantic_hash": ""
+  },
+  "app/api/etiquetas/sugestoes/route.ts": {
+    "mtime": 1786021497.360051,
+    "ast_hash": "cc13d1c6bfc02d84341602622494d52a",
     "semantic_hash": ""
   }
 }

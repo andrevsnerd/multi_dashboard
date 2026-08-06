@@ -10,8 +10,13 @@ import { fetchProductsWithDetails } from "@/lib/repositories/products";
  * Monta o payload do deck "Top Produtos (Campeões de Venda)" do Gerador de
  * Apresentações — porte fiel do modelo `scarfme-campeoes-<mês>.html`:
  *
- *   01 capa · 02 top 10 da rede · 03+ sumário · N páginas de subgrupo ·
- *   última(s) página(s) "Demais subgrupos".
+ *   01 capa · 02 top 10 da rede · 03+ sumário · N páginas de categoria ·
+ *   última(s) página(s) "Demais categorias".
+ *
+ * CATEGORIA = a dimensão que quebra o deck em páginas. Na ScarfMe é o SUBGRUPO
+ * (como no modelo original); no NERD é o GRUPO — os subgrupos do NERD são finos
+ * demais para render página. Quem manda é `DIMENSAO_POR_EMPRESA`, e o payload
+ * leva os rótulos ("subgrupo"/"grupo") prontos para o deck escrever.
  *
  * VENDAS/FATURAMENTO usam a ÚNICA lógica válida do sistema
  * (`fetchProductsWithDetails` com `groupByColor: true`): base LOJA_VENDA_PRODUTO
@@ -22,18 +27,18 @@ import { fetchProductsWithDetails } from "@/lib/repositories/products";
  * O grão do ranking é o ITEM = produto × cor (como na planilha de origem).
  */
 
-/** Itens mínimos para um subgrupo ganhar página própria… */
+/** Itens mínimos para uma categoria ganhar página própria… */
 const MIN_ITENS_PAGINA = 4;
 /** …ou, com menos itens, participação mínima na rede (%) para não ir pro complemento. */
 const MIN_PERC_REDE_PAGINA = 0.5;
-/** Itens por página de subgrupo (e do top da rede). */
+/** Itens por página de categoria (e do top da rede). */
 const TOP_N = 10;
-/** Até este total de itens o subgrupo sai em cards grandes em vez de tabela. */
+/** Até este total de itens a categoria sai em cards grandes em vez de tabela. */
 const MAX_ITENS_CARDS = 4;
 /** Linhas do sumário por página (2 colunas × 12). */
 const SUMARIO_POR_PAGINA = 24;
 /**
- * Linhas (subgrupo + produtos) por coluna na página "Demais subgrupos".
+ * Linhas (categoria + produtos) por coluna na página "Demais categorias".
  * As linhas são flex e encolhem um pouco além disso, então 17 é a densidade do
  * modelo sem estourar a altura do slide.
  */
@@ -43,6 +48,48 @@ export interface TopProdutosParams {
   company?: string;
   filial?: string | null;
   range?: { start?: string; end?: string };
+}
+
+/** Dimensão que quebra o deck em páginas. */
+export type TopProdutosDimensaoKey = "subgrupo" | "grupo";
+
+export interface TopProdutosDimensao {
+  key: TopProdutosDimensaoKey;
+  /** "subgrupo" — usado no meio da frase. */
+  singular: string;
+  /** "subgrupos". */
+  plural: string;
+  /** "Subgrupo" — início de frase / cabeçalho. */
+  singularCap: string;
+  /** "Subgrupos". */
+  pluralCap: string;
+}
+
+/** Empresa → dimensão. Ausente = subgrupo (padrão do modelo ScarfMe). */
+const DIMENSAO_POR_EMPRESA: Record<string, TopProdutosDimensaoKey> = {
+  nerd: "grupo",
+};
+
+const DIMENSOES: Record<TopProdutosDimensaoKey, TopProdutosDimensao> = {
+  subgrupo: {
+    key: "subgrupo",
+    singular: "subgrupo",
+    plural: "subgrupos",
+    singularCap: "Subgrupo",
+    pluralCap: "Subgrupos",
+  },
+  grupo: {
+    key: "grupo",
+    singular: "grupo",
+    plural: "grupos",
+    singularCap: "Grupo",
+    pluralCap: "Grupos",
+  },
+};
+
+function resolveDimensao(company: string | undefined): TopProdutosDimensao {
+  const key = DIMENSAO_POR_EMPRESA[(company ?? "").trim().toLowerCase()] ?? "subgrupo";
+  return DIMENSOES[key];
 }
 
 export interface TopProdutosItem {
@@ -55,7 +102,8 @@ export interface TopProdutosItem {
   colecaoCode: string;
   grade: string;
   linha: string;
-  subgrupo: string;
+  /** Nome da categoria do item (subgrupo na ScarfMe, grupo no NERD). */
+  categoria: string;
   faturamento: number;
   qtde: number;
   precoMedio: number;
@@ -63,22 +111,22 @@ export interface TopProdutosItem {
   barPct: number;
 }
 
-export interface TopProdutosSubgrupoSlide {
-  subgrupo: string;
-  /** Posição do subgrupo entre os que têm página (1º, 2º…). */
+export interface TopProdutosCategoriaSlide {
+  categoria: string;
+  /** Posição da categoria entre as que têm página (1ª, 2ª…). */
   rank: number;
-  /** Linhas (LINHA) presentes no subgrupo, ordenadas. */
+  /** Linhas (LINHA) presentes na categoria, ordenadas. */
   linhas: string[];
   itensComVenda: number;
   faturamento: number;
   qtde: number;
   percRede: number;
-  /** % do faturamento do subgrupo concentrado nos itens exibidos. */
+  /** % do faturamento da categoria concentrado nos itens exibidos. */
   topPerc: number;
   items: TopProdutosItem[];
   /** Tabela (padrão) ou cards grandes (poucos itens). */
   layout: "table" | "cards";
-  /** Rodapé de observação quando todos os itens do subgrupo estão listados. */
+  /** Rodapé de observação quando todos os itens da categoria estão listados. */
   note: string | null;
   /** Tamanho do título no cabeçalho (o modelo reduz conforme o nome cresce). */
   titleFontSize: string;
@@ -86,7 +134,7 @@ export interface TopProdutosSubgrupoSlide {
 
 export interface TopProdutosSumarioRow {
   ordem: number;
-  subgrupo: string;
+  categoria: string;
   itensComVenda: number;
   qtde: number;
   faturamento: number;
@@ -95,13 +143,15 @@ export interface TopProdutosSumarioRow {
 }
 
 export interface TopProdutosMenorGrupo {
-  subgrupo: string;
+  categoria: string;
   faturamento: number;
   qtde: number;
   items: Array<{ descricao: string; cor: string; faturamento: number; qtde: number }>;
 }
 
 export interface TopProdutosPayload {
+  /** Rótulos da dimensão das páginas (subgrupo na ScarfMe, grupo no NERD). */
+  dimensao: TopProdutosDimensao;
   period: {
     start: string;
     end: string;
@@ -121,7 +171,7 @@ export interface TopProdutosPayload {
     inLabel: string;
     /** "rede completa" · nome da filial (eyebrow da capa). */
     eyebrow: string;
-    /** "da rede" · "das lojas físicas" · "de MORUMBI 2" (ex.: "1º subgrupo da rede"). */
+    /** "da rede" · "das lojas físicas" · "de MORUMBI 2" (ex.: "1º grupo da rede"). */
     ofLabel: string;
     /** Rótulo do chip de participação: "% da rede" · "% do total". */
     pctLabel: string;
@@ -130,7 +180,7 @@ export interface TopProdutosPayload {
     faturamento: number;
     pecas: number;
     itensComVenda: number;
-    subgrupos: number;
+    categorias: number;
   };
   /** Top 10 da rede/filial: os 3 primeiros vão no pódio, o resto na tabela. */
   network: {
@@ -141,10 +191,10 @@ export interface TopProdutosPayload {
   };
   /** Sumário paginado (cada página vira um slide). */
   sumarioPages: TopProdutosSumarioRow[][];
-  slides: TopProdutosSubgrupoSlide[];
-  /** Complemento: subgrupos pequenos, paginado. */
+  slides: TopProdutosCategoriaSlide[];
+  /** Complemento: categorias pequenas, paginado. */
   menores: {
-    subgrupos: number;
+    categorias: number;
     faturamento: number;
     percRede: number;
     /** Cada página tem 2 colunas de grupos (já quebradas). */
@@ -204,7 +254,7 @@ function buildPeriodLabels(startIso: string, endIso: string) {
   };
 }
 
-/** O modelo encolhe o título do subgrupo conforme o nome cresce. */
+/** O modelo encolhe o título da categoria conforme o nome cresce. */
 function titleFontSizeFor(name: string): string {
   const len = name.trim().length;
   if (len <= 15) return "36px";
@@ -235,7 +285,7 @@ interface RawItem {
   colecaoCode: string;
   grade: string;
   linha: string;
-  subgrupo: string;
+  categoria: string;
   faturamento: number;
   qtde: number;
 }
@@ -250,7 +300,7 @@ function toItems(raw: RawItem[], leader: number): TopProdutosItem[] {
     colecaoCode: r.colecaoCode,
     grade: r.grade,
     linha: r.linha,
-    subgrupo: r.subgrupo,
+    categoria: r.categoria,
     faturamento: r.faturamento,
     qtde: r.qtde,
     precoMedio: r.qtde > 0 ? r.faturamento / r.qtde : 0,
@@ -303,6 +353,7 @@ export async function fetchTopProdutosPresentation({
 }: TopProdutosParams): Promise<TopProdutosPayload> {
   const startIso = range?.start ?? "";
   const endIso = range?.end ?? "";
+  const dimensao = resolveDimensao(company);
 
   const [details, scope] = await Promise.all([
     fetchProductsWithDetails({
@@ -333,7 +384,10 @@ export async function fetchTopProdutosPresentation({
         colecaoCode,
         grade: clean(d.grade),
         linha: clean(d.linha),
-        subgrupo: clean(d.subgrupo) || "SEM SUBGRUPO",
+        categoria:
+          dimensao.key === "grupo"
+            ? clean(d.grupo) || "SEM GRUPO"
+            : clean(d.subgrupo) || "SEM SUBGRUPO",
         faturamento: d.totalRevenue ?? 0,
         qtde: d.totalQuantity ?? 0,
       };
@@ -352,19 +406,19 @@ export async function fetchTopProdutosPresentation({
   const totalPecas = raw.reduce((s, r) => s + r.qtde, 0);
   const { label: periodLabel, longLabel, unit: periodUnit } = buildPeriodLabels(startIso, endIso);
 
-  // ---- agrupa por subgrupo ----
-  const bySubgrupo = new Map<string, RawItem[]>();
+  // ---- agrupa pela categoria da empresa (subgrupo · grupo) ----
+  const byCategoria = new Map<string, RawItem[]>();
   for (const item of raw) {
-    const list = bySubgrupo.get(item.subgrupo);
+    const list = byCategoria.get(item.categoria);
     if (list) list.push(item);
-    else bySubgrupo.set(item.subgrupo, [item]);
+    else byCategoria.set(item.categoria, [item]);
   }
 
-  const grupos = Array.from(bySubgrupo.entries())
-    .map(([subgrupo, items]) => {
+  const grupos = Array.from(byCategoria.entries())
+    .map(([categoria, items]) => {
       const faturamento = items.reduce((s, r) => s + r.faturamento, 0);
       return {
-        subgrupo,
+        categoria,
         items,
         faturamento,
         qtde: items.reduce((s, r) => s + r.qtde, 0),
@@ -376,7 +430,7 @@ export async function fetchTopProdutosPresentation({
     })
     .sort((a, b) => b.faturamento - a.faturamento);
 
-  // Subgrupo ganha página quando tem itens suficientes OU peso relevante na rede
+  // Categoria ganha página quando tem itens suficientes OU peso relevante na rede
   // (é o que faz um subgrupo de 1 item campeão, tipo MODAL COM SEDA, ter página).
   // Sem nenhum item positivo não há ranking para mostrar → vai pro complemento.
   const temPagina = (g: (typeof grupos)[number]) =>
@@ -399,7 +453,7 @@ export async function fetchTopProdutosPresentation({
       currentRows = 0;
     }
     currentColumn.push({
-      subgrupo: g.subgrupo,
+      categoria: g.categoria,
       faturamento: g.faturamento,
       qtde: g.qtde,
       items: g.items.map((r) => ({
@@ -416,8 +470,8 @@ export async function fetchTopProdutosPresentation({
   // ---- paginação (a numeração "04 / 28" precisa saber tudo antes) ----
   const sumarioPagesCount = Math.ceil(comPagina.length / SUMARIO_POR_PAGINA);
   const menoresPages = chunk(menoresColumns, 2);
-  const firstSubgrupoPage = 2 + sumarioPagesCount + 1; // capa + top10 + sumário(s)
-  const totalPages = firstSubgrupoPage - 1 + comPagina.length + menoresPages.length;
+  const firstCategoriaPage = 2 + sumarioPagesCount + 1; // capa + top10 + sumário(s)
+  const totalPages = firstCategoriaPage - 1 + comPagina.length + menoresPages.length;
 
   // ---- slide 02: top 10 da rede ----
   // Ranking = só itens com faturamento POSITIVO ("campeões de venda"); os
@@ -432,17 +486,17 @@ export async function fetchTopProdutosPresentation({
   const sumarioLeader = comPagina[0]?.faturamento ?? 0;
   const sumarioRows: TopProdutosSumarioRow[] = comPagina.map((g, i) => ({
     ordem: i + 1,
-    subgrupo: g.subgrupo,
+    categoria: g.categoria,
     itensComVenda: g.items.length,
     qtde: g.qtde,
     faturamento: g.faturamento,
     barPct: barPctOf(g.faturamento, sumarioLeader),
-    pagina: firstSubgrupoPage + i,
+    pagina: firstCategoriaPage + i,
   }));
 
-  // ---- páginas de subgrupo ----
-  const slides: TopProdutosSubgrupoSlide[] = comPagina.map((g, i) => {
-    // Ranking do subgrupo: só positivos. Faturamento/peças/% do subgrupo seguem
+  // ---- páginas de categoria ----
+  const slides: TopProdutosCategoriaSlide[] = comPagina.map((g, i) => {
+    // Ranking da categoria: só positivos. Faturamento/peças/% da categoria seguem
     // sendo o LÍQUIDO de todos os itens (senão a soma das páginas não fecharia
     // com o total do deck nem com o Dashboard).
     const positivosGrupo = g.items.filter((r) => r.faturamento > 0);
@@ -451,8 +505,8 @@ export async function fetchTopProdutosPresentation({
     const layout: "table" | "cards" = shown.length <= MAX_ITENS_CARDS ? "cards" : "table";
     const todosListados = shown.length === positivosGrupo.length;
     const negativos = g.items.length - positivosGrupo.length;
-    // O share do top N pode passar de 100% quando o subgrupo tem itens negativos
-    // (o líquido do grupo é menor que a soma dos positivos) — limita em 100%.
+    // O share do top N pode passar de 100% quando a categoria tem itens negativos
+    // (o líquido dela é menor que a soma dos positivos) — limita em 100%.
     const topPerc = Math.min(
       100,
       pct(
@@ -461,7 +515,7 @@ export async function fetchTopProdutosPresentation({
       )
     );
     return {
-      subgrupo: g.subgrupo,
+      categoria: g.categoria,
       rank: i + 1,
       linhas: g.linhas,
       itensComVenda: g.items.length,
@@ -474,16 +528,17 @@ export async function fetchTopProdutosPresentation({
       note:
         layout === "table" && todosListados
           ? negativos === 0
-            ? `Este subgrupo teve apenas ${g.items.length} itens com venda no ${periodUnit} — todos estão listados acima.`
-            : `Este subgrupo teve ${g.items.length} itens com venda no ${periodUnit}; os ${positivosGrupo.length} com faturamento positivo estão listados acima (${negativos} ficaram negativos por trocas).`
+            ? `Este ${dimensao.singular} teve apenas ${g.items.length} itens com venda no ${periodUnit} — todos estão listados acima.`
+            : `Este ${dimensao.singular} teve ${g.items.length} itens com venda no ${periodUnit}; os ${positivosGrupo.length} com faturamento positivo estão listados acima (${negativos} ficaram negativos por trocas).`
           : null,
-      titleFontSize: titleFontSizeFor(g.subgrupo),
+      titleFontSize: titleFontSizeFor(g.categoria),
     };
   });
 
   const menoresFaturamento = menoresGrupos.reduce((s, g) => s + g.faturamento, 0);
 
   return {
+    dimensao,
     period: {
       start: startIso,
       end: endIso,
@@ -497,7 +552,7 @@ export async function fetchTopProdutosPresentation({
       faturamento: totalFaturamento,
       pecas: totalPecas,
       itensComVenda: raw.length,
-      subgrupos: grupos.length,
+      categorias: grupos.length,
     },
     network: {
       items: networkItems,
@@ -508,7 +563,7 @@ export async function fetchTopProdutosPresentation({
     sumarioPages: chunk(sumarioRows, SUMARIO_POR_PAGINA),
     slides,
     menores: {
-      subgrupos: menoresGrupos.length,
+      categorias: menoresGrupos.length,
       faturamento: menoresFaturamento,
       percRede: pct(menoresFaturamento, totalFaturamento),
       pages: menoresPages,

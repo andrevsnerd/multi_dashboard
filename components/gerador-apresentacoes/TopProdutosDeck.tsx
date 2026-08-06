@@ -2,11 +2,12 @@
 
 import { Fragment, type RefObject } from "react";
 
+import { presentationBrandName } from "@/lib/presentations/brand";
 import type {
+  TopProdutosCategoriaSlide,
   TopProdutosItem,
   TopProdutosMenorGrupo,
   TopProdutosPayload,
-  TopProdutosSubgrupoSlide,
   TopProdutosSumarioRow,
 } from "@/lib/repositories/topProdutosPresentation";
 
@@ -17,15 +18,21 @@ import styles from "./TopProdutosDeck.module.css";
  * scarfme-campeoes-<mês>.html. Cada slide é uma <section> de 1280×905px marcada
  * com `data-pdf-slide` (+ data-pdf-width/height, que o export lê para clonar o
  * slide no tamanho exato) → uma página do PDF em A4 paisagem.
+ *
+ * O mesmo deck serve ScarfMe e NERD: o que muda é a marca (logo/wordmark) e a
+ * dimensão das páginas — `report.dimensao` traz os rótulos prontos ("subgrupo"
+ * na ScarfMe, "grupo" no NERD), então nenhuma string aqui é fixa.
  */
 
 interface TopProdutosDeckProps {
   report: TopProdutosPayload;
   logoDataUrl: string | null;
-  /** Foto da capa (recorte de coleção). Sem ela a capa sai só com tipografia. */
+  /** Foto da capa (recorte de coleção na ScarfMe, upload próprio no NERD). */
   coverDataUrl: string | null;
   /** Título da capa (ex.: "Campeões de venda"); a última palavra sai em itálico. */
   coverTitle?: string;
+  /** Nome da empresa (marca do logo/rodapé). */
+  companyName: string;
   deckRef?: RefObject<HTMLDivElement | null>;
 }
 
@@ -65,10 +72,13 @@ function Colecao({ desc, code }: { desc: string; code: string }) {
   );
 }
 
-/** Bloco "cor · coleção · grade · subgrupo" do pódio. */
-function podiumMeta(item: TopProdutosItem) {
+/** Bloco "cor · coleção · grade · subgrupo|grupo" do pódio. */
+function podiumMeta(item: TopProdutosItem, dimSingular: string) {
   const colecao = [item.colecaoDesc, item.colecaoCode].filter(Boolean).join(" ");
-  const linha2 = [item.grade ? `grade ${item.grade}` : "", item.subgrupo ? `subgrupo ${item.subgrupo}` : ""]
+  const linha2 = [
+    item.grade ? `grade ${item.grade}` : "",
+    item.categoria ? `${dimSingular} ${item.categoria}` : "",
+  ]
     .filter(Boolean)
     .join(" · ");
   return { cor: item.cor || "-", colecao, linha2 };
@@ -79,9 +89,12 @@ export default function TopProdutosDeck({
   logoDataUrl,
   coverDataUrl,
   coverTitle,
+  companyName,
   deckRef,
 }: TopProdutosDeckProps) {
-  const { period, scope, totals, network, sumarioPages, slides, menores, totalPages } = report;
+  const { dimensao, period, scope, totals, network, sumarioPages, slides, menores, totalPages } =
+    report;
+  const brandName = presentationBrandName(companyName);
 
   // Título da capa: última palavra em itálico coral, como "Campeões de venda".
   const titleRaw = (coverTitle?.trim() || "Campeões de venda").replace(/\s+/g, " ");
@@ -89,7 +102,7 @@ export default function TopProdutosDeck({
   const titleLead = words.slice(0, -1).join(" ");
   const titleTail = words.length > 1 ? words[words.length - 1] : "";
 
-  const footerLeft = `SCARF·ME  ·  ${titleRaw}  ·  ${period.label}  ·  ${scope.label}`;
+  const footerLeft = `${brandName}  ·  ${titleRaw}  ·  ${period.label}  ·  ${scope.label}`;
 
   const slideProps = {
     "data-pdf-slide": "",
@@ -98,9 +111,9 @@ export default function TopProdutosDeck({
   } as const;
 
   const mini = logoDataUrl ? (
-    <img className={styles.mini} src={logoDataUrl} alt="SCARF·ME" />
+    <img className={styles.mini} src={logoDataUrl} alt={brandName} />
   ) : (
-    <span className={styles.miniWord}>SCARF·ME</span>
+    <span className={styles.miniWord}>{brandName}</span>
   );
 
   const footer = (pageNumber: number, prefix?: string) => (
@@ -152,8 +165,8 @@ export default function TopProdutosDeck({
     );
   };
 
-  /** Página de subgrupo em cards grandes (subgrupo com poucos itens). */
-  const cardsGrid = (slide: TopProdutosSubgrupoSlide) => {
+  /** Página de categoria em cards grandes (categoria com poucos itens). */
+  const cardsGrid = (slide: TopProdutosCategoriaSlide) => {
     const n = slide.items.length;
     const columns = n === 1 ? 1 : 2;
     return (
@@ -209,10 +222,10 @@ export default function TopProdutosDeck({
   const sumarioColumn = (rows: TopProdutosSumarioRow[], key: string) => (
     <div key={key} className={styles.icol}>
       {rows.map((r) => (
-        <div key={r.subgrupo} className={styles.ir}>
+        <div key={r.categoria} className={styles.ir}>
           <u>{pad2(r.ordem)}</u>
           <div className={styles.isub}>
-            {r.subgrupo}
+            {r.categoria}
             <em>
               {fmtInt(r.itensComVenda)} {r.itensComVenda === 1 ? "item vendido" : "itens vendidos"} ·{" "}
               {fmtInt(r.qtde)} {r.qtde === 1 ? "peça" : "peças"}
@@ -228,27 +241,27 @@ export default function TopProdutosDeck({
     </div>
   );
 
-  /** Uma coluna da página "Demais subgrupos". */
+  /** Uma coluna da página "Demais categorias". */
   const menoresColumn = (grupos: TopProdutosMenorGrupo[], key: string) => (
     <div key={key} className={styles.mcol}>
       <div className={`${styles.mrow} ${styles.hd2}`}>
-        <div>Subgrupo · produto</div>
+        <div>{dimensao.singularCap} · produto</div>
         <div className={styles.tr}>Faturamento</div>
         <div className={styles.tr}>Qtde</div>
       </div>
       {grupos.map((g) => (
         // Fragment (sem nó no DOM) para as linhas caírem direto no flex da coluna —
         // um wrapper com display:contents não sobrevive ao html2canvas do PDF.
-        <Fragment key={g.subgrupo}>
+        <Fragment key={g.categoria}>
           <div className={styles.mrow}>
             <div className={styles.ms}>
-              <b>{g.subgrupo}</b>
+              <b>{g.categoria}</b>
             </div>
             <div className={styles.mf}>{fmtCurrency(g.faturamento)}</div>
             <div className={styles.mq}>{fmtInt(g.qtde)}</div>
           </div>
           {g.items.map((item, i) => (
-            <div key={`${g.subgrupo}-${i}`} className={styles.mrow}>
+            <div key={`${g.categoria}-${i}`} className={styles.mrow}>
               <div className={`${styles.ms} ${styles.msItem}`}>
                 <i>
                   {item.descricao}
@@ -264,7 +277,7 @@ export default function TopProdutosDeck({
     </div>
   );
 
-  // Numeração das páginas: capa · top 10 · sumário(s) · subgrupos · demais.
+  // Numeração das páginas: capa · top 10 · sumário(s) · categorias · demais.
   let pageNumber = 1;
   const coverPage = pageNumber++;
   const networkPage = pageNumber++;
@@ -287,9 +300,9 @@ export default function TopProdutosDeck({
         {coverDataUrl ? <img className={styles.model} src={coverDataUrl} alt="" /> : null}
         <div className={styles.cont}>
           {logoDataUrl ? (
-            <img className={styles.logo} src={logoDataUrl} alt="SCARF·ME" />
+            <img className={styles.logo} src={logoDataUrl} alt={brandName} />
           ) : (
-            <span className={styles.wordmark}>SCARF·ME</span>
+            <span className={styles.wordmark}>{brandName}</span>
           )}
           <div className={styles.eyebrow}>Relatório de performance · {scope.eyebrow}</div>
           <h1>
@@ -304,7 +317,7 @@ export default function TopProdutosDeck({
           </div>
           <div className={styles.lead}>
             Os <b>{network.items.length} maiores produtos</b> do período e o{" "}
-            <b>top {network.items.length} de cada subgrupo</b>. Critério único:{" "}
+            <b>top {network.items.length} de cada {dimensao.singular}</b>. Critério único:{" "}
             <b>faturamento no período</b>.
           </div>
         </div>
@@ -322,7 +335,7 @@ export default function TopProdutosDeck({
           <div className={styles.kpi}>
             <u>Itens com venda</u>
             <strong>{fmtInt(totals.itensComVenda)}</strong>
-            <i>em {fmtInt(totals.subgrupos)} subgrupos</i>
+            <i>em {fmtInt(totals.categorias)} {dimensao.plural}</i>
           </div>
         </div>
         <div className={styles.foot}>Ranking por item = produto + cor</div>
@@ -363,7 +376,7 @@ export default function TopProdutosDeck({
           {network.items.length >= 3 && (
             <div className={styles.pod}>
               {network.items.slice(0, 3).map((item) => {
-                const meta = podiumMeta(item);
+                const meta = podiumMeta(item, dimensao.singular);
                 return (
                   <div
                     key={`${item.rank}-${item.produto}-${item.cor}`}
@@ -418,23 +431,23 @@ export default function TopProdutosDeck({
                   Sumário{sumarioPages.length > 1 ? ` · ${pageIdx + 1}/${sumarioPages.length}` : ""}
                 </span>
                 <h2 style={{ fontSize: "27px" }}>
-                  Subgrupos em ordem de faturamento
+                  {dimensao.pluralCap} em ordem de faturamento
                   <small>
-                    Cada subgrupo abaixo tem uma página com seu próprio top {network.items.length}.
-                    {menores.subgrupos > 0
-                      ? ` Os ${menores.subgrupos} subgrupos menores estão consolidados na última página.`
+                    Cada {dimensao.singular} abaixo tem uma página com seu próprio top {network.items.length}.
+                    {menores.categorias > 0
+                      ? ` Os ${menores.categorias} ${dimensao.plural} menores estão consolidados na última página.`
                       : ""}
                   </small>
                 </h2>
               </div>
               <div className={styles.right}>
                 <div className={styles.chip}>
-                  <u>Subgrupos com página</u>
+                  <u>{dimensao.pluralCap} com página</u>
                   <strong className={styles.c}>{slides.length}</strong>
                 </div>
                 <div className={styles.chip}>
-                  <u>Demais subgrupos</u>
-                  <strong>{menores.subgrupos}</strong>
+                  <u>Demais {dimensao.plural}</u>
+                  <strong>{menores.categorias}</strong>
                 </div>
                 <div className={styles.chip}>
                   <u>Faturamento do {period.unit}</u>
@@ -454,25 +467,25 @@ export default function TopProdutosDeck({
         );
       })}
 
-      {/* ============ UMA PÁGINA POR SUBGRUPO ============ */}
+      {/* ============ UMA PÁGINA POR CATEGORIA (subgrupo · grupo) ============ */}
       {slides.map((slide, idx) => {
         const pageNo = slidePageNumbers[idx];
         const topN = slide.items.length;
         return (
           <section
-            key={slide.subgrupo}
+            key={slide.categoria}
             className={styles.page}
             {...slideProps}
-            data-titulo={slide.subgrupo}
+            data-titulo={slide.categoria}
             data-n={pageNo}
           >
             <div className={styles.hd}>
               <div className={styles.ttl}>
-                <span className={styles.eyebrow}>Top {topN} · subgrupo</span>
+                <span className={styles.eyebrow}>Top {topN} · {dimensao.singular}</span>
                 <h2 style={{ fontSize: slide.titleFontSize }}>
-                  {slide.subgrupo}
+                  {slide.categoria}
                   <small>
-                    {ordinal(slide.rank)} subgrupo {scope.ofLabel} em faturamento
+                    {ordinal(slide.rank)} {dimensao.singular} {scope.ofLabel} em faturamento
                     {slide.linhas.length > 0
                       ? `  ·  ${slide.linhas.length === 1 ? "linha" : "linhas"} ${slide.linhas.join(" / ")}`
                       : ""}
@@ -494,7 +507,7 @@ export default function TopProdutosDeck({
                   <strong>{fmtPct1(slide.percRede)}</strong>
                 </div>
                 <div className={styles.chip}>
-                  <u>Top {topN} do subgrupo</u>
+                  <u>Top {topN} do {dimensao.singular}</u>
                   <strong>{fmtPct1(slide.topPerc)}</strong>
                 </div>
                 {mini}
@@ -511,12 +524,12 @@ export default function TopProdutosDeck({
                 </>
               )}
             </div>
-            {footer(pageNo, slide.subgrupo)}
+            {footer(pageNo, slide.categoria)}
           </section>
         );
       })}
 
-      {/* ============ DEMAIS SUBGRUPOS ============ */}
+      {/* ============ DEMAIS CATEGORIAS ============ */}
       {menores.pages.map((columns, pageIdx) => {
         const pageNo = menoresPageNumbers[pageIdx];
         return (
@@ -524,7 +537,7 @@ export default function TopProdutosDeck({
             key={`menores-${pageIdx}`}
             className={styles.page}
             {...slideProps}
-            data-titulo="Demais subgrupos"
+            data-titulo={`Demais ${dimensao.plural}`}
             data-n={pageNo}
           >
             <div className={styles.hd}>
@@ -533,14 +546,16 @@ export default function TopProdutosDeck({
                   Complemento{menores.pages.length > 1 ? ` · ${pageIdx + 1}/${menores.pages.length}` : ""}
                 </span>
                 <h2 style={{ fontSize: "36px" }}>
-                  Demais subgrupos
-                  <small>Subgrupos menores do {period.unit} — todos os produtos listados</small>
+                  Demais {dimensao.plural}
+                  <small>
+                    {dimensao.pluralCap} menores do {period.unit} — todos os produtos listados
+                  </small>
                 </h2>
               </div>
               <div className={styles.right}>
                 <div className={styles.chip}>
-                  <u>Subgrupos</u>
-                  <strong>{menores.subgrupos}</strong>
+                  <u>{dimensao.pluralCap}</u>
+                  <strong>{menores.categorias}</strong>
                 </div>
                 <div className={styles.chip}>
                   <u>Faturamento somado</u>

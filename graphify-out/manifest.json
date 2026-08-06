@@ -1395,8 +1395,8 @@
     "semantic_hash": "81de06575d7fc50b8d2bd841c11e519d"
   },
   "components/gerador-apresentacoes/GeradorApresentacoesPage.tsx": {
-    "mtime": 1785863518.2870286,
-    "ast_hash": "3025a9e7bb3000cf88a6d689bece10d9",
+    "mtime": 1786036457.3560836,
+    "ast_hash": "a834b4614d4231fc3c5d5eb1ea82b46f",
     "semantic_hash": ""
   },
   "components/historico-transferencias/HistoricoTransferenciasPage.tsx": {
@@ -2300,8 +2300,8 @@
     "semantic_hash": ""
   },
   "lib/presentations/registry.ts": {
-    "mtime": 1785862404.5888302,
-    "ast_hash": "b2669d5eea59bcd25baa4926c61ccdcc",
+    "mtime": 1786036023.8434577,
+    "ast_hash": "85ae4ae0878a23aa9e4c778e48e703c1",
     "semantic_hash": ""
   },
   "lib/reports/clientes-filial.ts": {
@@ -3700,8 +3700,8 @@
     "semantic_hash": ""
   },
   "components/gerador-apresentacoes/ProdutoGiroDeck.tsx": {
-    "mtime": 1784811492.2472508,
-    "ast_hash": "d2671cb20f4ae809f5a44627a0976f75",
+    "mtime": 1786035849.0290372,
+    "ast_hash": "62f34155908d6016cb71f864eae02bb2",
     "semantic_hash": ""
   },
   "lib/repositories/produtoGiroPresentation.ts": {
@@ -3920,8 +3920,8 @@
     "semantic_hash": ""
   },
   "app/api/gerador-apresentacoes/top-produtos/route.ts": {
-    "mtime": 1785852020.7190893,
-    "ast_hash": "c4dc1b98dec4fc87b5f28b6bffc2a73f",
+    "mtime": 1786036198.8743525,
+    "ast_hash": "9606b97a35194b14493cf315fecc0543",
     "semantic_hash": ""
   },
   "app/api/precos/executar/route.ts": {
@@ -3985,8 +3985,8 @@
     "semantic_hash": ""
   },
   "components/gerador-apresentacoes/TopProdutosDeck.tsx": {
-    "mtime": 1785853856.9568598,
-    "ast_hash": "5e8d628c71aba61ac238c20615835c5e",
+    "mtime": 1786036336.8224041,
+    "ast_hash": "09062d8dccbc8d74da86ae21c6458795",
     "semantic_hash": ""
   },
   "components/precos/AlterarPrecosPage.tsx": {
@@ -4025,8 +4025,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/topProdutosPresentation.ts": {
-    "mtime": 1785855678.7573993,
-    "ast_hash": "ff9dd98b6bd65423571c1f9c6cf321cc",
+    "mtime": 1786036190.1449988,
+    "ast_hash": "422e3ea18b299191cc31eb23d504172d",
     "semantic_hash": ""
   },
   "lib/utils/transferencia-permissoes-filiais.ts": {
@@ -4102,6 +4102,11 @@
   "app/api/etiquetas/sugestoes/route.ts": {
     "mtime": 1786021497.360051,
     "ast_hash": "cc13d1c6bfc02d84341602622494d52a",
+    "semantic_hash": ""
+  },
+  "lib/presentations/brand.ts": {
+    "mtime": 1786035814.4803033,
+    "ast_hash": "28f9dda43bab370bd4504f32e1d9a5a7",
     "semantic_hash": ""
   }
 }

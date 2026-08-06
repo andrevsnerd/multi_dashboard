@@ -27,6 +27,11 @@ export interface PresentationTypeMeta {
   singleCollection: boolean;
   /** Empresas onde o tipo aparece (slug). Ausente = todas. */
   companies?: string[];
+  /**
+   * Descrição alternativa por empresa (slug). Serve quando o mesmo deck muda de
+   * vocabulário: no NERD o Top Produtos quebra por GRUPO, não por subgrupo.
+   */
+  descriptionByCompany?: Record<string, string>;
 }
 
 export const TOP_PRODUTOS_ID = "top-produtos";
@@ -97,15 +102,35 @@ export const PRESENTATION_TYPES: PresentationTypeMeta[] = [
     supportedFilters: ["periodo", "filial"],
     requiresCover: true,
     singleCollection: false,
-    companies: ["scarfme"],
+    companies: ["scarfme", "nerd"],
+    descriptionByCompany: {
+      nerd:
+        "Deck no padrão “Campeões de venda”: capa, os 10 maiores produtos do período, " +
+        "sumário de grupos e uma página com o top 10 de cada grupo (mais o " +
+        "complemento dos grupos menores). Ranking por item = produto × cor, " +
+        "critério único de faturamento. A imagem da capa é enviada por você. " +
+        "Filtra por período e filial. Exporta em PDF A4 paisagem.",
+    },
   },
 ];
 
-export function getPresentationMeta(id: string): PresentationTypeMeta | undefined {
-  return PRESENTATION_TYPES.find((t) => t.id === id);
+/**
+ * Meta de um tipo. Com `company`, aplica a descrição específica da empresa
+ * (ex.: Top Produtos fala em "grupos" no NERD e "subgrupos" na ScarfMe).
+ */
+export function getPresentationMeta(
+  id: string,
+  company?: string
+): PresentationTypeMeta | undefined {
+  const meta = PRESENTATION_TYPES.find((t) => t.id === id);
+  if (!meta) return undefined;
+  const override = company ? meta.descriptionByCompany?.[company] : undefined;
+  return override ? { ...meta, description: override } : meta;
 }
 
 /** Tipos visíveis para uma empresa (slug). Tipos sem `companies` valem para todas. */
 export function getPresentationTypesForCompany(company: string): PresentationTypeMeta[] {
-  return PRESENTATION_TYPES.filter((t) => !t.companies || t.companies.includes(company));
+  return PRESENTATION_TYPES.filter((t) => !t.companies || t.companies.includes(company)).map(
+    (t) => getPresentationMeta(t.id, company) ?? t
+  );
 }

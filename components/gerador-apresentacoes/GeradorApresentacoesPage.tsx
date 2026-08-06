@@ -15,6 +15,7 @@ import {
   painelPaletteForColecao,
   resolveDeckPalette,
 } from "@/lib/presentations/palettes";
+import { presentationBrandName } from "@/lib/presentations/brand";
 import {
   COLECAO_COMPLETA_ID,
   COMPARATIVO_COLECOES_ID,
@@ -65,6 +66,9 @@ export default function GeradorApresentacoesPage({
     return { startDate: r.start, endDate: r.end };
   }, []);
 
+  // Marca da empresa aberta: em NERD o logo/wordmark é NERD, não SCARF·ME.
+  const brandName = useMemo(() => presentationBrandName(companyName), [companyName]);
+
   const availableTypes = useMemo(() => getPresentationTypesForCompany(companyKey), [companyKey]);
   const [presentationTypeId, setPresentationTypeId] = useState<string>(
     () => availableTypes[0]?.id ?? PRODUTO_GIRO_ID
@@ -75,9 +79,22 @@ export default function GeradorApresentacoesPage({
       setPresentationTypeId(availableTypes[0]?.id ?? PRODUTO_GIRO_ID);
     }
   }, [availableTypes, presentationTypeId]);
-  const meta = useMemo(() => getPresentationMeta(presentationTypeId), [presentationTypeId]);
+  const meta = useMemo(
+    () => getPresentationMeta(presentationTypeId, companyKey),
+    [presentationTypeId, companyKey]
+  );
   const isGiro = presentationTypeId === PRODUTO_GIRO_ID;
   const isTopProdutos = presentationTypeId === TOP_PRODUTOS_ID;
+  /**
+   * Capa do Top Produtos sorteada entre as fotos de coleção só existe onde há
+   * coleção com foto cadastrada (ScarfMe). No NERD a capa é sempre upload do
+   * usuário, só desta geração.
+   */
+  const isTopProdutosCapaColecao = isTopProdutos && companyKey === "scarfme";
+  // Dimensão das páginas do Top Produtos (o payload traz a oficial; aqui é só
+  // para o texto de ajuda, que aparece antes de gerar).
+  const topDimSingular = companyKey === "nerd" ? "grupo" : "subgrupo";
+  const topDimPlural = `${topDimSingular}s`;
   const isColecaoType = presentationTypeId === COLECAO_COMPLETA_ID;
   const isComparativo = presentationTypeId === COMPARATIVO_COLECOES_ID;
   const isResumido = presentationTypeId === COMPARATIVO_RESUMIDO_ID;
@@ -342,7 +359,7 @@ export default function GeradorApresentacoesPage({
 
   // ---- capa do Top Produtos: lista de capas disponíveis + sorteio inicial ----
   useEffect(() => {
-    if (!isTopProdutos) return;
+    if (!isTopProdutosCapaColecao) return;
     let cancelled = false;
     fetch(`/api/gerador-apresentacoes/assets?company=${companyKey}&list=covers`, {
       cache: "no-store",
@@ -365,11 +382,11 @@ export default function GeradorApresentacoesPage({
     return () => {
       cancelled = true;
     };
-  }, [isTopProdutos, companyKey]);
+  }, [isTopProdutosCapaColecao, companyKey]);
 
   // Baixa o base64 da capa escolhida/sorteada.
   useEffect(() => {
-    if (!isTopProdutos || !topCoverRef) {
+    if (!isTopProdutosCapaColecao || !topCoverRef) {
       if (!topCoverRef) setTopCoverDataUrl(null);
       return;
     }
@@ -388,7 +405,7 @@ export default function GeradorApresentacoesPage({
     return () => {
       cancelled = true;
     };
-  }, [isTopProdutos, companyKey, topCoverRef]);
+  }, [isTopProdutosCapaColecao, companyKey, topCoverRef]);
 
   const sortearTopCover = useCallback(() => {
     if (topCoverRefs.length === 0) return;
@@ -1326,9 +1343,9 @@ export default function GeradorApresentacoesPage({
           <p className={styles.hint}>
             Ranking por item = <b>produto × cor</b>, critério único de faturamento (mesma lógica
             validada do relatório “Vendas por faturamento”). O deck sai com capa, os 10 maiores
-            produtos do período, o sumário de subgrupos e uma página com o top 10 de cada subgrupo —
-            os subgrupos menores entram no complemento final. Filtre por período e filial; sem filial
-            a apresentação cobre a rede inteira.
+            produtos do período, o sumário de {topDimPlural} e uma página com o top 10 de cada{" "}
+            {topDimSingular} — os {topDimPlural} menores entram no complemento final. Filtre por
+            período e filial; sem filial a apresentação cobre a rede inteira.
           </p>
         )}
         {isGiro && (
@@ -1345,14 +1362,17 @@ export default function GeradorApresentacoesPage({
         <section className={styles.panel}>
           <h2 className={styles.panelTitle}>Imagens</h2>
           <p className={styles.hint}>
-            {isTopProdutos
+            {isTopProdutosCapaColecao
               ? "A capa vem sorteada entre as fotos de coleção já enviadas — escolha outra na lista, sorteie de novo ou suba a sua (essa fica só nesta geração). O logo abaixo é salvo e vale para todas as apresentações."
-              : isGiro
-                ? "Escolha a imagem principal (capa/hero) deste relatório — ela fica só nesta geração (não é salva). O logo abaixo é salvo e vale para todas as apresentações."
-                : "Use imagens com fundo transparente (PNG recortado) — elas aparecem “flutuando” sobre o círculo da coleção, como no modelo. Reenviar substitui a anterior; o que já foi enviado aparece no preview."}
+              : isTopProdutos
+                ? "Envie a imagem da capa desta apresentação — ela fica só nesta geração (não é salva). O logo abaixo é salvo e vale para todas as apresentações."
+                  : isGiro
+                    ? "Escolha a imagem principal (capa/hero) deste relatório — ela fica só nesta geração (não é salva). O logo abaixo é salvo e vale para todas as apresentações."
+                    : "Use imagens com fundo transparente (PNG recortado) — elas aparecem “flutuando” sobre o círculo da coleção, como no modelo. Reenviar substitui a anterior; o que já foi enviado aparece no preview."}
           </p>
           <div className={styles.uploadGrid}>
-            {/* Capa do Top Produtos — sorteada entre as capas de coleção existentes */}
+            {/* Capa do Top Produtos — sorteada entre as capas de coleção (ScarfMe)
+                ou enviada pelo usuário (NERD, que não tem foto de coleção). */}
             {isTopProdutos && (
               <div className={styles.uploadCard}>
                 <div className={styles.uploadPreview}>
@@ -1375,40 +1395,48 @@ export default function GeradorApresentacoesPage({
                       ? "Imagem enviada (só nesta geração)"
                       : topCoverRef
                         ? `Capa de ${labelFromMaster(topCoverRef)}`
-                        : "Nenhuma capa de coleção disponível — envie uma imagem"}
+                        : isTopProdutosCapaColecao
+                          ? "Nenhuma capa de coleção disponível — envie uma imagem"
+                          : "Nenhuma imagem selecionada"}
                   </span>
-                  <select
-                    className={styles.select}
-                    value={topCoverUpload ? "" : topCoverRef ?? ""}
-                    onChange={(e) => {
-                      setTopCoverUpload(null);
-                      setTopCoverRef(e.target.value || null);
-                    }}
-                    disabled={topCoverRefs.length === 0}
-                  >
-                    {topCoverUpload && <option value="">Imagem enviada por você</option>}
-                    {topCoverRefs.length === 0 && <option value="">Nenhuma capa cadastrada</option>}
-                    {topCoverRefs.map((code) => (
-                      <option key={code} value={code}>
-                        {labelFromMaster(code)}
-                      </option>
-                    ))}
-                  </select>
-                  <div className={styles.uploadActions}>
-                    <button
-                      type="button"
-                      className={styles.fileBtn}
-                      onClick={sortearTopCover}
-                      disabled={topCoverRefs.length < 2}
+                  {isTopProdutosCapaColecao && (
+                    <select
+                      className={styles.select}
+                      value={topCoverUpload ? "" : topCoverRef ?? ""}
+                      onChange={(e) => {
+                        setTopCoverUpload(null);
+                        setTopCoverRef(e.target.value || null);
+                      }}
+                      disabled={topCoverRefs.length === 0}
                     >
-                      Sortear outra
-                    </button>
+                      {topCoverUpload && <option value="">Imagem enviada por você</option>}
+                      {topCoverRefs.length === 0 && (
+                        <option value="">Nenhuma capa cadastrada</option>
+                      )}
+                      {topCoverRefs.map((code) => (
+                        <option key={code} value={code}>
+                          {labelFromMaster(code)}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <div className={styles.uploadActions}>
+                    {isTopProdutosCapaColecao && (
+                      <button
+                        type="button"
+                        className={styles.fileBtn}
+                        onClick={sortearTopCover}
+                        disabled={topCoverRefs.length < 2}
+                      >
+                        Sortear outra
+                      </button>
+                    )}
                     <button
                       type="button"
                       className={styles.fileBtn}
                       onClick={() => topCoverInputRef.current?.click()}
                     >
-                      Enviar imagem
+                      {topCoverUpload ? "Trocar imagem" : "Enviar imagem"}
                     </button>
                     {topCoverUpload && (
                       <button
@@ -1542,21 +1570,21 @@ export default function GeradorApresentacoesPage({
                 );
               })}
 
-            {/* Logo SCARF·ME */}
+            {/* Logo da empresa (um por empresa: NERD tem o dela, ScarfMe a dela) */}
             <div className={styles.uploadCard}>
               <div className={styles.uploadPreview}>
                 {logoDataUrl ? (
-                  <img src={logoDataUrl} alt="Logo SCARF·ME" />
+                  <img src={logoDataUrl} alt={`Logo ${brandName}`} />
                 ) : (
                   <span className={styles.uploadEmpty}>Sem logo</span>
                 )}
               </div>
               <div className={styles.uploadBody}>
-                <span className={styles.uploadTitle}>Logo SCARF·ME</span>
+                <span className={styles.uploadTitle}>Logo {brandName}</span>
                 <span className={logoDataUrl ? `${styles.uploadStatus} ${styles.uploadStatusOk}` : styles.uploadStatus}>
                   {logoDataUrl
-                    ? `Logo salvo${logoUpdatedAt ? " · atualizado agora" : ""} (vale para todas as apresentações)`
-                    : "Nenhum logo enviado (usa o texto SCARF·ME)"}
+                    ? `Logo salvo${logoUpdatedAt ? " · atualizado agora" : ""} (vale para todas as apresentações de ${brandName})`
+                    : `Nenhum logo enviado (usa o texto ${brandName})`}
                 </span>
                 <div className={styles.uploadActions}>
                   <button
@@ -1633,7 +1661,8 @@ export default function GeradorApresentacoesPage({
         )}
         {topProdutos && !loading && (
           <span className={styles.resultMeta}>
-            {topProdutos.totalPages} páginas · {topProdutos.slides.length} subgrupos ·{" "}
+            {topProdutos.totalPages} páginas · {topProdutos.slides.length}{" "}
+            {topProdutos.dimensao.plural} ·{" "}
             {topProdutos.totals.itensComVenda.toLocaleString("pt-BR")} itens · {topProdutos.period.label}
           </span>
         )}
@@ -1649,6 +1678,7 @@ export default function GeradorApresentacoesPage({
             logoDataUrl={logoDataUrl}
             coverDataUrl={topCoverEffective}
             coverTitle={coverTitle}
+            companyName={companyName}
             deckRef={deckRef}
           />
         </div>

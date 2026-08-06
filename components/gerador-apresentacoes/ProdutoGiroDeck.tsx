@@ -3,6 +3,7 @@
 import { type RefObject } from "react";
 
 import type { ProdutoGiroPresentationPayload } from "@/lib/repositories/produtoGiroPresentation";
+import { isScarfmeBrand, presentationBrandName } from "@/lib/presentations/brand";
 
 import styles from "./ProdutoGiroDeck.module.css";
 
@@ -35,15 +36,14 @@ function fmtSigned(n: number): string {
 
 function Logo({ dataUrl, companyName }: { dataUrl: string | null; companyName: string }) {
   if (dataUrl) return <img className={styles.logo} src={dataUrl} alt={companyName} />;
-  const isScarf = companyName.toLowerCase().includes("scarf");
-  if (isScarf) {
+  if (isScarfmeBrand(companyName)) {
     return (
       <div className={styles.wordmark}>
         SCARF<span className={styles.dot}>·</span>ME
       </div>
     );
   }
-  return <div className={styles.wordmark}>{companyName.toUpperCase()}</div>;
+  return <div className={styles.wordmark}>{presentationBrandName(companyName)}</div>;
 }
 
 /** Barras verticais (ritmo diário / semanal) como SVG. */
@@ -259,7 +259,7 @@ export default function ProdutoGiroDeck({
         <img src={logoDataUrl} alt={companyName} />
       ) : (
         <span className={styles.footWordmark} style={dark ? { color: "#fff" } : undefined}>
-          {companyName}
+          {presentationBrandName(companyName)}
         </span>
       )}
       <span>{footerText}</span>
