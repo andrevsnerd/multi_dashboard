@@ -1230,8 +1230,8 @@
     "semantic_hash": "e449c381872599286ae61c72a1af8112"
   },
   "components/ajuste-estoque/AjusteEstoquePage.tsx": {
-    "mtime": 1785949622.0972414,
-    "ast_hash": "d8fd7fa6b430508ac863d17aba7ac19f",
+    "mtime": 1785949873.4400463,
+    "ast_hash": "2383a5a98d755a4f413d1c2eacf8388e",
     "semantic_hash": ""
   },
   "components/auth/AuthContext.tsx": {
@@ -1430,8 +1430,8 @@
     "semantic_hash": "7a672d31b6ac254cb25f6a420501049d"
   },
   "components/layout/Sidebar.tsx": {
-    "mtime": 1785933056.1651673,
-    "ast_hash": "07d6046bbd55c617919604fbd50bd8bc",
+    "mtime": 1786018908.2479408,
+    "ast_hash": "023233fee58b928aa63068b81ad5061f",
     "semantic_hash": ""
   },
   "components/layout/SidebarContext.tsx": {
@@ -2155,8 +2155,8 @@
     "semantic_hash": "29590f1b0f773ebbcd60e9dc314eec58"
   },
   "lib/config/page-permissions.ts": {
-    "mtime": 1785933033.4124634,
-    "ast_hash": "e71c5c3114ef6343d6887a8fa184d9b8",
+    "mtime": 1786017734.701482,
+    "ast_hash": "6da071da4bf4fd4d27f8064cf4d7223c",
     "semantic_hash": ""
   },
   "lib/constants/columns.ts": {
@@ -4032,6 +4032,71 @@
   "lib/utils/transferencia-permissoes-filiais.ts": {
     "mtime": 1785761951.1789758,
     "ast_hash": "92854a2ed038a4188b5ca624ac008f63",
+    "semantic_hash": ""
+  },
+  "app/(companies)/[company]/imprimir-etiquetas/page.tsx": {
+    "mtime": 1786018882.6225386,
+    "ast_hash": "0e382c479eedbf04f0ef1e2e1e858d1d",
+    "semantic_hash": ""
+  },
+  "app/api/etiquetas/config/route.ts": {
+    "mtime": 1786017762.6403775,
+    "ast_hash": "b3e85e27cf01d71fb0ad39dcc601133f",
+    "semantic_hash": ""
+  },
+  "app/api/etiquetas/produtos/route.ts": {
+    "mtime": 1786017747.9095845,
+    "ast_hash": "e0b92b1e7565f1635b79202d94fa3127",
+    "semantic_hash": ""
+  },
+  "components/etiquetas/ConfiguracaoEtiqueta.tsx": {
+    "mtime": 1786018712.9539175,
+    "ast_hash": "71c1dd37ef49010444e753528ffd9bd6",
+    "semantic_hash": ""
+  },
+  "components/etiquetas/EtiquetaSvg.tsx": {
+    "mtime": 1786019165.6936727,
+    "ast_hash": "4fff901f7a8332bc287529f63efb3a6b",
+    "semantic_hash": ""
+  },
+  "components/etiquetas/ImprimirEtiquetasPage.tsx": {
+    "mtime": 1786018872.1269395,
+    "ast_hash": "d2ad4127a2c4d6fc2b917be864ddbd3c",
+    "semantic_hash": ""
+  },
+  "components/etiquetas/zebra-browser-print.ts": {
+    "mtime": 1786018604.0493207,
+    "ast_hash": "477d1c36e9215d84491ddf59e473d5e7",
+    "semantic_hash": ""
+  },
+  "lib/auth/etiquetas-guard.ts": {
+    "mtime": 1786017727.3150394,
+    "ast_hash": "c758b0992ebe4834b466834fa23edbc5",
+    "semantic_hash": ""
+  },
+  "lib/etiquetas/barcode.ts": {
+    "mtime": 1786017437.5903158,
+    "ast_hash": "265e210c76f57b99c072bd62943d5fc7",
+    "semantic_hash": ""
+  },
+  "lib/etiquetas/tipos.ts": {
+    "mtime": 1786019143.0246708,
+    "ast_hash": "7dfb43497646398436c61d42104060c0",
+    "semantic_hash": ""
+  },
+  "lib/etiquetas/zpl.ts": {
+    "mtime": 1786018852.161461,
+    "ast_hash": "01044c3cd4da620be80443953af187be",
+    "semantic_hash": ""
+  },
+  "lib/repositories/etiquetas.ts": {
+    "mtime": 1786017654.6614728,
+    "ast_hash": "6991e7e65fe6b387b77a7c9befa52f4c",
+    "semantic_hash": ""
+  },
+  "lib/utils/etiquetas-config-store.ts": {
+    "mtime": 1786017675.2298787,
+    "ast_hash": "c539c0e3ed8efad89fe523407bef4eed",
     "semantic_hash": ""
   }
 }

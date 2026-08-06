@@ -102,6 +102,123 @@ function pesoDoCodigo(row: BarraRow): number {
   return 3;
 }
 
+/** Linha do autocomplete — leve de propósito (não traz as cores todas). */
+export interface SugestaoProduto {
+  produto: string;
+  descProduto: string;
+  subgrupo: string;
+  inativo: boolean;
+  /** Quantas cores o produto tem cadastradas. */
+  totalCores: number;
+  /** Quando o termo casou com um código de barra, qual cor era. */
+  corEncontrada: string | null;
+  descCorEncontrada: string | null;
+  codigoEncontrado: string | null;
+}
+
+/**
+ * Sugestões enquanto o usuário digita (nome, código ou código de barra).
+ *
+ * Espelha a ordenação do autocomplete do Produto Detalhado — barra exata,
+ * código exato, nome exato, começa com, contém — mas com guarda de permissão e
+ * escopo por PRODUTOS.EMPRESA, que a rota genérica `/api/products/search` não tem.
+ */
+export async function buscarSugestoesProduto(
+  company: EtiquetaCompany,
+  termo: string,
+  opts: { limite?: number; incluirInativos?: boolean } = {}
+): Promise<SugestaoProduto[]> {
+  const t = (termo ?? '').trim();
+  if (t.length < 2) return [];
+
+  const limite = Math.min(50, Math.max(1, opts.limite ?? 20));
+  const tEsc = esc(t);
+  const tUpper = esc(t.toUpperCase());
+  const empresa = filtroEmpresa(company);
+  const inativos = opts.incluirInativos ? '' : 'AND ISNULL(p.INATIVO, 0) = 0';
+
+  const rows = await query<{
+    PRODUTO: string;
+    DESC_PRODUTO: string;
+    SUBGRUPO: string;
+    INATIVO: number | null;
+    TOTAL_CORES: number;
+    COR: string | null;
+    DESC_COR: string | null;
+    CODIGO: string | null;
+  }>(`
+    SELECT TOP ${limite}
+      LTRIM(RTRIM(p.PRODUTO)) AS PRODUTO,
+      LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, ''))) AS DESC_PRODUTO,
+      LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, ''))) AS SUBGRUPO,
+      ISNULL(p.INATIVO, 0) AS INATIVO,
+      ISNULL(cores.TOTAL, 0) AS TOTAL_CORES,
+      barra.COR_PRODUTO AS COR,
+      cor.DESC_COR AS DESC_COR,
+      barra.CODIGO_BARRA AS CODIGO
+    FROM PRODUTOS p WITH (NOLOCK)
+    OUTER APPLY (
+      SELECT TOP 1
+        LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100)))) AS CODIGO_BARRA,
+        LTRIM(RTRIM(ISNULL(CAST(pb.COR_PRODUTO AS VARCHAR(20)), ''))) AS COR_PRODUTO
+      FROM PRODUTOS_BARRA pb WITH (NOLOCK)
+      WHERE pb.PRODUTO = p.PRODUTO
+        AND pb.CODIGO_BARRA IS NOT NULL
+        AND LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100)))) LIKE '%${tEsc}%'
+      ORDER BY
+        CASE WHEN LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100)))) = '${tEsc}' THEN 0 ELSE 1 END,
+        LEN(LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100))))),
+        pb.CODIGO_BARRA
+    ) barra
+    OUTER APPLY (
+      SELECT COUNT(DISTINCT LTRIM(RTRIM(ISNULL(CAST(pc.COR_PRODUTO AS VARCHAR(20)), '')))) AS TOTAL
+      FROM PRODUTO_CORES pc WITH (NOLOCK)
+      WHERE pc.PRODUTO = p.PRODUTO
+    ) cores
+    OUTER APPLY (
+      SELECT TOP 1 LTRIM(RTRIM(ISNULL(pc.DESC_COR_PRODUTO, ''))) AS DESC_COR
+      FROM PRODUTO_CORES pc WITH (NOLOCK)
+      WHERE pc.PRODUTO = p.PRODUTO
+        AND (
+          LTRIM(RTRIM(CAST(pc.COR_PRODUTO AS VARCHAR(20)))) = barra.COR_PRODUTO
+          OR TRY_CONVERT(INT, pc.COR_PRODUTO) = TRY_CONVERT(INT, barra.COR_PRODUTO)
+        )
+    ) cor
+    WHERE (
+        UPPER(p.DESC_PRODUTO) LIKE '%${tUpper}%'
+        OR LTRIM(RTRIM(p.PRODUTO)) LIKE '%${tEsc}%'
+        OR barra.CODIGO_BARRA IS NOT NULL
+      )
+      ${empresa}
+      ${inativos}
+    ORDER BY
+      CASE
+        WHEN barra.CODIGO_BARRA = '${tEsc}' THEN 0
+        WHEN LTRIM(RTRIM(p.PRODUTO)) = '${tEsc}' THEN 1
+        WHEN UPPER(LTRIM(RTRIM(p.DESC_PRODUTO))) = '${tUpper}' THEN 2
+        WHEN UPPER(p.DESC_PRODUTO) LIKE '${tUpper}%' THEN 3
+        WHEN UPPER(p.DESC_PRODUTO) LIKE '% ${tUpper}%' THEN 4
+        WHEN LTRIM(RTRIM(p.PRODUTO)) LIKE '${tEsc}%' THEN 5
+        WHEN UPPER(p.DESC_PRODUTO) LIKE '%${tUpper}%' THEN 6
+        WHEN barra.CODIGO_BARRA IS NOT NULL THEN 7
+        ELSE 8
+      END,
+      LEN(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))),
+      p.DESC_PRODUTO
+  `);
+
+  return rows.map((r) => ({
+    produto: (r.PRODUTO ?? '').trim(),
+    descProduto: (r.DESC_PRODUTO ?? '').trim(),
+    subgrupo: (r.SUBGRUPO ?? '').trim(),
+    inativo: Number(r.INATIVO ?? 0) !== 0,
+    totalCores: Number(r.TOTAL_CORES) || 0,
+    corEncontrada: (r.COR ?? '').trim() || null,
+    descCorEncontrada: (r.DESC_COR ?? '').trim() || null,
+    codigoEncontrado: (r.CODIGO ?? '').trim() || null,
+  }));
+}
+
 /**
  * Busca produtos pelo termo (código, descrição ou código de barra) e monta
  * produto → cores. `limite` corta a quantidade de produtos, não de cores.

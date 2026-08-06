@@ -59,6 +59,17 @@ interface ProdutoEtiqueta {
   cores: CorEtiqueta[];
 }
 
+interface SugestaoProduto {
+  produto: string;
+  descProduto: string;
+  subgrupo: string;
+  inativo: boolean;
+  totalCores: number;
+  corEncontrada: string | null;
+  descCorEncontrada: string | null;
+  codigoEncontrado: string | null;
+}
+
 interface ItemFila {
   item: ItemEtiqueta;
   quantidade: number;
@@ -73,6 +84,16 @@ const MAX_ETIQUETAS_NAVEGADOR = 900;
 
 function chaveItem(produto: string, cor: string): string {
   return `${produto}|${cor}`;
+}
+
+/** '06' e '6' são a mesma cor no ERP — comparar como string pura falha. */
+function mesmaCor(a: string, b: string): boolean {
+  const na = Number(a);
+  const nb = Number(b);
+  if (Number.isFinite(na) && Number.isFinite(nb) && a.trim() !== "" && b.trim() !== "") {
+    return na === nb;
+  }
+  return a.trim().toUpperCase() === b.trim().toUpperCase();
 }
 
 function montarItem(produto: ProdutoEtiqueta, cor: CorEtiqueta): ItemEtiqueta {
@@ -98,8 +119,14 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
   const [termo, setTermo] = useState("");
   const [incluirInativos, setIncluirInativos] = useState(false);
   const [buscando, setBuscando] = useState(false);
+  /** Produtos abertos, o mais recente no topo. A fila sobrevive a todos eles. */
   const [produtos, setProdutos] = useState<ProdutoEtiqueta[]>([]);
-  const [buscou, setBuscou] = useState(false);
+
+  const [sugestoes, setSugestoes] = useState<SugestaoProduto[]>([]);
+  const [mostrarSugestoes, setMostrarSugestoes] = useState(false);
+  const [indiceSugestao, setIndiceSugestao] = useState(-1);
+  const [corDestacada, setCorDestacada] = useState<string | null>(null);
+  const buscaRef = useRef<HTMLDivElement | null>(null);
 
   const [fila, setFila] = useState<Record<string, ItemFila>>({});
   const [qtdPadrao, setQtdPadrao] = useState(1);
@@ -179,32 +206,123 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
 
   /* ── busca ───────────────────────────────────────────────────────────── */
 
-  const buscar = useCallback(async () => {
+  // Sugestões enquanto digita (300ms de folga, igual ao Produto Detalhado).
+  useEffect(() => {
     const t = termo.trim();
-    if (t.length < 2) {
-      setErro("Digite ao menos 2 caracteres (código, nome ou código de barra).");
+    if (!username || t.length < 2) {
+      setSugestoes([]);
+      setMostrarSugestoes(false);
       return;
     }
-    setBuscando(true);
-    setErro(null);
-    setAviso(null);
-    try {
-      const resp = await fetch("/api/etiquetas/produtos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-auth-username": username },
-        body: JSON.stringify({ company: companyKey, termo: t, incluirInativos }),
-      });
-      const dados = await resp.json();
-      if (!resp.ok) throw new Error(dados?.error ?? "Erro ao buscar produtos.");
-      setProdutos(dados.produtos ?? []);
-      setBuscou(true);
-      if ((dados.produtos ?? []).length === 0) setAviso("Nenhum produto encontrado para esse termo.");
-    } catch (e) {
-      setErro(e instanceof Error ? e.message : "Erro ao buscar produtos.");
-    } finally {
-      setBuscando(false);
-    }
+
+    let ativo = true;
+    const timer = window.setTimeout(async () => {
+      try {
+        const resp = await fetch(
+          `/api/etiquetas/sugestoes?company=${companyKey}&q=${encodeURIComponent(t)}${
+            incluirInativos ? "&inativos=1" : ""
+          }`,
+          { headers: { "x-auth-username": username }, cache: "no-store" }
+        );
+        if (!resp.ok || !ativo) return;
+        const dados = await resp.json();
+        if (!ativo) return;
+        setSugestoes(dados.sugestoes ?? []);
+        setMostrarSugestoes((dados.sugestoes ?? []).length > 0);
+        setIndiceSugestao(-1);
+      } catch {
+        // digitar rápido cancela requisições — silêncio é o certo aqui
+      }
+    }, 300);
+
+    return () => {
+      ativo = false;
+      window.clearTimeout(timer);
+    };
   }, [termo, username, companyKey, incluirInativos]);
+
+  // Fecha o dropdown ao clicar fora.
+  useEffect(() => {
+    function aoClicarFora(evento: MouseEvent) {
+      if (buscaRef.current && !buscaRef.current.contains(evento.target as Node)) {
+        setMostrarSugestoes(false);
+      }
+    }
+    document.addEventListener("mousedown", aoClicarFora);
+    return () => document.removeEventListener("mousedown", aoClicarFora);
+  }, []);
+
+  /**
+   * Abre um produto (com todas as cores) no topo da lista. Não fecha os
+   * anteriores: dá para ir de produto em produto empilhando na fila.
+   */
+  const abrirProduto = useCallback(
+    async (codigo: string, corParaDestacar: string | null = null) => {
+      setBuscando(true);
+      setErro(null);
+      setMostrarSugestoes(false);
+      try {
+        const resp = await fetch("/api/etiquetas/produtos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-auth-username": username },
+          body: JSON.stringify({ company: companyKey, termo: codigo, incluirInativos, limite: 5 }),
+        });
+        const dados = await resp.json();
+        if (!resp.ok) throw new Error(dados?.error ?? "Erro ao buscar o produto.");
+
+        const encontrados: ProdutoEtiqueta[] = dados.produtos ?? [];
+        const alvo = encontrados.find((p) => p.produto === codigo) ?? encontrados[0];
+        if (!alvo) {
+          setAviso("Produto não encontrado.");
+          return;
+        }
+        setProdutos((atuais) => [alvo, ...atuais.filter((p) => p.produto !== alvo.produto)].slice(0, 8));
+        setCorDestacada(corParaDestacar);
+        setAviso(null);
+      } catch (e) {
+        setErro(e instanceof Error ? e.message : "Erro ao buscar o produto.");
+      } finally {
+        setBuscando(false);
+      }
+    },
+    [username, companyKey, incluirInativos]
+  );
+
+  const escolherSugestao = useCallback(
+    (sugestao: SugestaoProduto) => {
+      setTermo("");
+      setSugestoes([]);
+      void abrirProduto(sugestao.produto, sugestao.corEncontrada);
+    },
+    [abrirProduto]
+  );
+
+  /** ↑ ↓ para navegar, Enter para abrir, Esc para fechar. */
+  const aoTeclar = useCallback(
+    (evento: React.KeyboardEvent<HTMLInputElement>) => {
+      if (evento.key === "Escape") {
+        setMostrarSugestoes(false);
+        return;
+      }
+      if (!mostrarSugestoes || sugestoes.length === 0) {
+        if (evento.key === "Enter" && termo.trim().length >= 2 && sugestoes.length === 1) {
+          escolherSugestao(sugestoes[0]);
+        }
+        return;
+      }
+      if (evento.key === "ArrowDown") {
+        evento.preventDefault();
+        setIndiceSugestao((i) => (i + 1) % sugestoes.length);
+      } else if (evento.key === "ArrowUp") {
+        evento.preventDefault();
+        setIndiceSugestao((i) => (i <= 0 ? sugestoes.length - 1 : i - 1));
+      } else if (evento.key === "Enter") {
+        evento.preventDefault();
+        escolherSugestao(sugestoes[indiceSugestao >= 0 ? indiceSugestao : 0]);
+      }
+    },
+    [mostrarSugestoes, sugestoes, indiceSugestao, termo, escolherSugestao]
+  );
 
   /* ── fila de impressão ───────────────────────────────────────────────── */
 
@@ -260,6 +378,15 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
     () => itensFila.reduce((soma, i) => soma + i.quantidade, 0),
     [itensFila]
   );
+
+  /** Quantas etiquetas já estão na fila por produto — some no autocomplete. */
+  const etiquetasPorProduto = useMemo(() => {
+    const mapa: Record<string, number> = {};
+    for (const { item, quantidade } of itensFila) {
+      mapa[item.produto] = (mapa[item.produto] ?? 0) + quantidade;
+    }
+    return mapa;
+  }, [itensFila]);
 
   /* ── ZPL ─────────────────────────────────────────────────────────────── */
 
@@ -470,24 +597,91 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
         <div style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
           <div className={styles.card}>
             <h2 className={styles.cardTitle}>1. Produtos</h2>
-            <div className={styles.buscaLinha}>
-              <input
-                className={styles.input}
-                placeholder="Código do produto, nome ou código de barra"
-                value={termo}
-                onChange={(e) => setTermo(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void buscar();
-                }}
-              />
-              <button
-                type="button"
-                className={`${styles.botao} ${styles.botaoPrimario}`}
-                onClick={() => void buscar()}
-                disabled={buscando}
-              >
-                {buscando ? "Buscando…" : "Buscar"}
-              </button>
+            <div className={styles.buscaContainer} ref={buscaRef}>
+              <div className={styles.buscaWrapper}>
+                <span className={styles.buscaIcone} aria-hidden>
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="m21 21-4.35-4.35" />
+                  </svg>
+                </span>
+                <input
+                  className={styles.buscaInput}
+                  placeholder="Nome, código ou código de barras"
+                  value={termo}
+                  onChange={(e) => setTermo(e.target.value)}
+                  onKeyDown={aoTeclar}
+                  onFocus={() => {
+                    if (sugestoes.length > 0) setMostrarSugestoes(true);
+                  }}
+                  autoComplete="off"
+                />
+                {termo ? (
+                  <button
+                    type="button"
+                    className={styles.buscaLimpar}
+                    onClick={() => {
+                      setTermo("");
+                      setSugestoes([]);
+                      setMostrarSugestoes(false);
+                    }}
+                    aria-label="Limpar busca"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                      <path
+                        d="M12 4L4 12M4 4L12 12"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  </button>
+                ) : null}
+              </div>
+
+              {mostrarSugestoes && sugestoes.length > 0 ? (
+                <div className={styles.sugestoes}>
+                  {sugestoes.map((s, i) => {
+                    const naFila = etiquetasPorProduto[s.produto] ?? 0;
+                    return (
+                      <button
+                        key={`${s.produto}-${s.corEncontrada ?? "todas"}`}
+                        type="button"
+                        className={`${styles.sugestaoItem} ${i === indiceSugestao ? styles.sugestaoAtiva : ""}`}
+                        onMouseEnter={() => setIndiceSugestao(i)}
+                        onClick={() => escolherSugestao(s)}
+                      >
+                        <div className={styles.sugestaoNome}>
+                          {s.descProduto || s.produto}
+                          {s.inativo ? <span className={styles.tagInativo}>inativo</span> : null}
+                          {naFila > 0 ? (
+                            <span className={styles.tagFila}>{naFila} na fila</span>
+                          ) : null}
+                        </div>
+                        <div className={styles.sugestaoMeta}>
+                          {s.produto}
+                          {s.subgrupo ? ` · ${s.subgrupo}` : ""}
+                          {` · ${s.totalCores} cor${s.totalCores === 1 ? "" : "es"}`}
+                          {s.codigoEncontrado
+                            ? ` · barra ${s.codigoEncontrado}${
+                                s.descCorEncontrada ? ` (${s.descCorEncontrada})` : ""
+                              }`
+                            : ""}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
             </div>
 
             <div className={styles.checkLinha}>
@@ -520,6 +714,11 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
                         <div className={styles.produtoNome}>
                           {produto.descProduto || produto.produto}{" "}
                           {produto.inativo ? <span className={styles.tagInativo}>inativo</span> : null}
+                          {etiquetasPorProduto[produto.produto] ? (
+                            <span className={styles.tagFila}>
+                              {etiquetasPorProduto[produto.produto]} na fila
+                            </span>
+                          ) : null}
                         </div>
                         <div className={styles.produtoMeta}>
                           {produto.produto}
@@ -527,7 +726,7 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
                           {produto.grade ? ` · ${produto.grade}` : ""}
                         </div>
                       </div>
-                      <div style={{ display: "flex", gap: 6 }}>
+                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                         <button
                           type="button"
                           className={styles.botaoMini}
@@ -542,6 +741,19 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
                           title="Uma etiqueta por peça em estoque"
                         >
                           usar estoque
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.botaoFechar}
+                          onClick={() =>
+                            setProdutos((atuais) =>
+                              atuais.filter((p) => p.produto !== produto.produto)
+                            )
+                          }
+                          title="Fechar este produto (não mexe na fila)"
+                          aria-label="Fechar produto"
+                        >
+                          ✕
                         </button>
                       </div>
                     </div>
@@ -559,10 +771,21 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
                       <tbody>
                         {produto.cores.map((cor) => {
                           const qtd = quantidadeDe(produto.produto, cor.cor);
+                          // Quando o usuário buscou por um código de barra, a cor
+                          // daquele código fica marcada para não precisar caçar.
+                          const encontrada =
+                            corDestacada !== null &&
+                            produtos[0]?.produto === produto.produto &&
+                            mesmaCor(cor.cor, corDestacada);
                           return (
                             <tr
                               key={`${produto.produto}-${cor.cor}`}
-                              className={qtd > 0 ? styles.linhaAtiva : undefined}
+                              className={[
+                                qtd > 0 ? styles.linhaAtiva : "",
+                                encontrada ? styles.linhaEncontrada : "",
+                              ]
+                                .filter(Boolean)
+                                .join(" ")}
                             >
                               <td className={styles.mono}>{cor.cor || "—"}</td>
                               <td>{cor.descCor || <span className={styles.semCodigo}>sem descrição</span>}</td>
@@ -598,9 +821,13 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
                   </div>
                 ))}
               </div>
-            ) : buscou && !buscando ? (
-              <div className={styles.filaVazia}>Nada encontrado. Tente outro termo.</div>
-            ) : null}
+            ) : (
+              <div className={styles.filaVazia}>
+                {buscando
+                  ? "Abrindo produto…"
+                  : "Digite o nome, o código ou passe o leitor no código de barras. As sugestões aparecem enquanto você digita."}
+              </div>
+            )}
           </div>
 
           {/* ─────────────── fila ─────────────── */}

@@ -66,7 +66,126 @@
   }
 }
 
-/* ── busca ── */
+/* ── busca com autocomplete (espelha o Produto Detalhado) ── */
+
+.buscaContainer {
+  position: relative;
+  width: 100%;
+}
+.buscaWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.buscaIcone {
+  position: absolute;
+  left: 13px;
+  display: flex;
+  color: var(--t-gray500);
+  pointer-events: none;
+}
+.buscaInput {
+  width: 100%;
+  padding: 10px 38px 10px 40px;
+  border-radius: 8px;
+  border: 1px solid var(--b-300);
+  background: var(--s-white);
+  color: var(--t-900);
+  font-size: 14px;
+}
+.buscaInput:focus {
+  outline: none;
+  border-color: var(--t-500);
+  box-shadow: 0 0 0 3px var(--b-subtle);
+}
+.buscaLimpar {
+  position: absolute;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  color: var(--t-gray500);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+}
+.buscaLimpar:hover {
+  background: var(--s-100);
+  color: var(--t-800);
+}
+
+.sugestoes {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+  background: var(--s-white);
+  border: 1px solid var(--b-300);
+  border-radius: 8px;
+  box-shadow: 0 6px 16px -4px rgba(0, 0, 0, 0.18);
+  max-height: 320px;
+  overflow-y: auto;
+  z-index: 20;
+}
+.sugestaoItem {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 9px 14px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-bottom: 1px solid var(--b-subtle);
+}
+.sugestaoItem:last-child {
+  border-bottom: none;
+}
+.sugestaoAtiva {
+  background: var(--s-blue50);
+}
+.sugestaoNome {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--t-gray800);
+  margin-bottom: 3px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.sugestaoMeta {
+  font-size: 11.5px;
+  color: var(--t-gray500);
+}
+.tagFila {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #1d4ed8;
+  background: rgba(37, 99, 235, 0.12);
+  padding: 1px 6px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.botaoFechar {
+  border: none;
+  background: none;
+  color: var(--t-400);
+  font-size: 14px;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.botaoFechar:hover {
+  background: var(--s-100);
+  color: var(--t-800);
+}
+.linhaEncontrada {
+  box-shadow: inset 3px 0 0 #f59e0b;
+}
 
 .buscaLinha {
   display: flex;
