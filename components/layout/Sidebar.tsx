@@ -112,6 +112,8 @@ export default function Sidebar({ companyName }: SidebarProps) {
     basePath && basePath !== "/" ? `${basePath}/alterar-cadastro` : "/alterar-cadastro";
   const alterarProdutosMassaHref =
     basePath && basePath !== "/" ? `${basePath}/alterar-produtos-massa` : "/alterar-produtos-massa";
+  const imprimirEtiquetasHref =
+    basePath && basePath !== "/" ? `${basePath}/imprimir-etiquetas` : "/imprimir-etiquetas";
   const geradorApresentacoesHref =
     basePath && basePath !== "/" ? `${basePath}/gerador-apresentacoes` : "/gerador-apresentacoes";
   const fornecedoresHref =
@@ -281,6 +283,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     "/alterar-precos",
     "/alterar-cadastro",
     "/alterar-produtos-massa",
+    "/imprimir-etiquetas",
     "/gerador-apresentacoes",
     "/mapa-clientes",
     "/sincronizacao",
@@ -604,6 +607,18 @@ export default function Sidebar({ companyName }: SidebarProps) {
                     "/alterar-produtos-massa",
                     alterarProdutosMassaHref
                   ),
+              },
+            ]
+          : []),
+        ...(isScarfme || isNerd
+          ? [
+              {
+                key: "imprimir-etiquetas",
+                label: "Imprimir Etiquetas",
+                href: imprimirEtiquetasHref,
+                permission: "imprimir-etiquetas" as const,
+                isActive: (currentPathname: string | null) =>
+                  matchesSegment(currentPathname, "/imprimir-etiquetas", imprimirEtiquetasHref),
               },
             ]
           : []),

@@ -1,0 +1,448 @@
+/* Imprimir Etiquetas — busca à esquerda, fila e preview à direita.
+   Usa os tokens globais direto, então o tema noturno vem de graça. */
+
+.wrapper {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  color: var(--t-900);
+}
+
+/* ── cabeçalho ── */
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.title {
+  font-size: 26px;
+  font-weight: 700;
+  margin: 0;
+}
+.subtitle {
+  font-size: 13px;
+  color: var(--t-500);
+  margin: 0;
+}
+
+/* ── cards ── */
+
+.card {
+  background: var(--s-white);
+  border: 1px solid var(--b-200);
+  border-radius: 12px;
+  box-shadow: var(--elev-1);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.cardTitle {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.colunas {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 1100px) {
+  .colunas {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ── busca ── */
+
+.buscaLinha {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.input {
+  flex: 1 1 240px;
+  min-width: 0;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--b-300);
+  background: var(--s-white);
+  color: var(--t-900);
+  font-size: 14px;
+}
+.input:focus {
+  outline: 2px solid var(--b-300);
+  outline-offset: 1px;
+}
+.select {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--b-300);
+  background: var(--s-white);
+  color: var(--t-900);
+  font-size: 13px;
+}
+.numero {
+  width: 76px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--b-300);
+  background: var(--s-white);
+  color: var(--t-900);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.botao {
+  padding: 9px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--b-300);
+  background: var(--s-white);
+  color: var(--t-800);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.botao:hover:not(:disabled) {
+  background: var(--s-100);
+}
+.botao:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.botaoPrimario {
+  background: var(--t-900);
+  border-color: var(--t-900);
+  color: var(--s-white);
+}
+.botaoPrimario:hover:not(:disabled) {
+  opacity: 0.88;
+  background: var(--t-900);
+}
+.botaoMini {
+  padding: 4px 9px;
+  font-size: 12px;
+  border-radius: 6px;
+  border: 1px solid var(--b-300);
+  background: var(--s-white);
+  color: var(--t-700);
+  cursor: pointer;
+}
+.botaoMini:hover {
+  background: var(--s-100);
+}
+.botaoLink {
+  border: none;
+  background: none;
+  color: var(--t-600);
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+}
+
+.checkLinha {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  color: var(--t-600);
+}
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+/* ── resultados ── */
+
+.resultados {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 560px;
+  overflow-y: auto;
+}
+.produtoBloco {
+  border: 1px solid var(--b-200);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.produtoHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 12px;
+  background: var(--s-50);
+  border-bottom: 1px solid var(--b-200);
+  flex-wrap: wrap;
+}
+.produtoNome {
+  font-size: 14px;
+  font-weight: 700;
+}
+.produtoMeta {
+  font-size: 12px;
+  color: var(--t-500);
+}
+.tagInativo {
+  font-size: 11px;
+  font-weight: 700;
+  color: #b45309;
+  background: rgba(234, 179, 8, 0.16);
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+
+.tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.tabela th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--t-500);
+  font-weight: 600;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--b-200);
+  white-space: nowrap;
+}
+.tabela td {
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--b-subtle);
+  vertical-align: middle;
+}
+.tabela tr:last-child td {
+  border-bottom: none;
+}
+.tdNum {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+}
+.linhaAtiva {
+  background: var(--s-blue50);
+}
+.semCodigo {
+  color: #b91c1c;
+  font-size: 12px;
+}
+
+/* ── fila ── */
+
+.filaVazia {
+  font-size: 13px;
+  color: var(--t-500);
+  padding: 8px 0;
+}
+.totalLinha {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--t-600);
+  flex-wrap: wrap;
+}
+.totalNumero {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--t-900);
+  font-variant-numeric: tabular-nums;
+}
+
+.acoes {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── preview ── */
+
+.previewArea {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+}
+.previewEtiqueta {
+  border: 1px solid var(--b-200);
+  border-radius: 6px;
+  background: #fff;
+  padding: 4px;
+  box-shadow: var(--elev-1);
+}
+.previewFileira {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  overflow-x: auto;
+  max-width: 100%;
+  padding-bottom: 4px;
+}
+.previewLegenda {
+  font-size: 12px;
+  color: var(--t-500);
+  text-align: center;
+}
+.escalaLinha {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--t-600);
+}
+
+/* ── avisos ── */
+
+.aviso {
+  font-size: 12.5px;
+  line-height: 1.5;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(234, 179, 8, 0.4);
+  background: rgba(234, 179, 8, 0.1);
+  color: var(--t-700);
+}
+.erro {
+  font-size: 12.5px;
+  line-height: 1.5;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.1);
+  color: #b91c1c;
+}
+.ok {
+  font-size: 12.5px;
+  line-height: 1.5;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(34, 197, 94, 0.45);
+  background: rgba(34, 197, 94, 0.08);
+  color: var(--t-700);
+}
+
+/* ── status da impressora ── */
+
+.statusLinha {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  color: var(--t-600);
+}
+.bolinha {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.bolinhaOn {
+  background: #22c55e;
+}
+.bolinhaOff {
+  background: var(--t-400);
+}
+
+/* ── configuração ── */
+
+.configGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+}
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--t-600);
+}
+.campo input[type="number"],
+.campo input[type="text"],
+.campo select {
+  padding: 7px 9px;
+  border-radius: 7px;
+  border: 1px solid var(--b-300);
+  background: var(--s-white);
+  color: var(--t-900);
+  font-size: 13px;
+}
+.secaoConfig {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--b-200);
+}
+.secaoTitulo {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--t-500);
+}
+.linhaConfig {
+  display: grid;
+  grid-template-columns: 26px minmax(120px, 1.2fr) repeat(auto-fit, minmax(72px, 1fr)) auto;
+  gap: 8px;
+  align-items: end;
+  padding: 8px;
+  border: 1px solid var(--b-200);
+  border-radius: 8px;
+}
+.arrasteBotoes {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.zplBox {
+  width: 100%;
+  min-height: 180px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+  line-height: 1.45;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--b-300);
+  background: var(--s-50);
+  color: var(--t-800);
+  white-space: pre;
+  overflow: auto;
+}
+
+/* A folha de impressão fica montada fora da tela: o botão "imprimir pelo
+   navegador" copia o HTML dela para dentro de um iframe. */
+.folhaOculta {
+  position: absolute;
+  left: -10000px;
+  top: 0;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}

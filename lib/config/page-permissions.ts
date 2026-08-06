@@ -56,6 +56,7 @@ export const PAGE_PERMISSION_DEFINITIONS = [
     label: "Alterar Multiplos Produtos",
     routeSegments: ["alterar-produtos-massa"],
   },
+  { key: "imprimir-etiquetas", label: "Imprimir Etiquetas", routeSegments: ["imprimir-etiquetas"] },
   { key: "gerador-apresentacoes", label: "Gerador de Apresentacoes", routeSegments: ["gerador-apresentacoes"] },
   { key: "fornecedores", label: "Grupos de Fornecedores", routeSegments: ["fornecedores"] },
   { key: "sincronizacao", label: "Sincronizacao", routeSegments: ["sincronizacao"] },

@@ -1,0 +1,940 @@
+"use client";
+
+/**
+ * Imprimir Etiquetas — busca produto, mostra todas as cores, o usuário digita a
+ * quantidade de etiquetas por cor e manda para a Zebra.
+ *
+ * Três caminhos de saída, todos a partir do MESMO desenho:
+ *  1. Zebra Browser Print — manda o ZPL cru (barras desenhadas pela impressora);
+ *  2. Baixar .zpl — para copiar direto na fila da impressora;
+ *  3. Imprimir pelo navegador — folha em mm no driver ZDesigner, sem instalar nada.
+ *
+ * O código de barra usado é sempre o PREFERENCIAL (o menor/interno), conforme a
+ * regra canônica do cadastro; a configuração permite trocar para o EAN.
+ */
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { useAuth } from "@/components/auth/AuthContext";
+import { analisarBarras, gerarZpl, montarFileiras } from "@/lib/etiquetas/zpl";
+import {
+  CONFIG_PADRAO,
+  alturaConteudoMm,
+  clonarConfig,
+  larguraFileiraMm,
+  type EtiquetaCompany,
+  type EtiquetaConfig,
+  type ItemEtiqueta,
+} from "@/lib/etiquetas/tipos";
+
+import ConfiguracaoEtiqueta from "./ConfiguracaoEtiqueta";
+import EtiquetaSvg from "./EtiquetaSvg";
+import styles from "./ImprimirEtiquetasPage.module.css";
+import {
+  enviarZpl,
+  listarImpressoras,
+  type StatusBrowserPrint,
+  type ZebraDevice,
+} from "./zebra-browser-print";
+
+interface CorEtiqueta {
+  cor: string;
+  descCor: string;
+  codigoBarra: string;
+  ean: string;
+  codigos: string[];
+  estoque: number;
+}
+
+interface ProdutoEtiqueta {
+  produto: string;
+  descProduto: string;
+  grupo: string;
+  subgrupo: string;
+  linha: string;
+  colecao: string;
+  grade: string;
+  tipo: string;
+  inativo: boolean;
+  cores: CorEtiqueta[];
+}
+
+interface ItemFila {
+  item: ItemEtiqueta;
+  quantidade: number;
+}
+
+interface Props {
+  companyKey: EtiquetaCompany;
+}
+
+/** Teto do caminho "imprimir pelo navegador" — acima disso o DOM fica pesado. */
+const MAX_ETIQUETAS_NAVEGADOR = 900;
+
+function chaveItem(produto: string, cor: string): string {
+  return `${produto}|${cor}`;
+}
+
+function montarItem(produto: ProdutoEtiqueta, cor: CorEtiqueta): ItemEtiqueta {
+  return {
+    produto: produto.produto,
+    descProduto: produto.descProduto,
+    cor: cor.cor,
+    descCor: cor.descCor,
+    codigoBarra: cor.codigoBarra,
+    grupo: produto.grupo,
+    subgrupo: produto.subgrupo,
+    linha: produto.linha,
+    colecao: produto.colecao,
+    grade: produto.grade,
+    tipo: produto.tipo,
+  };
+}
+
+export default function ImprimirEtiquetasPage({ companyKey }: Props) {
+  const { user } = useAuth();
+  const username = user?.username ?? "";
+
+  const [termo, setTermo] = useState("");
+  const [incluirInativos, setIncluirInativos] = useState(false);
+  const [buscando, setBuscando] = useState(false);
+  const [produtos, setProdutos] = useState<ProdutoEtiqueta[]>([]);
+  const [buscou, setBuscou] = useState(false);
+
+  const [fila, setFila] = useState<Record<string, ItemFila>>({});
+  const [qtdPadrao, setQtdPadrao] = useState(1);
+
+  const [config, setConfig] = useState<EtiquetaConfig>(() => clonarConfig(CONFIG_PADRAO));
+  const [configSalva, setConfigSalva] = useState<EtiquetaConfig>(() => clonarConfig(CONFIG_PADRAO));
+  const [podeConfigurar, setPodeConfigurar] = useState(false);
+  const [mostrarConfig, setMostrarConfig] = useState(false);
+  const [salvandoConfig, setSalvandoConfig] = useState(false);
+
+  const [zebra, setZebra] = useState<StatusBrowserPrint | null>(null);
+  const [impressoraUid, setImpressoraUid] = useState("");
+  const [verificandoZebra, setVerificandoZebra] = useState(false);
+
+  const [erro, setErro] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
+  const [mostrarZpl, setMostrarZpl] = useState(false);
+
+  const folhaRef = useRef<HTMLDivElement | null>(null);
+  const [preparandoFolha, setPreparandoFolha] = useState(false);
+
+  /* ── configuração salva da empresa ───────────────────────────────────── */
+
+  useEffect(() => {
+    if (!username) return;
+    let cancelado = false;
+    (async () => {
+      try {
+        const resp = await fetch(`/api/etiquetas/config?company=${companyKey}`, {
+          headers: { "x-auth-username": username },
+        });
+        const dados = await resp.json();
+        if (!resp.ok) throw new Error(dados?.error ?? "Erro ao carregar a configuração.");
+        if (cancelado) return;
+        setConfig(dados.config);
+        setConfigSalva(dados.config);
+        setPodeConfigurar(Boolean(dados.podeConfigurar));
+      } catch (e) {
+        if (!cancelado) setErro(e instanceof Error ? e.message : "Erro ao carregar a configuração.");
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [companyKey, username]);
+
+  /* ── Zebra Browser Print ─────────────────────────────────────────────── */
+
+  const verificarZebra = useCallback(async () => {
+    setVerificandoZebra(true);
+    try {
+      const status = await listarImpressoras();
+      setZebra(status);
+      const preferida =
+        status.impressoras.find((i) => i.name === config.impressora.nomeImpressora) ??
+        status.padrao ??
+        status.impressoras[0];
+      if (preferida) setImpressoraUid(preferida.uid);
+    } finally {
+      setVerificandoZebra(false);
+    }
+  }, [config.impressora.nomeImpressora]);
+
+  useEffect(() => {
+    void verificarZebra();
+    // Só na montagem: reconsultar a cada mudança de config faria pedido à toa.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const impressoraEscolhida: ZebraDevice | null = useMemo(() => {
+    if (!zebra) return null;
+    return zebra.impressoras.find((i) => i.uid === impressoraUid) ?? zebra.padrao ?? null;
+  }, [zebra, impressoraUid]);
+
+  /** Serviço rodando E com pelo menos uma impressora de verdade. */
+  const zebraPronta = Boolean(zebra?.disponivel && zebra.impressoras.length > 0 && impressoraEscolhida);
+
+  /* ── busca ───────────────────────────────────────────────────────────── */
+
+  const buscar = useCallback(async () => {
+    const t = termo.trim();
+    if (t.length < 2) {
+      setErro("Digite ao menos 2 caracteres (código, nome ou código de barra).");
+      return;
+    }
+    setBuscando(true);
+    setErro(null);
+    setAviso(null);
+    try {
+      const resp = await fetch("/api/etiquetas/produtos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-auth-username": username },
+        body: JSON.stringify({ company: companyKey, termo: t, incluirInativos }),
+      });
+      const dados = await resp.json();
+      if (!resp.ok) throw new Error(dados?.error ?? "Erro ao buscar produtos.");
+      setProdutos(dados.produtos ?? []);
+      setBuscou(true);
+      if ((dados.produtos ?? []).length === 0) setAviso("Nenhum produto encontrado para esse termo.");
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Erro ao buscar produtos.");
+    } finally {
+      setBuscando(false);
+    }
+  }, [termo, username, companyKey, incluirInativos]);
+
+  /* ── fila de impressão ───────────────────────────────────────────────── */
+
+  const definirQuantidade = useCallback(
+    (produto: ProdutoEtiqueta, cor: CorEtiqueta, quantidade: number) => {
+      const chave = chaveItem(produto.produto, cor.cor);
+      setFila((atual) => {
+        const proximo = { ...atual };
+        const qtd = Math.max(0, Math.floor(quantidade));
+        if (qtd <= 0) delete proximo[chave];
+        else proximo[chave] = { item: montarItem(produto, cor), quantidade: qtd };
+        return proximo;
+      });
+    },
+    []
+  );
+
+  const quantidadeDe = useCallback(
+    (produto: string, cor: string) => fila[chaveItem(produto, cor)]?.quantidade ?? 0,
+    [fila]
+  );
+
+  const adicionarTodasAsCores = useCallback(
+    (produto: ProdutoEtiqueta) => {
+      setFila((atual) => {
+        const proximo = { ...atual };
+        for (const cor of produto.cores) {
+          const chave = chaveItem(produto.produto, cor.cor);
+          if (proximo[chave]) continue;
+          proximo[chave] = { item: montarItem(produto, cor), quantidade: Math.max(1, qtdPadrao) };
+        }
+        return proximo;
+      });
+    },
+    [qtdPadrao]
+  );
+
+  const preencherComEstoque = useCallback((produto: ProdutoEtiqueta) => {
+    setFila((atual) => {
+      const proximo = { ...atual };
+      for (const cor of produto.cores) {
+        const chave = chaveItem(produto.produto, cor.cor);
+        const qtd = Math.floor(cor.estoque);
+        if (qtd <= 0) delete proximo[chave];
+        else proximo[chave] = { item: montarItem(produto, cor), quantidade: qtd };
+      }
+      return proximo;
+    });
+  }, []);
+
+  const itensFila = useMemo(() => Object.entries(fila).map(([chave, v]) => ({ chave, ...v })), [fila]);
+  const totalEtiquetas = useMemo(
+    () => itensFila.reduce((soma, i) => soma + i.quantidade, 0),
+    [itensFila]
+  );
+
+  /* ── ZPL ─────────────────────────────────────────────────────────────── */
+
+  const resultadoZpl = useMemo(() => {
+    if (itensFila.length === 0) return null;
+    return gerarZpl(
+      itensFila.map(({ item, quantidade }) => ({ item, quantidade })),
+      config
+    );
+  }, [itensFila, config]);
+
+  const itemExemplo: ItemEtiqueta | null = itensFila[0]?.item ?? null;
+  const exemploPreview: ItemEtiqueta = itemExemplo ?? {
+    produto: "N4.7H.0080",
+    descProduto: "CP SILICONE IP 17 PRO MAX",
+    cor: "06",
+    descCor: "PRETO",
+    codigoBarra: "050496",
+    grupo: "ACESSORIOS",
+    subgrupo: "CAPA P/ CELULAR",
+    linha: "ELETRONICOS",
+    colecao: "",
+    grade: "",
+    tipo: "",
+  };
+
+  const fileiras = useMemo(
+    () =>
+      montarFileiras(
+        itensFila.map(({ item, quantidade }) => ({ item, quantidade })),
+        config.colunas
+      ),
+    [itensFila, config.colunas]
+  );
+
+  // O código de barras cabe na largura? Simbologia larga ou módulo grande fazem
+  // a Zebra cortar as barras sem avisar.
+  const barras = useMemo(
+    () =>
+      analisarBarras(
+        itensFila.map(({ item, quantidade }) => ({ item, quantidade })),
+        config
+      ),
+    [itensFila, config]
+  );
+
+  const alturaConteudo = alturaConteudoMm(config);
+  const conteudoNaoCabe = alturaConteudo > config.alturaEtiquetaMm + 0.01;
+  const larguraFileira = larguraFileiraMm(config);
+  const fileiraNaoCabe = larguraFileira > config.impressora.larguraMidiaMm + 0.01;
+
+  /* ── ações de impressão ──────────────────────────────────────────────── */
+
+  const imprimirNaZebra = useCallback(async () => {
+    if (!resultadoZpl || !impressoraEscolhida) return;
+    setErro(null);
+    setAviso(null);
+    try {
+      await enviarZpl(impressoraEscolhida, resultadoZpl.zpl);
+      setAviso(
+        `Enviado: ${resultadoZpl.totalEtiquetas} etiqueta(s) em ${resultadoZpl.totalFileiras} fileira(s) para ${impressoraEscolhida.name}.`
+      );
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Falha ao enviar para a impressora.");
+    }
+  }, [resultadoZpl, impressoraEscolhida]);
+
+  const baixarZpl = useCallback(() => {
+    if (!resultadoZpl) return;
+    const blob = new Blob([resultadoZpl.zpl], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `etiquetas-${companyKey}-${resultadoZpl.totalEtiquetas}.zpl`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [resultadoZpl, companyKey]);
+
+  const imprimirPeloNavegador = useCallback(() => {
+    if (totalEtiquetas === 0) return;
+    if (totalEtiquetas > MAX_ETIQUETAS_NAVEGADOR) {
+      setErro(
+        `A impressão pelo navegador aguenta até ${MAX_ETIQUETAS_NAVEGADOR} etiquetas por vez. Use o caminho ZPL ou divida o lote.`
+      );
+      return;
+    }
+    setErro(null);
+    // Monta a folha escondida e só então abre a caixa de impressão.
+    setPreparandoFolha(true);
+  }, [totalEtiquetas]);
+
+  useEffect(() => {
+    if (!preparandoFolha) return;
+    const timer = window.setTimeout(() => {
+      const folha = folhaRef.current;
+      if (!folha) {
+        setPreparandoFolha(false);
+        return;
+      }
+      const alturaFileira = config.alturaEtiquetaMm + config.espacoLinhasMm;
+      const iframe = document.createElement("iframe");
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "0";
+      document.body.appendChild(iframe);
+
+      const doc = iframe.contentDocument;
+      if (!doc) {
+        document.body.removeChild(iframe);
+        setPreparandoFolha(false);
+        return;
+      }
+
+      doc.open();
+      doc.write(`<!doctype html><html><head><meta charset="utf-8"><title>Etiquetas</title>
+<style>
+  @page { size: ${config.impressora.larguraMidiaMm}mm ${alturaFileira}mm; margin: 0; }
+  html, body { margin: 0; padding: 0; background: #fff; }
+  .fileira {
+    width: ${config.impressora.larguraMidiaMm}mm;
+    height: ${alturaFileira}mm;
+    display: flex;
+    gap: ${config.espacoColunasMm}mm;
+    padding-left: ${config.margemEsquerdaMm}mm;
+    box-sizing: border-box;
+    break-after: page;
+    page-break-after: always;
+    overflow: hidden;
+  }
+  .fileira:last-child { break-after: auto; page-break-after: auto; }
+  .fileira svg { display: block; }
+</style></head><body>${folha.innerHTML}</body></html>`);
+      doc.close();
+
+      const disparar = () => {
+        try {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+        } finally {
+          window.setTimeout(() => {
+            if (iframe.parentNode) document.body.removeChild(iframe);
+            setPreparandoFolha(false);
+          }, 1000);
+        }
+      };
+      // Dá um respiro para o layout do iframe assentar antes do print().
+      window.setTimeout(disparar, 250);
+    }, 60);
+
+    return () => window.clearTimeout(timer);
+  }, [preparandoFolha, config]);
+
+  /* ── salvar configuração ─────────────────────────────────────────────── */
+
+  const configMudou = useMemo(
+    () => JSON.stringify(config) !== JSON.stringify(configSalva),
+    [config, configSalva]
+  );
+
+  const salvarConfig = useCallback(
+    async (resetar = false) => {
+      setSalvandoConfig(true);
+      setErro(null);
+      try {
+        const resp = await fetch("/api/etiquetas/config", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", "x-auth-username": username },
+          body: JSON.stringify({ company: companyKey, config, resetar }),
+        });
+        const dados = await resp.json();
+        if (!resp.ok) throw new Error(dados?.error ?? "Erro ao salvar a configuração.");
+        setConfig(dados.config);
+        setConfigSalva(dados.config);
+        setAviso(resetar ? "Modelo voltou ao padrão." : "Modelo salvo para toda a empresa.");
+      } catch (e) {
+        setErro(e instanceof Error ? e.message : "Erro ao salvar a configuração.");
+      } finally {
+        setSalvandoConfig(false);
+      }
+    },
+    [companyKey, config, username]
+  );
+
+  /* ── render ──────────────────────────────────────────────────────────── */
+
+  const semCodigo = resultadoZpl?.semBarcode ?? [];
+
+  return (
+    <div className={styles.wrapper}>
+      <div className={styles.header}>
+        <h1 className={styles.title}>Imprimir Etiquetas</h1>
+        <p className={styles.subtitle}>
+          Busque o produto, escolha as cores e a quantidade. O código impresso é sempre o
+          preferencial do cadastro (o menor/interno), como no relatório do Linx.
+        </p>
+      </div>
+
+      {erro ? <div className={styles.erro}>{erro}</div> : null}
+      {aviso ? <div className={styles.ok}>{aviso}</div> : null}
+
+      <div className={styles.colunas}>
+        {/* ─────────────── coluna esquerda: busca ─────────────── */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
+          <div className={styles.card}>
+            <h2 className={styles.cardTitle}>1. Produtos</h2>
+            <div className={styles.buscaLinha}>
+              <input
+                className={styles.input}
+                placeholder="Código do produto, nome ou código de barra"
+                value={termo}
+                onChange={(e) => setTermo(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void buscar();
+                }}
+              />
+              <button
+                type="button"
+                className={`${styles.botao} ${styles.botaoPrimario}`}
+                onClick={() => void buscar()}
+                disabled={buscando}
+              >
+                {buscando ? "Buscando…" : "Buscar"}
+              </button>
+            </div>
+
+            <div className={styles.checkLinha}>
+              <label className={styles.check}>
+                <input
+                  type="checkbox"
+                  checked={incluirInativos}
+                  onChange={(e) => setIncluirInativos(e.target.checked)}
+                />
+                incluir produtos inativos
+              </label>
+              <label className={styles.check}>
+                quantidade padrão
+                <input
+                  className={styles.numero}
+                  type="number"
+                  min={1}
+                  value={qtdPadrao}
+                  onChange={(e) => setQtdPadrao(Math.max(1, Number(e.target.value) || 1))}
+                />
+              </label>
+            </div>
+
+            {produtos.length > 0 ? (
+              <div className={styles.resultados}>
+                {produtos.map((produto) => (
+                  <div key={produto.produto} className={styles.produtoBloco}>
+                    <div className={styles.produtoHead}>
+                      <div>
+                        <div className={styles.produtoNome}>
+                          {produto.descProduto || produto.produto}{" "}
+                          {produto.inativo ? <span className={styles.tagInativo}>inativo</span> : null}
+                        </div>
+                        <div className={styles.produtoMeta}>
+                          {produto.produto}
+                          {produto.subgrupo ? ` · ${produto.subgrupo}` : ""}
+                          {produto.grade ? ` · ${produto.grade}` : ""}
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button
+                          type="button"
+                          className={styles.botaoMini}
+                          onClick={() => adicionarTodasAsCores(produto)}
+                        >
+                          todas as cores × {qtdPadrao}
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.botaoMini}
+                          onClick={() => preencherComEstoque(produto)}
+                          title="Uma etiqueta por peça em estoque"
+                        >
+                          usar estoque
+                        </button>
+                      </div>
+                    </div>
+
+                    <table className={styles.tabela}>
+                      <thead>
+                        <tr>
+                          <th>Cor</th>
+                          <th>Descrição</th>
+                          <th>Código de barra</th>
+                          <th className={styles.tdNum}>Estoque</th>
+                          <th className={styles.tdNum}>Etiquetas</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {produto.cores.map((cor) => {
+                          const qtd = quantidadeDe(produto.produto, cor.cor);
+                          return (
+                            <tr
+                              key={`${produto.produto}-${cor.cor}`}
+                              className={qtd > 0 ? styles.linhaAtiva : undefined}
+                            >
+                              <td className={styles.mono}>{cor.cor || "—"}</td>
+                              <td>{cor.descCor || <span className={styles.semCodigo}>sem descrição</span>}</td>
+                              <td className={styles.mono}>
+                                {cor.codigoBarra || (
+                                  <span className={styles.semCodigo}>sem código</span>
+                                )}
+                              </td>
+                              <td className={`${styles.tdNum} ${styles.mono}`}>{cor.estoque}</td>
+                              <td className={styles.tdNum}>
+                                <input
+                                  className={styles.numero}
+                                  type="number"
+                                  min={0}
+                                  value={qtd}
+                                  onChange={(e) =>
+                                    definirQuantidade(produto, cor, Number(e.target.value) || 0)
+                                  }
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {produto.cores.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className={styles.semCodigo}>
+                              Produto sem cores cadastradas.
+                            </td>
+                          </tr>
+                        ) : null}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
+              </div>
+            ) : buscou && !buscando ? (
+              <div className={styles.filaVazia}>Nada encontrado. Tente outro termo.</div>
+            ) : null}
+          </div>
+
+          {/* ─────────────── fila ─────────────── */}
+          <div className={styles.card}>
+            <div className={styles.cardHeader}>
+              <h2 className={styles.cardTitle}>2. Fila de impressão</h2>
+              {itensFila.length > 0 ? (
+                <button type="button" className={styles.botaoMini} onClick={() => setFila({})}>
+                  limpar tudo
+                </button>
+              ) : null}
+            </div>
+
+            {itensFila.length === 0 ? (
+              <div className={styles.filaVazia}>
+                Nenhuma etiqueta na fila. Coloque uma quantidade em alguma cor acima.
+              </div>
+            ) : (
+              <>
+                <table className={styles.tabela}>
+                  <thead>
+                    <tr>
+                      <th>Produto</th>
+                      <th>Cor</th>
+                      <th>Código</th>
+                      <th className={styles.tdNum}>Qtd</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {itensFila.map(({ chave, item, quantidade }) => (
+                      <tr key={chave}>
+                        <td>
+                          <div>{item.descProduto || item.produto}</div>
+                          <div className={styles.produtoMeta}>{item.produto}</div>
+                        </td>
+                        <td>{item.descCor || item.cor || "—"}</td>
+                        <td className={styles.mono}>
+                          {item.codigoBarra || <span className={styles.semCodigo}>sem código</span>}
+                        </td>
+                        <td className={styles.tdNum}>
+                          <input
+                            className={styles.numero}
+                            type="number"
+                            min={0}
+                            value={quantidade}
+                            onChange={(e) => {
+                              const qtd = Math.max(0, Number(e.target.value) || 0);
+                              setFila((atual) => {
+                                const proximo = { ...atual };
+                                if (qtd <= 0) delete proximo[chave];
+                                else proximo[chave] = { item, quantidade: qtd };
+                                return proximo;
+                              });
+                            }}
+                          />
+                        </td>
+                        <td className={styles.tdNum}>
+                          <button
+                            type="button"
+                            className={styles.botaoLink}
+                            onClick={() =>
+                              setFila((atual) => {
+                                const proximo = { ...atual };
+                                delete proximo[chave];
+                                return proximo;
+                              })
+                            }
+                          >
+                            remover
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                <div className={styles.totalLinha}>
+                  <span className={styles.totalNumero}>{totalEtiquetas}</span>
+                  <span>
+                    etiqueta(s) · {fileiras.length} fileira(s) de {config.colunas} coluna(s) ·{" "}
+                    {(fileiras.length * (config.alturaEtiquetaMm + config.espacoLinhasMm)).toFixed(0)}
+                    mm de papel
+                  </span>
+                </div>
+
+                {semCodigo.length > 0 ? (
+                  <div className={styles.aviso}>
+                    {semCodigo.length} item(ns) sem código válido para{" "}
+                    {config.barcode.simbologia}: saem sem as barras.{" "}
+                    {semCodigo
+                      .slice(0, 4)
+                      .map((s) => `${s.produto}/${s.cor || "—"}`)
+                      .join(", ")}
+                    {semCodigo.length > 4 ? "…" : ""}
+                  </div>
+                ) : null}
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* ─────────────── coluna direita: preview + impressão ─────────────── */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
+          <div className={styles.card}>
+            <div className={styles.cardHeader}>
+              <h2 className={styles.cardTitle}>Prévia</h2>
+              <span className={styles.produtoMeta}>
+                {config.larguraEtiquetaMm} × {config.alturaEtiquetaMm} mm
+              </span>
+            </div>
+
+            <div className={styles.previewArea}>
+              <div className={styles.previewEtiqueta}>
+                <EtiquetaSvg
+                  item={exemploPreview}
+                  config={config}
+                  comBorda
+                  larguraCss={`${Math.min(360, config.larguraEtiquetaMm * 9)}px`}
+                />
+              </div>
+              <div className={styles.previewLegenda}>
+                {itemExemplo ? "Primeiro item da fila" : "Exemplo (a fila está vazia)"} — ampliado
+              </div>
+
+              {fileiras.length > 0 ? (
+                <>
+                  <div className={styles.previewFileira}>
+                    {fileiras[0].map((item, i) => (
+                      <EtiquetaSvg
+                        key={`${item.produto}-${item.cor}-${i}`}
+                        item={item}
+                        config={config}
+                        comBorda
+                        larguraCss={`${Math.min(150, config.larguraEtiquetaMm * 4)}px`}
+                      />
+                    ))}
+                  </div>
+                  <div className={styles.previewLegenda}>
+                    Primeira fileira ({fileiras[0].length} de {config.colunas} colunas)
+                  </div>
+                </>
+              ) : null}
+            </div>
+
+            {conteudoNaoCabe ? (
+              <div className={styles.aviso}>
+                O conteúdo ocupa {alturaConteudo.toFixed(1)}mm e a etiqueta tem{" "}
+                {config.alturaEtiquetaMm}mm — a Zebra vai cortar o que passar. Reduza as fontes/altura
+                das barras ou aumente a etiqueta.
+              </div>
+            ) : null}
+            {fileiraNaoCabe ? (
+              <div className={styles.aviso}>
+                A fileira mede {larguraFileira.toFixed(1)}mm e a mídia tem{" "}
+                {config.impressora.larguraMidiaMm}mm — reduza as colunas, a largura ou o espaço entre
+                elas.
+              </div>
+            ) : null}
+            {barras.estoura ? (
+              <div className={styles.erro}>
+                O código de barras precisa de {barras.larguraMaxMm.toFixed(1)}mm e só há{" "}
+                {barras.larguraUtilMm.toFixed(1)}mm — a Zebra vai cortar as barras e nenhum leitor
+                vai ler. Use Code 128, diminua a largura do módulo ou aumente a etiqueta.
+              </div>
+            ) : barras.quietZoneCurta ? (
+              <div className={styles.aviso}>
+                As barras ocupam {barras.larguraMaxMm.toFixed(1)}mm e sobram só{" "}
+                {barras.quietZoneMm.toFixed(1)}mm de silêncio de cada lado (as normas pedem 10
+                módulos). O leitor pode engasgar — diminua a largura do módulo ou troque a
+                simbologia.
+              </div>
+            ) : null}
+          </div>
+
+          <div className={styles.card}>
+            <h2 className={styles.cardTitle}>3. Imprimir</h2>
+
+            <div className={styles.statusLinha}>
+              <span
+                className={`${styles.bolinha} ${zebraPronta ? styles.bolinhaOn : styles.bolinhaOff}`}
+              />
+              {zebraPronta ? (
+                <>
+                  <span>Zebra Browser Print conectado</span>
+                  <select
+                    className={styles.select}
+                    value={impressoraUid}
+                    onChange={(e) => setImpressoraUid(e.target.value)}
+                  >
+                    {zebra!.impressoras.map((i) => (
+                      <option key={i.uid} value={i.uid}>
+                        {i.name}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              ) : (
+                <span>
+                  {zebra?.disponivel ? "Serviço rodando, sem impressora" : zebra ? "Serviço não encontrado" : "Procurando o Zebra Browser Print…"}
+                </span>
+              )}
+              <button
+                type="button"
+                className={styles.botaoMini}
+                onClick={() => void verificarZebra()}
+                disabled={verificandoZebra}
+              >
+                {verificandoZebra ? "verificando…" : "verificar"}
+              </button>
+            </div>
+
+            {!zebraPronta && zebra?.motivo ? (
+              <div className={styles.aviso}>{zebra.motivo}</div>
+            ) : null}
+
+            <div className={styles.acoes}>
+              <button
+                type="button"
+                className={`${styles.botao} ${styles.botaoPrimario}`}
+                onClick={() => void imprimirNaZebra()}
+                disabled={!resultadoZpl || !zebraPronta}
+                title={
+                  zebraPronta
+                    ? "Manda o ZPL direto para a impressora"
+                    : "Precisa do Zebra Browser Print com uma impressora reconhecida"
+                }
+              >
+                Imprimir na Zebra
+              </button>
+              <button
+                type="button"
+                className={styles.botao}
+                onClick={imprimirPeloNavegador}
+                disabled={totalEtiquetas === 0 || preparandoFolha}
+              >
+                {preparandoFolha ? "Preparando…" : "Imprimir pelo navegador"}
+              </button>
+              <button
+                type="button"
+                className={styles.botao}
+                onClick={baixarZpl}
+                disabled={!resultadoZpl}
+              >
+                Baixar .zpl
+              </button>
+              <button
+                type="button"
+                className={styles.botao}
+                onClick={() => setMostrarZpl((v) => !v)}
+                disabled={!resultadoZpl}
+              >
+                {mostrarZpl ? "Esconder ZPL" : "Ver ZPL"}
+              </button>
+            </div>
+
+            <div className={styles.produtoMeta}>
+              &quot;Imprimir pelo navegador&quot; abre a caixa do Windows: escolha a{" "}
+              <strong>ZDesigner ZD230-203dpi ZPL</strong>, margens zero e sem ajuste de escala.
+            </div>
+
+            {mostrarZpl && resultadoZpl ? (
+              <pre className={styles.zplBox}>{resultadoZpl.zpl}</pre>
+            ) : null}
+          </div>
+
+          <div className={styles.card}>
+            <div className={styles.cardHeader}>
+              <h2 className={styles.cardTitle}>Configuração da etiqueta</h2>
+              <button
+                type="button"
+                className={styles.botaoMini}
+                onClick={() => setMostrarConfig((v) => !v)}
+              >
+                {mostrarConfig ? "fechar" : "abrir"}
+              </button>
+            </div>
+
+            <div className={styles.produtoMeta}>
+              {config.nomeModelo} · {config.colunas} coluna(s) · {config.impressora.dpi}dpi ·{" "}
+              {config.barcode.simbologia}
+            </div>
+
+            {mostrarConfig ? (
+              <>
+                <ConfiguracaoEtiqueta
+                  config={config}
+                  onChange={setConfig}
+                  podeConfigurar={podeConfigurar}
+                />
+                <div className={styles.acoes}>
+                  <button
+                    type="button"
+                    className={`${styles.botao} ${styles.botaoPrimario}`}
+                    onClick={() => void salvarConfig(false)}
+                    disabled={!podeConfigurar || salvandoConfig || !configMudou}
+                  >
+                    {salvandoConfig ? "Salvando…" : "Salvar modelo"}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.botao}
+                    onClick={() => setConfig(clonarConfig(configSalva))}
+                    disabled={!configMudou}
+                  >
+                    Descartar alterações
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.botao}
+                    onClick={() => void salvarConfig(true)}
+                    disabled={!podeConfigurar || salvandoConfig}
+                  >
+                    Voltar ao padrão
+                  </button>
+                </div>
+              </>
+            ) : null}
+          </div>
+        </div>
+      </div>
+
+      {/* Folha oculta: só existe enquanto o usuário manda imprimir pelo navegador. */}
+      {preparandoFolha ? (
+        <div className={styles.folhaOculta} ref={folhaRef} aria-hidden>
+          {fileiras.map((fileira, i) => (
+            <div key={`f-${i}`} className="fileira">
+              {fileira.map((item, j) => (
+                <EtiquetaSvg key={`f-${i}-${j}`} item={item} config={config} />
+              ))}
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}

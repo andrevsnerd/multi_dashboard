@@ -1,0 +1,167 @@
+"use client";
+
+/**
+ * Desenho de UMA etiqueta em SVG, com o viewBox em MILÍMETROS.
+ *
+ * É a mesma geometria que o gerador de ZPL usa (mesmas margens, mesma ordem de
+ * linhas, mesma conta de centralização das barras), então o que aparece na tela
+ * é o que sai na Zebra. Serve para o preview e para o caminho "imprimir pelo
+ * navegador", onde o SVG vai direto para a folha em mm.
+ */
+
+import { barrasDoBinario, encodeBarcode, motivoFalha } from "@/lib/etiquetas/barcode";
+import {
+  dadoDoBarcode,
+  textoDaLinha,
+  type Alinhamento,
+  type EtiquetaConfig,
+  type ItemEtiqueta,
+} from "@/lib/etiquetas/tipos";
+
+interface Props {
+  item: ItemEtiqueta;
+  config: EtiquetaConfig;
+  /** Mostra a borda tracejada da etiqueta (só no preview da tela). */
+  comBorda?: boolean;
+  className?: string;
+  /** Largura renderizada. Sem isso o SVG ocupa exatamente os mm reais. */
+  larguraCss?: string;
+}
+
+function ancora(alinhamento: Alinhamento): "start" | "middle" | "end" {
+  if (alinhamento === "center") return "middle";
+  if (alinhamento === "right") return "end";
+  return "start";
+}
+
+function xDoTexto(alinhamento: Alinhamento, x: number, largura: number): number {
+  if (alinhamento === "center") return x + largura / 2;
+  if (alinhamento === "right") return x + largura;
+  return x;
+}
+
+export default function EtiquetaSvg({ item, config, comBorda, className, larguraCss }: Props) {
+  const { larguraEtiquetaMm: L, alturaEtiquetaMm: A, margemInternaMm: M } = config;
+  const larguraUtil = Math.max(0, L - M * 2);
+  const x0 = M;
+
+  const elementos: React.ReactNode[] = [];
+  let y = config.margemTopoMm + M;
+
+  // No ZPL a altura da fonte (^A0N,h) é a caixa do caractere e a linha de base
+  // fica a ~78% dela. Reproduzir isso aqui é o que faz o preview bater com o
+  // que sai impresso. O que passar da etiqueta é cortado pelo viewBox — mesmo
+  // comportamento do ^FB da Zebra.
+  const BASELINE = 0.78;
+
+  config.linhas.forEach((linha, i) => {
+    if (!linha.visivel) return;
+    const texto = textoDaLinha(item, linha);
+    if (texto) {
+      elementos.push(
+        <text
+          key={`linha-${linha.id}-${i}`}
+          x={xDoTexto(linha.alinhamento, x0, larguraUtil)}
+          y={y + linha.alturaMm * BASELINE}
+          textAnchor={ancora(linha.alinhamento)}
+          fontSize={linha.alturaMm}
+          fontWeight={linha.negrito ? 700 : 400}
+          fontFamily="Helvetica, Arial, sans-serif"
+          fill="#000"
+        >
+          {texto}
+        </text>
+      );
+    }
+    y += linha.alturaMm + linha.espacoAbaixoMm;
+  });
+
+  const dado = dadoDoBarcode(item, config);
+  const codificado = dado ? encodeBarcode(dado, config.barcode.simbologia) : null;
+  // 1 dot a 203dpi = 1/8 mm. O módulo é configurado em dots para bater com o ^BY.
+  const moduloMm = config.barcode.moduloDots / (config.impressora.dpi / 25.4);
+
+  if (config.barcode.alturaMm > 0) {
+    y += config.barcode.espacoAcimaMm;
+    if (codificado) {
+      const larguraBarras = codificado.modulos * moduloMm;
+      const sobra = Math.max(0, larguraUtil - larguraBarras);
+      const desloc =
+        config.barcode.alinhamento === "center"
+          ? sobra / 2
+          : config.barcode.alinhamento === "right"
+            ? sobra
+            : 0;
+      const xBarras = x0 + desloc;
+      for (const barra of barrasDoBinario(codificado.binario)) {
+        elementos.push(
+          <rect
+            key={`b-${barra.x}`}
+            x={xBarras + barra.x * moduloMm}
+            y={y}
+            width={barra.largura * moduloMm}
+            height={config.barcode.alturaMm}
+            fill="#000"
+          />
+        );
+      }
+    } else {
+      elementos.push(
+        <text
+          key="sem-barra"
+          x={x0}
+          y={y + config.barcode.alturaMm * 0.7}
+          fontSize={Math.min(2, config.barcode.alturaMm * 0.5)}
+          fontFamily="Helvetica, Arial, sans-serif"
+          fill="#b91c1c"
+        >
+          {motivoFalha(dado, config.barcode.simbologia)}
+        </text>
+      );
+    }
+    y += config.barcode.alturaMm;
+  }
+
+  if (dado && config.barcode.mostrarNumero) {
+    elementos.push(
+      <text
+        key="numero"
+        x={xDoTexto(config.barcode.alinhamento, x0, larguraUtil)}
+        y={y + config.barcode.alturaNumeroMm * BASELINE}
+        textAnchor={ancora(config.barcode.alinhamento)}
+        fontSize={config.barcode.alturaNumeroMm}
+        fontFamily="Helvetica, Arial, sans-serif"
+        fill="#000"
+      >
+        {dado}
+      </text>
+    );
+  }
+
+  return (
+    <svg
+      className={className}
+      viewBox={`0 0 ${L} ${A}`}
+      width={larguraCss ?? `${L}mm`}
+      height={larguraCss ? undefined : `${A}mm`}
+      style={larguraCss ? { aspectRatio: `${L} / ${A}` } : undefined}
+      xmlns="http://www.w3.org/2000/svg"
+      shapeRendering="crispEdges"
+    >
+      <rect x={0} y={0} width={L} height={A} fill="#fff" />
+      {comBorda ? (
+        <rect
+          x={0.05}
+          y={0.05}
+          width={L - 0.1}
+          height={A - 0.1}
+          fill="none"
+          stroke="#cbd5e1"
+          strokeWidth={0.1}
+          strokeDasharray="0.6 0.4"
+        />
+      ) : null}
+      {elementos}
+    </svg>
+  );
+}
