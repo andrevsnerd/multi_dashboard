@@ -12,7 +12,9 @@
 import { encodeBarcode } from './barcode';
 import { calcularLayout, elementoPorChave, escalaDe, moduloEfetivoDots } from './layout';
 import {
+  alturaConteudoBrutaMm,
   CAMPOS_DISPONIVEIS,
+  clonarConfig,
   dadoDoBarcode,
   dotsPorMm,
   larguraTextoEstimadaMm,
@@ -21,6 +23,7 @@ import {
   type EtiquetaConfig,
   type ItemEtiqueta,
   type Alinhamento,
+  type LinhaEtiqueta,
 } from './tipos';
 
 /** Item + quantas cópias imprimir. */
@@ -229,8 +232,6 @@ export interface LinhaEstoura {
   campoLabel: string;
   larguraEstimadaMm: number;
   larguraUtilMm: number;
-  /** Corte (máx. caracteres) que caberia na largura útil — o conserto sugerido. */
-  maxCaracteresQueCabe: number;
 }
 
 /**
@@ -262,18 +263,76 @@ export function analisarTextos(itens: ItemComQuantidade[], config: EtiquetaConfi
     }
 
     if (maiorMm > larguraUtilMm + 0.01) {
-      const porCaractere = larguraTextoEstimadaMm('X', alturaMm, larguraFonteMm);
       linhasEstouram.push({
         linhaId: linha.id,
         campoLabel: CAMPOS_DISPONIVEIS.find((c) => c.valor === linha.campo)?.label ?? linha.campo,
         larguraEstimadaMm: maiorMm,
         larguraUtilMm,
-        maxCaracteresQueCabe: porCaractere > 0 ? Math.max(1, Math.floor(larguraUtilMm / porCaractere)) : 1,
       });
     }
   }
 
   return linhasEstouram;
+}
+
+/** Quantos caracteres a linha precisa comportar (texto real ou o corte configurado). */
+function caracteresDaLinha(itens: ItemComQuantidade[], linha: LinhaEtiqueta): number {
+  let maior = linha.maxCaracteres > 0 ? linha.maxCaracteres : 0;
+  for (const { item } of itens) {
+    const n = textoDaLinha(item, linha).length;
+    if (n > maior) maior = n;
+  }
+  return maior;
+}
+
+/**
+ * Encolhe as FONTES até tudo caber — sem cortar texto nenhum.
+ *
+ * Duas passadas: primeiro cada linha que passa da largura tem a fonte reduzida
+ * no fator exato que falta; depois, se o conjunto ainda passa da altura da
+ * etiqueta, tudo encolhe proporcionalmente. Mexe no modelo (é uma correção de
+ * verdade, não calibração), então é reversível por "Descartar alterações".
+ */
+export function ajustarTamanhoParaCaber(
+  itens: ItemComQuantidade[],
+  config: EtiquetaConfig
+): EtiquetaConfig {
+  const novo = clonarConfig(config);
+  const larguraUtilMm = Math.max(0, novo.larguraEtiquetaMm - novo.margemInternaMm * 2);
+  const escala = escalaDe(novo);
+  const arred = (v: number) => Math.round(v * 100) / 100;
+
+  // 1) Largura: cada linha encolhe só o quanto precisa.
+  for (const linha of novo.linhas) {
+    if (!linha.visivel) continue;
+    const chars = caracteresDaLinha(itens, linha);
+    if (chars <= 0) continue;
+
+    const porCaractere = larguraTextoEstimadaMm('X', linha.alturaMm * escala, linha.larguraMm * escala);
+    const precisaMm = chars * porCaractere;
+    if (precisaMm <= larguraUtilMm + 0.01) continue;
+
+    const fator = larguraUtilMm / precisaMm;
+    linha.alturaMm = Math.max(0.8, arred(linha.alturaMm * fator));
+    if (linha.larguraMm > 0) linha.larguraMm = Math.max(0, arred(linha.larguraMm * fator));
+  }
+
+  // 2) Altura: se o conjunto ainda estoura, encolhe tudo junto.
+  const alvoBrutoMm = (novo.alturaEtiquetaMm - (novo.calibracao?.deslocYMm ?? 0)) / escala;
+  const brutoMm = alturaConteudoBrutaMm(novo);
+  if (brutoMm > alvoBrutoMm && alvoBrutoMm > 0) {
+    const fator = alvoBrutoMm / brutoMm;
+    for (const linha of novo.linhas) {
+      linha.alturaMm = Math.max(0.8, arred(linha.alturaMm * fator));
+      linha.espacoAbaixoMm = Math.max(0, arred(linha.espacoAbaixoMm * fator));
+    }
+    novo.barcode.alturaMm = arred(novo.barcode.alturaMm * fator);
+    novo.barcode.alturaNumeroMm = Math.max(0.8, arred(novo.barcode.alturaNumeroMm * fator));
+    novo.barcode.espacoAcimaMm = Math.max(0, arred(novo.barcode.espacoAcimaMm * fator));
+    novo.barcode.espacoNumeroMm = Math.max(0, arred(novo.barcode.espacoNumeroMm * fator));
+  }
+
+  return novo;
 }
 
 export interface ResultadoZpl {

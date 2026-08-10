@@ -387,13 +387,8 @@ export function clonarConfig(config: EtiquetaConfig): EtiquetaConfig {
   return JSON.parse(JSON.stringify(config)) as EtiquetaConfig;
 }
 
-/**
- * Altura total ocupada pelo conteúdo — usada para avisar que não cabe.
- * Já conta a escala e o deslocamento vertical da calibração: subir a escala
- * tem que acender o aviso de "vai cortar o pé da etiqueta".
- */
-export function alturaConteudoMm(config: EtiquetaConfig): number {
-  const escala = config.calibracao?.escala ?? 1;
+/** Altura do conteúdo no tamanho do MODELO, sem a calibração. */
+export function alturaConteudoBrutaMm(config: EtiquetaConfig): number {
   let altura = config.margemTopoMm + config.margemInternaMm;
   for (const linha of config.linhas) {
     if (!linha.visivel) continue;
@@ -403,8 +398,17 @@ export function alturaConteudoMm(config: EtiquetaConfig): number {
   if (config.barcode.mostrarNumero) {
     altura += config.barcode.espacoNumeroMm + config.barcode.alturaNumeroMm;
   }
-  altura += config.margemInternaMm;
-  return altura * escala + (config.calibracao?.deslocYMm ?? 0);
+  return altura + config.margemInternaMm;
+}
+
+/**
+ * Altura total ocupada pelo conteúdo — usada para avisar que não cabe.
+ * Já conta a escala e o deslocamento vertical da calibração: subir a escala
+ * tem que acender o aviso de "vai cortar o pé da etiqueta".
+ */
+export function alturaConteudoMm(config: EtiquetaConfig): number {
+  const escala = config.calibracao?.escala ?? 1;
+  return alturaConteudoBrutaMm(config) * escala + (config.calibracao?.deslocYMm ?? 0);
 }
 
 /** Largura total da fileira (todas as colunas + espaços + margem). */

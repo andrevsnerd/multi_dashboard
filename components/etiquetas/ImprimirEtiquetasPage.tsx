@@ -16,7 +16,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuth } from "@/components/auth/AuthContext";
-import { analisarBarras, analisarTextos, gerarZpl, montarFileiras } from "@/lib/etiquetas/zpl";
+import {
+  ajustarTamanhoParaCaber,
+  analisarBarras,
+  analisarTextos,
+  gerarZpl,
+  montarFileiras,
+} from "@/lib/etiquetas/zpl";
 import {
   CONFIG_PADRAO,
   alturaConteudoMm,
@@ -447,16 +453,15 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
     [itensFila, config]
   );
 
-  /** Aplica o corte sugerido em cada linha que estoura a largura. */
-  const cortarTextoQueNaoCabe = useCallback(() => {
-    const porLinha = new Map(linhasEstouram.map((l) => [l.linhaId, l.maxCaracteresQueCabe]));
-    setConfig((atual) => ({
-      ...atual,
-      linhas: atual.linhas.map((linha) =>
-        porLinha.has(linha.id) ? { ...linha, maxCaracteres: porLinha.get(linha.id)! } : linha
-      ),
-    }));
-  }, [linhasEstouram]);
+  /** Encolhe as fontes até tudo caber — sem cortar texto. */
+  const ajustarParaCaber = useCallback(() => {
+    setConfig((atual) =>
+      ajustarTamanhoParaCaber(
+        itensFila.map(({ item, quantidade }) => ({ item, quantidade })),
+        atual
+      )
+    );
+  }, [itensFila]);
 
   const alturaConteudo = alturaConteudoMm(config);
   const conteudoNaoCabe = alturaConteudo > config.alturaEtiquetaMm + 0.01;
@@ -1007,8 +1012,14 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
             {conteudoNaoCabe ? (
               <div className={styles.aviso}>
                 O conteúdo ocupa {alturaConteudo.toFixed(1)}mm e a etiqueta tem{" "}
-                {config.alturaEtiquetaMm}mm — a Zebra vai cortar o que passar. Reduza as fontes/altura
-                das barras ou aumente a etiqueta.
+                {config.alturaEtiquetaMm}mm — a Zebra vai cortar o que passar.{" "}
+                {podeConfigurar ? (
+                  <button type="button" className={styles.botaoLink} onClick={ajustarParaCaber}>
+                    diminuir o tamanho pra caber
+                  </button>
+                ) : (
+                  "Reduza as fontes/altura das barras ou aumente a etiqueta."
+                )}
               </div>
             ) : null}
             {fileiraNaoCabe ? (
@@ -1042,11 +1053,11 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
                   .join("; ")}{" "}
                 — o texto pode invadir a etiqueta vizinha na mídia contínua.{" "}
                 {podeConfigurar ? (
-                  <button type="button" className={styles.botaoLink} onClick={cortarTextoQueNaoCabe}>
-                    cortar o texto pra caber
+                  <button type="button" className={styles.botaoLink} onClick={ajustarParaCaber}>
+                    diminuir a fonte pra caber
                   </button>
                 ) : (
-                  "Reduza o \"máx. caracteres\" dessa linha."
+                  "Reduza a altura da fonte dessa linha."
                 )}{" "}
                 (é uma estimativa — confirme na impressora.)
               </div>
