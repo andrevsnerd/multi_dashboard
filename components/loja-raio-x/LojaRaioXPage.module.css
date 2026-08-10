@@ -922,6 +922,34 @@
   gap: 10px;
   flex-wrap: wrap;
 }
+.fornecedorFilter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.fornecedorFilterLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--t-500);
+  white-space: nowrap;
+}
+.fornecedorFilterSelect {
+  padding: 6px 10px;
+  border: 1px solid var(--s-200);
+  border-radius: 8px;
+  background: var(--s-50);
+  color: var(--t-700);
+  font-size: 13px;
+  cursor: pointer;
+}
+.fornecedorFilterSelect:focus {
+  outline: none;
+  border-color: #2563eb;
+}
+:global(:root[data-theme="dark"]) .fornecedorFilterSelect {
+  background: var(--s-100);
+  border-color: var(--s-300);
+}
 .exportRupturasBtn {
   appearance: none;
   height: 34px;

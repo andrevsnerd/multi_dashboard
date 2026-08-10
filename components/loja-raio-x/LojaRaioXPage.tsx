@@ -15,9 +15,13 @@ import {
 import FilialFilter from "@/components/filters/FilialFilter";
 import CompraIdealCell from "@/components/shared/CompraIdealCell";
 import { useTheme } from "@/components/theme/ThemeContext";
-import { resolveCompany, type CompanyKey } from "@/lib/config/company";
+import { useAuth } from "@/components/auth/AuthContext";
+import { canSeeCusto } from "@/lib/auth/permissions";
+import { compareFilialDisplayOrder, resolveCompany, type CompanyKey } from "@/lib/config/company";
 import type { CompraIdealResult } from "@/lib/utils/compra-ideal";
 import { exportLojaRaioXXlsx, exportRupturasXlsx } from "@/lib/utils/exportLojaRaioXXlsx";
+import { exportCompraPorLojaXlsx, type CompraLojaExportColumn } from "@/lib/utils/exportCompraSugeridaAbcXlsx";
+import { productMatchesFornecedor, type Fornecedor } from "@/lib/utils/fornecedor-matcher";
 
 import styles from "./LojaRaioXPage.module.css";
 
@@ -1474,6 +1478,158 @@ function RupturaCompraIdeal({ item, companyKey }: { item: RupturaItem; companyKe
   );
 }
 
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  mapper: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+  if (items.length === 0) return [];
+  const results = new Array<R>(items.length);
+  let next = 0;
+  async function worker() {
+    while (true) {
+      const i = next;
+      next += 1;
+      if (i >= items.length) return;
+      results[i] = await mapper(items[i]!, i);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
+/** Loja-alvo do export: nome canônico (param `filial` da API) + rótulo de exibição (cabeçalho da coluna). */
+interface FilialExportTarget {
+  filial: string;
+  label: string;
+}
+
+function buildRupturaKey(produto: string, cor: string | null | undefined): string {
+  return `${produto}||${(cor ?? "").trim().toUpperCase()}`;
+}
+
+/**
+ * Monta as linhas do export "Rupturas por Loja": une TODAS as rupturas de TODAS as lojas
+ * numa lista só (um item que zerou em qualquer loja aparece), com uma coluna por loja
+ * contendo a Compra Ideal daquela loja para aquele item (mesma regra/fonte da aba —
+ * `fetchRupturasLoja` com `withCompraIdeal`, já usada na Curva ABC/Lista Loja/Compra Ideal).
+ * Vendas/faturamento somam entre as lojas onde o item é ruptura (total de rede visível).
+ * Descontinuado nunca sugere compra e fica fora do export (mesma regra do botão simples).
+ */
+async function buildRupturasPorFilialRows(
+  companyKey: string,
+  mes: string,
+  filiais: FilialExportTarget[],
+  fornecedorFiltro: { id: string; fornecedores: Fornecedor[] } | null,
+  onFilialDone?: () => void
+): Promise<{ rows: Array<Record<string, string | number | boolean | null>>; colunasFiliais: string[] }> {
+  const seenLabel = new Map<string, number>();
+  const colunasFiliais = filiais.map((f) => {
+    const base = f.label;
+    const count = seenLabel.get(base) ?? 0;
+    seenLabel.set(base, count + 1);
+    return count === 0 ? base : `${base} (${count + 1})`;
+  });
+
+  const porFilial = await mapWithConcurrency(filiais, 3, async (f) => {
+    try {
+      const params = new URLSearchParams({ company: companyKey, filial: f.filial, mes, section: "rupturas" });
+      const res = await fetch(`/api/loja-raio-x?${params}`, { cache: "no-store" });
+      if (!res.ok) return [] as RupturaItem[];
+      const json = (await res.json()) as { data?: RupturaItem[] };
+      return json.data ?? [];
+    } catch {
+      return [] as RupturaItem[];
+    } finally {
+      onFilialDone?.();
+    }
+  });
+
+  interface Aggregated {
+    produto: string;
+    cor: string;
+    corDescricao: string;
+    descricao: string;
+    subgrupo: string | null;
+    grade: string | null;
+    descontinuado: boolean;
+    qtdVendida: number;
+    faturamento: number;
+    estoqueRede: number;
+    custoUnitario: number;
+    porFilialQtd: number[];
+  }
+  const map = new Map<string, Aggregated>();
+
+  porFilial.forEach((items, idx) => {
+    for (const r of items) {
+      const key = buildRupturaKey(r.produto, r.cor);
+      let agg = map.get(key);
+      if (!agg) {
+        agg = {
+          produto: r.produto,
+          cor: r.cor,
+          corDescricao: r.corDescricao,
+          descricao: r.descricao,
+          subgrupo: r.subgrupo,
+          grade: r.grade,
+          descontinuado: r.descontinuado,
+          qtdVendida: 0,
+          faturamento: 0,
+          estoqueRede: r.estoqueRede,
+          custoUnitario: 0,
+          porFilialQtd: new Array(filiais.length).fill(0),
+        };
+        map.set(key, agg);
+      }
+      agg.qtdVendida += r.qtdVendida;
+      agg.faturamento += r.faturamento;
+      agg.estoqueRede = Math.max(agg.estoqueRede, r.estoqueRede);
+      agg.custoUnitario = Math.max(agg.custoUnitario, r.custoUnitario);
+      agg.descontinuado = agg.descontinuado || r.descontinuado;
+      agg.porFilialQtd[idx] = r.descontinuado ? 0 : Math.max(0, r.compraIdealQtd ?? 0);
+    }
+  });
+
+  let aggregados = Array.from(map.values()).filter((a) => !a.descontinuado);
+  if (fornecedorFiltro) {
+    aggregados = aggregados.filter((a) =>
+      productMatchesFornecedor(fornecedorFiltro.fornecedores, fornecedorFiltro.id, {
+        produto: a.produto,
+        cor: a.cor,
+        descricao: a.descricao,
+      })
+    );
+  }
+
+  const rows = aggregados
+    .sort((a, b) => b.faturamento - a.faturamento)
+    .map((agg) => {
+      const row: Record<string, string | number | boolean | null> = {
+        PRODUTO: agg.produto,
+        DESCRICAO: agg.descricao || agg.produto,
+        COR_DESCRICAO: agg.corDescricao || agg.cor || "",
+        SUBGRUPO: agg.subgrupo?.trim() || "",
+        GRADE: agg.grade?.trim() || "",
+        CUSTO_UNIT: Math.round(agg.custoUnitario * 100) / 100,
+        VENDAS_PERIODO: Math.round(agg.faturamento * 100) / 100,
+        QTDE_PERIODO: agg.qtdVendida,
+        ESTOQUE_REDE: agg.estoqueRede,
+      };
+      let totalRede = 0;
+      filiais.forEach((_, idx) => {
+        const qtd = agg.porFilialQtd[idx] ?? 0;
+        row[colunasFiliais[idx]] = qtd;
+        totalRede += qtd;
+      });
+      row["TOTAL REDE"] = totalRede;
+      row.CUSTO_TOTAL = Math.round((Number(row.CUSTO_UNIT) || 0) * totalRede * 100) / 100;
+      return row;
+    });
+
+  return { rows, colunasFiliais };
+}
+
 function RupturasTab({
   data,
   loading,
@@ -1497,15 +1653,54 @@ function RupturasTab({
 }) {
   const [soZeradoRede, setSoZeradoRede] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [porFilialProgresso, setPorFilialProgresso] = useState<{ feito: number; total: number } | null>(null);
+  const { user } = useAuth();
+  const podeVerCusto = canSeeCusto(user);
   const escopo = isRede ? "na rede" : "nesta loja";
+
+  // Filtro por grupo de fornecedor (só NERD) — mesma lógica da Curva ABC.
+  const [fornecedorFiltro, setFornecedorFiltro] = useState<string>("");
+  const [fornecedoresOpts, setFornecedoresOpts] = useState<Fornecedor[]>([]);
+  useEffect(() => {
+    if (companyKey !== "nerd") {
+      setFornecedoresOpts([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/fornecedores?company=nerd`, { cache: "no-store" });
+        if (!res.ok) return;
+        const json = (await res.json()) as { data: Fornecedor[] };
+        if (!cancelled) setFornecedoresOpts(json.data ?? []);
+      } catch {
+        // silencioso
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [companyKey]);
+
   if (loading && !data) return <div className={styles.skeleton} style={{ height: 320 }} />;
   if (!data) return null;
   if (data.length === 0)
     return <div className={styles.empty}>Nenhuma ruptura em {mesLabel}: os produtos que venderam têm estoque {escopo}. 🎉</div>;
 
+  const dataFiltrada =
+    companyKey === "nerd" && fornecedorFiltro && fornecedoresOpts.length > 0
+      ? data.filter((r) =>
+          productMatchesFornecedor(fornecedoresOpts, fornecedorFiltro, {
+            produto: r.produto,
+            cor: r.cor,
+            descricao: r.descricao,
+          })
+        )
+      : data;
+
   // "Zerou na rede toda" = nenhuma loja tem estoque positivo do item (ondeTemEstoque vazio).
-  const zeradosRede = data.filter((r) => r.ondeTemEstoque.length === 0).length;
-  const visiveis = soZeradoRede ? data.filter((r) => r.ondeTemEstoque.length === 0) : data;
+  const zeradosRede = dataFiltrada.filter((r) => r.ondeTemEstoque.length === 0).length;
+  const visiveis = soZeradoRede ? dataFiltrada.filter((r) => r.ondeTemEstoque.length === 0) : dataFiltrada;
   // Descontinuado aparece na tela (marcado "Descontinuado") mas NÃO vai pro export.
   const exportaveis = visiveis.filter((r) => !r.descontinuado);
 
@@ -1530,14 +1725,123 @@ function RupturasTab({
     }
   }
 
+  async function handleExportRupturasPorFilial() {
+    if (porFilialProgresso !== null) return;
+
+    // Lojas-alvo: mesma seleção da Curva ABC (filiais canônicas de venda, excluindo
+    // MATRIZ, membros não-canônicos de grupos e o e-commerce; para SCARFME inclui o
+    // e-commerce), pra bater 1 pra 1 com as colunas do "Compra Ideal por Loja" de lá.
+    const cfg = resolveCompany(companyKey);
+    if (!cfg) return;
+    const ecommerceFilials = cfg.ecommerceFilials ?? [];
+    const groups = cfg.filialGroups ?? {};
+    const canonicals = new Set(Object.keys(groups));
+    const nonCanonicalGroupMembers = new Set<string>();
+    for (const members of Object.values(groups)) {
+      for (const m of members) {
+        if (!canonicals.has(m)) nonCanonicalGroupMembers.add(m);
+      }
+    }
+    const matrizByCompany: Record<string, string[]> = {
+      scarfme: ["SCARF ME - MATRIZ"],
+      nerd: ["NERD"],
+    };
+    const matrizSet = new Set(matrizByCompany[companyKey] ?? []);
+    const displayNames = cfg.filialDisplayNames ?? {};
+    const salesFiliais = cfg.filialFilters?.sales ?? [];
+    const targets: FilialExportTarget[] = salesFiliais
+      .filter(
+        (f) => !ecommerceFilials.includes(f) && !nonCanonicalGroupMembers.has(f) && !matrizSet.has(f)
+      )
+      .map((f) => ({ filial: f, label: displayNames[f] ?? f }));
+    if (companyKey === "scarfme" && ecommerceFilials.length > 0) {
+      const ec = ecommerceFilials[0]!;
+      targets.push({ filial: ec, label: displayNames[ec] ?? ec });
+    }
+    targets.sort((a, b) => compareFilialDisplayOrder(a.label, b.label, cfg));
+    if (targets.length === 0) return;
+
+    setPorFilialProgresso({ feito: 0, total: targets.length });
+    try {
+      const fornecedorAtivo =
+        companyKey === "nerd" && fornecedorFiltro && fornecedoresOpts.length > 0
+          ? { id: fornecedorFiltro, fornecedores: fornecedoresOpts }
+          : null;
+      const { rows, colunasFiliais } = await buildRupturasPorFilialRows(
+        companyKey,
+        mes,
+        targets,
+        fornecedorAtivo,
+        () => setPorFilialProgresso((prev) => (prev ? { ...prev, feito: prev.feito + 1 } : prev))
+      );
+      if (rows.length === 0) {
+        alert("Nenhuma ruptura encontrada em nenhuma loja da rede nesse período (com os filtros aplicados).");
+        return;
+      }
+
+      const fornecedorNome = fornecedorAtivo
+        ? (fornecedoresOpts.find((f) => f.id === fornecedorFiltro)?.nome ?? null)
+        : null;
+      const filtroAplicado =
+        `Todas as lojas · união das rupturas por loja · ${mesLabel}` +
+        (fornecedorNome ? ` · fornecedor: ${fornecedorNome}` : "");
+
+      const cols: CompraLojaExportColumn[] = [];
+      cols.push({ key: "PRODUTO", label: "Código", role: "value", type: "text" });
+      cols.push({ key: "COR_DESCRICAO", label: "Cor", role: "value", type: "text" });
+      cols.push({ key: "DESCRICAO", label: "Descrição", role: "value", type: "text" });
+      if (showGradeSubgrupo) {
+        cols.push({ key: "SUBGRUPO", label: "Subgrupo", role: "value", type: "text" });
+        cols.push({ key: "GRADE", label: "Grade", role: "value", type: "text" });
+      }
+      if (podeVerCusto) cols.push({ key: "CUSTO_UNIT", label: "Custo unit.", role: "custoUnit", type: "currency" });
+      cols.push({ key: "VENDAS_PERIODO", label: "Venda período", role: "value", type: "currency" });
+      cols.push({ key: "QTDE_PERIODO", label: "Qtd período", role: "value", type: "int" });
+      cols.push({ key: "ESTOQUE_REDE", label: "Estoque rede", role: "value", type: "int" });
+      cols.push({ key: "TOTAL REDE", label: "Compra total", role: "compraTotal", type: "int" });
+      if (podeVerCusto) cols.push({ key: "CUSTO_TOTAL", label: "Custo total", role: "custoTotal", type: "currency" });
+      for (const label of colunasFiliais) {
+        cols.push({ key: label, label, role: "filial", type: "int" });
+      }
+
+      await exportCompraPorLojaXlsx(rows, cols, {
+        fileLabel: `rupturas-por-loja-${mes}`,
+        companyKey,
+        sheetName: "Rupturas por Loja",
+        titleLines: [`${cfg.name} — Rupturas por Loja`, filtroAplicado],
+      });
+    } catch (err) {
+      alert((err as Error).message || "Erro ao exportar rupturas por loja");
+    } finally {
+      setPorFilialProgresso(null);
+    }
+  }
+
   return (
     <div className={styles.tabBody}>
       <div className={styles.rupturasHead}>
         <p className={styles.intro}>
-          <strong>{data.length} produtos</strong> venderam em {mesLabel} e estão zerados {escopo} — do maior faturamento ao menor.
+          <strong>{dataFiltrada.length} produtos</strong> venderam em {mesLabel} e estão zerados {escopo} — do maior faturamento ao menor.
           {" "}A coluna <strong>Compra Ideal</strong> usa a mesma regra da Curva ABC{isRede ? " (soma da necessidade por loja)" : ""}.
         </p>
         <div className={styles.rupturasActions}>
+          {companyKey === "nerd" && fornecedoresOpts.length > 0 && (
+            <div className={styles.fornecedorFilter}>
+              <span className={styles.fornecedorFilterLabel}>Fornecedor</span>
+              <select
+                className={styles.fornecedorFilterSelect}
+                value={fornecedorFiltro}
+                onChange={(e) => setFornecedorFiltro(e.target.value)}
+              >
+                <option value="">Todos</option>
+                {fornecedoresOpts.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.nome}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <label className={styles.checkFilter} title="Mostra só os itens sem estoque positivo em nenhuma loja da rede">
             <input
               type="checkbox"
@@ -1555,6 +1859,17 @@ function RupturasTab({
             title="Exporta em XLSX a lista de rupturas mostrada (respeita o filtro), sem os descontinuados, com Compra Ideal e custos"
           >
             {exporting ? "Exportando…" : `Exportar rupturas (${exportaveis.length})`}
+          </button>
+          <button
+            type="button"
+            className={styles.exportRupturasBtn}
+            onClick={handleExportRupturasPorFilial}
+            disabled={porFilialProgresso !== null}
+            title="Exporta a união das rupturas de TODAS as lojas numa lista só, com a Compra Ideal e o custo de cada loja em colunas separadas (mesma regra da Curva ABC)"
+          >
+            {porFilialProgresso
+              ? `Lendo lojas… ${porFilialProgresso.feito}/${porFilialProgresso.total}`
+              : "Exportar rupturas por loja"}
           </button>
         </div>
       </div>
