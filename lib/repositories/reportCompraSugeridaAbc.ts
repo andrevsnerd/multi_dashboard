@@ -6,6 +6,8 @@ import {
   getFilialLabelForDisplay,
   compareFilialDisplayOrder,
 } from "@/lib/config/company";
+import { listProdutosDescontinuados } from "@/lib/utils/produto-descontinuado-store";
+import { buildDescontinuadoKeySet, isProdutoDescontinuado } from "@/lib/utils/produtos-descontinuados";
 import { canonicalKey, ROW_COR_FIELD } from "@/lib/reports/keys";
 import { getMappedColorDescription } from "@/lib/utils/colorMapping";
 import { getControleEstoqueMetricasItensBatched } from "@/lib/server/controle-estoque-metricas";
@@ -35,15 +37,17 @@ import type {
   ReportSummaryMetric,
 } from "@/lib/reports/types";
 
-/**
- * Teto de itens da curva considerados. O cálculo de Compra Ideal por loja roda métricas
- * de ritmo/estoque por item × loja (caro), então limitamos aos itens de maior faturamento
- * (os relevantes da Curva ABC). O resto é cauda C, que dificilmente entra em "comprar agora".
- */
-const ITEM_LIMIT = 1500;
-
 /** Quantas lojas calcular em paralelo (cada uma já batcheia os itens internamente). */
 const FILIAL_CONCURRENCY = 3;
+
+/**
+ * Matriz nunca é coluna de compra sugerida — mesma exclusão do export "Compra Ideal por Loja"
+ * da Curva ABC (CurvaAbcPage.tsx), que não sugere reposição de loja de varejo para a matriz.
+ */
+const MATRIZ_BY_COMPANY: Record<string, string[]> = {
+  scarfme: ["SCARF ME - MATRIZ"],
+  nerd: ["NERD"],
+};
 
 /**
  * Alias por DESCRIÇÃO de cor (espelha lib/client/compras-transito): casa quando o
@@ -143,13 +147,15 @@ function roundInt(value: number | null | undefined): number {
 /**
  * Análise "Compra sugerida por Curva ABC" — lista de compras consolidada da rede.
  *
- * Universo = itens vendidos na rede no período (produto × cor), ordenados por faturamento
- * (Curva ABC). Para cada item, calcula a Compra Ideal de CADA loja com a MESMA fonte e
- * regra da Lista Loja / Curva ABC (resumo de métricas com escopo na filial + trânsito da
- * rede abatido como pool → `calcCompraIdealFromResumo`). A quantidade da loja só entra
- * quando aquela loja precisa "comprar agora" (data de compra já chegou) OU "comprar essa
- * semana" (data cai antes do próximo dia de compra) — espelha o filtro "Comprar agora"
- * da Curva ABC / Lista Loja. Itens que nenhuma loja precisa comprar agora ficam de fora.
+ * Universo = TODOS os itens vendidos na rede no período (produto × cor), sem teto, ordenados
+ * por faturamento (Curva ABC) — mesmo universo do export "Compra Ideal por Loja" da Curva ABC
+ * (união dos itens vendidos em cada loja). Para cada item, calcula a Compra Ideal de CADA loja
+ * com a MESMA fonte e regra da Lista Loja / Curva ABC (resumo de métricas com escopo na filial +
+ * trânsito da rede abatido como pool → `calcCompraIdealFromResumo`). Item descontinuado nunca
+ * sugere compra. A quantidade da loja só entra quando aquela loja precisa "comprar agora" (data
+ * de compra já chegou) OU "comprar essa semana" (data cai antes do próximo dia de compra) —
+ * espelha o filtro "Comprar agora" da Curva ABC / Lista Loja. Itens que nenhuma loja precisa
+ * comprar agora ficam de fora. Matriz nunca entra como coluna de loja.
  *
  * As colunas por loja são dinâmicas (`COMPRA_FILIAL::{loja}`). Compra total e Custo total
  * são preenchidos com o valor estático aqui (tabela web) e viram FÓRMULAS no XLSX dedicado.
@@ -158,19 +164,25 @@ export async function fetchCompraSugeridaAbc(
   filters: ReportFilters,
   ctx?: ReportRunContext
 ): Promise<ReportResult> {
-  const details = await fetchProductsWithDetails({
-    company: filters.company,
-    range: { start: filters.start, end: filters.end },
-    filial: null, // sempre a rede inteira — uma coluna por loja
-    grupos: filters.grupos ?? null,
-    linhas: filters.linhas ?? null,
-    subgrupos: filters.subgrupos ?? null,
-    grades: filters.grades ?? null,
-    colecoes: filters.colecoes ?? null,
-    produtoId: filters.produtoId ?? undefined,
-    produtoSearchTerm: filters.produtoSearchTerm ?? undefined,
-    groupByColor: true,
-  });
+  const [details, descontinuados] = await Promise.all([
+    fetchProductsWithDetails({
+      company: filters.company,
+      range: { start: filters.start, end: filters.end },
+      filial: null, // sempre a rede inteira — uma coluna por loja
+      grupos: filters.grupos ?? null,
+      linhas: filters.linhas ?? null,
+      subgrupos: filters.subgrupos ?? null,
+      grades: filters.grades ?? null,
+      colecoes: filters.colecoes ?? null,
+      produtoId: filters.produtoId ?? undefined,
+      produtoSearchTerm: filters.produtoSearchTerm ?? undefined,
+      groupByColor: true,
+    }),
+    filters.company
+      ? listProdutosDescontinuados(filters.company as CompanyKey).catch(() => [])
+      : Promise.resolve([]),
+  ]);
+  const descontinuadoKeys = buildDescontinuadoKeySet(descontinuados);
 
   const corSet = normalizeSet(filters.cores);
   const tipoSet = normalizeSet(filters.tipos);
@@ -182,12 +194,16 @@ export async function fetchCompraSugeridaAbc(
   filtered.sort((a, b) => b.totalRevenue - a.totalRevenue);
 
   const sumRevenue = filtered.reduce((s, d) => s + (d.totalRevenue ?? 0), 0);
-  const truncated = filtered.length > ITEM_LIMIT;
-  const candidates = truncated ? filtered.slice(0, ITEM_LIMIT) : filtered;
+  // Sem teto de itens — mesmo universo (sem corte de cauda) do export canônico da Curva ABC.
+  const truncated = false;
+  const candidates = filtered;
 
-  // ── Lojas da rede (nomes canônicos ativos) + rótulos de exibição (deduplicados) ──
+  // ── Lojas da rede (nomes canônicos ativos, sem matriz) + rótulos de exibição (deduplicados) ──
   const company = await resolveCompanyLive(filters.company);
-  const filialNames = company ? getOperationalFilials(company, "sales") : [];
+  const matrizSet = new Set(MATRIZ_BY_COMPANY[filters.company ?? ""] ?? []);
+  const filialNames = company
+    ? getOperationalFilials(company, "sales").filter((f) => !matrizSet.has(f))
+    : [];
   const orderedNames = [...filialNames].sort((a, b) =>
     company
       ? compareFilialDisplayOrder(
@@ -259,6 +275,7 @@ export async function fetchCompraSugeridaAbc(
     const pid = String(d.productId ?? "").trim();
     const corKey = d.corProduto ? String(d.corProduto).trim() : null;
     const itemKey = buildControleEstoqueItemKey(d.productId, d.corProduto);
+    const isDescontinuado = isProdutoDescontinuado(descontinuadoKeys, pid);
     let transit = transitIndex.get(canonicalKey(pid, corKey)) ?? [];
     if (transit.length === 0) {
       // Fallback por descrição de cor (códigos divergentes para a mesma cor, etc.).
@@ -277,7 +294,9 @@ export async function fetchCompraSugeridaAbc(
         subgrupo: d.subgrupo,
         company: filters.company,
       });
+      // Descontinuado nunca sugere compra → 0 em toda loja (mesma regra do export da Curva ABC).
       const precisaAgora =
+        !isDescontinuado &&
         ideal.status === "REPOR" &&
         (ideal.comprarAgora || precisaComprarEssaSemana(ideal, filters.company, hoje));
       const qtd = precisaAgora ? Math.max(0, ideal.compraIdeal) : 0;
