@@ -24,7 +24,10 @@ import { fetchProductsWithDetails } from "@/lib/repositories/products";
  * e-commerce por faturamento. É a mesma fonte da análise "Vendas por faturamento"
  * do Gerador de Relatórios — que é exatamente a planilha que originou o modelo.
  *
- * O grão do ranking é o ITEM = produto × cor (como na planilha de origem).
+ * O grão do ranking é o ITEM = produto × cor (como na planilha de origem) — com
+ * UMA exceção: o slide 02 ("Os 10 maiores produtos do mês") ranqueia por SKU,
+ * somando TODAS as cores do mesmo código (pedido do dono). As páginas de
+ * categoria e o complemento seguem desmembrados por produto × cor.
  */
 
 /** Itens mínimos para uma categoria ganhar página própria… */
@@ -97,6 +100,7 @@ export interface TopProdutosItem {
   /** Código do produto (ex.: "13.46.0445"). */
   produto: string;
   descricao: string;
+  /** Cor do item; no ranking por SKU vira "N cores" (todas somadas). */
   cor: string;
   colecaoDesc: string;
   colecaoCode: string;
@@ -117,7 +121,6 @@ export interface TopProdutosCategoriaSlide {
   rank: number;
   /** Linhas (LINHA) presentes na categoria, ordenadas. */
   linhas: string[];
-  itensComVenda: number;
   faturamento: number;
   qtde: number;
   percRede: number;
@@ -135,11 +138,9 @@ export interface TopProdutosCategoriaSlide {
 export interface TopProdutosSumarioRow {
   ordem: number;
   categoria: string;
-  itensComVenda: number;
   qtde: number;
   faturamento: number;
   barPct: number;
-  pagina: number;
 }
 
 export interface TopProdutosMenorGrupo {
@@ -176,13 +177,20 @@ export interface TopProdutosPayload {
     /** Rótulo do chip de participação: "% da rede" · "% do total". */
     pctLabel: string;
   };
+  /**
+   * Contagem de itens únicos (produto × cor com venda) NÃO entra aqui de
+   * propósito: o dono tirou essa métrica do deck — o que conta é o volume
+   * vendido (`pecas`).
+   */
   totals: {
     faturamento: number;
     pecas: number;
-    itensComVenda: number;
     categorias: number;
   };
-  /** Top 10 da rede/filial: os 3 primeiros vão no pódio, o resto na tabela. */
+  /**
+   * Top 10 da rede/filial, na mesma tabela das páginas de categoria.
+   * Grão de SKU — cada item soma todas as cores do código (só nesta página).
+   */
   network: {
     items: TopProdutosItem[];
     faturamento: number;
@@ -306,6 +314,40 @@ function toItems(raw: RawItem[], leader: number): TopProdutosItem[] {
     precoMedio: r.qtde > 0 ? r.faturamento / r.qtde : 0,
     barPct: barPctOf(r.faturamento, leader),
   }));
+}
+
+/**
+ * Colapsa produto × cor em SKU: uma linha por código de produto, somando TODAS
+ * as cores. Só o slide 02 usa isso.
+ *
+ * A soma percorre TODAS as linhas do SKU, inclusive as negativas (trocas
+ * maiores que a venda) — o número do SKU é o LÍQUIDO, igual ao critério dos
+ * totais do deck. Filtrar positivos antes de somar infla o faturamento.
+ * A cor deixa de identificar a linha e passa a contar quantas cores venderam.
+ */
+function aggregateByProduto(raw: RawItem[]): RawItem[] {
+  const byProduto = new Map<string, { item: RawItem; cores: Set<string> }>();
+  for (const r of raw) {
+    const entry = byProduto.get(r.produto);
+    if (entry) {
+      entry.item.faturamento += r.faturamento;
+      entry.item.qtde += r.qtde;
+      if (r.cor) entry.cores.add(r.cor);
+      continue;
+    }
+    byProduto.set(r.produto, {
+      // `raw` já vem ordenado por faturamento desc, então os atributos ficam os
+      // da cor mais forte do SKU (descrição/coleção/grade são iguais no SKU).
+      item: { ...r },
+      cores: new Set(r.cor ? [r.cor] : []),
+    });
+  }
+  return Array.from(byProduto.values())
+    .map(({ item, cores }) => ({
+      ...item,
+      cor: cores.size > 1 ? `${cores.size} cores` : Array.from(cores)[0] ?? "",
+    }))
+    .sort((a, b) => b.faturamento - a.faturamento);
 }
 
 function chunk<T>(items: T[], size: number): T[][] {
@@ -474,24 +516,26 @@ export async function fetchTopProdutosPresentation({
   const totalPages = firstCategoriaPage - 1 + comPagina.length + menoresPages.length;
 
   // ---- slide 02: top 10 da rede ----
-  // Ranking = só itens com faturamento POSITIVO ("campeões de venda"); os
-  // negativos continuam nos totais e nos números do subgrupo.
-  const positivos = raw.filter((r) => r.faturamento > 0);
-  const networkRaw = positivos.slice(0, TOP_N);
+  // ÚNICA página com grão de SKU: soma todas as cores do mesmo código antes de
+  // ranquear (o café da PASHMINA LISA VISCOSE entra somado com as outras cores).
+  // Depois de somar, ranqueia só os SKUs com líquido POSITIVO ("campeões de
+  // venda"); os negativos continuam nos totais e nos números da categoria.
+  const porSku = aggregateByProduto(raw);
+  const networkRaw = porSku.filter((r) => r.faturamento > 0).slice(0, TOP_N);
   const networkLeader = networkRaw[0]?.faturamento ?? 0;
   const networkItems = toItems(networkRaw, networkLeader);
   const networkFaturamento = networkRaw.reduce((s, r) => s + r.faturamento, 0);
 
   // ---- sumário ----
+  // O sumário não numera mais "pág N" (pedido do dono); `firstCategoriaPage`
+  // continua existindo só para alimentar `totalPages` (rodapé "04 / 28").
   const sumarioLeader = comPagina[0]?.faturamento ?? 0;
   const sumarioRows: TopProdutosSumarioRow[] = comPagina.map((g, i) => ({
     ordem: i + 1,
     categoria: g.categoria,
-    itensComVenda: g.items.length,
     qtde: g.qtde,
     faturamento: g.faturamento,
     barPct: barPctOf(g.faturamento, sumarioLeader),
-    pagina: firstCategoriaPage + i,
   }));
 
   // ---- páginas de categoria ----
@@ -518,18 +562,19 @@ export async function fetchTopProdutosPresentation({
       categoria: g.categoria,
       rank: i + 1,
       linhas: g.linhas,
-      itensComVenda: g.items.length,
       faturamento: g.faturamento,
       qtde: g.qtde,
       percRede: g.percRede,
       topPerc,
       items: toItems(shown, leader),
       layout,
+      // A nota explica por que a tabela tem menos de TOP_N linhas — sem citar
+      // contagem de itens únicos, métrica que o dono tirou do deck inteiro.
       note:
         layout === "table" && todosListados
           ? negativos === 0
-            ? `Este ${dimensao.singular} teve apenas ${g.items.length} itens com venda no ${periodUnit} — todos estão listados acima.`
-            : `Este ${dimensao.singular} teve ${g.items.length} itens com venda no ${periodUnit}; os ${positivosGrupo.length} com faturamento positivo estão listados acima (${negativos} ficaram negativos por trocas).`
+            ? `Todos os produtos vendidos neste ${dimensao.singular} no ${periodUnit} estão listados acima.`
+            : `Todos os produtos com faturamento positivo deste ${dimensao.singular} estão listados acima (${negativos} ficaram negativos por trocas no ${periodUnit}).`
           : null,
       titleFontSize: titleFontSizeFor(g.categoria),
     };
@@ -551,7 +596,6 @@ export async function fetchTopProdutosPresentation({
     totals: {
       faturamento: totalFaturamento,
       pecas: totalPecas,
-      itensComVenda: raw.length,
       categorias: grupos.length,
     },
     network: {

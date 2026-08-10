@@ -697,6 +697,7 @@ export async function fetchFilialProdutoSales(
           WHERE pb.PRODUTO = fp.PRODUTO
             AND pb.CODIGO_BARRA IS NOT NULL
             AND pb.CODIGO_BARRA <> ''
+            ${groupByCor ? "AND ISNULL(pb.COR_PRODUTO, '') = ISNULL(fp.COR_PRODUTO, '')" : ''}
           ORDER BY pb.CODIGO_BARRA
         ) pbsel
         ${corJoin}

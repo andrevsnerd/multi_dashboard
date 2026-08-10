@@ -1663,7 +1663,7 @@ export default function GeradorApresentacoesPage({
           <span className={styles.resultMeta}>
             {topProdutos.totalPages} páginas · {topProdutos.slides.length}{" "}
             {topProdutos.dimensao.plural} ·{" "}
-            {topProdutos.totals.itensComVenda.toLocaleString("pt-BR")} itens · {topProdutos.period.label}
+            {topProdutos.totals.pecas.toLocaleString("pt-BR")} peças · {topProdutos.period.label}
           </span>
         )}
       </section>

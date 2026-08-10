@@ -72,18 +72,6 @@ function Colecao({ desc, code }: { desc: string; code: string }) {
   );
 }
 
-/** Bloco "cor · coleção · grade · subgrupo|grupo" do pódio. */
-function podiumMeta(item: TopProdutosItem, dimSingular: string) {
-  const colecao = [item.colecaoDesc, item.colecaoCode].filter(Boolean).join(" ");
-  const linha2 = [
-    item.grade ? `grade ${item.grade}` : "",
-    item.categoria ? `${dimSingular} ${item.categoria}` : "",
-  ]
-    .filter(Boolean)
-    .join(" · ");
-  return { cor: item.cor || "-", colecao, linha2 };
-}
-
 export default function TopProdutosDeck({
   report,
   logoDataUrl,
@@ -126,11 +114,12 @@ export default function TopProdutosDeck({
     </div>
   );
 
-  const headerRow = (
+  /** Cabeçalho da tabela; no top da rede a coluna de cor é agregada ("Cores"). */
+  const headerRow = (corLabel: string = "Cor") => (
     <div className={`${styles.rw} ${styles.hrow}`}>
       <div>#</div>
       <div>Produto</div>
-      <div>Cor</div>
+      <div>{corLabel}</div>
       <div>Coleção</div>
       <div>Grade</div>
       <div>Comparativo · líder = 100%</div>
@@ -227,15 +216,13 @@ export default function TopProdutosDeck({
           <div className={styles.isub}>
             {r.categoria}
             <em>
-              {fmtInt(r.itensComVenda)} {r.itensComVenda === 1 ? "item vendido" : "itens vendidos"} ·{" "}
-              {fmtInt(r.qtde)} {r.qtde === 1 ? "peça" : "peças"}
+              {fmtInt(r.qtde)} {r.qtde === 1 ? "peça vendida" : "peças vendidas"}
             </em>
           </div>
           <div className={styles.ibar}>
             <span style={{ width: `${r.barPct}%` }} />
           </div>
           <div className={styles.ifat}>{fmtCurrency(r.faturamento)}</div>
-          <div className={styles.ipg}>pág {r.pagina}</div>
         </div>
       ))}
     </div>
@@ -327,18 +314,18 @@ export default function TopProdutosDeck({
             <strong>{fmtCurrency(totals.faturamento)}</strong>
             <i>{scope.label}</i>
           </div>
+          {/* Contagem de itens únicos saiu do deck por pedido do dono: o que vale
+              é o volume vendido (peças), não quantos códigos diferentes venderam. */}
           <div className={styles.kpi}>
             <u>Peças</u>
             <strong>{fmtInt(totals.pecas)}</strong>
-            <i>unidades líquidas</i>
-          </div>
-          <div className={styles.kpi}>
-            <u>Itens com venda</u>
-            <strong>{fmtInt(totals.itensComVenda)}</strong>
-            <i>em {fmtInt(totals.categorias)} {dimensao.plural}</i>
+            <i>unidades líquidas em {fmtInt(totals.categorias)} {dimensao.plural}</i>
           </div>
         </div>
-        <div className={styles.foot}>Ranking por item = produto + cor</div>
+        <div className={styles.foot}>
+          Top {network.items.length} da rede por produto (todas as cores somadas) · demais rankings
+          por produto + cor
+        </div>
       </section>
 
       {/* ============ 02 — TOP 10 DA REDE ============ */}
@@ -351,8 +338,8 @@ export default function TopProdutosDeck({
             <h2 style={{ fontSize: "27px" }}>
               Os {network.items.length} maiores produtos do {period.unit}
               <small>
-                Ranking por faturamento entre os {fmtInt(totals.itensComVenda)} itens vendidos{" "}
-                {scope.inLabel} em {period.longLabel}
+                Ranking por faturamento {scope.inLabel} em {period.longLabel} — cada produto soma
+                todas as suas cores
               </small>
             </h2>
           </div>
@@ -372,43 +359,11 @@ export default function TopProdutosDeck({
             {mini}
           </div>
         </div>
+        {/* Mesmo layout das páginas de categoria: cabeçalho + a lista inteira
+            (o pódio de 3 cards grandes do modelo saiu por pedido do dono). */}
         <div className={styles.body}>
-          {network.items.length >= 3 && (
-            <div className={styles.pod}>
-              {network.items.slice(0, 3).map((item) => {
-                const meta = podiumMeta(item, dimensao.singular);
-                return (
-                  <div
-                    key={`${item.rank}-${item.produto}-${item.cor}`}
-                    className={`${styles.pc} ${item.rank === 1 ? styles.one : ""}`}
-                  >
-                    {item.rank === 1 && <div className={styles.cut} />}
-                    <div className={styles.pr}>{pad2(item.rank)}</div>
-                    <div className={styles.pn}>{item.descricao}</div>
-                    <div className={styles.pc2}>
-                      <b>{meta.cor}</b>
-                      {meta.colecao ? ` · ${meta.colecao}` : ""}
-                      {meta.linha2 ? (
-                        <>
-                          <br />
-                          {meta.linha2}
-                        </>
-                      ) : null}
-                    </div>
-                    <div className={styles.pf}>{fmtCurrency(item.faturamento)}</div>
-                    <div className={styles.pmeta}>
-                      <b>{fmtInt(item.qtde)}</b> peças vendidas &nbsp;·&nbsp; preço médio{" "}
-                      <b>{fmtCurrency(item.precoMedio)}</b>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-          {headerRow}
-          <div className={styles.rows}>
-            {(network.items.length >= 3 ? network.items.slice(3) : network.items).map(rankingRow)}
-          </div>
+          {headerRow("Cores")}
+          <div className={styles.rows}>{network.items.map(rankingRow)}</div>
         </div>
         {footer(networkPage)}
       </section>
@@ -489,7 +444,7 @@ export default function TopProdutosDeck({
                     {slide.linhas.length > 0
                       ? `  ·  ${slide.linhas.length === 1 ? "linha" : "linhas"} ${slide.linhas.join(" / ")}`
                       : ""}
-                    {`  ·  ${fmtInt(slide.itensComVenda)} ${slide.itensComVenda === 1 ? "item" : "itens"} com venda no ${period.unit}`}
+                    {`  ·  ${fmtInt(slide.qtde)} ${slide.qtde === 1 ? "peça vendida" : "peças vendidas"} no ${period.unit}`}
                   </small>
                 </h2>
               </div>
@@ -518,7 +473,7 @@ export default function TopProdutosDeck({
                 cardsGrid(slide)
               ) : (
                 <>
-                  {headerRow}
+                  {headerRow()}
                   <div className={styles.rows}>{slide.items.map(rankingRow)}</div>
                   {slide.note ? <div className={styles.note}>{slide.note}</div> : null}
                 </>

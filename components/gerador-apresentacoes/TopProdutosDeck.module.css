@@ -6,8 +6,10 @@
    · Layout em flexbox: cabeçalho (.hd), corpo (.body) e rodapé (.fo) se ajustam
      sozinhos — mexer nos textos não desalinha nada.
    · Blocos: .hd cabeçalho · .rw grade de 9 colunas (linha de título .hrow e
-     linhas .row) · .pod pódio · .cards cards grandes · .idx sumário ·
+     linhas .row) · .cards cards grandes · .idx sumário ·
      .mn tabela dos subgrupos menores.
+   · O pódio de 3 cards grandes do modelo original foi removido (pedido do dono):
+     o top da rede usa a MESMA tabela das páginas de categoria, lista inteira.
    · Destaque: 1º lugar = .top na linha; 2º e 3º = .r2 / .r3.
 
    Fontes: display TeX Gyre Adventor se instalada, senão Jost; texto Poppins;
@@ -478,86 +480,6 @@
   flex-shrink: 0;
 }
 
-/* ---- pódio ---- */
-.pod {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  column-gap: 20px;
-  flex-shrink: 0;
-  margin-bottom: 28px;
-}
-.pc {
-  background: #fbf8f7;
-  padding: 18px 22px 16px;
-  position: relative;
-  overflow: hidden;
-}
-.pc.one {
-  background: #fff1f2;
-}
-.pc .cut {
-  position: absolute;
-  right: 0;
-  top: 0;
-  width: 0;
-  height: 0;
-  border-top: 28px solid #ff7983;
-  border-left: 28px solid transparent;
-}
-.pc .pr {
-  font-family: var(--display);
-  font-weight: 700;
-  font-size: 26px;
-  color: #16110f;
-  line-height: 1;
-}
-.pc.one .pr {
-  color: #e04a57;
-}
-.pc .pn {
-  font-size: 15px;
-  font-weight: 500;
-  margin-top: 10px;
-  line-height: 1.22;
-  height: 35px;
-  overflow: hidden;
-}
-.pc .pc2 {
-  font-size: 10.5px;
-  color: #7a6c69;
-  font-weight: 300;
-  margin-top: 5px;
-  line-height: 1.42;
-  height: 30px;
-  overflow: hidden;
-}
-.pc .pc2 b {
-  font-weight: 500;
-  color: #3e3533;
-}
-.pc .pf {
-  font-family: var(--display);
-  font-weight: 700;
-  font-size: 25px;
-  margin-top: 9px;
-}
-.pc.one .pf {
-  color: #c22f3d;
-}
-.pc .pmeta {
-  font-size: 10.5px;
-  color: #6b5c59;
-  font-weight: 300;
-  margin-top: 8px;
-  border-top: 1px solid #efe1e1;
-  padding-top: 9px;
-  line-height: 1.5;
-}
-.pc .pmeta b {
-  font-weight: 500;
-  color: #16110f;
-}
-
 /* ---- cards (poucos itens) ---- */
 .cards {
   flex: 1;
@@ -660,7 +582,9 @@
   flex: 1;
   max-height: 56px;
   display: grid;
-  grid-template-columns: 28px 1fr 100px 92px 46px;
+  /* Coluna "pág N" removida por pedido do dono (deck não numera páginas no
+     sumário); as 92px do faturamento absorveram o espaço da coluna extinta. */
+  grid-template-columns: 28px 1fr 100px 112px;
   align-items: center;
   column-gap: 12px;
   border-bottom: 1px solid #f4ebe9;
@@ -680,7 +604,9 @@
 .ir .isub em {
   font-style: normal;
   display: block;
-  font-size: 9px;
+  /* 12px (era 9px): a linha ficou só com as peças vendidas, então o dono pediu
+     o mesmo corpo do nome da categoria. */
+  font-size: 12px;
   color: #a2918e;
   font-weight: 300;
   margin-top: 3px;
@@ -701,13 +627,6 @@
   font-size: 12.5px;
   text-align: right;
 }
-.ir .ipg {
-  font-size: 9.5px;
-  color: #a2918e;
-  text-align: right;
-  letter-spacing: 0.06em;
-}
-
 /* ---- menores ---- */
 .mn {
   flex: 1;
