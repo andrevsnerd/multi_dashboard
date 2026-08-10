@@ -540,6 +540,55 @@
   gap: 2px;
 }
 
+/* ── ajuste fino da impressão (calibração) ── */
+
+.calibracao {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--b-200);
+  border-radius: 10px;
+  background: var(--s-50);
+}
+.calibracaoControle {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.calibracaoLabel {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--t-600);
+}
+.calibracaoValor {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--t-900);
+}
+.calibracaoLinha {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.calibracaoSlider {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--t-900);
+}
+.calibracaoRodape {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 11.5px;
+  color: var(--t-500);
+  line-height: 1.5;
+}
+
 .zplBox {
   width: 100%;
   min-height: 180px;
@@ -553,6 +602,79 @@
   color: var(--t-800);
   white-space: pre;
   overflow: auto;
+}
+
+/* ── editor visual (arrastar/redimensionar) ── */
+
+.editorVisual {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.editorBarra {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  color: var(--t-600);
+}
+.editorCanvasWrap {
+  display: flex;
+  justify-content: center;
+  padding: 14px;
+  background: var(--s-50);
+  border-radius: 10px;
+  border: 1px solid var(--b-200);
+  overflow: auto;
+}
+.editorCanvas {
+  position: relative;
+  flex: none;
+}
+.editorOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  touch-action: none;
+}
+.editorLista {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 170px;
+  overflow-y: auto;
+}
+.editorItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 7px;
+  border: 1px solid var(--b-200);
+  background: var(--s-white);
+  font-size: 12.5px;
+  color: var(--t-700);
+  cursor: pointer;
+  text-align: left;
+}
+.editorItem:hover {
+  background: var(--s-100);
+}
+.editorItemAtivo {
+  border-color: #2563eb;
+  background: var(--s-blue50);
+  color: var(--t-900);
+}
+.editorInspetor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--b-200);
+  border-radius: 10px;
+  background: var(--s-50);
 }
 
 /* A folha de impressão fica montada fora da tela: o botão "imprimir pelo

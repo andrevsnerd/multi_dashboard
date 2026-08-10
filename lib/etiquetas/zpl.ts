@@ -10,9 +10,13 @@
  */
 
 import { encodeBarcode } from './barcode';
+import { calcularLayout, elementoPorChave, escalaDe, moduloEfetivoDots } from './layout';
 import {
+  CAMPOS_DISPONIVEIS,
   dadoDoBarcode,
   dotsPorMm,
+  larguraTextoEstimadaMm,
+  PROPORCAO_FONTE_PADRAO,
   textoDaLinha,
   type EtiquetaConfig,
   type ItemEtiqueta,
@@ -49,10 +53,16 @@ function comandoTexto(
 ): string {
   const limpo = limparTexto(texto);
   if (!limpo) return '';
-  // Largura 0 = a Zebra mantém a proporção natural da fonte, que é o mesmo que o
-  // Helvetica faz no preview SVG. Forçar uma largura fixa deixava o impresso mais
-  // estreito do que a tela mostrava.
-  const fonte = `^A0N,${alturaDots},${larguraDots || 0}`;
+  // NUNCA mandar largura 0: pro firmware da Zebra, largura explícita 0 no ^A0
+  // é inválida e ele reaproveita a última largura aceita (de um ^A0 anterior,
+  // às vezes de outra etiqueta) — foi isso que fazia o texto (e o número do
+  // código de barras, que usa esta mesma função) saírem bem mais largos do
+  // que o preview mostrava, a ponto de invadir a etiqueta vizinha na mídia
+  // contínua. Sem uma largura pedida, calculamos uma pela altura (mesma
+  // proporção do Helvetica do preview) em vez de depender do aspecto nativo
+  // da fonte da impressora, que varia de firmware pra firmware.
+  const larguraFonte = larguraDots > 0 ? larguraDots : Math.max(1, Math.round(alturaDots * PROPORCAO_FONTE_PADRAO));
+  const fonte = `^A0N,${alturaDots},${larguraFonte}`;
   const bloco = `^FB${larguraBloco},1,0,${JUSTIFICACAO[alinhamento]}`;
   let out = `^FO${x},${y}${fonte}${bloco}^FD${limpo}^FS`;
   // ^A0 não tem negrito: repete o campo deslocado 1 dot para engrossar.
@@ -63,27 +73,17 @@ function comandoTexto(
 function comandoBarcode(
   dado: string,
   config: EtiquetaConfig,
-  xEtiqueta: number,
+  x: number,
   y: number,
-  larguraEtiquetaDots: number,
   alturaDots: number
 ): string {
-  const { simbologia, moduloDots } = config.barcode;
+  const { simbologia } = config.barcode;
   const codificado = encodeBarcode(dado, simbologia);
   if (!codificado) return '';
 
-  // Centraliza/alinha usando a largura real em módulos — a mesma conta do preview.
-  const larguraBarrasDots = codificado.modulos * moduloDots;
-  const sobra = Math.max(0, larguraEtiquetaDots - larguraBarrasDots);
-  const desloc =
-    config.barcode.alinhamento === 'center'
-      ? Math.round(sobra / 2)
-      : config.barcode.alinhamento === 'right'
-        ? sobra
-        : 0;
-  const x = xEtiqueta + desloc;
-
-  const by = `^BY${moduloDots},3,${alturaDots}`;
+  // x já vem posicionado (alinhamento/arraste resolvidos pelo layout.ts — a
+  // mesma conta que o preview usa), não precisa recalcular deslocamento aqui.
+  const by = `^BY${moduloEfetivoDots(config)},3,${alturaDots}`;
   const dados = limparTexto(dado);
 
   // A linha do número é impressa por nós (campo de texto próprio), não pelo
@@ -98,46 +98,66 @@ function comandoBarcode(
   return `${by}^FO${x},${y}${comando}^FD${dados}^FS`;
 }
 
-/** Desenha uma etiqueta na posição x da fileira. Devolve o ZPL do conteúdo. */
+/**
+ * Desenha uma etiqueta na posição x da fileira. Devolve o ZPL do conteúdo.
+ *
+ * As posições vêm de `calcularLayout` — a MESMA conta que o preview SVG usa
+ * (pilha automática, ou a posição arrastada no editor visual quando existir).
+ */
 function zplDaEtiqueta(item: ItemEtiqueta, config: EtiquetaConfig, xBaseDots: number): string {
   const dpmm = dotsPorMm(config.impressora.dpi);
-  const larguraUtil = mm(config.larguraEtiquetaMm - config.margemInternaMm * 2, dpmm);
-  const x = xBaseDots + mm(config.margemInternaMm, dpmm);
-
+  const layout = calcularLayout(config, item);
   const partes: string[] = [];
-  let y = mm(config.margemTopoMm + config.margemInternaMm, dpmm);
+
+  // As alturas vêm do layout (box.alturaMm), não do modelo cru: é lá que a
+  // escala de calibração já foi aplicada.
+  const escala = escalaDe(config);
 
   for (const linha of config.linhas) {
     if (!linha.visivel) continue;
-    const alturaDots = mm(linha.alturaMm, dpmm);
-    const larguraDots = mm(linha.larguraMm, dpmm);
+    const box = elementoPorChave(layout, `linha-${linha.id}`);
+    if (!box) continue;
     partes.push(
       comandoTexto(
         textoDaLinha(item, linha),
-        x,
-        y,
-        alturaDots,
-        larguraDots,
-        larguraUtil,
-        linha.alinhamento,
+        xBaseDots + mm(box.xMm, dpmm),
+        mm(box.yMm, dpmm),
+        mm(box.alturaMm, dpmm),
+        mm(linha.larguraMm * escala, dpmm),
+        mm(box.larguraMm, dpmm),
+        box.alinhamento,
         linha.negrito
       )
     );
-    y += alturaDots + mm(linha.espacoAbaixoMm, dpmm);
   }
 
   const dado = dadoDoBarcode(item, config);
-  if (dado && config.barcode.alturaMm > 0) {
-    y += mm(config.barcode.espacoAcimaMm, dpmm);
-    const alturaBarras = mm(config.barcode.alturaMm, dpmm);
-    partes.push(comandoBarcode(dado, config, x, y, larguraUtil, alturaBarras));
-    y += alturaBarras;
+  const boxBarcode = elementoPorChave(layout, 'barcode');
+  if (dado && boxBarcode) {
+    partes.push(
+      comandoBarcode(
+        dado,
+        config,
+        xBaseDots + mm(boxBarcode.xMm, dpmm),
+        mm(boxBarcode.yMm, dpmm),
+        mm(boxBarcode.alturaMm, dpmm)
+      )
+    );
   }
 
-  if (dado && config.barcode.mostrarNumero) {
-    const alturaNumero = mm(config.barcode.alturaNumeroMm, dpmm);
+  const boxNumero = elementoPorChave(layout, 'numero');
+  if (dado && boxNumero) {
     partes.push(
-      comandoTexto(dado, x, y, alturaNumero, 0, larguraUtil, config.barcode.alinhamento, false)
+      comandoTexto(
+        dado,
+        xBaseDots + mm(boxNumero.xMm, dpmm),
+        mm(boxNumero.yMm, dpmm),
+        mm(boxNumero.alturaMm, dpmm),
+        0,
+        mm(boxNumero.larguraMm, dpmm),
+        boxNumero.alinhamento,
+        false
+      )
     );
   }
 
@@ -184,7 +204,7 @@ export interface AnaliseBarras {
  */
 export function analisarBarras(itens: ItemComQuantidade[], config: EtiquetaConfig): AnaliseBarras {
   const larguraUtilMm = Math.max(0, config.larguraEtiquetaMm - config.margemInternaMm * 2);
-  const moduloMm = config.barcode.moduloDots / dotsPorMm(config.impressora.dpi);
+  const moduloMm = moduloEfetivoDots(config) / dotsPorMm(config.impressora.dpi);
 
   let maxModulos = 0;
   for (const { item } of itens) {
@@ -202,6 +222,58 @@ export function analisarBarras(itens: ItemComQuantidade[], config: EtiquetaConfi
     estoura: maxModulos > 0 && larguraMaxMm > larguraUtilMm + 0.01,
     quietZoneCurta: maxModulos > 0 && larguraMaxMm <= larguraUtilMm && quietZoneMm < 10 * moduloMm,
   };
+}
+
+export interface LinhaEstoura {
+  linhaId: string;
+  campoLabel: string;
+  larguraEstimadaMm: number;
+  larguraUtilMm: number;
+  /** Corte (máx. caracteres) que caberia na largura útil — o conserto sugerido. */
+  maxCaracteresQueCabe: number;
+}
+
+/**
+ * Estima (não mede de verdade — a Zebra não devolve isso) quais linhas de
+ * texto provavelmente vão além da largura útil da etiqueta, tanto pelo texto
+ * já na fila quanto pelo PIOR CASO permitido pelo corte (máx. caracteres)
+ * configurado — assim o aviso aparece mesmo com a fila vazia, enquanto o
+ * modelo ainda está sendo ajustado no editor visual.
+ */
+export function analisarTextos(itens: ItemComQuantidade[], config: EtiquetaConfig): LinhaEstoura[] {
+  const larguraUtilMm = Math.max(0, config.larguraEtiquetaMm - config.margemInternaMm * 2);
+  const escala = escalaDe(config);
+  const linhasEstouram: LinhaEstoura[] = [];
+
+  for (const linha of config.linhas) {
+    if (!linha.visivel) continue;
+    // Mede o tamanho JÁ calibrado — aumentar a escala tem que acender o aviso.
+    const alturaMm = linha.alturaMm * escala;
+    const larguraFonteMm = linha.larguraMm * escala;
+
+    let maiorMm = 0;
+    for (const { item } of itens) {
+      const largura = larguraTextoEstimadaMm(textoDaLinha(item, linha), alturaMm, larguraFonteMm);
+      if (largura > maiorMm) maiorMm = largura;
+    }
+    if (linha.maxCaracteres > 0) {
+      const piorCaso = larguraTextoEstimadaMm('X'.repeat(linha.maxCaracteres), alturaMm, larguraFonteMm);
+      if (piorCaso > maiorMm) maiorMm = piorCaso;
+    }
+
+    if (maiorMm > larguraUtilMm + 0.01) {
+      const porCaractere = larguraTextoEstimadaMm('X', alturaMm, larguraFonteMm);
+      linhasEstouram.push({
+        linhaId: linha.id,
+        campoLabel: CAMPOS_DISPONIVEIS.find((c) => c.valor === linha.campo)?.label ?? linha.campo,
+        larguraEstimadaMm: maiorMm,
+        larguraUtilMm,
+        maxCaracteresQueCabe: porCaractere > 0 ? Math.max(1, Math.floor(larguraUtilMm / porCaractere)) : 1,
+      });
+    }
+  }
+
+  return linhasEstouram;
 }
 
 export interface ResultadoZpl {

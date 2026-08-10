@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuth } from "@/components/auth/AuthContext";
-import { analisarBarras, gerarZpl, montarFileiras } from "@/lib/etiquetas/zpl";
+import { analisarBarras, analisarTextos, gerarZpl, montarFileiras } from "@/lib/etiquetas/zpl";
 import {
   CONFIG_PADRAO,
   alturaConteudoMm,
@@ -28,6 +28,8 @@ import {
 } from "@/lib/etiquetas/tipos";
 
 import ConfiguracaoEtiqueta from "./ConfiguracaoEtiqueta";
+import CalibracaoEtiqueta from "./CalibracaoEtiqueta";
+import EditorVisualEtiqueta from "./EditorVisualEtiqueta";
 import EtiquetaSvg from "./EtiquetaSvg";
 import styles from "./ImprimirEtiquetasPage.module.css";
 import {
@@ -134,7 +136,8 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
   const [config, setConfig] = useState<EtiquetaConfig>(() => clonarConfig(CONFIG_PADRAO));
   const [configSalva, setConfigSalva] = useState<EtiquetaConfig>(() => clonarConfig(CONFIG_PADRAO));
   const [podeConfigurar, setPodeConfigurar] = useState(false);
-  const [mostrarConfig, setMostrarConfig] = useState(false);
+  const [mostrarConfig, setMostrarConfig] = useState(true);
+  const [mostrarAvancado, setMostrarAvancado] = useState(false);
   const [salvandoConfig, setSalvandoConfig] = useState(false);
 
   const [zebra, setZebra] = useState<StatusBrowserPrint | null>(null);
@@ -433,6 +436,28 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
     [itensFila, config]
   );
 
+  // Idem para as linhas de texto: fonte alta demais ou "máx. caracteres"
+  // generoso demais faz o texto invadir a etiqueta vizinha na mídia contínua.
+  const linhasEstouram = useMemo(
+    () =>
+      analisarTextos(
+        itensFila.map(({ item, quantidade }) => ({ item, quantidade })),
+        config
+      ),
+    [itensFila, config]
+  );
+
+  /** Aplica o corte sugerido em cada linha que estoura a largura. */
+  const cortarTextoQueNaoCabe = useCallback(() => {
+    const porLinha = new Map(linhasEstouram.map((l) => [l.linhaId, l.maxCaracteresQueCabe]));
+    setConfig((atual) => ({
+      ...atual,
+      linhas: atual.linhas.map((linha) =>
+        porLinha.has(linha.id) ? { ...linha, maxCaracteres: porLinha.get(linha.id)! } : linha
+      ),
+    }));
+  }, [linhasEstouram]);
+
   const alturaConteudo = alturaConteudoMm(config);
   const conteudoNaoCabe = alturaConteudo > config.alturaEtiquetaMm + 0.01;
   const larguraFileira = larguraFileiraMm(config);
@@ -549,6 +574,12 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
   const configMudou = useMemo(
     () => JSON.stringify(config) !== JSON.stringify(configSalva),
     [config, configSalva]
+  );
+
+  /** Só a calibração mudou — o card de imprimir oferece salvar sem abrir o editor. */
+  const calibracaoMudou = useMemo(
+    () => JSON.stringify(config.calibracao) !== JSON.stringify(configSalva.calibracao),
+    [config.calibracao, configSalva.calibracao]
   );
 
   const salvarConfig = useCallback(
@@ -1001,6 +1032,25 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
                 simbologia.
               </div>
             ) : null}
+            {linhasEstouram.length > 0 ? (
+              <div className={styles.aviso}>
+                {linhasEstouram
+                  .map(
+                    (l) =>
+                      `"${l.campoLabel}" precisa de ~${l.larguraEstimadaMm.toFixed(1)}mm e só há ${l.larguraUtilMm.toFixed(1)}mm`
+                  )
+                  .join("; ")}{" "}
+                — o texto pode invadir a etiqueta vizinha na mídia contínua.{" "}
+                {podeConfigurar ? (
+                  <button type="button" className={styles.botaoLink} onClick={cortarTextoQueNaoCabe}>
+                    cortar o texto pra caber
+                  </button>
+                ) : (
+                  "Reduza o \"máx. caracteres\" dessa linha."
+                )}{" "}
+                (é uma estimativa — confirme na impressora.)
+              </div>
+            ) : null}
           </div>
 
           <div className={styles.card}>
@@ -1089,6 +1139,34 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
               <strong>ZDesigner ZD230-203dpi ZPL</strong>, margens zero e sem ajuste de escala.
             </div>
 
+            {/* Fica junto dos botões de imprimir de propósito: calibrar é
+                imprimir → olhar → ajustar → imprimir de novo. */}
+            <CalibracaoEtiqueta
+              config={config}
+              onChange={setConfig}
+              podeConfigurar={podeConfigurar}
+            />
+
+            {calibracaoMudou ? (
+              <div className={styles.acoes}>
+                <button
+                  type="button"
+                  className={`${styles.botao} ${styles.botaoPrimario}`}
+                  onClick={() => void salvarConfig(false)}
+                  disabled={!podeConfigurar || salvandoConfig}
+                >
+                  {salvandoConfig ? "Salvando…" : "Salvar modelo"}
+                </button>
+                <button
+                  type="button"
+                  className={styles.botao}
+                  onClick={() => setConfig(clonarConfig(configSalva))}
+                >
+                  Descartar alterações
+                </button>
+              </div>
+            ) : null}
+
             {mostrarZpl && resultadoZpl ? (
               <pre className={styles.zplBox}>{resultadoZpl.zpl}</pre>
             ) : null}
@@ -1096,7 +1174,7 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
 
           <div className={styles.card}>
             <div className={styles.cardHeader}>
-              <h2 className={styles.cardTitle}>Configuração da etiqueta</h2>
+              <h2 className={styles.cardTitle}>Editor da etiqueta</h2>
               <button
                 type="button"
                 className={styles.botaoMini}
@@ -1113,11 +1191,31 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
 
             {mostrarConfig ? (
               <>
-                <ConfiguracaoEtiqueta
+                <EditorVisualEtiqueta
                   config={config}
                   onChange={setConfig}
+                  item={exemploPreview}
                   podeConfigurar={podeConfigurar}
                 />
+
+                <button
+                  type="button"
+                  className={styles.botaoLink}
+                  onClick={() => setMostrarAvancado((v) => !v)}
+                >
+                  {mostrarAvancado
+                    ? "esconder configuração avançada"
+                    : "usar configuração avançada (todas as opções: impressora, colunas, margens…)"}
+                </button>
+
+                {mostrarAvancado ? (
+                  <ConfiguracaoEtiqueta
+                    config={config}
+                    onChange={setConfig}
+                    podeConfigurar={podeConfigurar}
+                  />
+                ) : null}
+
                 <div className={styles.acoes}>
                   <button
                     type="button"

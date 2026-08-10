@@ -395,6 +395,12 @@ export default function ConfiguracaoEtiqueta({ config, onChange, podeConfigurar 
             min={0.8}
             max={20}
           />
+          <NumeroCampo
+            label="Espaço antes do número"
+            valor={config.barcode.espacoNumeroMm}
+            onChange={(v) => setBarcode({ espacoNumeroMm: v })}
+            max={20}
+          />
           <label className={styles.campo}>
             <span>Alinhar</span>
             <select
