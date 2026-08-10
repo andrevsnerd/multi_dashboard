@@ -1,5 +1,6 @@
 import type { ColumnType, ReportPresetColumn, ReportRow } from "@/lib/reports/types";
 import { COMPRA_FILIAL_COL_PREFIX } from "@/lib/reports/compra-sugerida-abc";
+import { ROW_RUPTURA_FIELD } from "@/lib/reports/keys";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ExcelJSCell = any;
@@ -62,6 +63,119 @@ export interface CompraPorLojaExportOptions {
   titleLines?: string[];
   /** Período para o sufixo do nome do arquivo. */
   dateRange?: { startDate: Date; endDate: Date } | null;
+  /**
+   * Chave da coluna usada como categoria (ex.: GRUPO, LINHA): agrupa as linhas em blocos
+   * contíguos (ordem de 1ª aparição na lista) com uma faixa de título entre eles — mesmo
+   * visual do cabeçalho (fundo azul-escuro, texto branco). Sem isso, a lista sai "achatada",
+   * na ordem em que os dados chegaram.
+   */
+  categoryKey?: string;
+}
+
+// Cores fixas do layout "compra por loja" (compartilhadas por todos os exports de compra
+// sugerida — Curva ABC e Gerador de Relatórios).
+const BANNER_FILL_ARGB = "FF1E3A5F";
+const RUPTURA_ROW_FILL_ARGB = "FFF9D2E3";
+const FILIAL_POSITIVE_FILL_ARGB = "FFD8EFCB";
+const FILIAL_POSITIVE_FONT_ARGB = "FF1F6B34";
+const FILIAL_ZERO_FONT_ARGB = "FFC0C6CC";
+const TOTAL_CELL_FILL_ARGB = "FFF2F5F9";
+const FOOTER_ROW_FILL_ARGB = "FFEDEFF3";
+
+/**
+ * Família = descrição até a primeira palavra com dígito, incluindo também a palavra anterior
+ * quando ela é um marcador curto de modelo (≤3 letras, ex.: "IP" em "IP 17", "SG" em "SG S23")
+ * — assim "IP16", "IP 17" e "SG S23" cortam no mesmo lugar ("CP COURO MAGSAFE"), com ou sem
+ * espaço entre a marca e o número. Heurística best-effort para agrupar variantes do mesmo
+ * produto adjacentes — não é regra de cadastro, só organização visual do export.
+ */
+function splitFamilyAndModel(descricao: string): { family: string; model: number | null } {
+  const raw = String(descricao ?? "").trim();
+  if (!raw) return { family: "", model: null };
+  const words = raw.split(/\s+/);
+  const idx = words.findIndex((w) => /\d/.test(w));
+  if (idx <= 0) return { family: raw.toUpperCase(), model: null };
+
+  const digits = words[idx].replace(/\D+/g, "");
+  const model = digits ? parseInt(digits, 10) : null;
+
+  let cut = idx;
+  const prevWord = words[cut - 1];
+  if (cut - 1 > 0 && prevWord && /^[A-Za-zÀ-ÿ]{1,3}$/.test(prevWord)) cut -= 1;
+
+  const family = words.slice(0, cut).join(" ").toUpperCase();
+  return { family: family || raw.toUpperCase(), model: Number.isFinite(model as number) ? model : null };
+}
+
+type PlanItem =
+  | { kind: "banner"; label: string }
+  | { kind: "row"; row: Record<string, CellValue> };
+
+/**
+ * Monta a ordem final de exibição: sem `categoryKey`, devolve tudo "achatado" na ordem
+ * recebida (comportamento anterior). Com `categoryKey`, agrupa por categoria (ordem de 1ª
+ * aparição, faixa de título antes de cada bloco) e, dentro dela: itens normais primeiro —
+ * em blocos de "família" (ver `splitFamilyAndModel`) ordenados por custo unit. decrescente,
+ * dentro da família por modelo crescente e depois por descrição (empate = ordem original,
+ * sort estável) — e por fim os itens de ruptura (`ROW_RUPTURA_FIELD`), ordenados por Custo
+ * total decrescente.
+ */
+function planRows(
+  rows: Array<Record<string, CellValue>>,
+  categoryKey: string | undefined,
+  custoUnitKey: string | undefined,
+  custoTotalKey: string | undefined
+): PlanItem[] {
+  if (!categoryKey) return rows.map((row) => ({ kind: "row", row }));
+
+  const byCategory = new Map<string, Record<string, CellValue>[]>();
+  for (const row of rows) {
+    const cat = String(row[categoryKey] ?? "").trim() || "(sem grupo)";
+    const arr = byCategory.get(cat) ?? [];
+    arr.push(row);
+    byCategory.set(cat, arr);
+  }
+
+  const plan: PlanItem[] = [];
+  for (const [cat, catRows] of byCategory) {
+    plan.push({ kind: "banner", label: cat });
+
+    const normal = catRows.filter((r) => Number(r[ROW_RUPTURA_FIELD] ?? 0) !== 1);
+    const ruptura = catRows.filter((r) => Number(r[ROW_RUPTURA_FIELD] ?? 0) === 1);
+
+    const families = new Map<string, { rows: Record<string, CellValue>[]; maxCusto: number }>();
+    for (const row of normal) {
+      const { family } = splitFamilyAndModel(String(row.DESCRICAO ?? ""));
+      const key = family || "—";
+      const entry = families.get(key) ?? { rows: [], maxCusto: 0 };
+      const custo = custoUnitKey ? Number(row[custoUnitKey] ?? 0) : 0;
+      entry.maxCusto = Math.max(entry.maxCusto, custo);
+      entry.rows.push(row);
+      families.set(key, entry);
+    }
+
+    const orderedFamilies = Array.from(families.values()).sort((a, b) => b.maxCusto - a.maxCusto);
+    for (const fam of orderedFamilies) {
+      const withKeys = fam.rows.map((row, idx) => {
+        const { model } = splitFamilyAndModel(String(row.DESCRICAO ?? ""));
+        return { row, idx, model, desc: String(row.DESCRICAO ?? "").toUpperCase() };
+      });
+      withKeys.sort((a, b) => {
+        const am = a.model ?? Number.POSITIVE_INFINITY;
+        const bm = b.model ?? Number.POSITIVE_INFINITY;
+        if (am !== bm) return am - bm;
+        if (a.desc !== b.desc) return a.desc.localeCompare(b.desc, "pt-BR");
+        return a.idx - b.idx; // empate real (mesmo modelo/descrição) → ordem original
+      });
+      for (const w of withKeys) plan.push({ kind: "row", row: w.row });
+    }
+
+    const rupturaSorted = [...ruptura].sort(
+      (a, b) => Number((custoTotalKey ? b[custoTotalKey] : 0) ?? 0) - Number((custoTotalKey ? a[custoTotalKey] : 0) ?? 0)
+    );
+    for (const row of rupturaSorted) plan.push({ kind: "row", row });
+  }
+  return plan;
 }
 
 /**
@@ -83,9 +197,6 @@ export async function exportCompraPorLojaXlsx(
     alert("Selecione ao menos uma coluna");
     return;
   }
-
-  // Cor de destaque das células de loja com quantidade > 0 (facilita ler o que cada loja compra).
-  const FILIAL_HIGHLIGHT_ARGB = "FFDAEEF3";
 
   // Índices (1-based) das colunas especiais.
   const filialCols: number[] = [];
@@ -148,7 +259,7 @@ export async function exportCompraPorLojaXlsx(
   });
   headerRow.height = 20;
   headerRow.eachCell({ includeEmpty: true }, (cell: ExcelJSCell) => {
-    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E3A5F" } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BANNER_FILL_ARGB } };
     cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 10, name: "Calibri" };
     cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
     cell.border = {
@@ -157,9 +268,30 @@ export async function exportCompraPorLojaXlsx(
     };
   });
 
-  rows.forEach((row, i) => {
+  // ── Linhas de dados (agrupadas por categoria, se configurado) ──
+  const custoUnitKeyName = custoUnitCol > 0 ? columns[custoUnitCol - 1].key : undefined;
+  const custoTotalKeyName = custoTotalCol > 0 ? columns[custoTotalCol - 1].key : undefined;
+  const plan = planRows(rows, options.categoryKey, custoUnitKeyName, custoTotalKeyName);
+
+  plan.forEach((item, i) => {
     const r = firstDataRow + i;
     const xrow = ws.getRow(r);
+
+    if (item.kind === "banner") {
+      xrow.getCell(1).value = item.label;
+      ws.mergeCells(r, 1, r, columns.length);
+      xrow.height = 18;
+      xrow.eachCell({ includeEmpty: true }, (cell: ExcelJSCell) => {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BANNER_FILL_ARGB } };
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 10, name: "Calibri" };
+        cell.alignment = { horizontal: "left", vertical: "middle" };
+      });
+      return;
+    }
+
+    const row = item.row;
+    const isRuptura = Number(row[ROW_RUPTURA_FIELD] ?? 0) === 1;
+
     columns.forEach((c, ci) => {
       const t = typeOf(c);
       const v = row[c.key];
@@ -201,15 +333,39 @@ export async function exportCompraPorLojaXlsx(
         top: { style: "hair" }, left: { style: "hair" },
         bottom: { style: "hair" }, right: { style: "hair" },
       };
-      // Célula de loja com quantidade > 0 ganha fundo destacado.
-      if (filialColSet.has(colNum) && Number(cell.value ?? 0) > 0) {
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: FILIAL_HIGHLIGHT_ARGB } };
+
+      // Linha de ruptura (item que só apareceu na análise de Rupturas, não na lista
+      // principal): fundo rosa na linha inteira. O positivo de loja continua marcado só
+      // pela cor da fonte (não sobrepõe o rosa com o verde de destaque).
+      if (isRuptura) {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: RUPTURA_ROW_FILL_ARGB } };
+      }
+
+      // Célula de loja: positivo = verde e negrito (+ fundo verde-claro fora de linha rosa);
+      // zero = cinza-claro, sem destaque.
+      if (filialColSet.has(colNum)) {
+        const positive = Number(cell.value ?? 0) > 0;
+        if (positive) {
+          cell.font = { bold: true, size: 10, name: "Calibri", color: { argb: FILIAL_POSITIVE_FONT_ARGB } };
+          if (!isRuptura) {
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: FILIAL_POSITIVE_FILL_ARGB } };
+          }
+        } else {
+          cell.font = { size: 10, name: "Calibri", color: { argb: FILIAL_ZERO_FONT_ARGB } };
+        }
+      }
+
+      // Compra total / Custo total: fundo destacado + negrito (fora de linha rosa, que já
+      // cobre a linha inteira).
+      if ((colNum === compraTotalCol || colNum === custoTotalCol) && !isRuptura) {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: TOTAL_CELL_FILL_ARGB } };
+        cell.font = { bold: true, size: 10, name: "Calibri" };
       }
     });
   });
 
   // ── Linha TOTAL (rodapé) ──
-  const lastDataRow = firstDataRow + rows.length - 1;
+  const lastDataRow = firstDataRow + plan.length - 1;
   const totalRowNum = lastDataRow + 1;
   const totalRow = ws.getRow(totalRowNum);
   totalRow.getCell(1).value = "TOTAL";
@@ -227,7 +383,7 @@ export async function exportCompraPorLojaXlsx(
       cell.alignment = { horizontal: "right", vertical: "middle" };
     }
     cell.font = { bold: true, size: 10, name: "Calibri" };
-    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEDEFF3" } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: FOOTER_ROW_FILL_ARGB } };
     cell.border = { top: { style: "thin" }, bottom: { style: "thin" } };
   });
 
@@ -272,10 +428,23 @@ export async function exportCompraSugeridaAbcXlsx(
     if (c.key === "CUSTO_UNITARIO") return { key: c.key, label: c.label, role: "custoUnit", type: "currency" };
     return { key: c.key, label: c.label, role: "value", type: types[c.key] };
   });
+
+  // Categoria = a 1ª coluna líder da empresa (GRUPO no NERD, LINHA no ScarfMe) — mesma
+  // convenção de lib/reports/company-columns.ts. Código de barra (sempre anexado no fim
+  // pelo runReport) volta pra logo depois da categoria — layout fixo deste export.
+  const categoryKey = options.companyKey === "scarfme" ? "LINHA" : "GRUPO";
+  const codigoBarraIdx = mapped.findIndex((c) => c.key === "CODIGO_BARRA");
+  if (codigoBarraIdx > -1) {
+    const [codigoBarraCol] = mapped.splice(codigoBarraIdx, 1);
+    const categoryIdx = mapped.findIndex((c) => c.key === categoryKey);
+    mapped.splice(categoryIdx > -1 ? categoryIdx + 1 : 0, 0, codigoBarraCol);
+  }
+
   await exportCompraPorLojaXlsx(rows as Array<Record<string, CellValue>>, mapped, {
     fileLabel: options.reportLabel,
     companyKey: options.companyKey,
     sheetName: options.sheetName,
     dateRange: options.range,
+    categoryKey,
   });
 }

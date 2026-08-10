@@ -30,6 +30,7 @@ export const COMPRA_SUGERIDA_ABC_COLUMNS: ReportColumnDef[] = [
   { key: "GRADE", defaultLabel: "Grade", type: "text" },
   { key: "COLECAO", defaultLabel: "Coleção", type: "text" },
   { key: "CUSTO_UNITARIO", defaultLabel: "Custo unit.", type: "currency" },
+  { key: "ESTOQUE_REDE", defaultLabel: "Estoque rede", type: "int" },
   { key: "COMPRA_TOTAL", defaultLabel: "Compra total", type: "int" },
   { key: "CUSTO_TOTAL", defaultLabel: "Custo total", type: "currency" },
   // Lente de transferência (opt-in): incluir qualquer uma destas colunas liga o cálculo
@@ -61,19 +62,38 @@ const COMPRA_SUGERIDA_ABC_PRESETS: ReportPresetDef[] = [
     builtin: true,
     sortBy: "COMPRA_TOTAL",
     sortDir: "desc",
-    // Identidade do item → custo unitário → Compra total → Custo total. As colunas por loja
-    // (Compra sugerida de cada filial) são anexadas automaticamente APÓS estas, ao gerar.
+    // Identidade do item → custo unitário → estoque rede → Compra total → Custo total. As
+    // colunas por loja (Compra sugerida de cada filial) são anexadas automaticamente APÓS
+    // estas, ao gerar. Sem Curva/Código: o export agrupa por categoria (Grupo/Linha) com
+    // faixas — a classificação ABC não é o critério de organização visual do arquivo.
     columns: [
-      col("CURVA"),
-      col("PRODUTO"),
       col("COR_DESCRICAO"),
       col("DESCRICAO"),
       col("CUSTO_UNITARIO", "Custo unit."),
+      col("ESTOQUE_REDE", "Estoque rede"),
       col("COMPRA_TOTAL", "Compra total"),
       col("CUSTO_TOTAL", "Custo total"),
       // Lente de transferência (Transferência + Compra líquida) fica FORA do padrão — entra
       // só pelo checkbox "Considerar transferências" no Gerador (ver COMPRA_LENS_PRESET_COLUMNS).
     ],
+  },
+  {
+    id: "builtin-compra-sugerida-rupturas",
+    name: "Compra sugerida (agora + essa semana) + Rupturas",
+    builtin: true,
+    sortBy: "COMPRA_TOTAL",
+    sortDir: "desc",
+    // Mesmas colunas do preset normal — os itens de ruptura entram nas mesmas linhas/colunas,
+    // com fundo rosa no XLSX (ver ROW_RUPTURA_FIELD) pra diferenciar de onde cada um veio.
+    columns: [
+      col("COR_DESCRICAO"),
+      col("DESCRICAO"),
+      col("CUSTO_UNITARIO", "Custo unit."),
+      col("ESTOQUE_REDE", "Estoque rede"),
+      col("COMPRA_TOTAL", "Compra total"),
+      col("CUSTO_TOTAL", "Custo total"),
+    ],
+    incluirRupturas: true,
   },
 ];
 
@@ -87,14 +107,14 @@ export const COMPRA_LENS_PRESET_COLUMNS: Array<{ key: string; label: string }> =
 ];
 
 /**
- * Presets padrão por empresa: CURVA em 1º, colunas líderes (Grupo / Linha+Subgrupo…) logo
- * após, e o resto na sequência — mesma convenção do preset Curva ABC de vendas-faturamento.
+ * Presets padrão por empresa: colunas líderes (Grupo / Linha+Subgrupo…) em 1º — a primeira
+ * delas é a categoria usada para agrupar o export em blocos com faixa —, resto na sequência.
  */
 export function buildCompraSugeridaAbcPresets(companyKey: CompanyKey): ReportPresetDef[] {
   const leading = companyLeadingColumns(companyKey);
   return COMPRA_SUGERIDA_ABC_PRESETS.map((preset) => ({
     ...preset,
-    columns: [preset.columns[0], ...leading, ...preset.columns.slice(1)],
+    columns: [...leading, ...preset.columns],
   }));
 }
 

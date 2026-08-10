@@ -57,6 +57,12 @@ export interface ReportPresetDef {
    * por filial, INTERCALADA com o estoque: por filial → "{filial} Venda", "{filial} Estoque".
    */
   dynamicFilialSales?: boolean;
+  /**
+   * Compra sugerida ABC: quando true, este preset também agrega itens em ruptura (estoque
+   * zerado/negativo numa loja que precisa repor mas ainda não bateu o corte de "comprar
+   * agora/essa semana"). Reaproveita o cálculo já feito por item×loja — sem custo extra.
+   */
+  incluirRupturas?: boolean;
 }
 
 export type ReportFilterKey =
@@ -133,6 +139,13 @@ export interface ReportFilters {
    * Custo líquido e "De onde". Opt-in — ligado quando o usuário inclui essas colunas.
    */
   considerarTransferencias?: boolean;
+  /**
+   * Compra sugerida ABC: quando true, agrega à lista os itens em ruptura (precisa repor e
+   * está zerado numa loja, mas o corte de "comprar agora/essa semana" ainda não bateu) que
+   * a compra sugerida normal não capturou — nunca duplica. Sem custo extra: reusa o cálculo
+   * de Compra Ideal por item×loja já feito.
+   */
+  incluirRupturas?: boolean;
 }
 
 /** Cartão de KPI exibido no topo do resultado (ex.: Vendas Total, Ticket Médio). */

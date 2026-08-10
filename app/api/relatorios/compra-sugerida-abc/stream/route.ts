@@ -34,6 +34,7 @@ export async function GET(request: Request) {
   const produtoId = searchParams.get("produtoId");
   const produtoSearchTerm = searchParams.get("produtoSearchTerm");
   const considerarTransferencias = searchParams.get("considerarTransferencias") === "1";
+  const incluirRupturas = searchParams.get("incluirRupturas") === "1";
 
   const filters: ReportFilters = {
     company,
@@ -50,6 +51,7 @@ export async function GET(request: Request) {
     produtoId: produtoId || null,
     produtoSearchTerm: produtoSearchTerm || null,
     considerarTransferencias,
+    incluirRupturas,
   };
 
   const encoder = new TextEncoder();

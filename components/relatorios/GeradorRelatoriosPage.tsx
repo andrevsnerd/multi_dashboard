@@ -252,6 +252,12 @@ export default function GeradorRelatoriosPage({
     [allPresets, activePresetId]
   );
 
+  // Preset ativo pede a análise de Rupturas agregada (Compra sugerida + Rupturas)?
+  const wantsRupturas = useMemo(
+    () => !!allPresets.builtin.find((p) => p.id === activePresetId)?.incluirRupturas,
+    [allPresets, activePresetId]
+  );
+
   // Aplica um preset (builtin ou backend) à estrutura de colunas.
   const applyPreset = useCallback(
     (preset: { id: string; columns: { key: string; label: string }[]; sortBy?: string | null; sortDir?: SortDir | null }) => {
@@ -597,7 +603,7 @@ export default function GeradorRelatoriosPage({
           (c) => c.enabled && COMPRA_TRANSFER_LENS_COLUMNS.includes(c.key as (typeof COMPRA_TRANSFER_LENS_COLUMNS)[number])
         );
         await generateViaStream(
-          `/api/relatorios/compra-sugerida-abc/stream?reportType=${encodeURIComponent(reportTypeId)}&${qs}${transferOn ? "&considerarTransferencias=1" : ""}`
+          `/api/relatorios/compra-sugerida-abc/stream?reportType=${encodeURIComponent(reportTypeId)}&${qs}${transferOn ? "&considerarTransferencias=1" : ""}${wantsRupturas ? "&incluirRupturas=1" : ""}`
         );
         return;
       }
@@ -625,6 +631,7 @@ export default function GeradorRelatoriosPage({
     buildQuery,
     wantsFilialStock,
     wantsFilialSales,
+    wantsRupturas,
     reportTypeId,
     workingColumns,
     catalog,
@@ -1242,7 +1249,9 @@ export default function GeradorRelatoriosPage({
           <div className={styles.progressHeader}>
             <span className={styles.progressSpinner} aria-hidden="true" />
             <span className={styles.progressText}>
-              {genProgress && genProgress.phase === "lojas" && genProgress.total > 0
+              {genProgress && genProgress.phase === "rupturas" && genProgress.total > 0
+                ? `Verificando rupturas por loja… ${genProgress.done}/${genProgress.total} lojas`
+                : genProgress && genProgress.phase === "lojas" && genProgress.total > 0
                 ? `Calculando compra por loja… ${genProgress.done}/${genProgress.total} lojas`
                 : "Buscando vendas da rede…"}
             </span>

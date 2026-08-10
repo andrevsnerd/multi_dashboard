@@ -91,6 +91,10 @@ export interface RupturaItem {
   descricao: string;
   subgrupo: string | null;
   grade: string | null;
+  /** GRUPO_PRODUTO e LINHA/TIPO — só preenchidos para consumidores fora do Loja Raio X. */
+  grupo: string | null;
+  linha: string | null;
+  tipo: string | null;
   /** Marcado como descontinuado na tela Produtos Descontinuados. */
   descontinuado: boolean;
   /** Já existe compra em trânsito ativa (a caminho) para este produto/cor. */
@@ -1258,28 +1262,63 @@ async function attachCompraIdealRupturas(params: {
   }
 }
 
+function up(value: string | null | undefined): string {
+  return (value ?? "").trim().toUpperCase();
+}
+
+function normalizeUpperSet(values: string[] | null | undefined): Set<string> | null {
+  const list = (values ?? []).map(up).filter(Boolean);
+  return list.length > 0 ? new Set(list) : null;
+}
+
 export async function fetchRupturasLoja(params: {
   company?: string;
   filial?: string | null;
   range: Range; // janela alinhada do mês analisado
   linhas?: string[] | null;
+  /** Filtros estruturais opcionais — mesmo grão do Gerador de Relatórios (ReportFilters). */
+  grupos?: string[] | null;
+  subgrupos?: string[] | null;
+  grades?: string[] | null;
+  colecoes?: string[] | null;
+  cores?: string[] | null; // por DESCRIÇÃO
+  tipos?: string[] | null;
+  produtoId?: string | null;
+  produtoSearchTerm?: string | null;
   /** Calcula a Compra Ideal (regra global) por item — só na aba Rupturas (caro). */
   withCompraIdeal?: boolean;
 }): Promise<RupturaItem[]> {
-  const { company, filial, range, linhas, withCompraIdeal } = params;
+  const {
+    company, filial, range, linhas, withCompraIdeal,
+    grupos, subgrupos, grades, colecoes, cores, tipos, produtoId, produtoSearchTerm,
+  } = params;
 
-  const [produtos, cfg, descSet, transito] = await Promise.all([
+  const [produtosRaw, cfg, descSet, transito] = await Promise.all([
     fetchProductsWithDetails({
       company,
       range: { start: range.start, end: range.end },
       filial: filial ?? null,
       groupByColor: true,
       linhas: linhas ?? undefined,
+      grupos: grupos ?? undefined,
+      subgrupos: subgrupos ?? undefined,
+      grades: grades ?? undefined,
+      colecoes: colecoes ?? undefined,
+      produtoId: produtoId ?? undefined,
+      produtoSearchTerm: produtoSearchTerm ?? undefined,
     }),
     resolveCompanyLive(company),
     loadDescontinuadoSet(company),
     loadTransitoLookup(company),
   ]);
+
+  const corSet = normalizeUpperSet(cores);
+  const tipoSet = normalizeUpperSet(tipos);
+  const produtos = produtosRaw.filter((p) => {
+    if (corSet && !corSet.has(up(p.descCorProduto))) return false;
+    if (tipoSet && !tipoSet.has(up(p.tipo))) return false;
+    return true;
+  });
 
   // Só os produtos em ruptura (vendeu no mês + zerado na loja).
   const emRuptura = produtos.filter((p) => (p.totalQuantity ?? 0) > 0 && (p.stock ?? 0) <= 0);
@@ -1326,6 +1365,9 @@ export async function fetchRupturasLoja(params: {
         descricao: (p.productName ?? "").trim(),
         subgrupo: p.subgrupo ?? null,
         grade: p.grade ?? null,
+        grupo: p.grupo ?? null,
+        linha: p.linha ?? null,
+        tipo: p.tipo ?? null,
         descontinuado: isProdutoDescontinuado(descSet, prod),
         emTransito: !!t && t.quantidade > 0,
         transitoQtd: t?.quantidade ?? 0,

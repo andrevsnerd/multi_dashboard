@@ -2767,24 +2767,22 @@ const handleBadgeClick = (cat: string) => {
         estruturaisLabel +
         gatingLabel;
 
-      // Mesmo visual + fórmulas dinâmicas do Gerador de Relatórios: identidade → custo unit.
-      // → Compra total (= soma das lojas) → Custo total (= custo × compra total) → colunas das
-      // lojas. Editar a qtd de uma loja recalcula os totais no Excel.
+      // Mesmo visual + fórmulas dinâmicas do Gerador de Relatórios: categoria (faixa) →
+      // código de barra → cor/descrição → custo unit. → estoque rede → Compra total (= soma
+      // das lojas) → Custo total (= custo × compra total) → colunas das lojas. Editar a qtd
+      // de uma loja recalcula os totais no Excel.
+      const categoryKey = companyKey === "nerd" ? "GRUPO" : "LINHA";
       const cols: CompraLojaExportColumn[] = [];
-      cols.push({ key: "CURVA", label: "Curva", role: "value", type: "text" });
       if (companyKey === "nerd") {
         cols.push({ key: "GRUPO", label: "Grupo", role: "value", type: "text" });
       } else {
         cols.push({ key: "LINHA", label: "Linha", role: "value", type: "text" });
         cols.push({ key: "SUBGRUPO", label: "Subgrupo", role: "value", type: "text" });
       }
-      cols.push({ key: "PRODUTO", label: "Código", role: "value", type: "text" });
+      cols.push({ key: "CODIGO_BARRA", label: "Código de barra", role: "value", type: "text" });
       if (porCor) cols.push({ key: "COR_DESCRICAO", label: "Cor", role: "value", type: "text" });
       cols.push({ key: "DESCRICAO", label: "Descrição", role: "value", type: "text" });
-      cols.push({ key: "CODIGO_BARRA", label: "Código de barra", role: "value", type: "text" });
       if (podeVerCusto) cols.push({ key: "CUSTO_UNIT", label: "Custo unit.", role: "custoUnit", type: "currency" });
-      cols.push({ key: "VENDAS_PERIODO", label: "Venda período", role: "value", type: "currency" });
-      cols.push({ key: "QTDE_PERIODO", label: "Qtd período", role: "value", type: "int" });
       cols.push({ key: "ESTOQUE_REDE", label: "Estoque rede", role: "value", type: "int" });
       cols.push({ key: "TOTAL REDE", label: "Compra total", role: "compraTotal", type: "int" });
       if (podeVerCusto) cols.push({ key: "CUSTO_TOTAL", label: "Custo total", role: "custoTotal", type: "currency" });
@@ -2800,6 +2798,7 @@ const handleBadgeClick = (cat: string) => {
         sheetName: "Compra Ideal por Loja",
         titleLines: [`${cfg.name} — Compra Ideal por Loja`, filtroAplicado],
         dateRange: { startDate: range.startDate, endDate: range.endDate },
+        categoryKey,
       });
     } finally {
       setCompraIdealFilialProgresso(null);

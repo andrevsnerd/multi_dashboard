@@ -8,7 +8,9 @@ import {
 } from "@/lib/config/company";
 import { listProdutosDescontinuados } from "@/lib/utils/produto-descontinuado-store";
 import { buildDescontinuadoKeySet, isProdutoDescontinuado } from "@/lib/utils/produtos-descontinuados";
-import { canonicalKey, ROW_COR_FIELD } from "@/lib/reports/keys";
+import { fetchRupturasLoja, type RupturaItem } from "@/lib/repositories/lojaRaioX";
+import { normalizeRangeForQuery } from "@/lib/utils/date";
+import { canonicalKey, ROW_COR_FIELD, ROW_RUPTURA_FIELD } from "@/lib/reports/keys";
 import { getMappedColorDescription } from "@/lib/utils/colorMapping";
 import { getControleEstoqueMetricasItensBatched } from "@/lib/server/controle-estoque-metricas";
 import { buildControleEstoqueItemKey } from "@/lib/utils/controle-estoque-metricas";
@@ -159,6 +161,12 @@ function roundInt(value: number | null | undefined): number {
  *
  * As colunas por loja são dinâmicas (`COMPRA_FILIAL::{loja}`). Compra total e Custo total
  * são preenchidos com o valor estático aqui (tabela web) e viram FÓRMULAS no XLSX dedicado.
+ *
+ * Rupturas (opt-in, `filters.incluirRupturas`, preset "+ Rupturas"): roda a MESMA análise de
+ * Rupturas da Loja Raio X (`fetchRupturasLoja`) uma vez por loja da rede, com os mesmos
+ * filtros estruturais, e agrega à lista os itens que ela encontrou e a compra sugerida normal
+ * NÃO capturou (produto×cor ainda não presente na lista principal) — nunca duplica. Mais caro
+ * (uma consulta de vendas a mais por loja), mas fiel byte-a-byte à mesma lógica da página.
  */
 export async function fetchCompraSugeridaAbc(
   filters: ReportFilters,
@@ -265,6 +273,7 @@ export async function fetchCompraSugeridaAbc(
   }));
 
   let acumPerc = 0;
+  let itensRuptura = 0;
   const rows: ReportRow[] = [];
   for (const d of candidates) {
     const revenue = d.totalRevenue ?? 0;
@@ -287,6 +296,7 @@ export async function fetchCompraSugeridaAbc(
     const qtyByLabel = new Map<string, number>();
     let total = 0;
     let custoMax = 0;
+    let estoqueRede = 0;
     orderedNames.forEach((name, idx) => {
       const metricas = metricasPorFilial[idx]?.[itemKey] ?? null;
       const ideal = calcCompraIdealFromResumo(metricas?.resumo ?? null, transit, {
@@ -304,6 +314,8 @@ export async function fetchCompraSugeridaAbc(
       if (qtd > 0) qtyByLabel.set(label, (qtyByLabel.get(label) ?? 0) + qtd);
       total += qtd;
       custoMax = Math.max(custoMax, Number(metricas?.resumo?.custoUnitario ?? 0));
+      // Estoque negativo nunca conta — soma só os saldos positivos de cada loja (rede exclui matriz).
+      estoqueRede += Math.max(0, Number(metricas?.resumo?.estoqueTotal ?? 0));
     });
 
     if (total <= 0) continue; // só itens que alguma loja precisa comprar agora/essa semana
@@ -322,6 +334,7 @@ export async function fetchCompraSugeridaAbc(
       TIPO: d.tipo ?? "",
       GRADE: d.grade ?? "",
       CUSTO_UNITARIO: round2(custoUnit),
+      ESTOQUE_REDE: roundInt(estoqueRede),
       COMPRA_TOTAL: roundInt(total),
       CUSTO_TOTAL: round2(custoUnit * total),
     };
@@ -345,10 +358,117 @@ export async function fetchCompraSugeridaAbc(
     rows.push(row);
   }
 
+  // ── Rupturas (opt-in, preset "+ Rupturas") ──────────────────────────────────────────
+  // Roda a MESMA análise de Rupturas do Loja Raio X, uma vez por loja da rede (mesmas
+  // filiais/filtros de cima), e agrega à lista os itens que a compra sugerida normal NÃO
+  // capturou. Nunca duplica: item já presente na lista principal (mesma chave produto×cor)
+  // é ignorado — as colunas dele não são tocadas.
+  if (filters.incluirRupturas && filters.start && filters.end && orderedNames.length > 0) {
+    const baseKeys = new Set(rows.map((r) => canonicalKey(r.PRODUTO, r[ROW_COR_FIELD])));
+    const rupturaRange = normalizeRangeForQuery({ start: filters.start, end: filters.end });
+
+    let rupturasFeitas = 0;
+    ctx?.onProgress?.(0, orderedNames.length, "rupturas");
+    const porFilialRupturas = await mapWithConcurrency(orderedNames, FILIAL_CONCURRENCY, async (name) => {
+      const itens = await fetchRupturasLoja({
+        company: filters.company,
+        filial: name,
+        range: rupturaRange,
+        linhas: filters.linhas ?? undefined,
+        grupos: filters.grupos ?? undefined,
+        subgrupos: filters.subgrupos ?? undefined,
+        grades: filters.grades ?? undefined,
+        colecoes: filters.colecoes ?? undefined,
+        cores: filters.cores ?? undefined,
+        tipos: filters.tipos ?? undefined,
+        produtoId: filters.produtoId ?? undefined,
+        produtoSearchTerm: filters.produtoSearchTerm ?? undefined,
+        withCompraIdeal: true,
+      }).catch(() => [] as RupturaItem[]);
+      rupturasFeitas += 1;
+      ctx?.onProgress?.(rupturasFeitas, orderedNames.length, "rupturas");
+      return itens;
+    });
+
+    interface ExtraAcc {
+      produto: string;
+      cor: string;
+      corDescricao: string;
+      descricao: string;
+      grupo: string;
+      subgrupo: string;
+      linha: string;
+      tipo: string;
+      grade: string;
+      custoUnitario: number;
+      estoqueRede: number;
+      qtyByLabel: Map<string, number>;
+      total: number;
+    }
+    const extraByKey = new Map<string, ExtraAcc>();
+    orderedNames.forEach((name, idx) => {
+      const label = labelByName.get(name) ?? name;
+      for (const item of porFilialRupturas[idx] ?? []) {
+        if (item.compraIdealQtd <= 0) continue; // só o que realmente precisa repor
+        const key = canonicalKey(item.produto, item.cor);
+        if (baseKeys.has(key)) continue; // já está na lista principal — nunca duplica
+
+        const acc = extraByKey.get(key) ?? {
+          produto: item.produto,
+          cor: item.cor,
+          corDescricao: item.corDescricao,
+          descricao: item.descricao,
+          grupo: item.grupo ?? "",
+          subgrupo: item.subgrupo ?? "",
+          linha: item.linha ?? "",
+          tipo: item.tipo ?? "",
+          grade: item.grade ?? "",
+          custoUnitario: item.custoUnitario,
+          estoqueRede: item.estoqueRede,
+          qtyByLabel: new Map<string, number>(),
+          total: 0,
+        };
+        acc.custoUnitario = Math.max(acc.custoUnitario, item.custoUnitario);
+        acc.estoqueRede = Math.max(acc.estoqueRede, item.estoqueRede);
+        acc.qtyByLabel.set(label, (acc.qtyByLabel.get(label) ?? 0) + item.compraIdealQtd);
+        acc.total += item.compraIdealQtd;
+        extraByKey.set(key, acc);
+      }
+    });
+
+    for (const acc of extraByKey.values()) {
+      const row: ReportRow = {
+        [ROW_COR_FIELD]: acc.cor ?? "",
+        [ROW_RUPTURA_FIELD]: 1,
+        CURVA: "RUPTURA",
+        PRODUTO: acc.produto,
+        COR: acc.cor ?? "",
+        COR_DESCRICAO: acc.corDescricao ?? "",
+        DESCRICAO: acc.descricao ?? "",
+        GRUPO: acc.grupo,
+        SUBGRUPO: acc.subgrupo,
+        LINHA: acc.linha,
+        TIPO: acc.tipo,
+        GRADE: acc.grade,
+        CUSTO_UNITARIO: round2(acc.custoUnitario),
+        ESTOQUE_REDE: roundInt(acc.estoqueRede),
+        COMPRA_TOTAL: roundInt(acc.total),
+        CUSTO_TOTAL: round2(acc.custoUnitario * acc.total),
+      };
+      for (const dyn of dynamicColumns) {
+        const label = dyn.key.slice(COMPRA_FILIAL_COL_PREFIX.length);
+        row[dyn.key] = roundInt(acc.qtyByLabel.get(label) ?? 0);
+      }
+      rows.push(row);
+    }
+    itensRuptura = extraByKey.size;
+  }
+
   const sumQtde = rows.reduce((s, r) => s + Number(r.COMPRA_TOTAL ?? 0), 0);
   const sumCusto = rows.reduce((s, r) => s + Number(r.CUSTO_TOTAL ?? 0), 0);
   const summary: ReportSummaryMetric[] = [
     { label: "Itens p/ comprar", value: rows.length, format: "int" },
+    ...(itensRuptura > 0 ? [{ label: "Itens de ruptura agregados", value: itensRuptura, format: "int" as const }] : []),
     { label: "Qtd total", value: roundInt(sumQtde), format: "int" },
     { label: "Custo total", value: round2(sumCusto), format: "currency" },
   ];
