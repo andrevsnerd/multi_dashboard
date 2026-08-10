@@ -7,14 +7,35 @@ type ExcelJSCell = any;
 
 type CellValue = string | number | boolean | null;
 
-function safeFilenamePart(s: string): string {
-  return s.replace(/[^a-zA-Z0-9_-]+/g, "_").slice(0, 48);
+/** Minúsculo, sem acento, só letras/números separados por hífen — nome de arquivo limpo. */
+function slugifyFilenamePart(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+}
+
+/**
+ * Apelido curto pro nome do arquivo a partir dos filtros ativos: cada posição só entra
+ * quando aquele filtro é ESPECÍFICO (exatamente 1 valor selecionado) — várias seleções ou
+ * nenhuma ficam de fora, e o nome sai genérico. Ex.: fornecedor "Volt" sozinho → "volt";
+ * grupo "CAPAS" sozinho → "capas". Usado por todos os exports de compra sugerida (Curva ABC
+ * e Gerador de Relatórios) pra refletir o filtro aplicado sem virar um nome gigante.
+ */
+export function buildCompraSugeridaFileHint(singleValueFilters: Array<string | null | undefined>): string {
+  return singleValueFilters
+    .map((v) => (v ? slugifyFilenamePart(v) : ""))
+    .filter(Boolean)
+    .join("-");
 }
 
 function formatDateRange(start: Date, end: Date): string {
   const fmt = (d: Date) =>
     d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" }).replace(/\//g, "-");
-  return `${fmt(start)}_${fmt(end)}`;
+  return `${fmt(start)}_a_${fmt(end)}`;
 }
 
 /** Letra(s) da coluna do Excel a partir do número (1 → A, 27 → AA). */
@@ -398,7 +419,7 @@ export async function exportCompraPorLojaXlsx(
   const rangePart = options.dateRange
     ? `-${formatDateRange(options.dateRange.startDate, options.dateRange.endDate)}`
     : "";
-  a.download = `${safeFilenamePart(options.fileLabel)}-${options.companyKey}${rangePart}.xlsx`;
+  a.download = `${slugifyFilenamePart(options.fileLabel)}-${options.companyKey}${rangePart}.xlsx`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

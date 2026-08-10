@@ -71,7 +71,11 @@ import { isProdutoAgrupadoSyntheticId } from "@/lib/utils/produtos-agrupados";
 import FilialVendedoresTab from "./FilialVendedoresTab";
 import { exportCurvaAbcSimpleCsv } from "@/lib/utils/exportCurvaAbcSimpleCsv";
 import { exportCurvaAbcSimpleXlsx, type CurvaAbcSimpleXlsxRow } from "@/lib/utils/exportCurvaAbcSimpleXlsx";
-import { exportCompraPorLojaXlsx, type CompraLojaExportColumn } from "@/lib/utils/exportCompraSugeridaAbcXlsx";
+import {
+  exportCompraPorLojaXlsx,
+  buildCompraSugeridaFileHint,
+  type CompraLojaExportColumn,
+} from "@/lib/utils/exportCompraSugeridaAbcXlsx";
 import styles from "./FilialPerformancePage.module.css";
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
@@ -2741,7 +2745,6 @@ const handleBadgeClick = (cat: string) => {
         );
         return;
       }
-      const periodo = `${formatDateForQuery(range.startDate)}_a_${formatDateForQuery(range.endDate)}`;
       const gatingLabel =
         gating === "comprar-agora"
           ? " · só comprar agora/essa semana"
@@ -2792,8 +2795,21 @@ const handleBadgeClick = (cat: string) => {
         cols.push({ key: label, label, role: "filial", type: "int" });
       }
 
+      // Nome do arquivo: genérico ("compra-ideal-por-loja") a menos que um filtro
+      // ESPECÍFICO esteja ativo (1 só valor) — aí ele aparece (ex.: "-volt", "-capas").
+      // Data/empresa entram uma única vez (dateRange abaixo), sem duplicar no rótulo.
+      const colecaoHint = companyKey !== "nerd" && selectedColecoes.length === 1 ? selectedColecoes[0] : null;
+      const fileHint = buildCompraSugeridaFileHint([
+        fornecedorNome,
+        companyKey === "nerd" && selectedGrupos.length === 1 ? selectedGrupos[0] : null,
+        selectedSubgrupos.length === 1 ? selectedSubgrupos[0] : null,
+        selectedGrades.length === 1 ? selectedGrades[0] : null,
+        colecaoHint,
+      ]);
+      const fileLabel = fileHint ? `compra-ideal-por-loja-${fileHint}` : "compra-ideal-por-loja";
+
       await exportCompraPorLojaXlsx(rows, cols, {
-        fileLabel: `compra-ideal-por-loja-curva-abc-${periodo}`,
+        fileLabel,
         companyKey,
         sheetName: "Compra Ideal por Loja",
         titleLines: [`${cfg.name} — Compra Ideal por Loja`, filtroAplicado],

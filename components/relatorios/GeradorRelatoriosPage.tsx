@@ -9,7 +9,7 @@ import { useAuth } from "@/components/auth/AuthContext";
 import { resolveCompany, type CompanyKey } from "@/lib/config/company";
 import { getCurrentMonthRange, formatDateForQuery } from "@/lib/utils/date";
 import { exportRelatorioXlsx } from "@/lib/utils/exportRelatorioXlsx";
-import { exportCompraSugeridaAbcXlsx } from "@/lib/utils/exportCompraSugeridaAbcXlsx";
+import { exportCompraSugeridaAbcXlsx, buildCompraSugeridaFileHint } from "@/lib/utils/exportCompraSugeridaAbcXlsx";
 import { exportClientesFilialXlsx } from "@/lib/utils/exportClientesFilialXlsx";
 import { exportEstoqueRedeXlsx } from "@/lib/utils/exportEstoqueRedeXlsx";
 import { ESTOQUE_REDE_ID } from "@/lib/reports/estoque-rede";
@@ -816,11 +816,34 @@ export default function GeradorRelatoriosPage({
     // Compra sugerida por Curva ABC: export dedicado com fórmulas (Compra total / Custo
     // total dinâmicos no Excel). Os demais relatórios usam o export genérico (valores).
     if (reportTypeId === COMPRA_SUGERIDA_ABC_ID) {
+      // Nome do arquivo: genérico ("compra-sugerida[-rupturas]") a menos que um filtro
+      // ESPECÍFICO esteja ativo (1 só valor) — aí ele aparece (ex.: "compra-sugerida-volt",
+      // "compra-sugerida-capas"). Data/empresa entram uma única vez, via o export core.
+      const fornecedorNome =
+        companyKey === "nerd" && fornecedor
+          ? (fornecedoresOpts.find((f) => f.id === fornecedor)?.nome ?? null)
+          : null;
+      const colecaoLabel =
+        colecoes.length === 1
+          ? (optColecoes.find((o) => o.value === colecoes[0])?.label ?? colecoes[0])
+          : null;
+      const hint = buildCompraSugeridaFileHint([
+        fornecedorNome,
+        produtoSelected?.name ?? null,
+        grupos.length === 1 ? grupos[0] : null,
+        linhas.length === 1 ? linhas[0] : null,
+        subgrupos.length === 1 ? subgrupos[0] : null,
+        grades.length === 1 ? grades[0] : null,
+        colecaoLabel,
+        cores.length === 1 ? cores[0] : null,
+        tipos.length === 1 ? tipos[0] : null,
+      ]);
+      const baseLabel = wantsRupturas ? "compra-sugerida-rupturas" : "compra-sugerida";
       void exportCompraSugeridaAbcXlsx(
         sortedRows,
         enabledColumns.map((c) => ({ key: c.key, label: c.label })),
         {
-          reportLabel: meta?.label ?? "compra-sugerida",
+          reportLabel: hint ? `${baseLabel}-${hint}` : baseLabel,
           companyKey,
           range: { startDate: range.startDate, endDate: range.endDate },
           sheetName: meta?.label,
