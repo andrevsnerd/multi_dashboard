@@ -402,13 +402,18 @@ export function alturaConteudoBrutaMm(config: EtiquetaConfig): number {
 }
 
 /**
- * Altura total ocupada pelo conteúdo — usada para avisar que não cabe.
- * Já conta a escala e o deslocamento vertical da calibração: subir a escala
- * tem que acender o aviso de "vai cortar o pé da etiqueta".
+ * Onde o conteúdo TERMINA na vertical — comparado com a altura da etiqueta para
+ * avisar que a Zebra vai cortar o pé.
+ *
+ * Reproduz a mesma transformação do `calcularLayout`: a escala é um zoom em
+ * torno do centro da etiqueta (diminuir recolhe para o meio, não para o topo),
+ * e o deslocamento entra depois.
  */
 export function alturaConteudoMm(config: EtiquetaConfig): number {
   const escala = config.calibracao?.escala ?? 1;
-  return alturaConteudoBrutaMm(config) * escala + (config.calibracao?.deslocYMm ?? 0);
+  const cy = config.alturaEtiquetaMm / 2;
+  const fim = alturaConteudoBrutaMm(config);
+  return cy + (fim - cy) * escala + (config.calibracao?.deslocYMm ?? 0);
 }
 
 /** Largura total da fileira (todas as colunas + espaços + margem). */

@@ -17,7 +17,7 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 
-import { calcularLayout, type ElementoLayout } from "@/lib/etiquetas/layout";
+import { calcularLayout, pontoParaModelo, type ElementoLayout } from "@/lib/etiquetas/layout";
 import { textoDaLinha, type EtiquetaConfig, type ItemEtiqueta, type LinhaEtiqueta } from "@/lib/etiquetas/tipos";
 
 import EtiquetaSvg from "./EtiquetaSvg";
@@ -93,7 +93,11 @@ export default function EditorVisualEtiqueta({ config, onChange, item, podeConfi
     [config, onChange]
   );
 
-  /** Ponto do mouse convertido para mm dentro da etiqueta (0,0 = canto superior esquerdo). */
+  /**
+   * Ponto do mouse convertido para mm NO MODELO (0,0 = canto superior esquerdo).
+   * Já desfaz a calibração, senão arrastar com a escala fora de 100% gravaria
+   * uma posição deslocada.
+   */
   const clienteParaMm = useCallback(
     (clientX: number, clientY: number): { x: number; y: number } => {
       const svg = overlayRef.current;
@@ -101,9 +105,9 @@ export default function EditorVisualEtiqueta({ config, onChange, item, podeConfi
       const rect = svg.getBoundingClientRect();
       const x = ((clientX - rect.left) / rect.width) * L;
       const y = ((clientY - rect.top) / rect.height) * A;
-      return { x, y };
+      return pontoParaModelo(config, x, y);
     },
-    [L, A]
+    [L, A, config]
   );
 
   const elementoAtivo = useCallback(
@@ -176,6 +180,9 @@ export default function EditorVisualEtiqueta({ config, onChange, item, podeConfi
       const ativo = elementoAtivo(elemento.chave);
       if (!ativo) return;
       const ponto = clienteParaMm(evento.clientX, evento.clientY);
+      // A caixa do layout vem calibrada; a origem do arraste tem que estar na
+      // mesma régua do que será gravado — a do modelo.
+      const origem = pontoParaModelo(config, elemento.xMm, elemento.yMm);
       (evento.target as Element).setPointerCapture(evento.pointerId);
       arrasteRef.current = {
         modo,
@@ -183,13 +190,13 @@ export default function EditorVisualEtiqueta({ config, onChange, item, podeConfi
         pointerId: evento.pointerId,
         origemClienteXMm: ponto.x,
         origemClienteYMm: ponto.y,
-        origemXMm: elemento.xMm,
-        origemYMm: elemento.yMm,
-        origemAlturaMm: elemento.alturaMm,
+        origemXMm: origem.x,
+        origemYMm: origem.y,
+        origemAlturaMm: ativo.alturaMm,
         origemModuloDots: ativo.moduloDots ?? config.barcode.moduloDots,
       };
     },
-    [podeConfigurar, elementoAtivo, clienteParaMm, config.barcode.moduloDots]
+    [podeConfigurar, elementoAtivo, clienteParaMm, config]
   );
 
   const moverArraste = useCallback(

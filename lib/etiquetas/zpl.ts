@@ -318,7 +318,10 @@ export function ajustarTamanhoParaCaber(
   }
 
   // 2) Altura: se o conjunto ainda estoura, encolhe tudo junto.
-  const alvoBrutoMm = (novo.alturaEtiquetaMm - (novo.calibracao?.deslocYMm ?? 0)) / escala;
+  // Desfaz a mesma transformação do layout (zoom em torno do centro + desloc)
+  // para saber até onde o conteúdo pode ir no tamanho do modelo.
+  const cy = novo.alturaEtiquetaMm / 2;
+  const alvoBrutoMm = cy + (novo.alturaEtiquetaMm - (novo.calibracao?.deslocYMm ?? 0) - cy) / escala;
   const brutoMm = alturaConteudoBrutaMm(novo);
   if (brutoMm > alvoBrutoMm && alvoBrutoMm > 0) {
     const fator = alvoBrutoMm / brutoMm;
