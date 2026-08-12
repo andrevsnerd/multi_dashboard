@@ -12,6 +12,12 @@ async function canAccessExtrato(username: string): Promise<boolean> {
   return userHasPagePermission(user as unknown as UserSession, "extrato-produto");
 }
 
+/** Um tamanho da grade do produto: posição 1-based + rótulo cadastrado (P, M, G, 38...). */
+export interface TamanhoGrade {
+  ordinal: number;
+  label: string;
+}
+
 export interface ExtratoLinha {
   emissao: string;
   tipo: string;
@@ -21,7 +27,13 @@ export interface ExtratoLinha {
   filialDestino: string | null;
   romaneio: string | null; // romaneio pedido/saída origem
   qtde: number;           // campo QTDE (total declarado)
-  qtdeGrade: number;      // campo EN_1 ou SA_1 (grade 90x90)
+  qtdeGrade: number;      // campo EN_1 ou SA_1 (1ª posição da grade)
+  /**
+   * Quantidade por posição da grade, alinhada a `ExtratoResponse.tamanhos`. Só é
+   * preenchida em produto de grade múltipla (P/M/G etc.); `null` quando a fonte não
+   * guarda detalhe por tamanho (ajuste manual do dashboard).
+   */
+  qtdePorTamanho: number[] | null;
   valor: number;
   preco: number;
   obs: string | null;
@@ -62,6 +74,13 @@ export interface ExtratoResponse {
   tipoProduto: string | null;
   colecao: string | null;
   descColecao: string | null;
+  /**
+   * Tamanhos da grade (P, M, G...). Vazio em produto de tamanho único — que é o caso
+   * da NERD inteira e da maior parte da ScarfMe (lenço é tamanho único).
+   */
+  tamanhos: TamanhoGrade[];
+  /** Estoque atual por tamanho, alinhado a `tamanhos` e no mesmo escopo de filial. */
+  estoquePorTamanho: number[];
   coresDisponiveis: ProdutoCorOption[];
   filiaisDisponiveis: ProdutoFilialOption[];
   linhas: ExtratoLinha[];
@@ -322,6 +341,90 @@ async function resolveProdutoInput(input: string): Promise<ProdutoResolvido | nu
   }
 
   return null;
+}
+
+/** Nº máximo de posições de grade no Linx (EN_1..EN_48, SA_1..SA_48, ES1..ES48). */
+const MAX_TAMANHOS = 48;
+
+/**
+ * Tamanhos cadastrados da grade do produto (PRODUTOS.GRADE → PRODUTOS_TAMANHOS).
+ *
+ * A grade é a MESMA ordem usada por todas as colunas posicionais do Linx: ES1..ES48 no
+ * estoque, EN_1/SA_1.. nos romaneios, A1.. na contagem e LOJA_VENDA_PRODUTO.TAMANHO na
+ * venda. Em "P/M/G", posição 1 = P, 2 = M, 3 = G.
+ *
+ * Devolve vazio para grade de tamanho único (a esmagadora maioria: lenço, eletrônico),
+ * para o extrato seguir exatamente como era nesses produtos.
+ *
+ * NUMERO_TAMANHOS é lixo no cadastro (vem 16 em toda grade), então o que vale é quais
+ * TAMANHO_n estão preenchidos — TAMANHOS_DIGITADOS também diverge em algumas grades.
+ */
+async function fetchTamanhosDaGrade(grade: string | null): Promise<TamanhoGrade[]> {
+  const g = grade?.trim();
+  if (!g) return [];
+
+  const cols = Array.from(
+    { length: MAX_TAMANHOS },
+    (_, i) => `LTRIM(RTRIM(ISNULL(CAST(pt.TAMANHO_${i + 1} AS VARCHAR(20)), ''))) AS T${i + 1}`
+  ).join(",\n      ");
+
+  const rows = await query<Record<string, string | null>>(`
+    SELECT TOP 1
+      ${cols}
+    FROM PRODUTOS_TAMANHOS pt WITH (NOLOCK)
+    WHERE RTRIM(LTRIM(CAST(pt.GRADE AS VARCHAR(60)))) = '${sqlText(g)}'
+  `);
+  if (rows.length === 0) return [];
+
+  const row = rows[0];
+  const tamanhos: TamanhoGrade[] = [];
+  for (let i = 1; i <= MAX_TAMANHOS; i += 1) {
+    const label = trimValue(row[`T${i}`]);
+    if (label) tamanhos.push({ ordinal: i, label });
+  }
+  return tamanhos.length > 1 ? tamanhos : [];
+}
+
+/** Lista de colunas posicionais da grade (EN_1, SA_3, ES2, A1...) apelidadas T{ordinal}. */
+function gradeColsSql(alias: string, prefixo: string, tamanhos: TamanhoGrade[]) {
+  if (tamanhos.length === 0) return "";
+  return `,\n        ${tamanhos
+    .map((t) => `ISNULL(${alias}.${prefixo}${t.ordinal}, 0) AS T${t.ordinal}`)
+    .join(",\n        ")}`;
+}
+
+/** Lê as colunas T{ordinal} de uma linha, aplicando o sinal do movimento. */
+function readGradeCols(
+  row: Record<string, unknown>,
+  tamanhos: TamanhoGrade[],
+  sinal: 1 | -1
+): number[] | null {
+  if (tamanhos.length === 0) return null;
+  return tamanhos.map((t) => sinal * Number(row[`T${t.ordinal}`] ?? 0));
+}
+
+/** Estoque atual por posição da grade (ESTOQUE_PRODUTOS.ES1..ES48), no escopo de filial. */
+async function fetchEstoquePorTamanho(
+  produto: string,
+  cor: string,
+  filialNome: string,
+  tamanhos: TamanhoGrade[]
+): Promise<number[]> {
+  if (tamanhos.length === 0) return [];
+  const cols = tamanhos
+    .map((t) => `ISNULL(SUM(ISNULL(ep.ES${t.ordinal}, 0)), 0) AS T${t.ordinal}`)
+    .join(",\n      ");
+
+  const rows = await query<Record<string, number | null>>(`
+    SELECT
+      ${cols}
+    FROM ESTOQUE_PRODUTOS ep WITH (NOLOCK)
+    WHERE ${produtoEqualsSql("ep.PRODUTO", produto)}
+      AND ${corEqualsSql("ep.COR_PRODUTO", cor)}
+      ${filialNome ? `AND ${filialEqualsSql("ep.FILIAL", filialNome)}` : ""}
+  `);
+  const row = rows[0] ?? {};
+  return tamanhos.map((t) => Number(row[`T${t.ordinal}`] ?? 0));
 }
 
 async function fetchCoresDisponiveis(produto: string, filial?: string | null): Promise<ProdutoCorOption[]> {
@@ -622,6 +725,20 @@ export async function GET(request: NextRequest) {
   descProduto = descProduto ?? resolved?.descProduto ?? null;
   descCor = descCor ?? resolved?.descCor ?? corOption?.descCor ?? null;
 
+  // ── Grade de tamanhos (P/M/G etc.) ──
+  // Precisa vir antes das queries de movimento: é ela que define quais colunas
+  // posicionais (EN_1..EN_n / SA_1..SA_n / EN1..ENn / A1..An) cada fonte devolve.
+  let tamanhos: TamanhoGrade[] = [];
+  let estoquePorTamanho: number[] = [];
+  try {
+    tamanhos = await fetchTamanhosDaGrade(grade);
+    estoquePorTamanho = await fetchEstoquePorTamanho(produto, cor, filialNome, tamanhos);
+  } catch (e) {
+    tamanhos = [];
+    estoquePorTamanho = [];
+    erros.push(`Grade de tamanhos: ${(e as Error).message}`);
+  }
+
   // ── 1. LOJA ENTRADAS (romaneios de chegada de fornecedor/transferência confirmada) ──
   try {
     const rows = await query<{
@@ -651,7 +768,7 @@ export async function GET(request: NextRequest) {
         lep.VALOR,
         lep.PRECO1,
         le.STATUS_TRANSITO,
-        lep.ATUALIZOU_ESTOQUE,
+        lep.ATUALIZOU_ESTOQUE${gradeColsSql("lep", "EN", tamanhos)},
         CAST(le.OBS AS varchar(500)) AS OBS,
         le.TIPO_ENTRADA_SAIDA,
         t.DESC_TIPO_ENTRADA_SAIDA AS DESC_TIPO
@@ -676,6 +793,7 @@ export async function GET(request: NextRequest) {
         romaneio: null,
         qtde: r.QTDE_ENTRADA ?? 0,
         qtdeGrade: r.EN1 ?? 0,
+        qtdePorTamanho: readGradeCols(r as unknown as Record<string, unknown>, tamanhos, 1),
         valor: r.VALOR ?? 0,
         preco: r.PRECO1 ?? 0,
         obs: r.OBS?.trim() ?? null,
@@ -718,7 +836,7 @@ export async function GET(request: NextRequest) {
         e.TIPO_ENTRADA,
         p.QTDE,
         p.EN_1,
-        p.CUSTO1,
+        p.CUSTO1${gradeColsSql("p", "EN_", tamanhos)},
         e.ROMANEIO_ORIGEM,
         NULLIF(RTRIM(LTRIM(CAST(e.ORDEM_PRODUCAO AS VARCHAR(50)))), '') AS OP,
         NULLIF(RTRIM(LTRIM(CAST(e.PEDIDO         AS VARCHAR(50)))), '') AS PEDIDO,
@@ -746,6 +864,7 @@ export async function GET(request: NextRequest) {
         romaneio: romEnt || null,
         qtde: r.QTDE ?? 0,
         qtdeGrade: r.EN_1 ?? 0,
+        qtdePorTamanho: readGradeCols(r as unknown as Record<string, unknown>, tamanhos, 1),
         valor: 0,
         preco: r.CUSTO1 ?? 0,
         obs: r.OBS?.trim() ?? null,
@@ -785,7 +904,7 @@ export async function GET(request: NextRequest) {
         s.ROMANEIO_DESTINO,
         p.QTDE,
         p.SA_1,
-        p.CUSTO1,
+        p.CUSTO1${gradeColsSql("p", "SA_", tamanhos)},
         NULLIF(RTRIM(LTRIM(CAST(s.ORDEM_PRODUCAO AS VARCHAR(50)))), '') AS OP,
         NULLIF(RTRIM(LTRIM(CAST(s.COMENTARIO     AS VARCHAR(40)))), '') AS COMENTARIO,
         CAST(s.OBS AS varchar(500)) AS OBS
@@ -809,6 +928,7 @@ export async function GET(request: NextRequest) {
         romaneio: romSai || null,
         qtde: -(r.QTDE ?? 0),
         qtdeGrade: -(r.SA_1 ?? 0),
+        qtdePorTamanho: readGradeCols(r as unknown as Record<string, unknown>, tamanhos, -1),
         valor: 0,
         preco: r.CUSTO1 ?? 0,
         obs: r.OBS?.trim() ?? null,
@@ -833,6 +953,7 @@ export async function GET(request: NextRequest) {
       QTDE: number;
       PRECO_LIQUIDO: number;
       QTDE_CANCELADA: number;
+      TAMANHO: number | null;
       VENDEDOR_NOME: string | null;
     }>(`
       SELECT
@@ -843,6 +964,7 @@ export async function GET(request: NextRequest) {
         vp.QTDE,
         vp.PRECO_LIQUIDO,
         vp.QTDE_CANCELADA,
+        vp.TAMANHO,
         NULLIF(ISNULL(
           LTRIM(RTRIM(CAST(lv.VENDEDOR_APELIDO AS VARCHAR(60)))),
           LTRIM(RTRIM(CAST(v.VENDEDOR AS VARCHAR(20))))
@@ -862,6 +984,12 @@ export async function GET(request: NextRequest) {
     for (const r of rows) {
       const qtdeLiquida = (r.QTDE ?? 0) - (r.QTDE_CANCELADA ?? 0);
       if (qtdeLiquida === 0) continue; // ignora linhas com movimento líquido zero
+      // A venda não tem colunas posicionais: guarda o tamanho como ordinal da grade
+      // (LOJA_VENDA_PRODUTO.TAMANHO, o mesmo índice de PRODUTOS_BARRA).
+      const qtdePorTamanhoVenda =
+        tamanhos.length > 0
+          ? tamanhos.map((tam) => (tam.ordinal === Number(r.TAMANHO ?? 0) ? -qtdeLiquida : 0))
+          : null;
       linhas.push({
         emissao: r.DATA_VENDA ? new Date(r.DATA_VENDA).toISOString() : "",
         tipo: "LOJA VENDAS",
@@ -872,6 +1000,7 @@ export async function GET(request: NextRequest) {
         romaneio: null,
         qtde: -qtdeLiquida,
         qtdeGrade: -qtdeLiquida, // vendas não têm campo de grade separado
+        qtdePorTamanho: qtdePorTamanhoVenda,
         valor: -(r.PRECO_LIQUIDO ?? 0) * qtdeLiquida,
         preco: r.PRECO_LIQUIDO ?? 0,
         obs: null,
@@ -907,7 +1036,7 @@ export async function GET(request: NextRequest) {
         ls.TIPO_ENTRADA_SAIDA,
         t.DESC_TIPO_ENTRADA_SAIDA AS DESC_TIPO,
         lsp.QTDE_SAIDA,
-        lsp.EN1,
+        lsp.EN1${gradeColsSql("lsp", "EN", tamanhos)},
         CAST(ls.OBS AS varchar(500)) AS OBS
       FROM LOJA_SAIDAS ls WITH (NOLOCK)
       JOIN LOJA_SAIDAS_PRODUTO lsp WITH (NOLOCK)
@@ -930,6 +1059,7 @@ export async function GET(request: NextRequest) {
         romaneio: null,
         qtde: -(r.QTDE_SAIDA ?? 0),
         qtdeGrade: -(r.EN1 ?? 0),
+        qtdePorTamanho: readGradeCols(r as unknown as Record<string, unknown>, tamanhos, -1),
         valor: 0,
         preco: 0,
         obs: r.OBS?.trim() ?? null,
@@ -963,7 +1093,7 @@ export async function GET(request: NextRequest) {
         c.RESPONSAVEL,
         c.TIPO,
         a.QTDE_AJUSTE,
-        a.A1
+        a.A1${gradeColsSql("a", "A", tamanhos)}
       FROM ESTOQUE_PROD_CONTAGEM c WITH (NOLOCK)
       JOIN ESTOQUE_PROD_CTG_AJUSTE a WITH (NOLOCK)
         ON c.NOME_CONTAGEM = a.NOME_CONTAGEM
@@ -984,6 +1114,7 @@ export async function GET(request: NextRequest) {
         romaneio: r.RESPONSAVEL?.trim() ?? null,
         qtde: r.QTDE_AJUSTE ?? 0,
         qtdeGrade: r.A1 ?? 0,
+        qtdePorTamanho: readGradeCols(r as unknown as Record<string, unknown>, tamanhos, 1),
         valor: 0,
         preco: 0,
         obs: null,
@@ -1028,6 +1159,9 @@ export async function GET(request: NextRequest) {
         romaneio: r.OBS?.trim() ?? r.RESPONSAVEL?.trim() ?? null,
         qtde: r.QTDE_AJUSTE,
         qtdeGrade: r.QTDE_AJUSTE,
+        // Ajuste manual do dashboard não guarda posição de grade — fica "—" por tamanho
+        // em vez de fingir que caiu tudo no 1º, que é o que criava grade zerada falsa.
+        qtdePorTamanho: null,
         valor: 0,
         preco: 0,
         obs: r.OBS?.trim() ?? null,
@@ -1058,6 +1192,8 @@ export async function GET(request: NextRequest) {
     tipoProduto,
     colecao,
     descColecao,
+    tamanhos,
+    estoquePorTamanho,
     coresDisponiveis,
     filiaisDisponiveis,
     linhas,

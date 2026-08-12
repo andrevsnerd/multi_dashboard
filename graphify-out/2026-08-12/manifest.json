@@ -1340,8 +1340,8 @@
     "semantic_hash": "1f13894059c7c73365fb5303040f3f5a"
   },
   "components/extrato-produto/ExtratoProdutoPage.tsx": {
-    "mtime": 1786552564.034089,
-    "ast_hash": "2cb7a4196deeeddea315a59d2d783b0e",
+    "mtime": 1786552216.553274,
+    "ast_hash": "d53d647e692bb5d74c02b7498974e78a",
     "semantic_hash": ""
   },
   "components/faturamento/FaturamentoPage.tsx": {

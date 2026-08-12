@@ -549,6 +549,14 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
 
   if (!user) return null;
 
+  // ── Grade de tamanhos ──
+  // Só produto de grade múltipla (P/M/G, 36/38/40...) tem tamanhos; na prática isso
+  // hoje só existe no fashion da ScarfMe. Em tamanho único a lista vem vazia e a tela
+  // continua exatamente como era, com a coluna única de grade.
+  const tamanhos = dados?.tamanhos ?? [];
+  const multiTamanho = tamanhos.length > 1;
+  const estoquePorTamanho = dados?.estoquePorTamanho ?? [];
+
   // ── Filtros e saldo corrente ──
   const tiposDisponiveis = dados
     ? [...new Set(dados.linhas.map((l) => l.tipo))].sort()
@@ -561,10 +569,17 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
     : 0;
   const diferencaEstoque = dados ? dados.estoqueAtual - saldoMovimentos : 0;
 
+
   const linhasFiltradas = dados
     ? dados.linhas.filter((l) => {
         if (tiposFiltro.length > 0 && !tiposFiltro.includes(l.tipo)) return false;
-        if (!mostrarZeroGrade && l.qtdeGrade === 0) return false;
+        if (!mostrarZeroGrade) {
+          // Em grade múltipla o "zero" é a soma dos tamanhos, não só a 1ª posição.
+          const grade = multiTamanho
+            ? l.qtdePorTamanho?.reduce((s, v) => s + v, 0) ?? l.qtde
+            : l.qtdeGrade;
+          if (grade === 0) return false;
+        }
         return true;
       })
     : [];
@@ -584,6 +599,9 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
       tipo,
       qtde: ls.reduce((s, l) => s + l.qtde, 0),
       qtdeGrade: ls.reduce((s, l) => s + l.qtdeGrade, 0),
+      porTamanho: tamanhos.map((_, idx) =>
+        ls.reduce((s, l) => s + (l.qtdePorTamanho?.[idx] ?? 0), 0)
+      ),
       count: ls.length,
     };
   });
@@ -608,7 +626,8 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
         </h1>
         <p style={{ margin: 0, fontSize: 13, color: t.muted }}>
           Visualiza todos os movimentos de estoque de um produto+cor+filial, mostrando a diferença
-          entre o campo QTDE (total) e o campo de grade (EN_1/SA_1 → 90x90).
+          entre o campo QTDE (total) e os campos de grade (EN_1/SA_1...). Em produto de grade
+          múltipla (P/M/G, 36/38/40...) o estoque e cada movimento aparecem quebrados por tamanho.
         </p>
       </div>
 
@@ -914,9 +933,21 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
             {dados.codigoBarra && <InfoCard label="Código barra" value={dados.codigoBarra} t={t} />}
             <InfoCard label="Grade" value={dados.grade ?? "—"} highlight t={t} />
             <InfoCard label="Filial" value={dados.filial} t={t} />
-            <InfoCard label="Estoque atual" value={`${dados.estoqueAtual} un`} highlight t={t} />
+            <InfoCard
+              label="Estoque atual"
+              value={`${dados.estoqueAtual} un`}
+              sub={
+                multiTamanho
+                  ? tamanhos.map((tam, idx) => `${tam.label} ${estoquePorTamanho[idx] ?? 0}`).join(" · ")
+                  : undefined
+              }
+              highlight
+              t={t}
+            />
             <InfoCard label="Saldo QTDE" value={`${saldoMovimentos} un`} t={t} />
-            <InfoCard label="Saldo grade" value={`${saldoGrade} un`} t={t} />
+            {/* Em grade múltipla "Saldo grade" seria só a 1ª posição (o P), o que engana —
+                o detalhe por tamanho está nas colunas da tabela. */}
+            {!multiTamanho && <InfoCard label="Saldo grade" value={`${saldoGrade} un`} t={t} />}
             <InfoCard label="Diferença" value={`${diferencaEstoque} un`} highlight={diferencaEstoque !== 0} t={t} />
             <InfoCard label="Movimentos" value={`${dados.linhas.length}`} t={t} />
           </div>
@@ -965,12 +996,17 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
                     <div style={{ fontSize: 11, color: corTipo, marginBottom: 2 }}>{resumo.tipo}</div>
                     <div style={{ fontSize: 13, color: t.heading }}>
                       {resumo.count}x · QTDE: <span style={{ fontWeight: 700 }}>{fmtNum(resumo.qtde)}</span>
-                      {resumo.qtde !== resumo.qtdeGrade && (
+                      {!multiTamanho && resumo.qtde !== resumo.qtdeGrade && (
                         <span style={{ color: t.highlight, marginLeft: 8, fontSize: 11 }}>
                           Grade: {fmtNum(resumo.qtdeGrade)}
                         </span>
                       )}
                     </div>
+                    {multiTamanho && (
+                      <div style={{ fontSize: 11, color: t.highlight, marginTop: 2 }}>
+                        {tamanhos.map((tam, idx) => `${tam.label}: ${fmtNum(resumo.porTamanho[idx] ?? 0)}`).join(" · ")}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -1015,7 +1051,15 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
                   <th style={th}>Filial Origem</th>
                   <th style={th}>Filial Destino</th>
                   <th style={{ ...th, color: t.heading }}>QTDE</th>
-                  <th style={{ ...th, color: t.highlight }}>Grade ({dados.grade ?? "?"})</th>
+                  {multiTamanho ? (
+                    tamanhos.map((tam) => (
+                      <th key={tam.ordinal} style={{ ...th, color: t.highlight, textAlign: "right" }}>
+                        {tam.label}
+                      </th>
+                    ))
+                  ) : (
+                    <th style={{ ...th, color: t.highlight }}>Grade ({dados.grade ?? "?"})</th>
+                  )}
                   <th style={{ ...th, color: t.saldo }}>Saldo</th>
                   <th style={th}>Preço</th>
                   <th style={th}>Status Trânsito</th>
@@ -1025,7 +1069,12 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
               </thead>
               <tbody>
                 {linhasComSaldo.map((l, i) => {
-                  const diverge = l.qtde !== 0 && l.qtdeGrade === 0;
+                  // Em grade múltipla, "grade zerada" tem que olhar a soma dos tamanhos:
+                  // um movimento só de M tem EN_1 = 0 e não é divergência nenhuma.
+                  const somaTamanhos = l.qtdePorTamanho?.reduce((s, v) => s + v, 0) ?? 0;
+                  const diverge = multiTamanho
+                    ? l.qtde !== 0 && l.qtdePorTamanho != null && somaTamanhos === 0
+                    : l.qtde !== 0 && l.qtdeGrade === 0;
                   return (
                     <tr
                       key={i}
@@ -1056,15 +1105,40 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
                       <td style={{ ...td, textAlign: "right", color: l.qtde > 0 ? t.posNum : l.qtde < 0 ? t.negNum : t.zeroNum, fontWeight: 700 }}>
                         {fmtNum(l.qtde)}
                       </td>
-                      <td style={{ ...td, textAlign: "right", color: l.qtdeGrade > 0 ? t.gradePos : l.qtdeGrade < 0 ? t.gradeNeg : (diverge ? t.gradeWarn : t.zeroNum), fontWeight: 700 }}>
-                        {diverge ? (
-                          <span title="Grade zerada! QTDE tem valor mas EN_1/SA_1 = 0. Pode causar divergência no extrato Linx.">
-                            ⚠ {fmtNum(l.qtdeGrade)}
-                          </span>
-                        ) : (
-                          fmtNum(l.qtdeGrade)
-                        )}
-                      </td>
+                      {multiTamanho ? (
+                        tamanhos.map((tam, idx) => {
+                          const v = l.qtdePorTamanho?.[idx];
+                          if (v == null) {
+                            return (
+                              <td
+                                key={tam.ordinal}
+                                style={{ ...td, textAlign: "right", color: t.muted }}
+                                title="Fonte sem detalhe de grade (ajuste manual do dashboard)"
+                              >
+                                —
+                              </td>
+                            );
+                          }
+                          return (
+                            <td
+                              key={tam.ordinal}
+                              style={{ ...td, textAlign: "right", fontWeight: 700, color: v > 0 ? t.gradePos : v < 0 ? t.gradeNeg : t.zeroNum }}
+                            >
+                              {v === 0 ? "·" : fmtNum(v)}
+                            </td>
+                          );
+                        })
+                      ) : (
+                        <td style={{ ...td, textAlign: "right", color: l.qtdeGrade > 0 ? t.gradePos : l.qtdeGrade < 0 ? t.gradeNeg : (diverge ? t.gradeWarn : t.zeroNum), fontWeight: 700 }}>
+                          {diverge ? (
+                            <span title="Grade zerada! QTDE tem valor mas EN_1/SA_1 = 0. Pode causar divergência no extrato Linx.">
+                              ⚠ {fmtNum(l.qtdeGrade)}
+                            </span>
+                          ) : (
+                            fmtNum(l.qtdeGrade)
+                          )}
+                        </td>
+                      )}
                       <td style={{ ...td, textAlign: "right", color: t.saldo, fontWeight: 700 }}>
                         {l.saldoAcumulado}
                       </td>
@@ -1089,7 +1163,7 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
                 })}
                 {linhasComSaldo.length === 0 && (
                   <tr>
-                    <td colSpan={13} style={{ ...td, textAlign: "center", color: t.muted, padding: 32 }}>
+                    <td colSpan={multiTamanho ? 12 + tamanhos.length : 13} style={{ ...td, textAlign: "center", color: t.muted, padding: 32 }}>
                       Nenhum movimento encontrado com os filtros atuais.
                     </td>
                   </tr>
@@ -1105,9 +1179,19 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
               <div>
                 <strong style={{ color: t.heading }}>QTDE</strong> — campo total declarado no romaneio
               </div>
-              <div>
-                <strong style={{ color: t.highlight }}>Grade ({dados.grade ?? "?"})</strong> — campo EN_1/SA_1 (grade específica)
-              </div>
+              {multiTamanho ? (
+                <div>
+                  <strong style={{ color: t.highlight }}>
+                    {tamanhos.map((tam) => tam.label).join(" / ")}
+                  </strong>{" "}
+                  — quantidade por posição da grade {dados.grade ?? "?"} (EN_1..EN_{tamanhos.length} /
+                  SA_1..SA_{tamanhos.length}; venda pelo TAMANHO do item). “·” = zero naquele tamanho.
+                </div>
+              ) : (
+                <div>
+                  <strong style={{ color: t.highlight }}>Grade ({dados.grade ?? "?"})</strong> — campo EN_1/SA_1 (grade específica)
+                </div>
+              )}
               <div>
                 <strong style={{ color: t.saldo }}>Saldo</strong> — acumulado cronológico pelo campo QTDE
               </div>
@@ -1144,7 +1228,7 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
 
 // ── Sub-componentes ─────────────────────────────────────────────────────────
 
-function InfoCard({ label, value, highlight, t }: { label: string; value: string; highlight?: boolean; t: Palette }) {
+function InfoCard({ label, value, sub, highlight, t }: { label: string; value: string; sub?: string; highlight?: boolean; t: Palette }) {
   return (
     <div style={{
       background: t.cardBg,
@@ -1155,6 +1239,7 @@ function InfoCard({ label, value, highlight, t }: { label: string; value: string
     }}>
       <div style={{ fontSize: 10, color: t.muted, marginBottom: 2 }}>{label}</div>
       <div style={{ fontSize: 14, fontWeight: 600, color: highlight ? t.highlight : t.heading }}>{value}</div>
+      {sub && <div style={{ fontSize: 11, color: t.subMuted, marginTop: 2 }}>{sub}</div>}
     </div>
   );
 }
