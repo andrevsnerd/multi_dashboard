@@ -539,8 +539,13 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
     setAviso(null);
     try {
       await enviarZpl(impressoraEscolhida, resultadoZpl.zpl);
+      // Fila esvaziada só depois do envio dar certo: apertar de novo sem querer
+      // reimprimia o lote inteiro. As quantidades voltam a vazio junto (elas
+      // são a própria fila). Se der erro, a fila FICA — senão o trabalho de
+      // montar o lote se perde justamente quando deu problema.
+      setFila({});
       setAviso(
-        `Enviado: ${resultadoZpl.totalEtiquetas} etiqueta(s) em ${resultadoZpl.totalFileiras} fileira(s) para ${impressoraEscolhida.name}.`
+        `Enviado: ${resultadoZpl.totalEtiquetas} etiqueta(s) em ${resultadoZpl.totalFileiras} fileira(s) para ${impressoraEscolhida.name}. Fila limpa.`
       );
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Falha ao enviar para a impressora.");
@@ -645,6 +650,11 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
           window.setTimeout(() => {
             if (iframe.parentNode) document.body.removeChild(iframe);
             setPreparandoFolha(false);
+            // Pode ser esvaziada aqui sem medo: o HTML da folha já foi copiado
+            // para dentro do iframe (doc.write acima), então limpar a fila não
+            // apaga o que está sendo impresso.
+            setFila({});
+            setAviso("Enviado para a impressão do navegador. Fila limpa.");
           }, 1000);
         }
       };
@@ -875,13 +885,21 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
                       </div>
                     </div>
 
-                    <table className={styles.tabela}>
+                    {/* Larguras fixas: com vários produtos abertos ao mesmo tempo,
+                        as colunas de todos os blocos ficam na mesma posição em vez
+                        de cada tabela se dimensionar sozinha. */}
+                    <table className={`${styles.tabela} ${styles.tabelaCores}`}>
+                      <colgroup>
+                        <col style={{ width: 64 }} />
+                        <col />
+                        <col style={{ width: 132 }} />
+                        <col style={{ width: 96 }} />
+                      </colgroup>
                       <thead>
                         <tr>
                           <th>Cor</th>
                           <th>Descrição</th>
                           <th>Código de barra</th>
-                          <th className={styles.tdNum}>Estoque</th>
                           <th className={styles.tdNum}>Etiquetas</th>
                         </tr>
                       </thead>
@@ -911,13 +929,16 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
                                   <span className={styles.semCodigo}>sem código</span>
                                 )}
                               </td>
-                              <td className={`${styles.tdNum} ${styles.mono}`}>{cor.estoque}</td>
                               <td className={styles.tdNum}>
                                 <input
                                   className={styles.numero}
                                   type="number"
                                   min={0}
-                                  value={qtd}
+                                  // Zero aparece VAZIO: quem clica quer digitar a
+                                  // quantidade direto, e um "0" no campo obriga a
+                                  // apagar antes (ou vira "05").
+                                  value={qtd || ""}
+                                  placeholder="0"
                                   onChange={(e) =>
                                     definirQuantidade(produto, cor, Number(e.target.value) || 0)
                                   }
@@ -928,7 +949,7 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
                         })}
                         {produto.cores.length === 0 ? (
                           <tr>
-                            <td colSpan={5} className={styles.semCodigo}>
+                            <td colSpan={4} className={styles.semCodigo}>
                               Produto sem cores cadastradas.
                             </td>
                           </tr>

@@ -354,6 +354,22 @@
 .tabela tr:last-child td {
   border-bottom: none;
 }
+.tabelaCores {
+  table-layout: fixed;
+}
+/* Descrição é a única coluna elástica — corta com reticências em vez de
+   empurrar as outras e desalinhar os blocos de produto entre si. */
+.tabelaCores td:nth-child(2) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* O campo de quantidade ocupa a coluna inteira e fica encostado na direita,
+   alinhado com o cabeçalho "Etiquetas". */
+.tabelaCores td:last-child .numero {
+  width: 100%;
+}
+
 .tdNum {
   text-align: right;
   font-variant-numeric: tabular-nums;
