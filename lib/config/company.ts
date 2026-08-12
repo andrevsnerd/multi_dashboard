@@ -204,6 +204,47 @@ export function filterStockCarryingFilials(
   return filiais.filter((filial) => isActiveFilial(company, filial));
 }
 
+/**
+ * Rótulo curto que identifica QUAL CNPJ do grupo está em jogo, para exibir ao lado do
+ * nome lógico (ex.: "E-COMMERCE ᴀᴋs", "PAULISTA ғғғʀ"). Sem isso, um grupo multi-CNPJ
+ * não deixa claro de qual entidade o número está saindo — e no rodízio fiscal do
+ * e-commerce isso troca a cada ~15 dias.
+ *
+ * Devolve o primeiro token do nome que NENHUM outro membro do grupo tem; se não houver
+ * (dois membros com nomes de tokens idênticos), cai no último token, que é o sufixo que
+ * o ERP usa para diferenciar CNPJ. Pegar sempre o último não serve: MSC e AKS terminam
+ * as duas em "LT", então o discriminante delas é o prefixo.
+ *
+ * Devolve null para filial sem grupo — aí o nome já é único e a label seria ruído.
+ */
+export function getFilialGroupTag(
+  company: CompanyConfig | null | undefined,
+  filial: string | null | undefined
+): string | null {
+  const raw = (filial || '').trim();
+  if (!company || !raw) return null;
+
+  const members = getFilialGroupMembers(company, raw);
+  if (members.length <= 1) return null;
+
+  const tokenize = (s: string) =>
+    normalizeFilialNameForMatch(s)
+      .toUpperCase()
+      .split(/[\s\-]+/)
+      .filter(Boolean);
+
+  const own = tokenize(raw);
+  if (own.length === 0) return null;
+
+  const normalizedRaw = normalizeFilialNameForMatch(raw).toUpperCase();
+  const others = members
+    .filter((m) => normalizeFilialNameForMatch(m).toUpperCase() !== normalizedRaw)
+    .map((m) => new Set(tokenize(m)));
+
+  const unique = own.find((t) => others.every((set) => !set.has(t)));
+  return unique ?? own[own.length - 1] ?? null;
+}
+
 export function getOperationalFilials(
   company: CompanyConfig | null | undefined,
   module: CompanyModule = 'inventory'

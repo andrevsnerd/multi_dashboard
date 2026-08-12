@@ -92,6 +92,21 @@
   line-height: 1.2;
 }
 
+/*
+ * Qual CNPJ do grupo está sendo considerado (ex.: "E-COMMERCE AKS"). Só aparece em
+ * filial multi-CNPJ — ver getFilialGroupTag. Tamanho relativo para escalar junto com o
+ * nome, que tem corpo bem diferente na origem (24px) e no destino.
+ */
+.filialTag {
+  margin-left: 6px;
+  font-size: 0.55em;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--t-gray400);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
 .originLabel {
   font-size: 14px;
   opacity: 0.9;

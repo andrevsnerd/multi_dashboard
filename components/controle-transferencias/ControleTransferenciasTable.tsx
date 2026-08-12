@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useMemo, useState, useRef, useEffect, useCallback } from "react";
-import { getActiveFilial, resolveCompany, type CompanyKey } from "@/lib/config/company";
+import { getActiveFilial, getFilialGroupTag, resolveCompany, type CompanyKey } from "@/lib/config/company";
 import type { ProdutoTransferencia, FilialData } from "@/lib/repositories/controleTransferencias";
 import type { DateRangeValue } from "@/components/filters/DateRangeFilter";
 import { useAuth } from "@/components/auth/AuthContext";
@@ -870,7 +870,21 @@ export default function ControleTransferenciasTable({
                 </svg>
               </div>
               <div className={styles.originText}>
-                <div className={styles.originName}>{group.origem}</div>
+                <div className={styles.originName}>
+                  {group.origem}
+                  {(() => {
+                    // Qual CNPJ do grupo é a origem de verdade. O canônico já vem
+                    // colapsado na perna ATIVA pelo backend, então a tag acompanha o
+                    // rodízio fiscal sozinha.
+                    const raw = group.items[0]?.origemCanonico;
+                    const tag = raw ? getFilialGroupTag(company, raw) : null;
+                    return tag ? (
+                      <span className={styles.filialTag} title={`Filial considerada: ${raw?.trim()}`}>
+                        {tag}
+                      </span>
+                    ) : null;
+                  })()}
+                </div>
                 <div className={styles.originLabel}>Filial de origem</div>
               </div>
             </div>
@@ -947,7 +961,18 @@ export default function ControleTransferenciasTable({
                   </svg>
                   <div className={styles.destinationText}>
                     <span className={styles.destinationLabel}>Transferir para</span>
-                    <span className={styles.destinationName}>{destGroup.destino}</span>
+                    <span className={styles.destinationName}>
+                      {destGroup.destino}
+                      {(() => {
+                        const raw = destGroup.items[0]?.destinoCanonico;
+                        const tag = raw ? getFilialGroupTag(company, raw) : null;
+                        return tag ? (
+                          <span className={styles.filialTag} title={`Filial considerada: ${raw?.trim()}`}>
+                            {tag}
+                          </span>
+                        ) : null;
+                      })()}
+                    </span>
                   </div>
                 </div>
                 <div className={styles.destinationTabs} role="tablist" aria-label="Visão do destino">

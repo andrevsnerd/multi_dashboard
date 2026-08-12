@@ -7,6 +7,7 @@ import type { MultiSelectOption as ColecaoOption } from "@/components/filters/Mu
 import {
   compareFilialDisplayOrder,
   getFilialLabelForDisplay,
+  getFilialGroupTag,
   resolveCompany,
   VAREJO_VALUE,
   type CompanyKey,
@@ -568,14 +569,31 @@ export default function EstoqueItemPage({
     mostrarNegativos,
   ]);
 
-  const { pivotRows, filiaisColumns } = useMemo(() => {
+  const { pivotRows, filiaisColumns, filialTags } = useMemo(() => {
     if (!data?.variacoes.length) {
-      return { pivotRows: [] as PivotRow[], filiaisColumns: [] as string[] };
+      return {
+        pivotRows: [] as PivotRow[],
+        filiaisColumns: [] as string[],
+        filialTags: {} as Record<string, string>,
+      };
     }
 
+    // Tag de qual CNPJ do grupo a coluna está contando, tirada dos DADOS e não da
+    // config: o backend já devolve estoque só da perna ativa, então o nome cru que
+    // chegou É a ativa. Isso mantém a tag certa quando o rodízio fiscal virar, sem o
+    // cliente precisar saber qual perna está emitindo.
     const labelSet = new Set<string>();
+    const rawByLabel = new Map<string, string>();
     for (const variacao of data.variacoes) {
-      labelSet.add(getFilialLabelForDisplay(companyCfg, variacao.filial));
+      const label = getFilialLabelForDisplay(companyCfg, variacao.filial);
+      labelSet.add(label);
+      if (!rawByLabel.has(label)) rawByLabel.set(label, (variacao.filial || "").trim());
+    }
+
+    const tags: Record<string, string> = {};
+    for (const [label, raw] of rawByLabel) {
+      const tag = getFilialGroupTag(companyCfg, raw);
+      if (tag) tags[label] = tag;
     }
 
     const orderedFiliais = Array.from(labelSet).sort((left, right) =>
@@ -640,6 +658,7 @@ export default function EstoqueItemPage({
     return {
       pivotRows: rows,
       filiaisColumns: orderedFiliais,
+      filialTags: tags,
     };
   }, [data, companyCfg]);
 
@@ -1216,7 +1235,12 @@ export default function EstoqueItemPage({
                       className={`${styles.sortButton} ${styles.sortButtonCenter}`}
                       onClick={() => handleSort(`filial:${filial}`)}
                     >
-                      <span>{filial}</span>
+                      <span>
+                        {filial}
+                        {filialTags[filial] && (
+                          <span className={styles.filialTag}>{filialTags[filial]}</span>
+                        )}
+                      </span>
                       <span className={styles.sortIcon} aria-hidden>
                         {getSortIndicator(`filial:${filial}`)}
                       </span>

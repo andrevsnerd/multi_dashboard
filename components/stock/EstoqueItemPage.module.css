@@ -445,6 +445,19 @@
   opacity: 0.72;
 }
 
+/*
+ * Qual CNPJ do grupo a coluna está contando (ex.: "E-COMMERCE AKS", "PAULISTA FFFR").
+ * Só aparece em filial multi-CNPJ — ver getFilialGroupTag.
+ */
+.filialTag {
+  margin-left: 4px;
+  font-size: 0.62rem;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: var(--t-gray400);
+  white-space: nowrap;
+}
+
 .table tbody tr td {
   transition:
     background-color 0.18s ease,

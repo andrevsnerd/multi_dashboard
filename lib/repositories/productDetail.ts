@@ -1,6 +1,13 @@
 import sql from 'mssql';
 
-import { resolveCompany, isEcommerceFilial, getActiveFilial, type CompanyModule, VAREJO_VALUE } from '@/lib/config/company';
+import {
+  resolveCompany,
+  isEcommerceFilial,
+  getActiveFilial,
+  filterStockCarryingFilials,
+  type CompanyModule,
+  VAREJO_VALUE,
+} from '@/lib/config/company';
 import { resolveCompanyLive, liveNameForIncoming } from '@/lib/server/company-live';
 import { resolveCompanyDynamic } from '@/lib/config/company-server';
 import { withRequest } from '@/lib/db/connection';
@@ -1370,7 +1377,9 @@ async function fetchProductStockByFilialEcommerce({
     request.input('previousStartDate', sql.DateTime, previousRange.start);
     request.input('previousEndDate', sql.DateTime, previousRange.end);
 
-    const companyConfig = await resolveCompanyLive(company);
+    // Config DINÂMICA: o e-commerce é um rodízio fiscal (MSC↔AKS) e só a perna ativa
+    // carrega estoque. Com a estática, a ativa fica congelada no activeId do registry.
+    const companyConfig = (await resolveCompanyDynamic(company)) ?? (await resolveCompanyLive(company));
     if (!companyConfig) {
       return [];
     }
@@ -1379,24 +1388,39 @@ async function fetchProductStockByFilialEcommerce({
     const colorFilterE = colorFilter('e');
     const colorFilterFp = colorFilter('fp');
 
-    // Construir o filtro de filiais de ecommerce uma vez e reutilizar
+    // Estoque e vendas seguem réguas OPOSTAS aqui, então são dois filtros separados:
+    // - ESTOQUE: só a perna ATIVA. Somar os 5 CNPJs fazia o E-COMMERCE prometer saldo
+    //   que a loja ativa não tem (barra 046500 exibia 2 que estavam na MSC parada).
+    // - VENDAS: o grupo INTEIRO, senão o faturamento das pernas antigas desaparece.
     const ecommerceFilials = companyConfig.ecommerceFilials ?? [];
+    const estoqueFilials = filterStockCarryingFilials(companyConfig, ecommerceFilials);
     let estoqueFilialFilter = '';
     let vendasFilialFilter = '';
-    
+
     if (filial) {
+      request.input('ecommerceFilialEstoque', sql.VarChar, getActiveFilial(companyConfig, filial) || filial);
       request.input('ecommerceFilial', sql.VarChar, filial);
-      estoqueFilialFilter = `AND e.FILIAL = @ecommerceFilial`;
+      estoqueFilialFilter = `AND e.FILIAL = @ecommerceFilialEstoque`;
       vendasFilialFilter = `AND f.FILIAL = @ecommerceFilial`;
-    } else if (ecommerceFilials.length > 0) {
-      ecommerceFilials.forEach((filialName, index) => {
-        request.input(`ecommerceFilial${index}`, sql.VarChar, filialName);
-      });
-      const placeholders = ecommerceFilials
-        .map((_, index) => `@ecommerceFilial${index}`)
-        .join(', ');
-      estoqueFilialFilter = `AND e.FILIAL IN (${placeholders})`;
-      vendasFilialFilter = `AND f.FILIAL IN (${placeholders})`;
+    } else {
+      if (estoqueFilials.length > 0) {
+        estoqueFilials.forEach((filialName, index) => {
+          request.input(`ecommerceFilialEstoque${index}`, sql.VarChar, filialName);
+        });
+        const placeholders = estoqueFilials
+          .map((_, index) => `@ecommerceFilialEstoque${index}`)
+          .join(', ');
+        estoqueFilialFilter = `AND e.FILIAL IN (${placeholders})`;
+      }
+      if (ecommerceFilials.length > 0) {
+        ecommerceFilials.forEach((filialName, index) => {
+          request.input(`ecommerceFilial${index}`, sql.VarChar, filialName);
+        });
+        const placeholders = ecommerceFilials
+          .map((_, index) => `@ecommerceFilial${index}`)
+          .join(', ');
+        vendasFilialFilter = `AND f.FILIAL IN (${placeholders})`;
+      }
     }
 
     // Buscar estoque por filial (com filtro de cor)
@@ -1507,6 +1531,10 @@ async function fetchProductStockByFilialEcommerce({
       aggByDisplayName.set(filialDisplayName, existing);
     });
 
+    // Perna ativa do grupo — vira a label ao lado de "E-COMMERCE", para ficar explícito
+    // de qual CNPJ o estoque está sendo contado (o rodízio troca a cada ~15 dias).
+    const activeEcommerceFilial = estoqueFilials.length === 1 ? estoqueFilials[0] : undefined;
+
     const result: ProductStockByFilial[] = [];
     aggByDisplayName.forEach((agg, filialDisplayName) => {
       const revenueVariance =
@@ -1516,6 +1544,7 @@ async function fetchProductStockByFilialEcommerce({
       result.push({
         filial: filialDisplayName,
         filialDisplayName,
+        activeFilialRaw: ecommerceFilials.length > 1 ? activeEcommerceFilial : undefined,
         stock: agg.stock,
         revenue: agg.revenue,
         quantity: agg.quantity,
@@ -1570,6 +1599,8 @@ export async function fetchProductStockByFilial({
         existing.stock += item.stock;
         // Garantir que o filialDisplayName está mapeado corretamente
         existing.filialDisplayName = item.filialDisplayName;
+        // Preserva a perna ativa do grupo (label de qual CNPJ carrega o estoque)
+        existing.activeFilialRaw = item.activeFilialRaw ?? existing.activeFilialRaw;
         // Recalcular revenueVariance
         const previousRevenue = existing.revenueVariance !== null && existing.revenue > 0
           ? existing.revenue / (1 + existing.revenueVariance / 100)

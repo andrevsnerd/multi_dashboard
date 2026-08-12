@@ -35,7 +35,7 @@ import type {
   ProductCustoItem,
   ProductStockProgressDay,
 } from "@/lib/repositories/productDetail";
-import { resolveCompany } from "@/lib/config/company";
+import { resolveCompany, getFilialGroupTag } from "@/lib/config/company";
 
 import styles from "./ProductDetailKPIs.module.css";
 
@@ -438,7 +438,8 @@ export default function ProductDetailKPIs({
     ? detail.revenueVariance
     : null;
 
-  const filialOrder = resolveCompany(companyKey)?.estoqueFilialOrder ?? [];
+  const companyCfg = resolveCompany(companyKey);
+  const filialOrder = companyCfg?.estoqueFilialOrder ?? [];
   const filialOrderMap = new Map(
     filialOrder.map((name, i) => [name.toUpperCase().trim(), i])
   );
@@ -639,8 +640,21 @@ export default function ProductDetailKPIs({
                         <div className={styles.stockByFilialName}>
                           {(filial.filialDisplayName || filial.filial || "").toUpperCase()}
                           {filial.activeFilialRaw && (() => {
-                            const code = filial.activeFilialRaw.trim().split(/[\s\-]+/).pop() ?? "";
-                            return <span style={{ marginLeft: 5, fontSize: 10, color: "#94a3b8", fontWeight: 400, letterSpacing: "0.02em" }}>{code}</span>;
+                            // Qual CNPJ do grupo carrega este estoque. getFilialGroupTag
+                            // escolhe o token que de fato distingue os membros (MSC/AKS
+                            // terminam as duas em "LT", então o último não serve).
+                            const code =
+                              getFilialGroupTag(companyCfg, filial.activeFilialRaw) ??
+                              filial.activeFilialRaw.trim().split(/[\s\-]+/).pop() ??
+                              "";
+                            return (
+                              <span
+                                title={`Estoque considerado: ${filial.activeFilialRaw.trim()}`}
+                                style={{ marginLeft: 5, fontSize: 10, color: "#94a3b8", fontWeight: 400, letterSpacing: "0.02em" }}
+                              >
+                                {code}
+                              </span>
+                            );
                           })()}
                         </div>
                         <div className={styles.stockByFilialBarWrap} aria-hidden>
