@@ -11,6 +11,12 @@ export interface EstoqueConsultaExportRow {
   colecao: string;
   total: number;
   porFilial: Record<string, number>;
+  /**
+   * Rótulo do tamanho (P/M/G) quando a linha é a quebra de um item; vazio/ausente na
+   * linha agrupada. É por essa coluna que o rodapé TOTAL soma só as agrupadas — sem
+   * isso a quebra entraria em dobro no total.
+   */
+  tamanho?: string;
 }
 
 export interface ExportEstoqueConsultaItemOptions {
@@ -61,6 +67,10 @@ export async function exportEstoqueConsultaItemXlsx(
 
   const workbook = new ExcelJS.Workbook();
 
+  // A coluna Tamanho só entra quando há quebra por tamanho (grade P/M/G) — nos demais
+  // casos o export sai exatamente como sempre foi.
+  const temTamanhos = rows.some((row) => Boolean(row.tamanho));
+
   const fixedCols: Array<{ key: keyof EstoqueConsultaExportRow; label: string; width: number }> = [
     { key: "produto", label: "Código", width: 12 },
     { key: "descricao", label: "Descrição", width: 30 },
@@ -70,18 +80,23 @@ export async function exportEstoqueConsultaItemXlsx(
     ...(isScarfme
       ? ([
           { key: "grade" as const, label: "Grade", width: 12 },
+          ...(temTamanhos ? [{ key: "tamanho" as const, label: "Tamanho", width: 10 }] : []),
           { key: "colecao" as const, label: "Coleção", width: 14 },
         ])
       : []),
   ];
 
+  const tamanhoColPos = fixedCols.findIndex((c) => c.key === "tamanho");
+  const tamanhoColIndex = tamanhoColPos >= 0 ? tamanhoColPos + 1 : 0;
   const totalColIndex = fixedCols.length + 1;
   const filialStartIndex = totalColIndex + 1;
   const columnCount = filialStartIndex + filiaisColumns.length - 1;
 
   const titleLines = [
     "Estoque Consulta",
-    `${options.companyName}  ·  Filial: ${options.filialLabel ?? "Todas"}  ·  ${rows.length.toLocaleString("pt-BR")} item(ns)`,
+    `${options.companyName}  ·  Filial: ${options.filialLabel ?? "Todas"}  ·  ${rows
+      .filter((row) => !row.tamanho)
+      .length.toLocaleString("pt-BR")} item(ns)`,
     ...(options.filtrosResumo ? [options.filtrosResumo] : []),
   ];
   const headerRowNum = titleLines.length + 1;
@@ -139,7 +154,11 @@ export async function exportEstoqueConsultaItemXlsx(
     const xrow = ws.getRow(r);
 
     fixedCols.forEach((c, ci) => {
-      xrow.getCell(ci + 1).value = (row[c.key] as string) || "";
+      const raw = (row[c.key] as string) || "";
+      // Célula de Tamanho fica REALMENTE vazia na linha agrupada: é o que o SUMIF do
+      // rodapé usa para somar só as agrupadas e ignorar as quebras.
+      if (c.key === "tamanho" && !raw) return;
+      xrow.getCell(ci + 1).value = raw;
     });
 
     const totalCell = xrow.getCell(totalColIndex);
@@ -178,18 +197,30 @@ export async function exportEstoqueConsultaItemXlsx(
   const totalRow = ws.getRow(totalRowNum);
   totalRow.getCell(1).value = "TOTAL";
 
+  // Com quebra por tamanho as linhas de P/M/G repetem o mesmo estoque da agrupada, então
+  // o rodapé soma só onde a coluna Tamanho está vazia (= linhas agrupadas).
+  const agrupadas = rows.filter((row) => !row.tamanho);
+  const tamanhoRange =
+    tamanhoColIndex > 0
+      ? `${colLetter(tamanhoColIndex)}${firstDataRow}:${colLetter(tamanhoColIndex)}${lastDataRow}`
+      : null;
+  const somaFormula = (L: string) =>
+    tamanhoRange
+      ? `SUMIF(${tamanhoRange},"",${L}${firstDataRow}:${L}${lastDataRow})`
+      : `SUM(${L}${firstDataRow}:${L}${lastDataRow})`;
+
   const totalColLetter = colLetter(totalColIndex);
   totalRow.getCell(totalColIndex).value = {
-    formula: `SUM(${totalColLetter}${firstDataRow}:${totalColLetter}${lastDataRow})`,
-    result: rows.reduce((s, row) => s + row.total, 0),
+    formula: somaFormula(totalColLetter),
+    result: agrupadas.reduce((s, row) => s + row.total, 0),
   };
 
   filiaisColumns.forEach((f, fi) => {
     const col = filialStartIndex + fi;
     const L = colLetter(col);
     totalRow.getCell(col).value = {
-      formula: `SUM(${L}${firstDataRow}:${L}${lastDataRow})`,
-      result: rows.reduce((s, row) => s + (row.porFilial[f] ?? 0), 0),
+      formula: somaFormula(L),
+      result: agrupadas.reduce((s, row) => s + (row.porFilial[f] ?? 0), 0),
     };
   });
 

@@ -4635,6 +4635,12 @@ export interface ProdutoVariacaoDetalhesPorFilial {
   custoUnitario: number;
   custoTotal: number;
   vendasTotais: number;
+  /**
+   * Estoque quebrado por tamanho da grade, alinhado a `tamanhosPorGrade[grade]`.
+   * Só vem preenchido nas grades de tamanho P/M/G — nas demais é `null` e a linha
+   * continua sendo só o agrupado. Soma sempre igual a `estoque`.
+   */
+  estoquePorTamanho: number[] | null;
 }
 
 /**
@@ -4654,6 +4660,40 @@ export interface ProdutoDetalhesCompletoPorFilial {
   nomeProduto: string;
   resumo: ProdutoDetalhesResumoPorFilial;
   variacoes: ProdutoVariacaoDetalhesPorFilial[];
+  /** Rótulos dos tamanhos de cada grade quebrada por tamanho (hoje só `{"P/M/G": ["P","M","G"]}`). */
+  tamanhosPorGrade: Record<string, string[]>;
+}
+
+/**
+ * Grades cujos tamanhos são exatamente P, M e G — as únicas que a Estoque Consulta
+ * quebra em linhas por tamanho, por decisão do dono.
+ *
+ * O casamento é pelos RÓTULOS de `PRODUTOS_TAMANHOS`, não pelo nome da grade: hoje a
+ * única que qualifica se chama mesmo "P/M/G" (824 produtos), mas um cadastro novo
+ * escrito de outro jeito continua entrando sozinho. As posições da grade valem em todo
+ * o Linx (`ESTOQUE_PRODUTOS.ES1..ES48`) — aqui 1=P, 2=M, 3=G.
+ */
+async function fetchGradesPMG(request: sql.Request | RequestLike): Promise<Map<string, string[]>> {
+  const vazios = Array.from(
+    { length: 45 },
+    (_, i) => `LTRIM(RTRIM(ISNULL(CAST(TAMANHO_${i + 4} AS VARCHAR(20)), ''))) = ''`
+  ).join(' AND ');
+
+  const result = await request.query<{ grade: string }>(`
+    SELECT LTRIM(RTRIM(CONVERT(VARCHAR, GRADE))) AS grade
+    FROM PRODUTOS_TAMANHOS WITH (NOLOCK)
+    WHERE UPPER(LTRIM(RTRIM(ISNULL(CAST(TAMANHO_1 AS VARCHAR(20)), '')))) = 'P'
+      AND UPPER(LTRIM(RTRIM(ISNULL(CAST(TAMANHO_2 AS VARCHAR(20)), '')))) = 'M'
+      AND UPPER(LTRIM(RTRIM(ISNULL(CAST(TAMANHO_3 AS VARCHAR(20)), '')))) = 'G'
+      AND ${vazios}
+  `);
+
+  const map = new Map<string, string[]>();
+  for (const row of result.recordset) {
+    const grade = (row.grade ?? '').trim();
+    if (grade) map.set(grade.toUpperCase(), ['P', 'M', 'G']);
+  }
+  return map;
 }
 
 /**
@@ -4825,7 +4865,18 @@ export async function fetchProdutoDetalhesPorFilial({
           WHEN COUNT(CASE WHEN e.ESTOQUE > 0 THEN 1 END) > 0
             THEN SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE * ISNULL(p.CUSTO_REPOSICAO1, 0) ELSE 0 END)
           ELSE SUM(e.ESTOQUE * ISNULL(p.CUSTO_REPOSICAO1, 0))
-        END AS custoTotal
+        END AS custoTotal,
+        -- Posições 1..3 da grade (P/M/G). Repetem EXATAMENTE a mesma escolha de linhas do
+        -- estoque agrupado acima, senão a soma dos tamanhos não fecharia com o total.
+        ${[1, 2, 3]
+          .map(
+            (n) => `CASE
+          WHEN COUNT(CASE WHEN e.ESTOQUE > 0 THEN 1 END) > 0
+            THEN SUM(CASE WHEN e.ESTOQUE > 0 THEN ISNULL(e.ES${n}, 0) ELSE 0 END)
+          ELSE SUM(ISNULL(e.ES${n}, 0))
+        END AS es${n}`
+          )
+          .join(',\n        ')}
       FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
       LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
       LEFT JOIN (
@@ -4869,7 +4920,12 @@ export async function fetchProdutoDetalhesPorFilial({
       preco: number | null;
       custoUnitario: number | null;
       custoTotal: number | null;
+      es1: number | null;
+      es2: number | null;
+      es3: number | null;
     }>(variacoesQuery);
+
+    const gradesPMG = await fetchGradesPMG(request);
 
     // Buscar vendas SIMPLES: apenas do produto específico, agrupado por cor e filial
     // Se temos produtoNome (código do produto), filtrar APENAS por ele (SEM filtro de filial)
@@ -5013,12 +5069,15 @@ export async function fetchProdutoDetalhesPorFilial({
         return;
       }
 
+      const gradeTrim = row.grade?.trim() || '';
+      const ehPMG = gradesPMG.has(gradeTrim.toUpperCase());
+
       variacoes.push({
         produto: row.produto?.trim() || '',
         descricao: row.descricao?.trim() || '',
         linha: row.linha?.trim() || '',
         subgrupo: row.subgrupo?.trim() || '',
-        grade: row.grade?.trim() || '',
+        grade: gradeTrim,
         colecao: row.colecao?.trim() || '',
         cor: row.cor?.trim() || '',
         filial: row.filial?.trim() || '',
@@ -5027,6 +5086,9 @@ export async function fetchProdutoDetalhesPorFilial({
         custoUnitario: Number(row.custoUnitario ?? 0),
         custoTotal: Number(row.custoTotal ?? 0),
         vendasTotais: vendas,
+        estoquePorTamanho: ehPMG
+          ? [row.es1, row.es2, row.es3].map((v) => Math.round(Number(v ?? 0)))
+          : null,
       });
     });
 
@@ -5055,6 +5117,10 @@ export async function fetchProdutoDetalhesPorFilial({
           custoUnitario: primeiraVariacao ? Number(primeiraVariacao.custoUnitario ?? 0) : 0,
           custoTotal: 0,
           vendasTotais: Math.round(Number(row.vendasTotais ?? 0)),
+          // Filial que só teve venda entra com estoque 0 — zero em todos os tamanhos.
+          estoquePorTamanho: gradesPMG.has((primeiraVariacao?.grade?.trim() || '').toUpperCase())
+            ? [0, 0, 0]
+            : null,
         });
       }
     });
@@ -5080,6 +5146,7 @@ export async function fetchProdutoDetalhesPorFilial({
         vendasTotais,
       },
       variacoes,
+      tamanhosPorGrade: Object.fromEntries(gradesPMG),
     };
   });
 }

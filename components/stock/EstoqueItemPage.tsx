@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 
 import FilialFilter from "@/components/filters/FilialFilter";
 import type { MultiSelectOption as ColecaoOption } from "@/components/filters/MultiSelectFilter";
@@ -31,6 +31,8 @@ interface VariacaoPorFilial {
   cor: string;
   filial: string;
   estoque: number;
+  /** Estoque por tamanho da grade; só vem em grade P/M/G (ver `tamanhosPorGrade`). */
+  estoquePorTamanho: number[] | null;
 }
 
 interface DetalhesPorFilialResponse {
@@ -42,6 +44,14 @@ interface DetalhesPorFilialResponse {
     vendasTotais: number;
   };
   variacoes: VariacaoPorFilial[];
+  tamanhosPorGrade?: Record<string, string[]>;
+}
+
+/** Quebra de uma linha agrupada em um tamanho da grade (P, M ou G). */
+interface PivotTamanhoRow {
+  label: string;
+  porFilial: Record<string, number>;
+  total: number;
 }
 
 interface PivotRow {
@@ -54,6 +64,11 @@ interface PivotRow {
   cor: string;
   porFilial: Record<string, number>;
   total: number;
+  /**
+   * Linhas extras por tamanho, exibidas logo abaixo da agrupada. Só existe em grade
+   * P/M/G; em qualquer outra a linha continua sendo só a agrupada.
+   */
+  tamanhos: PivotTamanhoRow[];
 }
 
 type SortField = "descricao" | "total" | `filial:${string}`;
@@ -84,6 +99,26 @@ function buildItemMeta(row: PivotRow, companyKey: CompanyKey): string {
       : [row.linha, row.subgrupo, row.colecao, row.grade ? `Grade ${row.grade}` : null];
 
   return parts.filter((value) => Boolean(value && value.trim())).join(" · ");
+}
+
+/**
+ * Filiais onde P+M+G não fecha com o estoque agrupado.
+ *
+ * Não é erro de cálculo: no Linx o campo `ESTOQUE` e as posições da grade `ES1..ES48`
+ * chegam a divergir no mesmo registro (20 de 6.150 registros da grade P/M/G, 18 deles
+ * com saldo positivo). Marcar é melhor que forçar a bater — forçar inventaria número.
+ */
+function getFiliaisComDivergenciaDeGrade(row: PivotRow, filiaisColumns: string[]): Set<string> {
+  const divergentes = new Set<string>();
+  if (row.tamanhos.length === 0) return divergentes;
+
+  for (const filial of filiaisColumns) {
+    const agrupado = row.porFilial[filial] ?? 0;
+    const somaTamanhos = row.tamanhos.reduce((sum, t) => sum + (t.porFilial[filial] ?? 0), 0);
+    if (agrupado !== somaTamanhos) divergentes.add(filial);
+  }
+
+  return divergentes;
 }
 
 function getHighlightedFiliais(row: PivotRow, filiaisColumns: string[]): Set<string> {
@@ -548,6 +583,7 @@ export default function EstoqueItemPage({
     );
 
     const pivotMap = new Map<string, PivotRow>();
+    const tamanhosPorGrade = data.tamanhosPorGrade ?? {};
 
     for (const variacao of data.variacoes) {
       const key = `${variacao.produto}\u0000${variacao.cor}`;
@@ -556,6 +592,9 @@ export default function EstoqueItemPage({
       if (!pivotMap.has(key)) {
         const emptyFiliais: Record<string, number> = {};
         for (const filial of orderedFiliais) emptyFiliais[filial] = 0;
+
+        // Grade P/M/G ganha uma sub-linha por tamanho; qualquer outra fica sem nenhuma.
+        const labels = tamanhosPorGrade[(variacao.grade ?? "").trim().toUpperCase()] ?? [];
 
         pivotMap.set(key, {
           produto: variacao.produto,
@@ -567,6 +606,11 @@ export default function EstoqueItemPage({
           cor: variacao.cor,
           porFilial: emptyFiliais,
           total: 0,
+          tamanhos: labels.map((label) => ({
+            label,
+            porFilial: Object.fromEntries(orderedFiliais.map((filial) => [filial, 0])),
+            total: 0,
+          })),
         });
       }
 
@@ -574,11 +618,21 @@ export default function EstoqueItemPage({
       if (!row) continue;
 
       row.porFilial[filialLabel] = (row.porFilial[filialLabel] ?? 0) + variacao.estoque;
+
+      variacao.estoquePorTamanho?.forEach((valor, idx) => {
+        const tamanho = row.tamanhos[idx];
+        if (!tamanho) return;
+        tamanho.porFilial[filialLabel] = (tamanho.porFilial[filialLabel] ?? 0) + valor;
+      });
     }
 
     const rows = Array.from(pivotMap.values()).map((row) => ({
       ...row,
       total: sumOnlyPositive(orderedFiliais.map((filial) => row.porFilial[filial] ?? 0)),
+      tamanhos: row.tamanhos.map((tamanho) => ({
+        ...tamanho,
+        total: sumOnlyPositive(orderedFiliais.map((filial) => tamanho.porFilial[filial] ?? 0)),
+      })),
     }));
 
     rows.sort((left, right) => right.total - left.total || left.produto.localeCompare(right.produto));
@@ -666,6 +720,10 @@ export default function EstoqueItemPage({
     return base.map((row) => ({
       ...row,
       total: sumOnlyPositive(visibleFiliaisColumns.map((filial) => row.porFilial[filial] ?? 0)),
+      tamanhos: row.tamanhos.map((tamanho) => ({
+        ...tamanho,
+        total: sumOnlyPositive(visibleFiliaisColumns.map((filial) => tamanho.porFilial[filial] ?? 0)),
+      })),
     }));
   }, [pivotRows, cor, visibleFiliaisColumns]);
 
@@ -801,17 +859,33 @@ export default function EstoqueItemPage({
       companyName,
       filialLabel: selectedFilialLabel,
       filtrosResumo: filtros.length ? `Filtros: ${filtros.join(" · ")}` : undefined,
-      rows: sortedPivotRows.map((row) => ({
-        produto: row.produto,
-        descricao: row.descricao,
-        cor: row.cor,
-        linha: row.linha,
-        subgrupo: row.subgrupo,
-        grade: row.grade,
-        colecao: row.colecao,
-        total: row.total,
-        porFilial: row.porFilial,
-      })),
+      // Mesma ordem da tela: a linha agrupada seguida das suas quebras por tamanho.
+      // As quebras repetem a identidade do item para o autofiltro do Excel funcionar.
+      rows: sortedPivotRows.flatMap((row) => [
+        {
+          produto: row.produto,
+          descricao: row.descricao,
+          cor: row.cor,
+          linha: row.linha,
+          subgrupo: row.subgrupo,
+          grade: row.grade,
+          colecao: row.colecao,
+          total: row.total,
+          porFilial: row.porFilial,
+        },
+        ...row.tamanhos.map((tamanho) => ({
+          produto: row.produto,
+          descricao: row.descricao,
+          cor: row.cor,
+          linha: row.linha,
+          subgrupo: row.subgrupo,
+          grade: row.grade,
+          colecao: row.colecao,
+          total: tamanho.total,
+          porFilial: tamanho.porFilial,
+          tamanho: tamanho.label,
+        })),
+      ]),
       filiaisColumns: visibleFiliaisColumns,
     });
   }, [
@@ -1154,10 +1228,12 @@ export default function EstoqueItemPage({
             <tbody>
               {sortedPivotRows.map((row) => {
                 const highlightedFiliais = getHighlightedFiliais(row, visibleFiliaisColumns);
+                const gradeDivergente = getFiliaisComDivergenciaDeGrade(row, visibleFiliaisColumns);
                 const meta = buildItemMeta(row, companyKey);
 
                 return (
-                  <tr key={`${row.produto}-${row.cor}`}>
+                  <Fragment key={`${row.produto}-${row.cor}`}>
+                  <tr>
                     <td className={styles.itemColumn}>
                       <span className={styles.itemNameRow}>
                         <span className={styles.itemName}>{row.descricao || "-"}</span>
@@ -1181,6 +1257,7 @@ export default function EstoqueItemPage({
                     </td>
                     {visibleFiliaisColumns.map((filial) => {
                       const value = row.porFilial[filial] ?? 0;
+                      const divergente = gradeDivergente.has(filial);
 
                       return (
                         <td
@@ -1191,15 +1268,65 @@ export default function EstoqueItemPage({
                             value < 0 ? styles.neg : "",
                             value === 0 ? styles.zeroCell : "",
                             highlightedFiliais.has(filial) ? styles.branchCellHighlight : "",
+                            divergente ? styles.gradeDrift : "",
                           ]
                             .filter(Boolean)
                             .join(" ")}
+                          title={
+                            divergente
+                              ? `No Linx este registro tem ESTOQUE = ${formatInt(value)} mas a grade soma ${formatInt(
+                                  row.tamanhos.reduce((s, t) => s + (t.porFilial[filial] ?? 0), 0),
+                                )}. Os tamanhos abaixo mostram o que está na grade.`
+                              : undefined
+                          }
                         >
                           <span className={styles.branchValue}>{formatInt(value)}</span>
                         </td>
                       );
                     })}
                   </tr>
+
+                  {/* Quebra por tamanho (só grade P/M/G) — a soma delas é a linha acima. */}
+                  {row.tamanhos.map((tamanho) => (
+                    <tr key={`${row.produto}-${row.cor}-${tamanho.label}`} className={styles.sizeRow}>
+                      <td className={`${styles.itemColumn} ${styles.sizeCell}`}>
+                        <span className={styles.sizeLabel}>{tamanho.label}</span>
+                      </td>
+                      <td
+                        className={[
+                          styles.num,
+                          styles.totalCell,
+                          styles.sizeCell,
+                          tamanho.total < 0 ? styles.neg : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                      >
+                        <span className={styles.totalValue}>{formatInt(tamanho.total)}</span>
+                      </td>
+                      {visibleFiliaisColumns.map((filial) => {
+                        const value = tamanho.porFilial[filial] ?? 0;
+
+                        return (
+                          <td
+                            key={filial}
+                            className={[
+                              styles.num,
+                              styles.branchCell,
+                              styles.sizeCell,
+                              value < 0 ? styles.neg : "",
+                              value === 0 ? styles.zeroCell : "",
+                            ]
+                              .filter(Boolean)
+                              .join(" ")}
+                          >
+                            <span className={styles.branchValue}>{formatInt(value)}</span>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                  </Fragment>
                 );
               })}
             </tbody>
