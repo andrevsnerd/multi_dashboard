@@ -52,17 +52,19 @@ export function buildDerivedFilialConfig(company: CompanyKey, nameOf: NameOf): D
     if (d.leadTimeDays != null) byFilial[name] = d.leadTimeDays;
   }
 
-  // filialGroups: apenas grupos multi-membro e NÃO-ecommerce (e-commerce é
-  // agrupado via ecommerceFilials + label de exibição, não por este mecanismo).
+  // filialGroups: todos os grupos multi-membro, INCLUSIVE e-commerce.
   // A CANÔNICA é a filial ATIVA (não o 1º membro): é ela que o filtro de vendas
   // usa (`FILIAL = @filial`, sem expandir o grupo) e a chave de meta no dashboard.
   // Os membros vêm com a ativa primeiro, para a lógica de `slice(1)` que separa
   // canônica de não-canônicas (GoalsModal) continuar válida.
+  //
+  // O e-commerce era pulado aqui (agrupado só via ecommerceFilials + label), e por
+  // isso ficava fora da régua de filial ativa: o saldo dos 5 CNPJs era somado num
+  // balde só, fazendo a perna parada do rodízio (ex.: MSC) prometer estoque que a
+  // ativa não tem. Espelha o buildDerivedFilialConfig de filial-grupos-store.
   const filialGroups: Record<string, string[]> = {};
   for (const g of groups) {
     if (g.memberIds.length <= 1) continue;
-    const allEcommerce = g.memberIds.every((id) => getFilialById(id)?.ecommerce);
-    if (allEcommerce) continue;
     const orderedIds = [g.activeId, ...g.memberIds.filter((id) => id !== g.activeId)];
     filialGroups[nameOf(g.activeId)] = orderedIds.map(nameOf);
   }

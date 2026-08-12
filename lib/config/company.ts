@@ -182,6 +182,28 @@ export function isActiveFilial(
     normalizeFilialNameForMatch(raw).toUpperCase();
 }
 
+/**
+ * Reduz uma lista de filiais às que CARREGAM saldo de estoque: uma por grupo — a ATIVA.
+ *
+ * Um grupo multi-CNPJ (rodízio fiscal do e-commerce, PAULISTA, MORUMBI 1) é uma loja só.
+ * O saldo que existe de verdade para vender ou enviar é o da perna ativa; mercadoria
+ * parada num CNPJ que não fatura mais não pode sair, então somá-la ao balde do grupo faz
+ * a tela prometer estoque que a loja ativa não tem (ex.: barra 046500 aparecia com 2 no
+ * E-COMMERCE, mas os 2 estavam na MSC, parada, e a AKS ativa tinha zero).
+ *
+ * Vale SÓ para estoque. Vendas continuam somando o grupo inteiro — o histórico de
+ * faturamento das pernas antigas é legítimo e não deve ser descartado.
+ *
+ * Filial sem grupo passa direto (getActiveFilial é identidade).
+ */
+export function filterStockCarryingFilials(
+  company: CompanyConfig | null | undefined,
+  filiais: string[]
+): string[] {
+  if (!company) return filiais;
+  return filiais.filter((filial) => isActiveFilial(company, filial));
+}
+
 export function getOperationalFilials(
   company: CompanyConfig | null | undefined,
   module: CompanyModule = 'inventory'

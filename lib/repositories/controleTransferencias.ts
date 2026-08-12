@@ -1,6 +1,12 @@
 import sql from 'mssql';
 
-import { getActiveFilial, getFilialGroupMembers, resolveCompany, VAREJO_VALUE } from '@/lib/config/company';
+import {
+  getActiveFilial,
+  getFilialGroupMembers,
+  filterStockCarryingFilials,
+  resolveCompany,
+  VAREJO_VALUE,
+} from '@/lib/config/company';
 import { resolveCompanyLive, liveNameForIncoming } from '@/lib/server/company-live';
 import { resolveCompanyDynamic } from '@/lib/config/company-server';
 import { withRequest } from '@/lib/db/connection';
@@ -46,17 +52,29 @@ export interface ProdutoTransferencia {
   totalEstoque: number;
 }
 
+/**
+ * `scope` decide como grupos multi-CNPJ entram no filtro:
+ *
+ * - `'stock'` (default): só a perna ATIVA. Saldo num CNPJ que não fatura mais não pode
+ *   ser vendido nem enviado — somá-lo ao balde do grupo fazia o E-COMMERCE prometer
+ *   estoque que a loja ativa não tem. Ver filterStockCarryingFilials.
+ * - `'history'`: o grupo INTEIRO. Vendas e entradas das pernas antigas são histórico
+ *   legítimo; restringi-las à ativa apagaria faturamento e romaneios reais.
+ */
 async function buildFilialFilter(
   request: sql.Request | RequestLike,
   companySlug: string | undefined,
   specificFilial?: string | null,
-  prefix: string = 'e'
+  prefix: string = 'e',
+  scope: 'stock' | 'history' = 'stock'
 ): Promise<string> {
   if (!companySlug) {
     return '';
   }
 
-  const company = await resolveCompanyLive(companySlug);
+  // Config DINÂMICA: sem ela a perna ativa do rodízio MSC↔AKS fica travada no
+  // activeId do registry e o estoque do grupo cai para o CNPJ parado.
+  const company = (await resolveCompanyDynamic(companySlug)) ?? (await resolveCompanyLive(companySlug));
 
   if (!company) {
     return '';
@@ -65,12 +83,19 @@ async function buildFilialFilter(
   // Normaliza o nome vindo do front para o nome vivo do banco (match por COD_FILIAL).
   specificFilial = await liveNameForIncoming(specificFilial);
 
-  const filiais = company.filialFilters['inventory'] ?? [];
-  const ecommerceFilials = company.ecommerceFilials ?? [];
+  const isStock = scope === 'stock';
+  const allInventory = company.filialFilters['inventory'] ?? [];
+  const allEcommerce = company.ecommerceFilials ?? [];
+  const filiais = isStock ? filterStockCarryingFilials(company, allInventory) : allInventory;
+  const ecommerceFilials = isStock ? filterStockCarryingFilials(company, allEcommerce) : allEcommerce;
 
   // Se uma filial específica foi selecionada, usar ela ou o grupo que ela representa
   if (specificFilial && specificFilial !== VAREJO_VALUE) {
-    const members = getFilialGroupMembers(company, specificFilial);
+    // Estoque colapsa no membro ativo; histórico expande o grupo inteiro.
+    const members = isStock
+      ? [getActiveFilial(company, specificFilial) || specificFilial]
+      : getFilialGroupMembers(company, specificFilial);
+
     if (members.length > 1) {
       members.forEach((f, index) => {
         request.input(`filial${prefix}Group${index}`, sql.VarChar, f);
@@ -82,7 +107,7 @@ async function buildFilialFilter(
     }
 
     const filialParam = `filial${prefix}`;
-    request.input(filialParam, sql.VarChar, specificFilial);
+    request.input(filialParam, sql.VarChar, members[0] ?? specificFilial);
     return `AND ${prefix}.FILIAL = @${filialParam}`;
   }
 
@@ -167,7 +192,8 @@ export async function fetchControleTransferencias({
     request.input('minStartDate', sql.DateTime, minStartDate);
 
     const estoqueFilialFilter = await buildFilialFilter(request, company, filial, 'e');
-    const vendasFilialFilter = await buildFilialFilter(request, company, filial, 'vp');
+    // Vendas somam o grupo inteiro: histórico das pernas antigas do rodízio é legítimo.
+    const vendasFilialFilter = await buildFilialFilter(request, company, filial, 'vp', 'history');
 
     // Verificar se precisa buscar vendas de e-commerce (ScarfMe e filial null)
     // Usa resolveCompanyDynamic (grupos do admin + filial ativa) — a MESMA régua
@@ -279,11 +305,13 @@ export async function fetchControleTransferencias({
     // Query para buscar última data de entrada por produto+cor+filial
     // Busca em ESTOQUE_PROD_ENT e também em LOJA_ENTRADAS_PRODUTO (priorizando a mais recente)
     // Criar filtro de filial para a query de entrada (usando alias E, mas com prefixo diferente para evitar conflito de variáveis)
-    const ultimaEntradaFilialFilter = await buildFilialFilter(request, company, filial, 'ent');
+    // Entradas são histórico de movimento: o grupo inteiro conta (um romaneio que
+    // entrou na perna antiga do rodízio aconteceu de verdade).
+    const ultimaEntradaFilialFilter = await buildFilialFilter(request, company, filial, 'ent', 'history');
     // Ajustar o filtro para usar o alias E na query (substituir 'ent.' por 'E.')
     const ultimaEntradaFilialFilterAjustado = ultimaEntradaFilialFilter.replace(/ent\./g, 'E.');
     // Criar filtro para LOJA_ENTRADAS (usando prefixo 'le' para evitar conflito)
-    const lojaEntradasFilialFilter = await buildFilialFilter(request, company, filial, 'le');
+    const lojaEntradasFilialFilter = await buildFilialFilter(request, company, filial, 'le', 'history');
     // Ajustar o filtro para usar o alias LE na query (substituir 'le.' por 'LE.')
     const lojaEntradasFilialFilterAjustado = lojaEntradasFilialFilter.replace(/le\./g, 'LE.');
     const ultimaEntradaQuery = `

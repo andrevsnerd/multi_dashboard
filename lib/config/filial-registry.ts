@@ -114,7 +114,11 @@ export const FILIAL_GROUPS: FilialGroupDef[] = [
   { id: 'morumbi-1',         company: 'nerd',    display: 'MORUMBI 1',  memberIds: ['000099', '000116'],                     activeId: '000099' },
   { id: 'morumbi-2',         company: 'nerd',    display: 'MORUMBI 2',  memberIds: ['000115'],                               activeId: '000115' },
   { id: 'paulista',          company: 'scarfme', display: 'PAULISTA',   memberIds: ['000088', '000046', '000112', '000117'], activeId: '000117' },
-  { id: 'ecommerce-scarfme', company: 'scarfme', display: 'E-COMMERCE', memberIds: ['000108', '000083', '000082', '000111', '000118'], activeId: '000111' },
+  // activeId aqui é só o FALLBACK (usado quando a detecção viva falha) — a canônica
+  // real vem de active-filial-detector por EMISSAO mais recente, porque MSC↔AKS
+  // alternam a cada ~15 dias. Mantenha em dia com a perna que está faturando: um
+  // fallback defasado faz o estoque do grupo cair para o CNPJ parado.
+  { id: 'ecommerce-scarfme', company: 'scarfme', display: 'E-COMMERCE', memberIds: ['000108', '000083', '000082', '000111', '000118'], activeId: '000118' },
 ];
 
 // ── Configurações por empresa ──────────────────────────────────────────────────

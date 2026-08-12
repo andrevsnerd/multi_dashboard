@@ -1,7 +1,8 @@
 import sql from 'mssql';
 
-import { VAREJO_VALUE } from '@/lib/config/company';
+import { VAREJO_VALUE, getActiveFilial, filterStockCarryingFilials } from '@/lib/config/company';
 import { resolveCompanyLive, liveNameForIncoming } from '@/lib/server/company-live';
+import { resolveCompanyDynamic } from '@/lib/config/company-server';
 import { withRequest } from '@/lib/db/connection';
 import { RequestLike } from '@/lib/db/proxy';
 import { normalizeRangeForQuery } from '@/lib/utils/date';
@@ -53,7 +54,9 @@ async function buildFilialFilter(
     return '';
   }
 
-  const company = await resolveCompanyLive(companySlug);
+  // Config DINÂMICA: sem ela a perna ativa do rodízio MSC↔AKS fica travada no
+  // activeId do registry e o estoque do grupo cai para o CNPJ parado.
+  const company = (await resolveCompanyDynamic(companySlug)) ?? (await resolveCompanyLive(companySlug));
 
   if (!company) {
     return '';
@@ -63,13 +66,14 @@ async function buildFilialFilter(
   specificFilial = await liveNameForIncoming(specificFilial);
 
   const isScarfme = companySlug === 'scarfme';
-  const filiais = company.filialFilters['inventory'] ?? [];
-  const ecommerceFilials = company.ecommerceFilials ?? [];
+  // Estoque conta só na perna ATIVA de cada grupo — ver filterStockCarryingFilials.
+  const filiais = filterStockCarryingFilials(company, company.filialFilters['inventory'] ?? []);
+  const ecommerceFilials = filterStockCarryingFilials(company, company.ecommerceFilials ?? []);
 
-  // Se uma filial específica foi selecionada, usar apenas ela
+  // Se uma filial específica foi selecionada, usar apenas ela (colapsada na ativa)
   if (specificFilial && specificFilial !== VAREJO_VALUE) {
     const filialParam = `estoqueFilial`;
-    request.input(filialParam, sql.VarChar, specificFilial);
+    request.input(filialParam, sql.VarChar, getActiveFilial(company, specificFilial) || specificFilial);
     return `AND ${prefix}.FILIAL = @${filialParam}`;
   }
 

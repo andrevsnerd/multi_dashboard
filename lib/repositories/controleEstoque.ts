@@ -1,7 +1,15 @@
 import sql from 'mssql';
 
-import { resolveCompany, VAREJO_VALUE, isEcommerceFilial, getFilialGroupMembers } from '@/lib/config/company';
+import {
+  resolveCompany,
+  VAREJO_VALUE,
+  isEcommerceFilial,
+  getFilialGroupMembers,
+  getActiveFilial,
+  filterStockCarryingFilials,
+} from '@/lib/config/company';
 import { resolveCompanyLive, liveNameForIncoming, liveNamesForIncoming } from '@/lib/server/company-live';
+import { resolveCompanyDynamic } from '@/lib/config/company-server';
 import { getFilialById } from '@/lib/config/filial-registry';
 import { withRequest } from '@/lib/db/connection';
 import { RequestLike } from '@/lib/db/proxy';
@@ -41,18 +49,31 @@ function restrictFiliaisToAllowed(
   return filiais.filter((filial) => allowedSet.has(filial.trim().toUpperCase()));
 }
 
+/**
+ * `scope` decide como grupos multi-CNPJ entram no filtro:
+ *
+ * - `'stock'` (default): só a perna ATIVA. Saldo num CNPJ que não fatura mais não pode
+ *   ser vendido nem enviado — somá-lo ao balde do grupo fazia o E-COMMERCE prometer
+ *   estoque que a loja ativa não tem. Ver filterStockCarryingFilials.
+ * - `'history'`: o grupo INTEIRO. Vendas das pernas antigas do rodízio são histórico
+ *   legítimo e não podem ser descartadas.
+ */
 async function buildFilialFilter(
   request: sql.Request | RequestLike,
   companySlug: string | undefined,
   specificFilial?: string | null,
   prefix: string = 'e',
-  allowedFiliais?: string[] | null
+  allowedFiliais?: string[] | null,
+  scope: 'stock' | 'history' = 'stock'
 ): Promise<string> {
   if (!companySlug) {
     return '';
   }
 
-  const company = await resolveCompanyLive(companySlug);
+  // Config DINÂMICA: a filial ativa do grupo é detectada pela venda/emissão mais
+  // recente. Com a estática, o rodízio MSC↔AKS do e-commerce fica travado no
+  // activeId do registry e o estoque do grupo cai para a perna parada.
+  const company = (await resolveCompanyDynamic(companySlug)) ?? (await resolveCompanyLive(companySlug));
 
   if (!company) {
     return '';
@@ -63,15 +84,20 @@ async function buildFilialFilter(
   allowedFiliais = await liveNamesForIncoming(allowedFiliais);
 
   const isScarfme = companySlug === 'scarfme';
-  const filiais = company.filialFilters['inventory'] ?? [];
-  const ecommerceFilials = company.ecommerceFilials ?? [];
+  const isStock = scope === 'stock';
+  const allInventory = company.filialFilters['inventory'] ?? [];
+  const allEcommerce = company.ecommerceFilials ?? [];
+  const filiais = isStock ? filterStockCarryingFilials(company, allInventory) : allInventory;
+  const ecommerceFilials = isStock ? filterStockCarryingFilials(company, allEcommerce) : allEcommerce;
 
   // Se uma filial específica foi selecionada, usar ela ou o grupo que ela representa
   if (specificFilial && specificFilial !== VAREJO_VALUE) {
-    const baseMembers =
-      isScarfme && ecommerceFilials.includes(specificFilial)
-        ? ecommerceFilials
-        : getFilialGroupMembers(company, specificFilial);
+    // Estoque colapsa no membro ativo (é ele que carrega o saldo); histórico expande o grupo.
+    const baseMembers = isStock
+      ? [getActiveFilial(company, specificFilial) || specificFilial]
+      : (isScarfme && allEcommerce.includes(specificFilial)
+          ? allEcommerce
+          : getFilialGroupMembers(company, specificFilial));
     const members = restrictFiliaisToAllowed(baseMembers, allowedFiliais);
     if (members.length === 0) {
       return 'AND 1=0';
@@ -82,7 +108,7 @@ async function buildFilialFilter(
       return `AND ${prefix}.FILIAL IN (${placeholders})`;
     }
     const filialParam = `estoqueFilial`;
-    request.input(filialParam, sql.VarChar, specificFilial);
+    request.input(filialParam, sql.VarChar, members[0]);
     return `AND ${prefix}.FILIAL = @${filialParam}`;
   }
 
@@ -92,7 +118,7 @@ async function buildFilialFilter(
       filiais.filter(f => !ecommerceFilials.includes(f)),
       allowedFiliais
     );
-    
+
     if (normalFiliais.length === 0) {
       return '';
     }
@@ -3006,8 +3032,9 @@ export async function fetchDetalhesEntradasSemana({
         ? coresUnicas.map((_, i) => `@corVenda${i}`).join(', ')
         : '';
 
-      const vendasFilialFilter = await buildFilialFilter(request, company, filial, 'vp');
-      
+      // Vendas somam o grupo inteiro: histórico das pernas antigas do rodízio é legítimo.
+      const vendasFilialFilter = await buildFilialFilter(request, company, filial, 'vp', null, 'history');
+
       const vendasQuery = `
         SELECT 
           vp.PRODUTO,

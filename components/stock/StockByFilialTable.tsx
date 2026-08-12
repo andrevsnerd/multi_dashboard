@@ -48,7 +48,11 @@ function organizeFiliais(
   } else if (companyKey === "scarfme") {
     // Para scarfme, a matriz é "SCARF ME - MATRIZ" e o e-commerce inclui "SCARFME MATRIZ CMS" e "SCARF ME - MATRIZ LLL"
     matriz = "SCARF ME - MATRIZ";
-    ecommerce = "SCARFME MATRIZ CMS"; // Primeira filial de e-commerce (usado para referência, mas o filtro usa company.ecommerceFilials)
+    // Marcador de que a coluna E-COMMERCE existe. O VALOR dela não sai desta filial:
+    // getEcommerceData soma todos os CNPJs de e-commerce, porque qual deles carrega o
+    // saldo muda com o rodízio fiscal (MSC↔AKS) e o backend já devolve estoque só da
+    // perna ativa. Ler um CNPJ fixo aqui mostrava 0 sempre que o rodízio não estava nele.
+    ecommerce = company.ecommerceFilials?.[0] ?? null;
   }
 
   // Obter todas as filiais da configuração de inventory
@@ -318,10 +322,35 @@ export default function StockByFilialTable({
     const normalizeFilial = (name: string) => (name || '').trim().toUpperCase();
     const normalizedTarget = normalizeFilial(filialName);
     
-    const filialData = item.filiais.find((f) => 
+    const filialData = item.filiais.find((f) =>
       normalizeFilial(f.filial) === normalizedTarget
     );
     return filialData || { stock: 0, sales: 0, salesLast30Days: 0, hasEntry: false };
+  };
+
+  /**
+   * E-COMMERCE é uma loja só espalhada por vários CNPJs (rodízio fiscal MSC↔AKS), então
+   * a célula soma todos eles em vez de ler um fixo. O backend já entrega estoque apenas
+   * da perna ATIVA, então esta soma dá o saldo da ativa sem precisar saber qual é —
+   * e continua certa quando o rodízio virar. Vendas somam o grupo inteiro (histórico).
+   */
+  const getEcommerceData = (item: StockByFilialItem) => {
+    const membros = (company?.ecommerceFilials ?? []).map((f) => (f || '').trim().toUpperCase());
+    if (membros.length === 0) {
+      return { stock: 0, sales: 0, salesLast30Days: 0, hasEntry: false };
+    }
+    return item.filiais.reduce(
+      (acc, f) => {
+        if (!membros.includes((f.filial || '').trim().toUpperCase())) return acc;
+        return {
+          stock: acc.stock + f.stock,
+          sales: acc.sales + f.sales,
+          salesLast30Days: acc.salesLast30Days + f.salesLast30Days,
+          hasEntry: acc.hasEntry || f.hasEntry,
+        };
+      },
+      { stock: 0, sales: 0, salesLast30Days: 0, hasEntry: false }
+    );
   };
 
   // Função para determinar a classe CSS baseada nas regras de cores
@@ -409,7 +438,7 @@ export default function StockByFilialTable({
           <tbody>
             {filteredData.map((item, rowIndex) => {
               const matrizData = getFilialData(item, matriz);
-              const ecommerceData = ecommerce ? getFilialData(item, ecommerce) : { stock: 0, sales: 0, salesLast30Days: 0, hasEntry: false };
+              const ecommerceData = ecommerce ? getEcommerceData(item) : { stock: 0, sales: 0, salesLast30Days: 0, hasEntry: false };
               const productInfo = formatProductDescription(item.descricao, item.produto);
               return (
                 <tr key={`${item.produto}-${item.cor}-${item.grade}-${rowIndex}`}>
