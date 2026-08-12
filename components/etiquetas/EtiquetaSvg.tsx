@@ -10,9 +10,10 @@
  */
 
 import { barrasDoBinario, encodeBarcode, motivoFalha } from "@/lib/etiquetas/barcode";
-import { calcularLayout, elementoPorChave, moduloEfetivoDots } from "@/lib/etiquetas/layout";
+import { calcularLayout, elementoPorChave, escalaDe, moduloEfetivoDots } from "@/lib/etiquetas/layout";
 import {
   dadoDoBarcode,
+  larguraCaractereMm,
   textoDaLinha,
   type Alinhamento,
   type EtiquetaConfig,
@@ -46,6 +47,7 @@ export default function EtiquetaSvg({ item, config, comBorda, className, largura
 
   const elementos: React.ReactNode[] = [];
   const layout = calcularLayout(config, item);
+  const escala = escalaDe(config);
 
   // No ZPL a altura da fonte (^A0N,h) é a caixa do caractere e a linha de base
   // fica a ~78% dela. Reproduzir isso aqui é o que faz o preview bater com o
@@ -59,6 +61,13 @@ export default function EtiquetaSvg({ item, config, comBorda, className, largura
     if (!texto) return;
     const box = elementoPorChave(layout, `linha-${linha.id}`);
     if (!box) return;
+
+    // A fonte D da Zebra é MONOESPAÇADA e só existe em múltiplos de 18x10 dots.
+    // O preview precisa desenhar do mesmo jeito, senão a tela volta a mentir
+    // sobre o que cabe: aqui a largura de cada caractere é travada em mm reais
+    // (textLength + lengthAdjust), não deixada para a fonte do navegador.
+    const larguraCar = larguraCaractereMm(linha, config.impressora.dpi);
+    const monoespacada = linha.fonteZpl === 'bitmap';
     elementos.push(
       <text
         key={`linha-${linha.id}-${i}`}
@@ -67,7 +76,13 @@ export default function EtiquetaSvg({ item, config, comBorda, className, largura
         textAnchor={ancora(box.alinhamento)}
         fontSize={box.alturaMm}
         fontWeight={linha.negrito ? 700 : 400}
-        fontFamily="Helvetica, Arial, sans-serif"
+        fontFamily={
+          monoespacada
+            ? 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
+            : 'Helvetica, Arial, sans-serif'
+        }
+        textLength={monoespacada ? texto.length * larguraCar * escala : undefined}
+        lengthAdjust={monoespacada ? 'spacingAndGlyphs' : undefined}
         fill="#000"
       >
         {texto}

@@ -39,6 +39,7 @@ import EditorVisualEtiqueta from "./EditorVisualEtiqueta";
 import EtiquetaSvg from "./EtiquetaSvg";
 import styles from "./ImprimirEtiquetasPage.module.css";
 import {
+  calibrarMidia,
   enviarZpl,
   listarImpressoras,
   type StatusBrowserPrint,
@@ -153,6 +154,7 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [mostrarZpl, setMostrarZpl] = useState(false);
+  const [mostrarDetalheAvisos, setMostrarDetalheAvisos] = useState(false);
 
   const folhaRef = useRef<HTMLDivElement | null>(null);
   const [preparandoFolha, setPreparandoFolha] = useState(false);
@@ -468,6 +470,67 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
   const larguraFileira = larguraFileiraMm(config);
   const fileiraNaoCabe = larguraFileira > config.impressora.larguraMidiaMm + 0.01;
 
+  /**
+   * Tudo que não cabe, numa lista só — a prévia mostra o resumo em uma linha e
+   * guarda o detalhe atrás do "detalhes". Mais de um aviso aberto ao mesmo
+   * tempo ocupava mais espaço que a própria etiqueta.
+   */
+  const problemas = useMemo(() => {
+    const lista: Array<{ chave: string; resumo: string; detalhe: string; ajustavel: boolean }> = [];
+
+    if (conteudoNaoCabe) {
+      lista.push({
+        chave: "altura",
+        resumo: `O conteúdo passa ${(alturaConteudo - config.alturaEtiquetaMm).toFixed(1)}mm da altura`,
+        detalhe: `Altura: o conteúdo ocupa ${alturaConteudo.toFixed(1)}mm e a etiqueta tem ${config.alturaEtiquetaMm}mm — a Zebra corta o que passar.`,
+        ajustavel: true,
+      });
+    }
+    for (const l of linhasEstouram) {
+      lista.push({
+        chave: `linha-${l.linhaId}`,
+        resumo: `"${l.campoLabel}" passa ${(l.larguraEstimadaMm - l.larguraUtilMm).toFixed(1)}mm da largura`,
+        detalhe: `"${l.campoLabel}": precisa de ${l.larguraEstimadaMm.toFixed(1)}mm e só há ${l.larguraUtilMm.toFixed(1)}mm — o texto invade a etiqueta vizinha.`,
+        ajustavel: true,
+      });
+    }
+    if (barras.estoura) {
+      lista.push({
+        chave: "barras",
+        resumo: "O código de barras não cabe",
+        detalhe: `Código de barras: precisa de ${barras.larguraMaxMm.toFixed(1)}mm e só há ${barras.larguraUtilMm.toFixed(1)}mm — as barras saem cortadas e nenhum leitor lê. Diminua a largura do módulo ou aumente a etiqueta.`,
+        ajustavel: false,
+      });
+    } else if (barras.quietZoneCurta) {
+      lista.push({
+        chave: "silencio",
+        resumo: "Pouco silêncio ao redor das barras",
+        detalhe: `Código de barras: sobram ${barras.quietZoneMm.toFixed(1)}mm de silêncio de cada lado (as normas pedem 10 módulos). O leitor pode engasgar — diminua a largura do módulo.`,
+        ajustavel: false,
+      });
+    }
+    if (fileiraNaoCabe) {
+      lista.push({
+        chave: "fileira",
+        resumo: "A fileira não cabe na mídia",
+        detalhe: `Fileira: mede ${larguraFileira.toFixed(1)}mm e a mídia tem ${config.impressora.larguraMidiaMm}mm — reduza as colunas, a largura ou o espaço entre elas.`,
+        ajustavel: false,
+      });
+    }
+    return lista;
+  }, [
+    conteudoNaoCabe,
+    alturaConteudo,
+    config.alturaEtiquetaMm,
+    config.impressora.larguraMidiaMm,
+    linhasEstouram,
+    barras,
+    fileiraNaoCabe,
+    larguraFileira,
+  ]);
+
+  const podeAjustar = podeConfigurar && problemas.some((p) => p.ajustavel);
+
   /* ── ações de impressão ──────────────────────────────────────────────── */
 
   const imprimirNaZebra = useCallback(async () => {
@@ -483,6 +546,24 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
       setErro(e instanceof Error ? e.message : "Falha ao enviar para a impressora.");
     }
   }, [resultadoZpl, impressoraEscolhida]);
+
+  /**
+   * Ensina o passo do rolo para a impressora. Sem sensor calibrado o ^MNY não
+   * tem referência e a impressão volta a andar de lugar a cada tiragem.
+   */
+  const calibrar = useCallback(async () => {
+    if (!impressoraEscolhida) return;
+    setErro(null);
+    setAviso(null);
+    try {
+      await calibrarMidia(impressoraEscolhida);
+      setAviso(
+        'Calibração enviada — a impressora vai avançar algumas etiquetas medindo o vão entre elas. Espere parar e imprima de novo.'
+      );
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Falha ao calibrar a impressora.');
+    }
+  }, [impressoraEscolhida]);
 
   const baixarZpl = useCallback(() => {
     if (!resultadoZpl) return;
@@ -1009,57 +1090,35 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
               ) : null}
             </div>
 
-            {conteudoNaoCabe ? (
-              <div className={styles.aviso}>
-                O conteúdo ocupa {alturaConteudo.toFixed(1)}mm e a etiqueta tem{" "}
-                {config.alturaEtiquetaMm}mm — a Zebra vai cortar o que passar.{" "}
-                {podeConfigurar ? (
-                  <button type="button" className={styles.botaoLink} onClick={ajustarParaCaber}>
-                    diminuir o tamanho pra caber
+            {/* Um aviso só, numa linha. O detalhe (quantos mm faltam em cada
+                coisa) fica escondido: na hora de calibrar interessa saber que
+                não cabe e ter o botão de resolver, não ler três parágrafos. */}
+            {problemas.length > 0 ? (
+              <div className={barras.estoura ? styles.erro : styles.aviso}>
+                <div className={styles.avisoLinha}>
+                  <span>
+                    {problemas.length === 1 ? problemas[0].resumo : `${problemas.length} coisas não cabem na etiqueta`}
+                  </span>
+                  {podeAjustar ? (
+                    <button type="button" className={styles.botaoLink} onClick={ajustarParaCaber}>
+                      ajustar pra caber
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    className={styles.botaoLink}
+                    onClick={() => setMostrarDetalheAvisos((v) => !v)}
+                  >
+                    {mostrarDetalheAvisos ? "menos" : "detalhes"}
                   </button>
-                ) : (
-                  "Reduza as fontes/altura das barras ou aumente a etiqueta."
-                )}
-              </div>
-            ) : null}
-            {fileiraNaoCabe ? (
-              <div className={styles.aviso}>
-                A fileira mede {larguraFileira.toFixed(1)}mm e a mídia tem{" "}
-                {config.impressora.larguraMidiaMm}mm — reduza as colunas, a largura ou o espaço entre
-                elas.
-              </div>
-            ) : null}
-            {barras.estoura ? (
-              <div className={styles.erro}>
-                O código de barras precisa de {barras.larguraMaxMm.toFixed(1)}mm e só há{" "}
-                {barras.larguraUtilMm.toFixed(1)}mm — a Zebra vai cortar as barras e nenhum leitor
-                vai ler. Use Code 128, diminua a largura do módulo ou aumente a etiqueta.
-              </div>
-            ) : barras.quietZoneCurta ? (
-              <div className={styles.aviso}>
-                As barras ocupam {barras.larguraMaxMm.toFixed(1)}mm e sobram só{" "}
-                {barras.quietZoneMm.toFixed(1)}mm de silêncio de cada lado (as normas pedem 10
-                módulos). O leitor pode engasgar — diminua a largura do módulo ou troque a
-                simbologia.
-              </div>
-            ) : null}
-            {linhasEstouram.length > 0 ? (
-              <div className={styles.aviso}>
-                {linhasEstouram
-                  .map(
-                    (l) =>
-                      `"${l.campoLabel}" precisa de ~${l.larguraEstimadaMm.toFixed(1)}mm e só há ${l.larguraUtilMm.toFixed(1)}mm`
-                  )
-                  .join("; ")}{" "}
-                — o texto pode invadir a etiqueta vizinha na mídia contínua.{" "}
-                {podeConfigurar ? (
-                  <button type="button" className={styles.botaoLink} onClick={ajustarParaCaber}>
-                    diminuir a fonte pra caber
-                  </button>
-                ) : (
-                  "Reduza a altura da fonte dessa linha."
-                )}{" "}
-                (é uma estimativa — confirme na impressora.)
+                </div>
+                {mostrarDetalheAvisos ? (
+                  <ul className={styles.avisoDetalhe}>
+                    {problemas.map((p) => (
+                      <li key={p.chave}>{p.detalhe}</li>
+                    ))}
+                  </ul>
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -1126,6 +1185,15 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
                 disabled={totalEtiquetas === 0 || preparandoFolha}
               >
                 {preparandoFolha ? "Preparando…" : "Imprimir pelo navegador"}
+              </button>
+              <button
+                type="button"
+                className={styles.botao}
+                onClick={() => void calibrar()}
+                disabled={!zebraPronta}
+                title="Ensina o passo do rolo para a impressora — resolve a impressão que anda de lugar a cada tiragem"
+              >
+                Calibrar mídia
               </button>
               <button
                 type="button"

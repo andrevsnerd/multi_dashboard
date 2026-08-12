@@ -101,11 +101,14 @@ export default function ConfiguracaoEtiqueta({ config, onChange, podeConfigurar 
       id: `l${Date.now().toString(36)}`,
       campo: "descProduto",
       textoFixo: "",
-      alturaMm: 2,
+      alturaMm: 2.25,
       larguraMm: 0,
+      fonteZpl: 'bitmap',
       negrito: false,
       alinhamento: "left",
       maiuscula: true,
+      pularPalavras: 0,
+      maxPalavras: 0,
       maxCaracteres: 26,
       espacoAbaixoMm: 0.2,
       visivel: true,
@@ -269,6 +272,22 @@ export default function ConfiguracaoEtiqueta({ config, onChange, podeConfigurar 
               max={20}
             />
             <NumeroCampo
+              label="Pular palavras"
+              valor={linha.pularPalavras}
+              onChange={(v) => setLinha(index, { pularPalavras: Math.round(v) })}
+              passo={1}
+              max={20}
+              sufixo="do início"
+            />
+            <NumeroCampo
+              label="Máx. palavras"
+              valor={linha.maxPalavras}
+              onChange={(v) => setLinha(index, { maxPalavras: Math.round(v) })}
+              passo={1}
+              max={20}
+              sufixo="0=todas"
+            />
+            <NumeroCampo
               label="Máx. caracteres"
               valor={linha.maxCaracteres}
               onChange={(v) => setLinha(index, { maxCaracteres: Math.round(v) })}
@@ -276,6 +295,17 @@ export default function ConfiguracaoEtiqueta({ config, onChange, podeConfigurar 
               max={200}
               sufixo="0=sem corte"
             />
+
+            <label className={styles.campo}>
+              <span>Fonte</span>
+              <select
+                value={linha.fonteZpl}
+                onChange={(e) => setLinha(index, { fonteZpl: e.target.value as LinhaEtiqueta['fonteZpl'] })}
+              >
+                <option value="bitmap">nítida (tamanho em degraus)</option>
+                <option value="escalavel">escalável (qualquer tamanho)</option>
+              </select>
+            </label>
 
             <label className={styles.campo}>
               <span>Alinhar</span>

@@ -51,9 +51,77 @@ function larguraParaBinario(larguras: string, comecaComBarra = true): string {
   return out;
 }
 
+export interface SegmentoCode128 {
+  subset: 'B' | 'C';
+  texto: string;
+}
+
 /**
- * Code 128 com troca automática B↔C: trechos de 4+ dígitos pares viram subset C
- * (metade das barras). É o mesmo comportamento do gerador do Linx.
+ * Divide o dado nos subsets do Code 128: trechos de 4+ dígitos pares viram
+ * subset C (dois dígitos por símbolo = metade das barras), o resto é subset B.
+ *
+ * É a fonte ÚNICA dessa decisão — o desenho das barras (preview) e o `^FD` que
+ * vai para a Zebra saem daqui, senão a impressora escolhe um subset diferente
+ * do que a tela mostrou e o código sai com outra largura.
+ */
+export function segmentarCode128(texto: string): SegmentoCode128[] {
+  const segmentos: SegmentoCode128[] = [];
+  let i = 0;
+
+  const digitosAPartirDe = (pos: number) => {
+    let n = 0;
+    while (pos + n < texto.length && texto[pos + n] >= '0' && texto[pos + n] <= '9') n += 1;
+    return n;
+  };
+
+  const empilhar = (subset: 'B' | 'C', trecho: string) => {
+    const ultimo = segmentos[segmentos.length - 1];
+    if (ultimo && ultimo.subset === subset) ultimo.texto += trecho;
+    else segmentos.push({ subset, texto: trecho });
+  };
+
+  while (i < texto.length) {
+    const dig = digitosAPartirDe(i);
+    // Vale a pena o subset C: 4+ dígitos no meio, ou 2 dígitos no fim/começo.
+    const usarC = dig >= 4 || (dig >= 2 && (i === 0 || i + dig === texto.length) && dig % 2 === 0);
+
+    if (usarC) {
+      const pares = Math.floor(dig / 2);
+      empilhar('C', texto.slice(i, i + pares * 2));
+      i += pares * 2;
+      continue;
+    }
+
+    empilhar('B', texto[i]);
+    i += 1;
+  }
+
+  return segmentos;
+}
+
+/**
+ * Caracteres de invocação do Code 128 no `^FD` (tabela do manual ZPL II):
+ * `>;` inicia no subset C e `>6` troca para o B — exatamente o que os geradores
+ * do Linx emitem (`">;" + subs(barra,1,10) + ">6" + resto`).
+ *
+ * Sem eles a Zebra ignora a nossa decisão e codifica tudo em subset B, que gasta
+ * um símbolo por dígito em vez de um a cada dois: um código de 6 dígitos passa
+ * de 68 para 101 módulos (~50% mais largo que o preview desenhou).
+ */
+export function dadosZplCode128(dados: string): string {
+  const texto = dados.trim();
+  let out = '';
+  segmentarCode128(texto).forEach((seg, indice) => {
+    if (seg.subset === 'C') out += indice === 0 ? '>;' : '>7';
+    else out += indice === 0 ? '>:' : '>6';
+    // '>' é o próprio caractere de escape — no dado ele vira '>0'.
+    out += seg.texto.replace(/>/g, '>0');
+  });
+  return out;
+}
+
+/**
+ * Code 128 com troca automática B↔C — usa a mesma segmentação que o ZPL.
  */
 function encodeCode128(dados: string): string | null {
   const texto = dados.trim();
@@ -64,38 +132,17 @@ function encodeCode128(dados: string): string | null {
   }
 
   const valores: number[] = [];
-  let i = 0;
-  let modo: 'B' | 'C' | null = null;
-
-  const digitosAPartirDe = (pos: number) => {
-    let n = 0;
-    while (pos + n < texto.length && texto[pos + n] >= '0' && texto[pos + n] <= '9') n += 1;
-    return n;
-  };
-
-  while (i < texto.length) {
-    const dig = digitosAPartirDe(i);
-    // Vale a pena o subset C: 4+ dígitos no meio, ou 2 dígitos no fim/começo.
-    const usarC = dig >= 4 || (dig >= 2 && (i === 0 || i + dig === texto.length) && dig % 2 === 0);
-
-    if (usarC) {
-      const pares = Math.floor(dig / 2);
-      if (modo === null) valores.push(C128_START_C);
-      else if (modo !== 'C') valores.push(C128_CODE_C);
-      modo = 'C';
-      for (let p = 0; p < pares; p += 1) {
-        valores.push(Number(texto.slice(i, i + 2)));
-        i += 2;
+  segmentarCode128(texto).forEach((seg, indice) => {
+    if (seg.subset === 'C') {
+      valores.push(indice === 0 ? C128_START_C : C128_CODE_C);
+      for (let p = 0; p < seg.texto.length; p += 2) {
+        valores.push(Number(seg.texto.slice(p, p + 2)));
       }
-      continue;
+    } else {
+      valores.push(indice === 0 ? C128_START_B : C128_CODE_B);
+      for (const ch of seg.texto) valores.push(ch.charCodeAt(0) - 32);
     }
-
-    if (modo === null) valores.push(C128_START_B);
-    else if (modo !== 'B') valores.push(C128_CODE_B);
-    modo = 'B';
-    valores.push(texto.charCodeAt(i) - 32);
-    i += 1;
-  }
+  });
 
   if (valores.length === 0) return null;
 

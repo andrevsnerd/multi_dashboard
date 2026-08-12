@@ -126,6 +126,17 @@ export async function listarImpressoras(): Promise<StatusBrowserPrint> {
   }
 }
 
+/**
+ * Manda a impressora recalibrar o sensor de mídia (`~JC`).
+ *
+ * Ela avança algumas etiquetas medindo o vão entre elas e guarda o passo. Sem
+ * isso, `^MNY` não tem referência e a impressão volta a andar de lugar. É uma
+ * ação de uma vez só — só precisa repetir ao trocar o tipo de rolo.
+ */
+export async function calibrarMidia(device: ZebraDevice): Promise<void> {
+  await enviarZpl(device, '~JC');
+}
+
 /** Manda o ZPL cru para a impressora escolhida. */
 export async function enviarZpl(device: ZebraDevice, zpl: string): Promise<void> {
   const base = await detectarBrowserPrint();
@@ -150,6 +161,27 @@ export async function enviarZpl(device: ZebraDevice, zpl: string): Promise<void>
     );
   }
   const texto = (await resp.text()).trim();
-  // O serviço devolve corpo vazio no sucesso; qualquer texto costuma ser erro.
-  if (texto && !/^ok$/i.test(texto)) throw new Error(texto);
+  if (!texto) return;
+  // Corpo vazio, "ok" e "{}" são SUCESSO — as versões do Browser Print variam, e
+  // algumas devolvem um JSON vazio. Tratar tudo que não fosse "ok" como erro era
+  // o que fazia aparecer um "{}" vermelho na tela mesmo com o envio dando certo.
+  if (/^ok$/i.test(texto)) return;
+
+  if (texto.startsWith("{") || texto.startsWith("[")) {
+    let dados: unknown = null;
+    try {
+      dados = JSON.parse(texto);
+    } catch {
+      throw new Error(`Resposta não reconhecida do Browser Print: ${texto}`);
+    }
+    // Só é erro se o JSON realmente trouxer uma mensagem de erro.
+    const obj = (dados ?? {}) as Record<string, unknown>;
+    const motivo = [obj.error, obj.message, obj.errorMessage]
+      .map((v) => (typeof v === "string" ? v.trim() : ""))
+      .find(Boolean);
+    if (motivo) throw new Error(motivo);
+    return;
+  }
+
+  throw new Error(texto);
 }

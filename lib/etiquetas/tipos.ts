@@ -42,6 +42,97 @@ export const CAMPOS_DISPONIVEIS: Array<{ valor: CampoEtiqueta; label: string }> 
 
 export type Alinhamento = 'left' | 'center' | 'right';
 
+/**
+ * `bitmap` = as fontes internas da Zebra (`^AAN`, `^ABN`, `^ADN`…): monoespaçadas,
+ * nítidas e sólidas na térmica, mas só existem em tamanhos fixos.
+ * `escalavel` = `^A0N`, qualquer tamanho, porém fina e serrilhada no miúdo.
+ */
+export type FonteZpl = 'bitmap' | 'escalavel';
+
+/**
+ * Fontes bitmap internas da Zebra a 203dpi (altura x largura da célula, em dots).
+ *
+ * Elas NÃO diminuem abaixo da base e só crescem em múltiplos inteiros — é por
+ * isso que travar numa só (a D, dos .prg do Linx) deixava o ajuste de tamanho
+ * sem efeito. Com a escada inteira o tamanho anda em degraus e o texto continua
+ * nítido, em vez de cair na escalável fininha.
+ */
+export const FONTES_BITMAP = [
+  { nome: 'A', alturaDots: 9, larguraDots: 5 },
+  { nome: 'B', alturaDots: 11, larguraDots: 7 },
+  { nome: 'D', alturaDots: 18, larguraDots: 10 },
+  { nome: 'H', alturaDots: 21, larguraDots: 13 },
+  { nome: 'F', alturaDots: 26, larguraDots: 13 },
+  { nome: 'E', alturaDots: 28, larguraDots: 15 },
+] as const;
+
+/** Fonte A: a que a Zebra usa na linha de leitura do código de barras. */
+export const FONTE_A_BASE = { alturaDots: 9, larguraDots: 5 } as const;
+
+export interface MetricaFonte {
+  nome: string;
+  alturaDots: number;
+  larguraDots: number;
+}
+
+/**
+ * Degrau da escada bitmap mais próximo da altura pedida — é o tamanho que a
+ * impressora VAI usar de fato. Quem empilha o layout tem que usar este valor,
+ * não o pedido: era essa diferença que fazia o desenho descer no papel em
+ * relação ao preview.
+ */
+export function melhorFonteBitmap(alturaDots: number): MetricaFonte {
+  let escolhida: MetricaFonte = {
+    nome: FONTES_BITMAP[0].nome,
+    alturaDots: FONTES_BITMAP[0].alturaDots,
+    larguraDots: FONTES_BITMAP[0].larguraDots,
+  };
+  let melhorDif = Infinity;
+  let melhorMult = Infinity;
+  for (const f of FONTES_BITMAP) {
+    for (let mult = 1; mult <= 4; mult += 1) {
+      const h = f.alturaDots * mult;
+      const dif = Math.abs(h - alturaDots);
+      // Empate de medida → fica a fonte NATIVA (menor multiplicador). A 18x10
+      // dá tanto por D×1 quanto por A×2, e a bitmap ampliada sai mais grosseira
+      // que o desenho original da fonte.
+      if (dif < melhorDif || (dif === melhorDif && mult < melhorMult)) {
+        melhorDif = dif;
+        melhorMult = mult;
+        escolhida = { nome: f.nome, alturaDots: h, larguraDots: f.larguraDots * mult };
+      }
+    }
+  }
+  return escolhida;
+}
+
+/** Métrica real da linha: degrau da escada na bitmap, o valor pedido na escalável. */
+export function metricaDaLinha(
+  linha: Pick<LinhaEtiqueta, 'alturaMm' | 'larguraMm' | 'fonteZpl'>,
+  dpi: number
+): MetricaFonte {
+  const dpmm = dotsPorMm(dpi);
+  if (linha.fonteZpl === 'bitmap') return melhorFonteBitmap(linha.alturaMm * dpmm);
+  const alturaDots = Math.max(1, Math.round(linha.alturaMm * dpmm));
+  const larguraDots =
+    linha.larguraMm > 0
+      ? Math.round(linha.larguraMm * dpmm)
+      : Math.max(1, Math.round(alturaDots * PROPORCAO_FONTE_PADRAO));
+  return { nome: '0', alturaDots, larguraDots };
+}
+
+/**
+ * Altura que a linha REALMENTE ocupa. Na bitmap é o degrau da escada, que pode
+ * ser maior que o pedido — o layout precisa empilhar por aqui para o papel
+ * bater com a tela.
+ */
+export function alturaEfetivaMm(
+  linha: Pick<LinhaEtiqueta, 'alturaMm' | 'larguraMm' | 'fonteZpl'>,
+  dpi: number
+): number {
+  return metricaDaLinha(linha, dpi).alturaDots / dotsPorMm(dpi);
+}
+
 /** Uma linha de texto da etiqueta (de cima para baixo, na ordem do array). */
 export interface LinhaEtiqueta {
   id: string;
@@ -50,12 +141,30 @@ export interface LinhaEtiqueta {
   textoFixo: string;
   /** Altura da fonte em mm (a Zebra pensa em altura, não em pt). */
   alturaMm: number;
-  /** Largura da fonte em mm; 0 = proporcional à altura. */
+  /** Largura da fonte em mm; 0 = proporcional. Ignorado na fonte bitmap. */
   larguraMm: number;
+  /**
+   * `bitmap` escolhe sozinha o degrau da escada de fontes internas da Zebra mais
+   * próximo de `alturaMm` (A/B/D/H/F/E e múltiplos): nítida na térmica e com
+   * largura EXATA, mas o tamanho anda em degraus. `escalavel` (`^A0N`) aceita
+   * qualquer tamanho e sai fina/serrilhada no miúdo.
+   */
+  fonteZpl: FonteZpl;
   negrito: boolean;
   alinhamento: Alinhamento;
   maiuscula: boolean;
-  /** Corta o texto acima deste tamanho (0 = não corta). */
+  /**
+   * Pula as N primeiras PALAVRAS do campo. Com `maxPalavras` na linha de cima,
+   * é isso que QUEBRA um nome comprido em duas linhas em vez de cortar: o
+   * título leva "CP SILICONE" e a linha seguinte leva "IP 17 PRO MAX".
+   */
+  pularPalavras: number;
+  /**
+   * Mantém só as N primeiras PALAVRAS depois do pulo (0 = todas). É assim que o
+   * Linx monta o título — por caractere sobraria lixo ("CP SILICONE IP 17 PR").
+   */
+  maxPalavras: number;
+  /** Trava de segurança em caracteres, aplicada depois das palavras (0 = não corta). */
   maxCaracteres: number;
   /** Espaço em mm entre esta linha e a de baixo. */
   espacoAbaixoMm: number;
@@ -152,51 +261,89 @@ export const CONFIG_PADRAO: EtiquetaConfig = {
   larguraEtiquetaMm: 27,
   alturaEtiquetaMm: 15,
   colunas: 3,
-  espacoColunasMm: 2,
+  // PASSO ENTRE COLUNAS = 33mm (27 + 6), copiado do próprio Linx.
+  // Os geradores de ZPL do Linx (C:\Linx\Report\User\*_002016_zebra*.prg, a
+  // mesma tela 002016 de onde sai a etiqueta) posicionam as 3 colunas com
+  // ^LH001,000 / ^LH265,000 / ^LH529,000 — passo de 264 dots = 33mm a 203dpi.
+  // Com os 29mm que estavam aqui, cada coluna saía 4mm à esquerda da anterior
+  // (deriva acumulada de 6mm na 3ª), que é exatamente o defeito das amostras
+  // impressas: o texto de uma etiqueta invadindo a vizinha.
+  espacoColunasMm: 6,
   espacoLinhasMm: 0,
   margemInternaMm: 0.8,
-  margemEsquerdaMm: 2,
-  margemTopoMm: 0.5,
-  // Os tamanhos abaixo somam 14,65mm — cabem nos 15mm com folga. Na largura, o
-  // "máx. caracteres" de cada linha foi calibrado pra não passar dos 25,4mm
-  // úteis (27 - 2×0,8 de margem) usando PROPORCAO_FONTE_PADRAO — mexer neles
-  // sem olhar o aviso de "não cabe" faz o texto invadir a etiqueta vizinha.
+  // MEDIDO NA IMPRESSORA (ZD230 do escritório, rolo 27x15 de 3 colunas): o dono
+  // calibrou +3,9mm na horizontal e +0,8mm na vertical até a etiqueta sair
+  // certa, e os valores foram incorporados aqui (2+3,9 e 0,5+0,8). Ficam no
+  // MODELO de propósito, não na calibração, para o ajuste fino continuar zerado
+  // e disponível para a próxima correção.
+  // O recuo existe porque o ZPL cru não passa pelo driver ZDesigner, que é quem
+  // aplica a origem calibrada que o Linx herda de graça.
+  margemEsquerdaMm: 5.9,
+  // MEDIDO NO EDITOR VISUAL: o dono arrastou as 3 linhas até Y = 1,9 / 4,2 / 6,1mm
+  // e o resultado foi convertido de volta para a pilha AUTOMÁTICA (margem do topo
+  // + espaço abaixo de cada linha) em vez de virar posição arrastada — mesma
+  // impressão, mas o modelo continua cascateando se alguma altura mudar.
+  //   margemTopo   = 1,9 − 0,8 (margem interna)          = 1,1
+  //   l1.espaço    = 4,2 − 1,9 − 2,25 (fonte D, 18 dots) = 0,05
+  //   l2.espaço    = 6,1 − 4,2 − 1,375 (fonte B, 11 dots) = 0,525
+  margemTopoMm: 1.1,
+  // FONTE ESCALÁVEL (^A0), de propósito — não a bitmap D dos .prg do Linx.
+  // Os .prg são da etiqueta GRANDE do HandBook (~55mm): lá a fonte D fica
+  // pequena, aqui o MÍNIMO dela (18x10 dots = 2,25mm alto, 1,25mm/caractere)
+  // dá 20×1,25 = 25,0mm dos 25,4mm úteis — 98% cheio. E fonte bitmap só existe
+  // em múltiplos inteiros da base, então ela NÃO diminui: o ajuste fino de
+  // tamanho não tinha efeito algum. A etiqueta 27x15x3 do Linx é um relatório
+  // FoxPro impresso pelo driver do Windows (fonte TrueType, escalável) — ela
+  // também nunca usou a fonte D.
+  // Com a escalável a 0,58 de proporção: 20 × 2,0 × 0,58 = 23,2mm (2,2mm de
+  // folga) e o ajuste fino volta a funcionar em qualquer valor.
   linhas: [
     {
       id: 'l1',
       campo: 'descProduto',
       textoFixo: '',
-      alturaMm: 2.2,
+      alturaMm: 2.25,
       larguraMm: 0,
+      fonteZpl: 'bitmap',
       negrito: true,
       alinhamento: 'left',
       maiuscula: true,
-      maxCaracteres: 18,
-      espacoAbaixoMm: 0.15,
+      // O Linx põe as 2 primeiras palavras no título...
+      pularPalavras: 0,
+      maxPalavras: 2,
+      maxCaracteres: 20,
+      espacoAbaixoMm: 0.05,
       visivel: true,
     },
     {
       id: 'l2',
-      campo: 'subgrupo',
+      // ...e o RESTO do nome na linha de baixo — nada se perde.
+      campo: 'descProduto',
       textoFixo: '',
-      alturaMm: 1.6,
+      alturaMm: 1.375,
       larguraMm: 0,
+      fonteZpl: 'bitmap',
       negrito: false,
       alinhamento: 'left',
       maiuscula: true,
+      pularPalavras: 2,
+      maxPalavras: 0,
       maxCaracteres: 26,
-      espacoAbaixoMm: 0.15,
+      espacoAbaixoMm: 0.525,
       visivel: true,
     },
     {
       id: 'l3',
       campo: 'descCor',
       textoFixo: '',
-      alturaMm: 1.6,
+      alturaMm: 1.375,
       larguraMm: 0,
+      fonteZpl: 'bitmap',
       negrito: false,
       alinhamento: 'left',
       maiuscula: true,
+      pularPalavras: 0,
+      maxPalavras: 0,
       maxCaracteres: 26,
       espacoAbaixoMm: 0.15,
       visivel: true,
@@ -209,7 +356,7 @@ export const CONFIG_PADRAO: EtiquetaConfig = {
     alturaMm: 4.2,
     moduloDots: 2,
     mostrarNumero: true,
-    alturaNumeroMm: 1.8,
+    alturaNumeroMm: 1.125,
     espacoNumeroMm: 0.5,
     alinhamento: 'center',
     espacoAcimaMm: 0.3,
@@ -217,7 +364,14 @@ export const CONFIG_PADRAO: EtiquetaConfig = {
   impressora: {
     dpi: 203,
     larguraMidiaMm: 104,
-    tipoMidia: 'continua',
+    // ETIQUETA RECORTADA = 'gap' (^MNY), não contínua.
+    // Em 'continua' (^MNN) a Zebra ignora o sensor e só avança o ^LL que
+    // mandamos: se ele não bater CRAVADO com o passo físico do rolo, cada
+    // etiqueta sai um pouco fora da anterior e o erro acumula — era o "imprimo
+    // de novo e a distância vertical muda". Com 'gap' o sensor acha o vão e
+    // registra o topo de cada etiqueta, então toda impressão cai no mesmo lugar.
+    // Exige a impressora calibrada (botão "calibrar mídia" manda ~JC).
+    tipoMidia: 'gap',
     velocidadeMmS: 152,
     escuridao: 30,
     modoImpressao: 'transferencia-termica',
@@ -254,6 +408,15 @@ export function valorDoCampo(item: ItemEtiqueta, linha: LinhaEtiqueta): string {
 export function textoDaLinha(item: ItemEtiqueta, linha: LinhaEtiqueta): string {
   let texto = valorDoCampo(item, linha).trim();
   if (linha.maiuscula) texto = texto.toUpperCase();
+  // Palavras primeiro (regra do Linx): pula as N iniciais, depois limita as
+  // restantes. É o par pular+máx que quebra o nome em duas linhas sem perder
+  // nada. Caracteres ficam só como trava final.
+  if (linha.pularPalavras > 0 || linha.maxPalavras > 0) {
+    let palavras = texto.split(/\s+/).filter(Boolean);
+    if (linha.pularPalavras > 0) palavras = palavras.slice(linha.pularPalavras);
+    if (linha.maxPalavras > 0) palavras = palavras.slice(0, linha.maxPalavras);
+    texto = palavras.join(' ');
+  }
   if (linha.maxCaracteres > 0 && texto.length > linha.maxCaracteres) {
     texto = texto.slice(0, linha.maxCaracteres);
   }
@@ -274,10 +437,24 @@ export function dadoDoBarcode(item: ItemEtiqueta, config: EtiquetaConfig): strin
  */
 export const PROPORCAO_FONTE_PADRAO = 0.58;
 
-/** Estimativa (mm) da largura impressa de um texto nessa altura de fonte. */
-export function larguraTextoEstimadaMm(texto: string, alturaMm: number, larguraFonteMm: number): number {
-  const porCaractere = larguraFonteMm > 0 ? larguraFonteMm : alturaMm * PROPORCAO_FONTE_PADRAO;
-  return texto.length * porCaractere;
+/**
+ * Largura (mm) de UM caractere da linha. Na fonte D é o valor EXATO que sai
+ * impresso (ela é monoespaçada); na escalável é estimativa.
+ */
+export function larguraCaractereMm(
+  linha: Pick<LinhaEtiqueta, 'alturaMm' | 'larguraMm' | 'fonteZpl'>,
+  dpi: number
+): number {
+  return metricaDaLinha(linha, dpi).larguraDots / dotsPorMm(dpi);
+}
+
+/** Largura impressa de um texto — exata na fonte D, estimada na escalável. */
+export function larguraTextoMm(
+  texto: string,
+  linha: Pick<LinhaEtiqueta, 'alturaMm' | 'larguraMm' | 'fonteZpl'>,
+  dpi: number
+): number {
+  return texto.length * larguraCaractereMm(linha, dpi);
 }
 
 /** Dots por mm da impressora (203dpi = 8, 300dpi ≈ 11.8). */
@@ -317,11 +494,17 @@ export function normalizarConfig(raw: unknown): EtiquetaConfig {
       textoFixo: String(l?.textoFixo ?? ''),
       alturaMm: num(l?.alturaMm, 2, 0.8, 20),
       larguraMm: num(l?.larguraMm, 0, 0, 20),
+      // Config salva antes da fonte existir cai na escalável, que é como ela foi
+      // desenhada — trocar por baixo mudaria a etiqueta de quem já ajustou. O
+      // 'D' é do formato anterior, quando a bitmap era travada nessa fonte só.
+      fonteZpl: l?.fonteZpl === 'bitmap' || (l?.fonteZpl as string) === 'D' ? 'bitmap' : 'escalavel',
       negrito: Boolean(l?.negrito),
       alinhamento: (['left', 'center', 'right'] as const).includes(l?.alinhamento as Alinhamento)
         ? (l!.alinhamento as Alinhamento)
         : 'left',
       maiuscula: l?.maiuscula !== false,
+      pularPalavras: Math.round(num(l?.pularPalavras, 0, 0, 20)),
+      maxPalavras: Math.round(num(l?.maxPalavras, 0, 0, 20)),
       maxCaracteres: Math.round(num(l?.maxCaracteres, 0, 0, 200)),
       espacoAbaixoMm: num(l?.espacoAbaixoMm, 0.2, 0, 20),
       visivel: l?.visivel !== false,
@@ -392,7 +575,9 @@ export function alturaConteudoBrutaMm(config: EtiquetaConfig): number {
   let altura = config.margemTopoMm + config.margemInternaMm;
   for (const linha of config.linhas) {
     if (!linha.visivel) continue;
-    altura += linha.alturaMm + linha.espacoAbaixoMm;
+    // Altura EFETIVA: na fonte bitmap o degrau da escada pode ser maior que o
+    // pedido, e é ele que a impressora usa.
+    altura += alturaEfetivaMm(linha, config.impressora.dpi) + linha.espacoAbaixoMm;
   }
   altura += config.barcode.espacoAcimaMm + config.barcode.alturaMm;
   if (config.barcode.mostrarNumero) {

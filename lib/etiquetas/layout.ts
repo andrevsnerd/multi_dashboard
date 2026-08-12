@@ -14,6 +14,7 @@
 
 import { encodeBarcode } from './barcode';
 import {
+  alturaEfetivaMm,
   dadoDoBarcode,
   dotsPorMm,
   type Alinhamento,
@@ -90,14 +91,17 @@ export function calcularLayout(config: EtiquetaConfig, item?: ItemEtiqueta | nul
       xMm: manual ? (linha.xMm as number) : x0,
       yMm: manual ? (linha.yMm as number) : y,
       larguraMm: larguraUtil,
-      alturaMm: linha.alturaMm,
+      // Altura EFETIVA (degrau da fonte bitmap), não a pedida: é a que a
+      // impressora usa. Empilhar pela pedida fazia o desenho descer no papel
+      // sem descer no preview.
+      alturaMm: alturaEfetivaMm(linha, config.impressora.dpi),
       // Arrastado no editor = ancorado no ponto exato do arraste (como um
       // objeto solto numa peça gráfica); o alinhamento left/center/right só
       // faz sentido dentro da pilha automática.
       alinhamento: manual ? 'left' : linha.alinhamento,
       manual,
     });
-    y += linha.alturaMm + linha.espacoAbaixoMm;
+    y += alturaEfetivaMm(linha, config.impressora.dpi) + linha.espacoAbaixoMm;
   }
 
   if (config.barcode.alturaMm > 0) {
