@@ -15,6 +15,7 @@ import { withRequest } from '@/lib/db/connection';
 import { RequestLike } from '@/lib/db/proxy';
 import { getCurrentMonthRange, normalizeRangeForQuery, shiftRangeByMonths } from '@/lib/utils/date';
 import { getColorDescription } from '@/lib/utils/colorMapping';
+import { gradeEhFashion, MAX_TAMANHOS_GRADE, type TamanhoGrade } from '@/lib/utils/grade-tamanhos';
 import { buildControleEstoqueItemKey } from '@/lib/utils/controle-estoque-metricas';
 import type { DateRangeInput } from '@/types/dashboard';
 
@@ -6895,6 +6896,107 @@ export async function fetchTopProdutosUltimos3Meses({
       }));
 
     return comSugestao;
+  });
+}
+
+/**
+ * Estoque por filial QUEBRADO POR TAMANHO da grade, para a distribuição por tamanho da
+ * compra salva. Devolve `tamanhos: []` quando o produto não é de grade fashion (P/M/G e
+ * companhia) — aí o chamador segue com a distribuição agregada de sempre.
+ *
+ * Deliberadamente separado de [fetchEstoqueProdutoPorFilial]: aquela é usada por meia
+ * dúzia de telas e não vale a pena arriscar mexer nela por causa de um caso só.
+ *
+ * Negativo conta como zero, igual ao resto do app — quem tem -2 no P precisa dos 3 do
+ * mínimo por inteiro, não de 5.
+ */
+export async function fetchEstoqueProdutoPorFilialPorTamanho({
+  company,
+  filial,
+  produto,
+  corProduto,
+}: {
+  company?: string;
+  filial?: string | null;
+  produto: string;
+  corProduto?: string | null;
+}): Promise<{
+  grade: string | null;
+  tamanhos: TamanhoGrade[];
+  porFilial: Array<{ filial: string; estoque: number; porTamanho: number[] }>;
+}> {
+  return withRequest(async (request) => {
+    const produtoNorm = produto.trim();
+    request.input('pt_produto', sql.VarChar, produtoNorm);
+
+    const gradeResult = await request.query<Record<string, string | null>>(`
+      SELECT TOP 1
+        LTRIM(RTRIM(CONVERT(VARCHAR(60), p.GRADE))) AS grade,
+        ${Array.from(
+          { length: MAX_TAMANHOS_GRADE },
+          (_, i) => `LTRIM(RTRIM(ISNULL(CAST(pt.TAMANHO_${i + 1} AS VARCHAR(20)), ''))) AS T${i + 1}`
+        ).join(',\n        ')}
+      FROM PRODUTOS p WITH (NOLOCK)
+      LEFT JOIN PRODUTOS_TAMANHOS pt WITH (NOLOCK)
+        ON LTRIM(RTRIM(CONVERT(VARCHAR(60), pt.GRADE))) = LTRIM(RTRIM(CONVERT(VARCHAR(60), p.GRADE)))
+      WHERE LTRIM(RTRIM(ISNULL(p.PRODUTO, ''))) = @pt_produto
+    `);
+
+    const gradeRow = gradeResult.recordset[0];
+    const grade = (gradeRow?.grade ?? '').trim() || null;
+
+    const tamanhos: TamanhoGrade[] = [];
+    if (gradeRow) {
+      for (let i = 1; i <= MAX_TAMANHOS_GRADE; i += 1) {
+        const label = (gradeRow[`T${i}`] ?? '').trim();
+        if (label) tamanhos.push({ ordinal: i, label });
+      }
+    }
+
+    if (!gradeEhFashion(tamanhos)) {
+      return { grade, tamanhos: [], porFilial: [] };
+    }
+
+    const corNorm = (corProduto ?? '').trim();
+    request.input('pt_cor', sql.VarChar, corNorm);
+    const corNormNum = Number.parseInt(corNorm, 10);
+    request.input('pt_cor_num', sql.Int, Number.isNaN(corNormNum) ? null : corNormNum);
+
+    const estoqueFilialFilter = await buildFilialFilter(request, company, filial ?? null, 'e');
+    const corFilter = corProduto != null
+      ? `AND (
+          LTRIM(RTRIM(ISNULL(e.COR_PRODUTO, ''))) = @pt_cor
+          OR (
+            @pt_cor_num IS NOT NULL
+            AND TRY_CONVERT(INT, NULLIF(LTRIM(RTRIM(ISNULL(e.COR_PRODUTO, ''))), '')) = @pt_cor_num
+          )
+        )`
+      : '';
+
+    const colunasTamanho = tamanhos
+      .map((t) => `SUM(ISNULL(e.ES${t.ordinal}, 0)) AS T${t.ordinal}`)
+      .join(',\n        ');
+
+    const result = await request.query<Record<string, string | number | null>>(`
+      SELECT
+        e.FILIAL AS filial,
+        SUM(CASE WHEN e.ESTOQUE > 0 THEN e.ESTOQUE ELSE 0 END) AS positiveStock,
+        ${colunasTamanho}
+      FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+      WHERE LTRIM(RTRIM(ISNULL(e.PRODUTO, ''))) = @pt_produto
+        ${corFilter}
+        ${estoqueFilialFilter}
+      GROUP BY e.FILIAL
+      ORDER BY e.FILIAL
+    `);
+
+    const porFilial = result.recordset.map((row) => ({
+      filial: String(row.filial ?? '').trim(),
+      estoque: Math.round(Math.max(0, Number(row.positiveStock ?? 0))),
+      porTamanho: tamanhos.map((t) => Math.round(Number(row[`T${t.ordinal}`] ?? 0))),
+    }));
+
+    return { grade, tamanhos, porFilial };
   });
 }
 

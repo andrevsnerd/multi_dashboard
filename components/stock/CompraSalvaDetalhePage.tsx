@@ -19,6 +19,12 @@ import {
   type DestinoCompraFinalParte,
 } from "@/lib/utils/compra-final-destino";
 import {
+  distribuirPorTamanho,
+  LOJAS_FASHION,
+  type DistribuicaoPorTamanho,
+} from "@/lib/utils/compra-destino-tamanho";
+import type { TamanhoGrade } from "@/lib/utils/grade-tamanhos";
+import {
   calcNecessidadeMinimaQty,
   calcTotalPerFilialQty,
   combineBaseSuggestionWithNecessidadeMinima,
@@ -586,6 +592,30 @@ async function fetchEstoquePorFilial(params: URLSearchParams): Promise<Array<{ f
   return metricas?.estoquePorFilial ?? [];
 }
 
+/**
+ * Estoque por filial × tamanho — só volta preenchido em grade fashion (com P, M ou G).
+ * Qualquer falha vira "sem tamanhos", e o item cai no destino agregado de sempre.
+ */
+async function fetchEstoquePorTamanho(params: URLSearchParams): Promise<{
+  tamanhos: TamanhoGrade[];
+  porFilial: Array<{ filial: string; porTamanho: number[] }>;
+}> {
+  const vazio = { tamanhos: [] as TamanhoGrade[], porFilial: [] };
+  try {
+    const res = await fetch(`/api/controle-estoque/estoque-por-tamanho-item?${params}`, { cache: "no-store" });
+    if (!res.ok) return vazio;
+    const json = (await res.json()) as {
+      data?: { tamanhos?: TamanhoGrade[]; porFilial?: Array<{ filial: string; porTamanho: number[] }> };
+    };
+    return {
+      tamanhos: json.data?.tamanhos ?? [],
+      porFilial: json.data?.porFilial ?? [],
+    };
+  } catch {
+    return vazio;
+  }
+}
+
 async function fetchVendasPorFilialItem(
   params: URLSearchParams
 ): Promise<Array<{ filial: string; qtde12m: number; qtde60d: number }>> {
@@ -711,6 +741,13 @@ export default function CompraSalvaDetalhePage({
   const catraca = useCatracaDataCompra(companyKey, catracaFilial);
   const [estoquePorFilialCache, setEstoquePorFilialCache] = useState<
     Record<string, Array<{ filial: string; estoque: number }>>
+  >({});
+  /**
+   * Estoque por filial × tamanho dos itens de grade fashion (P/M/G e companhia). Item que
+   * não é fashion entra aqui com `tamanhos: []` e segue no fluxo agregado de sempre.
+   */
+  const [tamanhosCache, setTamanhosCache] = useState<
+    Record<string, { tamanhos: TamanhoGrade[]; porFilial: Array<{ filial: string; porTamanho: number[] }> }>
   >({});
   const [vendasPorFilialCache, setVendasPorFilialCache] = useState<
     Record<string, Array<{ filial: string; qtde12m: number; qtde60d: number }>>
@@ -1011,11 +1048,13 @@ export default function CompraSalvaDetalhePage({
       void Promise.all([
         fetchVendasPorFilialItem(params),
         fetchEstoquePorFilial(params),
+        fetchEstoquePorTamanho(params),
       ])
-        .then(([vendasData, estoqueData]) => {
+        .then(([vendasData, estoqueData, tamanhoData]) => {
           const norm = normalizeVendasPorFilialParaExibicao(companyKey, vendasData);
           setVendasPorFilialCache((p) => ({ ...p, [cacheKey]: norm }));
           setEstoquePorFilialCache((p) => ({ ...p, [cacheKey]: estoqueData }));
+          setTamanhosCache((p) => ({ ...p, [cacheKey]: tamanhoData }));
         })
         .catch(() => {
           setVendasPorFilialCache((p) => ({ ...p, [cacheKey]: [] }));
@@ -1336,14 +1375,57 @@ export default function CompraSalvaDetalhePage({
     }
   };
 
+  /**
+   * Distribuição por tamanho de cada item de grade fashion — calculada uma vez e usada
+   * pela tabela e pelo export, para os dois nunca contarem histórias diferentes.
+   * Item fora da grade fashion, ou em modo manual, fica `null` e segue o fluxo agregado.
+   */
+  const distTamanhoByItemKey = useMemo(() => {
+    const mapa: Record<string, DistribuicaoPorTamanho | null> = {};
+    for (const { it, effectiveQtdManual } of rowsComputed) {
+      const produtoK = it.produto.trim();
+      const corK = expandirPorCor ? ((it.corProduto ?? "").trim() || undefined) : undefined;
+      const vendasKey = `${produtoK}||${corK ?? ""}`;
+      const itemState = manualState[it.itemKey];
+      // Mesma noção de "manual" da tabela: só conta quando o usuário de fato assumiu a
+      // distribuição. Aí a escolha dele vence e a regra por tamanho não se mete.
+      const isManual =
+        (itemState === "editing" || itemState === "confirmed") &&
+        manualDistribuicao[it.itemKey] !== undefined;
+      const tamanhoInfo = tamanhosCache[vendasKey];
+      const vendasRows = vendasPorFilialCache[vendasKey];
+
+      mapa[it.itemKey] =
+        !isManual && tamanhoInfo && tamanhoInfo.tamanhos.length > 0 && vendasRows !== undefined
+          ? distribuirPorTamanho({
+              qtdTotal: effectiveQtdManual,
+              tamanhos: tamanhoInfo.tamanhos,
+              estoquePorFilial: tamanhoInfo.porFilial,
+              vendasPorFilial: vendasRows,
+              companyKey,
+            })
+          : null;
+    }
+    return mapa;
+  }, [
+    rowsComputed,
+    expandirPorCor,
+    manualState,
+    manualDistribuicao,
+    tamanhosCache,
+    vendasPorFilialCache,
+    companyKey,
+  ]);
+
   const handleExportXlsx = () => {
     const fmt2 = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
-    const rowExcel = rowsComputed.map(({ it, match, estoque, custoUnit, custoTotal, effectiveQtdManual }) => {
+    const rowExcel = rowsComputed.flatMap(({ it, match, estoque, custoUnit, custoTotal, effectiveQtdManual }) => {
       const produtoK = it.produto.trim();
       const corK = expandirPorCor ? ((it.corProduto ?? "").trim() || undefined) : undefined;
       const vendasKey = `${produtoK}||${corK ?? ""}`;
       const vendasRows = vendasPorFilialCache[vendasKey];
       const itemState = manualState[it.itemKey] ?? "auto";
+      const distTamanho = distTamanhoByItemKey[it.itemKey] ?? null;
       let destino: string;
       if (itemState === "confirmed") {
         const dist = manualDistribuicao[it.itemKey] ?? {};
@@ -1353,10 +1435,14 @@ export default function CompraSalvaDetalhePage({
           .sort(([a], [b]) => compareFilialDisplayOrder(a, b, cfg))
           .map(([label, qty]) => `${label}: ${fmt2(qty)}`)
           .join(" · ");
+      } else if (distTamanho) {
+        // Peça fashion: o destino real está nas linhas de tamanho logo abaixo.
+        destino = "por tamanho (ver linhas TAMANHO)";
       } else {
         destino = vendasRows !== undefined ? textoDestinoCompraFinal(effectiveQtdManual, vendasRows, companyKey, estoquePorFilialCache[vendasKey], getSharedLimiteDiasReposicao({ linha: match?.linha, subgrupo: match?.subgrupo })) : "";
       }
-      return {
+
+      const base = {
         PRODUTO: it.produto,
         CODIGO_BARRA: match?.codigoBarra ?? "",
         DESC_PRODUTO: it.descricao,
@@ -1364,11 +1450,32 @@ export default function CompraSalvaDetalhePage({
         DESC_COR_PRODUTO: it.corDescricao ?? "",
         GRADE: it.grade ?? "",
         COLECAO: it.colecao ?? "",
+      };
+
+      const linhaItem = {
+        ...base,
+        TAMANHO: "",
         QTD_MANUAL: effectiveQtdManual,
         DESTINO: destino,
         ESTOQUE_ATUAL: estoque ?? 0,
         ...(podeVerCusto ? { CUSTO_UNIT: custoUnit ?? 0, CUSTO_TOTAL: custoTotal ?? 0 } : {}),
       };
+
+      if (!distTamanho) return [linhaItem];
+
+      // Uma linha por tamanho, igual à tela. A coluna TAMANHO separa as quebras da linha
+      // do item — somar QTD_MANUAL sem filtrar por ela conta a mesma peça duas vezes.
+      return [
+        linhaItem,
+        ...distTamanho.linhas.map((linha) => ({
+          ...base,
+          TAMANHO: linha.label,
+          QTD_MANUAL: linha.qtd,
+          DESTINO: linha.partes.map((p) => `${p.label}: ${fmt2(p.qtd)}`).join(" · "),
+          ESTOQUE_ATUAL: "",
+          ...(podeVerCusto ? { CUSTO_UNIT: "", CUSTO_TOTAL: "" } : {}),
+        })),
+      ];
     });
 
     const kpis = [
@@ -1834,8 +1941,17 @@ export default function CompraSalvaDetalhePage({
                       vendasRowsK === undefined || qtdSugerida === null
                         ? undefined
                         : partesDestinoCompraFinal(qtdSugerida, vendasRowsK, companyKey, estoqueRowsK, getSharedLimiteDiasReposicao({ linha: match?.linha, subgrupo: match?.subgrupo }));
+
+                    // ── Peça fashion (grade com P, M ou G): quebra em uma linha por tamanho ──
+                    // A quantidade salva continua mandando; a regra só reparte entre as 4 lojas
+                    // que recebem fashion, cobrindo o mínimo por tamanho antes da performance.
+                    // Em modo manual a distribuição do usuário vence, como sempre.
+                    const tamanhoInfo = tamanhosCache[vendasKey];
+                    const distTamanho = distTamanhoByItemKey[it.itemKey] ?? null;
+
                     return (
-                      <tr key={it.itemKey}>
+                    <React.Fragment key={it.itemKey}>
+                      <tr>
                         <td>
                           <div className={styles.productName}>{it.descricao || it.produto}</div>
                           <div className={styles.productCode}>{it.produto}</div>
@@ -1925,7 +2041,19 @@ export default function CompraSalvaDetalhePage({
                             /* ── Estado: automático (padrão) ── */
                             <div>
                               <div className={styles.destinoCellInner}>
-                                {partesDestino === undefined
+                                {distTamanho !== null ? (
+                                  <span className={styles.destinoPorTamanhoNota}>
+                                    por tamanho ↓
+                                    {distTamanho.faltaTotalMinimos > distTamanho.qtdDistribuida && (
+                                      <span
+                                        className={styles.destinoFaltaMinimo}
+                                        title={`As 4 lojas fashion precisam de ${distTamanho.faltaTotalMinimos} peças só para ter o mínimo por tamanho (3 em Oscar, 1 nas outras). A quantidade desta compra cobre ${distTamanho.qtdDistribuida}.`}
+                                      >
+                                        faltam {distTamanho.faltaTotalMinimos - distTamanho.qtdDistribuida} p/ o mínimo
+                                      </span>
+                                    )}
+                                  </span>
+                                ) : partesDestino === undefined
                                   ? "…"
                                   : partesDestino === null
                                     ? "—"
@@ -2067,6 +2195,49 @@ export default function CompraSalvaDetalhePage({
                           </button>
                         </td>
                       </tr>
+
+                      {/* ── Uma linha por tamanho (peça fashion) ──
+                          A soma das Qtd destas linhas é exatamente a Qtd do item acima. */}
+                      {distTamanho?.linhas.map((linha) => {
+                        const estoqueFashion = (tamanhoInfo?.porFilial ?? []).reduce((soma, f) => {
+                          const label = getFilialLabelForDisplay(resolveCompany(companyKey), f.filial);
+                          if (!(LOJAS_FASHION as readonly string[]).includes(label)) return soma;
+                          const idx = (tamanhoInfo?.tamanhos ?? []).findIndex((t) => t.ordinal === linha.ordinal);
+                          return soma + Math.max(0, Number(f.porTamanho[idx] ?? 0));
+                        }, 0);
+
+                        return (
+                          <tr key={`${it.itemKey}-${linha.ordinal}`} className={styles.tamanhoRow}>
+                            <td>
+                              <span className={styles.tamanhoLabel}>{linha.label}</span>
+                            </td>
+                            <td className={styles.right}>
+                              <span className={styles.tamanhoQtd}>{fmt(linha.qtd)}</span>
+                            </td>
+                            <td className={styles.destinoCell}>
+                              {linha.partes.length > 0 ? (
+                                <DestinoCompraFinalBadges partes={linha.partes} />
+                              ) : (
+                                <span className={styles.tamanhoSemDestino}>
+                                  {distTamanho.qtdDistribuida >= distTamanho.faltaTotalMinimos
+                                    ? "lojas já têm o mínimo"
+                                    : "sem quantidade sobrando"}
+                                </span>
+                              )}
+                            </td>
+                            <td
+                              className={styles.right}
+                              title="Estoque deste tamanho somando as 4 lojas que recebem fashion"
+                            >
+                              <span className={styles.tamanhoQtd}>{fmt(estoqueFashion)}</span>
+                            </td>
+                            {podeVerCusto && <td className={styles.right} />}
+                            {podeVerCusto && <td className={styles.right} />}
+                            <td data-pdf-hide="" />
+                          </tr>
+                        );
+                      })}
+                    </React.Fragment>
                     );
                   })}
                 </tbody>

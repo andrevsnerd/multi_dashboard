@@ -1725,3 +1725,88 @@
 :global(:root[data-theme="dark"]) .manualProductAddBtn:hover:not(:disabled) {
   border-color: rgba(59, 130, 246, 0.35);
 }
+
+/* ── Linhas por tamanho da peça fashion (grade com P, M ou G) ─────────────────
+   Uma linha por tamanho logo abaixo do item, recuadas e mais discretas. A soma
+   das Qtd delas é exatamente a Qtd do item de cima. */
+.tamanhoRow td {
+  background: rgba(99, 102, 241, 0.04);
+  border-top: none;
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+
+.tamanhoLabel {
+  display: inline-block;
+  margin-left: 18px;
+  padding: 1px 8px;
+  border-radius: 5px;
+  background: rgba(99, 102, 241, 0.13);
+  color: #4338ca;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.tamanhoLabel::before {
+  content: "└ ";
+  margin-left: -14px;
+  color: #94a3b8;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.tamanhoQtd {
+  font-size: 12px;
+  font-weight: 700;
+  color: #475569;
+  font-variant-numeric: tabular-nums;
+}
+
+.tamanhoSemDestino {
+  font-size: 11px;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.destinoPorTamanhoNota {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6366f1;
+  letter-spacing: 0.02em;
+}
+
+.destinoFaltaMinimo {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(217, 119, 6, 0.13);
+  color: #b45309;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: help;
+}
+
+:global(:root[data-theme="dark"]) .tamanhoRow td {
+  background: rgba(129, 140, 248, 0.06);
+}
+
+:global(:root[data-theme="dark"]) .tamanhoLabel {
+  background: rgba(129, 140, 248, 0.17);
+  color: #c7d2fe;
+}
+
+:global(:root[data-theme="dark"]) .tamanhoQtd {
+  color: #cbd5e1;
+}
+
+:global(:root[data-theme="dark"]) .destinoPorTamanhoNota {
+  color: #a5b4fc;
+}
+
+:global(:root[data-theme="dark"]) .destinoFaltaMinimo {
+  background: rgba(251, 191, 36, 0.14);
+  color: #fcd34d;
+}
