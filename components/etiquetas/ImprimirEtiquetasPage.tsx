@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuth } from "@/components/auth/AuthContext";
+import { canMutate, canSeeCusto } from "@/lib/auth/permissions";
 import {
   ajustarTamanhoParaCaber,
   analisarBarras,
@@ -37,6 +38,7 @@ import ConfiguracaoEtiqueta from "./ConfiguracaoEtiqueta";
 import CalibracaoEtiqueta from "./CalibracaoEtiqueta";
 import EditorVisualEtiqueta from "./EditorVisualEtiqueta";
 import EtiquetaSvg from "./EtiquetaSvg";
+import ModalCustoProduto from "./ModalCustoProduto";
 import styles from "./ImprimirEtiquetasPage.module.css";
 import {
   calibrarMidia,
@@ -77,6 +79,8 @@ interface SugestaoProduto {
   corEncontrada: string | null;
   descCorEncontrada: string | null;
   codigoEncontrado: string | null;
+  /** Só apareceu no repescão sem filtro de empresa (cadastrado em outra EMPRESA). */
+  foraDoCatalogo?: boolean;
 }
 
 interface ItemFila {
@@ -124,6 +128,18 @@ function montarItem(produto: ProdutoEtiqueta, cor: CorEtiqueta): ItemEtiqueta {
 export default function ImprimirEtiquetasPage({ companyKey }: Props) {
   const { user } = useAuth();
   const username = user?.username ?? "";
+  /**
+   * Custo é restrito (gerente e supervisor nunca veem) — mesma regra da tela
+   * Alterar Custo / Preço, que as rotas `/api/precos/*` também aplicam no
+   * servidor. Diretor abre a ficha, mas só de leitura.
+   */
+  const podeVerCusto = canSeeCusto(user);
+  const podeAlterarCusto = podeVerCusto && canMutate(user);
+
+  /** Produto com a ficha de custo/preço aberta (null = modal fechado). */
+  const [produtoCusto, setProdutoCusto] = useState<{ produto: string; descProduto: string } | null>(
+    null
+  );
 
   const [termo, setTermo] = useState("");
   const [incluirInativos, setIncluirInativos] = useState(false);
@@ -790,6 +806,11 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
                         <div className={styles.sugestaoNome}>
                           {s.descProduto || s.produto}
                           {s.inativo ? <span className={styles.tagInativo}>inativo</span> : null}
+                          {s.foraDoCatalogo ? (
+                            <span className={styles.tagOutraEmpresa} title="Cadastrado em outra empresa do Linx">
+                              outra empresa
+                            </span>
+                          ) : null}
                           {naFila > 0 ? (
                             <span className={styles.tagFila}>{naFila} na fila</span>
                           ) : null}
@@ -846,11 +867,33 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
                               {etiquetasPorProduto[produto.produto]} na fila
                             </span>
                           ) : null}
+                          {/* Colado no nome de propósito: o fluxo é conferir o
+                              custo do que acabou de chegar e imprimir na hora.
+                              Só quem pode ver custo enxerga o botão. */}
+                          {podeVerCusto ? (
+                            <button
+                              type="button"
+                              className={styles.botaoCusto}
+                              onClick={() =>
+                                setProdutoCusto({
+                                  produto: produto.produto,
+                                  descProduto: produto.descProduto || produto.produto,
+                                })
+                              }
+                              title="Ver e alterar custo/preço deste produto (mesma regra e histórico da tela Alterar Custo / Preço)"
+                            >
+                              Alterar Custo
+                            </button>
+                          ) : null}
                         </div>
+                        {/* A contagem de cores fica à vista de propósito: é
+                            como conferir num relance se vieram TODAS as cores
+                            do cadastro (a tela não depende de estoque). */}
                         <div className={styles.produtoMeta}>
                           {produto.produto}
                           {produto.subgrupo ? ` · ${produto.subgrupo}` : ""}
                           {produto.grade ? ` · ${produto.grade}` : ""}
+                          {` · ${produto.cores.length} cor${produto.cores.length === 1 ? "" : "es"} no cadastro`}
                         </div>
                       </div>
                       <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
@@ -1347,6 +1390,19 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
           </div>
         </div>
       </div>
+
+      {/* Ficha de custo/preço do produto — mesmas rotas e mesmo histórico da
+          tela Alterar Custo / Preço, sem sair da tela de etiquetas. */}
+      {produtoCusto ? (
+        <ModalCustoProduto
+          companyKey={companyKey}
+          username={username}
+          produto={produtoCusto.produto}
+          descProduto={produtoCusto.descProduto}
+          podeGravar={podeAlterarCusto}
+          onFechar={() => setProdutoCusto(null)}
+        />
+      ) : null}
 
       {/* Folha oculta: só existe enquanto o usuário manda imprimir pelo navegador. */}
       {preparandoFolha ? (

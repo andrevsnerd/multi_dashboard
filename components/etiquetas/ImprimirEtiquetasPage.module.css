@@ -291,12 +291,14 @@
 
 /* ── resultados ── */
 
+/* Sem teto de altura de propósito: com 20+ cores o bloco estourava os 560px e o
+   resto da lista ficava escondido atrás de um scroll interno que ninguém vê —
+   parecia que o produto tinha menos cores do que o cadastro. Quem rola é a
+   página. */
 .resultados {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  max-height: 560px;
-  overflow-y: auto;
 }
 .produtoBloco {
   border: 1px solid var(--b-200);
@@ -326,6 +328,39 @@
   font-weight: 700;
   color: #b45309;
   background: rgba(234, 179, 8, 0.16);
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+/* Botão de custo/preço ao lado do nome do produto. Fica junto do título (e não
+   no bloco de ações à direita) porque é sobre o ITEM, não sobre a fila. */
+.botaoCusto {
+  margin-left: 10px;
+  padding: 3px 11px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--t-900);
+  color: var(--s-white);
+  cursor: pointer;
+  vertical-align: middle;
+  box-shadow: var(--elev-1);
+  transition: transform 0.12s ease, opacity 0.12s ease;
+}
+.botaoCusto:hover {
+  opacity: 0.88;
+  transform: translateY(-1px);
+}
+.botaoCusto:active {
+  transform: none;
+}
+/* Produto que só apareceu no repescão sem filtro de EMPRESA. */
+.tagOutraEmpresa {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--t-500);
+  background: var(--s-100);
   padding: 1px 6px;
   border-radius: 999px;
 }

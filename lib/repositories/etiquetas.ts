@@ -24,6 +24,124 @@ function esc(value: string): string {
   return (value ?? '').replace(/'/g, "''");
 }
 
+/**
+ * Literal para LIKE: os curingas do usuário (%, _, [) viram texto puro, senão
+ * um código com "_" casaria com qualquer coisa.
+ */
+function escLike(value: string): string {
+  return esc(value)
+    .replace(/\[/g, '[[]')
+    .replace(/%/g, '[%]')
+    .replace(/_/g, '[_]');
+}
+
+/**
+ * Comparação sem acento e sem caixa — quem digita "ALCA BASIC" tem que achar
+ * "ALÇA BASIC III". O banco é ..._CI_AS (sensível a acento).
+ */
+const COL = 'COLLATE Latin1_General_CI_AI';
+
+/**
+ * Descrição do cadastro com os espaços repetidos colapsados.
+ *
+ * O cadastro do Linx tem MUITOS nomes com espaço duplo no meio
+ * ("CP COURO  MAGSAFE SG S25 ULTRA", 95 produtos ativos na NERD e 148 na
+ * ScarfMe) — quem digita o nome como aparece na tela (um espaço só) nunca
+ * achava o produto. Quatro passadas colapsam até 16 espaços seguidos.
+ */
+function descNormalizada(alias = 'p'): string {
+  let expr = `LTRIM(RTRIM(ISNULL(${alias}.DESC_PRODUTO, '')))`;
+  for (let i = 0; i < 4; i += 1) expr = `REPLACE(${expr}, '  ', ' ')`;
+  return expr;
+}
+
+/** Termo quebrado em palavras (o mesmo colapso de espaços do lado do cadastro). */
+function palavrasDoTermo(termo: string): string[] {
+  return (termo ?? '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 8);
+}
+
+/**
+ * Condição de "o produto casa com o que foi digitado".
+ *
+ * Casa por código, por código de barra ou pelo nome — e o nome casa PALAVRA A
+ * PALAVRA (todas presentes, em qualquer ordem), o que resolve de uma vez os
+ * espaços duplos do cadastro e a busca fora de ordem ("magsafe couro s25").
+ */
+function condicaoTermo(termo: string, alias = 'p'): string {
+  const t = (termo ?? '').trim();
+  const tEsc = esc(t);
+  const tLike = escLike(t);
+  const soDigitos = t.replace(/\D/g, '');
+  const desc = descNormalizada(alias);
+  const palavras = palavrasDoTermo(t);
+
+  const condicoes: string[] = [
+    `LTRIM(RTRIM(${alias}.PRODUTO)) = '${tEsc}'`,
+    `LTRIM(RTRIM(${alias}.PRODUTO)) ${COL} LIKE '${tLike}%'`,
+  ];
+
+  // Pedaço do código ("03.0012") — só quando o termo é uma palavra só, senão
+  // uma frase inteira nunca casaria com um código e é varredura à toa.
+  if (palavras.length === 1) {
+    condicoes.push(`LTRIM(RTRIM(${alias}.PRODUTO)) ${COL} LIKE '%${tLike}%'`);
+  }
+
+  if (palavras.length > 0) {
+    const todasAsPalavras = palavras
+      .map((p) => `${desc} ${COL} LIKE '%${escLike(p)}%'`)
+      .join(' AND ');
+    condicoes.push(`(${todasAsPalavras})`);
+  }
+
+  // Código de barra: exato ou numericamente igual (leitor às vezes come o zero
+  // à esquerda). 4 dígitos é o piso para não varrer a tabela à toa.
+  if (soDigitos.length >= 4) {
+    condicoes.push(`EXISTS (
+      SELECT 1 FROM PRODUTOS_BARRA pb WITH (NOLOCK)
+      WHERE pb.PRODUTO = ${alias}.PRODUTO
+        AND (
+          LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100)))) = '${tEsc}'
+          OR TRY_CONVERT(BIGINT, LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100))))) = TRY_CONVERT(BIGINT, '${esc(soDigitos)}')
+        )
+    )`);
+  }
+
+  return `(${condicoes.join(' OR ')})`;
+}
+
+/**
+ * Escada de relevância — barra exata, código exato, nome exato, começa com,
+ * contém, palavras soltas. Compara sempre com a descrição normalizada, senão o
+ * espaço duplo joga o produto certo para o fim da fila.
+ */
+function ordemRelevancia(termo: string, alias = 'p'): string {
+  const t = (termo ?? '').trim();
+  const tEsc = esc(t);
+  const tLike = escLike(t);
+  const desc = descNormalizada(alias);
+  const palavras = palavrasDoTermo(t);
+  // Termo com os espaços colapsados, para casar com a descrição normalizada.
+  const frase = escLike(palavras.join(' '));
+
+  return `
+    CASE
+      WHEN LTRIM(RTRIM(${alias}.PRODUTO)) = '${tEsc}' THEN 0
+      WHEN ${desc} ${COL} = '${esc(palavras.join(' '))}' THEN 1
+      WHEN ${desc} ${COL} LIKE '${frase}%' THEN 2
+      WHEN ${desc} ${COL} LIKE '% ${frase}%' THEN 3
+      WHEN LTRIM(RTRIM(${alias}.PRODUTO)) ${COL} LIKE '${tLike}%' THEN 4
+      WHEN ${desc} ${COL} LIKE '%${frase}%' THEN 5
+      ELSE 6
+    END,
+    LEN(${desc}),
+    ${desc}
+  `;
+}
+
 export interface CorEtiqueta {
   /** COR_PRODUTO cru do ERP ('' quando o produto não tem cor). */
   cor: string;
@@ -114,14 +232,28 @@ export interface SugestaoProduto {
   corEncontrada: string | null;
   descCorEncontrada: string | null;
   codigoEncontrado: string | null;
+  /** Achado só no repescão sem filtro de empresa (cadastro de outra EMPRESA). */
+  foraDoCatalogo?: boolean;
+}
+
+interface SugestaoRow {
+  PRODUTO: string;
+  DESC_PRODUTO: string;
+  SUBGRUPO: string;
+  INATIVO: number | null;
+  TOTAL_CORES: number;
+  COR: string | null;
+  DESC_COR: string | null;
+  CODIGO: string | null;
 }
 
 /**
  * Sugestões enquanto o usuário digita (nome, código ou código de barra).
  *
- * Espelha a ordenação do autocomplete do Produto Detalhado — barra exata,
- * código exato, nome exato, começa com, contém — mas com guarda de permissão e
- * escopo por PRODUTOS.EMPRESA, que a rota genérica `/api/products/search` não tem.
+ * A busca é do CADASTRO puro: não olha estoque, não olha venda. O nome casa
+ * palavra a palavra (ver `condicaoTermo`), sem acento e sem caixa, e o escopo
+ * por PRODUTOS.EMPRESA só filtra enquanto houver resultado — se o produto está
+ * cadastrado em outra EMPRESA, ele volta no repescão em vez de sumir.
  */
 export async function buscarSugestoesProduto(
   company: EtiquetaCompany,
@@ -131,22 +263,12 @@ export async function buscarSugestoesProduto(
   const t = (termo ?? '').trim();
   if (t.length < 2) return [];
 
-  const limite = Math.min(50, Math.max(1, opts.limite ?? 20));
+  const limite = Math.min(50, Math.max(1, opts.limite ?? 30));
   const tEsc = esc(t);
-  const tUpper = esc(t.toUpperCase());
-  const empresa = filtroEmpresa(company);
+  const tLike = escLike(t);
   const inativos = opts.incluirInativos ? '' : 'AND ISNULL(p.INATIVO, 0) = 0';
 
-  const rows = await query<{
-    PRODUTO: string;
-    DESC_PRODUTO: string;
-    SUBGRUPO: string;
-    INATIVO: number | null;
-    TOTAL_CORES: number;
-    COR: string | null;
-    DESC_COR: string | null;
-    CODIGO: string | null;
-  }>(`
+  const montarSql = (empresa: string) => `
     SELECT TOP ${limite}
       LTRIM(RTRIM(p.PRODUTO)) AS PRODUTO,
       LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, ''))) AS DESC_PRODUTO,
@@ -164,16 +286,24 @@ export async function buscarSugestoesProduto(
       FROM PRODUTOS_BARRA pb WITH (NOLOCK)
       WHERE pb.PRODUTO = p.PRODUTO
         AND pb.CODIGO_BARRA IS NOT NULL
-        AND LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100)))) LIKE '%${tEsc}%'
+        AND LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100)))) LIKE '%${tLike}%'
       ORDER BY
         CASE WHEN LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100)))) = '${tEsc}' THEN 0 ELSE 1 END,
         LEN(LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100))))),
         pb.CODIGO_BARRA
     ) barra
+    -- Total de cores = cadastro de cores UNIÃO cores que têm código de barra,
+    -- exatamente o que a tela mostra quando o produto abre.
     OUTER APPLY (
-      SELECT COUNT(DISTINCT LTRIM(RTRIM(ISNULL(CAST(pc.COR_PRODUTO AS VARCHAR(20)), '')))) AS TOTAL
-      FROM PRODUTO_CORES pc WITH (NOLOCK)
-      WHERE pc.PRODUTO = p.PRODUTO
+      SELECT COUNT(*) AS TOTAL FROM (
+        SELECT DISTINCT LTRIM(RTRIM(ISNULL(CAST(pc.COR_PRODUTO AS VARCHAR(20)), ''))) AS COR
+        FROM PRODUTO_CORES pc WITH (NOLOCK)
+        WHERE pc.PRODUTO = p.PRODUTO
+        UNION
+        SELECT DISTINCT LTRIM(RTRIM(ISNULL(CAST(pb2.COR_PRODUTO AS VARCHAR(20)), ''))) AS COR
+        FROM PRODUTOS_BARRA pb2 WITH (NOLOCK)
+        WHERE pb2.PRODUTO = p.PRODUTO
+      ) u
     ) cores
     OUTER APPLY (
       SELECT TOP 1 LTRIM(RTRIM(ISNULL(pc.DESC_COR_PRODUTO, ''))) AS DESC_COR
@@ -184,28 +314,23 @@ export async function buscarSugestoesProduto(
           OR TRY_CONVERT(INT, pc.COR_PRODUTO) = TRY_CONVERT(INT, barra.COR_PRODUTO)
         )
     ) cor
-    WHERE (
-        UPPER(p.DESC_PRODUTO) LIKE '%${tUpper}%'
-        OR LTRIM(RTRIM(p.PRODUTO)) LIKE '%${tEsc}%'
-        OR barra.CODIGO_BARRA IS NOT NULL
-      )
+    WHERE (${condicaoTermo(t)} OR barra.CODIGO_BARRA IS NOT NULL)
       ${empresa}
       ${inativos}
     ORDER BY
-      CASE
-        WHEN barra.CODIGO_BARRA = '${tEsc}' THEN 0
-        WHEN LTRIM(RTRIM(p.PRODUTO)) = '${tEsc}' THEN 1
-        WHEN UPPER(LTRIM(RTRIM(p.DESC_PRODUTO))) = '${tUpper}' THEN 2
-        WHEN UPPER(p.DESC_PRODUTO) LIKE '${tUpper}%' THEN 3
-        WHEN UPPER(p.DESC_PRODUTO) LIKE '% ${tUpper}%' THEN 4
-        WHEN LTRIM(RTRIM(p.PRODUTO)) LIKE '${tEsc}%' THEN 5
-        WHEN UPPER(p.DESC_PRODUTO) LIKE '%${tUpper}%' THEN 6
-        WHEN barra.CODIGO_BARRA IS NOT NULL THEN 7
-        ELSE 8
-      END,
-      LEN(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))),
-      p.DESC_PRODUTO
-  `);
+      CASE WHEN barra.CODIGO_BARRA = '${tEsc}' THEN 0 ELSE 1 END,
+      ${ordemRelevancia(t)}
+  `;
+
+  let rows = await query<SugestaoRow>(montarSql(filtroEmpresa(company)));
+  let foraDoCatalogo = false;
+
+  // Repescão: o cadastro tem produtos em EMPRESAs fora do mapa (4, 6, 7, 11).
+  // Some-los da busca é pior do que mostrá-los com um aviso.
+  if (rows.length === 0) {
+    rows = await query<SugestaoRow>(montarSql(''));
+    foraDoCatalogo = rows.length > 0;
+  }
 
   return rows.map((r) => ({
     produto: (r.PRODUTO ?? '').trim(),
@@ -216,6 +341,7 @@ export async function buscarSugestoesProduto(
     corEncontrada: (r.COR ?? '').trim() || null,
     descCorEncontrada: (r.DESC_COR ?? '').trim() || null,
     codigoEncontrado: (r.CODIGO ?? '').trim() || null,
+    foraDoCatalogo,
   }));
 }
 
@@ -233,13 +359,10 @@ export async function buscarProdutosParaEtiqueta(
 
   const limite = Math.min(200, Math.max(1, opts.limite ?? 60));
   const tEsc = esc(t);
-  const tUpper = esc(t.toUpperCase());
-  const soDigitos = t.replace(/\D/g, '');
-  const empresa = opts.todoCadastro ? '' : filtroEmpresa(company);
   const inativos = opts.incluirInativos ? '' : 'AND ISNULL(p.INATIVO, 0) = 0';
 
-  // 1) Produtos que casam com o termo (código exato/prefixo, descrição ou barra).
-  const produtos = await query<ProdutoRow>(`
+  // 1) Produtos que casam com o termo (código, nome palavra a palavra ou barra).
+  const montarSql = (empresa: string) => `
     SELECT TOP ${limite}
       LTRIM(RTRIM(p.PRODUTO)) AS PRODUTO,
       LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, ''))) AS DESC_PRODUTO,
@@ -253,29 +376,21 @@ export async function buscarProdutosParaEtiqueta(
     FROM PRODUTOS p WITH (NOLOCK)
     -- Descrição da coleção vem de COLECOES (fonte mestre); PRODUTOS guarda só o código.
     LEFT JOIN COLECOES col WITH (NOLOCK) ON col.COLECAO = p.COLECAO
-    WHERE (
-        LTRIM(RTRIM(p.PRODUTO)) = '${tEsc}'
-        OR LTRIM(RTRIM(p.PRODUTO)) LIKE '${tEsc}%'
-        OR UPPER(p.DESC_PRODUTO) LIKE '%${tUpper}%'
-        ${
-          soDigitos.length >= 4
-            ? `OR EXISTS (
-                 SELECT 1 FROM PRODUTOS_BARRA pb WITH (NOLOCK)
-                 WHERE pb.PRODUTO = p.PRODUTO
-                   AND (
-                     LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100)))) = '${tEsc}'
-                     OR TRY_CONVERT(BIGINT, LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100))))) = TRY_CONVERT(BIGINT, '${esc(soDigitos)}')
-                   )
-               )`
-            : ''
-        }
-      )
+    WHERE ${condicaoTermo(t)}
       ${empresa}
       ${inativos}
     ORDER BY
       CASE WHEN LTRIM(RTRIM(p.PRODUTO)) = '${tEsc}' THEN 0 ELSE 1 END,
-      p.PRODUTO
-  `);
+      ${ordemRelevancia(t)}
+  `;
+
+  let produtos = await query<ProdutoRow>(montarSql(opts.todoCadastro ? '' : filtroEmpresa(company)));
+
+  // Repescão sem o filtro de EMPRESA: cadastro tem produtos em empresas fora do
+  // mapa e sumir com eles é pior do que trazê-los.
+  if (produtos.length === 0 && !opts.todoCadastro) {
+    produtos = await query<ProdutoRow>(montarSql(''));
+  }
 
   if (produtos.length === 0) return [];
 
