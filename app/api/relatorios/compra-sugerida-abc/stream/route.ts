@@ -33,6 +33,11 @@ export async function GET(request: Request) {
   const tipos = searchParams.getAll("tipo").filter(Boolean);
   const produtoId = searchParams.get("produtoId");
   const produtoSearchTerm = searchParams.get("produtoSearchTerm");
+  // Grupo de fornecedor (NERD): o front SEMPRE manda `fornecedor` em `buildQuery()`. Esta rota
+  // esquecia de lê-lo (a /dados lê), então o filtro escolhido na tela era silenciosamente
+  // ignorado e o arquivo saía com itens de OUTRO fornecedor — mesmo com o nome do arquivo
+  // dizendo "fornecedor-centro". Ver runReport (lib/reports/registry.server.ts).
+  const fornecedor = searchParams.get("fornecedor");
   const considerarTransferencias = searchParams.get("considerarTransferencias") === "1";
   const incluirRupturas = searchParams.get("incluirRupturas") === "1";
 
@@ -50,6 +55,7 @@ export async function GET(request: Request) {
     tipos: tipos.length > 0 ? tipos : null,
     produtoId: produtoId || null,
     produtoSearchTerm: produtoSearchTerm || null,
+    fornecedor: fornecedor || null,
     considerarTransferencias,
     incluirRupturas,
   };

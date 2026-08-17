@@ -8,6 +8,8 @@ import {
 } from "@/lib/config/company";
 import { listProdutosDescontinuados } from "@/lib/utils/produto-descontinuado-store";
 import { buildDescontinuadoKeySet, isProdutoDescontinuado } from "@/lib/utils/produtos-descontinuados";
+import { listFornecedoresByCompany } from "@/lib/utils/fornecedores-store";
+import { productMatchesFornecedor, type ProdutoInfo } from "@/lib/utils/fornecedor-matcher";
 import { fetchRupturasLoja, type RupturaItem } from "@/lib/repositories/lojaRaioX";
 import { normalizeRangeForQuery } from "@/lib/utils/date";
 import { canonicalKey, ROW_COR_FIELD, ROW_RUPTURA_FIELD } from "@/lib/reports/keys";
@@ -167,6 +169,9 @@ function roundInt(value: number | null | undefined): number {
  * filtros estruturais, e agrega à lista os itens que ela encontrou e a compra sugerida normal
  * NÃO capturou (produto×cor ainda não presente na lista principal) — nunca duplica. Mais caro
  * (uma consulta de vendas a mais por loja), mas fiel byte-a-byte à mesma lógica da página.
+ *
+ * Grupo de fornecedor (NERD, `filters.fornecedor`): aplicado aos DOIS lados (universo principal
+ * e itens de ruptura) com o matcher compartilhado, antes do cálculo — ver `matchesFornecedor`.
  */
 export async function fetchCompraSugeridaAbc(
   filters: ReportFilters,
@@ -192,11 +197,34 @@ export async function fetchCompraSugeridaAbc(
   ]);
   const descontinuadoKeys = buildDescontinuadoKeySet(descontinuados);
 
+  // Grupo de fornecedor (NERD): filtra o universo ANTES do cálculo por loja — mesma ordem da
+  // Curva ABC (universo filtrado → compra ideal) e MESMO matcher que o `runReport` aplica depois.
+  // Fazer aqui é o que mantém o resumo (Itens p/ comprar / Qtd / Custo total), a contagem de
+  // rupturas agregadas e a base de dedupe coerentes com as linhas que sobram — o filtro do
+  // `runReport` corta as linhas mas não recalcula o resumo. De quebra, não gasta consulta de
+  // métricas × loja em item que vai ser descartado.
+  const fornecedoresFiltro =
+    filters.fornecedor && filters.company
+      ? await listFornecedoresByCompany(filters.company)
+      : null;
+  const matchesFornecedor = (info: ProdutoInfo) =>
+    !fornecedoresFiltro || productMatchesFornecedor(fornecedoresFiltro, filters.fornecedor as string, info);
+
   const corSet = normalizeSet(filters.cores);
   const tipoSet = normalizeSet(filters.tipos);
   const filtered = details.filter((d) => {
     if (corSet && !corSet.has(up(d.descCorProduto))) return false;
     if (tipoSet && !tipoSet.has(up(d.tipo))) return false;
+    // Mesmos campos que o runReport usa (PRODUTO / cor da linha / DESCRICAO).
+    if (
+      !matchesFornecedor({
+        produto: String(d.productId ?? "").trim(),
+        cor: d.corProduto ?? null,
+        descricao: d.productName ?? null,
+      })
+    ) {
+      return false;
+    }
     return true;
   });
   filtered.sort((a, b) => b.totalRevenue - a.totalRevenue);
@@ -410,6 +438,11 @@ export async function fetchCompraSugeridaAbc(
       const label = labelByName.get(name) ?? name;
       for (const item of porFilialRupturas[idx] ?? []) {
         if (item.compraIdealQtd <= 0) continue; // só o que realmente precisa repor
+        // `fetchRupturasLoja` não conhece grupo de fornecedor — aplica a mesma régua do universo
+        // principal, senão a ruptura reintroduz item de outro fornecedor pela porta de trás.
+        if (!matchesFornecedor({ produto: item.produto, cor: item.cor, descricao: item.descricao })) {
+          continue;
+        }
         const key = canonicalKey(item.produto, item.cor);
         if (baseKeys.has(key)) continue; // já está na lista principal — nunca duplica
 
