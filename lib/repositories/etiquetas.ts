@@ -75,7 +75,10 @@ function condicaoTermo(termo: string, alias = 'p'): string {
   const t = (termo ?? '').trim();
   const tEsc = esc(t);
   const tLike = escLike(t);
-  const soDigitos = t.replace(/\D/g, '');
+  // Só trate o termo como código de barras quando ele for realmente numérico.
+  // Remover pontuação de um código de produto como "D4.14.15" gerava "41415"
+  // e podia fazê-lo casar com a barra "041415" de outro produto.
+  const soDigitos = /^\d+$/.test(t) ? t : '';
   const desc = descNormalizada(alias);
   const palavras = palavrasDoTermo(t);
 

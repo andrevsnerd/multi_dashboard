@@ -147,7 +147,35 @@ export async function exportEstoqueConsultaItemXlsx(
 
   // ── Linhas de dados ──
   const ZEBRA_FILL = { type: "pattern" as const, pattern: "solid" as const, fgColor: { argb: "FFF4F6FA" } };
-  const NEG_FONT_COLOR = { argb: "FFB91C1C" };
+  // Mesma "pegada" de destaque do export de compra sugerida / compra ideal
+  // ([lib/utils/exportCompraSugeridaAbcXlsx.ts]): fundo pastel + fonte escura da mesma
+  // matiz em negrito. Aqui a paleta muda conforme o caso:
+  //   · filial positiva  → verde
+  //   · Estoque total    → amarelo (destaca a coluna consolidada)
+  //   · negativo         → vermelho/rosa
+  //   · zero             → cinza-claro, sem fundo
+  const GREEN_TONE = { fill: "FFD8EFCB", font: "FF1F6B34" };
+  const YELLOW_TONE = { fill: "FFF9F2C1", font: "FF8A6A0B" };
+  const RED_TONE = { fill: "FFFAD3DC", font: "FFB01138" };
+  const ZERO_FONT_ARGB = "FFC0C6CC";
+
+  /**
+   * Pinta uma célula de quantidade conforme o sinal. `positiveTone` é a paleta usada
+   * quando o valor é positivo (verde nas filiais, amarelo no Estoque total).
+   */
+  const paintQtyCell = (
+    cell: ExcelJSCell,
+    value: number,
+    positiveTone: { fill: string; font: string }
+  ) => {
+    if (value === 0) {
+      cell.font = { size: 10, name: "Calibri", color: { argb: ZERO_FONT_ARGB } };
+      return;
+    }
+    const tone = value > 0 ? positiveTone : RED_TONE;
+    cell.font = { bold: true, size: 10, name: "Calibri", color: { argb: tone.font } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: tone.fill } };
+  };
 
   rows.forEach((row, i) => {
     const r = firstDataRow + i;
@@ -165,7 +193,7 @@ export async function exportEstoqueConsultaItemXlsx(
     totalCell.value = row.total;
     totalCell.numFmt = "#,##0";
     totalCell.alignment = { horizontal: "right", vertical: "middle" };
-    if (row.total < 0) totalCell.font = { size: 10, name: "Calibri", color: NEG_FONT_COLOR };
+    paintQtyCell(totalCell, row.total, YELLOW_TONE);
 
     filiaisColumns.forEach((f, fi) => {
       const value = row.porFilial[f] ?? 0;
@@ -173,7 +201,7 @@ export async function exportEstoqueConsultaItemXlsx(
       cell.value = value;
       cell.numFmt = "#,##0";
       cell.alignment = { horizontal: "right", vertical: "middle" };
-      if (value < 0) cell.font = { size: 10, name: "Calibri", color: NEG_FONT_COLOR };
+      paintQtyCell(cell, value, GREEN_TONE);
     });
 
     xrow.height = 16;
@@ -183,7 +211,8 @@ export async function exportEstoqueConsultaItemXlsx(
         top: { style: "hair" }, left: { style: "hair" },
         bottom: { style: "hair" }, right: { style: "hair" },
       };
-      if (i % 2 === 1) {
+      // Zebra só onde não há destaque: o verde do positivo não pode ser sobrescrito.
+      if (i % 2 === 1 && !cell.fill) {
         const existingFont = cell.font;
         cell.fill = ZEBRA_FILL;
         cell.font = existingFont;
