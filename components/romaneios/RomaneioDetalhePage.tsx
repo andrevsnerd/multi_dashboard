@@ -133,6 +133,8 @@ export interface RomaneioDetalheItem {
   descProduto: string;
   descCor: string;
   codigoBarra: string | null;
+  grupo: string;
+  linha: string;
   subgrupo: string;
   grade: string;
   qtde: number;
@@ -264,6 +266,34 @@ function normalizeSearchValue(value: string | null | undefined): string {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim();
+}
+
+function splitFamilyAndModel(descricao: string): { family: string; model: number | null } {
+  const raw = String(descricao ?? "").trim();
+  if (!raw) return { family: "", model: null };
+  const words = raw.split(/\s+/);
+  const idx = words.findIndex((w) => /\d/.test(w));
+  if (idx <= 0) return { family: raw.toUpperCase(), model: null };
+
+  const digits = words[idx].replace(/\D+/g, "");
+  const model = digits ? parseInt(digits, 10) : null;
+
+  let cut = idx;
+  const prevWord = words[cut - 1];
+  if (cut - 1 > 0 && prevWord && /^[A-Za-zÀ-ÿ]{1,3}$/.test(prevWord)) cut -= 1;
+
+  const family = words.slice(0, cut).join(" ").toUpperCase();
+  return { family: family || raw.toUpperCase(), model: Number.isFinite(model as number) ? model : null };
+}
+
+function getRomaneioCategoryValue(item: RomaneioDetalheItem, companySlug: string): string {
+  if (companySlug === "scarfme") {
+    return item.linha?.trim() || item.subgrupo?.trim() || "SEM LINHA";
+  }
+  if (companySlug === "nerd") {
+    return item.grupo?.trim() || "SEM GRUPO";
+  }
+  return item.grupo?.trim() || item.subgrupo?.trim() || item.linha?.trim() || "SEM GRUPO";
 }
 
 export default function RomaneioDetalhePage({
@@ -763,6 +793,68 @@ export default function RomaneioDetalhePage({
       codigoProduto.includes(filtroItemNormalizado)
     );
   });
+
+  const tableColSpan =
+    8 +
+    (isSaida && destinoSelected ? 1 : 0) +
+    (isEntradaLike ? 1 : 0) +
+    (isSaida || isTransito ? 1 : 0);
+
+  const itensPlanejados = (() => {
+    const byCategory = new Map<string, RomaneioDetalheItem[]>();
+
+    for (const item of itensFiltrados) {
+      const category = getRomaneioCategoryValue(item, companySlug);
+      const bucket = byCategory.get(category) ?? [];
+      bucket.push(item);
+      byCategory.set(category, bucket);
+    }
+
+    const planned: Array<
+      | { kind: "banner"; label: string }
+      | { kind: "item"; item: RomaneioDetalheItem; index: number }
+    > = [];
+
+    for (const [category, categoryItems] of byCategory) {
+      planned.push({ kind: "banner", label: category });
+
+      const families = new Map<string, Array<{ item: RomaneioDetalheItem; index: number }>>();
+
+      categoryItems.forEach((item, index) => {
+        const { family } = splitFamilyAndModel(item.descProduto);
+        const familyKey = family || "—";
+        const familyItems = families.get(familyKey) ?? [];
+        familyItems.push({ item, index });
+        families.set(familyKey, familyItems);
+      });
+
+      for (const familyItems of families.values()) {
+        familyItems.sort((a, b) => {
+          const aSplit = splitFamilyAndModel(a.item.descProduto);
+          const bSplit = splitFamilyAndModel(b.item.descProduto);
+          const aModel = aSplit.model ?? Number.POSITIVE_INFINITY;
+          const bModel = bSplit.model ?? Number.POSITIVE_INFINITY;
+          if (aModel !== bModel) return aModel - bModel;
+
+          const aDesc = String(a.item.descProduto ?? "").toUpperCase();
+          const bDesc = String(b.item.descProduto ?? "").toUpperCase();
+          if (aDesc !== bDesc) return aDesc.localeCompare(bDesc, "pt-BR");
+
+          if (a.item.produto !== b.item.produto) {
+            return a.item.produto.localeCompare(b.item.produto, "pt-BR");
+          }
+
+          return a.index - b.index;
+        });
+
+        for (const familyItem of familyItems) {
+          planned.push({ kind: "item", item: familyItem.item, index: familyItem.index });
+        }
+      }
+    }
+
+    return planned;
+  })();
 
   const todosConfirmados = itens.length > 0 && itens.every((item) =>
     confirmados.has(`${item.produto}|${item.corProduto ?? ""}`)
@@ -1331,7 +1423,7 @@ export default function RomaneioDetalhePage({
         );
       })()}
 
-      {itensFiltrados.length > 0 && (
+      {itensPlanejados.length > 0 && (
         <div className={styles.tableWrap}>
           <table className={styles.table}>
           <thead>
@@ -1350,7 +1442,18 @@ export default function RomaneioDetalhePage({
             </tr>
           </thead>
           <tbody>
-            {itensFiltrados.map((item, idx) => {
+            {itensPlanejados.map((entry, idx) => {
+              if (entry.kind === "banner") {
+                return (
+                  <tr key={`banner-${entry.label}-${idx}`} className={styles.groupBannerRow}>
+                    <td colSpan={tableColSpan} className={styles.groupBannerCell}>
+                      {entry.label}
+                    </td>
+                  </tr>
+                );
+              }
+
+              const item = entry.item;
               const destinoCell =
                 isSaida
                   ? destinoDisplay || "—"
@@ -1492,7 +1595,7 @@ export default function RomaneioDetalhePage({
           Nenhum item encontrado neste romaneio.
         </div>
       )}
-      {itens.length > 0 && itensFiltrados.length === 0 && (
+      {itens.length > 0 && itensPlanejados.length === 0 && (
         <div className={styles.emptyState}>
           Nenhum item encontrado para o filtro informado.
         </div>

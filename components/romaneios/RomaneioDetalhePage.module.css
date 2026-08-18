@@ -226,6 +226,29 @@
   background: var(--s-gray50);
 }
 
+.groupBannerRow:hover {
+  background: transparent !important;
+}
+
+.groupBannerCell {
+  padding: 10px 14px !important;
+  background: #eef2ff;
+  color: #312e81 !important;
+  border-top: 1px solid #c7d2fe;
+  border-bottom: 1px solid #c7d2fe;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+:global(:root[data-theme="dark"]) .groupBannerCell {
+  background: rgba(51, 65, 85, 0.72);
+  color: #e2e8f0 !important;
+  border-top: 1px solid rgba(148, 163, 184, 0.24);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.24);
+}
+
 .destinoTag {
   display: inline-block;
   padding: 4px 10px;

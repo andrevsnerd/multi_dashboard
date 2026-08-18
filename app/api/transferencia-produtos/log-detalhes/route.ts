@@ -8,6 +8,8 @@ interface LogDetalheItem {
   descProduto: string;
   descCor: string;
   codigoBarra: string | null;
+  grupo: string;
+  linha: string;
   subgrupo: string;
   grade: string;
   qtde: number;
@@ -121,6 +123,8 @@ export async function GET(request: Request) {
             ISNULL(c.DESC_COR, '') AS DESC_COR,
             (SELECT TOP 1 pb2.CODIGO_BARRA FROM PRODUTOS_BARRA pb2 WITH (NOLOCK)
              WHERE pb2.PRODUTO = sp.PRODUTO AND (ISNULL(pb2.COR_PRODUTO,'') = ISNULL(sp.COR_PRODUTO,''))) AS CODIGO_BARRA,
+            ISNULL(p.GRUPO_PRODUTO, '') AS GRUPO,
+            ISNULL(p.LINHA, '') AS LINHA,
             ISNULL(p.SUBGRUPO_PRODUTO, '') AS SUBGRUPO,
             ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS GRADE
           FROM LOJA_SAIDAS_PRODUTO sp WITH (NOLOCK)
@@ -141,6 +145,8 @@ export async function GET(request: Request) {
             ISNULL(c2.DESC_COR, '') AS DESC_COR,
             (SELECT TOP 1 pb3.CODIGO_BARRA FROM PRODUTOS_BARRA pb3 WITH (NOLOCK)
              WHERE pb3.PRODUTO = ep.PRODUTO AND (ISNULL(pb3.COR_PRODUTO,'') = ISNULL(ep.COR_PRODUTO,''))) AS CODIGO_BARRA,
+            ISNULL(p2.GRUPO_PRODUTO, '') AS GRUPO,
+            ISNULL(p2.LINHA, '') AS LINHA,
             ISNULL(p2.SUBGRUPO_PRODUTO, '') AS SUBGRUPO,
             ISNULL(CONVERT(VARCHAR, p2.GRADE), '') AS GRADE
           FROM ESTOQUE_PROD1_SAI ep WITH (NOLOCK)
@@ -171,6 +177,8 @@ export async function GET(request: Request) {
             ISNULL(c.DESC_COR, '') AS DESC_COR,
             (SELECT TOP 1 pb2.CODIGO_BARRA FROM PRODUTOS_BARRA pb2 WITH (NOLOCK)
              WHERE pb2.PRODUTO = ep.PRODUTO AND (ISNULL(pb2.COR_PRODUTO,'') = ISNULL(ep.COR_PRODUTO,''))) AS CODIGO_BARRA,
+            ISNULL(p.GRUPO_PRODUTO, '') AS GRUPO,
+            ISNULL(p.LINHA, '') AS LINHA,
             ISNULL(p.SUBGRUPO_PRODUTO, '') AS SUBGRUPO,
             ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS GRADE
           FROM ESTOQUE_PROD1_ENT ep WITH (NOLOCK)
@@ -191,6 +199,8 @@ export async function GET(request: Request) {
             ISNULL(c2.DESC_COR, '') AS DESC_COR,
             (SELECT TOP 1 pb3.CODIGO_BARRA FROM PRODUTOS_BARRA pb3 WITH (NOLOCK)
              WHERE pb3.PRODUTO = lep.PRODUTO AND (ISNULL(pb3.COR_PRODUTO,'') = ISNULL(lep.COR_PRODUTO,''))) AS CODIGO_BARRA,
+            ISNULL(p2.GRUPO_PRODUTO, '') AS GRUPO,
+            ISNULL(p2.LINHA, '') AS LINHA,
             ISNULL(p2.SUBGRUPO_PRODUTO, '') AS SUBGRUPO,
             ISNULL(CONVERT(VARCHAR, p2.GRADE), '') AS GRADE
           FROM LOJA_ENTRADAS_PRODUTO lep WITH (NOLOCK)
@@ -221,6 +231,8 @@ export async function GET(request: Request) {
         DESC_PRODUTO: string;
         DESC_COR: string;
         CODIGO_BARRA: string | null;
+        GRUPO: string;
+        LINHA: string;
         SUBGRUPO: string;
         GRADE: string;
       }>(itemsQuery);
@@ -306,6 +318,8 @@ export async function GET(request: Request) {
       DESC_PRODUTO?: string;
       DESC_COR?: string;
       CODIGO_BARRA?: string | null;
+      GRUPO?: string;
+      LINHA?: string;
       SUBGRUPO?: string;
       GRADE?: string;
     }>;
@@ -333,6 +347,8 @@ export async function GET(request: Request) {
         descProduto: row.DESC_PRODUTO?.toString().trim() ?? '',
         descCor: row.DESC_COR?.toString().trim() ?? '',
         codigoBarra: row.CODIGO_BARRA?.toString().trim() || null,
+        grupo: row.GRUPO?.toString().trim() ?? '',
+        linha: row.LINHA?.toString().trim() ?? '',
         subgrupo: row.SUBGRUPO?.toString().trim() ?? '',
         grade: row.GRADE?.toString().trim() ?? '',
         qtde: Number(row.QTDE) || 0,
