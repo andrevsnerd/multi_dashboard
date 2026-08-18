@@ -258,6 +258,14 @@ function sanitizeFilenamePart(value: string): string {
     .slice(0, 80);
 }
 
+function normalizeSearchValue(value: string | null | undefined): string {
+  return (value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
 export default function RomaneioDetalhePage({
   companySlug,
   romaneioId,
@@ -278,6 +286,7 @@ export default function RomaneioDetalhePage({
   const [loading, setLoading] = useState(true);
   const [deleteModalAberto, setDeleteModalAberto] = useState(false);
   const [responsavelPadrao, setResponsavelPadrao] = useState<string | null>(null);
+  const [filtroItem, setFiltroItem] = useState("");
 
   useEffect(() => {
     if (!user?.username) return;
@@ -740,6 +749,21 @@ export default function RomaneioDetalhePage({
     return !confirmados.has(chave) && (quantidades.get(chave) ?? item.qtde) > 0;
   });
 
+  const filtroItemNormalizado = normalizeSearchValue(filtroItem);
+  const itensFiltrados = itens.filter((item) => {
+    if (!filtroItemNormalizado) return true;
+
+    const descricao = normalizeSearchValue(item.descProduto);
+    const codigoBarras = normalizeSearchValue(item.codigoBarra);
+    const codigoProduto = normalizeSearchValue(item.produto);
+
+    return (
+      descricao.includes(filtroItemNormalizado) ||
+      codigoBarras.includes(filtroItemNormalizado) ||
+      codigoProduto.includes(filtroItemNormalizado)
+    );
+  });
+
   const todosConfirmados = itens.length > 0 && itens.every((item) =>
     confirmados.has(`${item.produto}|${item.corProduto ?? ""}`)
   );
@@ -970,6 +994,31 @@ export default function RomaneioDetalhePage({
       )}
 
       {/* Banner: romaneio de entrada gerado após Confirmar Tudo */}
+      <div className={styles.buscaSection}>
+        <label htmlFor="busca-item-romaneio" className={styles.buscaLabel}>
+          Buscar item
+        </label>
+        <div className={styles.buscaRow}>
+          <input
+            id="busca-item-romaneio"
+            type="text"
+            className={styles.buscaInput}
+            value={filtroItem}
+            onChange={(e) => setFiltroItem(e.target.value)}
+            placeholder="Digite o nome, código do produto ou código de barras"
+          />
+          {filtroItem && (
+            <button
+              type="button"
+              className={styles.buscaClearBtn}
+              onClick={() => setFiltroItem("")}
+            >
+              Limpar
+            </button>
+          )}
+        </div>
+      </div>
+
       {romaneioGerado && (
         <div className={styles.romaneioGeradoBanner}>
           <span>
@@ -1282,8 +1331,9 @@ export default function RomaneioDetalhePage({
         );
       })()}
 
-      <div className={styles.tableWrap}>
-        <table className={styles.table}>
+      {itensFiltrados.length > 0 && (
+        <div className={styles.tableWrap}>
+          <table className={styles.table}>
           <thead>
             <tr>
               <th>PRODUTO</th>
@@ -1300,7 +1350,7 @@ export default function RomaneioDetalhePage({
             </tr>
           </thead>
           <tbody>
-            {itens.map((item, idx) => {
+            {itensFiltrados.map((item, idx) => {
               const destinoCell =
                 isSaida
                   ? destinoDisplay || "—"
@@ -1433,12 +1483,18 @@ export default function RomaneioDetalhePage({
               );
             })}
           </tbody>
-        </table>
-      </div>
+          </table>
+        </div>
+      )}
 
       {itens.length === 0 && (
         <div className={styles.emptyState}>
           Nenhum item encontrado neste romaneio.
+        </div>
+      )}
+      {itens.length > 0 && itensFiltrados.length === 0 && (
+        <div className={styles.emptyState}>
+          Nenhum item encontrado para o filtro informado.
         </div>
       )}
     </div>

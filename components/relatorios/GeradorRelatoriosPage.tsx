@@ -883,7 +883,7 @@ export default function GeradorRelatoriosPage({
       );
       return;
     }
-    exportRelatorioXlsx(
+    void exportRelatorioXlsx(
       sortedRows,
       enabledColumns.map((c) => ({ key: c.key, label: c.label })),
       {

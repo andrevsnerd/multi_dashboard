@@ -634,6 +634,61 @@
   margin-bottom: 16px;
 }
 
+.buscaSection {
+  margin-bottom: 16px;
+}
+
+.buscaLabel {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--t-gray500);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin-bottom: 6px;
+}
+
+.buscaRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.buscaInput {
+  flex: 1;
+  min-width: 280px;
+  padding: 10px 12px;
+  font-size: 14px;
+  border: 1px solid var(--b-gray200);
+  border-radius: 8px;
+  background: var(--s-white);
+  color: var(--t-gray900);
+}
+
+.buscaInput:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.buscaClearBtn {
+  padding: 10px 16px;
+  background: var(--s-white);
+  color: var(--t-gray700);
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid var(--b-gray300);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.buscaClearBtn:hover {
+  background: var(--s-gray50);
+  border-color: #9ca3af;
+}
+
 .confirmarTudoBtn {
   display: inline-flex;
   align-items: center;
