@@ -55,6 +55,8 @@ export async function exportEstoqueConsultaItemXlsx(
 ): Promise<void> {
   const { rows, filiaisColumns, companyKey } = options;
   const isScarfme = companyKey === "scarfme";
+  const groupedRows = rows.filter((row) => !row.tamanho);
+  const estoqueTotal = groupedRows.reduce((sum, row) => sum + row.total, 0);
 
   if (rows.length === 0) {
     alert("Não há dados para exportar");
@@ -99,6 +101,12 @@ export async function exportEstoqueConsultaItemXlsx(
       .length.toLocaleString("pt-BR")} item(ns)`,
     ...(options.filtrosResumo ? [options.filtrosResumo] : []),
   ];
+  titleLines[1] =
+    `${options.companyName}  Â·  Filial: ${options.filialLabel ?? "Todas"}  Â·  ` +
+    `Estoque total: ${estoqueTotal.toLocaleString("pt-BR")}`;
+  titleLines[1] =
+    `${options.companyName}  -  Filial: ${options.filialLabel ?? "Todas"}  -  ` +
+    `Estoque total: ${estoqueTotal.toLocaleString("pt-BR")}`;
   const headerRowNum = titleLines.length + 1;
   const firstDataRow = headerRowNum + 1;
 
@@ -228,7 +236,7 @@ export async function exportEstoqueConsultaItemXlsx(
 
   // Com quebra por tamanho as linhas de P/M/G repetem o mesmo estoque da agrupada, então
   // o rodapé soma só onde a coluna Tamanho está vazia (= linhas agrupadas).
-  const agrupadas = rows.filter((row) => !row.tamanho);
+  const agrupadas = groupedRows;
   const tamanhoRange =
     tamanhoColIndex > 0
       ? `${colLetter(tamanhoColIndex)}${firstDataRow}:${colLetter(tamanhoColIndex)}${lastDataRow}`

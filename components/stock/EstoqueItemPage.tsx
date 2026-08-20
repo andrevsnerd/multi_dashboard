@@ -1171,12 +1171,12 @@ export default function EstoqueItemPage({
       {kpis ? (
         <div className={styles.kpis}>
           <div className={styles.kpi}>
-            <div className={styles.kpiLabel}>Itens encontrados</div>
-            <div className={styles.kpiValue}>{formatInt(kpis.itens)}</div>
-          </div>
-          <div className={styles.kpi}>
             <div className={styles.kpiLabel}>Estoque total</div>
             <div className={styles.kpiValue}>{formatInt(kpis.estoqueTotal)}</div>
+          </div>
+          <div className={styles.kpi}>
+            <div className={styles.kpiLabel}>Itens encontrados</div>
+            <div className={styles.kpiValue}>{formatInt(kpis.itens)}</div>
           </div>
           <div className={styles.kpi}>
             <div className={styles.kpiLabel}>Filiais visiveis</div>
