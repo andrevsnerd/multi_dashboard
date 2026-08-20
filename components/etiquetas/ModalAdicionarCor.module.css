@@ -1,0 +1,316 @@
+/* Adicionar Cor — mesmos tokens globais do modal de Custo / Preço, então o tema
+   noturno vem de graça e os dois modais da tela parecem irmãos. */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 1000;
+}
+:global(:root[data-theme="dark"]) .overlay {
+  background: rgba(2, 6, 23, 0.7);
+}
+
+.modal {
+  background: var(--s-white);
+  border: 1px solid var(--b-200);
+  border-radius: 14px;
+  box-shadow: var(--elev-2);
+  padding: 20px;
+  width: min(760px, 100%);
+  max-height: 88vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  color: var(--t-900);
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.titulo {
+  font-size: 15px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.subtitulo {
+  font-size: 13px;
+  color: var(--t-500);
+  margin-top: 4px;
+}
+.tagInativo {
+  font-size: 11px;
+  font-weight: 700;
+  color: #b45309;
+  background: rgba(234, 179, 8, 0.16);
+  padding: 1px 6px;
+  border-radius: 999px;
+  margin-left: 6px;
+}
+.botaoFechar {
+  border: 1px solid var(--b-200);
+  background: var(--s-white);
+  color: var(--t-500);
+  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+}
+.botaoFechar:hover {
+  background: var(--s-100);
+  color: var(--t-900);
+}
+
+/* ── busca + lista de cores ── */
+
+.busca {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.rotulo {
+  font-size: 12px;
+  color: var(--t-500);
+}
+.inputBusca {
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--b-300);
+  background: var(--s-white);
+  color: var(--t-900);
+  font-size: 14px;
+}
+.inputTexto {
+  width: 100%;
+  padding: 7px 9px;
+  border-radius: 6px;
+  border: 1px solid var(--b-300);
+  background: var(--s-white);
+  color: var(--t-900);
+  font-size: 13px;
+  text-transform: uppercase;
+}
+
+.lista {
+  border: 1px solid var(--b-200);
+  border-radius: 10px;
+  max-height: 300px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  text-align: left;
+  padding: 7px 10px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--b-subtle);
+  cursor: pointer;
+  color: var(--t-900);
+  font-size: 13px;
+}
+.item:last-child {
+  border-bottom: 0;
+}
+.item:hover:not(:disabled) {
+  background: var(--s-50);
+}
+.itemSelecionado,
+.itemSelecionado:hover {
+  background: var(--s-100);
+  box-shadow: inset 3px 0 0 var(--t-900);
+}
+.item:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.codigo {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 700;
+  min-width: 42px;
+}
+.nome {
+  font-weight: 600;
+}
+/* Nome do cadastro global quando ele DIVERGE do que a empresa usa — é o caso do
+   '06' (PRETO na tabela, ROXO na NERD). Aparecer é o ponto. */
+.nomeGlobal {
+  color: var(--t-500);
+  font-size: 12px;
+}
+.usos {
+  margin-left: auto;
+  color: var(--t-500);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.tagJaTem {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--t-500);
+  background: var(--s-100);
+  border-radius: 999px;
+  padding: 1px 6px;
+}
+.tagConflito {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #b45309;
+  background: rgba(234, 179, 8, 0.16);
+  border-radius: 999px;
+  padding: 1px 6px;
+}
+
+/* ── prévia ── */
+
+.previa {
+  border: 1px solid var(--b-200);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--s-50);
+}
+.previaLinha {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  color: var(--t-500);
+}
+.previaLinha strong {
+  color: var(--t-900);
+}
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.tabela th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--t-500);
+  font-weight: 600;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--b-200);
+  white-space: nowrap;
+}
+.tabela td {
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--b-subtle);
+}
+.tdMono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 700;
+}
+
+/* ── rodapé ── */
+
+.rodape {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--b-200);
+  padding-top: 12px;
+}
+.campoRodape {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--t-500);
+  flex: 1 1 200px;
+  min-width: 160px;
+}
+.acoes {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+.botao {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--b-300);
+  background: var(--s-white);
+  color: var(--t-900);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.botao:hover:not(:disabled) {
+  background: var(--s-100);
+}
+.botaoPrimario {
+  background: var(--t-900);
+  border-color: var(--t-900);
+  color: var(--s-white);
+}
+.botaoPrimario:hover:not(:disabled) {
+  opacity: 0.9;
+  background: var(--t-900);
+}
+.botao:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── mensagens ── */
+
+.erro,
+.aviso,
+.ok {
+  font-size: 13px;
+  border-radius: 8px;
+  padding: 9px 12px;
+  border: 1px solid;
+}
+.erro {
+  color: #b91c1c;
+  background: rgba(220, 38, 38, 0.08);
+  border-color: rgba(220, 38, 38, 0.25);
+}
+.aviso {
+  color: #b45309;
+  background: rgba(234, 179, 8, 0.12);
+  border-color: rgba(234, 179, 8, 0.3);
+}
+.ok {
+  color: #15803d;
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.28);
+}
+.vazio {
+  font-size: 13px;
+  color: var(--t-500);
+  padding: 14px 4px;
+  text-align: center;
+}

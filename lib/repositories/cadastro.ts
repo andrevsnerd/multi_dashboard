@@ -1046,6 +1046,27 @@ function novoLoteId(): string {
   return `CAD${stamp}${rand}`;
 }
 
+export type LinhaHistoricoCadastro = LinhaHistoricoInput;
+
+/**
+ * Registra um lote no histórico de cadastro a partir de OUTRA tela.
+ *
+ * Existe para que alterações de cadastro feitas fora desta página (hoje:
+ * "Adicionar Cor" na tela de Imprimir Etiquetas) caiam no MESMO histórico, com
+ * a mesma tabela e o mesmo formato de lote — em vez de cada tela inventar o seu.
+ * Devolve o lote gerado.
+ */
+export async function registrarHistoricoCadastro(params: {
+  company: CadastroCompany;
+  usuario: string;
+  obs?: string | null;
+  linhas: LinhaHistoricoCadastro[];
+}): Promise<string> {
+  const lote = novoLoteId();
+  await gravarHistorico(lote, params.company, params.usuario, params.obs ?? null, null, params.linhas);
+  return lote;
+}
+
 // ═════════════════════════ execução: dimensões ═════════════════════════
 
 export interface ResultadoDimensao {

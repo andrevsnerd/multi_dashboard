@@ -38,6 +38,7 @@ import ConfiguracaoEtiqueta from "./ConfiguracaoEtiqueta";
 import CalibracaoEtiqueta from "./CalibracaoEtiqueta";
 import EditorVisualEtiqueta from "./EditorVisualEtiqueta";
 import EtiquetaSvg from "./EtiquetaSvg";
+import ModalAdicionarCor from "./ModalAdicionarCor";
 import ModalCustoProduto from "./ModalCustoProduto";
 import styles from "./ImprimirEtiquetasPage.module.css";
 import {
@@ -138,6 +139,16 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
 
   /** Produto com a ficha de custo/preço aberta (null = modal fechado). */
   const [produtoCusto, setProdutoCusto] = useState<{ produto: string; descProduto: string } | null>(
+    null
+  );
+
+  /**
+   * Produto com o widget de Adicionar Cor aberto. A autorização é a MESMA de
+   * Alterar Custo / Preço (decisão do dono: criar cor é ato de cadastro, não de
+   * loja) — por isso reaproveita `podeVerCusto` / `podeAlterarCusto`, que são
+   * exatamente CUSTO_VISIBLE_ROLES e o filtro de somente-leitura.
+   */
+  const [produtoCor, setProdutoCor] = useState<{ produto: string; descProduto: string } | null>(
     null
   );
 
@@ -885,6 +896,24 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
                               Alterar Custo
                             </button>
                           ) : null}
+                          {/* Chegou peça de cor que não está no cadastro: cria a
+                              cor com os códigos de barra e imprime na hora. Mesma
+                              autorização de Alterar Custo / Preço. */}
+                          {podeVerCusto ? (
+                            <button
+                              type="button"
+                              className={styles.botaoCusto}
+                              onClick={() =>
+                                setProdutoCor({
+                                  produto: produto.produto,
+                                  descProduto: produto.descProduto || produto.produto,
+                                })
+                              }
+                              title="Adicionar uma cor já cadastrada no sistema a este produto, gerando os códigos de barra (interno + EAN) no Linx"
+                            >
+                              Adicionar Cor
+                            </button>
+                          ) : null}
                         </div>
                         {/* A contagem de cores fica à vista de propósito: é
                             como conferir num relance se vieram TODAS as cores
@@ -1401,6 +1430,23 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
           descProduto={produtoCusto.descProduto}
           podeGravar={podeAlterarCusto}
           onFechar={() => setProdutoCusto(null)}
+        />
+      ) : null}
+
+      {/* Adicionar cor ao cadastro do produto (com os códigos de barra), sem
+          sair da tela. Ao criar, o produto é relido para a cor nova já aparecer
+          imprimível, com a cor destacada na tabela. */}
+      {produtoCor ? (
+        <ModalAdicionarCor
+          companyKey={companyKey}
+          username={username}
+          produto={produtoCor.produto}
+          descProduto={produtoCor.descProduto}
+          podeGravar={podeAlterarCusto}
+          onFechar={() => setProdutoCor(null)}
+          onCriada={(cor) => {
+            void abrirProduto(produtoCor.produto, cor);
+          }}
         />
       ) : null}
 
