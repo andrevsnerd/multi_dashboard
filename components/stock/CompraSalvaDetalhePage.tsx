@@ -771,8 +771,17 @@ export default function CompraSalvaDetalhePage({
   const [manualDistribuicao, setManualDistribuicao] = useState<Record<string, Record<string, number>>>({});
   const manualDistribuicaoRef = useRef(manualDistribuicao);
   manualDistribuicaoRef.current = manualDistribuicao;
+  /**
+   * Quantidade travada à mão por tamanho: `itemKey` → ordinal da grade → quantidade.
+   * Tamanho que está aqui vale exatamente o que o comprador digitou; os outros dividem o
+   * que sobra da Qtd do item em grade fechada. A soma das linhas continua sendo a Qtd.
+   */
+  const [manualTamanhoQtd, setManualTamanhoQtd] = useState<Record<string, Record<number, number>>>({});
+  const manualTamanhoQtdRef = useRef(manualTamanhoQtd);
+  manualTamanhoQtdRef.current = manualTamanhoQtd;
   const filialOptions = useMemo(() => getFilialOptions(companyKey), [companyKey]);
   const manualStorageKey = `compra-manual:${compraId}`;
+  const manualTamanhoStorageKey = `compra-manual-tamanho:${compraId}`;
 
   useEffect(() => {
     let cancelled = false;
@@ -818,6 +827,44 @@ export default function CompraSalvaDetalhePage({
       }
     } catch { /* ignora erros de storage */ }
   }, [manualState, manualDistribuicao, manualStorageKey]);
+
+  // Restaura as quantidades travadas por tamanho (P/M/G editados à mão)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(manualTamanhoStorageKey);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as Record<string, Record<string, number>>;
+      if (typeof saved !== "object" || saved === null) return;
+      const normalizado: Record<string, Record<number, number>> = {};
+      for (const [itemKey, porOrdinal] of Object.entries(saved)) {
+        if (typeof porOrdinal !== "object" || porOrdinal === null) continue;
+        const limpo: Record<number, number> = {};
+        for (const [ordinal, qtd] of Object.entries(porOrdinal)) {
+          const ord = Number(ordinal);
+          const valor = Number(qtd);
+          if (!Number.isFinite(ord) || !Number.isFinite(valor)) continue;
+          limpo[ord] = Math.max(0, Math.round(valor));
+        }
+        if (Object.keys(limpo).length > 0) normalizado[itemKey] = limpo;
+      }
+      manualTamanhoQtdRef.current = normalizado;
+      setManualTamanhoQtd(normalizado);
+    } catch { /* ignora dados corrompidos */ }
+  }, [manualTamanhoStorageKey]);
+
+  // Persiste as travas por tamanho
+  useEffect(() => {
+    try {
+      const comTrava = Object.fromEntries(
+        Object.entries(manualTamanhoQtd).filter(([, porOrdinal]) => Object.keys(porOrdinal ?? {}).length > 0)
+      );
+      if (Object.keys(comTrava).length > 0) {
+        localStorage.setItem(manualTamanhoStorageKey, JSON.stringify(comTrava));
+      } else {
+        localStorage.removeItem(manualTamanhoStorageKey);
+      }
+    } catch { /* ignora erros de storage */ }
+  }, [manualTamanhoQtd, manualTamanhoStorageKey]);
 
   const expandirPorCor = doc?.expandirPorCor ?? true;
 
@@ -1242,6 +1289,7 @@ export default function CompraSalvaDetalhePage({
         return;
       }
       setItems((prev) => prev.filter((i) => i.itemKey !== itemKey));
+      handleManualTamanhoReset(itemKey);
     } catch (e) {
       window.alert(e instanceof Error ? e.message : "Erro ao remover item");
     }
@@ -1403,6 +1451,7 @@ export default function CompraSalvaDetalhePage({
               estoquePorFilial: tamanhoInfo.porFilial,
               vendasPorFilial: vendasRows,
               companyKey,
+              qtdPorOrdinal: manualTamanhoQtd[it.itemKey],
             })
           : null;
     }
@@ -1412,6 +1461,7 @@ export default function CompraSalvaDetalhePage({
     expandirPorCor,
     manualState,
     manualDistribuicao,
+    manualTamanhoQtd,
     tamanhosCache,
     vendasPorFilialCache,
     companyKey,
@@ -1702,6 +1752,54 @@ export default function CompraSalvaDetalhePage({
     void handleUpdateQtd(itemKey, total);
   };
 
+  /**
+   * Trava a quantidade de um tamanho (o comprador digitou 3 no P). Os tamanhos livres
+   * redividem o que sobra da Qtd do item — a soma das linhas nunca deixa de bater com ela.
+   * Se as travas passarem da Qtd, é a Qtd que sobe: quem digitou 4 no P quer 4 no P.
+   */
+  const handleManualTamanhoSet = (
+    itemKey: string,
+    ordinal: number,
+    value: number,
+    qtdAtualItem: number,
+    tamanhosNaGrade: number
+  ) => {
+    const bruto = Number(value);
+    const qtd = Math.max(0, Math.round(Number.isFinite(bruto) ? bruto : 0));
+    const doItem = { ...(manualTamanhoQtdRef.current[itemKey] ?? {}), [ordinal]: qtd };
+    const next = { ...manualTamanhoQtdRef.current, [itemKey]: doItem };
+    manualTamanhoQtdRef.current = next;
+    setManualTamanhoQtd(next);
+
+    // A Qtd do item segue as travas em dois casos: quando elas passam dela, e quando a
+    // grade toda está travada (aí não sobra tamanho livre para absorver a diferença).
+    const somaTravada = Object.values(doItem).reduce((soma, v) => soma + v, 0);
+    const gradeTodaTravada = tamanhosNaGrade > 0 && Object.keys(doItem).length >= tamanhosNaGrade;
+    if (somaTravada > qtdAtualItem || (gradeTodaTravada && somaTravada !== qtdAtualItem)) {
+      setItems((prev) => prev.map((i) => (i.itemKey === itemKey ? { ...i, qtdManual: somaTravada } : i)));
+      void handleUpdateQtd(itemKey, somaTravada);
+    }
+  };
+
+  /** Solta a trava de um tamanho: ele volta a entrar na divisão da grade fechada. */
+  const handleManualTamanhoLimpar = (itemKey: string, ordinal: number) => {
+    const doItem = { ...(manualTamanhoQtdRef.current[itemKey] ?? {}) };
+    delete doItem[ordinal];
+    const next = { ...manualTamanhoQtdRef.current };
+    if (Object.keys(doItem).length > 0) next[itemKey] = doItem;
+    else delete next[itemKey];
+    manualTamanhoQtdRef.current = next;
+    setManualTamanhoQtd(next);
+  };
+
+  /** Solta todas as travas do item — a grade volta 100% automática (fechada). */
+  const handleManualTamanhoReset = (itemKey: string) => {
+    const next = { ...manualTamanhoQtdRef.current };
+    delete next[itemKey];
+    manualTamanhoQtdRef.current = next;
+    setManualTamanhoQtd(next);
+  };
+
   const handleManualAddFilial = (itemKey: string, filial: string) => {
     setManualDistribuicao((prev) => {
       const current = prev[itemKey] ?? {};
@@ -1968,12 +2066,54 @@ export default function CompraSalvaDetalhePage({
                               type="number"
                               value={effectiveQtdManual}
                               min={0}
+                              /* Peça fashion anda de grade em grade: 6 → 9 → 12 numa P/M/G. */
+                              step={distTamanho ? distTamanho.tamanhosNaGrade : 1}
                               onChange={(e) => {
                                 const v = Math.max(0, Math.round(Number(e.target.value ?? 0)));
                                 setItems((prev) => prev.map((x) => (x.itemKey === it.itemKey ? { ...x, qtdManual: v } : x)));
                               }}
                               onBlur={() => { void handleUpdateQtd(it.itemKey, effectiveQtdManual); }}
                             />
+                          )}
+                          {distTamanho && (
+                            <div className={styles.gradeNota}>
+                              {/* A soma dos tamanhos é a Qtd do item. Só desencontra com trava
+                                  manual em toda a grade e Qtd mexida depois — aí avisa. */}
+                              {distTamanho.qtdDistribuida !== effectiveQtdManual && (
+                                <span
+                                  className={styles.gradeAbertaAviso}
+                                  title={`As linhas de tamanho somam ${fmt(distTamanho.qtdDistribuida)} e a Qtd deste item é ${fmt(effectiveQtdManual)}. Solte uma trava (↺) ou ajuste a Qtd para os dois voltarem a bater.`}
+                                >
+                                  tamanhos somam {fmt(distTamanho.qtdDistribuida)}
+                                </span>
+                              )}
+                              {distTamanho.temTravaManual ? (
+                                <>
+                                  <span
+                                    className={styles.gradeTravaBadge}
+                                    title="Algum tamanho está com a quantidade travada à mão. Os tamanhos livres dividem o que sobra da Qtd."
+                                  >
+                                    tamanho à mão
+                                  </span>
+                                  <button
+                                    type="button"
+                                    className={styles.manualToggleBtn}
+                                    data-pdf-hide=""
+                                    onClick={() => handleManualTamanhoReset(it.itemKey)}
+                                    title="Soltar todas as travas e voltar à grade fechada automática"
+                                  >
+                                    ↺ grade
+                                  </button>
+                                </>
+                              ) : !distTamanho.fechaGrade ? (
+                                <span
+                                  className={styles.gradeAbertaAviso}
+                                  title={`Peça fashion é comprada em grade fechada: a quantidade tem que ser múltiplo de ${distTamanho.tamanhosNaGrade} para dar a mesma quantidade em cada tamanho. Com ${fmt(effectiveQtdManual)} peças a grade não fecha e o resto vai para os tamanhos mais descobertos.`}
+                                >
+                                  não fecha grade de {distTamanho.tamanhosNaGrade}
+                                </span>
+                              ) : null}
+                            </div>
                           )}
                         </td>
                         <td className={styles.destinoCell}>
@@ -2212,7 +2352,44 @@ export default function CompraSalvaDetalhePage({
                               <span className={styles.tamanhoLabel}>{linha.label}</span>
                             </td>
                             <td className={styles.right}>
-                              <span className={styles.tamanhoQtd}>{fmt(linha.qtd)}</span>
+                              {/* Quantidade do tamanho — editar aqui trava o P (ou M, ou G) e
+                                  redivide os tamanhos livres dentro da mesma Qtd do item. */}
+                              <div className={styles.tamanhoQtdWrap}>
+                                <input
+                                  className={`${styles.tamanhoQtdInput} ${linha.origemQtd === "manual" ? styles.tamanhoQtdInputTravado : ""}`}
+                                  type="number"
+                                  min={0}
+                                  value={linha.qtd}
+                                  aria-label={`Quantidade do tamanho ${linha.label}`}
+                                  title={
+                                    linha.origemQtd === "manual"
+                                      ? `Tamanho ${linha.label} travado à mão em ${fmt(linha.qtd)}.`
+                                      : `Cota da grade fechada. Digite para travar o tamanho ${linha.label} — os outros redividem o que sobra.`
+                                  }
+                                  onChange={(e) =>
+                                    handleManualTamanhoSet(
+                                      it.itemKey,
+                                      linha.ordinal,
+                                      Number(e.target.value ?? 0),
+                                      effectiveQtdManual,
+                                      distTamanho.tamanhosNaGrade
+                                    )
+                                  }
+                                  onFocus={(e) => e.currentTarget.select()}
+                                />
+                                {linha.origemQtd === "manual" && (
+                                  <button
+                                    type="button"
+                                    className={styles.tamanhoTravaBtn}
+                                    data-pdf-hide=""
+                                    onClick={() => handleManualTamanhoLimpar(it.itemKey, linha.ordinal)}
+                                    title={`Soltar a trava do ${linha.label} e voltar à grade fechada`}
+                                    aria-label={`Soltar a trava do tamanho ${linha.label}`}
+                                  >
+                                    ↺
+                                  </button>
+                                )}
+                              </div>
                             </td>
                             <td className={styles.destinoCell}>
                               {linha.partes.length > 0 ? (
