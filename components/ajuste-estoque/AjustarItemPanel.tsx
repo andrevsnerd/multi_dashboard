@@ -91,7 +91,6 @@ export default function AjustarItemPanel({ companyKey, username, onExecuted }: P
   const [preencherValor, setPreencherValor] = useState("");
 
   const [filialFiltro, setFilialFiltro] = useState(""); // "" = todas
-  const [ocultarSemEstoque, setOcultarSemEstoque] = useState(true);
   const [dataContagem, setDataContagem] = useState(hojeISO());
   const [obs, setObs] = useState("");
 
@@ -235,8 +234,9 @@ export default function AjustarItemPanel({ companyKey, username, onExecuted }: P
         const estoque = saldos[key] ?? 0;
         const bruto = quantidades[key] ?? "";
         const temValor = bruto.trim() !== "";
-        // Sem valor digitado, linha zerada é só ruído — mas nunca esconde o que foi digitado.
-        if (ocultarSemEstoque && estoque === 0 && !temValor) continue;
+        // Nada é ocultado aqui: a aba serve tanto para baixar quanto para SUBIR
+        // quantidade, então toda filial do escopo tem que ter linha editável —
+        // inclusive onde o item está zerado.
         const alvoNum = temValor ? Number(bruto) : null;
         const invalido =
           temValor && (!Number.isInteger(alvoNum) || (alvoNum as number) < 0);
@@ -259,7 +259,7 @@ export default function AjustarItemPanel({ companyKey, username, onExecuted }: P
       }
     }
     return out;
-  }, [itensSelecionados, filiais, saldos, quantidades, filialFiltroValido, ocultarSemEstoque]);
+  }, [itensSelecionados, filiais, saldos, quantidades, filialFiltroValido]);
 
   const alteradas = useMemo(() => linhas.filter((l) => l.alvo !== null && l.delta !== 0), [linhas]);
   const invalidas = useMemo(() => linhas.filter((l) => l.invalido), [linhas]);
@@ -574,15 +574,10 @@ export default function AjustarItemPanel({ companyKey, username, onExecuted }: P
           </div>
 
           <div className={styles.tableHeaderRow}>
-            <label className={styles.toggle}>
-              <input
-                type="checkbox"
-                checked={ocultarSemEstoque}
-                onChange={(e) => setOcultarSemEstoque(e.target.checked)}
-              />
-              Ocultar filiais onde o item está zerado
-              {ocultarSemEstoque ? " (desmarque para lançar quantidade onde não há estoque)" : ""}
-            </label>
+            <span className={styles.fileHintMuted}>
+              Todas as filiais do escopo entram na lista, inclusive as zeradas — deixe em
+              branco onde não quer mudar nada.
+            </span>
             <div className={styles.searchRow}>
               <button
                 type="button"
@@ -723,8 +718,6 @@ export default function AjustarItemPanel({ companyKey, username, onExecuted }: P
                     <td colSpan={7} className={styles.fileHintMuted}>
                       {carregandoSaldo
                         ? "Carregando saldo por filial…"
-                        : ocultarSemEstoque
-                        ? "Nenhuma filial com estoque para os itens selecionados. Desmarque “Ocultar filiais onde o item está zerado” para lançar quantidade."
                         : "Nenhuma filial no escopo."}
                     </td>
                   </tr>
