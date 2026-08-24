@@ -78,6 +78,22 @@ function isTransferenciaEntreLojas(tipo: string): boolean {
   return norm.includes('TRANSFERENCIA ENTRE LOJAS');
 }
 
+function isTipoDefeito(tipo: string): boolean {
+  return tipo.trim().toUpperCase() === 'DEFEITO';
+}
+
+/** Romaneio de defeito j\u00e1 emitido hoje pela filial (TRAVA DE DEFEITO). */
+interface DefeitoDoDia {
+  romaneio: string;
+  filialOrigem: string;
+  filialDestino: string;
+  responsavel: string;
+  dataEmissao: string;
+  tipoRomaneio: string;
+  qtdProdutos: number;
+  qtdItens: number;
+}
+
 interface SaidasEntradasProdutosPageProps {
   companyKey: CompanyKey;
   companyName: string;
@@ -452,6 +468,25 @@ async function fetchLogEntradas(): Promise<TransferenciaLog[]> {
   return json.data || [];
 }
 
+/**
+ * Consulta a TRAVA DE DEFEITO: existe romaneio de defeito hoje nesta filial?
+ * Só avisa/desabilita — o bloqueio real é na rota `executar` (409).
+ */
+async function fetchDefeitoDoDia(
+  companyKey: string,
+  filial: string
+): Promise<{ data: DefeitoDoDia | null; mensagem: string | null }> {
+  const params = new URLSearchParams({ company: companyKey, filial });
+  const response = await fetch(`/api/saidas-entradas-produtos/defeito-do-dia?${params.toString()}`, {
+    cache: "no-store",
+  });
+
+  if (!response.ok) return { data: null, mensagem: null };
+
+  const json = (await response.json()) as { data: DefeitoDoDia | null; mensagem: string | null };
+  return { data: json.data ?? null, mensagem: json.mensagem ?? null };
+}
+
 async function salvarDestinoRomaneio(
   companyKey: string,
   romaneioId: string,
@@ -515,6 +550,12 @@ export default function SaidasEntradasProdutosPage({
   const [colorPickerOpcoes, setColorPickerOpcoes] = useState<Produto[]>([]);
   const [loadingColorPicker, setLoadingColorPicker] = useState(false);
   const [colorOptionsByProduto, setColorOptionsByProduto] = useState<Record<string, Produto[]>>({});
+  // TRAVA DE DEFEITO: romaneio de defeito já emitido hoje pela filial selecionada.
+  const [defeitoDoDia, setDefeitoDoDia] = useState<{ romaneio: DefeitoDoDia; mensagem: string } | null>(null);
+  const [checandoDefeitoDoDia, setChecandoDefeitoDoDia] = useState(false);
+  const [defeitoRefreshKey, setDefeitoRefreshKey] = useState(0);
+
+  const isAdmin = user?.role === "admin";
 
   const companyConfig = useMemo(() => resolveCompany(companyKey), [companyKey]);
   const filialLabel = useCallback(
@@ -544,6 +585,53 @@ export default function SaidasEntradasProdutosPage({
   }, [tipoRomaneioSelecionado, filiaisDestinoDisponiveis, companyKey, filialSelecionada]);
 
   const isSaidaMkt = isTipoSemDestino(tipoRomaneioSelecionado);
+
+  /**
+   * TRAVA DE DEFEITO — só UM romaneio de saída de defeito por filial por dia.
+   * O objetivo é que a loja junte as peças do dia em um romaneio só, em vez de
+   * abrir um romaneio por peça. Aqui é o aviso na tela (e o botão desabilitado);
+   * quem bloqueia de verdade é `/api/saidas-entradas-produtos/executar` (409).
+   */
+  const saidaDeDefeito =
+    tipoOperacao === "saida" &&
+    (isTipoDefeito(tipoRomaneioSelecionado) ||
+      (!!filialDestinoSaida && !!defeitoFilialOption(companyKey) &&
+        filialDestinoSaida.codFilial.trim().toUpperCase() ===
+          defeitoFilialOption(companyKey)!.codFilial.trim().toUpperCase()));
+
+  // Depende do codFilial, não do objeto: o refresh em foco recria o Filial
+  // (mesma loja, nova referência) e não deve refazer a consulta.
+  const codFilialSelecionada = filialSelecionada?.codFilial ?? null;
+
+  useEffect(() => {
+    if (!saidaDeDefeito || !codFilialSelecionada) {
+      setDefeitoDoDia(null);
+      setChecandoDefeitoDoDia(false);
+      return;
+    }
+
+    let cancelado = false;
+    setChecandoDefeitoDoDia(true);
+    fetchDefeitoDoDia(companyKey, codFilialSelecionada)
+      .then(({ data, mensagem }) => {
+        if (cancelado) return;
+        setDefeitoDoDia(data ? { romaneio: data, mensagem: mensagem || "" } : null);
+      })
+      .catch(() => {
+        // Falha na consulta não trava a tela: o bloqueio final é no servidor.
+        if (!cancelado) setDefeitoDoDia(null);
+      })
+      .finally(() => {
+        if (!cancelado) setChecandoDefeitoDoDia(false);
+      });
+
+    return () => {
+      cancelado = true;
+    };
+  }, [saidaDeDefeito, codFilialSelecionada, companyKey, defeitoRefreshKey]);
+
+  /** Bloqueia o registro? Admin passa por cima (igual à regra do servidor). */
+  const travaDefeitoAtiva = !!defeitoDoDia && saidaDeDefeito && !isAdmin;
 
   // Resetar filial destino ao TROCAR o tipo de romaneio; auto-selecionar quando só há uma opção.
   // NÃO zerar a seleção quando a lista apenas muda de referência (refresh em foco/visibilidade):
@@ -1276,6 +1364,8 @@ export default function SaidasEntradasProdutosPage({
       }
 
       setProdutosSelecionados([]);
+      // Reconsulta a trava de defeito: o romaneio que acabou de sair fecha o dia.
+      setDefeitoRefreshKey((k) => k + 1);
 
       const [novoSaidas, novoEntradas] = await Promise.all([fetchLogSaidas(), fetchLogEntradas()]);
       setLogSaidas(novoSaidas);
@@ -1397,8 +1487,6 @@ export default function SaidasEntradasProdutosPage({
     }
   }, [logEditando, tipoOperacao, user?.username, mostrarNotificacao, fecharModalEdicao]);
 
-  const isAdmin = user?.role === "admin";
-
   const abrirConfirmacaoRegistro = useCallback(() => {
     if (!filialSelecionada) {
       mostrarNotificacao("Selecione uma filial", "error");
@@ -1406,6 +1494,10 @@ export default function SaidasEntradasProdutosPage({
     }
     if (produtosSelecionados.length === 0) {
       mostrarNotificacao("Adicione pelo menos um produto", "error");
+      return;
+    }
+    if (travaDefeitoAtiva && defeitoDoDia) {
+      mostrarNotificacao(defeitoDoDia.mensagem || "Já existe romaneio de DEFEITO hoje nesta filial.", "error");
       return;
     }
     if (tipoOperacao === "saida") {
@@ -1420,7 +1512,7 @@ export default function SaidasEntradasProdutosPage({
       }
     }
     setMostrarConfirmacaoRegistro(true);
-  }, [filialSelecionada, produtosSelecionados.length, tipoOperacao, filiaisDestinoVisiveis.length, filialDestinoSaida, tipoRomaneioSelecionado, mostrarNotificacao]);
+  }, [filialSelecionada, produtosSelecionados.length, tipoOperacao, filiaisDestinoVisiveis.length, filialDestinoSaida, tipoRomaneioSelecionado, travaDefeitoAtiva, defeitoDoDia, mostrarNotificacao]);
 
   const confirmarRegistro = useCallback(() => {
     setMostrarConfirmacaoRegistro(false);
@@ -1898,6 +1990,28 @@ export default function SaidasEntradasProdutosPage({
                 disabled={isBusy}
               />
               <div className={styles.obsCounter}>{observacaoAtual.length}/2000</div>
+              {/* TRAVA DE DEFEITO: um romaneio de defeito por filial por dia */}
+              {defeitoDoDia && saidaDeDefeito && (
+                <div className={travaDefeitoAtiva ? styles.travaAviso : styles.travaAvisoAdmin}>
+                  <strong>
+                    {travaDefeitoAtiva
+                      ? "Defeito do dia já enviado"
+                      : "Já existe defeito hoje nesta filial"}
+                  </strong>
+                  <span>
+                    Romaneio #{defeitoDoDia.romaneio.romaneio} às{" "}
+                    {formatLogDateTime(defeitoDoDia.romaneio.dataEmissao)} ·{" "}
+                    {defeitoDoDia.romaneio.qtdProdutos} produto(s) /{" "}
+                    {defeitoDoDia.romaneio.qtdItens} item(ns)
+                    {defeitoDoDia.romaneio.responsavel ? ` · ${defeitoDoDia.romaneio.responsavel}` : ""}
+                  </span>
+                  <span>
+                    {travaDefeitoAtiva
+                      ? "É permitido apenas UM romaneio de defeito por dia por filial. Junte todas as peças com defeito no mesmo romaneio e envie o próximo amanhã."
+                      : "Como admin, você pode registrar outro romaneio de defeito hoje."}
+                  </span>
+                </div>
+              )}
               <div className={styles.submitRow}>
                 <div className={styles.submitCounts}>
                   <div className={styles.submitCountItem}>
@@ -1910,9 +2024,10 @@ export default function SaidasEntradasProdutosPage({
                   </div>
                 </div>
                 <button
-                  className={`${styles.submitBtn} ${isBusy || !filialSelecionada || produtosSelecionados.length === 0 ? "" : tipoOperacao === "saida" ? styles.submitBtnSaida : styles.submitBtnEntrada}`}
+                  className={`${styles.submitBtn} ${isBusy || travaDefeitoAtiva || !filialSelecionada || produtosSelecionados.length === 0 ? "" : tipoOperacao === "saida" ? styles.submitBtnSaida : styles.submitBtnEntrada}`}
                   onClick={abrirConfirmacaoRegistro}
-                  disabled={!filialSelecionada || produtosSelecionados.length === 0 || isBusy}
+                  disabled={!filialSelecionada || produtosSelecionados.length === 0 || isBusy || travaDefeitoAtiva || checandoDefeitoDoDia}
+                  title={travaDefeitoAtiva && defeitoDoDia ? defeitoDoDia.mensagem : undefined}
                 >
                   <span className={styles.submitBtnIcon} aria-hidden="true">
                     <svg viewBox="0 0 24 24" fill="none">
@@ -1933,7 +2048,9 @@ export default function SaidasEntradasProdutosPage({
                   </span>
                   {isBusy
                     ? "⏳ Processando…"
-                    : tipoOperacao === "saida" ? "Registrar Saída" : "Registrar Entrada"}
+                    : travaDefeitoAtiva
+                      ? "Defeito do dia já enviado"
+                      : tipoOperacao === "saida" ? "Registrar Saída" : "Registrar Entrada"}
                 </button>
               </div>
             </div>

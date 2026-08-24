@@ -965,8 +965,8 @@
     "semantic_hash": ""
   },
   "app/api/saidas-entradas-produtos/executar/route.ts": {
-    "mtime": 1785761951.172666,
-    "ast_hash": "16599ae1a67bcea4fc84319f41440c87",
+    "mtime": 1787590865.876466,
+    "ast_hash": "f50e8bb744a283263713179820a7ae7d",
     "semantic_hash": ""
   },
   "app/api/saidas-entradas-produtos/historico/route.ts": {
@@ -1620,8 +1620,8 @@
     "semantic_hash": ""
   },
   "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx": {
-    "mtime": 1785761951.1771586,
-    "ast_hash": "53ccabfbf829977c69ed98c9de607318",
+    "mtime": 1787591362.4230728,
+    "ast_hash": "9d86882845ed79bf126d554fb299729d",
     "semantic_hash": ""
   },
   "components/shared/CompraIdealCell.tsx": {
@@ -2495,8 +2495,8 @@
     "semantic_hash": "a2035ad5498c52867b04eb7e1a7878ca"
   },
   "lib/repositories/logSaidas.ts": {
-    "mtime": 1783520661.0520387,
-    "ast_hash": "9c5e8cc32fc1da91a0894417038aaea6",
+    "mtime": 1787591474.7026503,
+    "ast_hash": "92c1d92f35f25ae40ffed47c42352220",
     "semantic_hash": ""
   },
   "lib/repositories/logTransito.ts": {
@@ -4172,6 +4172,16 @@
   "lib/repositories/produtoCores.ts": {
     "mtime": 1787230886.0367534,
     "ast_hash": "ccfc50e9f7b00ad53256a6fa9cb04714",
+    "semantic_hash": ""
+  },
+  "app/api/saidas-entradas-produtos/defeito-do-dia/route.ts": {
+    "mtime": 1787590841.197629,
+    "ast_hash": "9c6daf75cfe306de99d5ed14483da635",
+    "semantic_hash": ""
+  },
+  "lib/server/trava-defeito.ts": {
+    "mtime": 1787590831.4005587,
+    "ast_hash": "a03d6dc9cf9f7e26ce44a94784dd49e7",
     "semantic_hash": ""
   }
 }

@@ -847,6 +847,34 @@
   margin-top: -6px;
 }
 
+/* trava de defeito: um romaneio de defeito por filial por dia */
+.travaAviso,
+.travaAvisoAdmin {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--saida-border);
+  background: var(--saida-bg);
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.travaAviso strong,
+.travaAvisoAdmin strong {
+  font-size: 16px;
+  color: var(--saida);
+}
+
+.travaAvisoAdmin {
+  border-color: var(--border);
+  background: transparent;
+}
+
+.travaAvisoAdmin strong { color: var(--text-2); }
+
 /* submit row: resumo + botão */
 .submitRow {
   display: flex;
@@ -1478,4 +1506,9 @@
 }
 :global(:root[data-theme="dark"]) .btnConfirmarSaida:hover {
   background: #ddd6fe;
+}
+
+/* ── Aviso da trava de defeito (texto sobre a tinta clara do dark) ── */
+:global(:root[data-theme="dark"]) .travaAviso strong {
+  color: #c4b5fd;
 }

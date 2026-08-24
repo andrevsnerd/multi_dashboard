@@ -11,6 +11,12 @@ import {
   type TransferenciaPendenteInsert,
 } from '@/lib/utils/transferencia-pendente-store';
 import { executeSaidaLote, executeEntradaLote } from '@/lib/saida-entrada-executor';
+import {
+  buscarDefeitoDoDia,
+  isSaidaDeDefeito,
+  mensagemTravaDefeito,
+  podeIgnorarTravaDefeito,
+} from '@/lib/server/trava-defeito';
 import { getActiveFilial } from '@/lib/config/company';
 import { resolveCompanyDynamic } from '@/lib/config/company-server';
 import type { CompanyConfig } from '@/lib/config/company';
@@ -235,6 +241,36 @@ export async function POST(request: Request) {
         return NextResponse.json(
           { error: 'Sem permissão para esta filial.' },
           { status: 403 }
+        );
+      }
+    }
+
+    /**
+     * TRAVA DE DEFEITO — UM romaneio de saída de defeito por filial por dia.
+     * Ver `lib/server/trava-defeito.ts`. Fica DEPOIS da checagem de permissão e
+     * ANTES de gerar o romaneio; a tela só espelha o aviso, o bloqueio é aqui.
+     * Se a consulta falhar, deixamos passar (fail-open): trava não pode derrubar
+     * a operação de defeito por indisponibilidade do banco.
+     */
+    if (
+      tipoOperacao === 'saida' &&
+      !podeIgnorarTravaDefeito(user.role) &&
+      isSaidaDeDefeito({ companyKey, tipoRomaneio, filialDestino: filialDestinoTrim })
+    ) {
+      let defeitoDoDia = null;
+      try {
+        defeitoDoDia = await buscarDefeitoDoDia(companyKey, filialTrim);
+      } catch (travaError) {
+        console.error('Erro ao verificar trava de romaneio de defeito do dia', travaError);
+      }
+      if (defeitoDoDia) {
+        return NextResponse.json(
+          {
+            error: mensagemTravaDefeito(defeitoDoDia),
+            travaDefeito: true,
+            romaneioExistente: defeitoDoDia,
+          },
+          { status: 409 }
         );
       }
     }

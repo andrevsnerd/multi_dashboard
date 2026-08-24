@@ -445,3 +445,122 @@ export async function fetchDefeitos(params: DefeitosParams): Promise<DefeitosRes
     };
   });
 }
+
+/**
+ * Romaneio de saída de DEFEITO já emitido HOJE por uma filial (ou null).
+ *
+ * Base da TRAVA DE DEFEITO: só UM romaneio de defeito por filial por dia. Sem
+ * ela cada gerente abria um romaneio por peça — dezenas de romaneios de 1 item
+ * por dia, impossível de conferir na chegada.
+ *
+ * "Hoje" é o dia do RELÓGIO DO BANCO (`CAST(GETDATE() AS DATE)`), o mesmo que o
+ * executor grava em `EMISSAO` — não o dia do processo Node (que já gravou
+ * EMISSAO em UTC no passado e roda em outro fuso na Vercel).
+ *
+ * Conta como defeito o mesmo recorte de `fetchDefeitos`: `TIPO_ROMANEIO = 'DEFEITO'`
+ * OU destino na filial de defeito da empresa. Romaneio cancelado em `LOJA_SAIDAS`
+ * não conta (e romaneio EXCLUÍDO já sai da tabela, liberando o dia de novo).
+ */
+export interface RomaneioDefeitoDoDia {
+  romaneio: string;
+  filialOrigem: string;
+  filialDestino: string;
+  responsavel: string;
+  dataEmissao: string;
+  tipoRomaneio: string;
+  qtdProdutos: number;
+  qtdItens: number;
+}
+
+/** Colapsa espaços internos no SQL (ver Galeão RJ, com 2 espaços no nome). */
+function sqlNomeNormalizado(coluna: string): string {
+  return `REPLACE(REPLACE(REPLACE(UPPER(LTRIM(RTRIM(ISNULL(${coluna}, '')))), ' ', '<|>'), '>|<', ''), '<|>', ' ')`;
+}
+
+function normalizaNomeFilial(value: string | null | undefined): string {
+  return (value || '').trim().replace(/\s+/g, ' ').toUpperCase();
+}
+
+export async function fetchRomaneioDefeitoDoDia(params: {
+  /** Filial de origem — aceita o COD_FILIAL ou o nome da filial. */
+  filialOrigem: string;
+  /** Nome da filial de defeito da empresa (ex.: "NERD DEFEITOS"). Opcional. */
+  defeitoFilialDestino?: string | null;
+}): Promise<RomaneioDefeitoDoDia | null> {
+  const filialAlvo = normalizaNomeFilial(params.filialOrigem);
+  if (!filialAlvo) return null;
+  const destino = normalizaNomeFilial(params.defeitoFilialDestino);
+
+  return withRequest(async (req) => {
+    req.input('filialAlvo', sql.VarChar, filialAlvo);
+    if (destino) req.input('defeitoDestino', sql.VarChar, destino);
+
+    const condicaoDefeito = destino
+      ? `(UPPER(LTRIM(RTRIM(ISNULL(s.TIPO_ROMANEIO, '')))) = 'DEFEITO'
+          OR ${sqlNomeNormalizado('s.FILIAL_DESTINO')} = @defeitoDestino)`
+      : `UPPER(LTRIM(RTRIM(ISNULL(s.TIPO_ROMANEIO, '')))) = 'DEFEITO'`;
+
+    const query = `
+      SELECT TOP 1
+        LTRIM(RTRIM(s.ROMANEIO_PRODUTO)) AS ROMANEIO,
+        LTRIM(RTRIM(ISNULL(s.FILIAL, ''))) AS FILIAL_ORIGEM,
+        LTRIM(RTRIM(ISNULL(s.FILIAL_DESTINO, ''))) AS FILIAL_DESTINO,
+        LTRIM(RTRIM(ISNULL(s.RESPONSAVEL, ''))) AS RESPONSAVEL,
+        LTRIM(RTRIM(ISNULL(s.TIPO_ROMANEIO, ''))) AS TIPO_ROMANEIO,
+        (CONVERT(VARCHAR(10), s.EMISSAO, 120) + 'T' + CONVERT(VARCHAR(8), s.EMISSAO, 108)) AS EMISSAO_STR,
+        (SELECT COUNT(*) FROM ESTOQUE_PROD1_SAI ep WITH (NOLOCK)
+         WHERE ep.ROMANEIO_PRODUTO = s.ROMANEIO_PRODUTO AND ep.FILIAL = s.FILIAL) AS QTD_PRODUTOS,
+        (SELECT ISNULL(SUM(ep.QTDE), 0) FROM ESTOQUE_PROD1_SAI ep WITH (NOLOCK)
+         WHERE ep.ROMANEIO_PRODUTO = s.ROMANEIO_PRODUTO AND ep.FILIAL = s.FILIAL) AS QTD_ITENS
+      FROM ESTOQUE_PROD_SAI s WITH (NOLOCK)
+      LEFT JOIN FILIAIS f WITH (NOLOCK)
+        ON ${sqlNomeNormalizado('f.FILIAL')} = ${sqlNomeNormalizado('s.FILIAL')}
+      WHERE CAST(s.EMISSAO AS DATE) = CAST(GETDATE() AS DATE)
+        AND (
+          ${sqlNomeNormalizado('s.FILIAL')} = @filialAlvo
+          OR UPPER(LTRIM(RTRIM(ISNULL(f.COD_FILIAL, '')))) = @filialAlvo
+        )
+        AND ${condicaoDefeito}
+        -- Romaneio SEM item não conta: é cabeçalho órfão de execução que falhou
+        -- no meio (o executor grava o cabeçalho antes dos itens). Se a trava
+        -- contasse isso, uma falha de rede deixaria a loja sem enviar defeito no dia.
+        AND EXISTS (
+          SELECT 1 FROM ESTOQUE_PROD1_SAI ep WITH (NOLOCK)
+          WHERE ep.ROMANEIO_PRODUTO = s.ROMANEIO_PRODUTO
+            AND ${sqlNomeNormalizado('ep.FILIAL')} = ${sqlNomeNormalizado('s.FILIAL')}
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM LOJA_SAIDAS ls WITH (NOLOCK)
+          WHERE ls.ROMANEIO_PRODUTO = s.ROMANEIO_PRODUTO
+            AND ${sqlNomeNormalizado('ls.FILIAL')} = ${sqlNomeNormalizado('s.FILIAL')}
+            AND ls.SAIDA_CANCELADA = 1
+        )
+      ORDER BY s.EMISSAO ASC, s.ROMANEIO_PRODUTO ASC
+    `;
+
+    const result = await req.query<{
+      ROMANEIO: string;
+      FILIAL_ORIGEM: string;
+      FILIAL_DESTINO: string | null;
+      RESPONSAVEL: string | null;
+      TIPO_ROMANEIO: string | null;
+      EMISSAO_STR: string | null;
+      QTD_PRODUTOS: number | null;
+      QTD_ITENS: number | null;
+    }>(query);
+
+    const row = result.recordset[0];
+    if (!row) return null;
+
+    return {
+      romaneio: row.ROMANEIO?.toString().trim() || '',
+      filialOrigem: row.FILIAL_ORIGEM?.toString().trim() || '',
+      filialDestino: row.FILIAL_DESTINO?.toString().trim() || '',
+      responsavel: row.RESPONSAVEL?.toString().trim() || '',
+      tipoRomaneio: row.TIPO_ROMANEIO?.toString().trim() || '',
+      dataEmissao: row.EMISSAO_STR?.toString().trim() || '',
+      qtdProdutos: Number(row.QTD_PRODUTOS ?? 0),
+      qtdItens: Number(row.QTD_ITENS ?? 0),
+    };
+  });
+}
