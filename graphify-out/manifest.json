@@ -1645,8 +1645,8 @@
     "semantic_hash": "f9f455e79710f72c6b9952301879ebc6"
   },
   "components/stock/CompraSalvaDetalhePage.tsx": {
-    "mtime": 1787590018.0345204,
-    "ast_hash": "ae71b72a0fd696179f13ac6cd8ec1368",
+    "mtime": 1787593126.3633668,
+    "ast_hash": "2a0de9ff446292d9de3508802a8adce8",
     "semantic_hash": ""
   },
   "components/stock/ComprasSalvasListPanel.tsx": {
@@ -2385,7 +2385,7 @@
     "semantic_hash": ""
   },
   "lib/repositories/ajusteEstoque.ts": {
-    "mtime": 1785949414.1098387,
+    "mtime": 1787592659.5681036,
     "ast_hash": "30495bf984a256ef6d1b4c52ec3aec1b",
     "semantic_hash": ""
   },
@@ -3880,7 +3880,7 @@
     "semantic_hash": ""
   },
   "app/api/ajuste-estoque/item/saldo/route.ts": {
-    "mtime": 1785949450.0741794,
+    "mtime": 1787592659.559467,
     "ast_hash": "369b90edca351f54ad3c4ae4b76c807e",
     "semantic_hash": ""
   },
@@ -3955,8 +3955,8 @@
     "semantic_hash": ""
   },
   "components/ajuste-estoque/AjustarItemPanel.tsx": {
-    "mtime": 1785949693.3105757,
-    "ast_hash": "fe3312e4fcd2d217a6e75df99b04fd14",
+    "mtime": 1787592659.559467,
+    "ast_hash": "bdd464bbaf2dd946ec646c037252dd83",
     "semantic_hash": ""
   },
   "components/cadastro/AbaDimensoes.tsx": {
@@ -4130,8 +4130,8 @@
     "semantic_hash": ""
   },
   "lib/utils/compra-destino-tamanho.ts": {
-    "mtime": 1787589618.747486,
-    "ast_hash": "202f14fd12ed4e322736e687a3c296c6",
+    "mtime": 1787592872.2387815,
+    "ast_hash": "325c7ebbfddcddbfdeb69e3bc0456abb",
     "semantic_hash": ""
   },
   "lib/utils/grade-tamanhos.ts": {

@@ -63,6 +63,11 @@ export interface LinhaTamanhoDestino {
 }
 
 export interface DistribuicaoPorTamanho {
+  /**
+   * `grade` = quem repartiu foi a regra (grade fechada + mínimo + performance);
+   * `manual` = o comprador distribuiu loja por loja dentro de cada tamanho.
+   */
+  modo: "grade" | "manual";
   linhas: LinhaTamanhoDestino[];
   /** Total repartido — igual a `qtdTotal` salvo quando há cota manual acima do total. */
   qtdDistribuida: number;
@@ -361,11 +366,57 @@ export function distribuirPorTamanho(input: {
   });
 
   return {
+    modo: "grade",
     linhas,
     qtdDistribuida: linhas.reduce((s, l) => s + l.qtd, 0),
     faltaTotalMinimos,
     tamanhosNaGrade: tamanhos.length,
     fechaGrade,
     temTravaManual,
+  };
+}
+
+/**
+ * Mesmas linhas por tamanho, mas a partir de uma distribuição feita **à mão**: o comprador
+ * disse loja por loja, dentro de cada tamanho, quanto vai. Aqui não existe regra nenhuma —
+ * nem grade fechada, nem mínimo, nem performance. A função só organiza o que ele digitou no
+ * formato da distribuição automática, para a tela e o export não precisarem saber a origem.
+ */
+export function distribuicaoManualPorTamanho(input: {
+  tamanhos: TamanhoGrade[];
+  /** ordinal da grade → loja → quantidade. */
+  porOrdinal: Record<number, Record<string, number>>;
+  companyKey: CompanyKey;
+}): DistribuicaoPorTamanho | null {
+  const { tamanhos, porOrdinal, companyKey } = input;
+  if (tamanhos.length === 0) return null;
+  const cfg = resolveCompany(companyKey);
+
+  const linhas: LinhaTamanhoDestino[] = tamanhos.map((tam) => {
+    const doTamanho = porOrdinal[tam.ordinal] ?? {};
+    const partes: DestinoCompraFinalParte[] = Object.entries(doTamanho)
+      .map(([label, qtd]) => ({ label, qtd: Math.max(0, Math.round(Number(qtd ?? 0))) }))
+      .filter((p) => p.qtd > 0)
+      .sort((a, b) => compareFilialDisplayOrder(a.label, b.label, cfg));
+
+    return {
+      label: tam.label,
+      ordinal: tam.ordinal,
+      qtd: partes.reduce((soma, p) => soma + p.qtd, 0),
+      qtdMinimo: 0,
+      origemQtd: "manual",
+      partes,
+    };
+  });
+
+  return {
+    modo: "manual",
+    linhas,
+    qtdDistribuida: linhas.reduce((soma, l) => soma + l.qtd, 0),
+    // Mínimo e grade fechada não valem aqui: quem manda é a mão do comprador.
+    faltaTotalMinimos: 0,
+    tamanhosNaGrade: tamanhos.length,
+    fechaGrade: true,
+    temTravaManual: true,
   };
 }

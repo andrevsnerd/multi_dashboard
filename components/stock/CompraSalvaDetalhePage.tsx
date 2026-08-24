@@ -19,6 +19,7 @@ import {
   type DestinoCompraFinalParte,
 } from "@/lib/utils/compra-final-destino";
 import {
+  distribuicaoManualPorTamanho,
   distribuirPorTamanho,
   LOJAS_FASHION,
   type DistribuicaoPorTamanho,
@@ -779,9 +780,21 @@ export default function CompraSalvaDetalhePage({
   const [manualTamanhoQtd, setManualTamanhoQtd] = useState<Record<string, Record<number, number>>>({});
   const manualTamanhoQtdRef = useRef(manualTamanhoQtd);
   manualTamanhoQtdRef.current = manualTamanhoQtd;
+  /**
+   * Modo manual de peça fashion: `itemKey` → ordinal do tamanho → loja → quantidade.
+   * É o mesmo modo manual do resto da tela, só uma dimensão mais fundo — em vez de
+   * "Guarulhos: 3" o comprador diz "Guarulhos: 1 no P, 2 no M". Item que está aqui não passa
+   * mais pela regra: a mão dele é a distribuição, e a Qtd do item é a soma de tudo.
+   */
+  const [manualDistTamanho, setManualDistTamanho] = useState<
+    Record<string, Record<number, Record<string, number>>>
+  >({});
+  const manualDistTamanhoRef = useRef(manualDistTamanho);
+  manualDistTamanhoRef.current = manualDistTamanho;
   const filialOptions = useMemo(() => getFilialOptions(companyKey), [companyKey]);
   const manualStorageKey = `compra-manual:${compraId}`;
   const manualTamanhoStorageKey = `compra-manual-tamanho:${compraId}`;
+  const manualDistTamanhoStorageKey = `compra-manual-destino-tamanho:${compraId}`;
 
   useEffect(() => {
     let cancelled = false;
@@ -865,6 +878,59 @@ export default function CompraSalvaDetalhePage({
       }
     } catch { /* ignora erros de storage */ }
   }, [manualTamanhoQtd, manualTamanhoStorageKey]);
+
+  // Restaura a distribuição manual por tamanho (loja × P/M/G editado à mão)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(manualDistTamanhoStorageKey);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as Record<string, Record<string, Record<string, number>>>;
+      if (typeof saved !== "object" || saved === null) return;
+      const normalizado: Record<string, Record<number, Record<string, number>>> = {};
+      for (const [itemKey, porOrdinal] of Object.entries(saved)) {
+        if (typeof porOrdinal !== "object" || porOrdinal === null) continue;
+        const doItem: Record<number, Record<string, number>> = {};
+        for (const [ordinal, porLoja] of Object.entries(porOrdinal)) {
+          const ord = Number(ordinal);
+          if (!Number.isFinite(ord) || typeof porLoja !== "object" || porLoja === null) continue;
+          const limpo: Record<string, number> = {};
+          for (const [loja, qtd] of Object.entries(porLoja)) {
+            const valor = Number(qtd);
+            if (!Number.isFinite(valor)) continue;
+            limpo[loja] = Math.max(0, Math.round(valor));
+          }
+          doItem[ord] = limpo;
+        }
+        if (Object.keys(doItem).length > 0) normalizado[itemKey] = doItem;
+      }
+      if (Object.keys(normalizado).length === 0) return;
+      manualDistTamanhoRef.current = normalizado;
+      setManualDistTamanho(normalizado);
+      // Mesmo contrato do manual por filial: o que está salvo volta como confirmado.
+      setManualState((prev) => {
+        const next = { ...prev };
+        Object.keys(normalizado).forEach((key) => { next[key] = "confirmed"; });
+        return next;
+      });
+    } catch { /* ignora dados corrompidos */ }
+  }, [manualDistTamanhoStorageKey]);
+
+  // Persiste a distribuição manual por tamanho dos itens confirmados
+  useEffect(() => {
+    try {
+      const toPersist: Record<string, Record<number, Record<string, number>>> = {};
+      Object.entries(manualState).forEach(([key, state]) => {
+        if (state === "confirmed" && manualDistTamanho[key]) {
+          toPersist[key] = manualDistTamanho[key];
+        }
+      });
+      if (Object.keys(toPersist).length > 0) {
+        localStorage.setItem(manualDistTamanhoStorageKey, JSON.stringify(toPersist));
+      } else {
+        localStorage.removeItem(manualDistTamanhoStorageKey);
+      }
+    } catch { /* ignora erros de storage */ }
+  }, [manualState, manualDistTamanho, manualDistTamanhoStorageKey]);
 
   const expandirPorCor = doc?.expandirPorCor ?? true;
 
@@ -1115,17 +1181,29 @@ export default function CompraSalvaDetalhePage({
     ) as Record<string, number>;
   }, [manualDistribuicao]);
 
+  /** Qtd do item no manual por tamanho: soma de todas as lojas de todos os tamanhos. */
+  const manualDistTamanhoTotalByItemKey = useMemo(() => {
+    return Object.fromEntries(
+      Object.entries(manualDistTamanho).map(([itemKey, porOrdinal]) => [
+        itemKey,
+        Object.values(porOrdinal ?? {}).reduce((soma, porLoja) => soma + sumDistribuicaoManual(porLoja), 0),
+      ])
+    ) as Record<string, number>;
+  }, [manualDistTamanho]);
+
   const rowsComputed = useMemo(() => {
     return items.map((it) => {
       const produto = it.produto.trim();
       const corProduto = (it.corProduto ?? "").trim();
       const itemManualState = manualState[it.itemKey];
-      const hasManualOverride =
-        (itemManualState === "editing" || itemManualState === "confirmed") &&
-        manualDistribuicao[it.itemKey] !== undefined;
-      const effectiveQtdManual = hasManualOverride
-        ? (manualTotalByItemKey[it.itemKey] ?? 0)
-        : Math.max(0, Number(it.qtdManual ?? 0));
+      const emManual = itemManualState === "editing" || itemManualState === "confirmed";
+      const hasManualTamanho = emManual && manualDistTamanho[it.itemKey] !== undefined;
+      const hasManualOverride = emManual && manualDistribuicao[it.itemKey] !== undefined;
+      const effectiveQtdManual = hasManualTamanho
+        ? (manualDistTamanhoTotalByItemKey[it.itemKey] ?? 0)
+        : hasManualOverride
+          ? (manualTotalByItemKey[it.itemKey] ?? 0)
+          : Math.max(0, Number(it.qtdManual ?? 0));
       const match = listaRows.find((p) => {
         const pProd = (p.produto ?? "").trim();
         const pCor = (p.cor ?? "").trim();
@@ -1151,7 +1229,7 @@ export default function CompraSalvaDetalhePage({
       const qtdSugerida = sugestaoAtual.qty;
       return { it, match, live, estoque, custoUnit, custoTotal, qtdSugerida, sugestaoAtual, effectiveQtdManual };
     });
-  }, [items, listaRows, expandirPorCor, liveMetrics, manualDistribuicao, manualState, manualTotalByItemKey, comprasTransitoIndex, companyKey, catraca.reconcile]);
+  }, [items, listaRows, expandirPorCor, liveMetrics, manualDistribuicao, manualDistTamanho, manualState, manualTotalByItemKey, manualDistTamanhoTotalByItemKey, comprasTransitoIndex, companyKey, catraca.reconcile]);
 
   // Catraca: junta gravações pendentes e persiste.
   const catracaFreezes = useMemo<CatracaFreeze[]>(() => {
@@ -1435,25 +1513,34 @@ export default function CompraSalvaDetalhePage({
       const corK = expandirPorCor ? ((it.corProduto ?? "").trim() || undefined) : undefined;
       const vendasKey = `${produtoK}||${corK ?? ""}`;
       const itemState = manualState[it.itemKey];
+      const emManual = itemState === "editing" || itemState === "confirmed";
       // Mesma noção de "manual" da tabela: só conta quando o usuário de fato assumiu a
       // distribuição. Aí a escolha dele vence e a regra por tamanho não se mete.
-      const isManual =
-        (itemState === "editing" || itemState === "confirmed") &&
-        manualDistribuicao[it.itemKey] !== undefined;
+      const isManualFilial = emManual && manualDistribuicao[it.itemKey] !== undefined;
+      const manualPorTamanho = emManual ? manualDistTamanho[it.itemKey] : undefined;
       const tamanhoInfo = tamanhosCache[vendasKey];
       const vendasRows = vendasPorFilialCache[vendasKey];
+      const temGradeFashion = tamanhoInfo !== undefined && tamanhoInfo.tamanhos.length > 0;
 
-      mapa[it.itemKey] =
-        !isManual && tamanhoInfo && tamanhoInfo.tamanhos.length > 0 && vendasRows !== undefined
-          ? distribuirPorTamanho({
-              qtdTotal: effectiveQtdManual,
-              tamanhos: tamanhoInfo.tamanhos,
-              estoquePorFilial: tamanhoInfo.porFilial,
-              vendasPorFilial: vendasRows,
-              companyKey,
-              qtdPorOrdinal: manualTamanhoQtd[it.itemKey],
-            })
-          : null;
+      if (manualPorTamanho && temGradeFashion) {
+        // Manual por tamanho: as linhas saem da mão do comprador, sem passar pela regra.
+        mapa[it.itemKey] = distribuicaoManualPorTamanho({
+          tamanhos: tamanhoInfo.tamanhos,
+          porOrdinal: manualPorTamanho,
+          companyKey,
+        });
+      } else if (!isManualFilial && temGradeFashion && vendasRows !== undefined) {
+        mapa[it.itemKey] = distribuirPorTamanho({
+          qtdTotal: effectiveQtdManual,
+          tamanhos: tamanhoInfo.tamanhos,
+          estoquePorFilial: tamanhoInfo.porFilial,
+          vendasPorFilial: vendasRows,
+          companyKey,
+          qtdPorOrdinal: manualTamanhoQtd[it.itemKey],
+        });
+      } else {
+        mapa[it.itemKey] = null;
+      }
     }
     return mapa;
   }, [
@@ -1461,6 +1548,7 @@ export default function CompraSalvaDetalhePage({
     expandirPorCor,
     manualState,
     manualDistribuicao,
+    manualDistTamanho,
     manualTamanhoQtd,
     tamanhosCache,
     vendasPorFilialCache,
@@ -1477,7 +1565,13 @@ export default function CompraSalvaDetalhePage({
       const itemState = manualState[it.itemKey] ?? "auto";
       const distTamanho = distTamanhoByItemKey[it.itemKey] ?? null;
       let destino: string;
-      if (itemState === "confirmed") {
+      if (distTamanho) {
+        // Peça fashion: o destino real está nas linhas de tamanho logo abaixo — vale tanto
+        // para a distribuição da regra quanto para a que o comprador fez à mão.
+        destino = distTamanho.modo === "manual"
+          ? "por tamanho, à mão (ver linhas TAMANHO)"
+          : "por tamanho (ver linhas TAMANHO)";
+      } else if (itemState === "confirmed") {
         const dist = manualDistribuicao[it.itemKey] ?? {};
         const cfg = resolveCompany(companyKey);
         destino = Object.entries(dist)
@@ -1485,9 +1579,6 @@ export default function CompraSalvaDetalhePage({
           .sort(([a], [b]) => compareFilialDisplayOrder(a, b, cfg))
           .map(([label, qty]) => `${label}: ${fmt2(qty)}`)
           .join(" · ");
-      } else if (distTamanho) {
-        // Peça fashion: o destino real está nas linhas de tamanho logo abaixo.
-        destino = "por tamanho (ver linhas TAMANHO)";
       } else {
         destino = vendasRows !== undefined ? textoDestinoCompraFinal(effectiveQtdManual, vendasRows, companyKey, estoquePorFilialCache[vendasKey], getSharedLimiteDiasReposicao({ linha: match?.linha, subgrupo: match?.subgrupo })) : "";
       }
@@ -1708,8 +1799,36 @@ export default function CompraSalvaDetalhePage({
     }
   };
 
-  const startManualEdit = (itemKey: string, partesDestino: DestinoCompraFinalParte[] | null | undefined) => {
-    if (!manualState[itemKey]) {
+  /**
+   * Entra no modo manual. Peça fashion entra JÁ quebrada por tamanho — cada linha de P/M/G
+   * ganha seu próprio editor de lojas, partindo do que a regra tinha proposto. Item sem
+   * grade fashion (ou sem os dados de tamanho ainda) cai no manual por filial de sempre.
+   */
+  const startManualEdit = (
+    itemKey: string,
+    partesDestino: DestinoCompraFinalParte[] | null | undefined,
+    distTamanho?: DistribuicaoPorTamanho | null
+  ) => {
+    const jaEmManual = !!manualState[itemKey];
+    const jaTemPorTamanho = manualDistTamanhoRef.current[itemKey] !== undefined;
+
+    if (distTamanho && !jaTemPorTamanho) {
+      const porOrdinal: Record<number, Record<string, number>> = {};
+      distTamanho.linhas.forEach((linha) => {
+        const porLoja: Record<string, number> = {};
+        linha.partes.forEach((p) => { porLoja[p.label] = p.qtd; });
+        porOrdinal[linha.ordinal] = porLoja;
+      });
+      manualDistTamanhoRef.current = { ...manualDistTamanhoRef.current, [itemKey]: porOrdinal };
+      setManualDistTamanho((prev) => ({ ...prev, [itemKey]: porOrdinal }));
+      // Manual por tamanho e manual por filial são excludentes: o de filial não sabe de P/M/G.
+      if (manualDistribuicaoRef.current[itemKey] !== undefined) {
+        const semFilial = { ...manualDistribuicaoRef.current };
+        delete semFilial[itemKey];
+        manualDistribuicaoRef.current = semFilial;
+        setManualDistribuicao(semFilial);
+      }
+    } else if (!jaEmManual && !jaTemPorTamanho) {
       const dist: Record<string, number> = {};
       (partesDestino ?? []).forEach((p) => { dist[p.label] = p.qtd; });
       manualDistribuicaoRef.current = { ...manualDistribuicaoRef.current, [itemKey]: dist };
@@ -1728,6 +1847,12 @@ export default function CompraSalvaDetalhePage({
       const next = { ...prev };
       delete next[itemKey];
       manualDistribuicaoRef.current = next;
+      return next;
+    });
+    setManualDistTamanho((prev) => {
+      const next = { ...prev };
+      delete next[itemKey];
+      manualDistTamanhoRef.current = next;
       return next;
     });
   };
@@ -1750,6 +1875,58 @@ export default function CompraSalvaDetalhePage({
     setManualDistribuicao((prev) => ({ ...prev, [itemKey]: itemDist }));
     setItems((prev) => prev.map((i) => (i.itemKey === itemKey ? { ...i, qtdManual: total } : i)));
     void handleUpdateQtd(itemKey, total);
+  };
+
+  /**
+   * Grava a distribuição manual de UM tamanho e mantém a Qtd do item igual à soma de tudo —
+   * a mesma conta do manual por filial, só uma dimensão mais fundo.
+   */
+  const aplicarManualDistTamanho = (
+    itemKey: string,
+    ordinal: number,
+    porLoja: Record<string, number>
+  ) => {
+    const doItem = { ...(manualDistTamanhoRef.current[itemKey] ?? {}), [ordinal]: porLoja };
+    const next = { ...manualDistTamanhoRef.current, [itemKey]: doItem };
+    manualDistTamanhoRef.current = next;
+    setManualDistTamanho(next);
+    const total = Object.values(doItem).reduce((soma, loja) => soma + sumDistribuicaoManual(loja), 0);
+    setItems((prev) => prev.map((i) => (i.itemKey === itemKey ? { ...i, qtdManual: total } : i)));
+    void handleUpdateQtd(itemKey, total);
+  };
+
+  const handleManualDistTamanhoDelta = (
+    itemKey: string,
+    ordinal: number,
+    filial: string,
+    delta: number
+  ) => {
+    const porLoja = { ...(manualDistTamanhoRef.current[itemKey]?.[ordinal] ?? {}) };
+    porLoja[filial] = Math.max(0, (porLoja[filial] ?? 0) + delta);
+    aplicarManualDistTamanho(itemKey, ordinal, porLoja);
+  };
+
+  const handleManualDistTamanhoSet = (
+    itemKey: string,
+    ordinal: number,
+    filial: string,
+    value: number
+  ) => {
+    const porLoja = { ...(manualDistTamanhoRef.current[itemKey]?.[ordinal] ?? {}) };
+    const bruto = Number(value);
+    porLoja[filial] = Math.max(0, Math.round(Number.isFinite(bruto) ? bruto : 0));
+    aplicarManualDistTamanho(itemKey, ordinal, porLoja);
+  };
+
+  const handleManualDistTamanhoAddFilial = (itemKey: string, ordinal: number, filial: string) => {
+    const porLoja = { ...(manualDistTamanhoRef.current[itemKey]?.[ordinal] ?? {}) };
+    if (filial in porLoja) return;
+    porLoja[filial] = 0;
+    // Filial nova entra com 0: não muda a Qtd, só abre a linha para o comprador digitar.
+    const doItem = { ...(manualDistTamanhoRef.current[itemKey] ?? {}), [ordinal]: porLoja };
+    const next = { ...manualDistTamanhoRef.current, [itemKey]: doItem };
+    manualDistTamanhoRef.current = next;
+    setManualDistTamanho(next);
   };
 
   /**
@@ -2046,6 +2223,9 @@ export default function CompraSalvaDetalhePage({
                     // Em modo manual a distribuição do usuário vence, como sempre.
                     const tamanhoInfo = tamanhosCache[vendasKey];
                     const distTamanho = distTamanhoByItemKey[it.itemKey] ?? null;
+                    // Manual de peça fashion: a mão do comprador desce até o tamanho, então as
+                    // linhas de P/M/G continuam na tela — cada uma com seu editor de lojas.
+                    const manualPorTamanho = isManual && distTamanho?.modo === "manual";
 
                     return (
                     <React.Fragment key={it.itemKey}>
@@ -2075,7 +2255,7 @@ export default function CompraSalvaDetalhePage({
                               onBlur={() => { void handleUpdateQtd(it.itemKey, effectiveQtdManual); }}
                             />
                           )}
-                          {distTamanho && (
+                          {distTamanho && distTamanho.modo === "grade" && (
                             <div className={styles.gradeNota}>
                               {/* A soma dos tamanhos é a Qtd do item. Só desencontra com trava
                                   manual em toda a grade e Qtd mexida depois — aí avisa. */}
@@ -2120,13 +2300,22 @@ export default function CompraSalvaDetalhePage({
                           {isEditing ? (
                             /* ── Estado: editando ── */
                             <div>
-                              <ManualDestinoEditor
-                                distribuicao={manualDistribuicao[it.itemKey] ?? {}}
-                                allFiliais={filialOptions}
-                                onDelta={(filial, delta) => handleManualFilialDelta(it.itemKey, filial, delta)}
-                                onSet={(filial, value) => handleManualFilialSet(it.itemKey, filial, value)}
-                                onAddFilial={(filial) => handleManualAddFilial(it.itemKey, filial)}
-                              />
+                              {manualPorTamanho ? (
+                                /* Peça fashion: o editor de lojas está em cada linha de tamanho. */
+                                <div className={styles.destinoCellInner}>
+                                  <span className={styles.destinoPorTamanhoNota}>
+                                    editando por tamanho ↓
+                                  </span>
+                                </div>
+                              ) : (
+                                <ManualDestinoEditor
+                                  distribuicao={manualDistribuicao[it.itemKey] ?? {}}
+                                  allFiliais={filialOptions}
+                                  onDelta={(filial, delta) => handleManualFilialDelta(it.itemKey, filial, delta)}
+                                  onSet={(filial, value) => handleManualFilialSet(it.itemKey, filial, value)}
+                                  onAddFilial={(filial) => handleManualAddFilial(it.itemKey, filial)}
+                                />
+                              )}
                               <div className={styles.manualEditActions} data-pdf-hide="">
                                 <button
                                   type="button"
@@ -2148,7 +2337,14 @@ export default function CompraSalvaDetalhePage({
                             /* ── Estado: manual confirmado — visual igual ao auto ── */
                             <div>
                               <div className={styles.destinoCellInner}>
-                                {(() => {
+                                {manualPorTamanho ? (
+                                  <span className={styles.destinoPorTamanhoNota}>
+                                    por tamanho ↓
+                                    <span className={styles.gradeTravaBadge} title="Distribuição feita à mão, tamanho por tamanho.">
+                                      à mão
+                                    </span>
+                                  </span>
+                                ) : (() => {
                                   const cfg = resolveCompany(companyKey);
                                   const manualPartes: DestinoCompraFinalParte[] = Object.entries(manualDistribuicao[it.itemKey] ?? {})
                                     .filter(([, qty]) => qty > 0)
@@ -2163,7 +2359,7 @@ export default function CompraSalvaDetalhePage({
                                 <button
                                   type="button"
                                   className={styles.manualToggleBtn}
-                                  onClick={() => startManualEdit(it.itemKey, partesDestino)}
+                                  onClick={() => startManualEdit(it.itemKey, partesDestino, distTamanho)}
                                 >
                                   Editar
                                 </button>
@@ -2260,8 +2456,12 @@ export default function CompraSalvaDetalhePage({
                                 <button
                                   type="button"
                                   className={styles.manualToggleBtn}
-                                  onClick={() => startManualEdit(it.itemKey, partesDestino)}
-                                  title="Editar distribuição por filial manualmente"
+                                  onClick={() => startManualEdit(it.itemKey, partesDestino, distTamanho)}
+                                  title={
+                                    distTamanho
+                                      ? "Editar à mão a distribuição de cada tamanho (P, M, G) por filial"
+                                      : "Editar distribuição por filial manualmente"
+                                  }
                                 >
                                   Manual
                                 </button>
@@ -2353,52 +2553,74 @@ export default function CompraSalvaDetalhePage({
                             </td>
                             <td className={styles.right}>
                               {/* Quantidade do tamanho — editar aqui trava o P (ou M, ou G) e
-                                  redivide os tamanhos livres dentro da mesma Qtd do item. */}
-                              <div className={styles.tamanhoQtdWrap}>
-                                <input
-                                  className={`${styles.tamanhoQtdInput} ${linha.origemQtd === "manual" ? styles.tamanhoQtdInputTravado : ""}`}
-                                  type="number"
-                                  min={0}
-                                  value={linha.qtd}
-                                  aria-label={`Quantidade do tamanho ${linha.label}`}
-                                  title={
-                                    linha.origemQtd === "manual"
-                                      ? `Tamanho ${linha.label} travado à mão em ${fmt(linha.qtd)}.`
-                                      : `Cota da grade fechada. Digite para travar o tamanho ${linha.label} — os outros redividem o que sobra.`
-                                  }
-                                  onChange={(e) =>
-                                    handleManualTamanhoSet(
-                                      it.itemKey,
-                                      linha.ordinal,
-                                      Number(e.target.value ?? 0),
-                                      effectiveQtdManual,
-                                      distTamanho.tamanhosNaGrade
-                                    )
-                                  }
-                                  onFocus={(e) => e.currentTarget.select()}
-                                />
-                                {linha.origemQtd === "manual" && (
-                                  <button
-                                    type="button"
-                                    className={styles.tamanhoTravaBtn}
-                                    data-pdf-hide=""
-                                    onClick={() => handleManualTamanhoLimpar(it.itemKey, linha.ordinal)}
-                                    title={`Soltar a trava do ${linha.label} e voltar à grade fechada`}
-                                    aria-label={`Soltar a trava do tamanho ${linha.label}`}
-                                  >
-                                    ↺
-                                  </button>
-                                )}
-                              </div>
+                                  redivide os tamanhos livres dentro da mesma Qtd do item.
+                                  No manual por tamanho a quantidade é a soma das lojas ao lado,
+                                  então aqui ela só é exibida (mexer é no editor de lojas). */}
+                              {manualPorTamanho ? (
+                                <span
+                                  className={styles.tamanhoQtd}
+                                  title={`Soma das lojas do tamanho ${linha.label}.`}
+                                >
+                                  {fmt(linha.qtd)}
+                                </span>
+                              ) : (
+                                <div className={styles.tamanhoQtdWrap}>
+                                  <input
+                                    className={`${styles.tamanhoQtdInput} ${linha.origemQtd === "manual" ? styles.tamanhoQtdInputTravado : ""}`}
+                                    type="number"
+                                    min={0}
+                                    value={linha.qtd}
+                                    aria-label={`Quantidade do tamanho ${linha.label}`}
+                                    title={
+                                      linha.origemQtd === "manual"
+                                        ? `Tamanho ${linha.label} travado à mão em ${fmt(linha.qtd)}.`
+                                        : `Cota da grade fechada. Digite para travar o tamanho ${linha.label} — os outros redividem o que sobra.`
+                                    }
+                                    onChange={(e) =>
+                                      handleManualTamanhoSet(
+                                        it.itemKey,
+                                        linha.ordinal,
+                                        Number(e.target.value ?? 0),
+                                        effectiveQtdManual,
+                                        distTamanho.tamanhosNaGrade
+                                      )
+                                    }
+                                    onFocus={(e) => e.currentTarget.select()}
+                                  />
+                                  {linha.origemQtd === "manual" && (
+                                    <button
+                                      type="button"
+                                      className={styles.tamanhoTravaBtn}
+                                      data-pdf-hide=""
+                                      onClick={() => handleManualTamanhoLimpar(it.itemKey, linha.ordinal)}
+                                      title={`Soltar a trava do ${linha.label} e voltar à grade fechada`}
+                                      aria-label={`Soltar a trava do tamanho ${linha.label}`}
+                                    >
+                                      ↺
+                                    </button>
+                                  )}
+                                </div>
+                              )}
                             </td>
                             <td className={styles.destinoCell}>
-                              {linha.partes.length > 0 ? (
+                              {manualPorTamanho && isEditing ? (
+                                /* Mesmo editor do manual por filial, só que dentro deste tamanho. */
+                                <ManualDestinoEditor
+                                  distribuicao={manualDistTamanho[it.itemKey]?.[linha.ordinal] ?? {}}
+                                  allFiliais={filialOptions}
+                                  onDelta={(filial, delta) => handleManualDistTamanhoDelta(it.itemKey, linha.ordinal, filial, delta)}
+                                  onSet={(filial, value) => handleManualDistTamanhoSet(it.itemKey, linha.ordinal, filial, value)}
+                                  onAddFilial={(filial) => handleManualDistTamanhoAddFilial(it.itemKey, linha.ordinal, filial)}
+                                />
+                              ) : linha.partes.length > 0 ? (
                                 <DestinoCompraFinalBadges partes={linha.partes} />
                               ) : (
                                 <span className={styles.tamanhoSemDestino}>
-                                  {distTamanho.qtdDistribuida >= distTamanho.faltaTotalMinimos
-                                    ? "lojas já têm o mínimo"
-                                    : "sem quantidade sobrando"}
+                                  {manualPorTamanho
+                                    ? "sem distribuição"
+                                    : distTamanho.qtdDistribuida >= distTamanho.faltaTotalMinimos
+                                      ? "lojas já têm o mínimo"
+                                      : "sem quantidade sobrando"}
                                 </span>
                               )}
                             </td>
