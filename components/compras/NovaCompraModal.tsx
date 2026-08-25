@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { CompraSalvaListEntry } from "@/lib/types/compra-salva";
 import {
@@ -80,15 +80,15 @@ export default function NovaCompraModal({
   const [erro, setErro] = useState<string | null>(null);
 
   // ───────── Compras Salvas disponíveis ─────────
-  // A busca é guardada por um ref, não pelos estados de carga: se `salvas.length`
-  // ou `carregandoSalvas` entrassem nas dependências, marcar "carregando" já
-  // derrubaria (cleanup) o próprio fetch que o guard acabou de liberar, e a lista
-  // nunca chegava. Ref = uma busca por empresa, sem laço.
-  const chaveBuscada = useRef<string | null>(null);
-
+  // Uma busca por empresa, na montagem do modal — nada de guard por ref nem
+  // pelos estados de carga:
+  //  - flag de carga na lista de dependências faz o `setCarregando(true)`
+  //    disparar o cleanup do próprio efeito que acabou de começar o fetch;
+  //  - guard por ref sobrevive à remontagem simulada do StrictMode (dev roda o
+  //    efeito 2x), então a 2ª execução saía sem buscar e a resposta da 1ª já
+  //    tinha sido descartada pelo cleanup — "carregando…" para sempre.
+  // Sem guard, a última execução é a que vale e sempre grava o resultado.
   useEffect(() => {
-    if (origem !== "salva" || chaveBuscada.current === companyKey) return;
-    chaveBuscada.current = companyKey;
     let cancelado = false;
     setCarregandoSalvas(true);
     setSalvasErro(null);
@@ -102,8 +102,6 @@ export default function NovaCompraModal({
         if (!cancelado) setSalvas(lista);
       })
       .catch((e) => {
-        // Libera nova tentativa ao trocar de origem e voltar.
-        chaveBuscada.current = null;
         if (!cancelado) setSalvasErro(e instanceof Error ? e.message : "Erro ao listar compras salvas");
       })
       .finally(() => {
@@ -112,7 +110,7 @@ export default function NovaCompraModal({
     return () => {
       cancelado = true;
     };
-  }, [origem, companyKey]);
+  }, [companyKey]);
 
   const salvaSelecionada = useMemo(
     () => salvas.find((s) => s.id === compraSalvaId) ?? null,
