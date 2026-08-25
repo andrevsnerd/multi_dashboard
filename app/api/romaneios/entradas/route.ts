@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPermissaoByUsername } from "@/lib/utils/transferencia-permissoes-store";
 import { fetchLogEntradas } from "@/lib/repositories/logEntradas";
 import { findUserByUsername } from "@/lib/auth/users-store";
-import { seesAllFiliais } from "@/lib/auth/permissions";
+import { canSeeRomaneioAjuste, seesAllFiliais } from "@/lib/auth/permissions";
+import { isTipoRomaneioAjuste } from "@/lib/utils/romaneio-tipos";
 import { getActiveFilial } from "@/lib/config/company";
 import { resolveCompanyDynamic } from "@/lib/config/company-server";
 import { getContadorConfirmadosByCompany } from "@/lib/utils/romaneio-confirmacao-store";
@@ -68,25 +69,31 @@ export async function GET(request: NextRequest) {
         )
       : entradasComConfirmacao;
 
+    // Ajuste de estoque é romaneio interno: só de logística pra cima enxerga.
+    // Filtra antes de qualquer retorno, para o gerente nunca receber esses romaneios.
+    const userRecord = username ? await findUserByUsername(username) : null;
+    const visiveis = canSeeRomaneioAjuste(userRecord?.role)
+      ? entradasDaEmpresa
+      : entradasDaEmpresa.filter((r) => !isTipoRomaneioAjuste(r.tipoRomaneio));
+
     if (!username) {
-      return NextResponse.json({ data: entradasDaEmpresa });
+      return NextResponse.json({ data: visiveis });
     }
 
     // Admin/diretor/supervisor/logística veem todos os romaneios da empresa; só o gerente filtra pela filial atribuída.
-    const userRecord = await findUserByUsername(username);
     if (seesAllFiliais(userRecord?.role)) {
-      return NextResponse.json({ data: entradasDaEmpresa });
+      return NextResponse.json({ data: visiveis });
     }
 
     const permissao = await getPermissaoByUsername(username);
 
     if (verTodasAsFiliais(permissao, companyConfig)) {
-      return NextResponse.json({ data: entradasDaEmpresa });
+      return NextResponse.json({ data: visiveis });
     }
 
     // Filial atribuída + adicionais (ex.: logística que também recebe em NERD DEFEITOS).
     const filiaisPermitidas = filiaisDeOperacao(permissao, companyConfig);
-    const filtered = entradasDaEmpresa.filter((e) => {
+    const filtered = visiveis.filter((e) => {
       const destino = normalizeFilialCmp(getActiveFilial(companyConfig, e.filialDestino ?? ""));
       return filiaisPermitidas.includes(destino);
     });

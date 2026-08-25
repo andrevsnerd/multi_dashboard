@@ -78,6 +78,17 @@ export function seesAllFiliais(role: RoleKey | undefined | null): boolean {
 }
 
 /**
+ * Romaneio de AJUSTE DE ESTOQUE e movimento interno (logistica/controladoria):
+ * so aparece de logistica pra cima. O gerente nunca enxerga esse tipo em Romaneios.
+ */
+export const ROMANEIO_AJUSTE_ROLES: RoleKey[] = ["admin", "diretor", "supervisor", "logistica"];
+
+/** True se a funcao pode ver romaneios do tipo ajuste de estoque. */
+export function canSeeRomaneioAjuste(role: RoleKey | undefined | null): boolean {
+  return !!role && ROMANEIO_AJUSTE_ROLES.includes(role);
+}
+
+/**
  * Excecao pontual a filialAtribuida: quem aprova os romaneios de DEFEITO e a
  * MATRIZ (logistica), nao a loja que enviou. Entao a logistica confirma entrada
  * na filial de defeito da empresa (NERD DEFEITOS / BAZAR SCARF ME) ALEM da sua
