@@ -11,15 +11,16 @@ import {
   type CompraGastoParcela,
   type CompraGastoTipo,
 } from "@/lib/types/compra-gasto";
-import { cents, gerarParcelas } from "@/lib/utils/compra-gastos-agregacao";
+import { cents } from "@/lib/utils/compra-gastos-agregacao";
 
+import ParcelasEditor from "./ParcelasEditor";
 import styles from "./GastosCompra.module.css";
-import { brl, money, parseMoeda } from "./gastos-compra-format";
+import { brl, dataBrasiliaDeIso, dataBrCompleta, money, parseMoeda } from "./gastos-compra-format";
 
 interface Props {
   companyKey: string;
   username: string;
-  /** Mês (YYYY-MM) sugerido para o primeiro vencimento. */
+  /** Mês (YYYY-MM) sugerido para a data da compra. */
   mesSugerido?: string | null;
   hoje: string;
   onClose: () => void;
@@ -61,18 +62,13 @@ export default function NovaCompraModal({
   const [colecao, setColecao] = useState("");
   const [fornecedor, setFornecedor] = useState("");
   const [tipo, setTipo] = useState<CompraGastoTipo>("mercadoria");
-  const [dataCompra, setDataCompra] = useState(hoje);
+  const [dataCompra, setDataCompra] = useState(mesSugerido ? `${mesSugerido}-15` : hoje);
   const [chegadaIni, setChegadaIni] = useState("");
   const [chegadaFim, setChegadaFim] = useState("");
   const [pdv, setPdv] = useState("");
   const [estimado, setEstimado] = useState(false);
   const [observacao, setObservacao] = useState("");
 
-  const [qtdParcelas, setQtdParcelas] = useState(1);
-  const [primeiroVencimento, setPrimeiroVencimento] = useState(
-    `${mesSugerido ?? hoje.slice(0, 7)}-15`
-  );
-  const [intervalo, setIntervalo] = useState<"mensal" | "quinzenal">("mensal");
   const [parcelas, setParcelas] = useState<CompraGastoParcela[]>([]);
   const [parcelasEditadas, setParcelasEditadas] = useState(false);
 
@@ -81,13 +77,9 @@ export default function NovaCompraModal({
 
   // ───────── Compras Salvas disponíveis ─────────
   // Uma busca por empresa, na montagem do modal — nada de guard por ref nem
-  // pelos estados de carga:
-  //  - flag de carga na lista de dependências faz o `setCarregando(true)`
-  //    disparar o cleanup do próprio efeito que acabou de começar o fetch;
-  //  - guard por ref sobrevive à remontagem simulada do StrictMode (dev roda o
-  //    efeito 2x), então a 2ª execução saía sem buscar e a resposta da 1ª já
-  //    tinha sido descartada pelo cleanup — "carregando…" para sempre.
-  // Sem guard, a última execução é a que vale e sempre grava o resultado.
+  // pelos estados de carga: flag de carga nas dependências dispara o cleanup do
+  // próprio efeito, e guard por ref sobrevive à remontagem do StrictMode (dev
+  // roda o efeito 2x), nos dois casos matando a única resposta que ia gravar.
   useEffect(() => {
     let cancelado = false;
     setCarregandoSalvas(true);
@@ -140,18 +132,18 @@ export default function NovaCompraModal({
     return parseMoeda(valorUnicoTexto);
   }, [origem, salvaSelecionada, itensDasLinhas, valorUnicoTexto]);
 
-  // Regera a prévia de parcelas enquanto o usuário não editar linha a linha.
+  // A compra nasce INTEIRA: uma parcela de 100% na data da compra. Só quando o
+  // usuário divide é que o valor sai desse mês e vai para os vencimentos novos.
   useEffect(() => {
     if (parcelasEditadas) return;
-    setParcelas(gerarParcelas(total, qtdParcelas, primeiroVencimento, intervalo));
-  }, [total, qtdParcelas, primeiroVencimento, intervalo, parcelasEditadas]);
-
-  // Título e código sugeridos ao escolher uma Compra Salva.
-  useEffect(() => {
-    if (origem === "salva" && salvaSelecionada) {
-      setTitulo((atual) => atual || salvaSelecionada.title);
+    if (total <= 0 || !dataCompra) {
+      setParcelas([]);
+      return;
     }
-  }, [origem, salvaSelecionada]);
+    setParcelas([
+      { numero: 1, vencimento: dataCompra, valor: total, pago: false, dataPagamento: null },
+    ]);
+  }, [total, dataCompra, parcelasEditadas]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -161,8 +153,19 @@ export default function NovaCompraModal({
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const somaParcelas = cents(parcelas.reduce((s, p) => s + p.valor, 0));
-  const parcelasDivergem = parcelas.length > 0 && Math.abs(somaParcelas - total) > 0.5;
+  /** Ao escolher a Compra Salva, título e data vêm dela — só o parcelamento sobra para editar. */
+  const escolherCompraSalva = useCallback(
+    (id: string) => {
+      setCompraSalvaId(id);
+      setParcelasEditadas(false);
+      const escolhida = salvas.find((s) => s.id === id);
+      if (!escolhida) return;
+      setTitulo(escolhida.title);
+      setCodigo((atual) => atual || escolhida.title.slice(0, 24));
+      setDataCompra(dataBrasiliaDeIso(escolhida.savedAt));
+    },
+    [salvas]
+  );
 
   const atualizarLinha = useCallback((i: number, campo: keyof LinhaLivre, valor: string) => {
     setLinhas((prev) => {
@@ -178,20 +181,10 @@ export default function NovaCompraModal({
     setLinhas((prev) => (prev.length <= 1 ? [{ ...LINHA_VAZIA }] : prev.filter((_, idx) => idx !== i)));
   }, []);
 
-  const atualizarParcela = useCallback(
-    (i: number, campo: "vencimento" | "valor", valor: string) => {
-      setParcelasEditadas(true);
-      setParcelas((prev) => {
-        const next = [...prev];
-        next[i] = {
-          ...next[i],
-          [campo]: campo === "valor" ? parseMoeda(valor) : valor,
-        };
-        return next;
-      });
-    },
-    []
-  );
+  const alterarParcelas = useCallback((novas: CompraGastoParcela[]) => {
+    setParcelasEditadas(true);
+    setParcelas(novas);
+  }, []);
 
   async function salvar() {
     setErro(null);
@@ -237,10 +230,10 @@ export default function NovaCompraModal({
 
       if (origem === "salva") {
         body.compraSalvaId = compraSalvaId;
-        // Sem edição manual, o servidor divide o total real dos itens (evita
-        // divergir do arredondamento da listagem).
+        // Sem edição manual, o servidor divide o total exato dos itens (a lista
+        // mostra o valor arredondado, e usá-lo aqui deixaria centavos sobrando).
         if (parcelasEditadas) body.parcelas = parcelas;
-        else body.parcelasConfig = { quantidade: qtdParcelas, primeiroVencimento, intervalo };
+        else body.parcelasConfig = { quantidade: 1, primeiroVencimento: dataCompra };
       } else if (origem === "itens") {
         body.itens = itensDasLinhas;
         body.parcelas = parcelas;
@@ -293,7 +286,7 @@ export default function NovaCompraModal({
             >
               <span className={styles.originName}>Compra Salva</span>
               <span className={styles.originDesc}>
-                Vincula uma lista já montada no dashboard. Valor e itens vêm calculados.
+                Vincula uma lista já montada no dashboard. Valor, itens e data vêm dela.
               </span>
             </button>
             <button
@@ -326,18 +319,20 @@ export default function NovaCompraModal({
                 <span>Compra Salva</span>
                 <select
                   value={compraSalvaId}
-                  onChange={(e) => {
-                    setCompraSalvaId(e.target.value);
-                    setParcelasEditadas(false);
-                  }}
+                  onChange={(e) => escolherCompraSalva(e.target.value)}
                   disabled={carregandoSalvas}
                 >
                   <option value="">
-                    {carregandoSalvas ? "carregando…" : "selecione uma compra salva"}
+                    {carregandoSalvas
+                      ? "carregando…"
+                      : salvas.length === 0
+                        ? "nenhuma compra salva nesta empresa"
+                        : "selecione uma compra salva"}
                   </option>
                   {salvas.map((s) => (
                     <option key={s.id} value={s.id}>
-                      {s.title} — {s.itemCount} itens · {brl(s.totalValor)}
+                      {dataBrCompleta(dataBrasiliaDeIso(s.savedAt))} · {s.title} — {s.itemCount} itens ·{" "}
+                      {brl(s.totalValor)}
                       {s.comprada ? " · comprada" : ""}
                     </option>
                   ))}
@@ -345,9 +340,9 @@ export default function NovaCompraModal({
               </label>
               {salvasErro && <p className={styles.note}>{salvasErro}</p>}
               <p className={styles.note}>
-                O valor vem de qtd × custo dos itens, item por item. Item sem custo cadastrado não
-                soma zero escondido: a compra nasce marcada como estimativa e a observação registra
-                quantos ficaram de fora.
+                Título e data da compra vêm da própria Compra Salva — só o parcelamento fica para
+                você editar. O valor sai de qtd × custo, item por item; item sem custo cadastrado não
+                soma zero escondido: a compra nasce como estimativa e a observação diz quantos.
               </p>
             </div>
           )}
@@ -486,7 +481,14 @@ export default function NovaCompraModal({
               </label>
               <label className={styles.field}>
                 <span>Data da compra</span>
-                <input type="date" value={dataCompra} onChange={(e) => setDataCompra(e.target.value)} />
+                <input
+                  type="date"
+                  value={dataCompra}
+                  onChange={(e) => {
+                    setDataCompra(e.target.value);
+                    setParcelasEditadas(false);
+                  }}
+                />
               </label>
               <label className={styles.field}>
                 <span>Previsão de chegada</span>
@@ -504,84 +506,22 @@ export default function NovaCompraModal({
           </div>
 
           <div>
-            <div className={styles.blockTitle}>Parcelas</div>
-            <div className={styles.fieldGrid}>
-              <label className={styles.field}>
-                <span>Nº de parcelas</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={48}
-                  value={qtdParcelas}
-                  onChange={(e) => {
-                    setQtdParcelas(Math.max(1, Math.min(48, Number(e.target.value) || 1)));
-                    setParcelasEditadas(false);
-                  }}
-                />
-              </label>
-              <label className={styles.field}>
-                <span>1º vencimento</span>
-                <input
-                  type="date"
-                  value={primeiroVencimento}
-                  onChange={(e) => {
-                    setPrimeiroVencimento(e.target.value);
-                    setParcelasEditadas(false);
-                  }}
-                />
-              </label>
-              <label className={styles.field}>
-                <span>Intervalo</span>
-                <select
-                  value={intervalo}
-                  onChange={(e) => {
-                    setIntervalo(e.target.value as "mensal" | "quinzenal");
-                    setParcelasEditadas(false);
-                  }}
-                >
-                  <option value="mensal">Mensal, mesmo dia</option>
-                  <option value="quinzenal">A cada 15 dias</option>
-                </select>
-              </label>
-            </div>
-
-            {parcelas.length > 0 && (
-              <div className={styles.parcelaGrid} style={{ marginTop: 10 }}>
-                {parcelas.map((p, i) => (
-                  <div className={styles.parcelaLine} key={i}>
-                    <span className={styles.parcelaNum}>
-                      {i + 1}/{parcelas.length}
-                    </span>
-                    <input
-                      type="date"
-                      value={p.vencimento}
-                      onChange={(e) => atualizarParcela(i, "vencimento", e.target.value)}
-                    />
-                    <input
-                      className={styles.money}
-                      value={money(p.valor)}
-                      inputMode="decimal"
-                      onChange={(e) => atualizarParcela(i, "valor", e.target.value)}
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className={styles.sumRow}>
-              <span className={styles.note} style={{ margin: 0 }}>
-                {origem === "salva" && !parcelasEditadas
+            <div className={styles.blockTitle}>Parcelamento</div>
+            <p className={styles.note} style={{ margin: "0 0 10px" }}>
+              Por padrão a compra vem inteira, vencendo na data da compra. Ao dividir, esse mês fica
+              só com a primeira parcela e o restante vai para os meses dos novos vencimentos.
+            </p>
+            <ParcelasEditor
+              total={total}
+              parcelas={parcelas}
+              onChange={alterarParcelas}
+              vencimentoSugerido={dataCompra}
+              rodape={
+                origem === "salva" && !parcelasEditadas
                   ? "Prévia: o valor exato dos itens é confirmado ao salvar"
-                  : "Soma das parcelas"}
-              </span>
-              <b className={parcelasDivergem ? styles.neg : undefined}>{brl(somaParcelas)}</b>
-            </div>
-            {parcelasDivergem && (
-              <p className={styles.note}>
-                A soma das parcelas difere do total da compra ({brl(total)}). Ajuste se não for
-                intencional — o gasto do mês segue as parcelas.
-              </p>
-            )}
+                  : "Soma das parcelas"
+              }
+            />
           </div>
 
           <label className={styles.check}>

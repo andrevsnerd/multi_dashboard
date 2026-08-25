@@ -159,6 +159,23 @@ export interface CompraGastoStatus {
   tom: "good" | "warn" | "crit" | "mute";
 }
 
+/**
+ * Compra Salva reconhecida como candidata a compra do painel: já vem com data
+ * (do `savedAt`) e valor (qtd × custo dos itens), pronta para lançar.
+ */
+export interface CompraGastoCandidata {
+  compraSalvaId: string;
+  titulo: string;
+  /** YYYY-MM-DD, fuso de Brasília. */
+  dataCompra: string;
+  itens: CompraGastoItem[];
+  total: number;
+  itemCount: number;
+  /** Linhas sem custo cadastrado — o valor está subestimado por elas. */
+  semCusto: number;
+  comprada: boolean;
+}
+
 /** Payload de criação/edição de lote (o que a tela manda para a API). */
 export interface CompraGastoLoteInput {
   codigo: string;

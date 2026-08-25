@@ -1,15 +1,18 @@
 import { NextResponse } from "next/server";
 
 import { readOnlyBlock } from "@/lib/auth/route-guards";
-import { fetchCustosPorProdutos } from "@/lib/repositories/controleEstoque";
 import type {
   CompraGastoItem,
   CompraGastoLoteInput,
   CompraGastoParcela,
 } from "@/lib/types/compra-gasto";
 import { cents, gerarParcelas, itensTotal } from "@/lib/utils/compra-gastos-agregacao";
+import {
+  avisoDeCustoFaltante,
+  combinarObservacao,
+  materializarCompraSalva,
+} from "@/lib/utils/compra-gastos-import";
 import { createLote, listLotes, listOrcamento } from "@/lib/utils/compra-gastos-store";
-import { getCompraSalva } from "@/lib/utils/compra-salva-store";
 
 /** Painel completo: lotes + orçamento. A agregação por mês roda na tela (função pura compartilhada). */
 export async function GET(request: Request) {
@@ -74,46 +77,18 @@ export async function POST(request: Request) {
       if (!compraSalvaId) {
         return NextResponse.json({ error: "Selecione a Compra Salva de origem" }, { status: 400 });
       }
-      const compra = await getCompraSalva(companyKey, compraSalvaId);
-      if (!compra) {
+      const m = await materializarCompraSalva(companyKey, compraSalvaId);
+      if (!m) {
         return NextResponse.json({ error: "Compra Salva não encontrada" }, { status: 404 });
       }
 
-      // Custo do item salvo tem prioridade; o que faltar tenta o cadastro do ERP.
-      const semCusto = compra.items.filter((i) => !(i.custoUnitario && i.custoUnitario > 0));
-      let custoMap = new Map<string, number>();
-      if (semCusto.length > 0) {
-        const produtos = [...new Set(semCusto.map((i) => i.produto.trim()).filter(Boolean))];
-        try {
-          custoMap = await fetchCustosPorProdutos(produtos);
-        } catch {
-          // ERP indisponível — os itens sem custo ficam explícitos abaixo.
-        }
-      }
-
-      itens = compra.items.map((i) => {
-        const custo =
-          i.custoUnitario && i.custoUnitario > 0
-            ? i.custoUnitario
-            : custoMap.get(i.produto.trim()) ?? 0;
-        return {
-          descricao: i.descricao || i.produto,
-          produto: i.produto,
-          corProduto: i.corProduto ?? null,
-          corDescricao: i.corDescricao ?? null,
-          qtd: Math.max(0, Math.round(i.qtdManual ?? 0)),
-          custoUnitario: custo,
-        };
-      });
-
-      const faltando = itens.filter((i) => !(i.custoUnitario > 0)).length;
-      if (faltando > 0) {
+      itens = m.itens;
+      valorUnico = null;
+      if (m.semCusto > 0) {
         // Nunca somar zero escondido: o lote vira estimativa e diz o porquê.
         estimado = true;
-        const aviso = `${faltando} de ${itens.length} itens sem custo cadastrado — valor subestimado.`;
-        observacao = observacao ? `${observacao}\n${aviso}` : aviso;
+        observacao = combinarObservacao(observacao, avisoDeCustoFaltante(m));
       }
-      valorUnico = null;
     }
 
     if (origem === "itens" && itens.length === 0) {

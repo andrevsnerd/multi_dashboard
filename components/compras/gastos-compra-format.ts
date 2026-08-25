@@ -85,3 +85,14 @@ export function hojeIso(): string {
   const brasilia = new Date(agora.getTime() - 3 * 60 * 60 * 1000);
   return brasilia.toISOString().slice(0, 10);
 }
+
+/**
+ * Data (YYYY-MM-DD) no fuso de Brasília a partir de um ISO em UTC.
+ * Fatiar o ISO direto erra o dia de tudo que foi salvo depois das 21h.
+ * Versão de cliente — o equivalente de servidor vive em compra-gastos-import.
+ */
+export function dataBrasiliaDeIso(iso: string): string {
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return String(iso ?? "").slice(0, 10);
+  return new Date(t - 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}

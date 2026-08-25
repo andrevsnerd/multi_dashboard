@@ -260,6 +260,63 @@ export function gerarParcelas(
 }
 
 /**
+ * Divide um total em parcelas por PERCENTUAL — "40% na data x, 60% na data y".
+ *
+ * Os percentuais são tratados como PESOS normalizados pela própria soma, então
+ * `[40, 60]` e `[2, 3]` dão o mesmo resultado e uma lista que não fecha 100
+ * ainda distribui o total inteiro. A última parcela absorve os centavos, de
+ * modo que a soma bate com o total ao centavo.
+ */
+export function gerarParcelasPorPercentual(
+  total: number,
+  percentuais: number[],
+  primeiroVencimento: string,
+  intervalo: "mensal" | "quinzenal" = "mensal"
+): CompraGastoParcela[] {
+  const pesos = (percentuais ?? []).map((p) => Math.max(0, Number(p) || 0));
+  const somaPesos = pesos.reduce((s, p) => s + p, 0);
+  if (!primeiroVencimento || pesos.length === 0 || somaPesos <= 0) return [];
+
+  const alvo = cents(total);
+  const out: CompraGastoParcela[] = [];
+  let somado = 0;
+
+  pesos.forEach((peso, i) => {
+    const ultima = i === pesos.length - 1;
+    const valor = ultima ? cents(alvo - somado) : cents((alvo * peso) / somaPesos);
+    somado = cents(somado + valor);
+    out.push({
+      numero: i + 1,
+      vencimento: deslocarVencimento(primeiroVencimento, i, intervalo),
+      valor,
+      pago: false,
+      dataPagamento: null,
+    });
+  });
+
+  return out;
+}
+
+/**
+ * Lê percentuais digitados como "40/60", "30 30 40" ou "33,3/33,3/33,4".
+ * Separadores: barra, ponto-e-vírgula, mais e espaço. Vírgula é decimal (pt-BR).
+ */
+export function parsePercentuais(texto: string): number[] {
+  return String(texto ?? "")
+    .split(/[/;+\s]+/)
+    .map((p) => p.trim().replace("%", "").replace(",", "."))
+    .filter(Boolean)
+    .map((p) => Number(p))
+    .filter((n) => Number.isFinite(n) && n > 0);
+}
+
+/** Percentual que cada parcela representa do total do lote. */
+export function percentualDaParcela(valor: number, total: number): number {
+  if (!(total > 0)) return 0;
+  return Math.round((valor / total) * 1000) / 10;
+}
+
+/**
  * Desloca o vencimento mantendo o dia do mês. Dia que não existe no mês de
  * destino (31 em fevereiro) cai no último dia daquele mês.
  */

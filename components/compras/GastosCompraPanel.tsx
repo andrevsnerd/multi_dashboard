@@ -6,9 +6,11 @@ import { useAuth } from "@/components/auth/AuthContext";
 import { isReadOnlyRole } from "@/lib/auth/permissions";
 import {
   COMPRA_GASTO_TIPO_LABEL,
+  type CompraGastoCandidata,
   type CompraGastoLote,
   type CompraGastoMes,
   type CompraGastoOrcamentoEntry,
+  type CompraGastoParcela,
 } from "@/lib/types/compra-gasto";
 import {
   agendaDePagamentos,
@@ -42,7 +44,7 @@ interface Props {
   companyName: string;
 }
 
-type Aba = "painel" | "agenda";
+type Aba = "painel" | "agenda" | "reconhecer";
 
 const TOM_CLASSE = {
   good: styles.pillGood,
@@ -73,6 +75,12 @@ export default function GastosCompraPanel({ companyKey, companyName }: Props) {
   const [salvando, setSalvando] = useState(false);
   const [rascunhoOrcamento, setRascunhoOrcamento] = useState<Record<string, string>>({});
 
+  // Reconhecimento de Compras Salvas ainda não lançadas.
+  const [candidatas, setCandidatas] = useState<CompraGastoCandidata[]>([]);
+  const [escopo, setEscopo] = useState<"comprada" | "todas">("comprada");
+  const [carregandoCandidatas, setCarregandoCandidatas] = useState(false);
+  const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set());
+
   // ───────── carga ─────────
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -97,6 +105,26 @@ export default function GastosCompraPanel({ companyKey, companyName }: Props) {
   useEffect(() => {
     void carregar();
   }, [carregar]);
+
+  const carregarCandidatas = useCallback(async () => {
+    setCarregandoCandidatas(true);
+    try {
+      const res = await fetch(`/api/compras-gastos/reconhecer?company=${companyKey}&escopo=${escopo}`, {
+        cache: "no-store",
+      });
+      const json = (await res.json()) as { candidatas?: CompraGastoCandidata[]; error?: string };
+      if (!res.ok) throw new Error(json.error ?? "Erro ao reconhecer compras salvas");
+      setCandidatas(json.candidatas ?? []);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Erro ao reconhecer compras salvas");
+    } finally {
+      setCarregandoCandidatas(false);
+    }
+  }, [companyKey, escopo]);
+
+  useEffect(() => {
+    void carregarCandidatas();
+  }, [carregarCandidatas]);
 
   // ───────── derivados ─────────
   const anos = useMemo(() => {
@@ -217,6 +245,75 @@ export default function GastosCompraPanel({ companyKey, companyName }: Props) {
     [companyKey, username, loteMap]
   );
 
+  const salvarParcelas = useCallback(
+    async (loteId: string, parcelas: CompraGastoParcela[]): Promise<boolean> => {
+      setSalvando(true);
+      try {
+        const res = await fetch(`/api/compras-gastos/${loteId}?company=${companyKey}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", "x-auth-username": username },
+          body: JSON.stringify({ parcelas }),
+        });
+        const json = (await res.json()) as { data?: CompraGastoLote; error?: string };
+        if (!res.ok || !json.data) {
+          setErro(json.error ?? "Não foi possível salvar o parcelamento.");
+          return false;
+        }
+        setLotes((prev) => prev.map((l) => (l.id === loteId ? (json.data as CompraGastoLote) : l)));
+        return true;
+      } catch {
+        setErro("Não foi possível salvar o parcelamento.");
+        return false;
+      } finally {
+        setSalvando(false);
+      }
+    },
+    [companyKey, username]
+  );
+
+  const lancarReconhecidas = useCallback(async () => {
+    const ids = [...selecionadas];
+    if (ids.length === 0) return;
+    setSalvando(true);
+    try {
+      const res = await fetch("/api/compras-gastos/reconhecer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-auth-username": username },
+        body: JSON.stringify({ companyKey, ids }),
+      });
+      const json = (await res.json()) as {
+        criados?: CompraGastoLote[];
+        ignorados?: { id: string; motivo: string }[];
+        error?: string;
+      };
+      if (!res.ok) {
+        setErro(json.error ?? "Não foi possível lançar as compras reconhecidas.");
+        return;
+      }
+      const criados = json.criados ?? [];
+      setLotes((prev) => [...criados, ...prev]);
+      setCandidatas((prev) => prev.filter((c) => !criados.some((l) => l.compraSalvaId === c.compraSalvaId)));
+      setSelecionadas(new Set());
+      if (criados.length > 0) {
+        const primeiro = criados[0].parcelas[0]?.vencimento ?? "";
+        const anoLancado = primeiro.slice(0, 4);
+        if (anoLancado && ano && anoLancado !== ano) setAno(anoLancado);
+        setAba("painel");
+      }
+      if (json.ignorados && json.ignorados.length > 0) {
+        setErro(
+          `${json.ignorados.length} não foram lançadas: ${json.ignorados
+            .map((i) => i.motivo)
+            .join("; ")}`
+        );
+      }
+    } catch {
+      setErro("Não foi possível lançar as compras reconhecidas.");
+    } finally {
+      setSalvando(false);
+    }
+  }, [companyKey, username, selecionadas, ano]);
+
   const aoSalvarCompra = useCallback(
     (lote: CompraGastoLote) => {
       setModalAberto(false);
@@ -226,6 +323,10 @@ export default function GastosCompraPanel({ companyKey, companyName }: Props) {
       if (anoDaCompra && ano && anoDaCompra !== ano) setAno(anoDaCompra);
       const ym = primeiroVenc.slice(0, 7);
       if (ym) setAbertos((prev) => new Set(prev).add(ym));
+      // Compra vinculada a uma Compra Salva sai da lista de candidatas.
+      if (lote.compraSalvaId) {
+        setCandidatas((prev) => prev.filter((c) => c.compraSalvaId !== lote.compraSalvaId));
+      }
     },
     [ano]
   );
@@ -382,6 +483,16 @@ export default function GastosCompraPanel({ companyKey, companyName }: Props) {
           >
             Agenda de pagamentos
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={aba === "reconhecer"}
+            className={aba === "reconhecer" ? styles.tabActive : undefined}
+            onClick={() => setAba("reconhecer")}
+          >
+            Compras Salvas reconhecidas
+            {candidatas.length > 0 && <span className={styles.tabBadge}>{candidatas.length}</span>}
+          </button>
         </div>
 
         {carregando && <div className={styles.feedback}>Carregando…</div>}
@@ -536,6 +647,140 @@ export default function GastosCompraPanel({ companyKey, companyName }: Props) {
             </table>
           </div>
         )}
+
+        {aba === "reconhecer" && (
+          <>
+            <div className={styles.reconhecerHead}>
+              <div>
+                <span className={styles.cardNote}>
+                  Compras Salvas que ainda não estão no painel. Data e valor vêm da própria lista —
+                  ao lançar, a compra entra inteira nessa data e você só edita o parcelamento.
+                </span>
+              </div>
+              <div className={styles.headTools}>
+                <div className={styles.seg} role="group" aria-label="Escopo do reconhecimento">
+                  <button
+                    type="button"
+                    className={escopo === "comprada" ? styles.segActive : undefined}
+                    aria-pressed={escopo === "comprada"}
+                    onClick={() => {
+                      setEscopo("comprada");
+                      setSelecionadas(new Set());
+                    }}
+                  >
+                    Marcadas como compradas
+                  </button>
+                  <button
+                    type="button"
+                    className={escopo === "todas" ? styles.segActive : undefined}
+                    aria-pressed={escopo === "todas"}
+                    onClick={() => {
+                      setEscopo("todas");
+                      setSelecionadas(new Set());
+                    }}
+                  >
+                    Todas
+                  </button>
+                </div>
+                {podeEditar && (
+                  <button
+                    type="button"
+                    className={`${styles.btn} ${styles.btnPrimary} ${styles.btnSm}`}
+                    onClick={() => void lancarReconhecidas()}
+                    disabled={salvando || selecionadas.size === 0}
+                  >
+                    {salvando
+                      ? "Lançando…"
+                      : `Lançar ${selecionadas.size || ""} ${selecionadas.size === 1 ? "compra" : "compras"}`.trim()}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {carregandoCandidatas && <div className={styles.feedback}>Carregando…</div>}
+
+            {!carregandoCandidatas && candidatas.length === 0 && (
+              <div className={styles.feedback}>
+                {escopo === "comprada"
+                  ? "Nenhuma Compra Salva marcada como comprada está fora do painel. Use “Todas” para ver as demais."
+                  : "Todas as Compras Salvas desta empresa já estão no painel."}
+              </div>
+            )}
+
+            {!carregandoCandidatas && candidatas.length > 0 && (
+              <div className={styles.reconhecerList}>
+                <label className={styles.check} style={{ padding: "0 2px 4px" }}>
+                  <input
+                    type="checkbox"
+                    checked={selecionadas.size === candidatas.length}
+                    onChange={(e) =>
+                      setSelecionadas(
+                        e.target.checked ? new Set(candidatas.map((c) => c.compraSalvaId)) : new Set()
+                      )
+                    }
+                  />
+                  <span>
+                    selecionar todas ({candidatas.length}) ·{" "}
+                    {brl(candidatas.reduce((acc, c) => acc + c.total, 0))}
+                  </span>
+                </label>
+
+                {candidatas.map((c) => {
+                  const marcada = selecionadas.has(c.compraSalvaId);
+                  return (
+                    <div
+                      key={c.compraSalvaId}
+                      className={`${styles.candidata} ${marcada ? styles.candidataSel : ""}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={marcada}
+                        onChange={(e) =>
+                          setSelecionadas((prev) => {
+                            const next = new Set(prev);
+                            if (e.target.checked) next.add(c.compraSalvaId);
+                            else next.delete(c.compraSalvaId);
+                            return next;
+                          })
+                        }
+                        aria-label={`Selecionar ${c.titulo}`}
+                      />
+                      <div>
+                        <div className={styles.candidataTitulo}>{c.titulo}</div>
+                        <div className={styles.candidataSub}>
+                          {c.itemCount} itens
+                          {c.semCusto > 0 ? ` · ${c.semCusto} sem custo` : ""}
+                        </div>
+                      </div>
+                      <span className={`${styles.num} ${styles.muted}`} style={{ textAlign: "left" }}>
+                        {dataBrCompleta(c.dataCompra)}
+                      </span>
+                      <span className={styles.num}>{money(c.total)}</span>
+                      <span>
+                        {c.semCusto > 0 ? (
+                          <span className={`${styles.pill} ${styles.pillWarn}`}>
+                            <i />
+                            estimativa
+                          </span>
+                        ) : c.comprada ? (
+                          <span className={`${styles.pill} ${styles.pillGood}`}>
+                            <i />
+                            comprada
+                          </span>
+                        ) : (
+                          <span className={`${styles.pill} ${styles.pillMute}`}>
+                            <i />
+                            não marcada
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
       </section>
 
       {loteAberto && loteMap.get(loteAberto) && (
@@ -547,6 +792,7 @@ export default function GastosCompraPanel({ companyKey, companyName }: Props) {
           salvando={salvando}
           onClose={() => setLoteAberto(null)}
           onTogglePago={(indice, pago) => void togglePago(loteAberto, indice, pago)}
+          onSalvarParcelas={(parcelas) => salvarParcelas(loteAberto, parcelas)}
           onDelete={() => void excluirLote(loteAberto)}
         />
       )}

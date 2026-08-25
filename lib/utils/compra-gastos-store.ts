@@ -239,6 +239,34 @@ export async function listLotes(companyKey: string): Promise<CompraGastoLote[]> 
     .sort((a, b) => (a.dataCompra < b.dataCompra ? 1 : a.dataCompra > b.dataCompra ? -1 : 0));
 }
 
+/**
+ * IDs de Compra Salva já lançados como compra — o reconhecimento automático não
+ * pode oferecer duas vezes a mesma lista (viraria valor duplicado no mês).
+ */
+export async function listCompraSalvaIdsLancados(companyKey: string): Promise<Set<string>> {
+  if (hasPostgres()) {
+    await ensureTable();
+    const sql = getNeonSql();
+    const rows = await sql`
+      SELECT DISTINCT compra_salva_id
+      FROM compra_gastos_lotes
+      WHERE company_key = ${companyKey} AND compra_salva_id IS NOT NULL
+    `;
+    return new Set(
+      rows
+        .map((r) => (r as { compra_salva_id: string | null }).compra_salva_id)
+        .filter((id): id is string => !!id)
+    );
+  }
+
+  const all = await readFileAll();
+  return new Set(
+    all.lotes
+      .filter((l) => l.companyKey === companyKey && l.compraSalvaId)
+      .map((l) => l.compraSalvaId as string)
+  );
+}
+
 export async function getLote(companyKey: string, id: string): Promise<CompraGastoLote | null> {
   if (hasPostgres()) {
     await ensureTable();

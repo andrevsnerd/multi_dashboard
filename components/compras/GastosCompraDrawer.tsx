@@ -6,6 +6,7 @@ import {
   COMPRA_GASTO_ORIGEM_LABEL,
   COMPRA_GASTO_TIPO_LABEL,
   type CompraGastoLote,
+  type CompraGastoParcela,
 } from "@/lib/types/compra-gasto";
 import {
   itemTotal,
@@ -14,8 +15,10 @@ import {
   loteStatus,
   loteTotal,
   loteTotalPago,
+  percentualDaParcela,
 } from "@/lib/utils/compra-gastos-agregacao";
 
+import ParcelasEditor from "./ParcelasEditor";
 import styles from "./GastosCompra.module.css";
 import { brl, dataBr, dataBrCompleta, money } from "./gastos-compra-format";
 
@@ -26,6 +29,7 @@ interface Props {
   salvando: boolean;
   onClose: () => void;
   onTogglePago: (indice: number, pago: boolean) => void;
+  onSalvarParcelas: (parcelas: CompraGastoParcela[]) => Promise<boolean>;
   onDelete: () => void;
 }
 
@@ -45,11 +49,14 @@ export default function GastosCompraDrawer({
   salvando,
   onClose,
   onTogglePago,
+  onSalvarParcelas,
   onDelete,
 }: Props) {
   // A aba volta para "Composição" a cada compra aberta porque o painel remonta
   // a gaveta por `key` — sem efeito de reset.
   const [aba, setAba] = useState<Aba>("composicao");
+  const [editandoParcelas, setEditandoParcelas] = useState(false);
+  const [rascunho, setRascunho] = useState<CompraGastoParcela[]>([]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -65,6 +72,16 @@ export default function GastosCompraDrawer({
   const somaLinhas = itensTotal(lote.itens);
   const semCusto = itensSemCusto(lote.itens);
   const divergencia = lote.itens.length > 0 ? Math.abs(somaLinhas - total) : 0;
+
+  function abrirEdicao() {
+    setRascunho(lote.parcelas.map((p) => ({ ...p })));
+    setEditandoParcelas(true);
+  }
+
+  async function salvarEdicao() {
+    const ok = await onSalvarParcelas(rascunho);
+    if (ok) setEditandoParcelas(false);
+  }
 
   return (
     <>
@@ -86,9 +103,7 @@ export default function GastosCompraDrawer({
               <i />
               {status.label}
             </span>
-            <span
-              className={`${styles.tag} ${lote.origem === "salva" ? styles.tagLinked : ""}`}
-            >
+            <span className={`${styles.tag} ${lote.origem === "salva" ? styles.tagLinked : ""}`}>
               {COMPRA_GASTO_ORIGEM_LABEL[lote.origem]}
             </span>
             <span className={styles.tag}>{COMPRA_GASTO_TIPO_LABEL[lote.tipo]}</span>
@@ -249,64 +264,124 @@ export default function GastosCompraDrawer({
             </>
           )}
 
-          {aba === "parcelas" && (
-            <div className={styles.tableScroll}>
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    <th>Parcela</th>
-                    <th>Vencimento</th>
-                    <th className={styles.thNum}>Valor</th>
-                    <th>Situação</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {lote.parcelas.map((p, i) => (
-                    <tr key={`${p.vencimento}-${i}`}>
-                      <td className={styles.parcelaNum}>
-                        {i + 1}/{lote.parcelas.length}
-                      </td>
-                      <td className={styles.num} style={{ textAlign: "left" }}>
-                        {dataBrCompleta(p.vencimento)}
-                      </td>
-                      <td className={styles.num}>{money(p.valor)}</td>
-                      <td>
-                        {podeEditar ? (
-                          <label className={styles.check}>
-                            <input
-                              type="checkbox"
-                              checked={p.pago}
-                              disabled={salvando}
-                              onChange={(e) => onTogglePago(i, e.target.checked)}
-                            />
-                            <span>
-                              {p.pago
-                                ? `pago${p.dataPagamento ? ` em ${dataBr(p.dataPagamento)}` : ""}`
-                                : p.vencimento < hoje
-                                  ? "vencido"
-                                  : "a pagar"}
-                            </span>
-                          </label>
-                        ) : (
-                          <span
-                            className={`${styles.pill} ${p.pago ? styles.pillGood : p.vencimento < hoje ? styles.pillCrit : styles.pillWarn}`}
-                          >
-                            <i />
-                            {p.pago ? "Pago" : p.vencimento < hoje ? "Vencido" : "A pagar"}
-                          </span>
-                        )}
-                      </td>
+          {aba === "parcelas" && !editandoParcelas && (
+            <>
+              <div className={styles.tableScroll}>
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th>Parcela</th>
+                      <th>Vencimento</th>
+                      <th className={styles.thNum}>Valor</th>
+                      <th className={styles.thNum}>%</th>
+                      <th>Situação</th>
                     </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr>
-                    <td colSpan={2}>Total</td>
-                    <td className={styles.num}>{money(total)}</td>
-                    <td />
-                  </tr>
-                </tfoot>
-              </table>
+                  </thead>
+                  <tbody>
+                    {lote.parcelas.map((p, i) => (
+                      <tr key={`${p.vencimento}-${i}`}>
+                        <td className={styles.parcelaNum}>
+                          {i + 1}/{lote.parcelas.length}
+                        </td>
+                        <td className={styles.num} style={{ textAlign: "left" }}>
+                          {dataBrCompleta(p.vencimento)}
+                        </td>
+                        <td className={styles.num}>{money(p.valor)}</td>
+                        <td className={`${styles.num} ${styles.muted}`}>
+                          {total > 0 ? `${percentualDaParcela(p.valor, total)}%` : "—"}
+                        </td>
+                        <td>
+                          {podeEditar ? (
+                            <label className={styles.check}>
+                              <input
+                                type="checkbox"
+                                checked={p.pago}
+                                disabled={salvando}
+                                onChange={(e) => onTogglePago(i, e.target.checked)}
+                              />
+                              <span>
+                                {p.pago
+                                  ? `pago${p.dataPagamento ? ` em ${dataBr(p.dataPagamento)}` : ""}`
+                                  : p.vencimento < hoje
+                                    ? "vencido"
+                                    : "a pagar"}
+                              </span>
+                            </label>
+                          ) : (
+                            <span
+                              className={`${styles.pill} ${p.pago ? styles.pillGood : p.vencimento < hoje ? styles.pillCrit : styles.pillWarn}`}
+                            >
+                              <i />
+                              {p.pago ? "Pago" : p.vencimento < hoje ? "Vencido" : "A pagar"}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colSpan={2}>Total</td>
+                      <td className={styles.num}>{money(total)}</td>
+                      <td colSpan={2} />
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+
+              {podeEditar && (
+                <div style={{ padding: "14px 18px", display: "flex", gap: 8, alignItems: "center" }}>
+                  <button
+                    type="button"
+                    className={`${styles.btn} ${styles.btnSm}`}
+                    onClick={abrirEdicao}
+                    disabled={salvando}
+                  >
+                    Editar parcelamento
+                  </button>
+                  <span className={styles.cardNote}>
+                    {lote.parcelas.length === 1
+                      ? "Hoje a compra está inteira em um pagamento."
+                      : `${lote.parcelas.length} pagamentos.`}
+                  </span>
+                </div>
+              )}
+            </>
+          )}
+
+          {aba === "parcelas" && editandoParcelas && (
+            <div style={{ padding: "14px 18px" }}>
+              <p className={styles.note} style={{ margin: "0 0 12px" }}>
+                Divida em parcelas iguais ou por percentual (ex.: 40/60). O valor sai do mês da
+                primeira parcela e vai para os meses dos vencimentos novos. Parcela já paga fica
+                travada e fora do rateio.
+              </p>
+              <ParcelasEditor
+                total={total}
+                parcelas={rascunho}
+                onChange={setRascunho}
+                vencimentoSugerido={lote.dataCompra}
+                rodape="Soma das parcelas"
+                disabled={salvando}
+              />
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 14 }}>
+                <button
+                  type="button"
+                  className={`${styles.btn} ${styles.btnGhost} ${styles.btnSm}`}
+                  onClick={() => setEditandoParcelas(false)}
+                  disabled={salvando}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.btn} ${styles.btnPrimary} ${styles.btnSm}`}
+                  onClick={() => void salvarEdicao()}
+                  disabled={salvando || rascunho.length === 0}
+                >
+                  {salvando ? "Salvando…" : "Salvar parcelamento"}
+                </button>
+              </div>
             </div>
           )}
 
@@ -334,8 +409,8 @@ export default function GastosCompraDrawer({
                 <div className={styles.fact}>
                   <span className={styles.factK}>Estimativa</span>
                   <span className={styles.factText}>
-                    Marcada como estimativa: entra no comprometido, mas aparece hachurada no
-                    gráfico para não se confundir com compra fechada.
+                    Marcada como estimativa: entra no comprometido, mas aparece hachurada no gráfico
+                    para não se confundir com compra fechada.
                   </span>
                 </div>
               )}
@@ -354,7 +429,7 @@ export default function GastosCompraDrawer({
           )}
         </div>
 
-        {podeEditar && (
+        {podeEditar && !editandoParcelas && (
           <div className={styles.drawerFoot}>
             <button
               type="button"
