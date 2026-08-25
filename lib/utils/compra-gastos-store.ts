@@ -29,11 +29,51 @@ interface FileShape {
 }
 
 let tableChecked = false;
+let ensurePromise: Promise<void> | null = null;
 
-async function ensureTable() {
+/**
+ * `CREATE TABLE IF NOT EXISTS` NÃO é atômico contra criação concorrente: dois
+ * pedidos simultâneos (o GET do painel busca lotes e orçamento em paralelo)
+ * disparam o DDL ao mesmo tempo e um deles morre com unique violation em
+ * `pg_type` (23505) ou "relation already exists" (42P07). Nos dois casos o
+ * objeto passou a existir — é sucesso, não erro.
+ */
+function objetoJaExiste(erro: unknown): boolean {
+  const code = (erro as { code?: string } | null)?.code;
+  return code === "23505" || code === "42P07" || code === "42710";
+}
+
+async function ddl(exec: () => Promise<unknown>): Promise<void> {
+  try {
+    await exec();
+  } catch (erro) {
+    if (!objetoJaExiste(erro)) throw erro;
+  }
+}
+
+/**
+ * Migração preguiçosa, uma única vez por processo. A promessa é memoizada para
+ * que chamadas concorrentes esperem a MESMA execução em vez de rodarem o DDL
+ * em paralelo; se falhar, a memoização é limpa para a próxima tentativa.
+ */
+async function ensureTable(): Promise<void> {
   if (tableChecked) return;
+  if (!ensurePromise) {
+    ensurePromise = runMigrations()
+      .then(() => {
+        tableChecked = true;
+      })
+      .catch((erro) => {
+        ensurePromise = null;
+        throw erro;
+      });
+  }
+  return ensurePromise;
+}
+
+async function runMigrations(): Promise<void> {
   const sql = getNeonSql();
-  await sql`
+  await ddl(() => sql`
     CREATE TABLE IF NOT EXISTS compra_gastos_lotes (
       id TEXT PRIMARY KEY,
       company_key TEXT NOT NULL,
@@ -58,12 +98,12 @@ async function ensureTable() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
-  `;
-  await sql`
+  `);
+  await ddl(() => sql`
     CREATE INDEX IF NOT EXISTS compra_gastos_lotes_company_idx
       ON compra_gastos_lotes (company_key)
-  `;
-  await sql`
+  `);
+  await ddl(() => sql`
     CREATE TABLE IF NOT EXISTS compra_gastos_orcamento (
       company_key TEXT NOT NULL,
       ym TEXT NOT NULL,
@@ -73,8 +113,7 @@ async function ensureTable() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       PRIMARY KEY (company_key, ym)
     )
-  `;
-  tableChecked = true;
+  `);
 }
 
 async function ensureDataFile() {
