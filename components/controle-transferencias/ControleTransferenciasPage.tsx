@@ -154,22 +154,12 @@ function getDefaultMatriz(companyKey: CompanyKey): string | null {
   return null;
 }
 
-function normalizeName(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toUpperCase();
-}
-
 export default function ControleTransferenciasPage({
   companyKey,
   companyName,
 }: ControleTransferenciasPageProps) {
   const { user } = useAuth();
   const company = resolveCompany(companyKey);
-  const filialDisplayNames = company?.filialDisplayNames ?? {};
   const inventoryFiliais = company?.filialFilters.inventory ?? [];
 
   // Período fixo: sempre últimos 30 dias (recalculado a cada montagem para refletir "hoje")
@@ -282,26 +272,9 @@ export default function ControleTransferenciasPage({
     });
   }, [user?.username]);
 
-  // TEMPORARIO: lojas novas ainda nao devem transferir como ORIGEM.
-  // Manter ocultas no filtro de origem ate liberacao operacional.
-  const blockedOriginDisplayNames = useMemo(() => {
-    if (companyKey === "nerd") {
-      return new Set(["ELDORADO", "MORUMBI 2"]);
-    }
-    if (companyKey === "scarfme") {
-      return new Set(["GALEAO RJ"]);
-    }
-    return new Set<string>();
-  }, [companyKey]);
-
-  const visibleOriginFiliais = useMemo(
-    () =>
-      inventoryFiliais.filter((filial) => {
-        const displayName = filialDisplayNames[filial] ?? filial;
-        return !blockedOriginDisplayNames.has(normalizeName(displayName));
-      }),
-    [inventoryFiliais, filialDisplayNames, blockedOriginDisplayNames]
-  );
+  // Toda filial de inventory pode ser origem. Nao ha mais bloqueio por loja nova:
+  // Eldorado, Morumbi 2 e Galeao RJ foram liberados operacionalmente.
+  const visibleOriginFiliais = inventoryFiliais;
 
   const allowedFiliaisOrigem = useMemo(() => {
     if (seesAllFiliais(user?.role) || !permissoes || permissoes.podeVerOutrasFiliais) {
