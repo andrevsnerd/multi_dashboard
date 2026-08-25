@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { CompraSalvaListEntry } from "@/lib/types/compra-salva";
 import {
@@ -80,8 +80,15 @@ export default function NovaCompraModal({
   const [erro, setErro] = useState<string | null>(null);
 
   // ───────── Compras Salvas disponíveis ─────────
+  // A busca é guardada por um ref, não pelos estados de carga: se `salvas.length`
+  // ou `carregandoSalvas` entrassem nas dependências, marcar "carregando" já
+  // derrubaria (cleanup) o próprio fetch que o guard acabou de liberar, e a lista
+  // nunca chegava. Ref = uma busca por empresa, sem laço.
+  const chaveBuscada = useRef<string | null>(null);
+
   useEffect(() => {
-    if (origem !== "salva" || salvas.length > 0 || carregandoSalvas) return;
+    if (origem !== "salva" || chaveBuscada.current === companyKey) return;
+    chaveBuscada.current = companyKey;
     let cancelado = false;
     setCarregandoSalvas(true);
     setSalvasErro(null);
@@ -92,10 +99,11 @@ export default function NovaCompraModal({
         return j.data ?? [];
       })
       .then((lista) => {
-        if (cancelado) return;
-        setSalvas(lista);
+        if (!cancelado) setSalvas(lista);
       })
       .catch((e) => {
+        // Libera nova tentativa ao trocar de origem e voltar.
+        chaveBuscada.current = null;
         if (!cancelado) setSalvasErro(e instanceof Error ? e.message : "Erro ao listar compras salvas");
       })
       .finally(() => {
@@ -104,7 +112,7 @@ export default function NovaCompraModal({
     return () => {
       cancelado = true;
     };
-  }, [origem, companyKey, salvas.length, carregandoSalvas]);
+  }, [origem, companyKey]);
 
   const salvaSelecionada = useMemo(
     () => salvas.find((s) => s.id === compraSalvaId) ?? null,
