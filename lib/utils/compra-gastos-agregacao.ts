@@ -119,15 +119,22 @@ export function anosDisponiveis(
 /**
  * Monta os meses do painel.
  *
- * @param ano  filtra os meses de um ano ("2026"); vazio = todos.
- * @param hoje YYYY-MM-DD — garante que o mês corrente sempre apareça.
+ * A janela não é só o que já tem dado: ela sempre inclui o mês corrente e um
+ * horizonte de meses à frente, senão não haveria linha onde digitar o orçamento
+ * de um mês futuro que ainda não tem compra nenhuma. Com um ano selecionado, a
+ * janela é o ano inteiro (jan a dez) pelo mesmo motivo.
+ *
+ * @param ano             filtra/abre os meses de um ano ("2026"); vazio = intervalo dos dados.
+ * @param hoje            YYYY-MM-DD — âncora do horizonte.
+ * @param horizonteMeses  quantos meses à frente abrir (padrão 12).
  */
 export function mesesDoPainel(
   lotes: CompraGastoLote[],
   orcamento: CompraGastoOrcamentoEntry[],
-  options: { ano?: string; hoje: string }
+  options: { ano?: string; hoje: string; horizonteMeses?: number }
 ): CompraGastoMes[] {
   const { ano, hoje } = options;
+  const horizonte = Math.max(0, Math.min(60, options.horizonteMeses ?? 12));
   const orcMap = new Map<string, number>();
   orcamento.forEach((o) => orcMap.set(o.ym, cents(o.valor)));
 
@@ -135,6 +142,18 @@ export function mesesDoPainel(
   lotes.forEach((l) => l.parcelas.forEach((p) => presentes.push(ymOf(p.vencimento))));
   orcamento.forEach((o) => presentes.push(o.ym));
   presentes.push(ymOf(hoje));
+
+  // Horizonte à frente: sempre há linha para lançar orçamento futuro.
+  let cursor = ymOf(hoje);
+  for (let i = 0; i < horizonte; i += 1) {
+    cursor = addMonth(cursor);
+    presentes.push(cursor);
+  }
+
+  // Ano selecionado abre os 12 meses dele, mesmo os sem movimento.
+  if (ano) {
+    for (let m = 1; m <= 12; m += 1) presentes.push(`${ano}-${String(m).padStart(2, "0")}`);
+  }
 
   const janela = preencherIntervalo(presentes.filter(Boolean)).filter((ym) =>
     ano ? ym.slice(0, 4) === ano : true

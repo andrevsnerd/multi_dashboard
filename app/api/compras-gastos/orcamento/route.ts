@@ -17,7 +17,17 @@ export async function GET(request: Request) {
   }
 }
 
-/** Define quanto se pretende gastar num mês. Valor 0 apaga o orçamento do mês. */
+// Exige mês 01..12: `\d{2}` sozinho deixaria passar "2026-13" e gravaria um
+// registro que nenhuma tela consegue mostrar.
+const MES_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+/**
+ * Define quanto se pretende gastar num mês. Valor 0 apaga o orçamento do mês.
+ *
+ * Aceita também `meses: [{ ym, valor }]` para gravar vários de uma vez — é o
+ * que a tela usa ao aplicar o mesmo valor num intervalo (planejar o ano
+ * inteiro sem uma requisição por mês).
+ */
 export async function PUT(request: Request) {
   try {
     const bloqueado = await readOnlyBlock(request.headers.get("x-auth-username"));
@@ -28,6 +38,7 @@ export async function PUT(request: Request) {
       ym?: string;
       valor?: number;
       observacao?: string | null;
+      meses?: { ym?: string; valor?: number }[];
     };
     const companyKey = String(body?.companyKey ?? "").trim();
     const ym = String(body?.ym ?? "").trim().slice(0, 7);
@@ -35,7 +46,31 @@ export async function PUT(request: Request) {
     if (!companyKey) {
       return NextResponse.json({ error: "companyKey é obrigatório" }, { status: 400 });
     }
-    if (!/^\d{4}-\d{2}$/.test(ym)) {
+
+    if (Array.isArray(body?.meses)) {
+      const entradas = body.meses
+        .map((m) => ({ ym: String(m?.ym ?? "").trim().slice(0, 7), valor: Number(m?.valor ?? 0) }))
+        .filter((m) => MES_RE.test(m.ym) && Number.isFinite(m.valor) && m.valor >= 0);
+
+      if (entradas.length === 0) {
+        return NextResponse.json({ error: "Nenhum mês válido para gravar" }, { status: 400 });
+      }
+      if (entradas.length > 120) {
+        return NextResponse.json({ error: "Intervalo muito longo (máx. 120 meses)" }, { status: 400 });
+      }
+
+      const username = request.headers.get("x-auth-username");
+      const gravados = [];
+      for (const entrada of entradas) {
+        if (entrada.valor === 0) {
+          await deleteOrcamento(companyKey, entrada.ym);
+          continue;
+        }
+        gravados.push(await setOrcamento(companyKey, entrada.ym, entrada.valor, username));
+      }
+      return NextResponse.json({ data: gravados, total: entradas.length });
+    }
+    if (!MES_RE.test(ym)) {
       return NextResponse.json({ error: "ym deve estar no formato YYYY-MM" }, { status: 400 });
     }
 

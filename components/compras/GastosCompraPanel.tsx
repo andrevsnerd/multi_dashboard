@@ -46,6 +46,9 @@ interface Props {
 
 type Aba = "painel" | "agenda" | "reconhecer";
 
+/** YYYY-MM com mês 01..12 (só `\d{2}` aceitaria "2026-13"). */
+const MES_VALIDO = /^\d{4}-(0[1-9]|1[0-2])$/;
+
 const TOM_CLASSE = {
   good: styles.pillGood,
   warn: styles.pillWarn,
@@ -74,6 +77,15 @@ export default function GastosCompraPanel({ companyKey, companyName }: Props) {
   const [mesSugerido, setMesSugerido] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [rascunhoOrcamento, setRascunhoOrcamento] = useState<Record<string, string>>({});
+
+  // Quantos meses à frente a tabela abre — é onde se lança orçamento futuro.
+  const [horizonte, setHorizonte] = useState(12);
+
+  // Aplicação de orçamento em série (mesmo valor num intervalo de meses).
+  const [serieValor, setSerieValor] = useState("");
+  const [serieDe, setSerieDe] = useState(hoje.slice(0, 7));
+  const [serieAte, setSerieAte] = useState("");
+  const [aplicandoSerie, setAplicandoSerie] = useState(false);
 
   // Reconhecimento de Compras Salvas ainda não lançadas.
   const [candidatas, setCandidatas] = useState<CompraGastoCandidata[]>([]);
@@ -127,15 +139,17 @@ export default function GastosCompraPanel({ companyKey, companyName }: Props) {
   }, [carregarCandidatas]);
 
   // ───────── derivados ─────────
+  // Anos com dado + o atual e os dois seguintes: dá para planejar 2027/2028
+  // antes de existir qualquer compra lá.
   const anos = useMemo(() => {
-    const lista = anosDisponiveis(lotes, orcamento);
-    const atual = hoje.slice(0, 4);
-    return lista.includes(atual) ? lista : [...lista, atual].sort();
+    const atual = parseInt(hoje.slice(0, 4), 10);
+    const futuros = [String(atual), String(atual + 1), String(atual + 2)];
+    return [...new Set([...anosDisponiveis(lotes, orcamento), ...futuros])].sort();
   }, [lotes, orcamento, hoje]);
 
   const meses = useMemo(
-    () => mesesDoPainel(lotes, orcamento, { ano: ano || undefined, hoje }),
-    [lotes, orcamento, ano, hoje]
+    () => mesesDoPainel(lotes, orcamento, { ano: ano || undefined, hoje, horizonteMeses: horizonte }),
+    [lotes, orcamento, ano, hoje, horizonte]
   );
   const totais = useMemo(() => totaisDoPainel(meses), [meses]);
   const loteMap = useMemo(() => new Map(lotes.map((l) => [l.id, l])), [lotes]);
@@ -190,6 +204,60 @@ export default function GastosCompraPanel({ companyKey, companyName }: Props) {
     },
     [companyKey, username, orcamento, carregar]
   );
+
+  /** Aplica o mesmo valor de orçamento em todos os meses do intervalo, numa requisição. */
+  const aplicarSerie = useCallback(async () => {
+    const valor = parseMoeda(serieValor);
+    const de = serieDe.slice(0, 7);
+    const ate = (serieAte || serieDe).slice(0, 7);
+
+    if (!MES_VALIDO.test(de) || !MES_VALIDO.test(ate)) {
+      setErro("Informe o mês inicial (e o final, se for um intervalo).");
+      return;
+    }
+    if (ate < de) {
+      setErro("O mês final é anterior ao inicial.");
+      return;
+    }
+
+    const alvos: string[] = [];
+    let cursor = de;
+    while (cursor <= ate && alvos.length <= 120) {
+      alvos.push(cursor);
+      const ano_ = parseInt(cursor.slice(0, 4), 10);
+      const mes_ = parseInt(cursor.slice(5, 7), 10);
+      cursor =
+        mes_ === 12
+          ? `${ano_ + 1}-01`
+          : `${ano_}-${String(mes_ + 1).padStart(2, "0")}`;
+    }
+
+    setAplicandoSerie(true);
+    setErro(null);
+    try {
+      const res = await fetch("/api/compras-gastos/orcamento", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "x-auth-username": username },
+        body: JSON.stringify({ companyKey, meses: alvos.map((ym) => ({ ym, valor })) }),
+      });
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        setErro(json.error ?? "Não foi possível aplicar o orçamento.");
+        return;
+      }
+      setOrcamento((prev) => {
+        const fora = prev.filter((o) => !alvos.includes(o.ym));
+        const novos = valor > 0 ? alvos.map((ym) => ({ ym, valor })) : [];
+        return [...fora, ...novos].sort((a, b) => a.ym.localeCompare(b.ym));
+      });
+      setRascunhoOrcamento({});
+      setSerieValor("");
+    } catch {
+      setErro("Não foi possível aplicar o orçamento.");
+    } finally {
+      setAplicandoSerie(false);
+    }
+  }, [companyKey, username, serieValor, serieDe, serieAte]);
 
   const togglePago = useCallback(
     async (loteId: string, indice: number, pago: boolean) => {
@@ -498,6 +566,49 @@ export default function GastosCompraPanel({ companyKey, companyName }: Props) {
         {carregando && <div className={styles.feedback}>Carregando…</div>}
 
         {!carregando && aba === "painel" && (
+          <>
+          {podeEditar && (
+            <div className={styles.serieBar}>
+              <span className={styles.blockTitle} style={{ margin: 0 }}>
+                Orçamento em série
+              </span>
+              <label className={styles.field}>
+                <span>Valor por mês</span>
+                <input
+                  className={styles.money}
+                  value={serieValor}
+                  placeholder="250.000,00"
+                  inputMode="decimal"
+                  onChange={(e) => setSerieValor(e.target.value)}
+                />
+              </label>
+              <label className={styles.field}>
+                <span>De</span>
+                <input type="month" value={serieDe} onChange={(e) => setSerieDe(e.target.value)} />
+              </label>
+              <label className={styles.field}>
+                <span>Até</span>
+                <input
+                  type="month"
+                  value={serieAte}
+                  min={serieDe}
+                  onChange={(e) => setSerieAte(e.target.value)}
+                />
+              </label>
+              <button
+                type="button"
+                className={`${styles.btn} ${styles.btnSm}`}
+                onClick={() => void aplicarSerie()}
+                disabled={aplicandoSerie || !serieValor.trim()}
+              >
+                {aplicandoSerie ? "Aplicando…" : "Aplicar"}
+              </button>
+              <span className={styles.cardNote}>
+                Grava o mesmo valor em cada mês do intervalo. Sem “Até”, grava só o mês inicial;
+                valor 0 apaga o orçamento dos meses. Mês a mês, edite direto na coluna Orçamento.
+              </span>
+            </div>
+          )}
           <div className={styles.tableScroll}>
             <table className={styles.table}>
               <thead>
@@ -565,6 +676,23 @@ export default function GastosCompraPanel({ companyKey, companyName }: Props) {
               )}
             </table>
           </div>
+          {!ano && (
+            <div className={styles.horizonteBar}>
+              <button
+                type="button"
+                className={`${styles.btn} ${styles.btnGhost} ${styles.btnSm}`}
+                onClick={() => setHorizonte((h) => Math.min(60, h + 12))}
+                disabled={horizonte >= 60}
+              >
+                + 12 meses à frente
+              </button>
+              <span className={styles.cardNote}>
+                A tabela abre {horizonte} meses à frente do mês atual, mesmo sem compra lançada —
+                é onde você define o orçamento futuro. Selecionar um ano acima mostra os 12 meses dele.
+              </span>
+            </div>
+          )}
+          </>
         )}
 
         {!carregando && aba === "agenda" && (

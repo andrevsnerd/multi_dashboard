@@ -1342,3 +1342,39 @@
     row-gap: 6px;
   }
 }
+
+/* ---------- orçamento em série / horizonte ---------- */
+
+.serieBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--b-200);
+  background: var(--s-50);
+}
+
+.serieBar .field {
+  min-width: 120px;
+}
+
+.serieBar .cardNote {
+  flex: 1 1 240px;
+  min-width: 220px;
+  line-height: 1.45;
+}
+
+.horizonteBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--b-200);
+}
+
+.horizonteBar .cardNote {
+  flex: 1 1 260px;
+  line-height: 1.45;
+}
