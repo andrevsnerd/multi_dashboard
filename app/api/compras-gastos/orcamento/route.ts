@@ -1,0 +1,64 @@
+import { NextResponse } from "next/server";
+
+import { readOnlyBlock } from "@/lib/auth/route-guards";
+import { deleteOrcamento, listOrcamento, setOrcamento } from "@/lib/utils/compra-gastos-store";
+
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const companyKey = searchParams.get("company") ?? "";
+  if (!companyKey) {
+    return NextResponse.json({ error: "company é obrigatório" }, { status: 400 });
+  }
+  try {
+    return NextResponse.json({ data: await listOrcamento(companyKey) });
+  } catch (error) {
+    console.error("Erro ao carregar orçamento de compra", error);
+    return NextResponse.json({ error: "Erro ao carregar orçamento" }, { status: 500 });
+  }
+}
+
+/** Define quanto se pretende gastar num mês. Valor 0 apaga o orçamento do mês. */
+export async function PUT(request: Request) {
+  try {
+    const bloqueado = await readOnlyBlock(request.headers.get("x-auth-username"));
+    if (bloqueado) return bloqueado;
+
+    const body = (await request.json()) as {
+      companyKey?: string;
+      ym?: string;
+      valor?: number;
+      observacao?: string | null;
+    };
+    const companyKey = String(body?.companyKey ?? "").trim();
+    const ym = String(body?.ym ?? "").trim().slice(0, 7);
+
+    if (!companyKey) {
+      return NextResponse.json({ error: "companyKey é obrigatório" }, { status: 400 });
+    }
+    if (!/^\d{4}-\d{2}$/.test(ym)) {
+      return NextResponse.json({ error: "ym deve estar no formato YYYY-MM" }, { status: 400 });
+    }
+
+    const valor = Number(body?.valor ?? 0);
+    if (!Number.isFinite(valor) || valor < 0) {
+      return NextResponse.json({ error: "Valor de orçamento inválido" }, { status: 400 });
+    }
+
+    if (valor === 0 && !body?.observacao) {
+      await deleteOrcamento(companyKey, ym);
+      return NextResponse.json({ data: null, removido: true });
+    }
+
+    const data = await setOrcamento(
+      companyKey,
+      ym,
+      valor,
+      request.headers.get("x-auth-username"),
+      body?.observacao ?? null
+    );
+    return NextResponse.json({ data });
+  } catch (error) {
+    console.error("Erro ao salvar orçamento de compra", error);
+    return NextResponse.json({ error: "Erro ao salvar orçamento" }, { status: 500 });
+  }
+}

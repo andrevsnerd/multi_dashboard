@@ -134,6 +134,9 @@ export const ROLE_RESTRICTED_PERMISSIONS: Partial<Record<PermissionKey, RoleKey[
   // mesmo conjunto restrito, com diretor entrando somente-leitura.
   "alterar-cadastro": ["admin", "diretor", "logistica"],
   "alterar-produtos-massa": ["admin", "diretor", "logistica"],
+  // Gastos de Compra e planejamento de desembolso: custo puro e decisao de
+  // diretoria. Fora de CUSTO_VISIBLE_ROLES de proposito — logistica nao entra.
+  "gastos-compra": ["admin", "diretor"],
   // Área corporativo é exclusiva do admin, diretor e do cliente_corporativo. Supervisor/gerente/logística
   // nunca acessam, pois roleAllowsPermission barra.
   "clientes-corporativos": ["admin", "diretor", "cliente_corporativo"],

@@ -167,6 +167,8 @@ export default function Sidebar({ companyName }: SidebarProps) {
     basePath && basePath !== "/" ? `${basePath}/compras-transito` : "/compras-transito";
   const comprasSalvasHref =
     basePath && basePath !== "/" ? `${basePath}/compras-salvas` : "/compras-salvas";
+  const gastosCompraHref =
+    basePath && basePath !== "/" ? `${basePath}/gastos-compra` : "/gastos-compra";
   const mapaClientesHref =
     basePath && basePath !== "/" ? `${basePath}/mapa-clientes` : "/mapa-clientes";
   const sincronizacaoHref =
@@ -264,6 +266,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     "/lista-loja",
     "/compras-transito",
     "/compras-salvas",
+    "/gastos-compra",
     "/produtos",
     "/produtos-recentes",
     "/produto-agrupado",
@@ -540,6 +543,14 @@ export default function Sidebar({ companyName }: SidebarProps) {
           permission: "compras-salvas",
           isActive: (currentPathname) =>
             matchesSegment(currentPathname, "/compras-salvas", comprasSalvasHref),
+        },
+        {
+          key: "gastos-compra",
+          label: "Gastos de Compra",
+          href: gastosCompraHref,
+          permission: "gastos-compra",
+          isActive: (currentPathname) =>
+            matchesSegment(currentPathname, "/gastos-compra", gastosCompraHref),
         },
       ],
     },

@@ -44,6 +44,7 @@ export const PAGE_PERMISSION_DEFINITIONS = [
   { key: "lista-loja", label: "Lista Loja", routeSegments: ["lista-loja"] },
   { key: "compras-transito", label: "Compras em Transito", routeSegments: ["compras-transito"] },
   { key: "compras-salvas", label: "Compras Salvas", routeSegments: ["compras-salvas"] },
+  { key: "gastos-compra", label: "Gastos de Compra", routeSegments: ["gastos-compra"] },
   { key: "mapa-clientes", label: "Mapa de Clientes", routeSegments: ["mapa-clientes"] },
   { key: "filial", label: "Filiais", routeSegments: ["filial"] },
   { key: "exportar-relatorios", label: "Exportar Relatorios", routeSegments: ["exportar-relatorios"] },
