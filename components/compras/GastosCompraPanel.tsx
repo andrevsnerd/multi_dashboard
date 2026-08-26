@@ -6,7 +6,6 @@ import { useAuth } from "@/components/auth/AuthContext";
 import { isReadOnlyRole } from "@/lib/auth/permissions";
 import {
   COMPRA_GASTO_TIPO_LABEL,
-  type CompraGastoCandidata,
   type CompraGastoLote,
   type CompraGastoMes,
   type CompraGastoOrcamentoEntry,
@@ -29,6 +28,7 @@ import NovaCompraModal from "./NovaCompraModal";
 import styles from "./GastosCompra.module.css";
 import {
   brl,
+  codigoDistinto,
   dataBr,
   dataBrCompleta,
   dataCurta,
@@ -44,10 +44,7 @@ interface Props {
   companyName: string;
 }
 
-type Aba = "painel" | "agenda" | "reconhecer";
-
-/** YYYY-MM com mês 01..12 (só `\d{2}` aceitaria "2026-13"). */
-const MES_VALIDO = /^\d{4}-(0[1-9]|1[0-2])$/;
+type Aba = "painel" | "agenda";
 
 const TOM_CLASSE = {
   good: styles.pillGood,
@@ -78,20 +75,12 @@ export default function GastosCompraPanel({ companyKey, companyName }: Props) {
   const [salvando, setSalvando] = useState(false);
   const [rascunhoOrcamento, setRascunhoOrcamento] = useState<Record<string, string>>({});
 
+  // Recorte padrão: planejamento olha pra frente. Mês passado só aparece
+  // quando o usuário desmarca.
+  const [somenteFuturo, setSomenteFuturo] = useState(true);
+
   // Quantos meses à frente a tabela abre — é onde se lança orçamento futuro.
   const [horizonte, setHorizonte] = useState(12);
-
-  // Aplicação de orçamento em série (mesmo valor num intervalo de meses).
-  const [serieValor, setSerieValor] = useState("");
-  const [serieDe, setSerieDe] = useState(hoje.slice(0, 7));
-  const [serieAte, setSerieAte] = useState("");
-  const [aplicandoSerie, setAplicandoSerie] = useState(false);
-
-  // Reconhecimento de Compras Salvas ainda não lançadas.
-  const [candidatas, setCandidatas] = useState<CompraGastoCandidata[]>([]);
-  const [escopo, setEscopo] = useState<"comprada" | "todas">("comprada");
-  const [carregandoCandidatas, setCarregandoCandidatas] = useState(false);
-  const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set());
 
   // ───────── carga ─────────
   const carregar = useCallback(async () => {
@@ -118,26 +107,6 @@ export default function GastosCompraPanel({ companyKey, companyName }: Props) {
     void carregar();
   }, [carregar]);
 
-  const carregarCandidatas = useCallback(async () => {
-    setCarregandoCandidatas(true);
-    try {
-      const res = await fetch(`/api/compras-gastos/reconhecer?company=${companyKey}&escopo=${escopo}`, {
-        cache: "no-store",
-      });
-      const json = (await res.json()) as { candidatas?: CompraGastoCandidata[]; error?: string };
-      if (!res.ok) throw new Error(json.error ?? "Erro ao reconhecer compras salvas");
-      setCandidatas(json.candidatas ?? []);
-    } catch (e) {
-      setErro(e instanceof Error ? e.message : "Erro ao reconhecer compras salvas");
-    } finally {
-      setCarregandoCandidatas(false);
-    }
-  }, [companyKey, escopo]);
-
-  useEffect(() => {
-    void carregarCandidatas();
-  }, [carregarCandidatas]);
-
   // ───────── derivados ─────────
   // Anos com dado + o atual e os dois seguintes: dá para planejar 2027/2028
   // antes de existir qualquer compra lá.
@@ -147,11 +116,21 @@ export default function GastosCompraPanel({ companyKey, companyName }: Props) {
     return [...new Set([...anosDisponiveis(lotes, orcamento), ...futuros])].sort();
   }, [lotes, orcamento, hoje]);
 
+  /** Todos os meses do período — base da exportação e da lista visível. */
   const meses = useMemo(
     () => mesesDoPainel(lotes, orcamento, { ano: ano || undefined, hoje, horizonteMeses: horizonte }),
     [lotes, orcamento, ano, hoje, horizonte]
   );
-  const totais = useMemo(() => totaisDoPainel(meses), [meses]);
+
+  /** O que a tabela e o gráfico mostram — e o que os KPIs somam. */
+  const mesesVisiveis = useMemo(
+    () => (somenteFuturo ? meses.filter((m) => m.ym >= hoje.slice(0, 7)) : meses),
+    [meses, somenteFuturo, hoje]
+  );
+
+  // KPIs e rodapé seguem a tabela: o número no topo tem que bater com as linhas
+  // logo abaixo dele. A agenda e a exportação continuam com o período inteiro.
+  const totais = useMemo(() => totaisDoPainel(mesesVisiveis), [mesesVisiveis]);
   const loteMap = useMemo(() => new Map(lotes.map((l) => [l.id, l])), [lotes]);
   const agenda = useMemo(() => agendaDePagamentos(lotes, { ano: ano || undefined }), [lotes, ano]);
 
@@ -204,60 +183,6 @@ export default function GastosCompraPanel({ companyKey, companyName }: Props) {
     },
     [companyKey, username, orcamento, carregar]
   );
-
-  /** Aplica o mesmo valor de orçamento em todos os meses do intervalo, numa requisição. */
-  const aplicarSerie = useCallback(async () => {
-    const valor = parseMoeda(serieValor);
-    const de = serieDe.slice(0, 7);
-    const ate = (serieAte || serieDe).slice(0, 7);
-
-    if (!MES_VALIDO.test(de) || !MES_VALIDO.test(ate)) {
-      setErro("Informe o mês inicial (e o final, se for um intervalo).");
-      return;
-    }
-    if (ate < de) {
-      setErro("O mês final é anterior ao inicial.");
-      return;
-    }
-
-    const alvos: string[] = [];
-    let cursor = de;
-    while (cursor <= ate && alvos.length <= 120) {
-      alvos.push(cursor);
-      const ano_ = parseInt(cursor.slice(0, 4), 10);
-      const mes_ = parseInt(cursor.slice(5, 7), 10);
-      cursor =
-        mes_ === 12
-          ? `${ano_ + 1}-01`
-          : `${ano_}-${String(mes_ + 1).padStart(2, "0")}`;
-    }
-
-    setAplicandoSerie(true);
-    setErro(null);
-    try {
-      const res = await fetch("/api/compras-gastos/orcamento", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", "x-auth-username": username },
-        body: JSON.stringify({ companyKey, meses: alvos.map((ym) => ({ ym, valor })) }),
-      });
-      const json = (await res.json()) as { error?: string };
-      if (!res.ok) {
-        setErro(json.error ?? "Não foi possível aplicar o orçamento.");
-        return;
-      }
-      setOrcamento((prev) => {
-        const fora = prev.filter((o) => !alvos.includes(o.ym));
-        const novos = valor > 0 ? alvos.map((ym) => ({ ym, valor })) : [];
-        return [...fora, ...novos].sort((a, b) => a.ym.localeCompare(b.ym));
-      });
-      setRascunhoOrcamento({});
-      setSerieValor("");
-    } catch {
-      setErro("Não foi possível aplicar o orçamento.");
-    } finally {
-      setAplicandoSerie(false);
-    }
-  }, [companyKey, username, serieValor, serieDe, serieAte]);
 
   const togglePago = useCallback(
     async (loteId: string, indice: number, pago: boolean) => {
@@ -339,49 +264,6 @@ export default function GastosCompraPanel({ companyKey, companyName }: Props) {
     [companyKey, username]
   );
 
-  const lancarReconhecidas = useCallback(async () => {
-    const ids = [...selecionadas];
-    if (ids.length === 0) return;
-    setSalvando(true);
-    try {
-      const res = await fetch("/api/compras-gastos/reconhecer", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-auth-username": username },
-        body: JSON.stringify({ companyKey, ids }),
-      });
-      const json = (await res.json()) as {
-        criados?: CompraGastoLote[];
-        ignorados?: { id: string; motivo: string }[];
-        error?: string;
-      };
-      if (!res.ok) {
-        setErro(json.error ?? "Não foi possível lançar as compras reconhecidas.");
-        return;
-      }
-      const criados = json.criados ?? [];
-      setLotes((prev) => [...criados, ...prev]);
-      setCandidatas((prev) => prev.filter((c) => !criados.some((l) => l.compraSalvaId === c.compraSalvaId)));
-      setSelecionadas(new Set());
-      if (criados.length > 0) {
-        const primeiro = criados[0].parcelas[0]?.vencimento ?? "";
-        const anoLancado = primeiro.slice(0, 4);
-        if (anoLancado && ano && anoLancado !== ano) setAno(anoLancado);
-        setAba("painel");
-      }
-      if (json.ignorados && json.ignorados.length > 0) {
-        setErro(
-          `${json.ignorados.length} não foram lançadas: ${json.ignorados
-            .map((i) => i.motivo)
-            .join("; ")}`
-        );
-      }
-    } catch {
-      setErro("Não foi possível lançar as compras reconhecidas.");
-    } finally {
-      setSalvando(false);
-    }
-  }, [companyKey, username, selecionadas, ano]);
-
   const aoSalvarCompra = useCallback(
     (lote: CompraGastoLote) => {
       setModalAberto(false);
@@ -391,10 +273,6 @@ export default function GastosCompraPanel({ companyKey, companyName }: Props) {
       if (anoDaCompra && ano && anoDaCompra !== ano) setAno(anoDaCompra);
       const ym = primeiroVenc.slice(0, 7);
       if (ym) setAbertos((prev) => new Set(prev).add(ym));
-      // Compra vinculada a uma Compra Salva sai da lista de candidatas.
-      if (lote.compraSalvaId) {
-        setCandidatas((prev) => prev.filter((c) => c.compraSalvaId !== lote.compraSalvaId));
-      }
     },
     [ano]
   );
@@ -409,13 +287,18 @@ export default function GastosCompraPanel({ companyKey, companyName }: Props) {
     <div className={styles.wrapper}>
       <div className={styles.head}>
         <div className={styles.headMain}>
-          <p className={styles.subtitle}>
-            Quanto pretendemos gastar em cada mês, quanto já está comprometido em compras lançadas e
-            quanto de fato saiu do caixa. Cada parcela conta uma vez, no mês do seu vencimento.
-          </p>
+          <h1 className={styles.titulo}>Gastos de Compra</h1>
         </div>
         <div className={styles.headTools}>
           {somenteLeitura && <span className={styles.readOnlyBadge}>somente leitura</span>}
+          <label className={styles.toggle}>
+            <input
+              type="checkbox"
+              checked={somenteFuturo}
+              onChange={(e) => setSomenteFuturo(e.target.checked)}
+            />
+            <span>Só do mês atual em diante</span>
+          </label>
           <select
             className={styles.select}
             value={ano}
@@ -458,13 +341,16 @@ export default function GastosCompraPanel({ companyKey, companyName }: Props) {
 
       {erro && <div className={styles.error}>{erro}</div>}
 
+
       <div className={styles.kpis}>
         <div className={styles.kpi}>
           <span className={styles.kpiLabel}>Orçamento</span>
           <span className={styles.kpiValue}>{brl(totais.orcamento)}</span>
           <span className={styles.kpiFoot}>
-            {meses.length > 0
-              ? `${meses.length} meses · ${mesCurto(meses[0].ym)} a ${mesCurto(meses[meses.length - 1].ym)}`
+            {mesesVisiveis.length > 0
+              ? `${mesesVisiveis.length} meses · ${mesCurto(mesesVisiveis[0].ym)} a ${mesCurto(
+                  mesesVisiveis[mesesVisiveis.length - 1].ym
+                )}`
               : "sem meses no filtro"}
           </span>
         </div>
@@ -514,12 +400,14 @@ export default function GastosCompraPanel({ companyKey, companyName }: Props) {
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle}>Orçamento × comprometido, mês a mês</h2>
           <span className={styles.cardNote}>
-            {carregando ? "carregando…" : `${meses.length} meses · vencimento das parcelas`}
+            {carregando
+              ? "carregando…"
+              : `${mesesVisiveis.length} meses · vencimento das parcelas`}
           </span>
         </div>
-        {!carregando && meses.length > 0 && (
+        {!carregando && mesesVisiveis.length > 0 && (
           <GastosCompraGrafico
-            meses={meses}
+            meses={mesesVisiveis}
             hoje={hoje}
             onSelectMes={(ym) => {
               setAba("painel");
@@ -551,64 +439,12 @@ export default function GastosCompraPanel({ companyKey, companyName }: Props) {
           >
             Agenda de pagamentos
           </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={aba === "reconhecer"}
-            className={aba === "reconhecer" ? styles.tabActive : undefined}
-            onClick={() => setAba("reconhecer")}
-          >
-            Compras Salvas reconhecidas
-            {candidatas.length > 0 && <span className={styles.tabBadge}>{candidatas.length}</span>}
-          </button>
         </div>
 
         {carregando && <div className={styles.feedback}>Carregando…</div>}
 
         {!carregando && aba === "painel" && (
           <>
-          {podeEditar && (
-            <div className={styles.serieBar}>
-              <span className={styles.blockTitle} style={{ margin: 0 }}>
-                Orçamento em série
-              </span>
-              <label className={styles.field}>
-                <span>Valor por mês</span>
-                <input
-                  className={styles.money}
-                  value={serieValor}
-                  placeholder="250.000,00"
-                  inputMode="decimal"
-                  onChange={(e) => setSerieValor(e.target.value)}
-                />
-              </label>
-              <label className={styles.field}>
-                <span>De</span>
-                <input type="month" value={serieDe} onChange={(e) => setSerieDe(e.target.value)} />
-              </label>
-              <label className={styles.field}>
-                <span>Até</span>
-                <input
-                  type="month"
-                  value={serieAte}
-                  min={serieDe}
-                  onChange={(e) => setSerieAte(e.target.value)}
-                />
-              </label>
-              <button
-                type="button"
-                className={`${styles.btn} ${styles.btnSm}`}
-                onClick={() => void aplicarSerie()}
-                disabled={aplicandoSerie || !serieValor.trim()}
-              >
-                {aplicandoSerie ? "Aplicando…" : "Aplicar"}
-              </button>
-              <span className={styles.cardNote}>
-                Grava o mesmo valor em cada mês do intervalo. Sem “Até”, grava só o mês inicial;
-                valor 0 apaga o orçamento dos meses. Mês a mês, edite direto na coluna Orçamento.
-              </span>
-            </div>
-          )}
           <div className={styles.tableScroll}>
             <table className={styles.table}>
               <thead>
@@ -625,7 +461,7 @@ export default function GastosCompraPanel({ companyKey, companyName }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {meses.map((mes) => (
+                {mesesVisiveis.map((mes) => (
                   <LinhaMes
                     key={mes.ym}
                     mes={mes}
@@ -650,7 +486,7 @@ export default function GastosCompraPanel({ companyKey, companyName }: Props) {
                     onNovaCompra={() => abrirNovaCompra(mes.ym)}
                   />
                 ))}
-                {meses.length === 0 && (
+                {mesesVisiveis.length === 0 && (
                   <tr>
                     <td colSpan={7} className={styles.feedback}>
                       Nenhum mês no filtro selecionado.
@@ -658,7 +494,7 @@ export default function GastosCompraPanel({ companyKey, companyName }: Props) {
                   </tr>
                 )}
               </tbody>
-              {meses.length > 0 && (
+              {mesesVisiveis.length > 0 && (
                 <tfoot>
                   <tr>
                     <td>{ano ? `Ciclo ${ano}` : "Total"}</td>
@@ -730,7 +566,7 @@ export default function GastosCompraPanel({ companyKey, companyName }: Props) {
                       {COMPRA_GASTO_TIPO_LABEL[linha.lote.tipo]}
                     </td>
                     <td>
-                      {linha.lote.codigo} · {linha.lote.titulo}
+                      {linha.lote.titulo}
                       {linha.total > 1 && (
                         <>
                           {" "}
@@ -774,140 +610,6 @@ export default function GastosCompraPanel({ companyKey, companyName }: Props) {
               </tbody>
             </table>
           </div>
-        )}
-
-        {aba === "reconhecer" && (
-          <>
-            <div className={styles.reconhecerHead}>
-              <div>
-                <span className={styles.cardNote}>
-                  Compras Salvas que ainda não estão no painel. Data e valor vêm da própria lista —
-                  ao lançar, a compra entra inteira nessa data e você só edita o parcelamento.
-                </span>
-              </div>
-              <div className={styles.headTools}>
-                <div className={styles.seg} role="group" aria-label="Escopo do reconhecimento">
-                  <button
-                    type="button"
-                    className={escopo === "comprada" ? styles.segActive : undefined}
-                    aria-pressed={escopo === "comprada"}
-                    onClick={() => {
-                      setEscopo("comprada");
-                      setSelecionadas(new Set());
-                    }}
-                  >
-                    Marcadas como compradas
-                  </button>
-                  <button
-                    type="button"
-                    className={escopo === "todas" ? styles.segActive : undefined}
-                    aria-pressed={escopo === "todas"}
-                    onClick={() => {
-                      setEscopo("todas");
-                      setSelecionadas(new Set());
-                    }}
-                  >
-                    Todas
-                  </button>
-                </div>
-                {podeEditar && (
-                  <button
-                    type="button"
-                    className={`${styles.btn} ${styles.btnPrimary} ${styles.btnSm}`}
-                    onClick={() => void lancarReconhecidas()}
-                    disabled={salvando || selecionadas.size === 0}
-                  >
-                    {salvando
-                      ? "Lançando…"
-                      : `Lançar ${selecionadas.size || ""} ${selecionadas.size === 1 ? "compra" : "compras"}`.trim()}
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {carregandoCandidatas && <div className={styles.feedback}>Carregando…</div>}
-
-            {!carregandoCandidatas && candidatas.length === 0 && (
-              <div className={styles.feedback}>
-                {escopo === "comprada"
-                  ? "Nenhuma Compra Salva marcada como comprada está fora do painel. Use “Todas” para ver as demais."
-                  : "Todas as Compras Salvas desta empresa já estão no painel."}
-              </div>
-            )}
-
-            {!carregandoCandidatas && candidatas.length > 0 && (
-              <div className={styles.reconhecerList}>
-                <label className={styles.check} style={{ padding: "0 2px 4px" }}>
-                  <input
-                    type="checkbox"
-                    checked={selecionadas.size === candidatas.length}
-                    onChange={(e) =>
-                      setSelecionadas(
-                        e.target.checked ? new Set(candidatas.map((c) => c.compraSalvaId)) : new Set()
-                      )
-                    }
-                  />
-                  <span>
-                    selecionar todas ({candidatas.length}) ·{" "}
-                    {brl(candidatas.reduce((acc, c) => acc + c.total, 0))}
-                  </span>
-                </label>
-
-                {candidatas.map((c) => {
-                  const marcada = selecionadas.has(c.compraSalvaId);
-                  return (
-                    <div
-                      key={c.compraSalvaId}
-                      className={`${styles.candidata} ${marcada ? styles.candidataSel : ""}`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={marcada}
-                        onChange={(e) =>
-                          setSelecionadas((prev) => {
-                            const next = new Set(prev);
-                            if (e.target.checked) next.add(c.compraSalvaId);
-                            else next.delete(c.compraSalvaId);
-                            return next;
-                          })
-                        }
-                        aria-label={`Selecionar ${c.titulo}`}
-                      />
-                      <div>
-                        <div className={styles.candidataTitulo}>{c.titulo}</div>
-                        <div className={styles.candidataSub}>
-                          {c.itemCount} itens
-                          {c.semCusto > 0 ? ` · ${c.semCusto} sem custo` : ""}
-                        </div>
-                      </div>
-                      <span className={`${styles.num} ${styles.muted}`} style={{ textAlign: "left" }}>
-                        {dataBrCompleta(c.dataCompra)}
-                      </span>
-                      <span className={styles.num}>{money(c.total)}</span>
-                      <span>
-                        {c.semCusto > 0 ? (
-                          <span className={`${styles.pill} ${styles.pillWarn}`}>
-                            <i />
-                            estimativa
-                          </span>
-                        ) : c.comprada ? (
-                          <span className={`${styles.pill} ${styles.pillGood}`}>
-                            <i />
-                            comprada
-                          </span>
-                        ) : (
-                          <span className={`${styles.pill} ${styles.pillMute}`}>
-                            <i />
-                            não marcada
-                          </span>
-                        )}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </>
         )}
       </section>
 
@@ -1054,11 +756,7 @@ function LinhaMes({
                     const chegada = lote.chegadaReal
                       ? `chegou ${dataBr(lote.chegadaReal)}`
                       : lote.chegadaIni
-                        ? `prev. ${dataCurta(lote.chegadaIni)}${
-                            lote.chegadaFim && lote.chegadaFim !== lote.chegadaIni
-                              ? ` a ${dataCurta(lote.chegadaFim)}`
-                              : ""
-                          }`
+                        ? `prev. ${dataCurta(lote.chegadaIni)}`
                         : "sem previsão de chegada";
 
                     return (
@@ -1070,7 +768,7 @@ function LinhaMes({
                       >
                         <span className={styles.loteId}>
                           <span className={styles.loteCode}>
-                            {lote.codigo}
+                            {codigoDistinto(lote.codigo, lote.titulo) ?? lote.titulo}
                             <span
                               className={`${styles.tag} ${lote.origem === "salva" ? styles.tagLinked : ""}`}
                             >
@@ -1086,10 +784,9 @@ function LinhaMes({
                               </span>
                             )}
                           </span>
-                          <span className={styles.loteDesc}>
-                            {lote.titulo}
-                            {lote.colecao ? ` · ${lote.colecao}` : ""}
-                          </span>
+                          {codigoDistinto(lote.codigo, lote.titulo) && (
+                            <span className={styles.loteDesc}>{lote.titulo}</span>
+                          )}
                         </span>
                         <span className={styles.loteMeta}>
                           {COMPRA_GASTO_TIPO_LABEL[lote.tipo]}

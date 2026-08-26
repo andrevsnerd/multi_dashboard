@@ -36,9 +36,18 @@ function mesBr(ym: string): string {
 export function exportGastosCompraXlsx(
   lotes: CompraGastoLote[],
   meses: CompraGastoMes[],
-  options: { companyKey: string; companyName?: string; ano?: string; hoje: string }
+  options: {
+    companyKey: string;
+    companyName?: string;
+    ano?: string;
+    hoje: string;
+    /** YYYY-MM-DD: corta parcelas anteriores a esta data (recorte "mês atual em diante"). */
+    desde?: string;
+  }
 ): void {
-  const agenda = agendaDePagamentos(lotes, { ano: options.ano });
+  const agenda = agendaDePagamentos(lotes, { ano: options.ano }).filter(
+    (l) => !options.desde || l.parcela.vencimento >= options.desde
+  );
   if (agenda.length === 0) {
     alert("Não há parcelas para exportar no período selecionado.");
     return;
@@ -51,7 +60,6 @@ export function exportGastosCompraXlsx(
     CATEGORIA: COMPRA_GASTO_TIPO_LABEL[linha.lote.tipo],
     DESCRICAO: `${linha.lote.codigo} · ${linha.lote.titulo}`,
     PARCELA: `${linha.indice}/${linha.total}`,
-    COLECAO: linha.lote.colecao ?? "",
     FORNECEDOR: linha.lote.fornecedor ?? "",
     SITUACAO: linha.parcela.pago
       ? "Pago"
@@ -73,21 +81,19 @@ export function exportGastosCompraXlsx(
     COMPRAS: m.lotes.length,
   }));
 
+  const idsNaAgenda = new Set(agenda.map((l) => l.lote.id));
   const abaCompras = lotes
     .filter((l) => (options.ano ? l.parcelas.some((p) => p.vencimento.startsWith(options.ano!)) : true))
+    .filter((l) => !options.desde || idsNaAgenda.has(l.id))
     .map((l) => ({
       CODIGO: l.codigo,
       DESCRICAO: l.titulo,
-      COLECAO: l.colecao ?? "",
       FORNECEDOR: l.fornecedor ?? "",
       CATEGORIA: COMPRA_GASTO_TIPO_LABEL[l.tipo],
       ORIGEM: COMPRA_GASTO_ORIGEM_LABEL[l.origem],
       DATA_COMPRA: dataBr(l.dataCompra),
-      PREVISAO_CHEGADA: l.chegadaIni
-        ? `${dataBr(l.chegadaIni)}${l.chegadaFim && l.chegadaFim !== l.chegadaIni ? ` a ${dataBr(l.chegadaFim)}` : ""}`
-        : "",
+      PREVISAO_CHEGADA: dataBr(l.chegadaIni),
       CHEGADA_REAL: dataBr(l.chegadaReal),
-      NO_PDV: dataBr(l.pdv),
       STATUS: loteStatus(l, options.hoje).label,
       ESTIMATIVA: l.estimado ? "sim" : "",
       LINHAS: l.itens.length,

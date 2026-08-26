@@ -96,3 +96,15 @@ export function dataBrasiliaDeIso(iso: string): string {
   if (!Number.isFinite(t)) return String(iso ?? "").slice(0, 10);
   return new Date(t - 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
+
+/**
+ * O código da compra é derivado do título quando o usuário não digita nada, e
+ * aí mostrar os dois lado a lado repete a mesma informação. Devolve `null`
+ * quando não vale a pena exibir.
+ */
+export function codigoDistinto(codigo: string, titulo: string): string | null {
+  const c = (codigo ?? "").trim();
+  const t = (titulo ?? "").trim();
+  if (!c || c === t || t.startsWith(c)) return null;
+  return c;
+}

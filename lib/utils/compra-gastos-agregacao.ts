@@ -56,15 +56,9 @@ export function itensSemCusto(itens: CompraGastoItem[] | undefined): number {
  */
 export function loteStatus(lote: CompraGastoLote, hoje: string): CompraGastoStatus {
   if (lote.estimado) return { key: "estimativa", label: "Estimativa", tom: "mute" };
-  if (lote.chegadaReal && lote.pdv && lote.pdv <= hoje) {
-    return { key: "no-pdv", label: "No PDV", tom: "good" };
-  }
   if (lote.chegadaReal) return { key: "recebido", label: "Recebido", tom: "good" };
-  if (!lote.chegadaIni && !lote.chegadaFim) {
-    return { key: "lancado", label: "Lançado", tom: "mute" };
-  }
-  const limite = lote.chegadaFim || lote.chegadaIni || "";
-  if (limite && limite < hoje) return { key: "atrasado", label: "Atrasado", tom: "crit" };
+  if (!lote.chegadaIni) return { key: "lancado", label: "Lançado", tom: "mute" };
+  if (lote.chegadaIni < hoje) return { key: "atrasado", label: "Atrasado", tom: "crit" };
   return { key: "transito", label: "Em trânsito", tom: "warn" };
 }
 
@@ -78,9 +72,9 @@ export function diasEntre(a: string, b: string): number {
 /** Dias de atraso da chegada, 0 se não está atrasado. */
 export function diasAtraso(lote: CompraGastoLote, hoje: string): number {
   if (lote.chegadaReal || lote.estimado) return 0;
-  const limite = lote.chegadaFim || lote.chegadaIni || "";
-  if (!limite || limite >= hoje) return 0;
-  return diasEntre(limite, hoje);
+  const prevista = lote.chegadaIni || "";
+  if (!prevista || prevista >= hoje) return 0;
+  return diasEntre(prevista, hoje);
 }
 
 function addMonth(ym: string): string {
@@ -314,6 +308,42 @@ export function gerarParcelasPorPercentual(
   });
 
   return out;
+}
+
+/**
+ * Joga a diferença até o total numa das parcelas em aberto — é o que faz
+ * "digitei 40% na primeira" virar 40/60 sem ninguém calcular o resto.
+ *
+ * Absorve a **última parcela em aberto que não é a editada**: mexer na primeira
+ * ajusta a última, mexer na última ajusta a anterior. Assim o valor recém
+ * digitado nunca é sobrescrito e a soma fecha do mesmo jeito.
+ *
+ * @param editada índice recém-alterado (use -1 quando a mudança não veio de uma
+ *                linha específica, como no botão de fechar a conta).
+ *
+ * Parcela paga nunca é escolhida: o que já saiu do caixa não muda de valor.
+ * Sem candidata (todas pagas, ou a editada é a única em aberto), devolve a lista
+ * como está e a divergência aparece para o usuário resolver.
+ */
+export function redistribuirNaUltimaEmAberto(
+  parcelas: CompraGastoParcela[],
+  total: number,
+  editada: number
+): CompraGastoParcela[] {
+  if (!(total > 0)) return parcelas;
+
+  let alvo = -1;
+  for (let i = parcelas.length - 1; i >= 0; i -= 1) {
+    if (!parcelas[i].pago && i !== editada) {
+      alvo = i;
+      break;
+    }
+  }
+  if (alvo < 0) return parcelas;
+
+  const outras = parcelas.reduce((s, p, i) => (i === alvo ? s : s + (Number(p.valor) || 0)), 0);
+  const resto = Math.max(0, cents(total - outras));
+  return parcelas.map((p, i) => (i === alvo ? { ...p, valor: resto } : p));
 }
 
 /**

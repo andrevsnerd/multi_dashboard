@@ -13,8 +13,8 @@
 import { fetchCustosPorProdutos } from "@/lib/repositories/controleEstoque";
 import type { CompraGastoCandidata, CompraGastoItem } from "@/lib/types/compra-gasto";
 import type { CompraSalva, CompraSalvaItemRow } from "@/lib/types/compra-salva";
-import { cents, itensTotal } from "@/lib/utils/compra-gastos-agregacao";
-import { getCompraSalva, listComprasSalvasFull } from "@/lib/utils/compra-salva-store";
+import { itensTotal } from "@/lib/utils/compra-gastos-agregacao";
+import { getCompraSalva } from "@/lib/utils/compra-salva-store";
 
 /** Mesmo contrato que a tela consome (o tipo vive em lib/types para não puxar este módulo, que depende do driver do SQL Server, para o cliente). */
 export type CompraSalvaMaterializada = CompraGastoCandidata;
@@ -89,35 +89,6 @@ export async function materializarCompraSalva(
   return materializar(compra, custoMap);
 }
 
-export type EscopoReconhecimento = "comprada" | "todas";
-
-/**
- * Compras Salvas que ainda NÃO foram lançadas no painel.
- *
- * `escopo` padrão "comprada" usa a marcação de comprada da tela de Compras
- * Salvas como sinal de "essa virou compra de verdade" — sem isso a lista traria
- * todo snapshot de Lista Loja. "todas" mostra o resto para os casos em que a
- * marcação não foi feita.
- */
-export async function listarCandidatasReconhecimento(
-  companyKey: string,
-  jaLancados: Set<string>,
-  escopo: EscopoReconhecimento = "comprada"
-): Promise<CompraSalvaMaterializada[]> {
-  const todas = await listComprasSalvasFull(companyKey);
-  const pendentes = todas
-    .filter((c) => !jaLancados.has(c.id))
-    .filter((c) => (escopo === "comprada" ? !!c.comprada : true));
-
-  if (pendentes.length === 0) return [];
-
-  const custoMap = await custosFaltantes(pendentes);
-  return pendentes
-    .map((c) => materializar(c, custoMap))
-    .filter((m) => m.itemCount > 0)
-    .sort((a, b) => b.dataCompra.localeCompare(a.dataCompra));
-}
-
 /**
  * Observação de import: registra o que ficou sem custo em vez de deixar o valor
  * mentir. Devolve `null` quando não há nada a avisar.
@@ -127,10 +98,6 @@ export function avisoDeCustoFaltante(m: CompraSalvaMaterializada): string | null
   return `${m.semCusto} de ${m.itemCount} itens sem custo cadastrado — valor subestimado.`;
 }
 
-/** Valor da compra reconhecida, já em centavos fechados. */
-export function totalDaMaterializada(m: CompraSalvaMaterializada): number {
-  return cents(m.total);
-}
 
 /** Junta observação existente e aviso automático em linhas separadas. */
 export function combinarObservacao(...partes: (string | null | undefined)[]): string | null {

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CompraSalvaListEntry } from "@/lib/types/compra-salva";
 import {
   COMPRA_GASTO_TIPO_LABEL,
+  type CompraGastoCandidata,
   type CompraGastoItem,
   type CompraGastoLote,
   type CompraGastoOrigem,
@@ -54,20 +55,20 @@ export default function NovaCompraModal({
   const [carregandoSalvas, setCarregandoSalvas] = useState(false);
   const [compraSalvaId, setCompraSalvaId] = useState("");
 
-  const [linhas, setLinhas] = useState<LinhaLivre[]>([{ ...LINHA_VAZIA }, { ...LINHA_VAZIA }]);
+  // Uma linha só: a próxima aparece sozinha ao digitar nesta.
+  const [linhas, setLinhas] = useState<LinhaLivre[]>([{ ...LINHA_VAZIA }]);
   const [valorUnicoTexto, setValorUnicoTexto] = useState("");
 
-  const [codigo, setCodigo] = useState("");
   const [titulo, setTitulo] = useState("");
-  const [colecao, setColecao] = useState("");
   const [fornecedor, setFornecedor] = useState("");
   const [tipo, setTipo] = useState<CompraGastoTipo>("mercadoria");
   const [dataCompra, setDataCompra] = useState(mesSugerido ? `${mesSugerido}-15` : hoje);
   const [chegadaIni, setChegadaIni] = useState("");
-  const [chegadaFim, setChegadaFim] = useState("");
-  const [pdv, setPdv] = useState("");
-  const [estimado, setEstimado] = useState(false);
   const [observacao, setObservacao] = useState("");
+
+  /** Itens já reconhecidos da Compra Salva escolhida (valor exato, não o arredondado da lista). */
+  const [previa, setPrevia] = useState<CompraGastoCandidata | null>(null);
+  const [carregandoPrevia, setCarregandoPrevia] = useState(false);
 
   const [parcelas, setParcelas] = useState<CompraGastoParcela[]>([]);
   const [parcelasEditadas, setParcelasEditadas] = useState(false);
@@ -125,12 +126,12 @@ export default function NovaCompraModal({
   );
 
   const total = useMemo(() => {
-    if (origem === "salva") return cents(salvaSelecionada?.totalValor ?? 0);
+    if (origem === "salva") return cents(previa?.total ?? salvaSelecionada?.totalValor ?? 0);
     if (origem === "itens") {
       return cents(itensDasLinhas.reduce((s, i) => s + i.qtd * i.custoUnitario, 0));
     }
     return parseMoeda(valorUnicoTexto);
-  }, [origem, salvaSelecionada, itensDasLinhas, valorUnicoTexto]);
+  }, [origem, previa, salvaSelecionada, itensDasLinhas, valorUnicoTexto]);
 
   // A compra nasce INTEIRA: uma parcela de 100% na data da compra. Só quando o
   // usuário divide é que o valor sai desse mês e vai para os vencimentos novos.
@@ -154,17 +155,45 @@ export default function NovaCompraModal({
   }, [onClose]);
 
   /** Ao escolher a Compra Salva, título e data vêm dela — só o parcelamento sobra para editar. */
+  /**
+   * Escolher a Compra Salva já traz tudo pronto: título, data da compra e os
+   * itens reconhecidos com o valor exato (qtd × custo). Só o parcelamento fica
+   * para o usuário.
+   */
   const escolherCompraSalva = useCallback(
-    (id: string) => {
+    async (id: string) => {
       setCompraSalvaId(id);
       setParcelasEditadas(false);
+      setPrevia(null);
+      if (!id) return;
+
       const escolhida = salvas.find((s) => s.id === id);
-      if (!escolhida) return;
-      setTitulo(escolhida.title);
-      setCodigo((atual) => atual || escolhida.title.slice(0, 24));
-      setDataCompra(dataBrasiliaDeIso(escolhida.savedAt));
+      if (escolhida) {
+        setTitulo(escolhida.title);
+        setDataCompra(dataBrasiliaDeIso(escolhida.savedAt));
+      }
+
+      setCarregandoPrevia(true);
+      try {
+        const res = await fetch(
+          `/api/compras-gastos/reconhecer?company=${companyKey}&compraSalvaId=${encodeURIComponent(id)}`,
+          { cache: "no-store" }
+        );
+        const json = (await res.json()) as { candidata?: CompraGastoCandidata; error?: string };
+        if (!res.ok || !json.candidata) {
+          setErro(json.error ?? "Não foi possível ler os itens da Compra Salva.");
+          return;
+        }
+        setPrevia(json.candidata);
+        setTitulo(json.candidata.titulo);
+        setDataCompra(json.candidata.dataCompra);
+      } catch {
+        setErro("Não foi possível ler os itens da Compra Salva.");
+      } finally {
+        setCarregandoPrevia(false);
+      }
     },
-    [salvas]
+    [salvas, companyKey]
   );
 
   const atualizarLinha = useCallback((i: number, campo: keyof LinhaLivre, valor: string) => {
@@ -215,16 +244,11 @@ export default function NovaCompraModal({
       const body: Record<string, unknown> = {
         companyKey,
         origem,
-        codigo: codigo.trim() || titulo.trim().slice(0, 24),
         titulo: titulo.trim(),
-        colecao: colecao.trim() || null,
         fornecedor: fornecedor.trim() || null,
         tipo,
         dataCompra,
         chegadaIni: chegadaIni || null,
-        chegadaFim: chegadaFim || chegadaIni || null,
-        pdv: pdv || null,
-        estimado,
         observacao: observacao.trim() || null,
       };
 
@@ -319,7 +343,7 @@ export default function NovaCompraModal({
                 <span>Compra Salva</span>
                 <select
                   value={compraSalvaId}
-                  onChange={(e) => escolherCompraSalva(e.target.value)}
+                  onChange={(e) => void escolherCompraSalva(e.target.value)}
                   disabled={carregandoSalvas}
                 >
                   <option value="">
@@ -339,11 +363,47 @@ export default function NovaCompraModal({
                 </select>
               </label>
               {salvasErro && <p className={styles.note}>{salvasErro}</p>}
-              <p className={styles.note}>
-                Título e data da compra vêm da própria Compra Salva — só o parcelamento fica para
-                você editar. O valor sai de qtd × custo, item por item; item sem custo cadastrado não
-                soma zero escondido: a compra nasce como estimativa e a observação diz quantos.
-              </p>
+
+              {carregandoPrevia && <p className={styles.note}>lendo os itens da compra…</p>}
+
+              {previa && (
+                <div className={styles.previa}>
+                  <div className={styles.previaHead}>
+                    <span>
+                      <strong>{previa.itemCount}</strong>{" "}
+                      {previa.itemCount === 1 ? "item reconhecido" : "itens reconhecidos"} · comprada
+                      em {dataBrCompleta(previa.dataCompra)}
+                    </span>
+                    <b>{brl(previa.total)}</b>
+                  </div>
+                  <div className={styles.previaItens}>
+                    {previa.itens.slice(0, 6).map((item, i) => (
+                      <div className={styles.previaItem} key={i}>
+                        <span className={styles.previaDesc}>
+                          {item.descricao}
+                          {item.corDescricao ? ` · ${item.corDescricao}` : ""}
+                        </span>
+                        <span className={styles.previaQtd}>{item.qtd.toLocaleString("pt-BR")} un</span>
+                        <span className={styles.previaValor}>
+                          {item.custoUnitario > 0 ? money(item.qtd * item.custoUnitario) : "sem custo"}
+                        </span>
+                      </div>
+                    ))}
+                    {previa.itemCount > 6 && (
+                      <span className={styles.note} style={{ margin: 0 }}>
+                        + {previa.itemCount - 6} itens
+                      </span>
+                    )}
+                  </div>
+                  {previa.semCusto > 0 && (
+                    <p className={styles.note} style={{ margin: 0 }}>
+                      {previa.semCusto} {previa.semCusto === 1 ? "item está" : "itens estão"} sem custo
+                      cadastrado — o valor acima está subestimado e a compra será marcada como
+                      estimativa.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -446,25 +506,12 @@ export default function NovaCompraModal({
           <div>
             <div className={styles.blockTitle}>Identificação e datas</div>
             <div className={styles.fieldGrid}>
-              <label className={styles.field}>
-                <span>Código</span>
-                <input
-                  className={styles.money}
-                  value={codigo}
-                  placeholder="compra 11"
-                  onChange={(e) => setCodigo(e.target.value)}
-                />
-              </label>
               {origem !== "valor" && (
                 <label className={styles.field}>
                   <span>Descrição</span>
                   <input value={titulo} onChange={(e) => setTitulo(e.target.value)} />
                 </label>
               )}
-              <label className={styles.field}>
-                <span>Coleção</span>
-                <input value={colecao} onChange={(e) => setColecao(e.target.value)} />
-              </label>
               <label className={styles.field}>
                 <span>Fornecedor</span>
                 <input value={fornecedor} onChange={(e) => setFornecedor(e.target.value)} />
@@ -494,14 +541,6 @@ export default function NovaCompraModal({
                 <span>Previsão de chegada</span>
                 <input type="date" value={chegadaIni} onChange={(e) => setChegadaIni(e.target.value)} />
               </label>
-              <label className={styles.field}>
-                <span>Chegada até</span>
-                <input type="date" value={chegadaFim} onChange={(e) => setChegadaFim(e.target.value)} />
-              </label>
-              <label className={styles.field}>
-                <span>No PDV</span>
-                <input type="date" value={pdv} onChange={(e) => setPdv(e.target.value)} />
-              </label>
             </div>
           </div>
 
@@ -523,14 +562,6 @@ export default function NovaCompraModal({
               }
             />
           </div>
-
-          <label className={styles.check}>
-            <input type="checkbox" checked={estimado} onChange={(e) => setEstimado(e.target.checked)} />
-            <span>
-              <strong>Marcar como estimativa.</strong> Entra no comprometido com hachura no gráfico,
-              para não confundir verba reservada com compra fechada.
-            </span>
-          </label>
 
           <label className={styles.field}>
             <span>Observação</span>

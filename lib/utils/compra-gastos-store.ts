@@ -86,9 +86,7 @@ async function runMigrations(): Promise<void> {
       compra_salva_id TEXT,
       data_compra DATE NOT NULL,
       chegada_ini DATE,
-      chegada_fim DATE,
       chegada_real DATE,
-      pdv DATE,
       estimado BOOLEAN NOT NULL DEFAULT false,
       valor_unico NUMERIC(14, 2),
       observacao TEXT,
@@ -99,6 +97,11 @@ async function runMigrations(): Promise<void> {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
+  // Janela de chegada (chegada_fim) e data de PDV saíram do produto: a compra
+  // tem data e previsão de chegada, nada mais. Drop idempotente para o schema
+  // não carregar coluna que nenhuma tela preenche.
+  await ddl(() => sql`ALTER TABLE compra_gastos_lotes DROP COLUMN IF EXISTS chegada_fim`);
+  await ddl(() => sql`ALTER TABLE compra_gastos_lotes DROP COLUMN IF EXISTS pdv`);
   await ddl(() => sql`
     CREATE INDEX IF NOT EXISTS compra_gastos_lotes_company_idx
       ON compra_gastos_lotes (company_key)
@@ -201,9 +204,7 @@ function rowToLote(row: Record<string, unknown>): CompraGastoLote {
     compraSalvaId: (row.compra_salva_id as string) ?? null,
     dataCompra: dateOnly(row.data_compra) ?? "",
     chegadaIni: dateOnly(row.chegada_ini),
-    chegadaFim: dateOnly(row.chegada_fim),
     chegadaReal: dateOnly(row.chegada_real),
-    pdv: dateOnly(row.pdv),
     estimado: !!row.estimado,
     valorUnico: row.valor_unico != null ? num(row.valor_unico) : null,
     observacao: (row.observacao as string) ?? null,
@@ -224,7 +225,7 @@ export async function listLotes(companyKey: string): Promise<CompraGastoLote[]> 
     const rows = await sql`
       SELECT
         id, company_key, codigo, titulo, colecao, fornecedor, tipo, origem, compra_salva_id,
-        data_compra, chegada_ini, chegada_fim, chegada_real, pdv, estimado, valor_unico,
+        data_compra, chegada_ini, chegada_real, estimado, valor_unico,
         observacao, itens, parcelas, criado_por, created_at, updated_at
       FROM compra_gastos_lotes
       WHERE company_key = ${companyKey}
@@ -239,34 +240,6 @@ export async function listLotes(companyKey: string): Promise<CompraGastoLote[]> 
     .sort((a, b) => (a.dataCompra < b.dataCompra ? 1 : a.dataCompra > b.dataCompra ? -1 : 0));
 }
 
-/**
- * IDs de Compra Salva já lançados como compra — o reconhecimento automático não
- * pode oferecer duas vezes a mesma lista (viraria valor duplicado no mês).
- */
-export async function listCompraSalvaIdsLancados(companyKey: string): Promise<Set<string>> {
-  if (hasPostgres()) {
-    await ensureTable();
-    const sql = getNeonSql();
-    const rows = await sql`
-      SELECT DISTINCT compra_salva_id
-      FROM compra_gastos_lotes
-      WHERE company_key = ${companyKey} AND compra_salva_id IS NOT NULL
-    `;
-    return new Set(
-      rows
-        .map((r) => (r as { compra_salva_id: string | null }).compra_salva_id)
-        .filter((id): id is string => !!id)
-    );
-  }
-
-  const all = await readFileAll();
-  return new Set(
-    all.lotes
-      .filter((l) => l.companyKey === companyKey && l.compraSalvaId)
-      .map((l) => l.compraSalvaId as string)
-  );
-}
-
 export async function getLote(companyKey: string, id: string): Promise<CompraGastoLote | null> {
   if (hasPostgres()) {
     await ensureTable();
@@ -274,7 +247,7 @@ export async function getLote(companyKey: string, id: string): Promise<CompraGas
     const rows = await sql`
       SELECT
         id, company_key, codigo, titulo, colecao, fornecedor, tipo, origem, compra_salva_id,
-        data_compra, chegada_ini, chegada_fim, chegada_real, pdv, estimado, valor_unico,
+        data_compra, chegada_ini, chegada_real, estimado, valor_unico,
         observacao, itens, parcelas, criado_por, created_at, updated_at
       FROM compra_gastos_lotes
       WHERE id = ${id} AND company_key = ${companyKey}
@@ -306,9 +279,7 @@ export async function createLote(
     compraSalvaId: input.compraSalvaId ? String(input.compraSalvaId) : null,
     dataCompra: dateOnly(input.dataCompra) ?? now.slice(0, 10),
     chegadaIni: dateOnly(input.chegadaIni),
-    chegadaFim: dateOnly(input.chegadaFim),
     chegadaReal: dateOnly(input.chegadaReal),
-    pdv: dateOnly(input.pdv),
     estimado: !!input.estimado,
     valorUnico: input.valorUnico != null ? num(input.valorUnico) : null,
     observacao: input.observacao ? String(input.observacao).trim() : null,
@@ -325,13 +296,13 @@ export async function createLote(
     await sql`
       INSERT INTO compra_gastos_lotes (
         id, company_key, codigo, titulo, colecao, fornecedor, tipo, origem, compra_salva_id,
-        data_compra, chegada_ini, chegada_fim, chegada_real, pdv, estimado, valor_unico,
+        data_compra, chegada_ini, chegada_real, estimado, valor_unico,
         observacao, itens, parcelas, criado_por, created_at, updated_at
       ) VALUES (
         ${lote.id}, ${lote.companyKey}, ${lote.codigo}, ${lote.titulo}, ${lote.colecao},
         ${lote.fornecedor}, ${lote.tipo}, ${lote.origem}, ${lote.compraSalvaId},
-        ${lote.dataCompra}, ${lote.chegadaIni}, ${lote.chegadaFim}, ${lote.chegadaReal},
-        ${lote.pdv}, ${lote.estimado}, ${lote.valorUnico}, ${lote.observacao},
+        ${lote.dataCompra}, ${lote.chegadaIni}, ${lote.chegadaReal},
+        ${lote.estimado}, ${lote.valorUnico}, ${lote.observacao},
         ${JSON.stringify(lote.itens)}::jsonb, ${JSON.stringify(lote.parcelas)}::jsonb,
         ${lote.criadoPor}, ${lote.createdAt}, ${lote.updatedAt}
       )
@@ -370,9 +341,7 @@ export async function updateLote(
       patch.compraSalvaId !== undefined ? (patch.compraSalvaId ?? null) : atual.compraSalvaId,
     dataCompra: patch.dataCompra !== undefined ? dateOnly(patch.dataCompra) ?? atual.dataCompra : atual.dataCompra,
     chegadaIni: patch.chegadaIni !== undefined ? dateOnly(patch.chegadaIni) : atual.chegadaIni,
-    chegadaFim: patch.chegadaFim !== undefined ? dateOnly(patch.chegadaFim) : atual.chegadaFim,
     chegadaReal: patch.chegadaReal !== undefined ? dateOnly(patch.chegadaReal) : atual.chegadaReal,
-    pdv: patch.pdv !== undefined ? dateOnly(patch.pdv) : atual.pdv,
     estimado: patch.estimado !== undefined ? !!patch.estimado : atual.estimado,
     valorUnico:
       patch.valorUnico !== undefined ? (patch.valorUnico != null ? num(patch.valorUnico) : null) : atual.valorUnico,
@@ -397,9 +366,7 @@ export async function updateLote(
         compra_salva_id = ${proximo.compraSalvaId},
         data_compra = ${proximo.dataCompra},
         chegada_ini = ${proximo.chegadaIni},
-        chegada_fim = ${proximo.chegadaFim},
         chegada_real = ${proximo.chegadaReal},
-        pdv = ${proximo.pdv},
         estimado = ${proximo.estimado},
         valor_unico = ${proximo.valorUnico},
         observacao = ${proximo.observacao},

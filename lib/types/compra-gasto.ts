@@ -72,13 +72,12 @@ export interface CompraGastoLote {
   origem: CompraGastoOrigem;
   /** Compra Salva de origem, quando houver. */
   compraSalvaId?: string | null;
-  /** YYYY-MM-DD */
+  /** Data em que a compra foi fechada (YYYY-MM-DD). */
   dataCompra: string;
+  /** Previsão de chegada. */
   chegadaIni?: string | null;
-  chegadaFim?: string | null;
+  /** Chegada confirmada. */
   chegadaReal?: string | null;
-  /** Data em que a mercadoria entra no PDV. */
-  pdv?: string | null;
   /** Valor ainda é chute (grade/mix a definir) — sai hachurado no gráfico. */
   estimado: boolean;
   /** Só para origem "valor": o total informado à mão. */
@@ -146,7 +145,6 @@ export interface CompraGastoPainel {
 
 export type CompraGastoStatusKey =
   | "estimativa"
-  | "no-pdv"
   | "recebido"
   | "atrasado"
   | "transito"
@@ -187,9 +185,7 @@ export interface CompraGastoLoteInput {
   compraSalvaId?: string | null;
   dataCompra: string;
   chegadaIni?: string | null;
-  chegadaFim?: string | null;
   chegadaReal?: string | null;
-  pdv?: string | null;
   estimado?: boolean;
   valorUnico?: number | null;
   observacao?: string | null;

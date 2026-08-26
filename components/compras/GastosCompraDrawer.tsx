@@ -20,7 +20,7 @@ import {
 
 import ParcelasEditor from "./ParcelasEditor";
 import styles from "./GastosCompra.module.css";
-import { brl, dataBr, dataBrCompleta, money } from "./gastos-compra-format";
+import { brl, codigoDistinto, dataBr, dataBrCompleta, money } from "./gastos-compra-format";
 
 interface Props {
   lote: CompraGastoLote;
@@ -90,7 +90,9 @@ export default function GastosCompraDrawer({
         <div className={styles.drawerHead}>
           <div className={styles.drawerTop}>
             <div>
-              <div className={styles.drawerCode}>{lote.codigo}</div>
+              <div className={styles.drawerCode}>
+                {codigoDistinto(lote.codigo, lote.titulo) ?? COMPRA_GASTO_TIPO_LABEL[lote.tipo]}
+              </div>
               <h3 className={styles.drawerTitle}>{lote.titulo}</h3>
             </div>
             <button type="button" className={styles.closeX} onClick={onClose} aria-label="Fechar">
@@ -124,23 +126,11 @@ export default function GastosCompraDrawer({
             </div>
             <div className={styles.fact}>
               <span className={styles.factK}>Previsão chegada</span>
-              <span className={styles.factV}>
-                {lote.chegadaIni
-                  ? `${dataBr(lote.chegadaIni)}${
-                      lote.chegadaFim && lote.chegadaFim !== lote.chegadaIni
-                        ? ` a ${dataBr(lote.chegadaFim)}`
-                        : ""
-                    }`
-                  : "—"}
-              </span>
+              <span className={styles.factV}>{dataBr(lote.chegadaIni)}</span>
             </div>
             <div className={styles.fact}>
               <span className={styles.factK}>Chegada real</span>
               <span className={styles.factV}>{dataBr(lote.chegadaReal)}</span>
-            </div>
-            <div className={styles.fact}>
-              <span className={styles.factK}>No PDV</span>
-              <span className={styles.factV}>{dataBr(lote.pdv)}</span>
             </div>
           </div>
         </div>
@@ -396,10 +386,6 @@ export default function GastosCompraDrawer({
                       ? `Linhas digitadas nesta compra: ${lote.itens.filter((i) => i.produto).length} vinculadas a produto e ${lote.itens.filter((i) => !i.produto).length} livres.`
                       : "Valor único informado à mão. Sem itens, sem impacto em estoque."}
                 </span>
-              </div>
-              <div className={styles.fact}>
-                <span className={styles.factK}>Coleção</span>
-                <span className={styles.factText}>{lote.colecao || "não informada"}</span>
               </div>
               <div className={styles.fact}>
                 <span className={styles.factK}>Fornecedor</span>

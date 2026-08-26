@@ -6,27 +6,31 @@ import type { CompraGastoParcela } from "@/lib/types/compra-gasto";
 import {
   cents,
   gerarParcelas,
-  gerarParcelasPorPercentual,
-  parsePercentuais,
-  percentualDaParcela,
+  redistribuirNaUltimaEmAberto,
 } from "@/lib/utils/compra-gastos-agregacao";
 
 import styles from "./GastosCompra.module.css";
 import { brl, money, parseMoeda } from "./gastos-compra-format";
 
 interface Props {
-  /** Valor de referência da compra — base do rateio e do aviso de divergência. */
+  /** Valor de referência da compra — base do % e do aviso de fechamento. */
   total: number;
   parcelas: CompraGastoParcela[];
   onChange: (parcelas: CompraGastoParcela[]) => void;
-  /** Data sugerida para o 1º vencimento ao gerar (normalmente a data da compra). */
+  /** Data sugerida para o 1º vencimento (normalmente a data da compra). */
   vencimentoSugerido: string;
-  /** Texto do rodapé à esquerda. */
   rodape?: string;
   disabled?: boolean;
 }
 
-type Modo = "quantidade" | "percentual";
+/** Célula em digitação: enquanto o campo tem foco, mostra o texto cru. */
+interface Edicao {
+  linha: number;
+  campo: "valor" | "pct";
+  texto: string;
+}
+
+const ATALHOS = [1, 2, 3, 4, 6, 12];
 
 function renumerar(parcelas: CompraGastoParcela[]): CompraGastoParcela[] {
   return parcelas.map((p, i) => ({ ...p, numero: i + 1 }));
@@ -35,9 +39,18 @@ function renumerar(parcelas: CompraGastoParcela[]): CompraGastoParcela[] {
 /**
  * Editor de parcelamento.
  *
- * Dois jeitos de dividir: em N parcelas iguais ou por percentual ("40/60",
- * "30/30/40"). Parcela já paga fica travada e sai do rateio — só o restante é
- * redividido, senão marcar como pago viraria um valor diferente do que saiu.
+ * Três decisões que sustentam a tela:
+ *  - **Atalho de quantidade**: 2x, 3x, 4x… divide na hora, sem passo de
+ *    "configurar e clicar em dividir".
+ *  - **% e R$ na mesma linha, ligados**: digitar 40 no % preenche o valor e
+ *    vice-versa. Não existe modo "por percentual" separado — 40/60 é digitar
+ *    40 na primeira linha.
+ *  - **As outras linhas se ajustam sozinhas**: ao editar uma, a última em aberto
+ *    que não seja ela absorve a diferença, então a soma fecha com o total sem
+ *    ninguém fazer conta de cabeça.
+ *
+ * Parcela já paga fica travada, fora do rateio e do ajuste automático — o que
+ * já saiu do caixa não pode mudar de valor.
  */
 export default function ParcelasEditor({
   total,
@@ -47,51 +60,67 @@ export default function ParcelasEditor({
   rodape,
   disabled,
 }: Props) {
-  const [modo, setModo] = useState<Modo>("quantidade");
-  const [quantidade, setQuantidade] = useState(2);
-  const [percentuaisTexto, setPercentuaisTexto] = useState("40/60");
   const [primeiroVencimento, setPrimeiroVencimento] = useState(vencimentoSugerido);
   const [intervalo, setIntervalo] = useState<"mensal" | "quinzenal">("mensal");
+  const [edicao, setEdicao] = useState<Edicao | null>(null);
 
   const pagas = useMemo(() => parcelas.filter((p) => p.pago), [parcelas]);
   const somaPagas = useMemo(() => cents(pagas.reduce((s, p) => s + p.valor, 0)), [pagas]);
-  const restante = cents(total - somaPagas);
   const soma = useMemo(() => cents(parcelas.reduce((s, p) => s + p.valor, 0)), [parcelas]);
-  const divergencia = cents(soma - total);
+  const diferenca = cents(soma - total);
+  const fecha = total <= 0 || Math.abs(diferenca) <= 0.5;
 
-  const percentuais = useMemo(() => parsePercentuais(percentuaisTexto), [percentuaisTexto]);
-  const somaPercentuais = percentuais.reduce((s, p) => s + p, 0);
+  /** Índice da última parcela em aberto — é ela que absorve o resto. */
+  const indiceBalanceadora = useMemo(() => {
+    for (let i = parcelas.length - 1; i >= 0; i -= 1) {
+      if (!parcelas[i].pago) return i;
+    }
+    return -1;
+  }, [parcelas]);
 
-  function gerar() {
-    const base = restante > 0 ? restante : total;
-    const novas =
-      modo === "quantidade"
-        ? gerarParcelas(base, quantidade, primeiroVencimento, intervalo)
-        : gerarParcelasPorPercentual(base, percentuais, primeiroVencimento, intervalo);
+  /** Depois de mexer numa linha, a última em aberto absorve a diferença. */
+  const comAjuste = (lista: CompraGastoParcela[], editada: number) =>
+    redistribuirNaUltimaEmAberto(lista, total, editada);
+
+  function dividirEm(quantidade: number) {
+    const base = cents(total - somaPagas);
+    const novas = gerarParcelas(base > 0 ? base : total, quantidade, primeiroVencimento, intervalo);
     if (novas.length === 0) return;
     onChange(renumerar([...pagas, ...novas]));
+    setEdicao(null);
   }
 
-  function alterar(indice: number, campo: "vencimento" | "valor", valor: string) {
-    onChange(
-      parcelas.map((p, i) =>
-        i === indice ? { ...p, [campo]: campo === "valor" ? parseMoeda(valor) : valor } : p
-      )
-    );
+  function alterarData(indice: number, valor: string) {
+    onChange(parcelas.map((p, i) => (i === indice ? { ...p, vencimento: valor } : p)));
+  }
+
+  function alterarValor(indice: number, texto: string) {
+    setEdicao({ linha: indice, campo: "valor", texto });
+    const valor = Math.max(0, parseMoeda(texto));
+    onChange(comAjuste(parcelas.map((p, i) => (i === indice ? { ...p, valor } : p)), indice));
+  }
+
+  function alterarPct(indice: number, texto: string) {
+    setEdicao({ linha: indice, campo: "pct", texto });
+    const pct = Math.max(0, parseMoeda(texto));
+    const valor = cents((total * pct) / 100);
+    onChange(comAjuste(parcelas.map((p, i) => (i === indice ? { ...p, valor } : p)), indice));
   }
 
   function remover(indice: number) {
-    onChange(renumerar(parcelas.filter((_, i) => i !== indice)));
+    setEdicao(null);
+    onChange(comAjuste(renumerar(parcelas.filter((_, i) => i !== indice)), -1));
   }
 
   function adicionar() {
     const ultima = parcelas[parcelas.length - 1];
+    setEdicao(null);
     onChange(
       renumerar([
         ...parcelas,
         {
           numero: parcelas.length + 1,
-          vencimento: ultima?.vencimento ?? primeiroVencimento,
+          vencimento: proximoMes(ultima?.vencimento ?? primeiroVencimento),
           valor: 0,
           pago: false,
           dataPagamento: null,
@@ -100,131 +129,109 @@ export default function ParcelasEditor({
     );
   }
 
+  /** Joga a sobra/falta na última parcela em aberto. */
+  function fecharNaUltima() {
+    onChange(redistribuirNaUltimaEmAberto(parcelas, total, -1));
+    setEdicao(null);
+  }
+
+  function textoValor(p: CompraGastoParcela, i: number): string {
+    if (edicao && edicao.linha === i && edicao.campo === "valor") return edicao.texto;
+    return money(p.valor);
+  }
+
+  function textoPct(p: CompraGastoParcela, i: number): string {
+    if (edicao && edicao.linha === i && edicao.campo === "pct") return edicao.texto;
+    if (total <= 0) return "";
+    const pct = (p.valor / total) * 100;
+    return String(Math.round(pct * 10) / 10).replace(".", ",");
+  }
+
+  const quantidadeAtual = parcelas.length;
+
   return (
-    <div>
-      <div className={styles.splitTools}>
-        <div className={styles.seg} role="group" aria-label="Como dividir">
-          <button
-            type="button"
-            className={modo === "quantidade" ? styles.segActive : undefined}
-            aria-pressed={modo === "quantidade"}
-            onClick={() => setModo("quantidade")}
-            disabled={disabled}
-          >
-            Em parcelas iguais
-          </button>
-          <button
-            type="button"
-            className={modo === "percentual" ? styles.segActive : undefined}
-            aria-pressed={modo === "percentual"}
-            onClick={() => setModo("percentual")}
-            disabled={disabled}
-          >
-            Por percentual
-          </button>
-        </div>
-
-        <div className={styles.fieldGrid}>
-          {modo === "quantidade" ? (
-            <label className={styles.field}>
-              <span>Nº de parcelas</span>
-              <input
-                type="number"
-                min={1}
-                max={48}
-                value={quantidade}
-                disabled={disabled}
-                onChange={(e) => setQuantidade(Math.max(1, Math.min(48, Number(e.target.value) || 1)))}
-              />
-            </label>
-          ) : (
-            <label className={styles.field}>
-              <span>Percentuais</span>
-              <input
-                className={styles.money}
-                value={percentuaisTexto}
-                placeholder="40/60"
-                disabled={disabled}
-                onChange={(e) => setPercentuaisTexto(e.target.value)}
-              />
-            </label>
-          )}
-          <label className={styles.field}>
-            <span>1º vencimento</span>
-            <input
-              type="date"
-              value={primeiroVencimento}
-              disabled={disabled}
-              onChange={(e) => setPrimeiroVencimento(e.target.value)}
-            />
-          </label>
-          <label className={styles.field}>
-            <span>Intervalo</span>
-            <select
-              value={intervalo}
-              disabled={disabled}
-              onChange={(e) => setIntervalo(e.target.value as "mensal" | "quinzenal")}
-            >
-              <option value="mensal">Mensal, mesmo dia</option>
-              <option value="quinzenal">A cada 15 dias</option>
-            </select>
-          </label>
-          <div className={styles.field}>
-            <span>&nbsp;</span>
+    <div className={styles.parcelas}>
+      <div className={styles.splitBar}>
+        <span className={styles.splitLabel}>Dividir em</span>
+        <div className={styles.atalhos}>
+          {ATALHOS.map((n) => (
             <button
+              key={n}
               type="button"
-              className={`${styles.btn} ${styles.btnSm}`}
-              onClick={gerar}
-              disabled={disabled || (modo === "percentual" && percentuais.length === 0)}
+              className={`${styles.atalho} ${quantidadeAtual === n ? styles.atalhoAtivo : ""}`}
+              onClick={() => dividirEm(n)}
+              disabled={disabled}
             >
-              Dividir
+              {n}x
             </button>
-          </div>
+          ))}
         </div>
-
-        {modo === "percentual" && percentuais.length > 0 && (
-          <p className={styles.note}>
-            {percentuais.map((p) => `${p}%`).join(" + ")}
-            {Math.abs(somaPercentuais - 100) > 0.05
-              ? ` — soma ${somaPercentuais}%, tratada como proporção do total`
-              : ""}
-            {somaPagas > 0 ? ` · rateando ${brl(restante)} (o já pago fica de fora)` : ""}
-          </p>
-        )}
+        <label className={styles.splitCampo}>
+          <span>a partir de</span>
+          <input
+            type="date"
+            value={primeiroVencimento}
+            disabled={disabled}
+            onChange={(e) => setPrimeiroVencimento(e.target.value)}
+          />
+        </label>
+        <span className={styles.splitDica}>
+          ou digite % / valor numa linha — as outras fecham a conta
+        </span>
+        <label className={styles.splitCampo}>
+          <span>a cada</span>
+          <select
+            value={intervalo}
+            disabled={disabled}
+            onChange={(e) => setIntervalo(e.target.value as "mensal" | "quinzenal")}
+          >
+            <option value="mensal">mês</option>
+            <option value="quinzenal">15 dias</option>
+          </select>
+        </label>
       </div>
 
       <div className={styles.parcelaGrid}>
-        <div className={styles.parcelaRow}>
-          <span className={styles.freeLineHead}>#</span>
-          <span className={styles.freeLineHead}>Vencimento</span>
-          <span className={`${styles.freeLineHead} ${styles.parcelaValorHead}`}>Valor</span>
-          <span className={styles.freeLineHead}>%</span>
+        <div className={`${styles.parcelaRow} ${styles.parcelaHead}`}>
+          <span>#</span>
+          <span>Vencimento</span>
+          <span className={styles.alinhaDireita}>%</span>
+          <span className={styles.alinhaDireita}>Valor</span>
           <span />
         </div>
 
         {parcelas.map((p, i) => (
-          <div className={styles.parcelaRow} key={`${i}-${p.vencimento}`}>
-            <span className={styles.parcelaNum}>
-              {i + 1}/{parcelas.length}
-            </span>
+          <div className={styles.parcelaRow} key={i}>
+            <span className={styles.parcelaNum}>{i + 1}</span>
             <input
               type="date"
               value={p.vencimento}
               disabled={disabled || p.pago}
-              onChange={(e) => alterar(i, "vencimento", e.target.value)}
+              onChange={(e) => alterarData(i, e.target.value)}
             />
             <input
-              className={styles.money}
-              value={money(p.valor)}
+                className={styles.pctInput}
+                value={textoPct(p, i)}
+                inputMode="decimal"
+                placeholder="0"
+                disabled={disabled || p.pago || total <= 0}
+                onChange={(e) => alterarPct(i, e.target.value)}
+                onFocus={(e) => e.currentTarget.select()}
+                onBlur={() => setEdicao(null)}
+                aria-label={`Percentual da parcela ${i + 1}`}
+              />
+            <input
+              className={`${styles.money} ${styles.valorInput}`}
+              value={textoValor(p, i)}
               inputMode="decimal"
               disabled={disabled || p.pago}
-              onChange={(e) => alterar(i, "valor", e.target.value)}
+              onChange={(e) => alterarValor(i, e.target.value)}
+              onFocus={(e) => e.currentTarget.select()}
+              onBlur={() => setEdicao(null)}
+              aria-label={`Valor da parcela ${i + 1}`}
             />
-            <span className={styles.parcelaPct}>
-              {total > 0 ? `${percentualDaParcela(p.valor, total)}%` : "—"}
-            </span>
             {p.pago ? (
-              <span className={`${styles.pill} ${styles.pillGood}`}>
+              <span className={`${styles.pill} ${styles.pillGood}`} title="parcela já paga">
                 <i />
                 pago
               </span>
@@ -252,20 +259,47 @@ export default function ParcelasEditor({
         >
           + parcela
         </button>
-        <div className={styles.sumRow} style={{ border: 0, margin: 0, padding: 0, flex: 1 }}>
-          <span className={styles.note} style={{ margin: 0 }}>
-            {rodape ?? "Soma das parcelas"}
-          </span>
-          <b className={Math.abs(divergencia) > 0.5 ? styles.neg : undefined}>{brl(soma)}</b>
+
+        <div className={styles.fechamento}>
+          <span className={styles.cardNote}>{rodape ?? "Soma das parcelas"}</span>
+          <b className={fecha ? undefined : styles.neg}>{brl(soma)}</b>
+          {total > 0 &&
+            (fecha ? (
+              <span className={`${styles.pill} ${styles.pillGood}`}>
+                <i />
+                fecha com a compra
+              </span>
+            ) : (
+              <button
+                type="button"
+                className={`${styles.btn} ${styles.btnSm}`}
+                onClick={fecharNaUltima}
+                disabled={disabled || indiceBalanceadora < 0}
+              >
+                {diferenca < 0 ? "Faltam" : "Sobram"} {brl(Math.abs(diferenca))} — ajustar
+              </button>
+            ))}
         </div>
       </div>
 
-      {Math.abs(divergencia) > 0.5 && (
+      {somaPagas > 0 && (
         <p className={styles.note}>
-          {divergencia > 0 ? "Sobra" : "Falta"} {brl(Math.abs(divergencia))} em relação ao valor da
-          compra ({brl(total)}). O gasto do mês segue as parcelas — ajuste se não for intencional.
+          {brl(somaPagas)} já pago fica travado: dividir de novo só redistribui os{" "}
+          {brl(cents(total - somaPagas))} restantes.
         </p>
       )}
     </div>
   );
+}
+
+/** Mesma data no mês seguinte, caindo no último dia quando o mês é mais curto. */
+function proximoMes(iso: string): string {
+  if (!iso) return iso;
+  const ano = parseInt(iso.slice(0, 4), 10);
+  const mes = parseInt(iso.slice(5, 7), 10);
+  const dia = parseInt(iso.slice(8, 10), 10);
+  const alvoAno = mes === 12 ? ano + 1 : ano;
+  const alvoMes = mes === 12 ? 1 : mes + 1;
+  const ultimoDia = new Date(Date.UTC(alvoAno, alvoMes, 0)).getUTCDate();
+  return `${alvoAno}-${String(alvoMes).padStart(2, "0")}-${String(Math.min(dia, ultimoDia)).padStart(2, "0")}`;
 }

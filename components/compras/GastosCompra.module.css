@@ -71,11 +71,12 @@
   min-width: 240px;
 }
 
-.subtitle {
-  font-size: 13.5px;
-  color: var(--t-500);
+.titulo {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--t-900);
   margin: 0;
-  max-width: 70ch;
 }
 
 .headTools {
@@ -389,6 +390,9 @@
   width: 100%;
   border-collapse: collapse;
   min-width: 720px;
+  /* Cor herdada: modificador aplicado na própria célula (.muted/.pos/.neg)
+     vence herança, mas perderia para `.table tbody td { color }`. */
+  color: var(--t-800);
 }
 
 .table thead th {
@@ -409,7 +413,6 @@
 .table tfoot td {
   padding: 9px 14px;
   border-bottom: 1px solid var(--b-200);
-  color: var(--t-800);
   vertical-align: middle;
 }
 
@@ -425,7 +428,12 @@
   font-size: 12.5px;
 }
 
-.thNum {
+/*
+ * Precisa do `.table thead th` na frente: sozinho, `.thNum` (0-1-0) perde para
+ * `.table thead th` (0-1-2) e o título da coluna fica à esquerda enquanto o
+ * número no corpo vai à direita — a tabela inteira parece desalinhada.
+ */
+.table thead th.thNum {
   text-align: right;
 }
 
@@ -522,8 +530,8 @@
 
 /* ---------- linha de lotes dentro do mês ---------- */
 
-.detailCell {
-  padding: 0 !important;
+.table tbody td.detailCell {
+  padding: 0;
   background: var(--s-50);
 }
 
@@ -1136,6 +1144,10 @@
   color: var(--t-500);
 }
 
+.table tbody td.feedback {
+  padding: 18px 14px;
+}
+
 .error {
   padding: 12px 14px;
   border-radius: 10px;
@@ -1179,55 +1191,139 @@
 
 /* ---------- editor de parcelas ---------- */
 
-.splitTools {
+.parcelas {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 12px;
+}
+
+/* Barra de atalhos: dividir é um clique, não um formulário. */
+.splitBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 12px;
   border: 1px solid var(--b-200);
   border-radius: 11px;
   background: var(--s-50);
   margin-bottom: 12px;
 }
 
-.seg {
-  display: inline-flex;
-  align-self: flex-start;
-  background: var(--s-white);
-  border: 1px solid var(--b-200);
-  border-radius: 9px;
-  padding: 2px;
+.splitLabel {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--t-500);
 }
 
-.seg button {
+.atalhos {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.atalho {
   font: inherit;
+  font-family: var(--gc-mono);
   font-size: 12.5px;
   font-weight: 500;
-  color: var(--t-500);
-  background: none;
-  border: 0;
-  padding: 6px 12px;
-  border-radius: 7px;
+  min-width: 38px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--b-300);
+  background: var(--s-white);
+  color: var(--t-700);
   cursor: pointer;
-  white-space: nowrap;
 }
 
-.seg button:disabled {
+.atalho:hover:not(:disabled) {
+  border-color: var(--gc-ring);
+  color: var(--gc-pago);
+}
+
+.atalho:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
 
-.segActive {
-  background: var(--gc-wash) !important;
-  color: var(--gc-pago) !important;
+.atalhoAtivo {
+  background: var(--gc-wash);
+  border-color: var(--gc-ring);
+  color: var(--gc-pago);
   box-shadow: 0 0 0 1px var(--gc-ring) inset;
+}
+
+.splitCampo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--t-500);
+}
+
+.splitCampo input,
+.splitCampo select {
+  font: inherit;
+  font-size: 12.5px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--b-300);
+  background: var(--s-white);
+  color: var(--t-900);
 }
 
 .parcelaRow {
   display: grid;
-  grid-template-columns: 52px minmax(120px, 1fr) 110px 54px 62px;
+  grid-template-columns: 26px minmax(130px, 1fr) 86px 128px 64px;
   gap: 8px;
   align-items: center;
+}
+
+.parcelaHead {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--t-400);
+  padding-bottom: 2px;
+}
+
+.alinhaDireita {
+  text-align: right;
+}
+
+
+/* % e R$ na mesma linha, um espelhando o outro. */
+.parcelaRow input.pctInput {
+  font-family: var(--gc-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--b-300);
+  background: var(--s-white);
+  color: var(--t-900);
+}
+
+
+.valorInput {
+  text-align: right;
+}
+
+.fechamento {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px 10px;
+  flex: 1;
+}
+
+.fechamento b {
+  font-family: var(--gc-mono);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  color: var(--t-900);
 }
 
 .parcelaRow input {
@@ -1247,21 +1343,11 @@
   cursor: not-allowed;
 }
 
-.parcelaValorHead {
-  text-align: right;
-}
 
 .parcelaRow .money {
   text-align: right;
 }
 
-.parcelaPct {
-  font-family: var(--gc-mono);
-  font-size: 11.5px;
-  color: var(--t-500);
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
 
 .parcelaFoot {
   display: flex;
@@ -1272,23 +1358,8 @@
   border-top: 1px dashed var(--b-300);
 }
 
-/* ---------- reconhecimento de compras salvas ---------- */
 
-.reconhecerHead {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 14px 16px 10px;
-}
 
-.reconhecerList {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 0 16px 16px;
-}
 
 .candidata {
   display: grid;
@@ -1319,21 +1390,6 @@
   color: var(--t-400);
 }
 
-.tabBadge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  margin-left: 6px;
-  border-radius: 20px;
-  background: var(--gc-pago);
-  color: var(--s-white);
-  font-size: 10.5px;
-  font-weight: 700;
-  font-family: var(--gc-mono);
-}
 
 @media (max-width: 720px) {
   .parcelaRow,
@@ -1343,27 +1399,8 @@
   }
 }
 
-/* ---------- orçamento em série / horizonte ---------- */
 
-.serieBar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 10px 12px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--b-200);
-  background: var(--s-50);
-}
-
-.serieBar .field {
-  min-width: 120px;
-}
-
-.serieBar .cardNote {
-  flex: 1 1 240px;
-  min-width: 220px;
-  line-height: 1.45;
-}
+/* ---------- horizonte de meses ---------- */
 
 .horizonteBar {
   display: flex;
@@ -1377,4 +1414,102 @@
 .horizonteBar .cardNote {
   flex: 1 1 260px;
   line-height: 1.45;
+}
+
+/* ---------- recorte "mês atual em diante" ---------- */
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--t-600);
+  background: var(--s-white);
+  border: 1px solid var(--b-300);
+  border-radius: 9px;
+  padding: 7px 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.toggle:hover {
+  background: var(--s-100);
+}
+
+.toggle input {
+  margin: 0;
+  cursor: pointer;
+}
+
+
+
+
+.splitDica {
+  font-size: 11.5px;
+  color: var(--t-400);
+  flex: 1 1 220px;
+  min-width: 180px;
+  line-height: 1.4;
+}
+
+/* ---------- prévia dos itens reconhecidos da Compra Salva ---------- */
+
+.previa {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid var(--gc-ring);
+  border-radius: 11px;
+  background: var(--gc-wash);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.previaHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--t-700);
+}
+
+.previaHead b {
+  font-family: var(--gc-mono);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  color: var(--gc-pago);
+}
+
+.previaItens {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.previaItem {
+  display: grid;
+  grid-template-columns: 1fr 72px 96px;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 12px;
+  color: var(--t-600);
+}
+
+.previaDesc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.previaQtd,
+.previaValor {
+  font-family: var(--gc-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.previaValor {
+  color: var(--t-800);
 }
