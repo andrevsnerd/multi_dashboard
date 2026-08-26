@@ -12,6 +12,8 @@ import { exportRelatorioXlsx } from "@/lib/utils/exportRelatorioXlsx";
 import { exportCompraSugeridaAbcXlsx, buildCompraSugeridaFileHint } from "@/lib/utils/exportCompraSugeridaAbcXlsx";
 import { exportClientesFilialXlsx } from "@/lib/utils/exportClientesFilialXlsx";
 import { exportEstoqueRedeXlsx } from "@/lib/utils/exportEstoqueRedeXlsx";
+import { exportRelatorioAbasXlsx } from "@/lib/utils/exportRelatorioAbasXlsx";
+import { ABA_DIMENSOES, getAbaDimensao, type AbaDimensaoId } from "@/lib/reports/abas";
 import { ESTOQUE_REDE_ID } from "@/lib/reports/estoque-rede";
 import {
   COMPRA_FILIAL_COL_PREFIX,
@@ -178,6 +180,9 @@ export default function GeradorRelatoriosPage({
   // Lente de transferência da Compra sugerida por Curva ABC (opt-in, sempre inicia desligada):
   // adiciona as colunas "Transferência" e "Compra líquida" ao preset.
   const [considerarTransferencias, setConsiderarTransferencias] = useState(false);
+  // Preset "Faturamento em abas": dimensão que quebra o XLSX em abas ("" = automático,
+  // escolhe o filtro com mais valores marcados).
+  const [abaDimensao, setAbaDimensao] = useState<"" | AbaDimensaoId>("");
   // Filtro por grupo de fornecedor (só NERD).
   const [fornecedor, setFornecedor] = useState<string>("");
   const [fornecedoresOpts, setFornecedoresOpts] = useState<Array<{ id: string; nome: string }>>([]);
@@ -257,6 +262,41 @@ export default function GeradorRelatoriosPage({
     () => !!allPresets.builtin.find((p) => p.id === activePresetId)?.incluirRupturas,
     [allPresets, activePresetId]
   );
+
+  // Preset ativo pede o XLSX quebrado em abas por filtro?
+  const wantsAbasPorFiltro = useMemo(
+    () => !!allPresets.builtin.find((p) => p.id === activePresetId)?.abasPorFiltro,
+    [allPresets, activePresetId]
+  );
+
+  // Quantos valores estão marcados em cada filtro que pode virar aba.
+  const abaSelecionados = useMemo<Record<AbaDimensaoId, string[]>>(
+    () => ({ grupo: grupos, subgrupo: subgrupos, linha: linhas, grade: grades, colecao: colecoes, cor: cores, tipo: tipos }),
+    [grupos, subgrupos, linhas, grades, colecoes, cores, tipos]
+  );
+
+  // Dimensões oferecidas: só as que a análise suporta como filtro.
+  const abaDimensoesDisponiveis = useMemo(
+    () => ABA_DIMENSOES.filter((d) => meta?.supportedFilters.includes(d.filterKey) ?? false),
+    [meta]
+  );
+
+  // Dimensão efetiva das abas: a escolhida ou, no automático, o filtro com mais valores
+  // marcados (empate → ordem de ABA_DIMENSOES). Sem nenhum filtro marcado, fica nula e o
+  // export avisa (o usuário pode escolher a dimensão na mão para quebrar por tudo).
+  const abaDimensaoEfetiva = useMemo(() => {
+    if (abaDimensao) return getAbaDimensao(abaDimensao) ?? null;
+    let best: (typeof abaDimensoesDisponiveis)[number] | null = null;
+    let bestCount = 0;
+    for (const d of abaDimensoesDisponiveis) {
+      const count = abaSelecionados[d.id]?.length ?? 0;
+      if (count > bestCount) {
+        best = d;
+        bestCount = count;
+      }
+    }
+    return best;
+  }, [abaDimensao, abaDimensoesDisponiveis, abaSelecionados]);
 
   // Aplica um preset (builtin ou backend) à estrutura de colunas.
   const applyPreset = useCallback(
@@ -883,6 +923,42 @@ export default function GeradorRelatoriosPage({
       );
       return;
     }
+    // Preset "Faturamento em abas": um XLSX com uma aba por valor do filtro escolhido
+    // (+ aba "Resumo"). Mesmas linhas da tela — o agrupamento é só na hora de escrever.
+    if (wantsAbasPorFiltro) {
+      if (!abaDimensaoEfetiva) {
+        alert(
+          "Escolha em \"Quebrar abas por\" a dimensão das abas, ou marque valores em um filtro (ex.: 5 subgrupos)."
+        );
+        return;
+      }
+      const dim = abaDimensaoEfetiva;
+      void exportRelatorioAbasXlsx(
+        sortedRows,
+        enabledColumns.map((c) => ({ key: c.key, label: c.label })),
+        {
+          reportLabel: meta?.label ?? "relatorio",
+          companyKey,
+          range: { startDate: range.startDate, endDate: range.endDate },
+          filialLabel,
+          columnTypes,
+          dimensao: {
+            id: dim.id,
+            label: dim.label,
+            rowField: dim.rowField,
+            hideColumns: dim.hideColumns,
+          },
+          // Coleção: a linha guarda o código; o rótulo bonito ("descrição (código)") vem
+          // das opções do filtro.
+          labelOf:
+            dim.id === "colecao"
+              ? (value: string) =>
+                  optColecoes.find((o) => o.value === value)?.label ?? value
+              : undefined,
+        }
+      );
+      return;
+    }
     void exportRelatorioXlsx(
       sortedRows,
       enabledColumns.map((c) => ({ key: c.key, label: c.label })),
@@ -1123,6 +1199,36 @@ export default function GeradorRelatoriosPage({
               </div>
             </div>
           )}
+          {wantsAbasPorFiltro && abaDimensoesDisponiveis.length > 0 && (
+            <div className={styles.searchField}>
+              <label className={styles.fieldLabel}>Quebrar abas por</label>
+              <select
+                className={styles.select}
+                value={abaDimensao}
+                onChange={(e) => setAbaDimensao(e.target.value as "" | AbaDimensaoId)}
+              >
+                <option value="">
+                  {abaDimensaoEfetiva
+                    ? `Automático (${abaDimensaoEfetiva.label})`
+                    : "Automático (marque um filtro)"}
+                </option>
+                {abaDimensoesDisponiveis.map((d) => {
+                  const n = abaSelecionados[d.id]?.length ?? 0;
+                  return (
+                    <option key={d.id} value={d.id}>
+                      {n > 0 ? `${d.label} (${n} selecionado${n > 1 ? "s" : ""})` : d.label}
+                    </option>
+                  );
+                })}
+              </select>
+              <p className={styles.hint}>
+                O XLSX sai com uma aba por valor desta dimensão (só os itens e os totais
+                daquela aba) + uma aba &quot;Resumo&quot; comparando todas. Sem valores
+                marcados no filtro, gera uma aba por valor encontrado (máx. 40, o resto vai
+                para &quot;Outros&quot;).
+              </p>
+            </div>
+          )}
           {reportTypeId === COMPRA_SUGERIDA_ABC_ID && (
             <div className={styles.searchField}>
               <label className={styles.fieldLabel}>Transferências (opcional)</label>
@@ -1257,7 +1363,7 @@ export default function GeradorRelatoriosPage({
           onClick={handleExport}
           disabled={rows.length === 0}
         >
-          Exportar XLSX
+          {wantsAbasPorFiltro ? "Exportar XLSX (abas)" : "Exportar XLSX"}
         </button>
         {generatedOnce && !loading && (
           <span className={styles.resultMeta}>

@@ -160,6 +160,9 @@ export default function GeradorApresentacoesPage({
   // O deck não é de uma coleção específica, então a capa PADRÃO é uma foto
   // sorteada entre as capas de coleção já enviadas. O usuário pode escolher outra
   // na lista, sortear de novo ou subir a própria imagem (essa fica só em memória).
+  // Recorte opcional do Top Produtos pelas CATEGORIAS do deck (subgrupos na ScarfMe,
+  // grupos no NERD): vazio = deck completo; com valores, só essas páginas.
+  const [topCategorias, setTopCategorias] = useState<string[]>([]);
   const [topCoverRefs, setTopCoverRefs] = useState<string[]>([]);
   const [topCoverRef, setTopCoverRef] = useState<string | null>(null);
   const [topCoverDataUrl, setTopCoverDataUrl] = useState<string | null>(null);
@@ -428,12 +431,15 @@ export default function GeradorApresentacoesPage({
     }
   };
 
+  /** Opções do recorte do Top Produtos: grupos no NERD, subgrupos nas demais. */
+  const topCategoriaOptions = companyKey === "nerd" ? optGrupos : optSubgrupos;
+
   /** Capa que vai pro deck: upload do usuário vence a capa sorteada/escolhida. */
   const topCoverEffective = topCoverUpload ?? topCoverDataUrl;
 
   // ---- opções dos filtros do Giro (mesmo escopo da página Produto Giro) ----
   useEffect(() => {
-    if (!isGiro) return;
+    if (!isGiro && !isTopProdutos) return;
     let cancelled = false;
     const params = new URLSearchParams({ company: companyKey, start: startStr, end: endStr });
     if (filial) params.set("filial", filial);
@@ -452,6 +458,14 @@ export default function GeradorApresentacoesPage({
     setOptSubgrupos([]);
     setOptGiroGrades([]);
     setOptGiroColecoes([]);
+    // Top Produtos só precisa da dimensão que quebra as páginas (subgrupo · grupo).
+    if (isTopProdutos) {
+      if (companyKey === "nerd") void load("grupos", setOptGrupos);
+      else void load("subgrupos", setOptSubgrupos);
+      return () => {
+        cancelled = true;
+      };
+    }
     void load("subgrupos", setOptSubgrupos);
     if (companyKey === "nerd") {
       void load("grupos", setOptGrupos);
@@ -462,7 +476,7 @@ export default function GeradorApresentacoesPage({
     return () => {
       cancelled = true;
     };
-  }, [isGiro, companyKey, filial, startStr, endStr]);
+  }, [isGiro, isTopProdutos, companyKey, filial, startStr, endStr]);
 
   // ---- busca de produtos (picker) — debounce + /api/products/search ----
   useEffect(() => {
@@ -656,6 +670,7 @@ export default function GeradorApresentacoesPage({
             company: companyKey,
             filial,
             range: { start: startStr, end: endStr },
+            categorias: topCategorias,
           }),
         });
         const json = (await res.json()) as { data?: TopProdutosPayload; error?: string };
@@ -849,6 +864,7 @@ export default function GeradorApresentacoesPage({
   }, [
     isGiro,
     isTopProdutos,
+    topCategorias,
     colecoes,
     companyKey,
     filial,
@@ -1104,6 +1120,21 @@ export default function GeradorApresentacoesPage({
           )}
           {isGiro && companyKey !== "nerd" && optGiroColecoes.length > 0 && (
             <MultiSelectFilter label="Coleção" value={giroColecoes} options={optGiroColecoes} onChange={setGiroColecoes} />
+          )}
+          {isTopProdutos && topCategoriaOptions.length > 0 && (
+            <div className={styles.field}>
+              <MultiSelectFilter
+                label={`${topDimSingular.charAt(0).toUpperCase()}${topDimSingular.slice(1)} (opcional)`}
+                value={topCategorias}
+                options={topCategoriaOptions}
+                onChange={setTopCategorias}
+              />
+              <p className={styles.hint}>
+                {topCategorias.length > 0
+                  ? `Recorte ativo: o deck sai só com as páginas destes ${topCategorias.length > 1 ? topDimPlural : topDimSingular} (${topCategorias.length}). Capa, top da rede, sumário e percentuais passam a considerar só o selecionado.`
+                  : `Vazio = deck completo (todos os ${topDimPlural}). Selecionando, o deck mantém tudo igual — uma página por ${topDimSingular} — mas só dos escolhidos.`}
+              </p>
+            </div>
           )}
           {isGiro && companyKey !== "nerd" && optGiroGrades.length > 0 && (
             <MultiSelectFilter label="Grade" value={giroGrades} options={optGiroGrades} onChange={setGiroGrades} />

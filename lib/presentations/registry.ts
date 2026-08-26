@@ -97,9 +97,12 @@ export const PRESENTATION_TYPES: PresentationTypeMeta[] = [
       "Deck no padrão “Campeões de venda”: capa, os 10 maiores produtos do período, " +
       "sumário de subgrupos e uma página com o top 10 de cada subgrupo (mais o " +
       "complemento dos subgrupos menores). Ranking por item = produto × cor, " +
-      "critério único de faturamento. Filtra por período e filial. Exporta em PDF " +
-      "A4 paisagem (1280×905 por slide, igual ao modelo).",
-    supportedFilters: ["periodo", "filial"],
+      "critério único de faturamento. Filtra por período, filial e (opcional) pelos " +
+      "próprios subgrupos — recortando, o deck sai só com as páginas dos selecionados. " +
+      "Exporta em PDF A4 paisagem (1280×905 por slide, igual ao modelo).",
+    // "subgrupo"/"grupo" = recorte pela DIMENSÃO das páginas; a página mostra só a que
+    // vale para a empresa (ScarfMe quebra por subgrupo, NERD por grupo).
+    supportedFilters: ["periodo", "filial", "subgrupo", "grupo"],
     requiresCover: true,
     singleCollection: false,
     companies: ["scarfme", "nerd"],
@@ -109,7 +112,8 @@ export const PRESENTATION_TYPES: PresentationTypeMeta[] = [
         "sumário de grupos e uma página com o top 10 de cada grupo (mais o " +
         "complemento dos grupos menores). Ranking por item = produto × cor, " +
         "critério único de faturamento. A imagem da capa é enviada por você. " +
-        "Filtra por período e filial. Exporta em PDF A4 paisagem.",
+        "Filtra por período, filial e (opcional) pelos próprios grupos — recortando, o " +
+        "deck sai só com as páginas dos selecionados. Exporta em PDF A4 paisagem.",
     },
   },
 ];

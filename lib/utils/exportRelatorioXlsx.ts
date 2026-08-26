@@ -5,25 +5,73 @@ import { ROW_COLECAO_COD_FIELD, ROW_COLECAO_DESC_FIELD } from "@/lib/reports/key
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ExcelJSCell = any;
 
-interface OutCol {
+export interface OutCol {
   key: string;
   label: string;
   type: ColumnType | undefined;
   get: (row: ReportRow) => ReportCellValue;
 }
 
-function safeFilenamePart(s: string): string {
+export function safeFilenamePart(s: string): string {
   return s.replace(/[^a-zA-Z0-9_-]+/g, "_").slice(0, 48);
 }
 
-function formatDateRange(start: Date, end: Date): string {
+export function formatDateRange(start: Date, end: Date): string {
   const fmt = (d: Date) =>
     d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" }).replace(/\//g, "-");
   return `${fmt(start)}_${fmt(end)}`;
 }
 
+/**
+ * Monta as colunas de saída na ordem do preset: aplica os formatadores de data/dias
+ * parado e desdobra "Coleção" em descrição + código. Compartilhado com o export em abas.
+ */
+export function buildOutCols(
+  columns: ReportPresetColumn[],
+  columnTypes?: Record<string, ColumnType>
+): OutCol[] {
+  const types = columnTypes ?? {};
+  const outCols: OutCol[] = [];
+  for (const colDef of columns) {
+    const label = colDef.label || colDef.key;
+    const t = types[colDef.key];
+
+    if (colDef.key === "COLECAO") {
+      outCols.push({
+        key: colDef.key,
+        label,
+        type: undefined,
+        get: (row) => {
+          const desc = row[ROW_COLECAO_DESC_FIELD];
+          if (desc != null && String(desc).trim() !== "") return desc as ReportCellValue;
+          return (row[ROW_COLECAO_COD_FIELD] ?? row.COLECAO ?? "") as ReportCellValue;
+        },
+      });
+      outCols.push({
+        key: "COLECAO_COD",
+        label: "Cód. coleção",
+        type: undefined,
+        get: (row) => (row[ROW_COLECAO_COD_FIELD] ?? "") as ReportCellValue,
+      });
+      continue;
+    }
+
+    const get =
+      t === "diasParado"
+        ? (row: ReportRow) => formatDiasParado(row[colDef.key])
+        : t === "dataVenda"
+          ? (row: ReportRow) => formatDataVenda(row[colDef.key])
+          : t === "date"
+            ? (row: ReportRow) => formatData(row[colDef.key])
+            : (row: ReportRow) => row[colDef.key] ?? "";
+
+    outCols.push({ key: colDef.key, label, type: t, get });
+  }
+  return outCols;
+}
+
 /** Letra(s) da coluna do Excel a partir do número (1 -> A, 27 -> AA). */
-function colLetter(n: number): string {
+export function colLetter(n: number): string {
   let s = "";
   let x = n;
   while (x > 0) {
@@ -34,7 +82,7 @@ function colLetter(n: number): string {
   return s;
 }
 
-function numFmtFor(type: ColumnType | undefined): string | null {
+export function numFmtFor(type: ColumnType | undefined): string | null {
   if (type === "currency") return "R$ #,##0.00";
   if (type === "int") return "#,##0";
   if (type === "number") return "#,##0.00";
@@ -42,7 +90,7 @@ function numFmtFor(type: ColumnType | undefined): string | null {
   return null;
 }
 
-function widthFor(key: string, label: string, type: ColumnType | undefined): number {
+export function widthFor(key: string, label: string, type: ColumnType | undefined): number {
   const fixed: Record<string, number> = {
     CURVA: 9,
     PRODUTO: 14,
@@ -65,11 +113,11 @@ function widthFor(key: string, label: string, type: ColumnType | undefined): num
   return Math.min(28, Math.max(11, label.length + 2));
 }
 
-function isNumericType(type: ColumnType | undefined): boolean {
+export function isNumericType(type: ColumnType | undefined): boolean {
   return type === "currency" || type === "int" || type === "number" || type === "percent";
 }
 
-function isSummableColumn(key: string, type: ColumnType | undefined): boolean {
+export function isSummableColumn(key: string, type: ColumnType | undefined): boolean {
   if (!isNumericType(type)) return false;
   const nonSummable = new Set([
     "TICKET_MEDIO",
@@ -126,44 +174,7 @@ export async function exportRelatorioXlsx(
     return;
   }
 
-  const types = options.columnTypes ?? {};
-
-  const outCols: OutCol[] = [];
-  for (const colDef of columns) {
-    const label = colDef.label || colDef.key;
-    const t = types[colDef.key];
-
-    if (colDef.key === "COLECAO") {
-      outCols.push({
-        key: colDef.key,
-        label,
-        type: undefined,
-        get: (row) => {
-          const desc = row[ROW_COLECAO_DESC_FIELD];
-          if (desc != null && String(desc).trim() !== "") return desc as ReportCellValue;
-          return (row[ROW_COLECAO_COD_FIELD] ?? row.COLECAO ?? "") as ReportCellValue;
-        },
-      });
-      outCols.push({
-        key: "COLECAO_COD",
-        label: "Cód. coleção",
-        type: undefined,
-        get: (row) => (row[ROW_COLECAO_COD_FIELD] ?? "") as ReportCellValue,
-      });
-      continue;
-    }
-
-    const get =
-      t === "diasParado"
-        ? (row: ReportRow) => formatDiasParado(row[colDef.key])
-        : t === "dataVenda"
-          ? (row: ReportRow) => formatDataVenda(row[colDef.key])
-          : t === "date"
-            ? (row: ReportRow) => formatData(row[colDef.key])
-            : (row: ReportRow) => row[colDef.key] ?? "";
-
-    outCols.push({ key: colDef.key, label, type: t, get });
-  }
+  const outCols = buildOutCols(columns, options.columnTypes);
 
   const excelJsMod = await import("exceljs");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -298,6 +309,19 @@ export async function exportRelatorioXlsx(
     });
   }
 
+  const filialPart = options.filialLabel ? `-${safeFilenamePart(options.filialLabel)}` : "";
+  await downloadXlsxWorkbook(
+    workbook,
+    `${safeFilenamePart(options.reportLabel)}-${options.companyKey}${filialPart}-${formatDateRange(
+      options.range.startDate,
+      options.range.endDate
+    )}.xlsx`
+  );
+}
+
+/** Serializa o workbook e dispara o download no navegador. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function downloadXlsxWorkbook(workbook: any, filename: string): Promise<void> {
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer as ArrayBuffer], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -305,13 +329,7 @@ export async function exportRelatorioXlsx(
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-
-  const filialPart = options.filialLabel ? `-${safeFilenamePart(options.filialLabel)}` : "";
-  a.download = `${safeFilenamePart(options.reportLabel)}-${options.companyKey}${filialPart}-${formatDateRange(
-    options.range.startDate,
-    options.range.endDate
-  )}.xlsx`;
-
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

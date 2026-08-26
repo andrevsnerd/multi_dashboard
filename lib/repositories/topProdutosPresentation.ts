@@ -51,6 +51,13 @@ export interface TopProdutosParams {
   company?: string;
   filial?: string | null;
   range?: { start?: string; end?: string };
+  /**
+   * Recorte opcional pelas CATEGORIAS do deck (subgrupos na ScarfMe, grupos no NERD).
+   * Vazio/ausente = deck completo. Com valores, o deck sai SÓ com essas categorias:
+   * some todo o resto (totais, top da rede, sumário e páginas passam a considerar
+   * apenas o selecionado) e cada categoria escolhida ganha sua página, como sempre.
+   */
+  categorias?: string[] | null;
 }
 
 /** Dimensão que quebra o deck em páginas. */
@@ -150,6 +157,17 @@ export interface TopProdutosMenorGrupo {
   items: Array<{ descricao: string; cor: string; faturamento: number; qtde: number }>;
 }
 
+/** Recorte por categoria aplicado ao deck (vazio = deck completo). */
+export interface TopProdutosSelecao {
+  ativo: boolean;
+  /** Categorias selecionadas, como vieram do filtro. */
+  categorias: string[];
+  /** "5 subgrupos selecionados" — usado nos rótulos do deck. */
+  label: string;
+  /** "SEDA, PASHMINA, VISCOSE e mais 2" — lista curta para o rodapé da capa. */
+  listLabel: string;
+}
+
 export interface TopProdutosPayload {
   /** Rótulos da dimensão das páginas (subgrupo na ScarfMe, grupo no NERD). */
   dimensao: TopProdutosDimensao;
@@ -210,6 +228,8 @@ export interface TopProdutosPayload {
   };
   /** Total de páginas do deck (capa incluída) — usado no "04 / 28". */
   totalPages: number;
+  /** Recorte por categoria (subgrupo/grupo). Ausente/inativo = deck completo. */
+  selecao?: TopProdutosSelecao;
 }
 
 const MESES = [
@@ -357,6 +377,35 @@ function chunk<T>(items: T[], size: number): T[][] {
   return out;
 }
 
+/**
+ * Chave de comparação de categoria: sem acento de espaço duplo, sem caixa. O nome do
+ * subgrupo/grupo vem da MESMA coluna nas duas pontas (opções do filtro e linhas de venda),
+ * mas há cadastro com espaço duplo no meio ([[desc-produto-espaco-duplo-busca]]) — colapsar
+ * o espaço evita um recorte que volta vazio por causa disso.
+ */
+function categoriaKey(value: string | null | undefined): string {
+  return String(value ?? "").trim().replace(/\s+/g, " ").toUpperCase();
+}
+
+/** Rótulos do recorte por categoria (vazio = deck completo). */
+function buildSelecao(
+  categorias: string[],
+  dimensao: TopProdutosDimensao
+): TopProdutosSelecao {
+  if (categorias.length === 0) {
+    return { ativo: false, categorias: [], label: "", listLabel: "" };
+  }
+  const nome = categorias.length === 1 ? dimensao.singular : dimensao.plural;
+  const primeiros = categorias.slice(0, 4);
+  const resto = categorias.length - primeiros.length;
+  return {
+    ativo: true,
+    categorias,
+    label: `${categorias.length} ${nome} selecionado${categorias.length > 1 ? "s" : ""}`,
+    listLabel: resto > 0 ? `${primeiros.join(", ")} e mais ${resto}` : primeiros.join(", "),
+  };
+}
+
 /** Rótulos de escopo (capa, subtítulos e rodapé) a partir do filtro de filial. */
 async function resolveScope(company: string | undefined, filial: string | null | undefined) {
   if (!filial) {
@@ -392,20 +441,42 @@ export async function fetchTopProdutosPresentation({
   company,
   filial,
   range,
+  categorias,
 }: TopProdutosParams): Promise<TopProdutosPayload> {
   const startIso = range?.start ?? "";
   const endIso = range?.end ?? "";
   const dimensao = resolveDimensao(company);
 
-  const [details, scope] = await Promise.all([
+  // Recorte por categoria: a lista escolhida no filtro (subgrupos na ScarfMe, grupos no
+  // NERD). Vai para o SQL (menos linhas) E é reaplicada nas linhas — a checagem em JS
+  // garante o recorte mesmo onde o filtro de SQL não vale para a empresa e cobre a
+  // categoria sintética "SEM SUBGRUPO"/"SEM GRUPO".
+  const categoriasSel = Array.from(
+    new Set((categorias ?? []).map((c) => String(c ?? "").trim()).filter(Boolean))
+  );
+  const selecao = buildSelecao(categoriasSel, dimensao);
+  const categoriasKeys = new Set(categoriasSel.map(categoriaKey));
+
+  const [details, scopeBase] = await Promise.all([
     fetchProductsWithDetails({
       company,
       filial: filial ?? null,
       range: { start: startIso, end: endIso },
       groupByColor: true,
+      ...(selecao.ativo
+        ? dimensao.key === "grupo"
+          ? { grupos: categoriasSel }
+          : { subgrupos: categoriasSel }
+        : {}),
     }),
     resolveScope(company, filial),
   ]);
+
+  // Com recorte ativo os totais são do SELECIONADO, então o chip de participação deixa
+  // de ser "% da rede" (senão o número parece errado ao lado do total do Dashboard).
+  const scope = selecao.ativo
+    ? { ...scopeBase, pctLabel: `% do recorte` }
+    : scopeBase;
 
   // Coleção sempre da tabela MESTRE COLECOES (o item pode nem ter descrição na venda).
   const produtoIds = details.map((d) => String(d.productId ?? "").trim()).filter(Boolean);
@@ -442,6 +513,7 @@ export async function fetchTopProdutosPresentation({
     // +R$ 1.973,80 em agosto/2026); tirar as zeradas mudava a contagem de itens.
     // Os RANKINGS usam `positivos` (abaixo); os TOTAIS usam `raw` inteiro.
     .filter((r) => r.produto)
+    .filter((r) => !selecao.ativo || categoriasKeys.has(categoriaKey(r.categoria)))
     .sort((a, b) => b.faturamento - a.faturamento);
 
   const totalFaturamento = raw.reduce((s, r) => s + r.faturamento, 0);
@@ -475,9 +547,12 @@ export async function fetchTopProdutosPresentation({
   // Categoria ganha página quando tem itens suficientes OU peso relevante na rede
   // (é o que faz um subgrupo de 1 item campeão, tipo MODAL COM SEDA, ter página).
   // Sem nenhum item positivo não há ranking para mostrar → vai pro complemento.
+  // Com RECORTE ativo o corte de tamanho não se aplica: o dono escolheu essas categorias
+  // a dedo, então cada uma ganha sua página (só continua exigindo pelo menos um item
+  // positivo — sem isso não há ranking para mostrar).
   const temPagina = (g: (typeof grupos)[number]) =>
     g.items.some((r) => r.faturamento > 0) &&
-    (g.items.length >= MIN_ITENS_PAGINA || g.percRede >= MIN_PERC_REDE_PAGINA);
+    (selecao.ativo || g.items.length >= MIN_ITENS_PAGINA || g.percRede >= MIN_PERC_REDE_PAGINA);
   const comPagina = grupos.filter(temPagina);
   const menoresGrupos = grupos.filter((g) => !temPagina(g));
 
@@ -613,5 +688,6 @@ export async function fetchTopProdutosPresentation({
       pages: menoresPages,
     },
     totalPages,
+    selecao,
   };
 }

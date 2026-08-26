@@ -8,6 +8,8 @@ type RequestBody = {
   company?: string;
   filial?: string | null;
   range?: { start?: string; end?: string };
+  /** Recorte pelas categorias do deck (subgrupos na ScarfMe, grupos no NERD). */
+  categorias?: string[] | null;
 };
 
 export async function POST(request: Request) {
@@ -36,6 +38,7 @@ export async function POST(request: Request) {
       company: body.company,
       filial: body.filial ?? null,
       range: { start: body.range.start, end: body.range.end },
+      categorias: Array.isArray(body.categorias) ? body.categorias : null,
     });
     return NextResponse.json({ data }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {

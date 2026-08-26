@@ -63,6 +63,13 @@ export interface ReportPresetDef {
    * agora/essa semana"). Reaproveita o cálculo já feito por item×loja — sem custo extra.
    */
   incluirRupturas?: boolean;
+  /**
+   * Quando true, o export XLSX é QUEBRADO EM ABAS por uma dimensão de filtro (ex.: 5
+   * subgrupos selecionados → 5 abas, cada uma com seus itens ordenados e o painel de
+   * totais só daquela aba, mais uma aba "Resumo" comparando todas). Só afeta o export —
+   * a consulta e a tabela na tela continuam iguais. Ver lib/reports/abas.ts.
+   */
+  abasPorFiltro?: boolean;
 }
 
 export type ReportFilterKey =

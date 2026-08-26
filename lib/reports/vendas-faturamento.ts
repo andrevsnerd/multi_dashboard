@@ -86,6 +86,30 @@ const VENDAS_FATURAMENTO_PRESETS: ReportPresetDef[] = [
     ],
   },
   {
+    id: "builtin-faturamento-abas",
+    name: "Faturamento em abas (por filtro)",
+    builtin: true,
+    sortBy: "FATURAMENTO",
+    sortDir: "desc",
+    // Mesmas colunas do preset de faturamento, mas o XLSX sai quebrado em ABAS pela
+    // dimensão escolhida (ex.: 5 subgrupos marcados → 5 abas + aba "Resumo"). Cada aba
+    // traz os itens daquele valor em ordem e o painel de totais só dela.
+    abasPorFiltro: true,
+    columns: [
+      col("PRODUTO"),
+      col("COR_DESCRICAO"),
+      col("DESCRICAO"),
+      col("QTDE"),
+      col("FATURAMENTO"),
+      col("TICKET_MEDIO", "Preço médio"),
+      col("CUSTO_UNITARIO", "Custo unit."),
+      col("CUSTO_TOTAL"),
+      col("MARGEM"),
+      col("MARGEM_PERC"),
+      col("ESTOQUE"),
+    ],
+  },
+  {
     id: "builtin-margem",
     name: "Margem",
     builtin: true,
@@ -211,6 +235,7 @@ const VENDAS_FATURAMENTO_PRESETS: ReportPresetDef[] = [
 // Presets que recebem as colunas líderes logo no INÍCIO.
 const PRESETS_LEADING_AT_START = new Set([
   "builtin-faturamento",
+  "builtin-faturamento-abas",
   "builtin-faturamento-estoque",
   "builtin-vendas-estoque-filiais",
   "builtin-vendas-estoque-por-filial",

@@ -82,6 +82,10 @@ export default function TopProdutosDeck({
 }: TopProdutosDeckProps) {
   const { dimensao, period, scope, totals, network, sumarioPages, slides, menores, totalPages } =
     report;
+  // Recorte por categoria (subgrupos/grupos escolhidos no filtro): quando ativo, o deck
+  // inteiro já vem só com eles — aqui é só o aviso, para ninguém ler os números do
+  // recorte como se fossem a rede inteira.
+  const selecao = report.selecao?.ativo ? report.selecao : null;
   const brandName = presentationBrandName(companyName);
 
   // Título da capa: última palavra em itálico coral, como "Campeões de venda".
@@ -90,7 +94,7 @@ export default function TopProdutosDeck({
   const titleLead = words.slice(0, -1).join(" ");
   const titleTail = words.length > 1 ? words[words.length - 1] : "";
 
-  const footerLeft = `${brandName}  ·  ${titleRaw}  ·  ${period.label}  ·  ${scope.label}`;
+  const footerLeft = `${brandName}  ·  ${titleRaw}  ·  ${period.label}  ·  ${scope.label}${selecao ? `  ·  ${selecao.label}` : ""}`;
 
   const slideProps = {
     "data-pdf-slide": "",
@@ -291,7 +295,10 @@ export default function TopProdutosDeck({
           ) : (
             <span className={styles.wordmark}>{brandName}</span>
           )}
-          <div className={styles.eyebrow}>Relatório de performance · {scope.eyebrow}</div>
+          <div className={styles.eyebrow}>
+            Relatório de performance · {scope.eyebrow}
+            {selecao ? ` · ${selecao.label}` : ""}
+          </div>
           <h1>
             {titleLead}
             {titleLead && titleTail ? <br /> : null}
@@ -325,6 +332,7 @@ export default function TopProdutosDeck({
         <div className={styles.foot}>
           Top {network.items.length} da rede por produto (todas as cores somadas) · demais rankings
           por produto + cor
+          {selecao ? ` · recorte: ${selecao.listLabel}` : ""}
         </div>
       </section>
 
@@ -340,6 +348,7 @@ export default function TopProdutosDeck({
               <small>
                 Ranking por faturamento {scope.inLabel} em {period.longLabel} — cada produto soma
                 todas as suas cores
+                {selecao ? ` · apenas ${selecao.label}` : ""}
               </small>
             </h2>
           </div>
@@ -392,6 +401,7 @@ export default function TopProdutosDeck({
                     {menores.categorias > 0
                       ? ` Os ${menores.categorias} ${dimensao.plural} menores estão consolidados na última página.`
                       : ""}
+                    {selecao ? ` Recorte: ${selecao.listLabel}.` : ""}
                   </small>
                 </h2>
               </div>
