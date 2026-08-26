@@ -44,7 +44,7 @@ const PERMISSION_GROUPS: { label: string; keys: PermissionKey[] }[] = [
     label: "Operações",
     keys: [
       "controle-transferencias", "transferencia-produtos", "romaneios",
-      "saidas-entradas-produtos", "extrato-produto", "lista-loja", "compras-transito", "compras-salvas", "destino-romaneio",
+      "saidas-entradas-produtos", "extrato-produto", "lista-loja", "compras-transito", "compras-salvas", "gastos-compra", "destino-romaneio",
     ],
   },
   {
