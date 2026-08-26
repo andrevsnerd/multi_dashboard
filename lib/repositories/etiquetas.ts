@@ -121,7 +121,7 @@ function condicaoTermo(termo: string, alias = 'p'): string {
  * contém, palavras soltas. Compara sempre com a descrição normalizada, senão o
  * espaço duplo joga o produto certo para o fim da fila.
  */
-function ordemRelevancia(termo: string, alias = 'p'): string {
+function ordemRelevancia(termo: string, alias = 'p', desempate = ''): string {
   const t = (termo ?? '').trim();
   const tEsc = esc(t);
   const tLike = escLike(t);
@@ -141,6 +141,7 @@ function ordemRelevancia(termo: string, alias = 'p'): string {
       ELSE 6
     END,
     LEN(${desc}),
+    ${desempate ? `${desempate},` : ''}
     ${desc}
   `;
 }
@@ -204,10 +205,19 @@ interface EstoqueRow {
   ESTOQUE: number;
 }
 
-function filtroEmpresa(company: EtiquetaCompany, alias = 'p'): string {
+/**
+ * 0 = produto está na EMPRESA da empresa do dashboard, 1 = está em outra.
+ *
+ * PRODUTOS.EMPRESA NÃO é o dono do produto — é resíduo fiscal do cadastro. Boa
+ * parte do catálogo NERD mora em EMPRESA=1 (só de ELETRONICOS/CAPAS são ~1.100
+ * ativos, entre eles "CP BASIC IP13"), e a ScarfMe tem itens em EMPRESA=8. Usar
+ * isso como filtro sumia com o produto certo justamente em quem digita o nome
+ * curto; então aqui ele só desempata a ordenação e vira a tag "outra empresa".
+ */
+function foraDoEscopo(company: EtiquetaCompany, alias = 'p'): string {
   const codes = EMPRESA_CODES[company] ?? [];
-  if (codes.length === 0) return '';
-  return `AND ${alias}.EMPRESA IN (${codes.join(', ')})`;
+  if (codes.length === 0) return '0';
+  return `CASE WHEN ${alias}.EMPRESA IN (${codes.join(', ')}) THEN 0 ELSE 1 END`;
 }
 
 /**
@@ -235,7 +245,7 @@ export interface SugestaoProduto {
   corEncontrada: string | null;
   descCorEncontrada: string | null;
   codigoEncontrado: string | null;
-  /** Achado só no repescão sem filtro de empresa (cadastro de outra EMPRESA). */
+  /** Cadastrado em outra PRODUTOS.EMPRESA — informativo, por linha. */
   foraDoCatalogo?: boolean;
 }
 
@@ -248,15 +258,16 @@ interface SugestaoRow {
   COR: string | null;
   DESC_COR: string | null;
   CODIGO: string | null;
+  FORA_ESCOPO: number | null;
 }
 
 /**
  * Sugestões enquanto o usuário digita (nome, código ou código de barra).
  *
  * A busca é do CADASTRO puro: não olha estoque, não olha venda. O nome casa
- * palavra a palavra (ver `condicaoTermo`), sem acento e sem caixa, e o escopo
- * por PRODUTOS.EMPRESA só filtra enquanto houver resultado — se o produto está
- * cadastrado em outra EMPRESA, ele volta no repescão em vez de sumir.
+ * palavra a palavra (ver `condicaoTermo`), sem acento e sem caixa, e a
+ * PRODUTOS.EMPRESA só desempata a ordenação (ver `foraDoEscopo`) — nada some da
+ * lista por causa dela.
  */
 export async function buscarSugestoesProduto(
   company: EtiquetaCompany,
@@ -271,7 +282,9 @@ export async function buscarSugestoesProduto(
   const tLike = escLike(t);
   const inativos = opts.incluirInativos ? '' : 'AND ISNULL(p.INATIVO, 0) = 0';
 
-  const montarSql = (empresa: string) => `
+  const escopo = foraDoEscopo(company);
+
+  const sql = `
     SELECT TOP ${limite}
       LTRIM(RTRIM(p.PRODUTO)) AS PRODUTO,
       LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, ''))) AS DESC_PRODUTO,
@@ -280,7 +293,8 @@ export async function buscarSugestoesProduto(
       ISNULL(cores.TOTAL, 0) AS TOTAL_CORES,
       barra.COR_PRODUTO AS COR,
       cor.DESC_COR AS DESC_COR,
-      barra.CODIGO_BARRA AS CODIGO
+      barra.CODIGO_BARRA AS CODIGO,
+      ${escopo} AS FORA_ESCOPO
     FROM PRODUTOS p WITH (NOLOCK)
     OUTER APPLY (
       SELECT TOP 1
@@ -318,22 +332,13 @@ export async function buscarSugestoesProduto(
         )
     ) cor
     WHERE (${condicaoTermo(t)} OR barra.CODIGO_BARRA IS NOT NULL)
-      ${empresa}
       ${inativos}
     ORDER BY
       CASE WHEN barra.CODIGO_BARRA = '${tEsc}' THEN 0 ELSE 1 END,
-      ${ordemRelevancia(t)}
+      ${ordemRelevancia(t, 'p', escopo)}
   `;
 
-  let rows = await query<SugestaoRow>(montarSql(filtroEmpresa(company)));
-  let foraDoCatalogo = false;
-
-  // Repescão: o cadastro tem produtos em EMPRESAs fora do mapa (4, 6, 7, 11).
-  // Some-los da busca é pior do que mostrá-los com um aviso.
-  if (rows.length === 0) {
-    rows = await query<SugestaoRow>(montarSql(''));
-    foraDoCatalogo = rows.length > 0;
-  }
+  const rows = await query<SugestaoRow>(sql);
 
   return rows.map((r) => ({
     produto: (r.PRODUTO ?? '').trim(),
@@ -344,13 +349,17 @@ export async function buscarSugestoesProduto(
     corEncontrada: (r.COR ?? '').trim() || null,
     descCorEncontrada: (r.DESC_COR ?? '').trim() || null,
     codigoEncontrado: (r.CODIGO ?? '').trim() || null,
-    foraDoCatalogo,
+    foraDoCatalogo: Number(r.FORA_ESCOPO ?? 0) !== 0,
   }));
 }
 
 /**
  * Busca produtos pelo termo (código, descrição ou código de barra) e monta
  * produto → cores. `limite` corta a quantidade de produtos, não de cores.
+ *
+ * `todoCadastro` não faz mais diferença: a busca já cobre o cadastro inteiro e
+ * a EMPRESA só desempata a ordem (ver `foraDoEscopo`). Fica na assinatura só
+ * porque a rota e o modal de custo ainda mandam a flag.
  */
 export async function buscarProdutosParaEtiqueta(
   company: EtiquetaCompany,
@@ -363,9 +372,10 @@ export async function buscarProdutosParaEtiqueta(
   const limite = Math.min(200, Math.max(1, opts.limite ?? 60));
   const tEsc = esc(t);
   const inativos = opts.incluirInativos ? '' : 'AND ISNULL(p.INATIVO, 0) = 0';
+  const escopo = foraDoEscopo(company);
 
   // 1) Produtos que casam com o termo (código, nome palavra a palavra ou barra).
-  const montarSql = (empresa: string) => `
+  const sql = `
     SELECT TOP ${limite}
       LTRIM(RTRIM(p.PRODUTO)) AS PRODUTO,
       LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, ''))) AS DESC_PRODUTO,
@@ -380,20 +390,13 @@ export async function buscarProdutosParaEtiqueta(
     -- Descrição da coleção vem de COLECOES (fonte mestre); PRODUTOS guarda só o código.
     LEFT JOIN COLECOES col WITH (NOLOCK) ON col.COLECAO = p.COLECAO
     WHERE ${condicaoTermo(t)}
-      ${empresa}
       ${inativos}
     ORDER BY
       CASE WHEN LTRIM(RTRIM(p.PRODUTO)) = '${tEsc}' THEN 0 ELSE 1 END,
-      ${ordemRelevancia(t)}
+      ${ordemRelevancia(t, 'p', escopo)}
   `;
 
-  let produtos = await query<ProdutoRow>(montarSql(opts.todoCadastro ? '' : filtroEmpresa(company)));
-
-  // Repescão sem o filtro de EMPRESA: cadastro tem produtos em empresas fora do
-  // mapa e sumir com eles é pior do que trazê-los.
-  if (produtos.length === 0 && !opts.todoCadastro) {
-    produtos = await query<ProdutoRow>(montarSql(''));
-  }
+  const produtos = await query<ProdutoRow>(sql);
 
   if (produtos.length === 0) return [];
 
