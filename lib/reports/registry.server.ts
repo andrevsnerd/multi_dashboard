@@ -7,6 +7,7 @@ import { fetchProdutosCadastro } from "@/lib/repositories/reportProdutosCadastro
 import { fetchVendasHistorico } from "@/lib/repositories/reportVendasHistorico";
 import { fetchCompraSugeridaAbc } from "@/lib/repositories/reportCompraSugeridaAbc";
 import { fetchClientesFilial } from "@/lib/repositories/reportClientesFilial";
+import { fetchProjecaoVendas } from "@/lib/repositories/reportProjecaoVendas";
 import { fetchMenorCodigoBarra } from "@/lib/repositories/products";
 import { listFornecedoresByCompany } from "@/lib/utils/fornecedores-store";
 import { productMatchesFornecedor } from "@/lib/utils/fornecedor-matcher";
@@ -21,6 +22,7 @@ import { PRODUTOS_CADASTRO_ID } from "./produtos-cadastro";
 import { VENDAS_HISTORICO_ID } from "./vendas-historico";
 import { COMPRA_SUGERIDA_ABC_ID } from "./compra-sugerida-abc";
 import { CLIENTES_FILIAL_ID } from "./clientes-filial";
+import { PROJECAO_VENDAS_ID } from "./projecao-vendas";
 import { getReportMeta } from "./registry";
 
 /** Progresso opcional de uma análise demorada (ex.: cálculo por loja). */
@@ -46,6 +48,7 @@ const FETCHERS: Record<string, ReportFetcher> = {
   [VENDAS_HISTORICO_ID]: fetchVendasHistorico,
   [COMPRA_SUGERIDA_ABC_ID]: fetchCompraSugeridaAbc,
   [CLIENTES_FILIAL_ID]: fetchClientesFilial,
+  [PROJECAO_VENDAS_ID]: fetchProjecaoVendas,
 };
 
 export function getReportFetcher(id: string): ReportFetcher | undefined {

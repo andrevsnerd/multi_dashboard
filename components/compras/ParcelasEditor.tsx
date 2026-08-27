@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   COMPRA_GASTO_CANAL_CURTO,
   COMPRA_GASTO_CANAL_LABEL,
+  type CompraGastoCanal,
   type CompraGastoModeloParcelamento,
   type CompraGastoParcela,
 } from "@/lib/types/compra-gasto";
@@ -98,6 +99,10 @@ export default function ParcelasEditor({
 
   const canais = useMemo(() => canaisDasParcelas(parcelas), [parcelas]);
   const temCanal = canais.length > 0;
+  const totaisPorCanal = useMemo(
+    () => new Map(resumoPorCanal(parcelas).map((resumo) => [resumo.canal, resumo.total])),
+    [parcelas]
+  );
   const modeloAtivo = MODELOS.find((m) => m.valor === modelo) ?? MODELOS[0];
 
   // O modelo é aplicado por efeito, não no onChange do select, porque o total
@@ -150,8 +155,31 @@ export default function ParcelasEditor({
   }, [parcelas]);
 
   /** Depois de mexer numa linha, a última em aberto absorve a diferença. */
-  const comAjuste = (lista: CompraGastoParcela[], editada: number) =>
-    redistribuirNaUltimaEmAberto(lista, total, editada);
+  function comAjuste(
+    lista: CompraGastoParcela[],
+    editada: number,
+    canal: CompraGastoCanal | null | undefined = lista[editada]?.canal
+  ): CompraGastoParcela[] {
+    if (!canal) return redistribuirNaUltimaEmAberto(lista, total, editada);
+
+    const totalCanal = totaisPorCanal.get(canal);
+    if (!(totalCanal && totalCanal > 0)) return lista;
+
+    const indices = lista.flatMap((p, i) => (p.canal === canal ? [i] : []));
+    const parcelasDoCanal = indices.map((i) => lista[i]);
+    const editadaNoCanal = indices.indexOf(editada);
+    const ajustadas = redistribuirNaUltimaEmAberto(
+      parcelasDoCanal,
+      totalCanal,
+      editadaNoCanal
+    );
+    const porIndice = new Map(indices.map((indice, i) => [indice, ajustadas[i]]));
+    return lista.map((p, i) => porIndice.get(i) ?? p);
+  }
+
+  function basePercentual(p: CompraGastoParcela): number {
+    return p.canal ? (totaisPorCanal.get(p.canal) ?? 0) : total;
+  }
 
   function dividirEm(quantidade: number) {
     setModelo("manual");
@@ -178,14 +206,21 @@ export default function ParcelasEditor({
     setModelo("manual");
     setEdicao({ linha: indice, campo: "pct", texto });
     const pct = Math.max(0, parseMoeda(texto));
-    const valor = cents((total * pct) / 100);
+    const valor = cents((basePercentual(parcelas[indice]) * pct) / 100);
     onChange(comAjuste(parcelas.map((p, i) => (i === indice ? { ...p, valor } : p)), indice));
   }
 
   function remover(indice: number) {
     setModelo("manual");
     setEdicao(null);
-    onChange(comAjuste(renumerar(parcelas.filter((_, i) => i !== indice)), -1));
+    const removida = parcelas[indice];
+    onChange(
+      comAjuste(
+        renumerar(parcelas.filter((_, i) => i !== indice)),
+        -1,
+        removida?.canal
+      )
+    );
   }
 
   function adicionar() {
@@ -219,8 +254,9 @@ export default function ParcelasEditor({
 
   function textoPct(p: CompraGastoParcela, i: number): string {
     if (edicao && edicao.linha === i && edicao.campo === "pct") return edicao.texto;
-    if (total <= 0) return "";
-    const pct = (p.valor / total) * 100;
+    const base = basePercentual(p);
+    if (base <= 0) return "";
+    const pct = (p.valor / base) * 100;
     return String(Math.round(pct * 10) / 10).replace(".", ",");
   }
 
@@ -334,7 +370,7 @@ export default function ParcelasEditor({
                 onChange={(e) => alterarPct(i, e.target.value)}
                 onFocus={(e) => e.currentTarget.select()}
                 onBlur={() => setEdicao(null)}
-                aria-label={`Percentual da parcela ${i + 1}`}
+                aria-label={`Percentual da parcela ${i + 1}${p.canal ? ` de ${COMPRA_GASTO_CANAL_LABEL[p.canal]}` : ""}`}
               />
             <input
               className={`${styles.money} ${styles.valorInput}`}

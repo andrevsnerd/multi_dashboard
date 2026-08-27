@@ -31,6 +31,11 @@ import {
   clientesFilialMeta,
   CLIENTES_FILIAL_ID,
 } from "./clientes-filial";
+import {
+  buildProjecaoVendasPresets,
+  projecaoVendasMeta,
+  PROJECAO_VENDAS_ID,
+} from "./projecao-vendas";
 
 /**
  * Registry PURO de tipos de análise (apenas metadados/colunas/presets).
@@ -49,6 +54,7 @@ export const REPORT_TYPES: ReportTypeMeta[] = [
   produtosCadastroMeta,
   compraSugeridaAbcMeta,
   clientesFilialMeta,
+  projecaoVendasMeta,
 ];
 
 export function getReportMeta(id: string): ReportTypeMeta | undefined {
@@ -80,6 +86,9 @@ export function getDefaultPresets(id: string, companyKey: CompanyKey): ReportPre
   }
   if (id === CLIENTES_FILIAL_ID) {
     return buildClientesFilialPresets();
+  }
+  if (id === PROJECAO_VENDAS_ID) {
+    return buildProjecaoVendasPresets(companyKey);
   }
   return getReportMeta(id)?.defaultPresets ?? [];
 }

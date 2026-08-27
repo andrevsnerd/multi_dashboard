@@ -22,7 +22,14 @@ import {
   COMPRA_TRANSFER_LENS_COLUMNS,
 } from "@/lib/reports/compra-sugerida-abc";
 import { CLIENTES_FILIAL_ID, FILIAL_COMPRAS_COL_PREFIX } from "@/lib/reports/clientes-filial";
-import { formatData, formatDataVenda, formatDiasParado } from "@/lib/reports/format";
+import {
+  PROJECAO_JANELAS_MESES,
+  PROJECAO_JANELA_DEFAULT,
+  PROJECAO_MES_COL_PREFIX,
+  PROJECAO_VENDAS_ID,
+} from "@/lib/reports/projecao-vendas";
+import { exportProjecaoVendasXlsx } from "@/lib/utils/exportProjecaoVendasXlsx";
+import { formatData, formatDataVenda, formatDiasAcabar, formatDiasParado } from "@/lib/reports/format";
 import { getDefaultPresets, getReportMeta, REPORT_TYPES, VENDAS_FATURAMENTO_ID } from "@/lib/reports/registry";
 import { computeExtraSources, getEditorExtraColumns } from "@/lib/reports/column-sources";
 import type {
@@ -106,6 +113,7 @@ function formatCell(value: ReportRow[string], type: ColumnType): string {
   if (type === "dataVenda") return formatDataVenda(value);
   if (type === "date") return formatData(value);
   if (type === "diasParado") return formatDiasParado(value);
+  if (type === "diasAcabar") return formatDiasAcabar(value);
   if (value === null || value === undefined || value === "") return "";
   if (type === "text") return String(value);
   const num = Number(value);
@@ -161,6 +169,8 @@ export default function GeradorRelatoriosPage({
     return [...catalog, ...getEditorExtraColumns(reportTypeId, baseKeys)];
   }, [catalog, reportTypeId]);
   const supports = (f: string) => meta?.supportedFilters.includes(f as never) ?? false;
+  /** Análise que recebe uma LISTA de produtos (chips) em vez de um produto só. */
+  const supportsProdutosMulti = supports("produtos");
 
   // Filtros
   const [range, setRange] = useState<DateRangeValue>(initialRange);
@@ -205,6 +215,11 @@ export default function GeradorRelatoriosPage({
   const [produtoDropdownOpen, setProdutoDropdownOpen] = useState(false);
   const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchWrapRef = useRef<HTMLDivElement | null>(null);
+  // Seleção de VÁRIOS produtos (filtro "produtos", usado pela Projeção de vendas): chips.
+  const [produtosSelecionados, setProdutosSelecionados] = useState<Array<{ id: string; name: string }>>([]);
+  // Opções da Projeção de vendas: janela do ritmo (meses) + índice sazonal (opt-in).
+  const [projecaoJanela, setProjecaoJanela] = useState<number>(PROJECAO_JANELA_DEFAULT);
+  const [projecaoSazonalidade, setProjecaoSazonalidade] = useState(false);
 
   // Presets + estrutura de colunas
   const [backendPresets, setBackendPresets] = useState<ReportPreset[]>([]);
@@ -327,6 +342,12 @@ export default function GeradorRelatoriosPage({
     const first = builtinPresets[0];
     if (first) applyPreset(first);
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reportTypeId]);
+
+  // Troca de análise limpa a seleção de produtos em chips: cada análise tem seu escopo, e
+  // carregar chips de uma para outra (onde talvez nem exista o filtro) só confunde.
+  useEffect(() => {
+    setProdutosSelecionados([]);
   }, [reportTypeId]);
 
   // Carrega presets do backend.
@@ -462,10 +483,24 @@ export default function GeradorRelatoriosPage({
   };
 
   const pickProduto = (p: { productId: string; productName: string }) => {
+    // Análise com filtro "produtos" (Projeção de vendas): cada escolha ACUMULA como chip e
+    // a busca fica livre para o próximo item; nas outras, seleção única como sempre.
+    if (supportsProdutosMulti) {
+      setProdutosSelecionados((prev) =>
+        prev.some((x) => x.id === p.productId) ? prev : [...prev, { id: p.productId, name: p.productName }]
+      );
+      setProdutoQuery("");
+      setProdutoResults([]);
+      setProdutoDropdownOpen(false);
+      return;
+    }
     setProdutoSelected({ id: p.productId, name: p.productName });
     setProdutoQuery(`${p.productName} (${p.productId})`);
     setProdutoDropdownOpen(false);
   };
+
+  const removeProdutoChip = (id: string) =>
+    setProdutosSelecionados((prev) => prev.filter((x) => x.id !== id));
 
   const clearProduto = () => {
     setProdutoSelected(null);
@@ -514,6 +549,12 @@ export default function GeradorRelatoriosPage({
     } else if (produtoQuery.trim().length >= 2) {
       params.set("produtoSearchTerm", produtoQuery.trim());
     }
+    // Vários produtos (chips) — chave `prod`, repetida. Convive com a busca textual.
+    produtosSelecionados.forEach((p) => params.append("prod", p.id));
+    if (meta?.supportedFilters.includes("projecao" as never)) {
+      params.set("projecaoJanelaMeses", String(projecaoJanela));
+      if (projecaoSazonalidade) params.set("projecaoSazonalidade", "1");
+    }
     const diasNum = Number(diasParadoValor.trim());
     const suportaDiasParado = meta?.supportedFilters.includes("diasParado" as never) ?? false;
     if (suportaDiasParado && diasParadoValor.trim() !== "" && Number.isFinite(diasNum) && diasNum >= 0) {
@@ -527,7 +568,8 @@ export default function GeradorRelatoriosPage({
     return params.toString();
   }, [
     companyKey, filial, startStr, endStr, grupos, linhas, subgrupos, grades,
-    colecoes, cores, tipos, produtoSelected, produtoQuery,
+    colecoes, cores, tipos, produtoSelected, produtoQuery, produtosSelecionados,
+    projecaoJanela, projecaoSazonalidade,
     diasParadoValor, diasParadoModo, incluirZerados, incluirNegativos, fornecedor, meta,
   ]);
 
@@ -559,7 +601,8 @@ export default function GeradorRelatoriosPage({
           !c.key.startsWith(VENDA_FILIAL_COL_PREFIX) &&
           !c.key.startsWith(QTD_FILIAL_COL_PREFIX) &&
           !c.key.startsWith(COMPRA_FILIAL_COL_PREFIX) &&
-          !c.key.startsWith(FILIAL_COMPRAS_COL_PREFIX)
+          !c.key.startsWith(FILIAL_COMPRAS_COL_PREFIX) &&
+          !c.key.startsWith(PROJECAO_MES_COL_PREFIX)
       );
       const existing = new Set(stripped.map((c) => c.key));
       const appended = dyn
@@ -644,6 +687,15 @@ export default function GeradorRelatoriosPage({
         );
         await generateViaStream(
           `/api/relatorios/compra-sugerida-abc/stream?reportType=${encodeURIComponent(reportTypeId)}&${qs}${transferOn ? "&considerarTransferencias=1" : ""}${wantsRupturas ? "&incluirRupturas=1" : ""}`
+        );
+        return;
+      }
+
+      // Projeção de vendas: uma consulta de vendas por mês (24 meses) → stream genérico
+      // com progresso ("Lendo vendas mês a mês… X/24").
+      if (reportTypeId === PROJECAO_VENDAS_ID) {
+        await generateViaStream(
+          `/api/relatorios/stream?reportType=${encodeURIComponent(reportTypeId)}&${qs}`
         );
         return;
       }
@@ -892,6 +944,37 @@ export default function GeradorRelatoriosPage({
       );
       return;
     }
+    // Projeção de vendas: export dedicado (faixa dos meses, heat-map da projeção,
+    // semáforo de urgência em "Dias p/ acabar" e legenda da regra do ritmo).
+    if (reportTypeId === PROJECAO_VENDAS_ID) {
+      const hint =
+        produtosSelecionados.length === 1
+          ? produtosSelecionados[0]!.name
+          : produtosSelecionados.length > 1
+            ? `${produtosSelecionados.length}-itens`
+            : grupos.length === 1
+              ? grupos[0]!
+              : subgrupos.length === 1
+                ? subgrupos[0]!
+                : linhas.length === 1
+                  ? linhas[0]!
+                  : null;
+      void exportProjecaoVendasXlsx(
+        sortedRows,
+        enabledColumns.map((c) => ({ key: c.key, label: c.label })),
+        {
+          companyKey,
+          dataBase: new Date(),
+          filialLabel,
+          sheetName: meta?.label,
+          columnTypes,
+          janelaMeses: projecaoJanela,
+          sazonalidade: projecaoSazonalidade,
+          fileHint: hint,
+        }
+      );
+      return;
+    }
     // Clientes por filial: export dedicado com estilo (cabeçalho, zebra, linha TOTAL).
     if (reportTypeId === CLIENTES_FILIAL_ID) {
       void exportClientesFilialXlsx(
@@ -1107,7 +1190,11 @@ export default function GeradorRelatoriosPage({
           )}
           {supports("nome") && (
             <div className={styles.searchField}>
-              <label className={styles.fieldLabel}>Nome / código / cód. barra</label>
+              <label className={styles.fieldLabel}>
+                {supportsProdutosMulti
+                  ? `Produtos (${produtosSelecionados.length} selecionado${produtosSelecionados.length === 1 ? "" : "s"})`
+                  : "Nome / código / cód. barra"}
+              </label>
               <div className={styles.searchWrap} ref={searchWrapRef}>
                 <input
                   className={styles.input}
@@ -1139,6 +1226,60 @@ export default function GeradorRelatoriosPage({
                     ))}
                   </div>
                 )}
+              </div>
+              {/* Chips dos produtos escolhidos (só nas análises com filtro "produtos"):
+                  a busca continua livre para ir somando item por item. */}
+              {supportsProdutosMulti && produtosSelecionados.length > 0 && (
+                <div className={styles.chips}>
+                  {produtosSelecionados.map((p) => (
+                    <span key={p.id} className={styles.chip} title={`${p.name} (${p.id})`}>
+                      <span className={styles.chipText}>{p.name}</span>
+                      <button
+                        type="button"
+                        className={styles.chipRemove}
+                        onClick={() => removeProdutoChip(p.id)}
+                        aria-label={`Remover ${p.name}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                  <button
+                    type="button"
+                    className={styles.chipClearAll}
+                    onClick={() => setProdutosSelecionados([])}
+                  >
+                    Limpar todos
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+          {supports("projecao") && (
+            <div className={styles.searchField}>
+              <label className={styles.fieldLabel}>Ritmo da projeção</label>
+              <div className={styles.saldoRow}>
+                <select
+                  className={styles.select}
+                  value={projecaoJanela}
+                  onChange={(e) => setProjecaoJanela(Number(e.target.value))}
+                  title="Quantos meses entram na média do ritmo. A janela sempre TERMINA no último mês com venda do item."
+                >
+                  {PROJECAO_JANELAS_MESES.map((n) => (
+                    <option key={n} value={n}>{`Janela de ${n} meses`}</option>
+                  ))}
+                </select>
+                <label
+                  className={styles.checkLabel}
+                  title="Distribui a projeção pelo peso de cada mês do ano (dez pesa mais, fev menos). O índice vem do histórico da PRÓPRIA seleção nos últimos 24 meses — em seleção pequena ele é ruidoso; use com um grupo/coleção inteiro. Sem 12 meses fechados de histórico, a projeção continua plana."
+                >
+                  <input
+                    type="checkbox"
+                    checked={projecaoSazonalidade}
+                    onChange={(e) => setProjecaoSazonalidade(e.target.checked)}
+                  />
+                  Aplicar sazonalidade
+                </label>
               </div>
             </div>
           )}
@@ -1373,7 +1514,7 @@ export default function GeradorRelatoriosPage({
         )}
       </section>
 
-      {loading && reportTypeId === COMPRA_SUGERIDA_ABC_ID && (
+      {loading && (reportTypeId === COMPRA_SUGERIDA_ABC_ID || reportTypeId === PROJECAO_VENDAS_ID) && (
         <section className={styles.progressWrap}>
           <div className={styles.progressHeader}>
             <span className={styles.progressSpinner} aria-hidden="true" />
@@ -1382,6 +1523,8 @@ export default function GeradorRelatoriosPage({
                 ? `Verificando rupturas por loja… ${genProgress.done}/${genProgress.total} lojas`
                 : genProgress && genProgress.phase === "lojas" && genProgress.total > 0
                 ? `Calculando compra por loja… ${genProgress.done}/${genProgress.total} lojas`
+                : genProgress && genProgress.phase === "meses" && genProgress.total > 0
+                ? `Lendo vendas mês a mês… ${genProgress.done}/${genProgress.total} meses`
                 : "Buscando vendas da rede…"}
             </span>
           </div>

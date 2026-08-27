@@ -17,7 +17,13 @@ export type ColumnType =
   /** Última venda: data ISO (yyyy-mm-dd); vazio/nulo exibe "Nunca vendeu". */
   | "dataVenda"
   /** Data genérica: ISO (yyyy-mm-dd) → dd/mm/yyyy; vazio fica em branco. */
-  | "date";
+  | "date"
+  /**
+   * Dias até o estoque acabar (Projeção de vendas): número de dias; sentinelas exibem
+   * "Mais de 12 meses" (não acaba no horizonte) e "Sem giro" (ritmo zero). Ambas as
+   * sentinelas são números altos para ordenarem no fim.
+   */
+  | "diasAcabar";
 
 /** Catálogo de uma coluna disponível em uma análise. */
 export interface ReportColumnDef {
@@ -75,6 +81,10 @@ export interface ReportPresetDef {
 export type ReportFilterKey =
   | "periodo"
   | "nome"
+  /** Seleção de VÁRIOS produtos (chips) — a análise recebe `produtoIds`. */
+  | "produtos"
+  /** Opções da Projeção de vendas: janela do ritmo + sazonalidade. */
+  | "projecao"
   | "cor"
   | "linha"
   | "subgrupo"
@@ -122,6 +132,16 @@ export interface ReportFilters {
   tipos?: string[] | null;
   produtoSearchTerm?: string | null;
   produtoId?: string | null;
+  /**
+   * Vários produtos escolhidos na tela (filtro "produtos"). Quando presente, restringe a
+   * análise a esses códigos — é o modo de uso principal da Projeção de vendas ("mando uma
+   * lista de itens e vejo a projeção de cada um"). Convive com os filtros de categoria.
+   */
+  produtoIds?: string[] | null;
+  /** Projeção de vendas: meses da janela do ritmo (termina no último mês com venda). */
+  projecaoJanelaMeses?: number | null;
+  /** Projeção de vendas: aplica índice sazonal por mês (calculado da própria seleção). */
+  projecaoSazonalidade?: boolean;
   /** Limite de linhas retornadas (default no repositório). */
   limit?: number;
   /** Filtro opcional de dias parado (análise Produtos Parados). Nº de dias de corte. */

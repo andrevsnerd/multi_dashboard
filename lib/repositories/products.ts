@@ -60,6 +60,14 @@ export interface ProductsQueryParams {
   grades?: string[] | null;
   groupByColor?: boolean; // Se true, agrupa produtos por cor
   produtoId?: string;
+  /**
+   * Restringe a consulta a uma LISTA de códigos de produto (scoping da mesma query
+   * validada, não lógica nova). É ADITIVO: combina com `produtoId`/`produtoSearchTerm`
+   * e com os filtros de categoria. Usado pela análise "Projeção de vendas" do Gerador,
+   * que mede a série mensal de uma seleção de itens (24 consultas, uma por mês) e
+   * precisa que cada uma seja leve.
+   */
+  produtoIds?: string[] | null;
   produtoSearchTerm?: string;
   acimaDoTicket?: boolean; // Se true, filtra apenas vendas acima do preço sugerido
   filterByRegistrationDate?: boolean; // Se true, filtra produtos pela data de cadastramento ao invés da data de venda
@@ -99,6 +107,25 @@ function normalizeCorKey(cor: string | null | undefined): string {
   if (trimmed === '') return '';
   if (/^\d+$/.test(trimmed)) return String(parseInt(trimmed, 10));
   return trimmed.toUpperCase();
+}
+
+/**
+ * Registra a lista de códigos de produto UMA vez e devolve só os placeholders
+ * ("@p0, @p1, …") — quem chama monta o `IN` com o alias de coluna que precisa
+ * (vp.PRODUTO, fp.PRODUTO, p.PRODUTO), reusando os mesmos @params em cada variante
+ * da query. Devolve '' quando não há lista (nenhum filtro aplicado).
+ */
+function buildProdutoIdsPlaceholders(
+  request: sql.Request | RequestLike,
+  produtoIds: string[] | null | undefined,
+  paramBase: string
+): string {
+  const list = Array.from(
+    new Set((produtoIds ?? []).map((p) => String(p ?? '').trim()).filter(Boolean))
+  );
+  if (list.length === 0) return '';
+  list.forEach((value, index) => request.input(`${paramBase}${index}`, sql.VarChar, value));
+  return list.map((_, index) => `@${paramBase}${index}`).join(', ');
 }
 
 function buildInFilter(
@@ -508,20 +535,21 @@ export async function fetchProductsWithDetails({
   grades,
   groupByColor = false,
   produtoId,
+  produtoIds,
   produtoSearchTerm,
   acimaDoTicket = false,
   filterByRegistrationDate = false,
 }: ProductsQueryParams = {}): Promise<ProductDetail[]> {
   // Se for e-commerce, usar função específica de e-commerce
   if (isEcommerceFilial(company, filial)) {
-    return fetchProductsWithDetailsEcommerce({ company, range, filial, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, groupByColor, produtoId, produtoSearchTerm, acimaDoTicket, filterByRegistrationDate });
+    return fetchProductsWithDetailsEcommerce({ company, range, filial, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, groupByColor, produtoId, produtoIds, produtoSearchTerm, acimaDoTicket, filterByRegistrationDate });
   }
 
   // Para scarfme com "Todas as filiais" (null), agregar vendas normais + ecommerce
   if (company === 'scarfme' && filial === null) {
     const [salesProducts, ecommerceProducts] = await Promise.all([
-      fetchProductsWithDetailsSales({ company, range, filial: VAREJO_VALUE, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, groupByColor, produtoId, produtoSearchTerm, acimaDoTicket, filterByRegistrationDate }),
-      fetchProductsWithDetailsEcommerce({ company, range, filial: null, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, groupByColor, produtoId, produtoSearchTerm, acimaDoTicket, filterByRegistrationDate }),
+      fetchProductsWithDetailsSales({ company, range, filial: VAREJO_VALUE, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, groupByColor, produtoId, produtoIds, produtoSearchTerm, acimaDoTicket, filterByRegistrationDate }),
+      fetchProductsWithDetailsEcommerce({ company, range, filial: null, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, groupByColor, produtoId, produtoIds, produtoSearchTerm, acimaDoTicket, filterByRegistrationDate }),
     ]);
 
     // Agregar produtos por productId (e cor se groupByColor estiver ativo).
@@ -612,7 +640,7 @@ export async function fetchProductsWithDetails({
   }
 
   // Função normal para vendas de loja
-  return fetchProductsWithDetailsSales({ company, range, filial, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, groupByColor, produtoId, produtoSearchTerm, acimaDoTicket, filterByRegistrationDate });
+  return fetchProductsWithDetailsSales({ company, range, filial, grupo, grupos, linha, linhas, colecao, colecoes, subgrupo, subgrupos, grade, grades, groupByColor, produtoId, produtoIds, produtoSearchTerm, acimaDoTicket, filterByRegistrationDate });
 }
 
 /**
@@ -634,6 +662,7 @@ async function fetchProductsWithDetailsSales({
   grades,
   groupByColor = false,
   produtoId,
+  produtoIds,
   produtoSearchTerm,
   acimaDoTicket = false,
   filterByRegistrationDate = false,
@@ -666,6 +695,11 @@ async function fetchProductsWithDetailsSales({
       request.input('produtoSearchTerm', sql.VarChar, searchPattern);
       produtoFilter = `AND vp.DESC_PRODUTO LIKE @produtoSearchTerm`;
     }
+    // Lista de produtos: ADITIVA (soma-se ao caso acima em vez de substituí-lo). Emitida
+    // com o alias vp.PRODUTO porque os `replace` logo abaixo reescrevem o alias para as
+    // variantes da query (pos = vp, trocas puras = vt).
+    const produtoIdsIn = buildProdutoIdsPlaceholders(request, produtoIds, 'prodIdsList');
+    if (produtoIdsIn) produtoFilter += ` AND vp.PRODUTO IN (${produtoIdsIn})`;
 
     const posGrupoFilter = grupoFilter.replace(/vp\.GRUPO_PRODUTO/g, 'p.GRUPO_PRODUTO');
     const posLinhaFilter = linhaFilter.replace(/vp\.LINHA/g, 'p.LINHA');
@@ -932,6 +966,8 @@ async function fetchProductsWithDetailsSales({
       } else if (produtoSearchTerm && produtoSearchTerm.trim().length >= 2) {
         produtoSemVendaProdutoFilter = `AND p.DESC_PRODUTO LIKE @produtoSearchTerm`;
       }
+      // Reusa os MESMOS @params já registrados acima, só troca o alias da coluna.
+      if (produtoIdsIn) produtoSemVendaProdutoFilter += ` AND p.PRODUTO IN (${produtoIdsIn})`;
 
       // Para produtos sem venda, não agrupamos por cor (não há vendas para diferenciar)
       const produtoSemVendaColorFields = groupByColor
@@ -1279,6 +1315,7 @@ async function fetchProductsWithDetailsEcommerce({
   grades,
   groupByColor = false,
   produtoId,
+  produtoIds,
   produtoSearchTerm,
   acimaDoTicket = false,
   filterByRegistrationDate = false,
@@ -1339,6 +1376,9 @@ async function fetchProductsWithDetailsEcommerce({
       request.input('produtoSearchTermEcommerce', sql.VarChar, searchPattern);
       produtoFilter = `AND p.DESC_PRODUTO LIKE @produtoSearchTermEcommerce`;
     }
+    // Lista de produtos: ADITIVA (ver a mesma regra na variante de loja/POS).
+    const produtoIdsIn = buildProdutoIdsPlaceholders(request, produtoIds, 'prodIdsListEcom');
+    if (produtoIdsIn) produtoFilter += ` AND fp.PRODUTO IN (${produtoIdsIn})`;
     
     // Filtro de grupo para e-commerce
     const gruposList = grupos && grupos.length > 0 ? grupos : grupo ? [grupo] : [];
@@ -1505,6 +1545,8 @@ async function fetchProductsWithDetailsEcommerce({
       } else if (produtoSearchTerm && produtoSearchTerm.trim().length >= 2) {
         produtoSemVendaProdutoFilter = `AND p.DESC_PRODUTO LIKE @produtoSearchTermEcommerce`;
       }
+      // Reusa os MESMOS @params registrados acima, só troca o alias da coluna.
+      if (produtoIdsIn) produtoSemVendaProdutoFilter += ` AND p.PRODUTO IN (${produtoIdsIn})`;
 
       // Para produtos sem venda, não agrupamos por cor (não há vendas para diferenciar)
       const produtoSemVendaColorFields = groupByColor

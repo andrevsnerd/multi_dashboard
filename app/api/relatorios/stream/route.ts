@@ -1,15 +1,17 @@
 import { runReport } from "@/lib/reports/registry.server";
-import { COMPRA_SUGERIDA_ABC_ID } from "@/lib/reports/compra-sugerida-abc";
-import { parseReportFilters } from "@/lib/reports/params";
+import { parseExtraSources, parseReportFilters } from "@/lib/reports/params";
 
-// Pro: até 300s. O cálculo de compra sugerida por loja varre a rede inteira.
+// Pro: até 300s. Análises com muitas consultas (uma por mês, uma por loja) demoram.
 export const maxDuration = 300;
 
 /**
- * Stream (NDJSON) da análise "Compra sugerida por Curva ABC". Rota histórica, mantida
- * porque o front já aponta para ela; a leitura dos filtros vem do parser COMPARTILHADO
- * (`parseReportFilters`), o mesmo da /dados e da /stream genérica — antes esta rota
- * reimplementava a leitura e esqueceu `fornecedor`, ignorando em silêncio o filtro da tela.
+ * Stream (NDJSON) GENÉRICO do Gerador de Relatórios: vale para QUALQUER `reportType`.
+ * Emite progresso enquanto calcula e, ao fim, o ReportResult completo — usado pelas
+ * análises demoradas (Projeção de vendas: uma consulta de vendas por mês).
+ *
+ * Lê os filtros pelo parser compartilhado com a rota /dados (`parseReportFilters`), então
+ * não existe o risco de a rota de streaming "esquecer" um filtro que a tela mandou —
+ * foi exatamente o que aconteceu com `fornecedor` na rota dedicada da compra sugerida.
  *
  * NDJSON via fetch+ReadableStream (não SSE/EventSource): o EventSource RECONECTA sozinho
  * ao fim do stream, o que dispararia o cálculo pesado de novo.
@@ -19,11 +21,9 @@ export const maxDuration = 300;
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-
-  const filters = {
-    ...parseReportFilters(searchParams),
-    filial: null, // esta análise é SEMPRE da rede inteira (uma coluna por loja)
-  };
+  const reportType = searchParams.get("reportType") ?? "";
+  const filters = parseReportFilters(searchParams);
+  const extraSources = parseExtraSources(searchParams);
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
         controller.enqueue(encoder.encode(`${JSON.stringify(obj)}\n`));
       };
       try {
-        const result = await runReport(COMPRA_SUGERIDA_ABC_ID, filters, [], {
+        const result = await runReport(reportType, filters, extraSources, {
           onProgress: (done, total, phase) => send({ type: "progress", done, total, phase }),
         });
         if (!result) {
@@ -43,7 +43,7 @@ export async function GET(request: Request) {
           send({ type: "result", result });
         }
       } catch (error) {
-        console.error("Erro ao gerar compra sugerida (stream)", error);
+        console.error(`Erro ao gerar relatório em stream (${reportType})`, error);
         const details = error instanceof Error ? error.message : "Erro desconhecido";
         send({ type: "failed", error: "Erro ao gerar relatório", details });
       } finally {

@@ -279,8 +279,21 @@ export async function buscarSugestoesProduto(
 
   const limite = Math.min(50, Math.max(1, opts.limite ?? 30));
   const tEsc = esc(t);
-  const tLike = escLike(t);
+  const soDigitos = /^\d+$/.test(t) ? t : '';
   const inativos = opts.incluirInativos ? '' : 'AND ISNULL(p.INATIVO, 0) = 0';
+
+  // Código de barras identifica uma variação inteira: nunca deve casar por
+  // trecho. Ex.: 053199 não pode sugerir o EAN 7898586053199. Mantemos apenas
+  // a equivalência numérica usada na busca principal para tolerar zero inicial
+  // omitido pelo leitor.
+  const condicaoBarra = [
+    `LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100)))) = '${tEsc}'`,
+    ...(soDigitos.length >= 4
+      ? [
+          `TRY_CONVERT(BIGINT, LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100))))) = TRY_CONVERT(BIGINT, '${esc(soDigitos)}')`,
+        ]
+      : []),
+  ].join(' OR ');
 
   const escopo = foraDoEscopo(company);
 
@@ -303,7 +316,7 @@ export async function buscarSugestoesProduto(
       FROM PRODUTOS_BARRA pb WITH (NOLOCK)
       WHERE pb.PRODUTO = p.PRODUTO
         AND pb.CODIGO_BARRA IS NOT NULL
-        AND LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100)))) LIKE '%${tLike}%'
+        AND (${condicaoBarra})
       ORDER BY
         CASE WHEN LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100)))) = '${tEsc}' THEN 0 ELSE 1 END,
         LEN(LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100))))),

@@ -1,5 +1,5 @@
 import type { ColumnType, ReportCellValue, ReportPresetColumn, ReportRow } from "@/lib/reports/types";
-import { formatData, formatDataVenda, formatDiasParado } from "@/lib/reports/format";
+import { formatData, formatDataVenda, formatDiasAcabar, formatDiasParado } from "@/lib/reports/format";
 import { ROW_COLECAO_COD_FIELD, ROW_COLECAO_DESC_FIELD } from "@/lib/reports/keys";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -59,11 +59,13 @@ export function buildOutCols(
     const get =
       t === "diasParado"
         ? (row: ReportRow) => formatDiasParado(row[colDef.key])
-        : t === "dataVenda"
-          ? (row: ReportRow) => formatDataVenda(row[colDef.key])
-          : t === "date"
-            ? (row: ReportRow) => formatData(row[colDef.key])
-            : (row: ReportRow) => row[colDef.key] ?? "";
+        : t === "diasAcabar"
+          ? (row: ReportRow) => formatDiasAcabar(row[colDef.key])
+          : t === "dataVenda"
+            ? (row: ReportRow) => formatDataVenda(row[colDef.key])
+            : t === "date"
+              ? (row: ReportRow) => formatData(row[colDef.key])
+              : (row: ReportRow) => row[colDef.key] ?? "";
 
     outCols.push({ key: colDef.key, label, type: t, get });
   }
@@ -120,6 +122,13 @@ export function isNumericType(type: ColumnType | undefined): boolean {
 export function isSummableColumn(key: string, type: ColumnType | undefined): boolean {
   if (!isNumericType(type)) return false;
   const nonSummable = new Set([
+    // Projeção de vendas: dias/ritmo/cobertura são por item — somar não significa nada.
+    "DIAS_PARA_ACABAR",
+    "RITMO_MES",
+    "RITMO_DIA",
+    "COBERTURA_MESES",
+    "BASE_MESES",
+    "MESES_PARADO",
     "TICKET_MEDIO",
     "CUSTO_UNITARIO",
     "MARKUP",

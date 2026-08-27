@@ -83,6 +83,7 @@ export default function GastosCompraDrawer({
   const canais = canaisDasParcelas(lote.parcelas);
   const temCanal = canais.length > 0;
   const porCanal = temCanal ? resumoPorCanal(lote.parcelas) : [];
+  const totaisPorCanal = new Map(porCanal.map((resumo) => [resumo.canal, resumo.total]));
   const convergencia = temCanal ? convergenciaPorData(lote.parcelas) : [];
 
   function abrirEdicao() {
@@ -306,7 +307,12 @@ export default function GastosCompraDrawer({
                         )}
                         <td className={styles.num}>{money(p.valor)}</td>
                         <td className={`${styles.num} ${styles.muted}`}>
-                          {total > 0 ? `${percentualDaParcela(p.valor, total)}%` : "—"}
+                          {total > 0
+                            ? `${percentualDaParcela(
+                                p.valor,
+                                p.canal ? (totaisPorCanal.get(p.canal) ?? 0) : total
+                              )}%`
+                            : "—"}
                         </td>
                         <td>
                           {podeEditar ? (

@@ -9022,6 +9022,12 @@ export interface EstoqueRedeParams {
   cores?: string[] | null; // por descrição
   tipos?: string[] | null;
   produtoId?: string | null;
+  /**
+   * Restringe a uma LISTA de códigos de produto. ADITIVO: combina com `produtoId`/busca
+   * textual e com os filtros de categoria. Usado pela análise "Projeção de vendas" do
+   * Gerador, que trabalha sobre uma seleção de itens.
+   */
+  produtoIds?: string[] | null;
   produtoSearchTerm?: string | null;
   /** Quando true, também retorna grupos (produto×cor×filial) com saldo líquido ZERO. */
   incluirZerados?: boolean;
@@ -9044,6 +9050,7 @@ export async function fetchEstoqueRedePorProduto({
   cores,
   tipos,
   produtoId,
+  produtoIds,
   produtoSearchTerm,
   incluirZerados = false,
 }: EstoqueRedeParams): Promise<EstoqueRedeItemRow[]> {
@@ -9064,6 +9071,16 @@ export async function fetchEstoqueRedePorProduto({
     } else if (produtoSearchTerm && produtoSearchTerm.trim().length >= 2) {
       request.input('produtoSearchEstRede', sql.VarChar, `%${produtoSearchTerm.trim()}%`);
       produtoFilter = `AND p.DESC_PRODUTO LIKE @produtoSearchEstRede`;
+    }
+
+    // Lista de produtos (aditiva ao filtro acima).
+    const produtoIdsList = Array.from(
+      new Set((produtoIds ?? []).map((v) => String(v ?? '').trim()).filter(Boolean))
+    );
+    if (produtoIdsList.length > 0) {
+      produtoIdsList.forEach((v, i) => request.input(`estRedeProdId${i}`, sql.VarChar, v));
+      const ph = produtoIdsList.map((_, i) => `@estRedeProdId${i}`).join(', ');
+      produtoFilter += ` AND e.PRODUTO IN (${ph})`;  // CHAR: o SQL Server ignora espaço à direita na comparação
     }
 
     let corFilter = '';
