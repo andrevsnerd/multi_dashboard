@@ -4220,8 +4220,8 @@
     "semantic_hash": ""
   },
   "components/compras/GastosCompraDrawer.tsx": {
-    "mtime": 1787838905.5423942,
-    "ast_hash": "e613f3f289ea8d608a266504cc5fb2f9",
+    "mtime": 1787843543.7598834,
+    "ast_hash": "a3a61df07664cb3007abdd174b1d7304",
     "semantic_hash": ""
   },
   "components/compras/GastosCompraGrafico.tsx": {
@@ -4240,8 +4240,8 @@
     "semantic_hash": ""
   },
   "components/compras/ParcelasEditor.tsx": {
-    "mtime": 1787839141.592378,
-    "ast_hash": "ac0f8f779984f93718915ee627fc7155",
+    "mtime": 1787843543.7524426,
+    "ast_hash": "baaf28d1a90462787764e8aa6501e896",
     "semantic_hash": ""
   },
   "components/compras/gastos-compra-format.ts": {
@@ -4322,6 +4322,11 @@
   "lib/utils/projecao-vendas.ts": {
     "mtime": 1787843123.181239,
     "ast_hash": "ba330f1ba68f8734d5d394d2707ec921",
+    "semantic_hash": ""
+  },
+  "tmp/test-projecao.js": {
+    "mtime": 1787843541.0660486,
+    "ast_hash": "1e6b1cbc10d0b2555e2dc71c312c57b3",
     "semantic_hash": ""
   }
 }
