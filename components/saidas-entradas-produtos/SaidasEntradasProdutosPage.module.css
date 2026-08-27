@@ -1512,3 +1512,441 @@
 :global(:root[data-theme="dark"]) .travaAviso strong {
   color: #c4b5fd;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   BIPAGEM + RASCUNHOS
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Cabeçalho da lista: badge + estado do autosave ── */
+.cardHeaderRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.rascunhoStatus {
+  font-size: 13px;
+  color: var(--text-3);
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.rascunhoStatus::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
+  flex-shrink: 0;
+}
+.rascunhoStatusErro {
+  color: #dc2626;
+  font-weight: 600;
+}
+.rascunhoStatusErro::before { background: #dc2626; }
+
+/* ── Campo de bipagem (acima da lista, como no Linx) ── */
+.bipeArea {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  background: var(--s-white);
+  cursor: text;
+}
+.bipeAreaSaida  { border-color: var(--saida-border); background: var(--saida-bg); }
+.bipeAreaEntrada{ border-color: var(--entrada-border); background: var(--entrada-bg); }
+
+.bipeRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bipeIcon {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-2);
+  flex-shrink: 0;
+}
+.bipeIcon svg { width: 22px; height: 22px; }
+
+.bipeInput {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 12px;
+  border: 2px solid var(--b-300);
+  border-radius: 8px;
+  background: var(--s-white);
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  font-variant-numeric: tabular-nums;
+  outline: none;
+}
+.bipeInput::placeholder {
+  color: var(--text-3);
+  font-weight: 500;
+  letter-spacing: normal;
+  font-size: 17px;
+}
+.bipeInput:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, .18);
+}
+.bipeInput:disabled {
+  background: var(--s-100);
+  color: var(--text-3);
+  cursor: not-allowed;
+}
+
+.bipeLoading {
+  font-size: 13px;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
+.bipeAddBtn {
+  padding: 11px 16px;
+  border: 1px solid var(--b-300);
+  border-radius: 8px;
+  background: var(--s-white);
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 140ms, border-color 140ms;
+}
+.bipeAddBtn:hover:not(:disabled) { background: var(--s-100); }
+.bipeAddBtn:disabled { opacity: .4; cursor: not-allowed; }
+
+.bipeSomBtn {
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--b-300);
+  border-radius: 8px;
+  background: var(--s-white);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.bipeSomBtn:hover { background: var(--s-100); }
+
+/* ── Confirmação do último bipe ── */
+.bipeFeedback {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 9px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 15px;
+  line-height: 1.35;
+}
+.bipeFeedbackOk {
+  background: rgba(34, 197, 94, .12);
+  color: #15803d;
+}
+.bipeFeedbackErro {
+  background: rgba(220, 38, 38, .1);
+  color: #b91c1c;
+}
+.bipeFeedbackIcon {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 13px;
+  color: #fff;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.bipeFeedbackOk .bipeFeedbackIcon   { background: #16a34a; }
+.bipeFeedbackErro .bipeFeedbackIcon { background: #dc2626; }
+.bipeFeedbackTexto {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.bipeFeedbackTexto strong { font-weight: 700; }
+.bipeFeedbackTexto span   { opacity: .85; font-size: 14px; }
+
+/* ── Desempate: mesmo código em mais de um produto × cor ── */
+.bipeOpcoes {
+  margin-top: 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--s-white);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  cursor: default;
+}
+.bipeOpcoesTitulo {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-2);
+  padding: 2px 4px 4px;
+}
+.bipeOpcaoBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--s-white);
+  cursor: pointer;
+  transition: border-color 140ms, background 140ms;
+}
+.bipeOpcaoBtn:hover { background: var(--s-100); border-color: var(--b-300); }
+.bipeOpcaoNome { font-size: 16px; font-weight: 700; color: var(--text); }
+.bipeOpcaoMeta { font-size: 14px; color: var(--text-3); }
+.bipeOpcaoCancelar {
+  align-self: flex-start;
+  border: none;
+  background: none;
+  color: var(--text-3);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 3px 4px;
+  text-decoration: underline;
+}
+
+/* ── Destaque da linha recém-bipada ── */
+.produtoItemBipado {
+  border-color: #16a34a !important;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, .18);
+  animation: bipeFlash 1.2s ease-out;
+}
+@keyframes bipeFlash {
+  0%   { background: rgba(34, 197, 94, .22); }
+  100% { background: transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .produtoItemBipado { animation: none; }
+}
+
+/* ── Aviso de rascunho recuperado ── */
+.rascunhoRestauradoAviso {
+  margin-bottom: 10px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: rgba(245, 158, 11, .12);
+  color: #b45309;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* ── Abas da coluna lateral (Histórico | Rascunhos) ── */
+.abasLaterais {
+  display: flex;
+  gap: 4px;
+  padding: 10px 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.abaLateralBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 12px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--text-2);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-bottom: -1px;
+}
+.abaLateralBtn:hover { color: var(--text); }
+.abaLateralBtnAtiva {
+  color: var(--text);
+  border-bottom-color: #2563eb;
+}
+
+.abaLateralContador {
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 9px;
+  background: var(--s-100);
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+}
+.abaLateralContadorAlerta {
+  background: #f59e0b;
+  color: #fff;
+}
+
+.rascunhosAjuda {
+  font-size: 14px;
+  color: var(--text-3);
+  line-height: 1.35;
+}
+
+/* ── Card de rascunho ── */
+.rascunhoItem {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 11px 14px;
+  border-top: 1px solid var(--border);
+}
+.rascunhoItem:first-child { border-top: none; }
+
+.rascunhoTopo {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.rascunhoTipoPill {
+  padding: 2px 8px;
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .02em;
+  color: #fff;
+}
+.rascunhoTipoPillSaida   { background: var(--saida); }
+.rascunhoTipoPillEntrada { background: var(--entrada); }
+
+.rascunhoFilial {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rascunhoAtualPill {
+  padding: 2px 7px;
+  border-radius: 9px;
+  background: rgba(37, 99, 235, .14);
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.rascunhoMeta {
+  font-size: 14px;
+  color: var(--text-3);
+}
+
+.rascunhoAcoes {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.rascunhoRetomarBtn,
+.rascunhoDescartarBtn {
+  padding: 6px 12px;
+  border-radius: 7px;
+  border: 1px solid var(--b-300);
+  background: var(--s-white);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 140ms, border-color 140ms;
+}
+.rascunhoRetomarBtn:hover:not(:disabled) {
+  background: rgba(37, 99, 235, .1);
+  border-color: var(--entrada);
+}
+.rascunhoDescartarBtn:hover:not(:disabled) {
+  background: rgba(220, 38, 38, .09);
+  border-color: #dc2626;
+  color: #b91c1c;
+}
+.rascunhoRetomarBtn:disabled,
+.rascunhoDescartarBtn:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+/* ── Telas estreitas: o campo de bipagem quebra em duas linhas ── */
+@media (max-width: 640px) {
+  .bipeRow { flex-wrap: wrap; }
+  .bipeInput { flex: 1 1 100%; order: -1; }
+  .bipeAddBtn { flex: 1; }
+}
+
+/* ═══════════ TEMA NOTURNO ═══════════ */
+:global(:root[data-theme="dark"]) .bipeInput:focus {
+  border-color: rgba(59, 130, 246, .55);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, .25);
+}
+:global(:root[data-theme="dark"]) .bipeFeedbackOk {
+  background: rgba(34, 197, 94, .16);
+  color: #4ade80;
+}
+:global(:root[data-theme="dark"]) .bipeFeedbackErro {
+  background: rgba(248, 113, 113, .14);
+  color: #fca5a5;
+}
+:global(:root[data-theme="dark"]) .bipeFeedbackErro .bipeFeedbackIcon {
+  background: #f87171;
+  color: #2a0f0f;
+}
+:global(:root[data-theme="dark"]) .bipeAddBtn:hover:not(:disabled),
+:global(:root[data-theme="dark"]) .bipeSomBtn:hover,
+:global(:root[data-theme="dark"]) .bipeOpcaoBtn:hover {
+  background: var(--s-100);
+}
+:global(:root[data-theme="dark"]) .rascunhoStatusErro {
+  color: #fca5a5;
+}
+:global(:root[data-theme="dark"]) .rascunhoStatusErro::before {
+  background: #fca5a5;
+}
+:global(:root[data-theme="dark"]) .rascunhoRestauradoAviso {
+  background: rgba(245, 158, 11, .14);
+  color: #fbbf24;
+}
+:global(:root[data-theme="dark"]) .abaLateralBtnAtiva {
+  border-bottom-color: #60a5fa;
+}
+:global(:root[data-theme="dark"]) .abaLateralContadorAlerta {
+  background: #fbbf24;
+  color: #2a1f05;
+}
+:global(:root[data-theme="dark"]) .rascunhoAtualPill {
+  background: rgba(59, 130, 246, .18);
+  color: #93c5fd;
+}
+/* --saida vira roxo no dark neste módulo; a pill sólida acompanha. */
+:global(:root[data-theme="dark"]) .rascunhoTipoPillSaida {
+  background: #c4b5fd;
+  color: #1b1630;
+}
+:global(:root[data-theme="dark"]) .rascunhoDescartarBtn:hover:not(:disabled) {
+  background: rgba(248, 113, 113, .14);
+  border-color: #f87171;
+  color: #fca5a5;
+}
+:global(:root[data-theme="dark"]) .produtoItemBipado {
+  border-color: #4ade80 !important;
+  box-shadow: 0 0 0 3px rgba(74, 222, 128, .2);
+}

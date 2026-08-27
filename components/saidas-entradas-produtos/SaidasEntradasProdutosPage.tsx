@@ -58,6 +58,54 @@ interface TransferenciaLog {
   status: string;
 }
 
+/** Item já resolvido pela bipagem (produto × cor + saldo na filial da operação). */
+interface BipeItem {
+  produto: string;
+  descProduto: string;
+  corProduto: string | null;
+  descCor: string;
+  codigoBarra: string | null;
+  grade: string | null;
+  estoque: number;
+  filial: string;
+}
+
+type BipeStatus = "ok" | "sem_estoque" | "ambiguo" | "nao_encontrado";
+
+interface BipeResposta {
+  status: BipeStatus;
+  item: BipeItem | null;
+  opcoes: BipeItem[];
+}
+
+/** Rascunho persistido no Neon (ver `lib/utils/saida-entrada-draft-store.ts`). */
+interface RascunhoResumo {
+  id: string;
+  companyKey: string;
+  username: string;
+  tipoOperacao: TipoOperacao;
+  filial: string;
+  filialLabel: string;
+  filialDestino: string | null;
+  filialDestinoLabel: string | null;
+  tipoRomaneio: string;
+  observacao: string;
+  itens: Array<{
+    produto: string;
+    descProduto: string;
+    codigoBarra: string | null;
+    corProduto: string | null;
+    descCor: string;
+    quantidade: number;
+    estoque: number;
+  }>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Estado do autosave, mostrado ao lado do título da lista. */
+type RascunhoStatus = "idle" | "salvando" | "salvo" | "erro";
+
 function defeitoFilialOption(companyKey: string): Filial | undefined {
   const nome = getDefeitoFilial(companyKey);
   return nome ? { codFilial: nome, filial: nome } : undefined;
@@ -487,6 +535,86 @@ async function fetchDefeitoDoDia(
   return { data: json.data ?? null, mensagem: json.mensagem ?? null };
 }
 
+/**
+ * BIPAGEM — resolve o código de barras direto no item pronto (produto × cor + saldo
+ * na filial) em uma única ida ao servidor. O caminho do modal precisa de duas
+ * (`produto-por-codigo-barras` → `produtos`), o que é lento demais quando o
+ * operador está passando peça atrás de peça no leitor.
+ */
+async function biparCodigo(
+  codigoBarras: string,
+  filial: string,
+  companyKey: string
+): Promise<BipeResposta> {
+  const params = new URLSearchParams({
+    codigoBarras: codigoBarras.trim(),
+    filial,
+    company: companyKey,
+  });
+
+  const response = await fetch(`/api/transferencia-produtos/bipar?${params.toString()}`, {
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error("Erro ao consultar o código de barras");
+  }
+
+  const json = (await response.json()) as BipeResposta;
+  return {
+    status: json.status ?? "nao_encontrado",
+    item: json.item ?? null,
+    opcoes: json.opcoes ?? [],
+  };
+}
+
+async function fetchRascunhos(companyKey: string): Promise<RascunhoResumo[]> {
+  const response = await fetch(
+    `/api/saidas-entradas-produtos/rascunhos?company=${encodeURIComponent(companyKey)}`,
+    { cache: "no-store" }
+  );
+
+  if (!response.ok) return [];
+
+  const json = (await response.json()) as { data: RascunhoResumo[] };
+  return json.data || [];
+}
+
+async function salvarRascunhoApi(payload: string, username: string): Promise<void> {
+  const response = await fetch("/api/saidas-entradas-produtos/rascunhos", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", "x-auth-username": username },
+    body: payload,
+  });
+
+  if (!response.ok) {
+    throw new Error("Erro ao salvar rascunho");
+  }
+}
+
+async function removerRascunhoApi(
+  params: { id: string } | { companyKey: string; tipoOperacao: TipoOperacao; filial: string },
+  username?: string
+): Promise<void> {
+  const search = new URLSearchParams(
+    "id" in params
+      ? { id: params.id }
+      : {
+          company: params.companyKey,
+          tipoOperacao: params.tipoOperacao,
+          filial: params.filial,
+        }
+  );
+
+  const headers: Record<string, string> = {};
+  if (username) headers["x-auth-username"] = username;
+
+  await fetch(`/api/saidas-entradas-produtos/rascunhos?${search.toString()}`, {
+    method: "DELETE",
+    headers,
+  });
+}
+
 async function salvarDestinoRomaneio(
   companyKey: string,
   romaneioId: string,
@@ -554,6 +682,42 @@ export default function SaidasEntradasProdutosPage({
   const [defeitoDoDia, setDefeitoDoDia] = useState<{ romaneio: DefeitoDoDia; mensagem: string } | null>(null);
   const [checandoDefeitoDoDia, setChecandoDefeitoDoDia] = useState(false);
   const [defeitoRefreshKey, setDefeitoRefreshKey] = useState(0);
+
+  // ── BIPAGEM ────────────────────────────────────────────────────────────────
+  // Fluxo alternativo ao modal: o leitor manda o código + Enter e o produto já
+  // entra na lista. O campo fica sempre focado para o operador nunca precisar
+  // clicar entre uma peça e outra.
+  const [codigoBipado, setCodigoBipado] = useState("");
+  const [bipesEmVoo, setBipesEmVoo] = useState(0);
+  const [ultimoBipe, setUltimoBipe] = useState<{ ok: boolean; titulo: string; detalhe: string } | null>(null);
+  const [itemDestacado, setItemDestacado] = useState<string | null>(null);
+  const [bipeAmbiguo, setBipeAmbiguo] = useState<{ codigo: string; opcoes: BipeItem[] } | null>(null);
+  const [somBipeLigado, setSomBipeLigado] = useState(true);
+  const bipeInputRef = useRef<HTMLInputElement | null>(null);
+  const destaqueTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
+  // ── RASCUNHOS ──────────────────────────────────────────────────────────────
+  const [abaLateral, setAbaLateral] = useState<"historico" | "rascunhos">("historico");
+  const [rascunhos, setRascunhos] = useState<RascunhoResumo[]>([]);
+  const [loadingRascunhos, setLoadingRascunhos] = useState(false);
+  const [rascunhoStatus, setRascunhoStatus] = useState<RascunhoStatus>("idle");
+  const [rascunhoRestauradoEm, setRascunhoRestauradoEm] = useState<string | null>(null);
+  /** Último payload gravado — evita reenviar o mesmo rascunho a cada re-render. */
+  const rascunhoPayloadRef = useRef<string>("");
+  /**
+   * Já existe rascunho gravado para o escopo atual? Sem isso o primeiro render
+   * (lista vazia) dispararia um PUT vazio que APAGA o rascunho antes mesmo de
+   * ele ser restaurado.
+   */
+  const rascunhoSalvoRef = useRef(false);
+  /**
+   * Enquanto restaura, o autosave fica mudo (senão grava por cima do que leu).
+   * É estado, não ref, DE PROPÓSITO: o autosave precisa ser reavaliado quando a
+   * restauração termina — com ref ele ficaria parado até a próxima alteração e a
+   * lista recém-trazida do banco poderia passar minutos só na memória do browser.
+   */
+  const [hidratandoRascunho, setHidratandoRascunho] = useState(false);
 
   const isAdmin = user?.role === "admin";
 
@@ -1288,6 +1452,225 @@ export default function SaidasEntradasProdutosPage({
     setProdutosSelecionados([]);
   }, []);
 
+  // ── BIPAGEM ────────────────────────────────────────────────────────────────
+
+  /**
+   * Espelho síncrono da lista. Dois bipes em sequência rápida podem cair no mesmo
+   * ciclo de render: lendo `produtosSelecionados` do closure, o segundo bipe veria
+   * a lista de antes do primeiro e perderia a peça. O ref é atualizado na hora em
+   * que o item entra, então cada bipe enxerga o resultado do anterior.
+   */
+  const produtosSelecionadosRef = useRef<ProdutoSelecionado[]>(produtosSelecionados);
+  useEffect(() => {
+    produtosSelecionadosRef.current = produtosSelecionados;
+  }, [produtosSelecionados]);
+
+  /** Bipe curto e agudo = entrou; grave e longo = erro. Som é conforto: falha calado. */
+  const tocarBipe = useCallback((ok: boolean) => {
+    if (!somBipeLigado) return;
+    try {
+      const Ctor =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!Ctor) return;
+      if (!audioCtxRef.current) audioCtxRef.current = new Ctor();
+      const ctx = audioCtxRef.current;
+      if (ctx.state === "suspended") void ctx.resume();
+
+      const duracao = ok ? 0.08 : 0.3;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = ok ? "square" : "sawtooth";
+      osc.frequency.setValueAtTime(ok ? 1200 : 240, ctx.currentTime);
+      gain.gain.setValueAtTime(0.05, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duracao);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + duracao);
+    } catch {
+      // Sem áudio (navegador bloqueou / sem gesto do usuário): segue sem som.
+    }
+  }, [somBipeLigado]);
+
+  /** Devolve o cursor ao campo — o operador nunca deve precisar clicar entre peças. */
+  const focarCampoBipe = useCallback(() => {
+    requestAnimationFrame(() => bipeInputRef.current?.focus());
+  }, []);
+
+  const registrarBipe = useCallback((ok: boolean, titulo: string, detalhe: string) => {
+    setUltimoBipe({ ok, titulo, detalhe });
+    tocarBipe(ok);
+  }, [tocarBipe]);
+
+  /** Última linha já rolada para a vista — evita re-scroll a cada render do destaque. */
+  const destaqueScrollRef = useRef<string | null>(null);
+
+  const destacarItem = useCallback((chave: string) => {
+    destaqueScrollRef.current = null;
+    setItemDestacado(chave);
+    if (destaqueTimeoutRef.current) clearTimeout(destaqueTimeoutRef.current);
+    destaqueTimeoutRef.current = setTimeout(() => setItemDestacado(null), 1600);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (destaqueTimeoutRef.current) clearTimeout(destaqueTimeoutRef.current);
+    };
+  }, []);
+
+  const adicionarItemBipado = useCallback((item: BipeItem) => {
+    if (!filialSelecionada) {
+      registrarBipe(false, "Selecione a filial", "A bipagem precisa saber de qual loja sai/entra a peça.");
+      return;
+    }
+
+    const corTxt = textoCorProduto(item.descCor, item.corProduto);
+    const rotulo = corTxt ? `${item.descProduto} · ${corTxt}` : item.descProduto;
+    const chave = `${item.produto}|${item.corProduto ?? ""}`;
+    const atual = produtosSelecionadosRef.current;
+    const idx = atual.findIndex(
+      (p) =>
+        p.produto === item.produto &&
+        (p.corProduto ?? "") === (item.corProduto ?? "") &&
+        p.filial === filialSelecionada.codFilial
+    );
+
+    let proximo: ProdutoSelecionado[];
+    let quantidade: number;
+
+    if (idx === -1) {
+      if (tipoOperacao === "saida" && item.estoque <= 0) {
+        registrarBipe(false, "Sem estoque", `${rotulo} não tem saldo em ${filialOptionLabel(filialSelecionada)}.`);
+        return;
+      }
+      quantidade = 1;
+      proximo = [
+        ...atual,
+        {
+          produto: item.produto,
+          descProduto: item.descProduto,
+          codigoBarra: item.codigoBarra,
+          corProduto: item.corProduto,
+          descCor: item.descCor,
+          filial: filialSelecionada.codFilial,
+          nomeFilial: filialOptionLabel(filialSelecionada),
+          estoque: item.estoque,
+          quantidade: 1,
+        },
+      ];
+    } else {
+      const linha = atual[idx];
+      if (tipoOperacao === "saida" && linha.quantidade >= item.estoque) {
+        registrarBipe(false, "Quantidade máxima", `${rotulo} já está com o estoque todo (${item.estoque}).`);
+        return;
+      }
+      quantidade = linha.quantidade + 1;
+      proximo = [...atual];
+      // Reaproveita o saldo recém-consultado: entre um bipe e outro o estoque pode ter mudado.
+      proximo[idx] = { ...linha, quantidade, estoque: item.estoque };
+    }
+
+    produtosSelecionadosRef.current = proximo;
+    setProdutosSelecionados(proximo);
+    destacarItem(chave);
+    registrarBipe(
+      true,
+      rotulo,
+      `${item.produto}${item.codigoBarra ? ` · ${item.codigoBarra}` : ""} · qtd ${quantidade}`
+    );
+  }, [filialSelecionada, tipoOperacao, filialOptionLabel, registrarBipe, destacarItem]);
+
+  const processarBipe = useCallback(async (codigoRaw: string) => {
+    const codigo = codigoRaw.trim();
+    if (!codigo) return;
+
+    if (!filialSelecionada) {
+      registrarBipe(false, "Selecione a filial", "Escolha a loja antes de bipar.");
+      return;
+    }
+
+    setBipeAmbiguo(null);
+    setBipesEmVoo((n) => n + 1);
+    try {
+      const resposta = await biparCodigo(codigo, filialSelecionada.codFilial, companyKey);
+
+      if (resposta.status === "ambiguo") {
+        setBipeAmbiguo({ codigo, opcoes: resposta.opcoes });
+        registrarBipe(false, "Código em mais de um produto", `Escolha qual item o código ${codigo} representa.`);
+        return;
+      }
+
+      if (resposta.status === "nao_encontrado" || !resposta.item) {
+        registrarBipe(false, "Código não encontrado", `Nenhum produto cadastrado com o código ${codigo}.`);
+        return;
+      }
+
+      // Entrada aceita saldo zerado (é justamente o que a entrada vai criar);
+      // saída não — `adicionarItemBipado` barra e avisa.
+      adicionarItemBipado(resposta.item);
+    } catch {
+      registrarBipe(false, "Falha na consulta", `Não deu para consultar o código ${codigo}. Tente de novo.`);
+    } finally {
+      setBipesEmVoo((n) => Math.max(0, n - 1));
+      focarCampoBipe();
+    }
+  }, [filialSelecionada, companyKey, registrarBipe, adicionarItemBipado, focarCampoBipe]);
+
+  const submeterBipe = useCallback(() => {
+    const codigo = codigoBipado.trim();
+    if (!codigo) return;
+    // Limpa ANTES de consultar: o próximo bipe já pode estar chegando pelo leitor.
+    setCodigoBipado("");
+    void processarBipe(codigo);
+  }, [codigoBipado, processarBipe]);
+
+  const escolherOpcaoAmbigua = useCallback((item: BipeItem) => {
+    setBipeAmbiguo(null);
+    adicionarItemBipado(item);
+    focarCampoBipe();
+  }, [adicionarItemBipado, focarCampoBipe]);
+
+  // Preferência de som do operador (loja barulhenta / loja silenciosa).
+  useEffect(() => {
+    try {
+      const salvo = window.localStorage.getItem("saidas-entradas:som-bipe");
+      if (salvo !== null) setSomBipeLigado(salvo === "1");
+    } catch {
+      // localStorage indisponível (aba privada): mantém o padrão ligado.
+    }
+  }, []);
+
+  const alternarSomBipe = useCallback(() => {
+    setSomBipeLigado((prev) => {
+      const proximo = !prev;
+      try {
+        window.localStorage.setItem("saidas-entradas:som-bipe", proximo ? "1" : "0");
+      } catch {
+        // sem persistência: vale só para esta sessão
+      }
+      return proximo;
+    });
+  }, []);
+
+  // Troca de loja ou de tipo zera o painel de bipagem: o feedback anterior não vale mais.
+  useEffect(() => {
+    setCodigoBipado("");
+    setUltimoBipe(null);
+    setBipeAmbiguo(null);
+  }, [codFilialSelecionada, tipoOperacao]);
+
+  /**
+   * Cursor no campo de bipagem por padrão — inclusive quando um modal fecha.
+   * Depende do CÓDIGO da filial (string), nunca do objeto: o refresh em foco recria
+   * o objeto e roubaria o cursor de quem estivesse digitando a observação.
+   */
+  useEffect(() => {
+    if (!codFilialSelecionada) return;
+    if (modalAberto || modalEdicaoAberto || mostrarConfirmacaoRegistro) return;
+    focarCampoBipe();
+  }, [codFilialSelecionada, modalAberto, modalEdicaoAberto, mostrarConfirmacaoRegistro, focarCampoBipe]);
+
   const atualizarQuantidade = useCallback((index: number, quantidade: number) => {
     if (quantidade < 1) return;
     
@@ -1363,7 +1746,24 @@ export default function SaidasEntradasProdutosPage({
         }
       }
 
+      // O rascunho existe só até o romaneio sair. Zerar os controles do autosave
+      // ANTES de limpar a lista evita que ele grave um rascunho vazio logo depois.
+      rascunhoSalvoRef.current = false;
+      rascunhoPayloadRef.current = "";
+      setRascunhoStatus("idle");
+      setRascunhoRestauradoEm(null);
+      try {
+        await removerRascunhoApi(
+          { companyKey, tipoOperacao, filial: filialSelecionada.codFilial },
+          user?.username
+        );
+      } catch (err) {
+        console.error("Erro ao remover rascunho após registrar romaneio", err);
+      }
+
       setProdutosSelecionados([]);
+      produtosSelecionadosRef.current = [];
+      void fetchRascunhos(companyKey).then(setRascunhos).catch(() => undefined);
       // Reconsulta a trava de defeito: o romaneio que acabou de sair fecha o dia.
       setDefeitoRefreshKey((k) => k + 1);
 
@@ -1533,6 +1933,297 @@ export default function SaidasEntradasProdutosPage({
     }
   }, [filialSelecionada]);
 
+  // ── RASCUNHOS ──────────────────────────────────────────────────────────────
+  // A lista da tela É o rascunho: cada alteração é gravada no Neon, então uma
+  // queda no meio da conferência não custa o trabalho já bipado. O rascunho some
+  // quando o romaneio é registrado.
+
+  const carregarRascunhos = useCallback(async () => {
+    setLoadingRascunhos(true);
+    try {
+      setRascunhos(await fetchRascunhos(companyKey));
+    } catch {
+      // Aba de rascunhos é auxiliar: falha de leitura não pode travar a operação.
+    } finally {
+      setLoadingRascunhos(false);
+    }
+  }, [companyKey]);
+
+  useEffect(() => {
+    void carregarRascunhos();
+  }, [carregarRascunhos]);
+
+  /** Escopo do rascunho ativo: um por empresa × usuário × tipo × filial. */
+  const escopoRascunho =
+    user?.username && filialSelecionada
+      ? `${companyKey}|${user.username}|${tipoOperacao}|${filialSelecionada.codFilial}`
+      : null;
+
+  // Restaura o rascunho do escopo atual (carga da página, troca de filial ou de tipo).
+  useEffect(() => {
+    rascunhoPayloadRef.current = "";
+    rascunhoSalvoRef.current = false;
+    setRascunhoStatus("idle");
+    setRascunhoRestauradoEm(null);
+
+    if (!escopoRascunho || !user?.username || !filialSelecionada) return;
+
+    const username = user.username;
+    const filialCod = filialSelecionada.codFilial;
+    let cancelado = false;
+    setHidratandoRascunho(true);
+
+    (async () => {
+      try {
+        const lista = await fetchRascunhos(companyKey);
+        if (cancelado) return;
+        setRascunhos(lista);
+
+        const meu = lista.find(
+          (r) =>
+            r.username.toLowerCase() === username.toLowerCase() &&
+            r.tipoOperacao === tipoOperacao &&
+            r.filial.trim().toUpperCase() === filialCod.trim().toUpperCase()
+        );
+        if (!meu || meu.itens.length === 0) return;
+
+        // Só restaura sobre lista vazia: se o operador já começou a bipar
+        // enquanto a consulta ia e voltava, o que ele fez agora vale mais.
+        let aplicou = false;
+        setProdutosSelecionados((prev) => {
+          if (prev.length > 0) return prev;
+          aplicou = true;
+          return meu.itens.map((item) => ({
+            produto: item.produto,
+            descProduto: item.descProduto,
+            codigoBarra: item.codigoBarra,
+            corProduto: item.corProduto,
+            descCor: item.descCor,
+            filial: filialCod,
+            nomeFilial: filialOptionLabel(filialSelecionada),
+            estoque: item.estoque,
+            quantidade: item.quantidade,
+          }));
+        });
+
+        if (!aplicou) return;
+        rascunhoSalvoRef.current = true;
+        setRascunhoRestauradoEm(meu.updatedAt);
+        if (meu.observacao) setObservacaoAtual(meu.observacao);
+      } catch {
+        // Sem rascunho recuperado: a tela segue com a lista vazia.
+      } finally {
+        if (!cancelado) setHidratandoRascunho(false);
+      }
+    })();
+
+    return () => {
+      cancelado = true;
+      setHidratandoRascunho(false);
+    };
+    // `filialSelecionada`/`filialOptionLabel` mudam de referência no refresh em foco;
+    // o escopo (string) é o que de fato define quando recarregar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [escopoRascunho, companyKey, tipoOperacao, user?.username]);
+
+  // Autosave: grava o rascunho pouco depois de cada mudança (bipe, quantidade, obs).
+  useEffect(() => {
+    if (!user?.username || !filialSelecionada) return;
+    if (hidratandoRascunho) return;
+    // Lista vazia e nada gravado ainda = estado inicial. Não pode virar um PUT
+    // vazio, que apagaria o rascunho antes da restauração terminar.
+    if (produtosSelecionados.length === 0 && !rascunhoSalvoRef.current) return;
+
+    const username = user.username;
+    const payload = JSON.stringify({
+      company: companyKey,
+      tipoOperacao,
+      filial: filialSelecionada.codFilial,
+      filialLabel: filialOptionLabel(filialSelecionada),
+      filialDestino: filialDestinoSaida?.codFilial ?? null,
+      filialDestinoLabel: filialDestinoSaida ? filialOptionLabel(filialDestinoSaida) : null,
+      tipoRomaneio: tipoRomaneioSelecionado,
+      observacao: observacaoAtual,
+      itens: produtosSelecionados.map((p) => ({
+        produto: p.produto,
+        descProduto: p.descProduto,
+        codigoBarra: p.codigoBarra,
+        corProduto: p.corProduto,
+        descCor: p.descCor,
+        quantidade: p.quantidade,
+        estoque: p.estoque,
+      })),
+    });
+
+    if (payload === rascunhoPayloadRef.current) return;
+
+    const timeoutId = setTimeout(async () => {
+      setRascunhoStatus("salvando");
+      try {
+        await salvarRascunhoApi(payload, username);
+        rascunhoPayloadRef.current = payload;
+        rascunhoSalvoRef.current = produtosSelecionados.length > 0;
+        setRascunhoStatus("salvo");
+        void carregarRascunhos();
+      } catch {
+        // Não marca como gravado: a próxima alteração tenta de novo.
+        setRascunhoStatus("erro");
+      }
+    }, 400);
+
+    return () => clearTimeout(timeoutId);
+  }, [
+    produtosSelecionados,
+    observacaoAtual,
+    tipoRomaneioSelecionado,
+    filialDestinoSaida,
+    filialSelecionada,
+    filialOptionLabel,
+    tipoOperacao,
+    companyKey,
+    user?.username,
+    hidratandoRascunho,
+    carregarRascunhos,
+  ]);
+
+  /**
+   * Assume um rascunho: traz tipo, filial, destino e itens para a tela.
+   * Rascunho de outro usuário é transferido (o original é apagado) — a lista é da
+   * LOJA, e quem entra no turno precisa continuar a conferência, não duplicá-la.
+   */
+  const retomarRascunho = useCallback(async (rascunho: RascunhoResumo) => {
+    const filial = filiaisDisponiveis.find((f) => matchesFilialOption(f, rascunho.filial));
+    if (!filial) {
+      mostrarNotificacao(`Você não opera a filial ${rascunho.filialLabel}`, "error");
+      return;
+    }
+
+    // Neutraliza os efeitos que limpam a lista ao detectar troca de filial/tipo:
+    // aqui a troca é intencional e já vem com os itens do rascunho.
+    filialCodRef.current = filial.codFilial;
+    tipoRomaneioRef.current = rascunho.tipoRomaneio || tipoRomaneioSelecionado;
+
+    const destino = rascunho.filialDestino
+      ? filiaisDestinoDisponiveis.find((f) => matchesFilialOption(f, rascunho.filialDestino)) ?? null
+      : null;
+
+    setTipoOperacao(rascunho.tipoOperacao);
+    setFilialSelecionada(filial);
+    setFilialDestinoSaida(destino);
+    if (rascunho.tipoRomaneio) setTipoRomaneioSelecionado(rascunho.tipoRomaneio);
+    if (rascunho.tipoOperacao === "saida") setObservacaoSaida(rascunho.observacao);
+    else setObservacaoEntrada(rascunho.observacao);
+
+    const itens = rascunho.itens.map((item) => ({
+      produto: item.produto,
+      descProduto: item.descProduto,
+      codigoBarra: item.codigoBarra,
+      corProduto: item.corProduto,
+      descCor: item.descCor,
+      filial: filial.codFilial,
+      nomeFilial: filialOptionLabel(filial),
+      estoque: item.estoque,
+      quantidade: item.quantidade,
+    }));
+    produtosSelecionadosRef.current = itens;
+    setProdutosSelecionados(itens);
+
+    setModalAberto(false);
+    setAbaLateral("historico");
+
+    const meu = rascunho.username.toLowerCase() === (user?.username || "").toLowerCase();
+
+    /**
+     * Grava no MEU escopo antes de apagar o original. Se a ordem fosse inversa,
+     * entre o DELETE e a próxima gravação a conferência existiria só na memória
+     * do browser — exatamente o buraco que o rascunho existe para fechar.
+     */
+    if (user?.username) {
+      const payload = JSON.stringify({
+        company: companyKey,
+        tipoOperacao: rascunho.tipoOperacao,
+        filial: filial.codFilial,
+        filialLabel: filialOptionLabel(filial),
+        filialDestino: destino?.codFilial ?? null,
+        filialDestinoLabel: destino ? filialOptionLabel(destino) : null,
+        tipoRomaneio: rascunho.tipoRomaneio,
+        observacao: rascunho.observacao,
+        itens: rascunho.itens.map((item) => ({
+          produto: item.produto,
+          descProduto: item.descProduto,
+          codigoBarra: item.codigoBarra,
+          corProduto: item.corProduto,
+          descCor: item.descCor,
+          quantidade: item.quantidade,
+          estoque: item.estoque,
+        })),
+      });
+      try {
+        await salvarRascunhoApi(payload, user.username);
+        rascunhoPayloadRef.current = payload;
+        rascunhoSalvoRef.current = true;
+        setRascunhoStatus("salvo");
+      } catch {
+        // Não gravou: o autosave tenta de novo na próxima alteração. Nesse caso
+        // NÃO apagamos o original — ele continua sendo a única cópia segura.
+        setRascunhoStatus("erro");
+        mostrarNotificacao("Rascunho retomado, mas não foi possível salvá-lo ainda", "error");
+        void carregarRascunhos();
+        return;
+      }
+    }
+
+    if (!meu) {
+      try {
+        await removerRascunhoApi({ id: rascunho.id }, user?.username);
+      } catch {
+        // Se não apagar, fica uma cópia duplicada visível na aba — perde-se a
+        // limpeza, não o trabalho.
+      }
+    }
+
+    void carregarRascunhos();
+    mostrarNotificacao(
+      `Rascunho retomado · ${rascunho.itens.length} produto(s)${meu ? "" : ` de ${rascunho.username}`}`
+    );
+  }, [
+    companyKey,
+    filiaisDisponiveis,
+    filiaisDestinoDisponiveis,
+    filialOptionLabel,
+    tipoRomaneioSelecionado,
+    user?.username,
+    mostrarNotificacao,
+    carregarRascunhos,
+  ]);
+
+  const descartarRascunho = useCallback(async (rascunho: RascunhoResumo) => {
+    if (!confirm(`Descartar o rascunho de ${rascunho.filialLabel} com ${rascunho.itens.length} produto(s)?`)) {
+      return;
+    }
+    try {
+      await removerRascunhoApi({ id: rascunho.id }, user?.username);
+      // É o rascunho da tela? Então a lista atual também morre com ele.
+      const ehOAtual =
+        !!filialSelecionada &&
+        rascunho.tipoOperacao === tipoOperacao &&
+        rascunho.filial.trim().toUpperCase() === filialSelecionada.codFilial.trim().toUpperCase() &&
+        rascunho.username.toLowerCase() === (user?.username || "").toLowerCase();
+      if (ehOAtual) {
+        rascunhoSalvoRef.current = false;
+        rascunhoPayloadRef.current = "";
+        setRascunhoRestauradoEm(null);
+        setRascunhoStatus("idle");
+        produtosSelecionadosRef.current = [];
+        setProdutosSelecionados([]);
+      }
+      void carregarRascunhos();
+      mostrarNotificacao("Rascunho descartado");
+    } catch {
+      mostrarNotificacao("Erro ao descartar o rascunho", "error");
+    }
+  }, [user?.username, filialSelecionada, tipoOperacao, carregarRascunhos, mostrarNotificacao]);
+
   const totalItens = produtosSelecionados.reduce((sum, p) => sum + p.quantidade, 0);
   const totalProdutos = produtosSelecionados.length;
 
@@ -1545,6 +2236,17 @@ export default function SaidasEntradasProdutosPage({
       return matchFilial(log.filialDestino, filialSelecionada);
     });
   })();
+
+  /**
+   * Rascunhos pendentes das filiais que ESTE usuário opera. Mostrar os de outras
+   * lojas só encheria a aba com trabalho que ele não pode retomar.
+   */
+  const rascunhosVisiveis = rascunhos.filter(
+    (r) =>
+      r.itens.length > 0 &&
+      (filiaisDisponiveis.length === 0 ||
+        filiaisDisponiveis.some((f) => matchesFilialOption(f, r.filial)))
+  );
 
   if (!permissoesCarregadas) {
     return (
@@ -1764,24 +2466,117 @@ export default function SaidasEntradasProdutosPage({
         {/* Coluna de logs (esquerda) */}
         <div className={styles.logColumn}>
           <div className={styles.card}>
-            <div className={styles.cardHeader}>
-              <span className={styles.cardLabelWithIcon}>
-                <span className={styles.cardHeaderIcon} aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none">
-                    <path d="M12 7v5l3 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M12 22a10 10 0 1 0-10-10 10 10 0 0 0 10 10Z" stroke="currentColor" strokeWidth="2" />
-                  </svg>
-                </span>
-                Histórico de {tipoOperacao === "saida" ? "Saídas" : "Entradas"}
-              </span>
-              {logsFiltrados.length > 0 && (
-                <span className={styles.badgeMuted}>
-                  {logsFiltrados.length} {tipoOperacao === "saida"
-                    ? (logsFiltrados.length === 1 ? "saída" : "saídas")
-                    : (logsFiltrados.length === 1 ? "entrada" : "entradas")}
-                </span>
-              )}
+            {/* Abas: histórico (já registrado) × rascunhos (conferência em aberto) */}
+            <div className={styles.abasLaterais} role="tablist" aria-label="Painel lateral">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={abaLateral === "historico"}
+                className={`${styles.abaLateralBtn} ${abaLateral === "historico" ? styles.abaLateralBtnAtiva : ""}`}
+                onClick={() => setAbaLateral("historico")}
+              >
+                Histórico
+                {logsFiltrados.length > 0 && (
+                  <span className={styles.abaLateralContador}>{logsFiltrados.length}</span>
+                )}
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={abaLateral === "rascunhos"}
+                className={`${styles.abaLateralBtn} ${abaLateral === "rascunhos" ? styles.abaLateralBtnAtiva : ""}`}
+                onClick={() => setAbaLateral("rascunhos")}
+              >
+                Rascunhos
+                {rascunhosVisiveis.length > 0 && (
+                  <span className={`${styles.abaLateralContador} ${styles.abaLateralContadorAlerta}`}>
+                    {rascunhosVisiveis.length}
+                  </span>
+                )}
+              </button>
             </div>
+
+            {abaLateral === "rascunhos" ? (
+              <>
+                <div className={styles.historicoActionRow}>
+                  <span className={styles.rascunhosAjuda}>
+                    Listas em aberto — somem quando a saída/entrada é registrada.
+                  </span>
+                </div>
+
+                {loadingRascunhos && rascunhosVisiveis.length === 0 ? (
+                  <div className={styles.emptyLog}>Carregando...</div>
+                ) : rascunhosVisiveis.length === 0 ? (
+                  <div className={styles.emptyLog}>
+                    <div className={styles.emptyLogIcon}>📝</div>
+                    <div>Nenhum rascunho pendente</div>
+                  </div>
+                ) : (
+                  <div className={styles.logScrollContainer}>
+                    <div className={styles.logList}>
+                      {rascunhosVisiveis.map((rascunho) => {
+                        const totalPecas = rascunho.itens.reduce((sum, i) => sum + i.quantidade, 0);
+                        const ehAtual =
+                          !!filialSelecionada &&
+                          rascunho.tipoOperacao === tipoOperacao &&
+                          rascunho.filial.trim().toUpperCase() ===
+                            filialSelecionada.codFilial.trim().toUpperCase() &&
+                          rascunho.username.toLowerCase() === (user?.username || "").toLowerCase();
+                        return (
+                          <div key={rascunho.id} className={styles.rascunhoItem}>
+                            <div className={styles.rascunhoTopo}>
+                              <span
+                                className={`${styles.rascunhoTipoPill} ${
+                                  rascunho.tipoOperacao === "saida"
+                                    ? styles.rascunhoTipoPillSaida
+                                    : styles.rascunhoTipoPillEntrada
+                                }`}
+                              >
+                                {rascunho.tipoOperacao === "saida" ? "Saída" : "Entrada"}
+                              </span>
+                              <span className={styles.rascunhoFilial}>
+                                {filialLabel(rascunho.filialLabel || rascunho.filial)}
+                              </span>
+                              {ehAtual && <span className={styles.rascunhoAtualPill}>na tela</span>}
+                            </div>
+                            <div className={styles.rascunhoMeta}>
+                              {rascunho.itens.length} prod · {totalPecas}{" "}
+                              {totalPecas === 1 ? "item" : "itens"}
+                              {rascunho.filialDestinoLabel
+                                ? ` · → ${filialLabel(rascunho.filialDestinoLabel)}`
+                                : ""}
+                            </div>
+                            <div className={styles.rascunhoMeta}>
+                              {rascunho.username} · {formatLogDateTime(rascunho.updatedAt)}
+                            </div>
+                            <div className={styles.rascunhoAcoes}>
+                              <button
+                                type="button"
+                                className={styles.rascunhoRetomarBtn}
+                                onClick={() => void retomarRascunho(rascunho)}
+                                disabled={ehAtual || isBusy}
+                                title={ehAtual ? "Este rascunho já é a lista da tela" : "Trazer para a tela"}
+                              >
+                                {ehAtual ? "Em edição" : "Retomar"}
+                              </button>
+                              <button
+                                type="button"
+                                className={styles.rascunhoDescartarBtn}
+                                onClick={() => void descartarRascunho(rascunho)}
+                                disabled={isBusy}
+                              >
+                                Descartar
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+            <>
             <div className={styles.historicoActionRow}>
               <Link href={historicoCompletoHref} className={styles.historicoActionLink}>
                 Ver histórico completo →
@@ -1855,6 +2650,8 @@ export default function SaidasEntradasProdutosPage({
                 </div>
               </div>
             )}
+            </>
+            )}
           </div>
         </div>
 
@@ -1881,12 +2678,140 @@ export default function SaidasEntradasProdutosPage({
                   </span>
                   Produtos para {tipoOperacao === "saida" ? "Saída" : "Entrada"}
                 </span>
-                {totalProdutos > 0 && (
-                  <span className={`${styles.badge} ${tipoOperacao === "saida" ? styles.badgeSaida : styles.badgeEntrada}`}>
-                    {totalProdutos} prod · {totalItens} itens
+                <div className={styles.cardHeaderRight}>
+                  {/* Estado do autosave: o operador precisa VER que o que ele bipou já está salvo. */}
+                  {rascunhoStatus !== "idle" && (
+                    <span
+                      className={`${styles.rascunhoStatus} ${
+                        rascunhoStatus === "erro" ? styles.rascunhoStatusErro : ""
+                      }`}
+                      title={
+                        rascunhoStatus === "erro"
+                          ? "Não foi possível salvar o rascunho — a próxima alteração tenta de novo."
+                          : "A lista é salva automaticamente e sobrevive a queda/fechamento da aba."
+                      }
+                    >
+                      {rascunhoStatus === "salvando"
+                        ? "salvando rascunho…"
+                        : rascunhoStatus === "salvo"
+                          ? "rascunho salvo"
+                          : "rascunho não salvo"}
+                    </span>
+                  )}
+                  {totalProdutos > 0 && (
+                    <span className={`${styles.badge} ${tipoOperacao === "saida" ? styles.badgeSaida : styles.badgeEntrada}`}>
+                      {totalProdutos} prod · {totalItens} itens
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* ── BIPAGEM ── caminho rápido: leitor manda código + Enter e a peça
+                  entra na lista, sem abrir modal (igual ao campo do próprio Linx). */}
+              <div
+                className={`${styles.bipeArea} ${tipoOperacao === "saida" ? styles.bipeAreaSaida : styles.bipeAreaEntrada}`}
+                onClick={focarCampoBipe}
+              >
+                <div className={styles.bipeRow}>
+                  <span className={styles.bipeIcon} aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none">
+                      <path d="M3 5v14M6.5 5v14M10 5v14M13.5 5v10M17 5v14M20.5 5v14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                    </svg>
                   </span>
+                  <input
+                    ref={bipeInputRef}
+                    type="text"
+                    className={styles.bipeInput}
+                    value={codigoBipado}
+                    onChange={(e) => setCodigoBipado(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        submeterBipe();
+                      }
+                    }}
+                    placeholder={
+                      filialSelecionada
+                        ? "Bipe o código de barras (ou digite e tecle Enter)"
+                        : "Selecione a filial para começar a bipar"
+                    }
+                    disabled={!filialSelecionada || isBusy}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    aria-label="Código de barras"
+                  />
+                  {bipesEmVoo > 0 && <span className={styles.bipeLoading}>consultando…</span>}
+                  <button
+                    type="button"
+                    className={styles.bipeAddBtn}
+                    onClick={submeterBipe}
+                    disabled={!codigoBipado.trim() || !filialSelecionada || isBusy}
+                  >
+                    Adicionar
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.bipeSomBtn}
+                    onClick={(e) => { e.stopPropagation(); alternarSomBipe(); }}
+                    title={somBipeLigado ? "Desligar o som do bipe" : "Ligar o som do bipe"}
+                    aria-pressed={somBipeLigado}
+                  >
+                    {somBipeLigado ? "🔊" : "🔇"}
+                  </button>
+                </div>
+
+                {/* Confirmação do último bipe: o operador está olhando a peça, não a lista. */}
+                {ultimoBipe && (
+                  <div className={`${styles.bipeFeedback} ${ultimoBipe.ok ? styles.bipeFeedbackOk : styles.bipeFeedbackErro}`}>
+                    <span className={styles.bipeFeedbackIcon} aria-hidden="true">{ultimoBipe.ok ? "✓" : "!"}</span>
+                    <span className={styles.bipeFeedbackTexto}>
+                      <strong>{ultimoBipe.titulo}</strong>
+                      <span>{ultimoBipe.detalhe}</span>
+                    </span>
+                  </div>
+                )}
+
+                {/* O mesmo código cadastrado em mais de um produto × cor: quem decide é o operador. */}
+                {bipeAmbiguo && (
+                  <div className={styles.bipeOpcoes} onClick={(e) => e.stopPropagation()}>
+                    <div className={styles.bipeOpcoesTitulo}>
+                      Código {bipeAmbiguo.codigo} está em {bipeAmbiguo.opcoes.length} produtos — escolha:
+                    </div>
+                    {bipeAmbiguo.opcoes.map((opcao) => {
+                      const corTxt = textoCorProduto(opcao.descCor, opcao.corProduto);
+                      return (
+                        <button
+                          key={`${opcao.produto}|${opcao.corProduto ?? ""}`}
+                          type="button"
+                          className={styles.bipeOpcaoBtn}
+                          onClick={() => escolherOpcaoAmbigua(opcao)}
+                        >
+                          <span className={styles.bipeOpcaoNome}>{opcao.descProduto}</span>
+                          <span className={styles.bipeOpcaoMeta}>
+                            {opcao.produto}
+                            {corTxt ? ` · ${corTxt}` : ""} · estoque {opcao.estoque}
+                          </span>
+                        </button>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      className={styles.bipeOpcaoCancelar}
+                      onClick={() => { setBipeAmbiguo(null); focarCampoBipe(); }}
+                    >
+                      Cancelar
+                    </button>
+                  </div>
                 )}
               </div>
+
+              {/* Rascunho recuperado do banco: deixa claro que a lista não é nova. */}
+              {rascunhoRestauradoEm && produtosSelecionados.length > 0 && (
+                <div className={styles.rascunhoRestauradoAviso}>
+                  Rascunho recuperado — última gravação em {formatLogDateTime(rascunhoRestauradoEm)}
+                </div>
+              )}
 
               {produtosSelecionados.length === 0 ? (
                 <div className={styles.emptyProducts}>
@@ -1903,15 +2828,28 @@ export default function SaidasEntradasProdutosPage({
                   </div>
                   <div className={styles.emptyProductsTitle}>Nenhum produto adicionado</div>
                   <div className={styles.emptyProductsSub}>
-                    Busque e adicione produtos à {tipoOperacao === "saida" ? "saída" : "entrada"}
+                    Bipe o código de barras acima ou use “Adicionar Produto” para montar a{" "}
+                    {tipoOperacao === "saida" ? "saída" : "entrada"}
                   </div>
                 </div>
               ) : (
                 <div className={styles.produtosList}>
                   {produtosSelecionados.map((produto, index) => {
                     const corTxt = textoCorProduto(produto.descCor, produto.corProduto);
+                    const chaveItem = `${produto.produto}|${produto.corProduto ?? ""}`;
+                    const destacado = itemDestacado === chaveItem;
                     return (
-                    <div key={index} className={styles.produtoItem}>
+                    <div
+                      key={index}
+                      className={`${styles.produtoItem} ${destacado ? styles.produtoItemBipado : ""}`}
+                      ref={(el) => {
+                        // Traz a linha recém-bipada para a vista (a lista rola).
+                        if (!destacado || !el) return;
+                        if (destaqueScrollRef.current === chaveItem) return;
+                        destaqueScrollRef.current = chaveItem;
+                        el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+                      }}
+                    >
                       <div className={styles.produtoInfo}>
                         <div className={styles.produtoName}>{produto.descProduto}</div>
                         <div className={styles.produtoSku}>
