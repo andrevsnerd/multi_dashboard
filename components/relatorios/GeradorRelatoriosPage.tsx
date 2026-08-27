@@ -216,10 +216,20 @@ export default function GeradorRelatoriosPage({
   const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchWrapRef = useRef<HTMLDivElement | null>(null);
   // Seleção de VÁRIOS produtos (filtro "produtos", usado pela Projeção de vendas): chips.
-  const [produtosSelecionados, setProdutosSelecionados] = useState<Array<{ id: string; name: string }>>([]);
-  // Opções da Projeção de vendas: janela do ritmo (meses) + índice sazonal (opt-in).
+  // `cor` só vem preenchida quando o item entrou por CÓDIGO DE BARRA — a barra identifica a
+  // variação, então a análise fica naquela cor. Chip sem cor abre todas as cores do produto.
+  const [produtosSelecionados, setProdutosSelecionados] = useState<
+    Array<{ id: string; name: string; cor?: string | null; corDescricao?: string }>
+  >([]);
+  // Campo "colar lista de códigos" (mesmo hábito da Lista Loja): textarea + resolução em lote.
+  const [codigosColados, setCodigosColados] = useState("");
+  const [resolvendoCodigos, setResolvendoCodigos] = useState(false);
+  const [avisoCodigos, setAvisoCodigos] = useState<string | null>(null);
+  // Opções da Projeção de vendas: janela do ritmo (meses) + índice sazonal (opt-in) +
+  // limitar a projeção ao estoque atual (ligado por padrão).
   const [projecaoJanela, setProjecaoJanela] = useState<number>(PROJECAO_JANELA_DEFAULT);
   const [projecaoSazonalidade, setProjecaoSazonalidade] = useState(false);
+  const [projecaoConsiderarEstoque, setProjecaoConsiderarEstoque] = useState(true);
 
   // Presets + estrutura de colunas
   const [backendPresets, setBackendPresets] = useState<ReportPreset[]>([]);
@@ -348,6 +358,8 @@ export default function GeradorRelatoriosPage({
   // carregar chips de uma para outra (onde talvez nem exista o filtro) só confunde.
   useEffect(() => {
     setProdutosSelecionados([]);
+    setCodigosColados("");
+    setAvisoCodigos(null);
   }, [reportTypeId]);
 
   // Carrega presets do backend.
@@ -486,8 +498,11 @@ export default function GeradorRelatoriosPage({
     // Análise com filtro "produtos" (Projeção de vendas): cada escolha ACUMULA como chip e
     // a busca fica livre para o próximo item; nas outras, seleção única como sempre.
     if (supportsProdutosMulti) {
+      // Escolhido na busca por nome → nível PRODUTO (sem cor): abre todas as cores.
       setProdutosSelecionados((prev) =>
-        prev.some((x) => x.id === p.productId) ? prev : [...prev, { id: p.productId, name: p.productName }]
+        prev.some((x) => x.id === p.productId && !x.cor)
+          ? prev
+          : [...prev, { id: p.productId, name: p.productName, cor: null }]
       );
       setProdutoQuery("");
       setProdutoResults([]);
@@ -499,8 +514,84 @@ export default function GeradorRelatoriosPage({
     setProdutoDropdownOpen(false);
   };
 
-  const removeProdutoChip = (id: string) =>
-    setProdutosSelecionados((prev) => prev.filter((x) => x.id !== id));
+  /** Chave do chip = produto + cor (o mesmo produto pode estar em duas cores na lista). */
+  const chipKey = (c: { id: string; cor?: string | null }) => `${c.id}|${c.cor ?? ""}`;
+
+  const removeProdutoChip = (key: string) =>
+    setProdutosSelecionados((prev) => prev.filter((x) => chipKey(x) !== key));
+
+  /**
+   * Resolve em LOTE os códigos colados (código de barra interno OU código do produto) e
+   * adiciona como chips. Uma requisição para a lista inteira; código que não casou é
+   * mostrado na tela — colar 11 códigos e receber 9 itens sem aviso seria pior que o erro.
+   */
+  const adicionarCodigosColados = useCallback(async () => {
+    const codigos = codigosColados
+      // Aceita linha, vírgula, ponto e vírgula, tab ou espaço como separador.
+      .split(/[\s,;]+/g)
+      .map((c) => c.trim())
+      .filter(Boolean);
+    if (codigos.length === 0) {
+      setAvisoCodigos("Cole pelo menos um código.");
+      return;
+    }
+    setResolvendoCodigos(true);
+    setAvisoCodigos(null);
+    try {
+      const res = await fetch("/api/relatorios/resolver-produtos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ codigos }),
+      });
+      const json = (await res.json()) as {
+        itens?: Array<{
+          codigo: string;
+          produto: string;
+          cor: string | null;
+          corDescricao: string;
+          descricao: string;
+        }>;
+        naoEncontrados?: string[];
+        error?: string;
+      };
+      if (!res.ok) throw new Error(json?.error || "Erro ao resolver os códigos");
+
+      const itens = json.itens ?? [];
+      setProdutosSelecionados((prev) => {
+        const existentes = new Set(prev.map((c) => chipKey(c)));
+        const novos: typeof prev = [];
+        for (const it of itens) {
+          const chip = {
+            id: it.produto,
+            name: it.descricao || it.produto,
+            cor: it.cor,
+            corDescricao: it.corDescricao,
+          };
+          const k = chipKey(chip);
+          if (existentes.has(k)) continue;
+          existentes.add(k);
+          novos.push(chip);
+        }
+        return [...prev, ...novos];
+      });
+
+      const naoEncontrados = json.naoEncontrados ?? [];
+      const partes: string[] = [];
+      if (itens.length > 0) partes.push(`${itens.length} item(ns) adicionado(s)`);
+      if (naoEncontrados.length > 0) {
+        const lista = naoEncontrados.slice(0, 10).join(", ");
+        partes.push(
+          `${naoEncontrados.length} não reconhecido(s): ${lista}${naoEncontrados.length > 10 ? "…" : ""}`
+        );
+      }
+      setAvisoCodigos(partes.join(" · ") || "Nenhum código reconhecido.");
+      if (naoEncontrados.length === 0) setCodigosColados("");
+    } catch (e) {
+      setAvisoCodigos(e instanceof Error ? e.message : "Erro ao resolver os códigos");
+    } finally {
+      setResolvendoCodigos(false);
+    }
+  }, [codigosColados]);
 
   const clearProduto = () => {
     setProdutoSelected(null);
@@ -549,11 +640,17 @@ export default function GeradorRelatoriosPage({
     } else if (produtoQuery.trim().length >= 2) {
       params.set("produtoSearchTerm", produtoQuery.trim());
     }
-    // Vários produtos (chips) — chave `prod`, repetida. Convive com a busca textual.
-    produtosSelecionados.forEach((p) => params.append("prod", p.id));
+    // Vários produtos (chips). Chip COM cor (veio de código de barra) vai em `prodcor`
+    // como "PRODUTO|COR" e restringe a análise àquela cor; chip sem cor vai em `prod` e
+    // abre todas as cores do produto.
+    produtosSelecionados.forEach((p) => {
+      if (p.cor) params.append("prodcor", `${p.id}|${p.cor}`);
+      else params.append("prod", p.id);
+    });
     if (meta?.supportedFilters.includes("projecao" as never)) {
       params.set("projecaoJanelaMeses", String(projecaoJanela));
       if (projecaoSazonalidade) params.set("projecaoSazonalidade", "1");
+      if (!projecaoConsiderarEstoque) params.set("projecaoConsiderarEstoque", "0");
     }
     const diasNum = Number(diasParadoValor.trim());
     const suportaDiasParado = meta?.supportedFilters.includes("diasParado" as never) ?? false;
@@ -569,7 +666,7 @@ export default function GeradorRelatoriosPage({
   }, [
     companyKey, filial, startStr, endStr, grupos, linhas, subgrupos, grades,
     colecoes, cores, tipos, produtoSelected, produtoQuery, produtosSelecionados,
-    projecaoJanela, projecaoSazonalidade,
+    projecaoJanela, projecaoSazonalidade, projecaoConsiderarEstoque,
     diasParadoValor, diasParadoModo, incluirZerados, incluirNegativos, fornecedor, meta,
   ]);
 
@@ -970,6 +1067,7 @@ export default function GeradorRelatoriosPage({
           columnTypes,
           janelaMeses: projecaoJanela,
           sazonalidade: projecaoSazonalidade,
+          considerarEstoque: projecaoConsiderarEstoque,
           fileHint: hint,
         }
       );
@@ -1231,19 +1329,29 @@ export default function GeradorRelatoriosPage({
                   a busca continua livre para ir somando item por item. */}
               {supportsProdutosMulti && produtosSelecionados.length > 0 && (
                 <div className={styles.chips}>
-                  {produtosSelecionados.map((p) => (
-                    <span key={p.id} className={styles.chip} title={`${p.name} (${p.id})`}>
-                      <span className={styles.chipText}>{p.name}</span>
-                      <button
-                        type="button"
-                        className={styles.chipRemove}
-                        onClick={() => removeProdutoChip(p.id)}
-                        aria-label={`Remover ${p.name}`}
+                  {produtosSelecionados.map((p) => {
+                    const corTxt = p.cor ? p.corDescricao || p.cor : "";
+                    return (
+                      <span
+                        key={chipKey(p)}
+                        className={styles.chip}
+                        title={`${p.name} (${p.id})${p.cor ? ` · cor ${corTxt}` : " · todas as cores"}`}
                       >
-                        ×
-                      </button>
-                    </span>
-                  ))}
+                        <span className={styles.chipText}>
+                          {p.name}
+                          {corTxt ? ` · ${corTxt}` : ""}
+                        </span>
+                        <button
+                          type="button"
+                          className={styles.chipRemove}
+                          onClick={() => removeProdutoChip(chipKey(p))}
+                          aria-label={`Remover ${p.name}`}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    );
+                  })}
                   <button
                     type="button"
                     className={styles.chipClearAll}
@@ -1251,6 +1359,42 @@ export default function GeradorRelatoriosPage({
                   >
                     Limpar todos
                   </button>
+                </div>
+              )}
+              {/* Colar lista de códigos (mesmo hábito da Lista Loja): resolve em lote e vira
+                  chips. Código de barra fixa a cor; código do produto abre todas as cores. */}
+              {supportsProdutosMulti && (
+                <div className={styles.pasteBox}>
+                  <textarea
+                    className={styles.pasteArea}
+                    value={codigosColados}
+                    placeholder={"Colar lista de códigos (um por linha)\n050341\n050340\n050338"}
+                    onChange={(e) => setCodigosColados(e.target.value)}
+                    rows={3}
+                  />
+                  <div className={styles.pasteActions}>
+                    <button
+                      type="button"
+                      className={styles.pasteBtn}
+                      onClick={() => void adicionarCodigosColados()}
+                      disabled={resolvendoCodigos || codigosColados.trim() === ""}
+                    >
+                      {resolvendoCodigos ? "Buscando…" : "Adicionar códigos"}
+                    </button>
+                    {codigosColados.trim() !== "" && (
+                      <button
+                        type="button"
+                        className={styles.chipClearAll}
+                        onClick={() => {
+                          setCodigosColados("");
+                          setAvisoCodigos(null);
+                        }}
+                      >
+                        Limpar
+                      </button>
+                    )}
+                  </div>
+                  {avisoCodigos && <div className={styles.pasteHint}>{avisoCodigos}</div>}
                 </div>
               )}
             </div>
@@ -1269,6 +1413,17 @@ export default function GeradorRelatoriosPage({
                     <option key={n} value={n}>{`Janela de ${n} meses`}</option>
                   ))}
                 </select>
+                <label
+                  className={styles.checkLabel}
+                  title="LIGADO: a projeção de cada mês é limitada pelo estoque atual e zera quando ele acaba (responde 'até quando o que tenho vai durar'). DESLIGADO: mostra a DEMANDA que o histórico sustenta, sem teto de estoque — é o modo para analisar antes de comprar, em que item já zerado continua mostrando quanto venderia. Dias p/ acabar e Demanda/Falta valem nos dois modos."
+                >
+                  <input
+                    type="checkbox"
+                    checked={projecaoConsiderarEstoque}
+                    onChange={(e) => setProjecaoConsiderarEstoque(e.target.checked)}
+                  />
+                  Considerar estoque
+                </label>
                 <label
                   className={styles.checkLabel}
                   title="Distribui a projeção pelo peso de cada mês do ano (dez pesa mais, fev menos). O índice vem do histórico da PRÓPRIA seleção nos últimos 24 meses — em seleção pequena ele é ruidoso; use com um grupo/coleção inteiro. Sem 12 meses fechados de histórico, a projeção continua plana."

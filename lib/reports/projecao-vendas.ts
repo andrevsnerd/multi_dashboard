@@ -70,6 +70,11 @@ export const PROJECAO_VENDAS_COLUMNS: ReportColumnDef[] = [
   { key: "DIAS_PARA_ACABAR", defaultLabel: "Dias p/ acabar", type: "diasAcabar" },
   { key: "DATA_ACABA", defaultLabel: "Acaba em", type: "date" },
   { key: "PROJECAO_TOTAL", defaultLabel: "Projeção total (un)", type: "int" },
+  // Demanda e falta são calculadas SEMPRE sem teto de estoque e sobre o horizonte fixo de
+  // 12 meses — não mudam quando você liga/desliga "Considerar estoque", então servem de
+  // âncora para decidir compra nos dois modos.
+  { key: "DEMANDA_HORIZONTE", defaultLabel: "Demanda 12 meses (un)", type: "int" },
+  { key: "FALTA_HORIZONTE", defaultLabel: "Falta p/ atender 12 meses", type: "int" },
   { key: "SOBRA_HORIZONTE", defaultLabel: "Sobra no horizonte", type: "int" },
 ];
 
@@ -97,6 +102,8 @@ const PROJECAO_VENDAS_PRESETS: ReportPresetDef[] = [
       col("CONFIANCA"),
       col("DIAS_PARA_ACABAR"),
       col("DATA_ACABA"),
+      col("DEMANDA_HORIZONTE"),
+      col("FALTA_HORIZONTE"),
       // As colunas de mês (ago/26, set/26, …) são anexadas automaticamente APÓS estas.
     ],
   },
@@ -127,6 +134,8 @@ const PROJECAO_VENDAS_PRESETS: ReportPresetDef[] = [
       col("DIAS_PARA_ACABAR"),
       col("DATA_ACABA"),
       col("PROJECAO_TOTAL"),
+      col("DEMANDA_HORIZONTE"),
+      col("FALTA_HORIZONTE"),
       col("SOBRA_HORIZONTE"),
     ],
   },
@@ -145,7 +154,7 @@ export const projecaoVendasMeta: ReportTypeMeta = {
   id: PROJECAO_VENDAS_ID,
   label: "Projeção de vendas",
   description:
-    "Quanto cada item (produto × cor) deve vender no mês atual e nos próximos, consumindo o estoque de hoje até acabar — uma coluna por mês, mais os dias até zerar. O ritmo vem da série MENSAL de vendas dos últimos 24 meses, medido na janela que termina no último mês com venda: item ativo usa os meses recentes, item que parou usa os meses em que vendia (e o relatório mostra há quanto tempo parou e a confiança da estimativa). Nenhuma reconstrução de estoque retroativo entra na conta.",
+    "Quanto cada item (produto × cor) deve vender no mês atual e nos próximos — uma coluna por mês, mais os dias até o estoque zerar. Cole a lista de códigos (código de barra interno ou código do produto) e cada item é projetado a partir da PRÓPRIA história. O ritmo vem da série MENSAL de vendas dos últimos 24 meses, medido na janela que termina no último mês com venda: item ativo usa os meses recentes, item que parou usa os meses em que vendia (e o relatório mostra há quanto tempo parou e a confiança da estimativa). Com \"Considerar estoque\" ligado a projeção para quando o estoque acaba; desligado, mostra a demanda pura do histórico — o modo de analisar antes de comprar, em que item já zerado continua mostrando quanto venderia. Nenhuma reconstrução de estoque retroativo entra na conta.",
   // Sem "periodo": o ritmo é sempre medido nos últimos 24 meses e a projeção começa no mês
   // corrente — um período escolhido na tela só confundiria (não muda nada no cálculo).
   supportedFilters: [

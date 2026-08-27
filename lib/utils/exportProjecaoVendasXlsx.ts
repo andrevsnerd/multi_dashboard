@@ -74,6 +74,8 @@ export async function exportProjecaoVendasXlsx(
     /** Meses da janela do ritmo (para o subtítulo explicar de onde veio o número). */
     janelaMeses: number;
     sazonalidade: boolean;
+    /** true = projeção limitada pelo estoque; false = demanda pura (modo pré-compra). */
+    considerarEstoque: boolean;
     /** Trecho opcional no nome do arquivo (ex.: nome do produto / categoria filtrada). */
     fileHint?: string | null;
   }
@@ -151,7 +153,11 @@ export async function exportProjecaoVendasXlsx(
   const titleLines = [
     "Projeção de vendas",
     `${options.filialLabel && options.filialLabel !== "todas-filiais" ? `Filial: ${options.filialLabel}  ·  ` : ""}Data-base ${fmtDate(options.dataBase)}  ·  ${rows.length.toLocaleString("pt-BR")} item(ns)`,
-    `Ritmo: média dos ${options.janelaMeses} meses que terminam no último mês com venda de cada item  ·  Sazonalidade: ${options.sazonalidade ? "aplicada" : "não aplicada (ritmo plano)"}  ·  A projeção consome o estoque atual, sem considerar reposição`,
+    `Ritmo: média dos ${options.janelaMeses} meses que terminam no último mês com venda de cada item  ·  Sazonalidade: ${options.sazonalidade ? "aplicada" : "não aplicada (ritmo plano)"}  ·  ${
+      options.considerarEstoque
+        ? "Projeção LIMITADA ao estoque atual (zera quando o estoque acaba), sem reposição"
+        : "Projeção = DEMANDA do histórico, SEM teto de estoque (modo de análise pré-compra)"
+    }`,
   ];
   // Faixa da projeção (uma linha, só quando há colunas de mês) logo acima do cabeçalho.
   const bandRowNum = primeiroMes >= 0 ? titleLines.length + 1 : 0;
@@ -192,7 +198,9 @@ export async function exportProjecaoVendasXlsx(
   if (bandRowNum > 0 && primeiroMes >= 0) {
     const band = ws.getRow(bandRowNum);
     band.height = 18;
-    band.getCell(primeiroMes + 1).value = "Projeção mensal (un) — até o estoque acabar";
+    band.getCell(primeiroMes + 1).value = options.considerarEstoque
+      ? "Projeção mensal (un) — até o estoque acabar"
+      : "Demanda mensal projetada (un) — sem teto de estoque";
     if (ultimoMes > primeiroMes) {
       ws.mergeCells(bandRowNum, primeiroMes + 1, bandRowNum, ultimoMes + 1);
     }
@@ -367,9 +375,12 @@ export async function exportProjecaoVendasXlsx(
   const legendaRow = totalRowNum + 2;
   const legenda = ws.getRow(legendaRow);
   legenda.getCell(1).value =
-    "Legenda: célula azul = venda projetada no mês · célula âmbar = mês em que o estoque zera · célula apagada = sem projeção.  " +
+    (options.considerarEstoque
+      ? "Legenda: célula azul = venda projetada no mês · célula âmbar = mês em que o estoque zera · célula apagada = sem projeção.  "
+      : "Legenda: célula azul = demanda projetada no mês (sem teto de estoque) · célula apagada = sem demanda.  ") +
     "Ritmo = média mensal da janela que termina no último mês COM venda do item (meses zerados no meio da janela contam; " +
-    "os posteriores viram \"Parado há (meses)\").  Estoque considera só saldos positivos.";
+    "os posteriores viram \"Parado há (meses)\").  Estoque considera só saldos positivos.  " +
+    "Demanda 12 meses e Falta p/ atender NUNCA usam teto de estoque — são os mesmos números nos dois modos.";
   ws.mergeCells(legendaRow, 1, legendaRow, Math.max(1, outCols.length));
   legenda.getCell(1).font = { size: 9, name: "Calibri", color: { argb: "FF64748B" }, italic: true };
   legenda.getCell(1).alignment = { horizontal: "left", vertical: "middle", wrapText: true };

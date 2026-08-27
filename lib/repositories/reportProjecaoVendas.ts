@@ -4,7 +4,7 @@ import {
 } from "@/lib/repositories/products";
 import { fetchEstoqueRedePorProduto } from "@/lib/repositories/controleEstoque";
 import { applyColecaoLabels } from "@/lib/repositories/colecao";
-import { canonicalKey, ROW_COR_FIELD } from "@/lib/reports/keys";
+import { canonicalCor, canonicalKey, ROW_COR_FIELD } from "@/lib/reports/keys";
 import {
   DIAS_ACABAR_EXCEDE,
   DIAS_ACABAR_SEM_GIRO,
@@ -195,8 +195,35 @@ export async function fetchProjecaoVendas(
     meses.push({ mes, start, end });
   }
 
+  // ── Escopo de produtos ──────────────────────────────────────────────────────────────
+  // Duas formas de escolher, que convivem:
+  //  · `produtoIds` (chips de busca / código do produto colado) → TODAS as cores do produto.
+  //  · `produtoChaves` ("PRODUTO|COR", código de BARRA colado) → só aquela cor.
+  // A consulta SQL é escopada por PRODUTO (índice); o recorte por cor é aplicado em JS,
+  // mesmo padrão dos filtros de cor/tipo desta análise.
   const produtoIds = (filters.produtoIds ?? []).map((p) => String(p ?? "").trim()).filter(Boolean);
-  const escopoProdutos = produtoIds.length > 0 ? produtoIds : null;
+  const chavesCor = new Map<string, Set<string>>();
+  for (const raw of filters.produtoChaves ?? []) {
+    const [prod, cor] = String(raw ?? "").split("|");
+    const produto = (prod ?? "").trim();
+    if (!produto) continue;
+    const set = chavesCor.get(produto) ?? new Set<string>();
+    set.add(canonicalCor(cor ?? ""));
+    chavesCor.set(produto, set);
+  }
+  // Produto pedido pelo código (sem cor) libera todas as cores dele.
+  const produtosTodasCores = new Set(produtoIds);
+  const produtosEscopo = Array.from(new Set([...produtoIds, ...chavesCor.keys()]));
+  const escopoProdutos = produtosEscopo.length > 0 ? produtosEscopo : null;
+  /** Item passa pelo recorte de cor? (só restringe produto pedido por barra). */
+  const corPermitida = (produto: string, cor: string | null): boolean => {
+    if (produtosTodasCores.has(produto)) return true;
+    const permitidas = chavesCor.get(produto);
+    if (!permitidas) return true; // produto veio por categoria, não por lista
+    return permitidas.has(canonicalCor(cor ?? ""));
+  };
+
+  const considerarEstoque = filters.projecaoConsiderarEstoque !== false;
 
   // ── Série mensal (uma consulta por mês) + estoque + custo ───────────────────────────
   let mesesFeitos = 0;
@@ -238,6 +265,11 @@ export async function fetchProjecaoVendas(
         produtoId: filters.produtoId ?? null,
         produtoIds: escopoProdutos,
         produtoSearchTerm: filters.produtoSearchTerm ?? null,
+        // Com uma lista explícita de itens, traz também os de saldo ZERO: o item que o
+        // usuário colou tem que aparecer na tabela (com "Sem giro"/estoque 0) em vez de
+        // desaparecer em silêncio. Sem lista (análise por categoria) fica no padrão, senão
+        // a consulta devolveria o cadastro inteiro.
+        incluirZerados: escopoProdutos != null,
       })
     ),
   ]);
@@ -266,6 +298,7 @@ export async function fetchProjecaoVendas(
       const produto = String(d.productId ?? "").trim();
       if (!produto) continue;
       const corCodigo = d.corProduto ? String(d.corProduto).trim() : "";
+      if (!corPermitida(produto, corCodigo)) continue;
       const key = canonicalKey(produto, corCodigo);
       const acc = getAcc(key, {
         produto,
@@ -295,6 +328,7 @@ export async function fetchProjecaoVendas(
     const produto = (r.produto ?? "").trim();
     if (!produto) continue;
     const corCodigo = (r.corCodigo ?? "").trim();
+    if (!corPermitida(produto, corCodigo)) continue;
     const key = canonicalKey(produto, corCodigo);
     const acc = getAcc(key, {
       produto,
@@ -364,6 +398,7 @@ export async function fetchProjecaoVendas(
       diaAtual: hoje.dia,
       maxMeses: PROJECAO_HORIZONTE_MESES,
       indiceSazonal,
+      limitarAoEstoque: considerarEstoque,
     });
 
     // Arredonda as colunas de mês PRESERVANDO a soma (nunca round-then-sum: a soma das
@@ -377,9 +412,9 @@ export async function fetchProjecaoVendas(
       if (qtde > 0) mesesUsados = i + 1;
     });
     const projecaoTotal = inteiros.reduce((s, v) => s + v, 0);
-    const proj90 = projecao.meses
-      .slice(0, 3)
-      .reduce((s, m) => s + m.qtde, 0);
+    // Soma os 3 primeiros meses NA MESMA leitura da tabela (com teto de estoque quando o
+    // modo está ligado; demanda pura quando não) — o rótulo do KPI acompanha o modo.
+    const proj90 = projecao.meses.slice(0, 3).reduce((s, m) => s + m.qtde, 0);
 
     // Janelas de venda para leitura rápida (rolantes, incluem o mês corrente parcial).
     const somaUltimos = (n: number) =>
@@ -433,6 +468,10 @@ export async function fetchProjecaoVendas(
           ? addDiasYmd(hoje.ymd, Math.ceil(projecao.diasParaAcabar))
           : "",
       PROJECAO_TOTAL: projecaoTotal,
+      // Demanda/falta ignoram o modo e o teto de estoque de propósito: são a régua de
+      // compra, e precisam ser o mesmo número com "Considerar estoque" ligado ou não.
+      DEMANDA_HORIZONTE: roundInt(projecao.demandaHorizonte),
+      FALTA_HORIZONTE: roundInt(Math.max(0, projecao.demandaHorizonte - acc.estoque)),
       SOBRA_HORIZONTE: roundInt(projecao.sobra),
     };
 
@@ -446,11 +485,15 @@ export async function fetchProjecaoVendas(
     });
   }
 
-  // ── Colunas de mês: do mês corrente até o mês em que o ÚLTIMO item zera (teto 12) ───
-  // Item que não zera dentro do horizonte usa o horizonte inteiro.
-  const horizonteUsado = calculadas.some((c) => c.row.DIAS_PARA_ACABAR === DIAS_ACABAR_EXCEDE)
+  // ── Colunas de mês ──────────────────────────────────────────────────────────────────
+  // Com estoque: do mês corrente até o mês em que o ÚLTIMO item zera (item que não zera
+  // dentro do horizonte estica para o horizonte inteiro). Sem estoque (modo demanda): nada
+  // "acaba", então sempre o horizonte inteiro.
+  const horizonteUsado = !considerarEstoque
     ? PROJECAO_HORIZONTE_MESES
-    : Math.max(1, ...calculadas.map((c) => c.mesesUsados));
+    : calculadas.some((c) => c.row.DIAS_PARA_ACABAR === DIAS_ACABAR_EXCEDE)
+      ? PROJECAO_HORIZONTE_MESES
+      : Math.max(1, ...calculadas.map((c) => c.mesesUsados));
 
   const dynamicColumns: ReportColumnDef[] = [];
   const mesesColuna: string[] = [];
@@ -475,13 +518,21 @@ export async function fetchProjecaoVendas(
   const estoqueTotal = rows.reduce((s, r) => s + Number(r.ESTOQUE_REDE ?? 0), 0);
   const valorEstoque = rows.reduce((s, r) => s + Number(r.VALOR_ESTOQUE ?? 0), 0);
   const proj90Total = calculadas.reduce((s, c) => s + c.proj90, 0);
+  const demandaTotal = rows.reduce((s, r) => s + Number(r.DEMANDA_HORIZONTE ?? 0), 0);
+  const faltaTotal = rows.reduce((s, r) => s + Number(r.FALTA_HORIZONTE ?? 0), 0);
   const semGiroCount = calculadas.filter((c) => c.semGiro).length;
   const zeradosCount = calculadas.filter((c) => c.zerado).length;
   const summary: ReportSummaryMetric[] = [
     { label: "Itens (produto × cor)", value: rows.length, format: "int" },
     { label: "Estoque atual (un)", value: roundInt(estoqueTotal), format: "int" },
     { label: "Valor do estoque", value: round2(valorEstoque), format: "currency" },
-    { label: "Projeção 3 meses (un)", value: roundInt(proj90Total), format: "int" },
+    {
+      label: considerarEstoque ? "Projeção 3 meses (un)" : "Demanda 3 meses (un)",
+      value: roundInt(proj90Total),
+      format: "int",
+    },
+    { label: "Demanda 12 meses (un)", value: roundInt(demandaTotal), format: "int" },
+    { label: "Falta p/ atender 12 meses", value: roundInt(faltaTotal), format: "int" },
     { label: "Itens sem giro", value: semGiroCount, format: "int" },
     { label: "Itens zerados", value: zeradosCount, format: "int" },
   ];

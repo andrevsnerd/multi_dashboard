@@ -212,6 +212,64 @@
   padding: 0 4px;
 }
 
+/* Campo "colar lista de códigos" (filtro "produtos"). */
+.pasteBox {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 280px;
+  margin-top: 4px;
+}
+
+.pasteArea {
+  border: 1px solid var(--b-300);
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  background: var(--s-white);
+  color: var(--t-900);
+  resize: vertical;
+  min-height: 54px;
+}
+
+.pasteArea:focus {
+  outline: none;
+  border-color: #0ea5e9;
+}
+
+.pasteActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pasteBtn {
+  border: 1px solid var(--b-300);
+  border-radius: 8px;
+  background: var(--s-white);
+  color: var(--t-700);
+  font-size: 12px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.pasteBtn:hover:not(:disabled) {
+  border-color: #0ea5e9;
+  color: #0284c7;
+}
+
+.pasteBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.pasteHint {
+  font-size: 11px;
+  color: var(--t-600);
+  line-height: 1.35;
+}
+
 .searchDropdown {
   position: absolute;
   top: calc(100% + 4px);

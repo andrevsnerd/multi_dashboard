@@ -44,6 +44,8 @@ export function parseReportFilters(searchParams: URLSearchParams): ReportFilters
     produtoId: searchParams.get("produtoId") || null,
     // Vários produtos: aceita repetido (?produtoId2=a&produtoId2=b) na chave curta `prod`.
     produtoIds: list("prod"),
+    // Pares "PRODUTO|COR" (código de barra colado resolve a variação, não o produto todo).
+    produtoChaves: list("prodcor"),
     produtoSearchTerm: searchParams.get("produtoSearchTerm") || null,
     fornecedor: searchParams.get("fornecedor") || null,
     limit: limit != null && limit > 0 ? limit : undefined,
@@ -59,6 +61,8 @@ export function parseReportFilters(searchParams: URLSearchParams): ReportFilters
     incluirRupturas: searchParams.get("incluirRupturas") === "1",
     projecaoJanelaMeses: janelaRaw != null && janelaRaw > 0 ? Math.floor(janelaRaw) : null,
     projecaoSazonalidade: searchParams.get("projecaoSazonalidade") === "1",
+    // Default LIGADO: só desliga quando a tela manda explicitamente "0".
+    projecaoConsiderarEstoque: searchParams.get("projecaoConsiderarEstoque") !== "0",
   };
 }
 

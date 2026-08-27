@@ -130,5 +130,24 @@ r = p.calcRitmoMensal({ serie: s([18, 22, 0, 0, 0, 0, 0, 0], "2026-01"), mesAtua
 check("15 mesesParado", r.mesesParado, 5);
 check("15 baseIdadeMeses", r.baseIdadeMeses, 5);
 
+// 16. modo "so a demanda": nao limita ao estoque, mas mantem dias/mes que acaba
+proj = p.projetarConsumoEstoque({ estoque: 5, ritmoMes: 30, mesAtual: "2026-08", diaAtual: 1, maxMeses: 12, limitarAoEstoque: false });
+check("16 mes cheio sem teto", proj.meses[1].qtde, 30);
+check("16 demanda 12m", Math.round(proj.demandaHorizonte), 360);
+check("16 ainda diz quando acaba", proj.mesAcaba, "2026-08");
+check("16 dias p/ acabar ~5", Math.round(proj.diasParaAcabar), 5);
+check("16 sobra", proj.sobra, 0);
+
+// 17. estoque zerado: com teto vira fila de zeros; sem teto mostra a demanda (caso do dono)
+const comTeto = p.projetarConsumoEstoque({ estoque: 0, ritmoMes: 20, mesAtual: "2026-08", diaAtual: 15, maxMeses: 12 });
+const semTeto = p.projetarConsumoEstoque({ estoque: 0, ritmoMes: 20, mesAtual: "2026-08", diaAtual: 15, maxMeses: 12, limitarAoEstoque: false });
+check("17 com teto: tudo zero", comTeto.meses.every((m) => m.qtde === 0), true);
+check("17 sem teto: set = 20", semTeto.meses[1].qtde, 20);
+check("17 demanda igual nos dois modos", Math.round(comTeto.demandaHorizonte), Math.round(semTeto.demandaHorizonte));
+
+// 18. com teto, a soma continua fechando com o estoque
+proj = p.projetarConsumoEstoque({ estoque: 47, ritmoMes: 10, mesAtual: "2026-08", diaAtual: 10, maxMeses: 12 });
+check("18 soma == estoque", proj.meses.reduce((a, m) => a + m.qtde, 0), 47);
+
 console.log(falhas === 0 ? "\nTODOS OS TESTES PASSARAM" : `\n${falhas} FALHA(S)`);
 process.exit(falhas === 0 ? 0 : 1);

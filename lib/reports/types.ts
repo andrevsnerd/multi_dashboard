@@ -138,8 +138,21 @@ export interface ReportFilters {
    * lista de itens e vejo a projeção de cada um"). Convive com os filtros de categoria.
    */
   produtoIds?: string[] | null;
+  /**
+   * Restringe a PARES produto × cor específicos, no formato "PRODUTO|COR" (código de cor
+   * cru). Vem do campo "Colar lista de códigos": código de BARRA identifica a variação, e
+   * a análise fica só naquela cor. Um produto colado pelo CÓDIGO DO PRODUTO não entra
+   * aqui — vai só em `produtoIds` e abre todas as cores.
+   */
+  produtoChaves?: string[] | null;
   /** Projeção de vendas: meses da janela do ritmo (termina no último mês com venda). */
   projecaoJanelaMeses?: number | null;
+  /**
+   * Projeção de vendas: quando true (default), a projeção mensal é limitada pelo estoque
+   * atual e zera quando ele acaba. Quando false, mostra a DEMANDA pura do histórico —
+   * modo de analisar antes de comprar (item zerado continua mostrando quanto venderia).
+   */
+  projecaoConsiderarEstoque?: boolean;
   /** Projeção de vendas: aplica índice sazonal por mês (calculado da própria seleção). */
   projecaoSazonalidade?: boolean;
   /** Limite de linhas retornadas (default no repositório). */

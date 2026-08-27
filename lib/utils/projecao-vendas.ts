@@ -277,16 +277,35 @@ export interface ProjecaoEstoqueResultado {
   mesAcaba: string | null;
   /** true quando há giro mas o estoque não acaba dentro do horizonte pedido. */
   excedeHorizonte: boolean;
-  /** Unidades que sobram no fim do horizonte. */
+  /** Unidades de estoque que sobram no fim do horizonte (0 se acabar antes). */
   sobra: number;
+  /**
+   * DEMANDA do horizonte inteiro: soma da capacidade de venda de todos os meses, SEM
+   * limite de estoque. Igual nos dois modos — é o "quanto isso vende" puro, e a base do
+   * "falta comprar" (`demandaHorizonte − estoque`).
+   */
+  demandaHorizonte: number;
   /** Cobertura simples em meses (estoque ÷ ritmo), ignorando sazonalidade. */
   coberturaMeses: number | null;
 }
 
 /**
- * Consome o estoque atual mês a mês pelo ritmo estimado, começando no mês corrente
- * (proporcional aos dias que ainda faltam nele) e parando quando o estoque zera.
- * Nenhuma reposição é considerada — é a leitura de "com o que tenho hoje, até quando vai".
+ * Projeta a venda mês a mês pelo ritmo estimado, começando no mês corrente (proporcional
+ * aos dias que ainda faltam nele). Nenhuma reposição é considerada.
+ *
+ * DOIS MODOS (`limitarAoEstoque`, decisão do dono ago/2026):
+ *
+ *  - **true (Considerar estoque)** — a coluna de cada mês é limitada pelo estoque que
+ *    ainda resta, e zera quando o estoque acaba. Responde "com o que tenho hoje, até
+ *    quando vai" e a soma das colunas fecha com o estoque consumido.
+ *  - **false (Só a demanda)** — a coluna de cada mês é a venda que o histórico sustenta,
+ *    SEM teto de estoque. É o modo para analisar ANTES de comprar: item que já zerou (ou
+ *    zera semana que vem) continua mostrando o que venderia, em vez de virar uma fila de
+ *    zeros. `DIAS_PARA_ACABAR`/`mesAcaba` continuam valendo — eles descrevem o estoque
+ *    real, independentemente de a projeção estar ou não limitada por ele.
+ *
+ * `demandaHorizonte` (sem teto) é calculada nos DOIS modos: é o que permite dizer quanto
+ * falta comprar para atender o horizonte.
  */
 export function projetarConsumoEstoque(params: {
   estoque: number;
@@ -297,6 +316,8 @@ export function projetarConsumoEstoque(params: {
   diaAtual: number;
   maxMeses: number;
   indiceSazonal?: Map<number, number> | null;
+  /** Ver os dois modos acima. Default true (limita ao estoque). */
+  limitarAoEstoque?: boolean;
 }): ProjecaoEstoqueResultado {
   const estoque = Math.max(0, Number(params.estoque ?? 0));
   const ritmo = Math.max(0, Number(params.ritmoMes ?? 0));
@@ -309,6 +330,8 @@ export function projetarConsumoEstoque(params: {
     Math.max(1, totalDiasMesAtual - params.diaAtual + 1)
   );
 
+  const limitar = params.limitarAoEstoque !== false;
+
   if (ritmo <= 0) {
     for (let i = 0; i < maxMeses; i += 1) {
       meses.push({ mes: addMeses(params.mesAtual, i), qtde: 0, capacidade: 0 });
@@ -319,11 +342,16 @@ export function projetarConsumoEstoque(params: {
       mesAcaba: null,
       excedeHorizonte: estoque > 0,
       sobra: estoque,
+      demandaHorizonte: 0,
       coberturaMeses: null,
     };
   }
 
-  let restante = estoque;
+  // `restanteEstoque` acompanha o estoque REAL sendo consumido — é ele que dá os dias até
+  // acabar. No modo "só a demanda" a coluna do mês pode passar do estoque, então a coluna
+  // exibida e o consumo do estoque são grandezas separadas.
+  let restanteEstoque = estoque;
+  let demandaHorizonte = 0;
   let dias = 0;
   let diasParaAcabar: number | null = null;
   let mesAcaba: string | null = null;
@@ -335,21 +363,22 @@ export function projetarConsumoEstoque(params: {
     // Mês corrente entra proporcional aos dias que faltam; os seguintes, inteiros.
     const fracao = i === 0 ? diasRestantesMesAtual / totalDiasMesAtual : 1;
     const capacidade = ritmo * fator * fracao;
-    const venda = Math.min(capacidade, Math.max(0, restante));
+    demandaHorizonte += capacidade;
+    const venda = limitar ? Math.min(capacidade, Math.max(0, restanteEstoque)) : capacidade;
     meses.push({ mes, qtde: venda, capacidade });
 
     const diasDoTrecho = i === 0 ? diasRestantesMesAtual : diasNoMes(mes);
     if (diasParaAcabar == null) {
-      if (capacidade > 0 && restante <= capacidade) {
+      if (capacidade > 0 && restanteEstoque <= capacidade) {
         // Zera dentro deste mês: fração proporcional dos dias do trecho.
-        dias += (restante / capacidade) * diasDoTrecho;
+        dias += (restanteEstoque / capacidade) * diasDoTrecho;
         diasParaAcabar = dias;
         mesAcaba = mes;
       } else {
         dias += diasDoTrecho;
       }
     }
-    restante = Math.max(0, restante - venda);
+    restanteEstoque = Math.max(0, restanteEstoque - capacidade);
   }
 
   return {
@@ -357,7 +386,8 @@ export function projetarConsumoEstoque(params: {
     diasParaAcabar,
     mesAcaba,
     excedeHorizonte: diasParaAcabar == null,
-    sobra: restante,
+    sobra: restanteEstoque,
+    demandaHorizonte,
     coberturaMeses: estoque / ritmo,
   };
 }
