@@ -1,12 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import type { CompraGastoParcela } from "@/lib/types/compra-gasto";
 import {
+  COMPRA_GASTO_CANAL_CURTO,
+  COMPRA_GASTO_CANAL_LABEL,
+  type CompraGastoModeloParcelamento,
+  type CompraGastoParcela,
+} from "@/lib/types/compra-gasto";
+import {
+  canaisDasParcelas,
   cents,
   gerarParcelas,
+  gerarParcelasModelo,
   redistribuirNaUltimaEmAberto,
+  resumoPorCanal,
 } from "@/lib/utils/compra-gastos-agregacao";
 
 import styles from "./GastosCompra.module.css";
@@ -31,6 +39,25 @@ interface Edicao {
 }
 
 const ATALHOS = [1, 2, 3, 4, 6, 12];
+
+/**
+ * Modelos de pagamento do select "Tipo". Cada um é um gerador: escolher aplica
+ * as datas e os valores na hora, e mexer em qualquer linha depois volta o select
+ * para "Manual" — o que o usuário digitou nunca é sobrescrito pelo modelo.
+ */
+const MODELOS: { valor: CompraGastoModeloParcelamento; label: string; dica: string }[] = [
+  { valor: "manual", label: "Manual", dica: "Divide em Nx ou por % à mão." },
+  {
+    valor: "salete",
+    label: "Salete",
+    dica: "2x iguais: 90 e 120 dias depois da data da compra.",
+  },
+  {
+    valor: "china",
+    label: "China",
+    dica: `${COMPRA_GASTO_CANAL_LABEL.transferencia} 40% + ${COMPRA_GASTO_CANAL_LABEL.alibaba} 60%, cada um 30% no ato do pedido, 50% no despacho (+30 dias) e 20% 60 dias depois do despacho (+90). As datas convergem: o dia soma os dois pagamentos.`,
+  },
+];
 
 function renumerar(parcelas: CompraGastoParcela[]): CompraGastoParcela[] {
   return parcelas.map((p, i) => ({ ...p, numero: i + 1 }));
@@ -63,6 +90,50 @@ export default function ParcelasEditor({
   const [primeiroVencimento, setPrimeiroVencimento] = useState(vencimentoSugerido);
   const [intervalo, setIntervalo] = useState<"mensal" | "quinzenal">("mensal");
   const [edicao, setEdicao] = useState<Edicao | null>(null);
+  // Parcelamento que já vem com canal foi gerado pelo modelo China — o select
+  // abre refletindo isso, em vez de mentir "Manual" sobre o que está na tela.
+  const [modelo, setModelo] = useState<CompraGastoModeloParcelamento>(() =>
+    parcelas.some((p) => p.canal) ? "china" : "manual"
+  );
+
+  const canais = useMemo(() => canaisDasParcelas(parcelas), [parcelas]);
+  const temCanal = canais.length > 0;
+  const modeloAtivo = MODELOS.find((m) => m.valor === modelo) ?? MODELOS[0];
+
+  // O modelo é aplicado por efeito, não no onChange do select, porque o total
+  // costuma chegar DEPOIS da escolha (no modal você pode escolher "China" antes
+  // de selecionar a Compra Salva). Refs para não colocar `parcelas`/`onChange`
+  // nas dependências: a lista muda a cada aplicação e o efeito entraria em laço.
+  const parcelasRef = useRef(parcelas);
+  const onChangeRef = useRef(onChange);
+  const primeiraRenderizacao = useRef(true);
+  useEffect(() => {
+    parcelasRef.current = parcelas;
+    onChangeRef.current = onChange;
+  }, [parcelas, onChange]);
+
+  // A âncora acompanha a data da compra: mudar a data no modal reancora o
+  // modelo (Salete conta 90/120 dias DELA), em vez de deixar a data antiga
+  // congelada no campo "a partir de".
+  useEffect(() => {
+    setPrimeiroVencimento(vencimentoSugerido);
+  }, [vencimentoSugerido]);
+
+  useEffect(() => {
+    // Na montagem nada é regerado: abrir um parcelamento existente não pode
+    // reescrever o que está salvo.
+    if (primeiraRenderizacao.current) {
+      primeiraRenderizacao.current = false;
+      return;
+    }
+    if (modelo === "manual") return;
+    const jaPagas = parcelasRef.current.filter((p) => p.pago);
+    const travado = cents(jaPagas.reduce((s, p) => s + (Number(p.valor) || 0), 0));
+    const base = cents(total - travado);
+    const novas = gerarParcelasModelo(base > 0 ? base : total, primeiroVencimento, modelo);
+    if (novas.length === 0) return;
+    onChangeRef.current(renumerar([...jaPagas, ...novas]));
+  }, [modelo, total, primeiroVencimento]);
 
   const pagas = useMemo(() => parcelas.filter((p) => p.pago), [parcelas]);
   const somaPagas = useMemo(() => cents(pagas.reduce((s, p) => s + p.valor, 0)), [pagas]);
@@ -83,6 +154,7 @@ export default function ParcelasEditor({
     redistribuirNaUltimaEmAberto(lista, total, editada);
 
   function dividirEm(quantidade: number) {
+    setModelo("manual");
     const base = cents(total - somaPagas);
     const novas = gerarParcelas(base > 0 ? base : total, quantidade, primeiroVencimento, intervalo);
     if (novas.length === 0) return;
@@ -91,16 +163,19 @@ export default function ParcelasEditor({
   }
 
   function alterarData(indice: number, valor: string) {
+    setModelo("manual");
     onChange(parcelas.map((p, i) => (i === indice ? { ...p, vencimento: valor } : p)));
   }
 
   function alterarValor(indice: number, texto: string) {
+    setModelo("manual");
     setEdicao({ linha: indice, campo: "valor", texto });
     const valor = Math.max(0, parseMoeda(texto));
     onChange(comAjuste(parcelas.map((p, i) => (i === indice ? { ...p, valor } : p)), indice));
   }
 
   function alterarPct(indice: number, texto: string) {
+    setModelo("manual");
     setEdicao({ linha: indice, campo: "pct", texto });
     const pct = Math.max(0, parseMoeda(texto));
     const valor = cents((total * pct) / 100);
@@ -108,12 +183,14 @@ export default function ParcelasEditor({
   }
 
   function remover(indice: number) {
+    setModelo("manual");
     setEdicao(null);
     onChange(comAjuste(renumerar(parcelas.filter((_, i) => i !== indice)), -1));
   }
 
   function adicionar() {
     const ultima = parcelas[parcelas.length - 1];
+    setModelo("manual");
     setEdicao(null);
     onChange(
       renumerar([
@@ -158,7 +235,9 @@ export default function ParcelasEditor({
             <button
               key={n}
               type="button"
-              className={`${styles.atalho} ${quantidadeAtual === n ? styles.atalhoAtivo : ""}`}
+              className={`${styles.atalho} ${
+                modelo === "manual" && quantidadeAtual === n ? styles.atalhoAtivo : ""
+              }`}
               onClick={() => dividirEm(n)}
               disabled={disabled}
             >
@@ -179,6 +258,21 @@ export default function ParcelasEditor({
           ou digite % / valor numa linha — as outras fecham a conta
         </span>
         <label className={styles.splitCampo}>
+          <span>Tipo:</span>
+          <select
+            value={modelo}
+            disabled={disabled}
+            title={modeloAtivo.dica}
+            onChange={(e) => setModelo(e.target.value as CompraGastoModeloParcelamento)}
+          >
+            {MODELOS.map((m) => (
+              <option key={m.valor} value={m.valor}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className={styles.splitCampo}>
           <span>a cada</span>
           <select
             value={intervalo}
@@ -191,17 +285,25 @@ export default function ParcelasEditor({
         </label>
       </div>
 
+      {modelo !== "manual" && <p className={styles.modeloDica}>{modeloAtivo.dica}</p>}
+
       <div className={styles.parcelaGrid}>
-        <div className={`${styles.parcelaRow} ${styles.parcelaHead}`}>
+        <div
+          className={`${styles.parcelaRow} ${temCanal ? styles.parcelaRowCanal : ""} ${styles.parcelaHead}`}
+        >
           <span>#</span>
           <span>Vencimento</span>
+          {temCanal && <span>Pagamento</span>}
           <span className={styles.alinhaDireita}>%</span>
           <span className={styles.alinhaDireita}>Valor</span>
           <span />
         </div>
 
         {parcelas.map((p, i) => (
-          <div className={styles.parcelaRow} key={i}>
+          <div
+            className={`${styles.parcelaRow} ${temCanal ? styles.parcelaRowCanal : ""}`}
+            key={i}
+          >
             <span className={styles.parcelaNum}>{i + 1}</span>
             <input
               type="date"
@@ -209,6 +311,20 @@ export default function ParcelasEditor({
               disabled={disabled || p.pago}
               onChange={(e) => alterarData(i, e.target.value)}
             />
+            {temCanal && (
+              <span
+                className={styles.canalCell}
+                title={p.etapa ? `${p.canal ? COMPRA_GASTO_CANAL_LABEL[p.canal] : "pagamento único"} — ${p.etapa}` : undefined}
+              >
+                {p.canal ? (
+                  <span className={`${styles.tag} ${styles[`canal_${p.canal}`]}`}>
+                    {COMPRA_GASTO_CANAL_CURTO[p.canal]}
+                  </span>
+                ) : (
+                  <span className={styles.muted}>—</span>
+                )}
+              </span>
+            )}
             <input
                 className={styles.pctInput}
                 value={textoPct(p, i)}
@@ -281,6 +397,20 @@ export default function ParcelasEditor({
             ))}
         </div>
       </div>
+
+      {temCanal && (
+        <div className={styles.canalResumo}>
+          {resumoPorCanal(parcelas).map((r) => (
+            <span className={styles.canalResumoItem} key={r.canal}>
+              <span className={`${styles.tag} ${styles[`canal_${r.canal}`]}`}>{r.label}</span>
+              <b>{brl(r.total)}</b>
+              <span className={styles.cardNote}>
+                {r.parcelas} {r.parcelas === 1 ? "pagamento" : "pagamentos"}
+              </span>
+            </span>
+          ))}
+        </div>
+      )}
 
       {somaPagas > 0 && (
         <p className={styles.note}>

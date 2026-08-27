@@ -5,6 +5,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/AuthContext";
 import { isReadOnlyRole } from "@/lib/auth/permissions";
 import {
+  COMPRA_GASTO_CANAL_CURTO,
+  COMPRA_GASTO_CANAL_LABEL,
   COMPRA_GASTO_TIPO_LABEL,
   type CompraGastoLote,
   type CompraGastoMes,
@@ -132,6 +134,15 @@ export default function GastosCompraPanel({ companyKey, companyName }: Props) {
   // logo abaixo dele. A agenda e a exportação continuam com o período inteiro.
   const totais = useMemo(() => totaisDoPainel(mesesVisiveis), [mesesVisiveis]);
   const loteMap = useMemo(() => new Map(lotes.map((l) => [l.id, l])), [lotes]);
+
+  /**
+   * Compras Salvas que já viraram compra aqui. O modal esconde essas do select:
+   * lançar a mesma Compra Salva duas vezes duplicaria o comprometido do mês.
+   */
+  const comprasSalvasLancadas = useMemo(
+    () => new Set(lotes.map((l) => l.compraSalvaId).filter(Boolean) as string[]),
+    [lotes]
+  );
   const agenda = useMemo(() => agendaDePagamentos(lotes, { ano: ano || undefined }), [lotes, ano]);
 
   const pctOrcamento = totais.orcamento > 0 ? (totais.comprometido / totais.orcamento) * 100 : 0;
@@ -575,6 +586,19 @@ export default function GastosCompraPanel({ companyKey, companyName }: Props) {
                           </span>
                         </>
                       )}
+                      {linha.parcela.canal && (
+                        <>
+                          {" "}
+                          <span
+                            className={`${styles.tag} ${styles[`canal_${linha.parcela.canal}`]}`}
+                            title={`${COMPRA_GASTO_CANAL_LABEL[linha.parcela.canal]}${
+                              linha.parcela.etapa ? ` — ${linha.parcela.etapa}` : ""
+                            }`}
+                          >
+                            {COMPRA_GASTO_CANAL_CURTO[linha.parcela.canal]}
+                          </span>
+                        </>
+                      )}
                     </td>
                     <td>
                       <span
@@ -633,6 +657,7 @@ export default function GastosCompraPanel({ companyKey, companyName }: Props) {
           username={username}
           mesSugerido={mesSugerido}
           hoje={hoje}
+          comprasSalvasLancadas={comprasSalvasLancadas}
           onClose={() => setModalAberto(false)}
           onSaved={aoSalvarCompra}
         />

@@ -46,7 +46,7 @@ export async function POST(request: Request) {
   try {
     const createdByName = request.headers.get("x-auth-username") ?? undefined;
     const body = await request.json();
-    const { companyKey, title, items, draft } = body ?? {};
+    const { companyKey, title, items, draft, compraSalvaId } = body ?? {};
 
     if (!companyKey) {
       return NextResponse.json({ error: "companyKey é obrigatório" }, { status: 400 });
@@ -114,6 +114,9 @@ export async function POST(request: Request) {
       items: itemsComBarcode,
       forceStatus: draft ? "rascunho" : undefined,
       createdByName,
+      // Vínculo com a Compra Salva de origem: é por ele que Gastos de Compra acha
+      // a previsão de chegada desta compra ao importar a Compra Salva.
+      compraSalvaId: compraSalvaId ? String(compraSalvaId) : null,
     });
 
     return NextResponse.json({ data: created });

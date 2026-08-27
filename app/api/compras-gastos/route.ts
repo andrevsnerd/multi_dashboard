@@ -12,7 +12,12 @@ import {
   combinarObservacao,
   materializarCompraSalva,
 } from "@/lib/utils/compra-gastos-import";
-import { createLote, listLotes, listOrcamento } from "@/lib/utils/compra-gastos-store";
+import {
+  createLote,
+  existeLoteDaCompraSalva,
+  listLotes,
+  listOrcamento,
+} from "@/lib/utils/compra-gastos-store";
 
 /** Painel completo: lotes + orçamento. A agregação por mês roda na tela (função pura compartilhada). */
 export async function GET(request: Request) {
@@ -72,10 +77,22 @@ export async function POST(request: Request) {
     let observacao = body.observacao ? String(body.observacao).trim() : null;
     let valorUnico = body.valorUnico != null ? cents(body.valorUnico) : null;
 
+    // Previsão de chegada da Compra Salva importada (menor data de recebimento do
+    // trânsito que nasceu dela). Só entra quando a tela não mandou uma.
+    let previsaoChegadaSalva: string | null = null;
+
     if (origem === "salva") {
       const compraSalvaId = String(body.compraSalvaId ?? "").trim();
       if (!compraSalvaId) {
         return NextResponse.json({ error: "Selecione a Compra Salva de origem" }, { status: 400 });
+      }
+      // Uma Compra Salva entra no painel UMA vez. Lançar de novo duplicaria o
+      // comprometido do mês com o mesmo dinheiro.
+      if (await existeLoteDaCompraSalva(companyKey, compraSalvaId)) {
+        return NextResponse.json(
+          { error: "Esta Compra Salva já foi lançada como compra neste painel." },
+          { status: 409 }
+        );
       }
       const m = await materializarCompraSalva(companyKey, compraSalvaId);
       if (!m) {
@@ -84,6 +101,7 @@ export async function POST(request: Request) {
 
       itens = m.itens;
       valorUnico = null;
+      previsaoChegadaSalva = m.previsaoChegada ?? null;
       if (m.semCusto > 0) {
         // Nunca somar zero escondido: o lote vira estimativa e diz o porquê.
         estimado = true;
@@ -138,7 +156,7 @@ export async function POST(request: Request) {
         origem,
         compraSalvaId: origem === "salva" ? String(body.compraSalvaId) : null,
         dataCompra: String(body.dataCompra).slice(0, 10),
-        chegadaIni: body.chegadaIni ?? null,
+        chegadaIni: body.chegadaIni ?? previsaoChegadaSalva,
         chegadaReal: body.chegadaReal ?? null,
         estimado,
         valorUnico: origem === "valor" ? valorUnico : null,

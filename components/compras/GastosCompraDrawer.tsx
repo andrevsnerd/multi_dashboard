@@ -3,12 +3,16 @@
 import { useEffect, useState } from "react";
 
 import {
+  COMPRA_GASTO_CANAL_CURTO,
+  COMPRA_GASTO_CANAL_LABEL,
   COMPRA_GASTO_ORIGEM_LABEL,
   COMPRA_GASTO_TIPO_LABEL,
   type CompraGastoLote,
   type CompraGastoParcela,
 } from "@/lib/types/compra-gasto";
 import {
+  canaisDasParcelas,
+  convergenciaPorData,
   itemTotal,
   itensSemCusto,
   itensTotal,
@@ -16,6 +20,7 @@ import {
   loteTotal,
   loteTotalPago,
   percentualDaParcela,
+  resumoPorCanal,
 } from "@/lib/utils/compra-gastos-agregacao";
 
 import ParcelasEditor from "./ParcelasEditor";
@@ -72,6 +77,13 @@ export default function GastosCompraDrawer({
   const somaLinhas = itensTotal(lote.itens);
   const semCusto = itensSemCusto(lote.itens);
   const divergencia = lote.itens.length > 0 ? Math.abs(somaLinhas - total) : 0;
+
+  // Pagamentos em canais paralelos (modelo China): a aba de parcelas mostra os
+  // dois separados linha por linha E somados por data de vencimento.
+  const canais = canaisDasParcelas(lote.parcelas);
+  const temCanal = canais.length > 0;
+  const porCanal = temCanal ? resumoPorCanal(lote.parcelas) : [];
+  const convergencia = temCanal ? convergenciaPorData(lote.parcelas) : [];
 
   function abrirEdicao() {
     setRascunho(lote.parcelas.map((p) => ({ ...p })));
@@ -262,6 +274,7 @@ export default function GastosCompraDrawer({
                     <tr>
                       <th>Parcela</th>
                       <th>Vencimento</th>
+                      {temCanal && <th>Pagamento</th>}
                       <th className={styles.thNum}>Valor</th>
                       <th className={styles.thNum}>%</th>
                       <th>Situação</th>
@@ -276,6 +289,21 @@ export default function GastosCompraDrawer({
                         <td className={styles.num} style={{ textAlign: "left" }}>
                           {dataBrCompleta(p.vencimento)}
                         </td>
+                        {temCanal && (
+                          <td>
+                            {p.canal ? (
+                              <span
+                                className={`${styles.tag} ${styles[`canal_${p.canal}`]}`}
+                                title={`${COMPRA_GASTO_CANAL_LABEL[p.canal]}${p.etapa ? ` — ${p.etapa}` : ""}`}
+                              >
+                                {COMPRA_GASTO_CANAL_CURTO[p.canal]}
+                              </span>
+                            ) : (
+                              <span className={styles.muted}>—</span>
+                            )}
+                            {p.etapa && <div className={styles.etapaNota}>{p.etapa}</div>}
+                          </td>
+                        )}
                         <td className={styles.num}>{money(p.valor)}</td>
                         <td className={`${styles.num} ${styles.muted}`}>
                           {total > 0 ? `${percentualDaParcela(p.valor, total)}%` : "—"}
@@ -311,13 +339,67 @@ export default function GastosCompraDrawer({
                   </tbody>
                   <tfoot>
                     <tr>
-                      <td colSpan={2}>Total</td>
+                      <td colSpan={temCanal ? 3 : 2}>Total</td>
                       <td className={styles.num}>{money(total)}</td>
                       <td colSpan={2} />
                     </tr>
                   </tfoot>
                 </table>
               </div>
+
+              {temCanal && (
+                <div className={styles.convergencia}>
+                  <div className={styles.blockTitle}>Pagamentos que convergem</div>
+                  <p className={styles.note} style={{ margin: "0 0 10px" }}>
+                    {porCanal.map((r) => `${r.label} ${brl(r.total)}`).join(" + ")} ={" "}
+                    {brl(total)}. São dois pagamentos paralelos: cada data soma os dois, e o
+                    quadro abaixo mostra quanto sai de cada um.
+                  </p>
+                  <div className={styles.tableScroll}>
+                    <table className={styles.table}>
+                      <thead>
+                        <tr>
+                          <th>Vencimento</th>
+                          {canais.map((c) => (
+                            <th className={styles.thNum} key={c}>
+                              {COMPRA_GASTO_CANAL_CURTO[c]}
+                            </th>
+                          ))}
+                          <th className={styles.thNum}>Total do dia</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {convergencia.map((linha) => (
+                          <tr key={linha.vencimento}>
+                            <td className={styles.num} style={{ textAlign: "left" }}>
+                              {dataBrCompleta(linha.vencimento)}
+                            </td>
+                            {canais.map((c) => (
+                              <td className={styles.num} key={c}>
+                                {linha.porCanal[c] ? money(linha.porCanal[c] as number) : "—"}
+                              </td>
+                            ))}
+                            <td className={styles.num}>
+                              <b>{money(linha.total)}</b>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr>
+                          <td>Total</td>
+                          {canais.map((c) => (
+                            <td className={styles.num} key={c}>
+                              {money(porCanal.find((r) => r.canal === c)?.total ?? 0)}
+                            </td>
+                          ))}
+                          <td className={styles.num}>{money(total)}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              )}
 
               {podeEditar && (
                 <div style={{ padding: "14px 18px", display: "flex", gap: 8, alignItems: "center" }}>
@@ -391,6 +473,22 @@ export default function GastosCompraDrawer({
                 <span className={styles.factK}>Fornecedor</span>
                 <span className={styles.factText}>{lote.fornecedor || "não informado"}</span>
               </div>
+              {temCanal && (
+                <div className={styles.fact}>
+                  <span className={styles.factK}>Modelo de pagamento</span>
+                  <span className={styles.factText}>
+                    Dois pagamentos paralelos sobre o mesmo total:{" "}
+                    {porCanal
+                      .map(
+                        (r) =>
+                          `${COMPRA_GASTO_CANAL_LABEL[r.canal]} ${brl(r.total)} (${percentualDaParcela(r.total, total)}%)`
+                      )
+                      .join(" e ")}
+                    . As datas coincidem, então cada vencimento soma os dois — o painel conta
+                    cada parcela uma vez, no mês do próprio vencimento.
+                  </span>
+                </div>
+              )}
               {lote.estimado && (
                 <div className={styles.fact}>
                   <span className={styles.factK}>Estimativa</span>

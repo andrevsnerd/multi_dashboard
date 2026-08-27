@@ -1279,6 +1279,11 @@
   align-items: center;
 }
 
+/* Modelo de pagamento com dois canais (China): entra uma coluna de canal. */
+.parcelaRowCanal {
+  grid-template-columns: 26px minmax(118px, 1fr) 104px 74px 118px 56px;
+}
+
 .parcelaHead {
   font-size: 9.5px;
   font-weight: 600;
@@ -1286,6 +1291,61 @@
   text-transform: uppercase;
   color: var(--t-400);
   padding-bottom: 2px;
+}
+
+.canalCell {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.canal_transferencia {
+  color: var(--gc-pago);
+  border-style: solid;
+  border-color: var(--gc-ring);
+  background: var(--gc-wash);
+}
+
+.canal_alibaba {
+  color: var(--gc-warn);
+  border-style: solid;
+  border-color: var(--gc-warn);
+  background: var(--gc-warn-wash);
+}
+
+.modeloDica {
+  margin: -6px 0 12px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--t-500);
+}
+
+/* Os dois pagamentos do modelo China, cada um com o seu total. */
+.canalResumo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  padding-top: 10px;
+  margin-top: 10px;
+  border-top: 1px dashed var(--b-200);
+}
+
+.canalResumoItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.etapaNota {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--t-400);
+}
+
+.convergencia {
+  padding: 14px 18px 18px;
 }
 
 .alinhaDireita {

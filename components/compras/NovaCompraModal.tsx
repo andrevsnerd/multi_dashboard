@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { CompraSalvaListEntry } from "@/lib/types/compra-salva";
 import {
+  COMPRA_GASTO_CANAL_LABEL,
   COMPRA_GASTO_TIPO_LABEL,
   type CompraGastoCandidata,
   type CompraGastoItem,
@@ -24,6 +25,11 @@ interface Props {
   /** Mês (YYYY-MM) sugerido para a data da compra. */
   mesSugerido?: string | null;
   hoje: string;
+  /**
+   * Ids de Compras Salvas que já foram lançadas como compra. Ficam FORA do
+   * select: lançar a mesma Compra Salva de novo duplicaria o comprometido.
+   */
+  comprasSalvasLancadas?: Set<string>;
   onClose: () => void;
   onSaved: (lote: CompraGastoLote) => void;
 }
@@ -45,6 +51,7 @@ export default function NovaCompraModal({
   username,
   mesSugerido,
   hoje,
+  comprasSalvasLancadas,
   onClose,
   onSaved,
 }: Props) {
@@ -105,6 +112,17 @@ export default function NovaCompraModal({
     };
   }, [companyKey]);
 
+  /**
+   * Só as Compras Salvas ainda não lançadas. A que já virou compra sai do select
+   * — não existe motivo legítimo para lançar a mesma duas vezes, e o risco de
+   * duplicar o comprometido do mês é real.
+   */
+  const disponiveis = useMemo(
+    () => (comprasSalvasLancadas ? salvas.filter((s) => !comprasSalvasLancadas.has(s.id)) : salvas),
+    [salvas, comprasSalvasLancadas]
+  );
+  const ocultadas = salvas.length - disponiveis.length;
+
   const salvaSelecionada = useMemo(
     () => salvas.find((s) => s.id === compraSalvaId) ?? null,
     [salvas, compraSalvaId]
@@ -156,9 +174,10 @@ export default function NovaCompraModal({
 
   /** Ao escolher a Compra Salva, título e data vêm dela — só o parcelamento sobra para editar. */
   /**
-   * Escolher a Compra Salva já traz tudo pronto: título, data da compra e os
-   * itens reconhecidos com o valor exato (qtd × custo). Só o parcelamento fica
-   * para o usuário.
+   * Escolher a Compra Salva já traz tudo pronto: título, data da compra, a
+   * previsão de chegada (da Compra em trânsito que nasceu dela) e os itens
+   * reconhecidos com o valor exato (qtd × custo). Só o parcelamento fica para o
+   * usuário.
    */
   const escolherCompraSalva = useCallback(
     async (id: string) => {
@@ -187,6 +206,9 @@ export default function NovaCompraModal({
         setPrevia(json.candidata);
         setTitulo(json.candidata.titulo);
         setDataCompra(json.candidata.dataCompra);
+        // Compra Salva sem trânsito com data não tem previsão para dar: nesse caso
+        // o que o usuário já digitou fica de pé em vez de ser apagado.
+        if (json.candidata.previsaoChegada) setChegadaIni(json.candidata.previsaoChegada);
       } catch {
         setErro("Não foi possível ler os itens da Compra Salva.");
       } finally {
@@ -351,9 +373,11 @@ export default function NovaCompraModal({
                       ? "carregando…"
                       : salvas.length === 0
                         ? "nenhuma compra salva nesta empresa"
-                        : "selecione uma compra salva"}
+                        : disponiveis.length === 0
+                          ? "todas as compras salvas já foram lançadas"
+                          : "selecione uma compra salva"}
                   </option>
-                  {salvas.map((s) => (
+                  {disponiveis.map((s) => (
                     <option key={s.id} value={s.id}>
                       {dataBrCompleta(dataBrasiliaDeIso(s.savedAt))} · {s.title} — {s.itemCount} itens ·{" "}
                       {brl(s.totalValor)}
@@ -363,6 +387,13 @@ export default function NovaCompraModal({
                 </select>
               </label>
               {salvasErro && <p className={styles.note}>{salvasErro}</p>}
+              {ocultadas > 0 && (
+                <p className={styles.note}>
+                  {ocultadas} {ocultadas === 1 ? "compra salva já lançada" : "compras salvas já lançadas"}{" "}
+                  {ocultadas === 1 ? "não aparece" : "não aparecem"} na lista — cada Compra Salva
+                  entra aqui uma única vez.
+                </p>
+              )}
 
               {carregandoPrevia && <p className={styles.note}>lendo os itens da compra…</p>}
 
@@ -548,7 +579,10 @@ export default function NovaCompraModal({
             <div className={styles.blockTitle}>Parcelamento</div>
             <p className={styles.note} style={{ margin: "0 0 10px" }}>
               Por padrão a compra vem inteira, vencendo na data da compra. Ao dividir, esse mês fica
-              só com a primeira parcela e o restante vai para os meses dos novos vencimentos.
+              só com a primeira parcela e o restante vai para os meses dos novos vencimentos. Em{" "}
+              <b>Tipo</b> você aplica um modelo pronto: Salete (2x, 90 e 120 dias) ou China (
+              {COMPRA_GASTO_CANAL_LABEL.transferencia} 40% + {COMPRA_GASTO_CANAL_LABEL.alibaba} 60%,
+              somados nas mesmas datas).
             </p>
             <ParcelasEditor
               total={total}

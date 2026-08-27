@@ -56,6 +56,7 @@ async function ensureTable() {
     )
   `;
   await sql`ALTER TABLE compras_transito ADD COLUMN IF NOT EXISTS created_by TEXT`;
+  await sql`ALTER TABLE compras_transito ADD COLUMN IF NOT EXISTS compra_salva_id TEXT`;
   tableChecked = true;
 }
 
@@ -103,6 +104,7 @@ function rowToCompraTransito(row: {
   updated_at: Date | string;
   confirmed_at: Date | string;
   created_by?: string | null;
+  compra_salva_id?: string | null;
 }): CompraTransito {
   const items = Array.isArray(row.items)
     ? (row.items as CompraTransitoItemRow[]).map(normalizeItem)
@@ -112,6 +114,7 @@ function rowToCompraTransito(row: {
     id: row.id,
     companyKey: row.company_key,
     title: row.title,
+    compraSalvaId: row.compra_salva_id ?? null,
     status: getCompraTransitoStatusFromItems(items),
     items,
     createdAt: new Date(row.created_at).toISOString(),
@@ -155,6 +158,7 @@ function toListEntry(compra: CompraTransito): CompraTransitoListEntry {
   return {
     id: compra.id,
     title: compra.title,
+    compraSalvaId: compra.compraSalvaId ?? null,
     itemCount: compra.items.length,
     totalQuantidade,
     totalValor,
@@ -173,7 +177,7 @@ export async function listComprasTransitoFull(companyKey: string): Promise<Compr
     await ensureTable();
     const sql = getNeonSql();
     const rows = await sql`
-      SELECT id, company_key, title, status, items, created_at, updated_at, confirmed_at, created_by
+      SELECT id, company_key, title, status, items, created_at, updated_at, confirmed_at, created_by, compra_salva_id
       FROM compras_transito
       WHERE company_key = ${companyKey}
       ORDER BY confirmed_at DESC
@@ -210,7 +214,7 @@ export async function getCompraTransito(
     await ensureTable();
     const sql = getNeonSql();
     const rows = await sql`
-      SELECT id, company_key, title, status, items, created_at, updated_at, confirmed_at, created_by
+      SELECT id, company_key, title, status, items, created_at, updated_at, confirmed_at, created_by, compra_salva_id
       FROM compras_transito
       WHERE id = ${id} AND company_key = ${companyKey}
       LIMIT 1
@@ -236,6 +240,8 @@ export async function createCompraTransito(input: {
   items: CompraTransitoItemRow[];
   forceStatus?: CompraTransitoStatus;
   createdByName?: string;
+  /** Compra Salva de origem, quando a compra nasceu do "Exportar para trânsito". */
+  compraSalvaId?: string | null;
 }): Promise<CompraTransito> {
   const id = randomUUID();
   const now = new Date().toISOString();
@@ -243,6 +249,7 @@ export async function createCompraTransito(input: {
     id,
     companyKey: input.companyKey,
     title: input.title.trim(),
+    compraSalvaId: (input.compraSalvaId ?? "").trim() || null,
     status: input.forceStatus ?? getCompraTransitoStatusFromItems(input.items),
     items: input.items.map(normalizeItem),
     createdAt: now,
@@ -256,7 +263,7 @@ export async function createCompraTransito(input: {
     const sql = getNeonSql();
     await sql`
       INSERT INTO compras_transito (
-        id, company_key, title, status, items, created_at, updated_at, confirmed_at, created_by
+        id, company_key, title, status, items, created_at, updated_at, confirmed_at, created_by, compra_salva_id
       ) VALUES (
         ${row.id},
         ${row.companyKey},
@@ -266,7 +273,8 @@ export async function createCompraTransito(input: {
         ${row.createdAt},
         ${row.updatedAt},
         ${row.confirmedAt},
-        ${row.createdByName ?? null}
+        ${row.createdByName ?? null},
+        ${row.compraSalvaId ?? null}
       )
     `;
     return row;
@@ -340,4 +348,66 @@ export async function deleteCompraTransito(companyKey: string, id: string): Prom
   if (next.length === all.length) return false;
   await writeFileAll(next);
   return true;
+}
+
+/** Título normalizado para casar Compra Salva × Compra em trânsito antiga (sem vínculo gravado). */
+function tituloChave(value?: string | null): string {
+  return (value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/** Menor `dataRecebimento` preenchida dos itens — a previsão de chegada da compra. */
+function primeiraChegada(items: CompraTransitoItemRow[]): string | null {
+  const datas = items
+    .map((item) => normalizeDate(item.dataRecebimento))
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b));
+  return datas[0] ?? null;
+}
+
+/**
+ * Previsão de chegada de uma Compra Salva: a menor data de recebimento da Compra
+ * em trânsito que nasceu dela ("Exportar para trânsito").
+ *
+ * O vínculo firme é `compra_salva_id`. `titulo` é só o resgate das compras em
+ * trânsito criadas antes de o vínculo existir — nelas o título foi herdado da
+ * Compra Salva, então casar por título é o que sobra. Rascunho sem nenhuma data
+ * não conta: cai para o próximo candidato.
+ */
+export async function fetchPrevisaoChegadaDaCompraSalva(
+  companyKey: string,
+  compraSalvaId: string,
+  titulo?: string | null
+): Promise<string | null> {
+  const chave = tituloChave(titulo);
+
+  let candidatos: CompraTransito[];
+  if (hasPostgres()) {
+    await ensureTable();
+    const sql = getNeonSql();
+    const rows = await sql`
+      SELECT id, company_key, title, status, items, created_at, updated_at, confirmed_at, created_by, compra_salva_id
+      FROM compras_transito
+      WHERE company_key = ${companyKey}
+        AND (compra_salva_id = ${compraSalvaId} OR LOWER(BTRIM(title)) = ${chave})
+      ORDER BY updated_at DESC
+    `;
+    candidatos = rows.map((row) => rowToCompraTransito(row as never));
+  } else {
+    const all = await listComprasTransitoFull(companyKey);
+    candidatos = all
+      .filter((c) => c.compraSalvaId === compraSalvaId || (!!chave && tituloChave(c.title) === chave))
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }
+
+  // Vínculo gravado sempre vence o palpite por título.
+  const ordenados = [
+    ...candidatos.filter((c) => c.compraSalvaId === compraSalvaId),
+    ...candidatos.filter((c) => c.compraSalvaId !== compraSalvaId),
+  ];
+
+  for (const compra of ordenados) {
+    const data = primeiraChegada(compra.items);
+    if (data) return data;
+  }
+  return null;
 }

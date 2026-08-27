@@ -10,14 +10,18 @@
  * disponível para a API/relatórios sem duplicar a conta.
  */
 
-import type {
-  CompraGastoItem,
-  CompraGastoLote,
-  CompraGastoMes,
-  CompraGastoOrcamentoEntry,
-  CompraGastoParcela,
-  CompraGastoStatus,
-  CompraGastoTotais,
+import {
+  COMPRA_GASTO_CANAIS,
+  COMPRA_GASTO_CANAL_CURTO,
+  type CompraGastoCanal,
+  type CompraGastoItem,
+  type CompraGastoLote,
+  type CompraGastoMes,
+  type CompraGastoModeloParcelamento,
+  type CompraGastoOrcamentoEntry,
+  type CompraGastoParcela,
+  type CompraGastoStatus,
+  type CompraGastoTotais,
 } from "@/lib/types/compra-gasto";
 
 /** Arredonda para centavos, evitando o lixo de ponto flutuante das somas. */
@@ -308,6 +312,187 @@ export function gerarParcelasPorPercentual(
   });
 
   return out;
+}
+
+/**
+ * Desloca uma data YYYY-MM-DD em N dias corridos.
+ *
+ * Conta em UTC a partir das partes da string — nunca `new Date(iso)` em fuso
+ * local, que no Brasil devolve o dia anterior e faz a parcela cair um dia antes.
+ */
+export function adiarDias(iso: string, dias: number): string {
+  if (!iso) return iso;
+  const ano = parseInt(iso.slice(0, 4), 10);
+  const mes = parseInt(iso.slice(5, 7), 10);
+  const dia = parseInt(iso.slice(8, 10), 10);
+  if (!ano || !mes || !dia) return iso;
+  const d = new Date(Date.UTC(ano, mes - 1, dia));
+  d.setUTCDate(d.getUTCDate() + Math.round(dias || 0));
+  return d.toISOString().slice(0, 10);
+}
+
+/** Etapa de um modelo: quantos dias depois da compra e que fatia do canal leva. */
+interface EtapaModelo {
+  dias: number;
+  pct: number;
+  etapa: string;
+}
+
+/** Salete: a compra fecha em 2x iguais, 90 e 120 dias depois. */
+const SALETE_ETAPAS: EtapaModelo[] = [
+  { dias: 90, pct: 50, etapa: "90 dias da compra" },
+  { dias: 120, pct: 50, etapa: "120 dias da compra" },
+];
+
+/**
+ * China: dois pagamentos paralelos sobre o MESMO total — transferência bancária
+ * leva 40% e o Alibaba 60%. Cada um segue o mesmo calendário, então as datas
+ * convergem e o mês soma os dois.
+ */
+const CHINA_CANAIS: { canal: CompraGastoCanal; pct: number }[] = [
+  { canal: "transferencia", pct: 40 },
+  { canal: "alibaba", pct: 60 },
+];
+
+const CHINA_ETAPAS: EtapaModelo[] = [
+  { dias: 0, pct: 30, etapa: "no ato do pedido" },
+  { dias: 30, pct: 50, etapa: "no despacho (30 dias)" },
+  { dias: 90, pct: 20, etapa: "60 dias após o despacho" },
+];
+
+/**
+ * Reparte um valor pelas etapas de um modelo. A última etapa absorve os
+ * centavos, então a soma bate ao centavo com o valor recebido — a regra do
+ * projeto é somar exato e arredondar só na exibição.
+ */
+function parcelasDeEtapas(
+  valor: number,
+  dataBase: string,
+  etapas: EtapaModelo[],
+  canal: CompraGastoCanal | null
+): CompraGastoParcela[] {
+  const alvo = cents(valor);
+  let somado = 0;
+  return etapas.map((et, i) => {
+    const ultima = i === etapas.length - 1;
+    const parte = ultima ? cents(alvo - somado) : cents((alvo * et.pct) / 100);
+    somado = cents(somado + parte);
+    return {
+      numero: i + 1,
+      vencimento: adiarDias(dataBase, et.dias),
+      valor: parte,
+      pago: false,
+      dataPagamento: null,
+      canal,
+      etapa: et.etapa,
+    };
+  });
+}
+
+/**
+ * Gera as parcelas de um modelo de pagamento a partir da data da compra.
+ *
+ * `manual` não gera nada (quem divide é o usuário). No `china` os dois canais
+ * saem numa lista só, ordenada por data — as parcelas do mesmo dia ficam lado a
+ * lado, que é como o dinheiro sai: somadas na data, separadas por canal.
+ */
+export function gerarParcelasModelo(
+  total: number,
+  dataCompra: string,
+  modelo: CompraGastoModeloParcelamento
+): CompraGastoParcela[] {
+  if (modelo === "manual" || !dataCompra) return [];
+
+  if (modelo === "salete") {
+    return renumerarParcelas(parcelasDeEtapas(total, dataCompra, SALETE_ETAPAS, null));
+  }
+
+  // China: fatia o total entre os canais primeiro (o último canal absorve os
+  // centavos), depois cada canal se divide nas suas etapas.
+  const alvo = cents(total);
+  let alocado = 0;
+  const parcelas: CompraGastoParcela[] = [];
+  CHINA_CANAIS.forEach((c, i) => {
+    const ultimo = i === CHINA_CANAIS.length - 1;
+    const valorCanal = ultimo ? cents(alvo - alocado) : cents((alvo * c.pct) / 100);
+    alocado = cents(alocado + valorCanal);
+    parcelas.push(...parcelasDeEtapas(valorCanal, dataCompra, CHINA_ETAPAS, c.canal));
+  });
+
+  parcelas.sort(
+    (a, b) =>
+      a.vencimento.localeCompare(b.vencimento) ||
+      ordemDoCanal(a.canal) - ordemDoCanal(b.canal)
+  );
+  return renumerarParcelas(parcelas);
+}
+
+function ordemDoCanal(canal?: CompraGastoCanal | null): number {
+  const i = canal ? COMPRA_GASTO_CANAIS.indexOf(canal) : -1;
+  return i < 0 ? 99 : i;
+}
+
+function renumerarParcelas(parcelas: CompraGastoParcela[]): CompraGastoParcela[] {
+  return parcelas.map((p, i) => ({ ...p, numero: i + 1 }));
+}
+
+/** Canais presentes nas parcelas, na ordem de exibição. */
+export function canaisDasParcelas(parcelas: CompraGastoParcela[]): CompraGastoCanal[] {
+  const presentes = new Set(parcelas.map((p) => p.canal).filter(Boolean) as CompraGastoCanal[]);
+  return COMPRA_GASTO_CANAIS.filter((c) => presentes.has(c));
+}
+
+/** Total (e quanto já saiu) de cada canal — a visão "separada" dos pagamentos. */
+export interface CompraGastoCanalResumo {
+  canal: CompraGastoCanal;
+  label: string;
+  total: number;
+  pago: number;
+  parcelas: number;
+}
+
+export function resumoPorCanal(parcelas: CompraGastoParcela[]): CompraGastoCanalResumo[] {
+  return canaisDasParcelas(parcelas).map((canal) => {
+    const doCanal = parcelas.filter((p) => p.canal === canal);
+    return {
+      canal,
+      label: COMPRA_GASTO_CANAL_CURTO[canal],
+      total: cents(doCanal.reduce((s, p) => s + (Number(p.valor) || 0), 0)),
+      pago: cents(doCanal.reduce((s, p) => s + (p.pago ? Number(p.valor) || 0 : 0), 0)),
+      parcelas: doCanal.length,
+    };
+  });
+}
+
+/**
+ * Uma linha por data de vencimento com o valor de cada canal e o total do dia —
+ * a visão "somada" dos pagamentos que convergem. É o que responde "quanto sai
+ * neste dia" sem esconder de onde cada pedaço vem.
+ */
+export interface CompraGastoConvergenciaLinha {
+  vencimento: string;
+  porCanal: Partial<Record<CompraGastoCanal, number>>;
+  /** Parcelas do dia sem canal definido. */
+  semCanal: number;
+  total: number;
+}
+
+export function convergenciaPorData(
+  parcelas: CompraGastoParcela[]
+): CompraGastoConvergenciaLinha[] {
+  const mapa = new Map<string, CompraGastoConvergenciaLinha>();
+  parcelas.forEach((p) => {
+    const dia = p.vencimento || "";
+    if (!dia) return;
+    const linha =
+      mapa.get(dia) ?? { vencimento: dia, porCanal: {}, semCanal: 0, total: 0 };
+    const valor = Number(p.valor) || 0;
+    if (p.canal) linha.porCanal[p.canal] = cents((linha.porCanal[p.canal] ?? 0) + valor);
+    else linha.semCanal = cents(linha.semCanal + valor);
+    linha.total = cents(linha.total + valor);
+    mapa.set(dia, linha);
+  });
+  return [...mapa.values()].sort((a, b) => a.vencimento.localeCompare(b.vencimento));
 }
 
 /**

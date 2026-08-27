@@ -1487,6 +1487,7 @@ export default function CompraSalvaDetalhePage({
           title: titleEdit.trim() || doc.title,
           items: transitItems,
           draft: true,
+          compraSalvaId: compraId,
         }),
       });
       const json = (await res.json()) as { data?: { id?: string }; error?: string };

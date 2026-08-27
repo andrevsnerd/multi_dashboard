@@ -14,6 +14,7 @@ import { fetchCustosPorProdutos } from "@/lib/repositories/controleEstoque";
 import type { CompraGastoCandidata, CompraGastoItem } from "@/lib/types/compra-gasto";
 import type { CompraSalva, CompraSalvaItemRow } from "@/lib/types/compra-salva";
 import { itensTotal } from "@/lib/utils/compra-gastos-agregacao";
+import { fetchPrevisaoChegadaDaCompraSalva } from "@/lib/utils/compra-transito-store";
 import { getCompraSalva } from "@/lib/utils/compra-salva-store";
 
 /** Mesmo contrato que a tela consome (o tipo vive em lib/types para não puxar este módulo, que depende do driver do SQL Server, para o cliente). */
@@ -64,7 +65,11 @@ async function custosFaltantes(compras: CompraSalva[]): Promise<Map<string, numb
   }
 }
 
-function materializar(compra: CompraSalva, custoMap: Map<string, number>): CompraSalvaMaterializada {
+function materializar(
+  compra: CompraSalva,
+  custoMap: Map<string, number>,
+  previsaoChegada: string | null = null
+): CompraSalvaMaterializada {
   const itens = compra.items.map((row) => itemDaCompraSalva(row, custoMap));
   return {
     compraSalvaId: compra.id,
@@ -75,6 +80,7 @@ function materializar(compra: CompraSalva, custoMap: Map<string, number>): Compr
     itemCount: itens.length,
     semCusto: itens.filter((i) => !(i.custoUnitario > 0)).length,
     comprada: !!compra.comprada,
+    previsaoChegada,
   };
 }
 
@@ -86,7 +92,15 @@ export async function materializarCompraSalva(
   const compra = await getCompraSalva(companyKey, compraSalvaId);
   if (!compra) return null;
   const custoMap = await custosFaltantes([compra]);
-  return materializar(compra, custoMap);
+  // Previsão de chegada não é dado da Compra Salva: vem da Compra em trânsito que
+  // nasceu dela. Falha aqui não derruba o import — só deixa a previsão em branco.
+  let previsaoChegada: string | null = null;
+  try {
+    previsaoChegada = await fetchPrevisaoChegadaDaCompraSalva(companyKey, compra.id, compra.title);
+  } catch {
+    previsaoChegada = null;
+  }
+  return materializar(compra, custoMap, previsaoChegada);
 }
 
 /**

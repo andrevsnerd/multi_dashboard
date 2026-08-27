@@ -11,14 +11,16 @@ import { promises as fs } from "fs";
 import path from "path";
 
 import { hasPostgres, getNeonSql } from "@/lib/db/neon";
-import type {
-  CompraGastoItem,
-  CompraGastoLote,
-  CompraGastoLoteInput,
-  CompraGastoOrcamentoEntry,
-  CompraGastoOrigem,
-  CompraGastoParcela,
-  CompraGastoTipo,
+import {
+  COMPRA_GASTO_CANAIS,
+  type CompraGastoCanal,
+  type CompraGastoItem,
+  type CompraGastoLote,
+  type CompraGastoLoteInput,
+  type CompraGastoOrcamentoEntry,
+  type CompraGastoOrigem,
+  type CompraGastoParcela,
+  type CompraGastoTipo,
 } from "@/lib/types/compra-gasto";
 
 const FILE_PATH = path.join(process.cwd(), "data", "compra-gastos.json");
@@ -180,12 +182,17 @@ export function normalizeItem(raw: Partial<CompraGastoItem>): CompraGastoItem {
 }
 
 export function normalizeParcela(raw: Partial<CompraGastoParcela>, i: number): CompraGastoParcela {
+  const canal = raw?.canal as CompraGastoCanal | undefined;
   return {
     numero: Number(raw?.numero) > 0 ? Math.round(Number(raw.numero)) : i + 1,
     vencimento: dateOnly(raw?.vencimento) ?? "",
     valor: num(raw?.valor),
     pago: !!raw?.pago,
     dataPagamento: dateOnly(raw?.dataPagamento),
+    // Canal e etapa vêm do modelo de pagamento (China = transferência + Alibaba).
+    // Valor desconhecido cai para null em vez de entrar no banco como lixo.
+    canal: canal && COMPRA_GASTO_CANAIS.includes(canal) ? canal : null,
+    etapa: raw?.etapa ? String(raw.etapa).trim().slice(0, 80) : null,
   };
 }
 
@@ -217,6 +224,35 @@ function rowToLote(row: Record<string, unknown>): CompraGastoLote {
 }
 
 // ───────────────────────── lotes ─────────────────────────
+
+/**
+ * Já existe compra lançada a partir desta Compra Salva?
+ *
+ * A tela esconde do select o que já foi lançado, mas a trava real é aqui: duas
+ * abas abertas (ou um duplo-clique) lançariam a MESMA Compra Salva duas vezes e
+ * o comprometido do mês contaria o mesmo dinheiro em dobro.
+ */
+export async function existeLoteDaCompraSalva(
+  companyKey: string,
+  compraSalvaId: string
+): Promise<boolean> {
+  if (!compraSalvaId) return false;
+
+  if (hasPostgres()) {
+    await ensureTable();
+    const sql = getNeonSql();
+    const rows = await sql`
+      SELECT 1
+      FROM compra_gastos_lotes
+      WHERE company_key = ${companyKey} AND compra_salva_id = ${compraSalvaId}
+      LIMIT 1
+    `;
+    return rows.length > 0;
+  }
+
+  const all = await readFileAll();
+  return all.lotes.some((l) => l.companyKey === companyKey && l.compraSalvaId === compraSalvaId);
+}
 
 export async function listLotes(companyKey: string): Promise<CompraGastoLote[]> {
   if (hasPostgres()) {

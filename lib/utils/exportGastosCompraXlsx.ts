@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 
 import {
+  COMPRA_GASTO_CANAL_LABEL,
   COMPRA_GASTO_ORIGEM_LABEL,
   COMPRA_GASTO_TIPO_LABEL,
   type CompraGastoLote,
@@ -60,6 +61,8 @@ export function exportGastosCompraXlsx(
     CATEGORIA: COMPRA_GASTO_TIPO_LABEL[linha.lote.tipo],
     DESCRICAO: `${linha.lote.codigo} · ${linha.lote.titulo}`,
     PARCELA: `${linha.indice}/${linha.total}`,
+    PAGAMENTO: linha.parcela.canal ? COMPRA_GASTO_CANAL_LABEL[linha.parcela.canal] : "",
+    ETAPA: linha.parcela.etapa ?? "",
     FORNECEDOR: linha.lote.fornecedor ?? "",
     SITUACAO: linha.parcela.pago
       ? "Pago"

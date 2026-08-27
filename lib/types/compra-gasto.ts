@@ -22,6 +22,47 @@ export type CompraGastoTipo =
 
 export type CompraGastoOrigem = "salva" | "itens" | "valor";
 
+/**
+ * Canal de pagamento de uma parcela.
+ *
+ * Existe porque uma compra pode ter DOIS pagamentos correndo em paralelo que
+ * caem nas MESMAS datas — a compra na China é transferência bancária (40% do
+ * total) + Alibaba (60%), cada um com o próprio 30/50/20. O mês soma os dois
+ * (cada parcela conta uma vez, como sempre), e o canal é o que permite ver cada
+ * pagamento separado depois de lançado.
+ *
+ * Parcela sem canal = pagamento único, o caso normal.
+ */
+export type CompraGastoCanal = "transferencia" | "alibaba";
+
+export const COMPRA_GASTO_CANAL_LABEL: Record<CompraGastoCanal, string> = {
+  transferencia: "Transferência bancária",
+  alibaba: "Alibaba",
+};
+
+/** Rótulo curto, para caber em célula de tabela e tag. */
+export const COMPRA_GASTO_CANAL_CURTO: Record<CompraGastoCanal, string> = {
+  transferencia: "Transferência",
+  alibaba: "Alibaba",
+};
+
+/** Ordem de exibição dos canais — a mesma em toda tela. */
+export const COMPRA_GASTO_CANAIS: CompraGastoCanal[] = ["transferencia", "alibaba"];
+
+/**
+ * Modelo de parcelamento: um gerador de parcelas, não um campo do lote.
+ *
+ *  - `manual`: divide em Nx / % à mão (o de sempre).
+ *  - `salete`: 2x iguais, 90 e 120 dias depois da compra.
+ *  - `china`: transferência 40% + Alibaba 60%, cada canal com 30% no ato do
+ *    pedido, 50% no despacho (+30 dias) e 20% 60 dias depois do despacho (+90).
+ *
+ * Não é persistido: o que fica gravado é o resultado (datas, valores, canal e
+ * etapa de cada parcela), porque depois de gerado o parcelamento pode ser
+ * editado à mão e um "modelo" salvo viraria mentira.
+ */
+export type CompraGastoModeloParcelamento = "manual" | "salete" | "china";
+
 export const COMPRA_GASTO_TIPO_LABEL: Record<CompraGastoTipo, string> = {
   mercadoria: "Mercadoria",
   frete: "Frete e importação",
@@ -58,6 +99,10 @@ export interface CompraGastoParcela {
   pago: boolean;
   /** YYYY-MM-DD */
   dataPagamento?: string | null;
+  /** Canal do pagamento. Nulo/ausente = pagamento único, sem divisão por canal. */
+  canal?: CompraGastoCanal | null;
+  /** Etapa que originou a data ("no despacho"), só para leitura humana. */
+  etapa?: string | null;
 }
 
 export interface CompraGastoLote {
@@ -172,6 +217,12 @@ export interface CompraGastoCandidata {
   /** Linhas sem custo cadastrado — o valor está subestimado por elas. */
   semCusto: number;
   comprada: boolean;
+  /**
+   * Previsão de chegada (YYYY-MM-DD), quando a Compra Salva já virou Compra em
+   * trânsito: a menor data de recebimento dos itens. Nulo = ainda não há
+   * trânsito com data, e o campo do modal fica com o que o usuário digitar.
+   */
+  previsaoChegada?: string | null;
 }
 
 /** Payload de criação/edição de lote (o que a tela manda para a API). */
