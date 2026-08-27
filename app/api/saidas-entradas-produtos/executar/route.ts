@@ -278,12 +278,23 @@ export async function POST(request: Request) {
     // Responsável: sempre o usuário do LINX atrelado ao login (resolveResponsavelLinx).
     // O valor enviado pelo cliente é completamente ignorado.
     const responsavelFinal = await resolveResponsavelLinx(username);
+    const gravarTipoNerdProducao =
+      tipoOperacao === 'entrada' &&
+      companyKey?.trim().toLowerCase() === 'nerd' &&
+      normalizeFilialKey(tipoRomaneio) === 'NERD PRODUCAO';
 
     const pool = shouldUseProxy() ? new ProxyPool() : await getConnectionPool();
     const result = tipoOperacao === 'saida'
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ? await executeSaidaLote(pool, { itens, filial: filialTrim, filialDestino: filialDestinoTrim, tipoRomaneio, responsavel: responsavelFinal, observacao } as any)
-      : await executeEntradaLote(pool, { itens, filial: filialTrim, tipoRomaneio, responsavel: responsavelFinal, observacao });
+      : await executeEntradaLote(pool, {
+          itens,
+          filial: filialTrim,
+          tipoRomaneio,
+          responsavel: responsavelFinal,
+          observacao,
+          gravarTipoRomaneio: gravarTipoNerdProducao,
+        });
 
     if (tipoOperacao === 'saida' && companyKey && filialDestinoTrim && result.romaneio) {
       try {

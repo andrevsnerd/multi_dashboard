@@ -166,6 +166,16 @@ interface TransferenciaPermissao {
 
 type TipoOperacao = "saida" | "entrada";
 
+const TIPO_NERD_PRODUCAO = "NERD PRODUÇÃO";
+
+function normalizarTipoRomaneio(value: string): string {
+  return (value || "")
+    .trim()
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
 /** Cor na UI: prioriza descrição; a API às vezes manda só descCor com corProduto nulo (igual lista-loja). */
 function textoCorProduto(descCor: string, corProduto: string | null): string {
   const d = (descCor || "").trim();
@@ -683,6 +693,22 @@ export default function SaidasEntradasProdutosPage({
   const [checandoDefeitoDoDia, setChecandoDefeitoDoDia] = useState(false);
   const [defeitoRefreshKey, setDefeitoRefreshKey] = useState(0);
 
+  const isEntradaNerd = tipoOperacao === "entrada" && companyKey === "nerd";
+  const tiposRomaneioExibidos = useMemo(() => {
+    if (!isEntradaNerd) return tiposRomaneioDisponiveis;
+
+    const tipoCadastrado = tiposRomaneio.find(
+      (tipo) => normalizarTipoRomaneio(tipo) === "NERD PRODUCAO"
+    ) || TIPO_NERD_PRODUCAO;
+
+    return [
+      tipoCadastrado,
+      ...tiposRomaneioDisponiveis.filter(
+        (tipo) => normalizarTipoRomaneio(tipo) !== "NERD PRODUCAO"
+      ),
+    ];
+  }, [isEntradaNerd, tiposRomaneio, tiposRomaneioDisponiveis]);
+
   // ── BIPAGEM ────────────────────────────────────────────────────────────────
   // Fluxo alternativo ao modal: o leitor manda o código + Enter e o produto já
   // entra na lista. O campo fica sempre focado para o operador nunca precisar
@@ -1009,6 +1035,14 @@ export default function SaidasEntradasProdutosPage({
     loadTiposRomaneio();
   }, [permissoes, permissoesCarregadas]);
 
+  useEffect(() => {
+    if (!isEntradaNerd) return;
+    const tipoCadastrado = tiposRomaneio.find(
+      (tipo) => normalizarTipoRomaneio(tipo) === "NERD PRODUCAO"
+    );
+    setTipoRomaneioSelecionado(tipoCadastrado || TIPO_NERD_PRODUCAO);
+  }, [isEntradaNerd, tiposRomaneio]);
+
   // Aplicar responsável padrão imediatamente quando as permissões carregam
   useEffect(() => {
     if (!permissoesCarregadas || !permissoes?.responsavelPadrao) return;
@@ -1070,6 +1104,19 @@ export default function SaidasEntradasProdutosPage({
 
   const trocarTipoOperacao = useCallback((next: TipoOperacao) => {
     setTipoOperacao(next);
+    if (next === "entrada" && companyKey === "nerd") {
+      const tipoCadastrado = tiposRomaneio.find(
+        (tipo) => normalizarTipoRomaneio(tipo) === "NERD PRODUCAO"
+      );
+      setTipoRomaneioSelecionado(tipoCadastrado || TIPO_NERD_PRODUCAO);
+    } else if (next === "saida") {
+      setTipoRomaneioSelecionado((atual) => {
+        if (normalizarTipoRomaneio(atual) !== "NERD PRODUCAO") return atual;
+        return tiposRomaneioDisponiveis.find(
+          (tipo) => normalizarTipoRomaneio(tipo) === "TRANSFERENCIA ENTRE LOJAS"
+        ) || tiposRomaneioDisponiveis[0] || "TRANSFERENCIA ENTRE LOJAS";
+      });
+    }
     // evitar "cadeia" de updates pós-clique
     setProdutosSelecionados([]);
     setProdutosSelecionadosModal([]);
@@ -1077,7 +1124,7 @@ export default function SaidasEntradasProdutosPage({
     setProdutos([]);
     setModalAberto(false);
     setFilialDestinoSaida(null);
-  }, []);
+  }, [companyKey, tiposRomaneio, tiposRomaneioDisponiveis]);
 
   const observacaoAtual = tipoOperacao === "saida" ? observacaoSaida : observacaoEntrada;
   const setObservacaoAtual = useCallback((value: string) => {
@@ -2425,7 +2472,7 @@ export default function SaidasEntradasProdutosPage({
             </div>
             <div className={styles.configBody}>
               <span className={styles.configBarLabel}>Tipo de Romaneio</span>
-              {tiposRomaneioDisponiveis.length === 1 || permissoes?.tipoRomaneioFixo ? (
+              {tiposRomaneioExibidos.length === 1 || permissoes?.tipoRomaneioFixo ? (
                 <span className={styles.configBarText}>{tipoRomaneioSelecionado}</span>
               ) : (
                 <div className={styles.selectWrap}>
@@ -2434,9 +2481,10 @@ export default function SaidasEntradasProdutosPage({
                     value={tipoRomaneioSelecionado}
                     onChange={(e) => setTipoRomaneioSelecionado(e.target.value)}
                   >
-                    {[...tiposRomaneioDisponiveis].sort((a, b) => {
+                    {[...tiposRomaneioExibidos].sort((a, b) => {
                       const ordem = (s: string) => {
                         const u = s.toUpperCase();
+                        if (isEntradaNerd && normalizarTipoRomaneio(u) === 'NERD PRODUCAO') return -1;
                         if (u === 'TRANSFERENCIA ENTRE LOJAS') return 0;
                         if (u === 'DEFEITO') return 1;
                         return 2;
