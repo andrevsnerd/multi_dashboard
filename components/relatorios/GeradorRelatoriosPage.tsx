@@ -28,7 +28,9 @@ import {
   PROJECAO_MES_COL_PREFIX,
   PROJECAO_VENDAS_ID,
 } from "@/lib/reports/projecao-vendas";
+import { CUSTOS_DEFEITOS_ID } from "@/lib/reports/custos-defeitos";
 import { exportProjecaoVendasXlsx } from "@/lib/utils/exportProjecaoVendasXlsx";
+import { exportCustosDefeitosXlsx } from "@/lib/utils/exportCustosDefeitosXlsx";
 import { formatData, formatDataVenda, formatDiasAcabar, formatDiasParado } from "@/lib/reports/format";
 import { getDefaultPresets, getReportMeta, REPORT_TYPES, VENDAS_FATURAMENTO_ID } from "@/lib/reports/registry";
 import { computeExtraSources, getEditorExtraColumns } from "@/lib/reports/column-sources";
@@ -171,6 +173,11 @@ export default function GeradorRelatoriosPage({
   const supports = (f: string) => meta?.supportedFilters.includes(f as never) ?? false;
   /** Análise que recebe uma LISTA de produtos (chips) em vez de um produto só. */
   const supportsProdutosMulti = supports("produtos");
+  /**
+   * Custos de defeitos: a entrada não são filtros, é a LISTA COLADA de peças (uma por
+   * linha, repetição = quantidade). A tela troca o painel de filtros pelo campo da lista.
+   */
+  const isCustosDefeitos = reportTypeId === CUSTOS_DEFEITOS_ID;
 
   // Filtros
   const [range, setRange] = useState<DateRangeValue>(initialRange);
@@ -225,6 +232,10 @@ export default function GeradorRelatoriosPage({
   const [codigosColados, setCodigosColados] = useState("");
   const [resolvendoCodigos, setResolvendoCodigos] = useState(false);
   const [avisoCodigos, setAvisoCodigos] = useState<string | null>(null);
+  // Custos de defeitos: a lista colada de peças defeituosas (uma por linha; a mesma peça
+  // repetida N vezes = quantidade N) e o aviso dos códigos que não foram reconhecidos.
+  const [defeitosTexto, setDefeitosTexto] = useState("");
+  const [defeitosNaoEncontrados, setDefeitosNaoEncontrados] = useState<string[]>([]);
   // Opções da Projeção de vendas: janela do ritmo (meses) + índice sazonal (opt-in) +
   // limitar a projeção ao estoque atual (ligado por padrão).
   const [projecaoJanela, setProjecaoJanela] = useState<number>(PROJECAO_JANELA_DEFAULT);
@@ -360,6 +371,10 @@ export default function GeradorRelatoriosPage({
     setProdutosSelecionados([]);
     setCodigosColados("");
     setAvisoCodigos(null);
+    // O aviso de códigos não reconhecidos é do resultado anterior — some junto. A lista
+    // colada de defeitos NÃO é apagada: pode ter centenas de linhas e uma troca sem
+    // querer no seletor de análise não pode custar o trabalho de colar tudo de novo.
+    setDefeitosNaoEncontrados([]);
   }, [reportTypeId]);
 
   // Carrega presets do backend.
@@ -773,6 +788,30 @@ export default function GeradorRelatoriosPage({
     setError(null);
     setGenProgress(null);
     try {
+      // Custos de defeitos: não tem filtro nenhum — manda a LISTA COLADA por POST (com as
+      // repetições, que são a quantidade). Uma lista de peças passa fácil de mil linhas e
+      // não caberia na query string das demais análises.
+      if (isCustosDefeitos) {
+        const codigos = defeitosTexto
+          .split(/[\s,;]+/g)
+          .map((c) => c.trim())
+          .filter(Boolean);
+        if (codigos.length === 0) {
+          clearResultOnError("Cole a lista de produtos defeituosos (um código por linha).");
+          return;
+        }
+        const res = await fetch("/api/relatorios/custos-defeitos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ codigos }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json?.error || json?.details || "Erro ao gerar relatório");
+        setDefeitosNaoEncontrados(Array.isArray(json?.naoEncontrados) ? json.naoEncontrados : []);
+        applyResult(json);
+        return;
+      }
+
       const qs = buildQuery();
 
       // Análise demorada → streaming com progresso por loja.
@@ -818,6 +857,8 @@ export default function GeradorRelatoriosPage({
     }
   }, [
     buildQuery,
+    isCustosDefeitos,
+    defeitosTexto,
     wantsFilialStock,
     wantsFilialSales,
     wantsRupturas,
@@ -1073,6 +1114,16 @@ export default function GeradorRelatoriosPage({
       );
       return;
     }
+    // Custos de defeitos: mesmo layout do XLSX de compra (faixa de título, cabeçalho
+    // azul-escuro, Custo total por fórmula e linha TOTAL somando peças e custo).
+    if (reportTypeId === CUSTOS_DEFEITOS_ID) {
+      void exportCustosDefeitosXlsx(
+        sortedRows,
+        enabledColumns.map((c) => ({ key: c.key, label: c.label })),
+        { companyKey, companyName, columnTypes, sheetName: meta?.label }
+      );
+      return;
+    }
     // Clientes por filial: export dedicado com estilo (cabeçalho, zebra, linha TOTAL).
     if (reportTypeId === CLIENTES_FILIAL_ID) {
       void exportClientesFilialXlsx(
@@ -1184,7 +1235,59 @@ export default function GeradorRelatoriosPage({
         {meta?.description && <p className={styles.hint}>{meta.description}</p>}
       </section>
 
+      {/* Custos de defeitos: a lista colada é a entrada da análise (substitui os filtros).
+          Uma peça por linha — o mesmo código repetido N vezes vira quantidade N. */}
+      {isCustosDefeitos && (
+        <section className={styles.panel}>
+          <h2 className={styles.panelTitle}>Lista de produtos defeituosos</h2>
+          <div className={styles.pasteBox}>
+            <textarea
+              className={styles.pasteArea}
+              value={defeitosTexto}
+              placeholder={
+                "Cole a lista (um por linha — código de barra ou código do produto)\n050341\n050341\n050340"
+              }
+              onChange={(e) => setDefeitosTexto(e.target.value)}
+              rows={12}
+            />
+            <div className={styles.pasteActions}>
+              <span className={styles.pasteHint}>
+                {(() => {
+                  const linhasColadas = defeitosTexto
+                    .split(/[\s,;]+/g)
+                    .map((c) => c.trim())
+                    .filter(Boolean);
+                  return linhasColadas.length > 0
+                    ? `${linhasColadas.length} peça(s) na lista`
+                    : "Cada linha conta 1 peça. Repita o código para contar mais de uma.";
+                })()}
+              </span>
+              {defeitosTexto.trim() !== "" && (
+                <button
+                  type="button"
+                  className={styles.chipClearAll}
+                  onClick={() => {
+                    setDefeitosTexto("");
+                    setDefeitosNaoEncontrados([]);
+                  }}
+                >
+                  Limpar
+                </button>
+              )}
+            </div>
+            {defeitosNaoEncontrados.length > 0 && (
+              <div className={styles.pasteHint}>
+                {defeitosNaoEncontrados.length} código(s) não reconhecido(s):{" "}
+                {defeitosNaoEncontrados.slice(0, 20).join(", ")}
+                {defeitosNaoEncontrados.length > 20 ? "…" : ""}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
       {/* Filtros */}
+      {!isCustosDefeitos && (
       <section className={styles.panel}>
         <h2 className={styles.panelTitle}>Filtros</h2>
         <div className={styles.filtersGrid}>
@@ -1542,6 +1645,7 @@ export default function GeradorRelatoriosPage({
           )}
         </div>
       </section>
+      )}
 
       {/* Estrutura de colunas */}
       <section className={styles.panel}>

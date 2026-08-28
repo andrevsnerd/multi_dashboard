@@ -36,6 +36,11 @@ import {
   projecaoVendasMeta,
   PROJECAO_VENDAS_ID,
 } from "./projecao-vendas";
+import {
+  buildCustosDefeitosPresets,
+  custosDefeitosMeta,
+  CUSTOS_DEFEITOS_ID,
+} from "./custos-defeitos";
 
 /**
  * Registry PURO de tipos de análise (apenas metadados/colunas/presets).
@@ -55,6 +60,7 @@ export const REPORT_TYPES: ReportTypeMeta[] = [
   compraSugeridaAbcMeta,
   clientesFilialMeta,
   projecaoVendasMeta,
+  custosDefeitosMeta,
 ];
 
 export function getReportMeta(id: string): ReportTypeMeta | undefined {
@@ -89,6 +95,9 @@ export function getDefaultPresets(id: string, companyKey: CompanyKey): ReportPre
   }
   if (id === PROJECAO_VENDAS_ID) {
     return buildProjecaoVendasPresets(companyKey);
+  }
+  if (id === CUSTOS_DEFEITOS_ID) {
+    return buildCustosDefeitosPresets();
   }
   return getReportMeta(id)?.defaultPresets ?? [];
 }
