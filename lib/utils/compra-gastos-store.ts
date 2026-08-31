@@ -99,6 +99,14 @@ async function runMigrations(): Promise<void> {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
+  // A fonte das compras passou a ser a Compra em trânsito CONFIRMADA (antes era a
+  // Compra Salva). `compra_salva_id` fica no schema porque os lotes já gravados
+  // continuam apontando para lá — nenhum lote novo escreve nessa coluna.
+  await ddl(() => sql`ALTER TABLE compra_gastos_lotes ADD COLUMN IF NOT EXISTS compra_transito_id TEXT`);
+  await ddl(() => sql`
+    CREATE INDEX IF NOT EXISTS compra_gastos_lotes_transito_idx
+      ON compra_gastos_lotes (company_key, compra_transito_id)
+  `);
   // Janela de chegada (chegada_fim) e data de PDV saíram do produto: a compra
   // tem data e previsão de chegada, nada mais. Drop idempotente para o schema
   // não carregar coluna que nenhuma tela preenche.
@@ -156,7 +164,9 @@ async function writeFileAll(data: FileShape) {
 // ───────────────────────── normalização ─────────────────────────
 
 const TIPOS: CompraGastoTipo[] = ["mercadoria", "frete", "adiantamento", "material", "outros"];
-const ORIGENS: CompraGastoOrigem[] = ["salva", "itens", "valor"];
+// "salva" é legado: nenhum lote novo nasce dela, mas os já gravados precisam
+// continuar sendo lidos com a própria origem em vez de cair no fallback.
+const ORIGENS: CompraGastoOrigem[] = ["transito", "itens", "valor", "salva"];
 
 function num(v: unknown): number {
   const n = typeof v === "string" ? Number(v) : (v as number);
@@ -208,6 +218,7 @@ function rowToLote(row: Record<string, unknown>): CompraGastoLote {
     fornecedor: (row.fornecedor as string) ?? null,
     tipo: (TIPOS.includes(row.tipo as CompraGastoTipo) ? row.tipo : "mercadoria") as CompraGastoTipo,
     origem: (ORIGENS.includes(row.origem as CompraGastoOrigem) ? row.origem : "valor") as CompraGastoOrigem,
+    compraTransitoId: (row.compra_transito_id as string) ?? null,
     compraSalvaId: (row.compra_salva_id as string) ?? null,
     dataCompra: dateOnly(row.data_compra) ?? "",
     chegadaIni: dateOnly(row.chegada_ini),
@@ -226,17 +237,17 @@ function rowToLote(row: Record<string, unknown>): CompraGastoLote {
 // ───────────────────────── lotes ─────────────────────────
 
 /**
- * Já existe compra lançada a partir desta Compra Salva?
+ * Já existe compra lançada a partir desta Compra em trânsito?
  *
  * A tela esconde do select o que já foi lançado, mas a trava real é aqui: duas
- * abas abertas (ou um duplo-clique) lançariam a MESMA Compra Salva duas vezes e
- * o comprometido do mês contaria o mesmo dinheiro em dobro.
+ * abas abertas (ou um duplo-clique) lançariam a MESMA compra duas vezes e o
+ * comprometido do mês contaria o mesmo dinheiro em dobro.
  */
-export async function existeLoteDaCompraSalva(
+export async function existeLoteDaCompraTransito(
   companyKey: string,
-  compraSalvaId: string
+  compraTransitoId: string
 ): Promise<boolean> {
-  if (!compraSalvaId) return false;
+  if (!compraTransitoId) return false;
 
   if (hasPostgres()) {
     await ensureTable();
@@ -244,14 +255,16 @@ export async function existeLoteDaCompraSalva(
     const rows = await sql`
       SELECT 1
       FROM compra_gastos_lotes
-      WHERE company_key = ${companyKey} AND compra_salva_id = ${compraSalvaId}
+      WHERE company_key = ${companyKey} AND compra_transito_id = ${compraTransitoId}
       LIMIT 1
     `;
     return rows.length > 0;
   }
 
   const all = await readFileAll();
-  return all.lotes.some((l) => l.companyKey === companyKey && l.compraSalvaId === compraSalvaId);
+  return all.lotes.some(
+    (l) => l.companyKey === companyKey && l.compraTransitoId === compraTransitoId
+  );
 }
 
 export async function listLotes(companyKey: string): Promise<CompraGastoLote[]> {
@@ -260,7 +273,8 @@ export async function listLotes(companyKey: string): Promise<CompraGastoLote[]> 
     const sql = getNeonSql();
     const rows = await sql`
       SELECT
-        id, company_key, codigo, titulo, colecao, fornecedor, tipo, origem, compra_salva_id,
+        id, company_key, codigo, titulo, colecao, fornecedor, tipo, origem,
+        compra_transito_id, compra_salva_id,
         data_compra, chegada_ini, chegada_real, estimado, valor_unico,
         observacao, itens, parcelas, criado_por, created_at, updated_at
       FROM compra_gastos_lotes
@@ -282,7 +296,8 @@ export async function getLote(companyKey: string, id: string): Promise<CompraGas
     const sql = getNeonSql();
     const rows = await sql`
       SELECT
-        id, company_key, codigo, titulo, colecao, fornecedor, tipo, origem, compra_salva_id,
+        id, company_key, codigo, titulo, colecao, fornecedor, tipo, origem,
+        compra_transito_id, compra_salva_id,
         data_compra, chegada_ini, chegada_real, estimado, valor_unico,
         observacao, itens, parcelas, criado_por, created_at, updated_at
       FROM compra_gastos_lotes
@@ -312,6 +327,7 @@ export async function createLote(
     fornecedor: input.fornecedor ? String(input.fornecedor).trim() : null,
     tipo: TIPOS.includes(input.tipo) ? input.tipo : "mercadoria",
     origem: ORIGENS.includes(input.origem) ? input.origem : "valor",
+    compraTransitoId: input.compraTransitoId ? String(input.compraTransitoId) : null,
     compraSalvaId: input.compraSalvaId ? String(input.compraSalvaId) : null,
     dataCompra: dateOnly(input.dataCompra) ?? now.slice(0, 10),
     chegadaIni: dateOnly(input.chegadaIni),
@@ -331,12 +347,14 @@ export async function createLote(
     const sql = getNeonSql();
     await sql`
       INSERT INTO compra_gastos_lotes (
-        id, company_key, codigo, titulo, colecao, fornecedor, tipo, origem, compra_salva_id,
+        id, company_key, codigo, titulo, colecao, fornecedor, tipo, origem,
+        compra_transito_id, compra_salva_id,
         data_compra, chegada_ini, chegada_real, estimado, valor_unico,
         observacao, itens, parcelas, criado_por, created_at, updated_at
       ) VALUES (
         ${lote.id}, ${lote.companyKey}, ${lote.codigo}, ${lote.titulo}, ${lote.colecao},
-        ${lote.fornecedor}, ${lote.tipo}, ${lote.origem}, ${lote.compraSalvaId},
+        ${lote.fornecedor}, ${lote.tipo}, ${lote.origem},
+        ${lote.compraTransitoId}, ${lote.compraSalvaId},
         ${lote.dataCompra}, ${lote.chegadaIni}, ${lote.chegadaReal},
         ${lote.estimado}, ${lote.valorUnico}, ${lote.observacao},
         ${JSON.stringify(lote.itens)}::jsonb, ${JSON.stringify(lote.parcelas)}::jsonb,
@@ -373,6 +391,10 @@ export async function updateLote(
         : atual.fornecedor,
     tipo: patch.tipo && TIPOS.includes(patch.tipo) ? patch.tipo : atual.tipo,
     origem: patch.origem && ORIGENS.includes(patch.origem) ? patch.origem : atual.origem,
+    compraTransitoId:
+      patch.compraTransitoId !== undefined
+        ? (patch.compraTransitoId ?? null)
+        : atual.compraTransitoId,
     compraSalvaId:
       patch.compraSalvaId !== undefined ? (patch.compraSalvaId ?? null) : atual.compraSalvaId,
     dataCompra: patch.dataCompra !== undefined ? dateOnly(patch.dataCompra) ?? atual.dataCompra : atual.dataCompra,
@@ -399,6 +421,7 @@ export async function updateLote(
         fornecedor = ${proximo.fornecedor},
         tipo = ${proximo.tipo},
         origem = ${proximo.origem},
+        compra_transito_id = ${proximo.compraTransitoId},
         compra_salva_id = ${proximo.compraSalvaId},
         data_compra = ${proximo.dataCompra},
         chegada_ini = ${proximo.chegadaIni},

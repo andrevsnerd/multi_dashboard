@@ -118,7 +118,11 @@ export default function GastosCompraDrawer({
               <i />
               {status.label}
             </span>
-            <span className={`${styles.tag} ${lote.origem === "salva" ? styles.tagLinked : ""}`}>
+            <span
+              className={`${styles.tag} ${
+                lote.origem === "transito" || lote.origem === "salva" ? styles.tagLinked : ""
+              }`}
+            >
               {COMPRA_GASTO_ORIGEM_LABEL[lote.origem]}
             </span>
             <span className={styles.tag}>{COMPRA_GASTO_TIPO_LABEL[lote.tipo]}</span>
@@ -468,11 +472,13 @@ export default function GastosCompraDrawer({
               <div className={styles.fact}>
                 <span className={styles.factK}>Origem do valor</span>
                 <span className={styles.factText}>
-                  {lote.origem === "salva"
-                    ? `Compra Salva vinculada — ${lote.itens.length} itens. O valor veio de qtd × custo item por item.`
-                    : lote.origem === "itens"
-                      ? `Linhas digitadas nesta compra: ${lote.itens.filter((i) => i.produto).length} vinculadas a produto e ${lote.itens.filter((i) => !i.produto).length} livres.`
-                      : "Valor único informado à mão. Sem itens, sem impacto em estoque."}
+                  {lote.origem === "transito"
+                    ? `Compra em trânsito confirmada — ${lote.itens.length} itens. O valor veio de qtd × custo item por item.`
+                    : lote.origem === "salva"
+                      ? `Compra Salva vinculada — ${lote.itens.length} itens (vínculo antigo, de antes de a fonte passar a ser a Compra em trânsito). O valor veio de qtd × custo item por item.`
+                      : lote.origem === "itens"
+                        ? `Linhas digitadas nesta compra: ${lote.itens.filter((i) => i.produto).length} vinculadas a produto e ${lote.itens.filter((i) => !i.produto).length} livres.`
+                        : "Valor único informado à mão. Sem itens, sem impacto em estoque."}
                 </span>
               </div>
               <div className={styles.fact}>

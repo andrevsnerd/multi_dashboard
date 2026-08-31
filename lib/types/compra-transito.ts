@@ -28,9 +28,8 @@ export interface CompraTransito {
   title: string;
   /**
    * Compra Salva que originou esta compra em trânsito, quando ela nasceu do
-   * "Exportar para trânsito". É o que liga a previsão de chegada (a menor
-   * `dataRecebimento` dos itens) de volta à Compra Salva — em Gastos de Compra,
-   * importar a Compra Salva já traz essa previsão sem redigitação.
+   * "Exportar para trânsito". Registro de procedência: diz de qual lista a
+   * compra saiu.
    */
   compraSalvaId?: string | null;
   status: CompraTransitoStatus;

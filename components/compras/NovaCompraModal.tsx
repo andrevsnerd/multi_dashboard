@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import type { CompraSalvaListEntry } from "@/lib/types/compra-salva";
+import type { CompraTransitoListEntry } from "@/lib/types/compra-transito";
 import {
   COMPRA_GASTO_CANAL_LABEL,
   COMPRA_GASTO_TIPO_LABEL,
@@ -17,7 +17,7 @@ import { cents } from "@/lib/utils/compra-gastos-agregacao";
 
 import ParcelasEditor from "./ParcelasEditor";
 import styles from "./GastosCompra.module.css";
-import { brl, dataBrasiliaDeIso, dataBrCompleta, money, parseMoeda } from "./gastos-compra-format";
+import { brl, dataBr, dataBrasiliaDeIso, dataBrCompleta, money, parseMoeda } from "./gastos-compra-format";
 
 interface Props {
   companyKey: string;
@@ -26,10 +26,16 @@ interface Props {
   mesSugerido?: string | null;
   hoje: string;
   /**
-   * Ids de Compras Salvas que já foram lançadas como compra. Ficam FORA do
-   * select: lançar a mesma Compra Salva de novo duplicaria o comprometido.
+   * Ids de Compras em trânsito que já foram lançadas como compra. Ficam FORA do
+   * select: lançar a mesma compra de novo duplicaria o comprometido.
    */
-  comprasSalvasLancadas?: Set<string>;
+  comprasTransitoLancadas?: Set<string>;
+  /**
+   * Descrições (normalizadas) das compras já lançadas no painel. Serve para
+   * avisar sobre o que veio das Compras Salvas antigas, cujo vínculo não é com
+   * o trânsito e por isso escapa da trava por id.
+   */
+  titulosLancados?: Set<string>;
   onClose: () => void;
   onSaved: (lote: CompraGastoLote) => void;
 }
@@ -51,16 +57,17 @@ export default function NovaCompraModal({
   username,
   mesSugerido,
   hoje,
-  comprasSalvasLancadas,
+  comprasTransitoLancadas,
+  titulosLancados,
   onClose,
   onSaved,
 }: Props) {
-  const [origem, setOrigem] = useState<CompraGastoOrigem>("salva");
+  const [origem, setOrigem] = useState<CompraGastoOrigem>("transito");
 
-  const [salvas, setSalvas] = useState<CompraSalvaListEntry[]>([]);
-  const [salvasErro, setSalvasErro] = useState<string | null>(null);
-  const [carregandoSalvas, setCarregandoSalvas] = useState(false);
-  const [compraSalvaId, setCompraSalvaId] = useState("");
+  const [transitos, setTransitos] = useState<CompraTransitoListEntry[]>([]);
+  const [transitosErro, setTransitosErro] = useState<string | null>(null);
+  const [carregandoTransitos, setCarregandoTransitos] = useState(false);
+  const [compraTransitoId, setCompraTransitoId] = useState("");
 
   // Uma linha só: a próxima aparece sozinha ao digitar nesta.
   const [linhas, setLinhas] = useState<LinhaLivre[]>([{ ...LINHA_VAZIA }]);
@@ -73,7 +80,7 @@ export default function NovaCompraModal({
   const [chegadaIni, setChegadaIni] = useState("");
   const [observacao, setObservacao] = useState("");
 
-  /** Itens já reconhecidos da Compra Salva escolhida (valor exato, não o arredondado da lista). */
+  /** Itens já reconhecidos da Compra em trânsito escolhida (valor exato, não o arredondado da lista). */
   const [previa, setPrevia] = useState<CompraGastoCandidata | null>(null);
   const [carregandoPrevia, setCarregandoPrevia] = useState(false);
 
@@ -83,29 +90,32 @@ export default function NovaCompraModal({
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
-  // ───────── Compras Salvas disponíveis ─────────
+  // ───────── Compras em trânsito confirmadas ─────────
   // Uma busca por empresa, na montagem do modal — nada de guard por ref nem
   // pelos estados de carga: flag de carga nas dependências dispara o cleanup do
   // próprio efeito, e guard por ref sobrevive à remontagem do StrictMode (dev
   // roda o efeito 2x), nos dois casos matando a única resposta que ia gravar.
   useEffect(() => {
     let cancelado = false;
-    setCarregandoSalvas(true);
-    setSalvasErro(null);
-    fetch(`/api/controle-estoque/compras-salvas?company=${companyKey}`, { cache: "no-store" })
+    setCarregandoTransitos(true);
+    setTransitosErro(null);
+    fetch(`/api/compras-transito?company=${companyKey}`, { cache: "no-store" })
       .then(async (r) => {
-        const j = (await r.json()) as { data?: CompraSalvaListEntry[]; error?: string };
-        if (!r.ok) throw new Error(j.error ?? "Erro ao listar compras salvas");
+        const j = (await r.json()) as { data?: CompraTransitoListEntry[]; error?: string };
+        if (!r.ok) throw new Error(j.error ?? "Erro ao listar compras em trânsito");
         return j.data ?? [];
       })
       .then((lista) => {
-        if (!cancelado) setSalvas(lista);
+        // Rascunho não é compra: só o que foi CONFIRMADO em trânsito (em trânsito
+        // ou já recebido) é reconhecido como gasto.
+        if (!cancelado) setTransitos(lista.filter((c) => c.status !== "rascunho"));
       })
       .catch((e) => {
-        if (!cancelado) setSalvasErro(e instanceof Error ? e.message : "Erro ao listar compras salvas");
+        if (!cancelado)
+          setTransitosErro(e instanceof Error ? e.message : "Erro ao listar compras em trânsito");
       })
       .finally(() => {
-        if (!cancelado) setCarregandoSalvas(false);
+        if (!cancelado) setCarregandoTransitos(false);
       });
     return () => {
       cancelado = true;
@@ -113,19 +123,33 @@ export default function NovaCompraModal({
   }, [companyKey]);
 
   /**
-   * Só as Compras Salvas ainda não lançadas. A que já virou compra sai do select
-   * — não existe motivo legítimo para lançar a mesma duas vezes, e o risco de
-   * duplicar o comprometido do mês é real.
+   * Só as Compras em trânsito ainda não lançadas. A que já virou compra sai do
+   * select — não existe motivo legítimo para lançar a mesma duas vezes, e o
+   * risco de duplicar o comprometido do mês é real.
    */
   const disponiveis = useMemo(
-    () => (comprasSalvasLancadas ? salvas.filter((s) => !comprasSalvasLancadas.has(s.id)) : salvas),
-    [salvas, comprasSalvasLancadas]
+    () =>
+      comprasTransitoLancadas
+        ? transitos.filter((c) => !comprasTransitoLancadas.has(c.id))
+        : transitos,
+    [transitos, comprasTransitoLancadas]
   );
-  const ocultadas = salvas.length - disponiveis.length;
+  const ocultadas = transitos.length - disponiveis.length;
 
-  const salvaSelecionada = useMemo(
-    () => salvas.find((s) => s.id === compraSalvaId) ?? null,
-    [salvas, compraSalvaId]
+  const transitoSelecionado = useMemo(
+    () => transitos.find((c) => c.id === compraTransitoId) ?? null,
+    [transitos, compraTransitoId]
+  );
+
+  /** Já existe compra lançada com esta descrição? Suspeita, não veredicto. */
+  const jaLancadaPorTitulo = useCallback(
+    (title: string) => !!titulosLancados?.has(title.trim().toLowerCase().replace(/\s+/g, " ")),
+    [titulosLancados]
+  );
+
+  const suspeitas = useMemo(
+    () => disponiveis.filter((c) => jaLancadaPorTitulo(c.title)).length,
+    [disponiveis, jaLancadaPorTitulo]
   );
 
   const itensDasLinhas = useMemo<CompraGastoItem[]>(
@@ -144,12 +168,12 @@ export default function NovaCompraModal({
   );
 
   const total = useMemo(() => {
-    if (origem === "salva") return cents(previa?.total ?? salvaSelecionada?.totalValor ?? 0);
+    if (origem === "transito") return cents(previa?.total ?? transitoSelecionado?.totalValor ?? 0);
     if (origem === "itens") {
       return cents(itensDasLinhas.reduce((s, i) => s + i.qtd * i.custoUnitario, 0));
     }
     return parseMoeda(valorUnicoTexto);
-  }, [origem, previa, salvaSelecionada, itensDasLinhas, valorUnicoTexto]);
+  }, [origem, previa, transitoSelecionado, itensDasLinhas, valorUnicoTexto]);
 
   // A compra nasce INTEIRA: uma parcela de 100% na data da compra. Só quando o
   // usuário divide é que o valor sai desse mês e vai para os vencimentos novos.
@@ -172,50 +196,49 @@ export default function NovaCompraModal({
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  /** Ao escolher a Compra Salva, título e data vêm dela — só o parcelamento sobra para editar. */
   /**
-   * Escolher a Compra Salva já traz tudo pronto: título, data da compra, a
-   * previsão de chegada (da Compra em trânsito que nasceu dela) e os itens
-   * reconhecidos com o valor exato (qtd × custo). Só o parcelamento fica para o
-   * usuário.
+   * Escolher a Compra em trânsito já traz tudo pronto: título, data da compra
+   * (o dia em que o trânsito foi confirmado), a previsão de chegada (a menor
+   * data de recebimento dos itens) e os itens reconhecidos com o valor exato
+   * (qtd × custo). Só o parcelamento fica para o usuário.
    */
-  const escolherCompraSalva = useCallback(
+  const escolherCompraTransito = useCallback(
     async (id: string) => {
-      setCompraSalvaId(id);
+      setCompraTransitoId(id);
       setParcelasEditadas(false);
       setPrevia(null);
       if (!id) return;
 
-      const escolhida = salvas.find((s) => s.id === id);
+      const escolhida = transitos.find((c) => c.id === id);
       if (escolhida) {
         setTitulo(escolhida.title);
-        setDataCompra(dataBrasiliaDeIso(escolhida.savedAt));
+        setDataCompra(dataBrasiliaDeIso(escolhida.confirmedAt));
       }
 
       setCarregandoPrevia(true);
       try {
         const res = await fetch(
-          `/api/compras-gastos/reconhecer?company=${companyKey}&compraSalvaId=${encodeURIComponent(id)}`,
+          `/api/compras-gastos/reconhecer?company=${companyKey}&compraTransitoId=${encodeURIComponent(id)}`,
           { cache: "no-store" }
         );
         const json = (await res.json()) as { candidata?: CompraGastoCandidata; error?: string };
         if (!res.ok || !json.candidata) {
-          setErro(json.error ?? "Não foi possível ler os itens da Compra Salva.");
+          setErro(json.error ?? "Não foi possível ler os itens da Compra em trânsito.");
           return;
         }
         setPrevia(json.candidata);
         setTitulo(json.candidata.titulo);
         setDataCompra(json.candidata.dataCompra);
-        // Compra Salva sem trânsito com data não tem previsão para dar: nesse caso
-        // o que o usuário já digitou fica de pé em vez de ser apagado.
+        // Sem data de recebimento não há previsão para dar: nesse caso o que o
+        // usuário já digitou fica de pé em vez de ser apagado.
         if (json.candidata.previsaoChegada) setChegadaIni(json.candidata.previsaoChegada);
       } catch {
-        setErro("Não foi possível ler os itens da Compra Salva.");
+        setErro("Não foi possível ler os itens da Compra em trânsito.");
       } finally {
         setCarregandoPrevia(false);
       }
     },
-    [salvas, companyKey]
+    [transitos, companyKey]
   );
 
   const atualizarLinha = useCallback((i: number, campo: keyof LinhaLivre, valor: string) => {
@@ -244,8 +267,8 @@ export default function NovaCompraModal({
       setErro("Descreva a compra (o que é esse gasto).");
       return;
     }
-    if (origem === "salva" && !compraSalvaId) {
-      setErro("Selecione a Compra Salva de origem.");
+    if (origem === "transito" && !compraTransitoId) {
+      setErro("Selecione a Compra em trânsito de origem.");
       return;
     }
     if (origem === "itens" && itensDasLinhas.length === 0) {
@@ -274,8 +297,8 @@ export default function NovaCompraModal({
         observacao: observacao.trim() || null,
       };
 
-      if (origem === "salva") {
-        body.compraSalvaId = compraSalvaId;
+      if (origem === "transito") {
+        body.compraTransitoId = compraTransitoId;
         // Sem edição manual, o servidor divide o total exato dos itens (a lista
         // mostra o valor arredondado, e usá-lo aqui deixaria centavos sobrando).
         if (parcelasEditadas) body.parcelas = parcelas;
@@ -326,13 +349,14 @@ export default function NovaCompraModal({
           <div className={styles.originGrid} role="group" aria-label="Origem da compra">
             <button
               type="button"
-              className={`${styles.origin} ${origem === "salva" ? styles.originActive : ""}`}
-              aria-pressed={origem === "salva"}
-              onClick={() => setOrigem("salva")}
+              className={`${styles.origin} ${origem === "transito" ? styles.originActive : ""}`}
+              aria-pressed={origem === "transito"}
+              onClick={() => setOrigem("transito")}
             >
-              <span className={styles.originName}>Compra Salva</span>
+              <span className={styles.originName}>Compra em trânsito</span>
               <span className={styles.originDesc}>
-                Vincula uma lista já montada no dashboard. Valor, itens e data vêm dela.
+                Vincula uma compra já confirmada em trânsito. Valor, itens, data e previsão de
+                chegada vêm dela.
               </span>
             </button>
             <button
@@ -359,39 +383,56 @@ export default function NovaCompraModal({
             </button>
           </div>
 
-          {origem === "salva" && (
+          {origem === "transito" && (
             <div>
               <label className={styles.field}>
-                <span>Compra Salva</span>
+                <span>Compra em trânsito</span>
                 <select
-                  value={compraSalvaId}
-                  onChange={(e) => void escolherCompraSalva(e.target.value)}
-                  disabled={carregandoSalvas}
+                  value={compraTransitoId}
+                  onChange={(e) => void escolherCompraTransito(e.target.value)}
+                  disabled={carregandoTransitos}
                 >
                   <option value="">
-                    {carregandoSalvas
+                    {carregandoTransitos
                       ? "carregando…"
-                      : salvas.length === 0
-                        ? "nenhuma compra salva nesta empresa"
+                      : transitos.length === 0
+                        ? "nenhuma compra confirmada em trânsito nesta empresa"
                         : disponiveis.length === 0
-                          ? "todas as compras salvas já foram lançadas"
-                          : "selecione uma compra salva"}
+                          ? "todas as compras em trânsito já foram lançadas"
+                          : "selecione uma compra em trânsito"}
                   </option>
-                  {disponiveis.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {dataBrCompleta(dataBrasiliaDeIso(s.savedAt))} · {s.title} — {s.itemCount} itens ·{" "}
-                      {brl(s.totalValor)}
-                      {s.comprada ? " · comprada" : ""}
+                  {disponiveis.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {dataBrCompleta(dataBrasiliaDeIso(c.confirmedAt))} · {c.title} — {c.itemCount}{" "}
+                      itens · {brl(c.totalValor)}
+                      {c.minDataRecebimento ? ` · chega ${dataBr(c.minDataRecebimento)}` : ""}
+                      {c.status === "recebido" ? " · recebida" : ""}
+                      {jaLancadaPorTitulo(c.title) ? " · ⚠ descrição já lançada" : ""}
                     </option>
                   ))}
                 </select>
               </label>
-              {salvasErro && <p className={styles.note}>{salvasErro}</p>}
+              {transitosErro && <p className={styles.note}>{transitosErro}</p>}
+              <p className={styles.note}>
+                Só aparecem compras <b>confirmadas em trânsito</b> — rascunho é lista em montagem,
+                não compra.
+              </p>
               {ocultadas > 0 && (
                 <p className={styles.note}>
-                  {ocultadas} {ocultadas === 1 ? "compra salva já lançada" : "compras salvas já lançadas"}{" "}
-                  {ocultadas === 1 ? "não aparece" : "não aparecem"} na lista — cada Compra Salva
-                  entra aqui uma única vez.
+                  {ocultadas} {ocultadas === 1 ? "compra já lançada" : "compras já lançadas"}{" "}
+                  {ocultadas === 1 ? "não aparece" : "não aparecem"} na lista — cada Compra em
+                  trânsito entra aqui uma única vez.
+                </p>
+              )}
+              {suspeitas > 0 && (
+                <p className={styles.note}>
+                  ⚠ {suspeitas}{" "}
+                  {suspeitas === 1
+                    ? "compra tem descrição igual à de uma compra"
+                    : "compras têm descrição igual à de compras"}{" "}
+                  já lançada no painel (as que entraram pela Compra Salva, antes de a fonte ser o
+                  trânsito). Continuam selecionáveis porque descrição igual não é prova — confira
+                  antes, para não contar o mesmo dinheiro duas vezes.
                 </p>
               )}
 
@@ -402,8 +443,12 @@ export default function NovaCompraModal({
                   <div className={styles.previaHead}>
                     <span>
                       <strong>{previa.itemCount}</strong>{" "}
-                      {previa.itemCount === 1 ? "item reconhecido" : "itens reconhecidos"} · comprada
-                      em {dataBrCompleta(previa.dataCompra)}
+                      {previa.itemCount === 1 ? "item reconhecido" : "itens reconhecidos"} ·{" "}
+                      {previa.totalQuantidade.toLocaleString("pt-BR")} peças · confirmada em{" "}
+                      {dataBrCompleta(previa.dataCompra)}
+                      {previa.previsaoChegada
+                        ? ` · chega ${dataBrCompleta(previa.previsaoChegada)}`
+                        : ""}
                     </span>
                     <b>{brl(previa.total)}</b>
                   </div>
@@ -426,6 +471,13 @@ export default function NovaCompraModal({
                       </span>
                     )}
                   </div>
+                  {jaLancadaPorTitulo(previa.titulo) && (
+                    <p className={styles.note} style={{ margin: 0 }}>
+                      ⚠ Já existe compra lançada com esta descrição. Se for a mesma compra (lançada
+                      antes pela Compra Salva), não lance de novo — o comprometido do mês contaria o
+                      mesmo dinheiro duas vezes.
+                    </p>
+                  )}
                   {previa.semCusto > 0 && (
                     <p className={styles.note} style={{ margin: 0 }}>
                       {previa.semCusto} {previa.semCusto === 1 ? "item está" : "itens estão"} sem custo
@@ -590,7 +642,7 @@ export default function NovaCompraModal({
               onChange={alterarParcelas}
               vencimentoSugerido={dataCompra}
               rodape={
-                origem === "salva" && !parcelasEditadas
+                origem === "transito" && !parcelasEditadas
                   ? "Prévia: o valor exato dos itens é confirmado ao salvar"
                   : "Soma das parcelas"
               }

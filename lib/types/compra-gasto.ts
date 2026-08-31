@@ -2,9 +2,10 @@
  * Gastos de Compra — planejamento mensal de desembolso com compra.
  *
  * Modelo em duas peças:
- *  - LOTE (`CompraGastoLote`): uma compra. Pode nascer de uma Compra Salva, de
- *    linhas digitadas à mão (com ou sem vínculo a produto do Linx) ou de um
- *    valor único sem item nenhum (adiantamento, frete de despachante, verba).
+ *  - LOTE (`CompraGastoLote`): uma compra. Pode nascer de uma Compra em trânsito
+ *    confirmada, de linhas digitadas à mão (com ou sem vínculo a produto do Linx)
+ *    ou de um valor único sem item nenhum (adiantamento, frete de despachante,
+ *    verba).
  *  - PARCELA (`CompraGastoParcela`): o desembolso. Cada parcela conta UMA vez,
  *    no mês do seu vencimento — 4x de 25% aparecem em quatro meses diferentes,
  *    nunca somadas no mês da compra.
@@ -13,6 +14,8 @@
  * pretendemos gastar em cada mês-calendário.
  */
 
+import type { CompraTransitoStatus } from "@/lib/types/compra-transito";
+
 export type CompraGastoTipo =
   | "mercadoria"
   | "frete"
@@ -20,7 +23,19 @@ export type CompraGastoTipo =
   | "material"
   | "outros";
 
-export type CompraGastoOrigem = "salva" | "itens" | "valor";
+/**
+ * De onde vem o valor da compra.
+ *
+ *  - `transito`: de uma Compra em trânsito CONFIRMADA (itens, quantidades,
+ *    custo e previsão de chegada vêm dela). É a única origem vinculada ao
+ *    estoque — compra confirmada em trânsito é compra que existe de verdade.
+ *  - `itens`: linhas digitadas à mão.
+ *  - `valor`: só descrição e valor total.
+ *  - `salva`: LEGADO. Antes de a fonte passar a ser a Compra em trânsito, o
+ *    vínculo era com a Compra Salva. Nenhuma compra nova nasce assim; o valor
+ *    só existe para os lotes já gravados continuarem legíveis no painel.
+ */
+export type CompraGastoOrigem = "transito" | "itens" | "valor" | "salva";
 
 /**
  * Canal de pagamento de uma parcela.
@@ -72,9 +87,10 @@ export const COMPRA_GASTO_TIPO_LABEL: Record<CompraGastoTipo, string> = {
 };
 
 export const COMPRA_GASTO_ORIGEM_LABEL: Record<CompraGastoOrigem, string> = {
-  salva: "Compra Salva",
+  transito: "Compra em trânsito",
   itens: "Itens digitados",
   valor: "Valor único",
+  salva: "Compra Salva (legado)",
 };
 
 /**
@@ -115,7 +131,9 @@ export interface CompraGastoLote {
   fornecedor?: string | null;
   tipo: CompraGastoTipo;
   origem: CompraGastoOrigem;
-  /** Compra Salva de origem, quando houver. */
+  /** Compra em trânsito confirmada que originou a compra (origem "transito"). */
+  compraTransitoId?: string | null;
+  /** LEGADO: Compra Salva de origem dos lotes gravados antes da troca de fonte. */
   compraSalvaId?: string | null;
   /** Data em que a compra foi fechada (YYYY-MM-DD). */
   dataCompra: string;
@@ -203,24 +221,30 @@ export interface CompraGastoStatus {
 }
 
 /**
- * Compra Salva reconhecida como candidata a compra do painel: já vem com data
- * (do `savedAt`) e valor (qtd × custo dos itens), pronta para lançar.
+ * Compra em trânsito reconhecida como candidata a compra do painel: já vem com
+ * data (a da confirmação do trânsito), valor (qtd × custo dos itens) e previsão
+ * de chegada (a menor data de recebimento), pronta para lançar.
  */
 export interface CompraGastoCandidata {
-  compraSalvaId: string;
+  compraTransitoId: string;
   titulo: string;
-  /** YYYY-MM-DD, fuso de Brasília. */
+  /** YYYY-MM-DD, fuso de Brasília: o dia em que a compra foi confirmada em trânsito. */
   dataCompra: string;
   itens: CompraGastoItem[];
   total: number;
   itemCount: number;
+  /** Soma das quantidades dos itens — quantas peças a compra tem. */
+  totalQuantidade: number;
   /** Linhas sem custo cadastrado — o valor está subestimado por elas. */
   semCusto: number;
-  comprada: boolean;
   /**
-   * Previsão de chegada (YYYY-MM-DD), quando a Compra Salva já virou Compra em
-   * trânsito: a menor data de recebimento dos itens. Nulo = ainda não há
-   * trânsito com data, e o campo do modal fica com o que o usuário digitar.
+   * Status da compra em trânsito. Rascunho NÃO é compra confirmada e nunca
+   * entra no painel — quem consome recusa o lançamento.
+   */
+  status: CompraTransitoStatus;
+  /**
+   * Previsão de chegada (YYYY-MM-DD): a menor data de recebimento dos itens.
+   * Nulo só em rascunho (item sem data), que não entra aqui de qualquer forma.
    */
   previsaoChegada?: string | null;
 }
@@ -233,6 +257,7 @@ export interface CompraGastoLoteInput {
   fornecedor?: string | null;
   tipo: CompraGastoTipo;
   origem: CompraGastoOrigem;
+  compraTransitoId?: string | null;
   compraSalvaId?: string | null;
   dataCompra: string;
   chegadaIni?: string | null;

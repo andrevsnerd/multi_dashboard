@@ -10,11 +10,11 @@ import { cents, gerarParcelas, itensTotal } from "@/lib/utils/compra-gastos-agre
 import {
   avisoDeCustoFaltante,
   combinarObservacao,
-  materializarCompraSalva,
+  materializarCompraTransito,
 } from "@/lib/utils/compra-gastos-import";
 import {
   createLote,
-  existeLoteDaCompraSalva,
+  existeLoteDaCompraTransito,
   listLotes,
   listOrcamento,
 } from "@/lib/utils/compra-gastos-store";
@@ -42,9 +42,10 @@ export async function GET(request: Request) {
  * Cria um lote de compra.
  *
  * Três origens:
- *  - "salva": os itens são materializados a partir da Compra Salva (qtd × custo,
- *    com fallback de custo no ERP). Item sem custo NÃO vira zero em silêncio —
- *    o lote nasce marcado como estimativa e a observação registra quantos.
+ *  - "transito": os itens são materializados a partir de uma Compra em trânsito
+ *    CONFIRMADA (qtd × custo, com fallback de custo no ERP). Rascunho é recusado.
+ *    Item sem custo NÃO vira zero em silêncio — o lote nasce marcado como
+ *    estimativa e a observação registra quantos.
  *  - "itens": as linhas vêm do corpo da requisição (com ou sem vínculo a produto).
  *  - "valor": só descrição e valor total.
  *
@@ -71,37 +72,51 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "A data da compra é obrigatória" }, { status: 400 });
     }
 
-    const origem = body.origem === "salva" || body.origem === "itens" ? body.origem : "valor";
+    const origem = body.origem === "transito" || body.origem === "itens" ? body.origem : "valor";
     let itens: CompraGastoItem[] = Array.isArray(body.itens) ? body.itens : [];
     let estimado = !!body.estimado;
     let observacao = body.observacao ? String(body.observacao).trim() : null;
     let valorUnico = body.valorUnico != null ? cents(body.valorUnico) : null;
 
-    // Previsão de chegada da Compra Salva importada (menor data de recebimento do
-    // trânsito que nasceu dela). Só entra quando a tela não mandou uma.
-    let previsaoChegadaSalva: string | null = null;
+    // Previsão de chegada da Compra em trânsito importada (a menor data de
+    // recebimento dos itens). Só entra quando a tela não mandou uma.
+    let previsaoChegadaTransito: string | null = null;
 
-    if (origem === "salva") {
-      const compraSalvaId = String(body.compraSalvaId ?? "").trim();
-      if (!compraSalvaId) {
-        return NextResponse.json({ error: "Selecione a Compra Salva de origem" }, { status: 400 });
-      }
-      // Uma Compra Salva entra no painel UMA vez. Lançar de novo duplicaria o
-      // comprometido do mês com o mesmo dinheiro.
-      if (await existeLoteDaCompraSalva(companyKey, compraSalvaId)) {
+    if (origem === "transito") {
+      const compraTransitoId = String(body.compraTransitoId ?? "").trim();
+      if (!compraTransitoId) {
         return NextResponse.json(
-          { error: "Esta Compra Salva já foi lançada como compra neste painel." },
+          { error: "Selecione a Compra em trânsito de origem" },
+          { status: 400 }
+        );
+      }
+      // Uma Compra em trânsito entra no painel UMA vez. Lançar de novo duplicaria
+      // o comprometido do mês com o mesmo dinheiro.
+      if (await existeLoteDaCompraTransito(companyKey, compraTransitoId)) {
+        return NextResponse.json(
+          { error: "Esta Compra em trânsito já foi lançada como compra neste painel." },
           { status: 409 }
         );
       }
-      const m = await materializarCompraSalva(companyKey, compraSalvaId);
+      const m = await materializarCompraTransito(companyKey, compraTransitoId);
       if (!m) {
-        return NextResponse.json({ error: "Compra Salva não encontrada" }, { status: 404 });
+        return NextResponse.json({ error: "Compra em trânsito não encontrada" }, { status: 404 });
+      }
+      // Só compra CONFIRMADA em trânsito é reconhecida como gasto: rascunho é
+      // lista em montagem, não compra.
+      if (m.status === "rascunho") {
+        return NextResponse.json(
+          {
+            error:
+              "Esta compra em trânsito ainda é um rascunho. Só compras confirmadas em trânsito entram no painel.",
+          },
+          { status: 409 }
+        );
       }
 
       itens = m.itens;
       valorUnico = null;
-      previsaoChegadaSalva = m.previsaoChegada ?? null;
+      previsaoChegadaTransito = m.previsaoChegada ?? null;
       if (m.semCusto > 0) {
         // Nunca somar zero escondido: o lote vira estimativa e diz o porquê.
         estimado = true;
@@ -154,9 +169,9 @@ export async function POST(request: Request) {
         fornecedor: body.fornecedor ?? null,
         tipo: body.tipo ?? "mercadoria",
         origem,
-        compraSalvaId: origem === "salva" ? String(body.compraSalvaId) : null,
+        compraTransitoId: origem === "transito" ? String(body.compraTransitoId) : null,
         dataCompra: String(body.dataCompra).slice(0, 10),
-        chegadaIni: body.chegadaIni ?? previsaoChegadaSalva,
+        chegadaIni: body.chegadaIni ?? previsaoChegadaTransito,
         chegadaReal: body.chegadaReal ?? null,
         estimado,
         valorUnico: origem === "valor" ? valorUnico : null,

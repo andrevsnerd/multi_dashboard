@@ -136,11 +136,25 @@ export default function GastosCompraPanel({ companyKey, companyName }: Props) {
   const loteMap = useMemo(() => new Map(lotes.map((l) => [l.id, l])), [lotes]);
 
   /**
-   * Compras Salvas que já viraram compra aqui. O modal esconde essas do select:
-   * lançar a mesma Compra Salva duas vezes duplicaria o comprometido do mês.
+   * Compras em trânsito que já viraram compra aqui. O modal esconde essas do
+   * select: lançar a mesma duas vezes duplicaria o comprometido do mês.
    */
-  const comprasSalvasLancadas = useMemo(
-    () => new Set(lotes.map((l) => l.compraSalvaId).filter(Boolean) as string[]),
+  const comprasTransitoLancadas = useMemo(
+    () => new Set(lotes.map((l) => l.compraTransitoId).filter(Boolean) as string[]),
+    [lotes]
+  );
+
+  /**
+   * Descrições já lançadas, normalizadas. É a única defesa contra relançar as
+   * compras que entraram aqui pela Compra Salva (antes da troca de fonte): o
+   * vínculo delas é com a Compra Salva, então o id do trânsito não as denuncia.
+   * Título igual NÃO é prova — o modal avisa em vez de esconder.
+   */
+  const titulosLancados = useMemo(
+    () =>
+      new Set(
+        lotes.map((l) => l.titulo.trim().toLowerCase().replace(/\s+/g, " ")).filter(Boolean)
+      ),
     [lotes]
   );
   const agenda = useMemo(() => agendaDePagamentos(lotes, { ano: ano || undefined }), [lotes, ano]);
@@ -657,7 +671,8 @@ export default function GastosCompraPanel({ companyKey, companyName }: Props) {
           username={username}
           mesSugerido={mesSugerido}
           hoje={hoje}
-          comprasSalvasLancadas={comprasSalvasLancadas}
+          comprasTransitoLancadas={comprasTransitoLancadas}
+          titulosLancados={titulosLancados}
           onClose={() => setModalAberto(false)}
           onSaved={aoSalvarCompra}
         />
@@ -795,13 +810,19 @@ function LinhaMes({
                           <span className={styles.loteCode}>
                             {codigoDistinto(lote.codigo, lote.titulo) ?? lote.titulo}
                             <span
-                              className={`${styles.tag} ${lote.origem === "salva" ? styles.tagLinked : ""}`}
+                              className={`${styles.tag} ${
+                                lote.origem === "transito" || lote.origem === "salva"
+                                  ? styles.tagLinked
+                                  : ""
+                              }`}
                             >
-                              {lote.origem === "salva"
-                                ? "Compra Salva"
-                                : lote.origem === "itens"
-                                  ? `${lote.itens.length} linhas`
-                                  : "valor único"}
+                              {lote.origem === "transito"
+                                ? "Compra em trânsito"
+                                : lote.origem === "salva"
+                                  ? "Compra Salva"
+                                  : lote.origem === "itens"
+                                    ? `${lote.itens.length} linhas`
+                                    : "valor único"}
                             </span>
                             {ref.totalParcelas > 1 && (
                               <span className={styles.tag}>

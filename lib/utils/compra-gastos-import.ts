@@ -1,10 +1,14 @@
 /**
- * Ponte Compras Salvas → Gastos de Compra.
+ * Ponte Compras em trânsito → Gastos de Compra.
  *
- * Uma Compra Salva já é a lista real do que foi comprado (produto × cor × qtd ×
- * custo) e já carrega a data em que foi fechada. Então ela é reconhecida como
- * compra do painel sem redigitação: valor vem de `qtd × custo` item por item e a
- * data da compra vem do `savedAt`.
+ * A compra que o painel financeiro reconhece é a Compra em trânsito CONFIRMADA:
+ * ela é a única lista que representa mercadoria que já foi de fato comprada e
+ * está vindo (produto × cor × qtd × custo, com data de recebimento por item).
+ * Rascunho não é compra — é lista sendo montada — e por isso nunca entra aqui.
+ *
+ * Nada é redigitado: o valor vem de `qtd × custo` item por item, a data da
+ * compra é o dia em que o trânsito foi confirmado e a previsão de chegada é a
+ * menor data de recebimento dos itens.
  *
  * Item sem custo cadastrado nunca soma zero escondido — quem consome marca o
  * lote como estimativa e registra quantos ficaram de fora.
@@ -12,17 +16,16 @@
 
 import { fetchCustosPorProdutos } from "@/lib/repositories/controleEstoque";
 import type { CompraGastoCandidata, CompraGastoItem } from "@/lib/types/compra-gasto";
-import type { CompraSalva, CompraSalvaItemRow } from "@/lib/types/compra-salva";
+import type { CompraTransito, CompraTransitoItemRow } from "@/lib/types/compra-transito";
 import { itensTotal } from "@/lib/utils/compra-gastos-agregacao";
-import { fetchPrevisaoChegadaDaCompraSalva } from "@/lib/utils/compra-transito-store";
-import { getCompraSalva } from "@/lib/utils/compra-salva-store";
+import { getCompraTransito } from "@/lib/utils/compra-transito-store";
 
 /** Mesmo contrato que a tela consome (o tipo vive em lib/types para não puxar este módulo, que depende do driver do SQL Server, para o cliente). */
-export type CompraSalvaMaterializada = CompraGastoCandidata;
+export type CompraTransitoMaterializada = CompraGastoCandidata;
 
 /**
- * `savedAt` é ISO em UTC. Converter fatiando a string direto erra o dia para
- * qualquer registro salvo depois das 21h de Brasília.
+ * Timestamps são ISO em UTC. Converter fatiando a string direto erra o dia para
+ * qualquer registro criado depois das 21h de Brasília.
  */
 export function dataBrasiliaDe(iso: string): string {
   const t = Date.parse(iso);
@@ -30,7 +33,10 @@ export function dataBrasiliaDe(iso: string): string {
   return new Date(t - 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
-function itemDaCompraSalva(row: CompraSalvaItemRow, custoMap: Map<string, number>): CompraGastoItem {
+function itemDaCompraTransito(
+  row: CompraTransitoItemRow,
+  custoMap: Map<string, number>
+): CompraGastoItem {
   const custo =
     row.custoUnitario && row.custoUnitario > 0
       ? row.custoUnitario
@@ -40,13 +46,13 @@ function itemDaCompraSalva(row: CompraSalvaItemRow, custoMap: Map<string, number
     produto: row.produto,
     corProduto: row.corProduto ?? null,
     corDescricao: row.corDescricao ?? null,
-    qtd: Math.max(0, Math.round(row.qtdManual ?? 0)),
+    qtd: Math.max(0, Math.round(row.quantidade ?? 0)),
     custoUnitario: custo,
   };
 }
 
 /** Busca no ERP o custo dos itens que não têm custo salvo. Falha do ERP não derruba nada. */
-async function custosFaltantes(compras: CompraSalva[]): Promise<Map<string, number>> {
+async function custosFaltantes(compras: CompraTransito[]): Promise<Map<string, number>> {
   const produtos = [
     ...new Set(
       compras
@@ -65,49 +71,51 @@ async function custosFaltantes(compras: CompraSalva[]): Promise<Map<string, numb
   }
 }
 
+/** Menor data de recebimento preenchida dos itens — a previsão de chegada da compra. */
+function previsaoChegadaDe(items: CompraTransitoItemRow[]): string | null {
+  const datas = items
+    .map((item) => (item.dataRecebimento ?? "").trim().slice(0, 10))
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b));
+  return datas[0] ?? null;
+}
+
 function materializar(
-  compra: CompraSalva,
-  custoMap: Map<string, number>,
-  previsaoChegada: string | null = null
-): CompraSalvaMaterializada {
-  const itens = compra.items.map((row) => itemDaCompraSalva(row, custoMap));
+  compra: CompraTransito,
+  custoMap: Map<string, number>
+): CompraTransitoMaterializada {
+  const itens = compra.items.map((row) => itemDaCompraTransito(row, custoMap));
   return {
-    compraSalvaId: compra.id,
+    compraTransitoId: compra.id,
     titulo: compra.title,
-    dataCompra: dataBrasiliaDe(compra.savedAt),
+    // A compra existe a partir do momento em que foi confirmada em trânsito.
+    dataCompra: dataBrasiliaDe(compra.confirmedAt),
     itens,
     total: itensTotal(itens),
     itemCount: itens.length,
+    totalQuantidade: itens.reduce((s, i) => s + i.qtd, 0),
     semCusto: itens.filter((i) => !(i.custoUnitario > 0)).length,
-    comprada: !!compra.comprada,
-    previsaoChegada,
+    status: compra.status,
+    previsaoChegada: previsaoChegadaDe(compra.items),
   };
 }
 
-/** Materializa UMA Compra Salva. `null` quando ela não existe na empresa. */
-export async function materializarCompraSalva(
+/** Materializa UMA Compra em trânsito. `null` quando ela não existe na empresa. */
+export async function materializarCompraTransito(
   companyKey: string,
-  compraSalvaId: string
-): Promise<CompraSalvaMaterializada | null> {
-  const compra = await getCompraSalva(companyKey, compraSalvaId);
+  compraTransitoId: string
+): Promise<CompraTransitoMaterializada | null> {
+  const compra = await getCompraTransito(companyKey, compraTransitoId);
   if (!compra) return null;
   const custoMap = await custosFaltantes([compra]);
-  // Previsão de chegada não é dado da Compra Salva: vem da Compra em trânsito que
-  // nasceu dela. Falha aqui não derruba o import — só deixa a previsão em branco.
-  let previsaoChegada: string | null = null;
-  try {
-    previsaoChegada = await fetchPrevisaoChegadaDaCompraSalva(companyKey, compra.id, compra.title);
-  } catch {
-    previsaoChegada = null;
-  }
-  return materializar(compra, custoMap, previsaoChegada);
+  return materializar(compra, custoMap);
 }
 
 /**
  * Observação de import: registra o que ficou sem custo em vez de deixar o valor
  * mentir. Devolve `null` quando não há nada a avisar.
  */
-export function avisoDeCustoFaltante(m: CompraSalvaMaterializada): string | null {
+export function avisoDeCustoFaltante(m: CompraTransitoMaterializada): string | null {
   if (m.semCusto <= 0) return null;
   return `${m.semCusto} de ${m.itemCount} itens sem custo cadastrado — valor subestimado.`;
 }
