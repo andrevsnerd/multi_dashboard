@@ -10,6 +10,7 @@ import {
   type CompraGastoParcela,
 } from "@/lib/types/compra-gasto";
 import {
+  COMPRA_GASTO_FORNECEDORES,
   canaisDasParcelas,
   cents,
   gerarParcelas,
@@ -28,6 +29,11 @@ interface Props {
   onChange: (parcelas: CompraGastoParcela[]) => void;
   /** Data sugerida para o 1º vencimento (normalmente a data da compra). */
   vencimentoSugerido: string;
+  /**
+   * Calendário a aplicar — vem do FORNECEDOR escolhido lá em cima, não daqui.
+   * "manual" (o padrão) = sem fornecedor, quem divide é o usuário.
+   */
+  modelo?: CompraGastoModeloParcelamento;
   rodape?: string;
   disabled?: boolean;
 }
@@ -40,25 +46,6 @@ interface Edicao {
 }
 
 const ATALHOS = [1, 2, 3, 4, 6, 12];
-
-/**
- * Modelos de pagamento do select "Tipo". Cada um é um gerador: escolher aplica
- * as datas e os valores na hora, e mexer em qualquer linha depois volta o select
- * para "Manual" — o que o usuário digitou nunca é sobrescrito pelo modelo.
- */
-const MODELOS: { valor: CompraGastoModeloParcelamento; label: string; dica: string }[] = [
-  { valor: "manual", label: "Manual", dica: "Divide em Nx ou por % à mão." },
-  {
-    valor: "salete",
-    label: "Salete",
-    dica: "2x iguais: 90 e 120 dias depois da data da compra.",
-  },
-  {
-    valor: "china",
-    label: "China",
-    dica: `${COMPRA_GASTO_CANAL_LABEL.transferencia} 40% + ${COMPRA_GASTO_CANAL_LABEL.alibaba} 60%, cada um 30% no ato do pedido, 50% no despacho (+30 dias) e 20% 60 dias depois do despacho (+90). As datas convergem: o dia soma os dois pagamentos.`,
-  },
-];
 
 function renumerar(parcelas: CompraGastoParcela[]): CompraGastoParcela[] {
   return parcelas.map((p, i) => ({ ...p, numero: i + 1 }));
@@ -85,17 +72,19 @@ export default function ParcelasEditor({
   parcelas,
   onChange,
   vencimentoSugerido,
+  modelo = "manual",
   rodape,
   disabled,
 }: Props) {
   const [primeiroVencimento, setPrimeiroVencimento] = useState(vencimentoSugerido);
   const [intervalo, setIntervalo] = useState<"mensal" | "quinzenal">("mensal");
   const [edicao, setEdicao] = useState<Edicao | null>(null);
-  // Parcelamento que já vem com canal foi gerado pelo modelo China — o select
-  // abre refletindo isso, em vez de mentir "Manual" sobre o que está na tela.
-  const [modelo, setModelo] = useState<CompraGastoModeloParcelamento>(() =>
-    parcelas.some((p) => p.canal) ? "china" : "manual"
-  );
+  /**
+   * O usuário mexeu nas parcelas à mão? A partir daí o calendário do fornecedor
+   * para de ser reaplicado — o que foi digitado nunca é sobrescrito. Trocar de
+   * fornecedor zera isto: escolher outro nome é pedir o calendário dele.
+   */
+  const [ajustadoAMao, setAjustadoAMao] = useState(false);
 
   const canais = useMemo(() => canaisDasParcelas(parcelas), [parcelas]);
   const temCanal = canais.length > 0;
@@ -103,12 +92,13 @@ export default function ParcelasEditor({
     () => new Map(resumoPorCanal(parcelas).map((resumo) => [resumo.canal, resumo.total])),
     [parcelas]
   );
-  const modeloAtivo = MODELOS.find((m) => m.valor === modelo) ?? MODELOS[0];
+  const fornecedorAtivo = COMPRA_GASTO_FORNECEDORES.find((m) => m.valor === modelo) ?? null;
 
-  // O modelo é aplicado por efeito, não no onChange do select, porque o total
-  // costuma chegar DEPOIS da escolha (no modal você pode escolher "China" antes
-  // de selecionar a Compra Salva). Refs para não colocar `parcelas`/`onChange`
-  // nas dependências: a lista muda a cada aplicação e o efeito entraria em laço.
+  // O calendário é aplicado por efeito, não no onChange do select, porque o
+  // total costuma chegar DEPOIS da escolha (dá para escolher o fornecedor antes
+  // de selecionar a Compra em trânsito). Refs para não colocar
+  // `parcelas`/`onChange` nas dependências: a lista muda a cada aplicação e o
+  // efeito entraria em laço.
   const parcelasRef = useRef(parcelas);
   const onChangeRef = useRef(onChange);
   const primeiraRenderizacao = useRef(true);
@@ -124,6 +114,25 @@ export default function ParcelasEditor({
     setPrimeiroVencimento(vencimentoSugerido);
   }, [vencimentoSugerido]);
 
+  // Trocar de fornecedor destrava a geração: o pedido é justamente "aplique o
+  // calendário deste aqui". E LIMPAR o fornecedor devolve a compra ao padrão
+  // (inteira, na data da compra) — sem isso o calendário de quem foi escolhido
+  // por engano continuaria na tela sem nenhum nome para explicá-lo.
+  const modeloAnterior = useRef(modelo);
+  useEffect(() => {
+    const anterior = modeloAnterior.current;
+    if (anterior === modelo) return;
+    modeloAnterior.current = modelo;
+    setAjustadoAMao(false);
+    if (modelo !== "manual" || anterior === "manual") return;
+    const jaPagas = parcelasRef.current.filter((p) => p.pago);
+    const travado = cents(jaPagas.reduce((s, p) => s + (Number(p.valor) || 0), 0));
+    const base = cents(total - travado);
+    const novas = gerarParcelas(base > 0 ? base : total, 1, primeiroVencimento, intervalo);
+    if (novas.length === 0) return;
+    onChangeRef.current(renumerar([...jaPagas, ...novas]));
+  }, [modelo, total, primeiroVencimento, intervalo]);
+
   useEffect(() => {
     // Na montagem nada é regerado: abrir um parcelamento existente não pode
     // reescrever o que está salvo.
@@ -131,14 +140,14 @@ export default function ParcelasEditor({
       primeiraRenderizacao.current = false;
       return;
     }
-    if (modelo === "manual") return;
+    if (modelo === "manual" || ajustadoAMao) return;
     const jaPagas = parcelasRef.current.filter((p) => p.pago);
     const travado = cents(jaPagas.reduce((s, p) => s + (Number(p.valor) || 0), 0));
     const base = cents(total - travado);
     const novas = gerarParcelasModelo(base > 0 ? base : total, primeiroVencimento, modelo);
     if (novas.length === 0) return;
     onChangeRef.current(renumerar([...jaPagas, ...novas]));
-  }, [modelo, total, primeiroVencimento]);
+  }, [modelo, total, primeiroVencimento, ajustadoAMao]);
 
   const pagas = useMemo(() => parcelas.filter((p) => p.pago), [parcelas]);
   const somaPagas = useMemo(() => cents(pagas.reduce((s, p) => s + p.valor, 0)), [pagas]);
@@ -182,7 +191,7 @@ export default function ParcelasEditor({
   }
 
   function dividirEm(quantidade: number) {
-    setModelo("manual");
+    setAjustadoAMao(true);
     const base = cents(total - somaPagas);
     const novas = gerarParcelas(base > 0 ? base : total, quantidade, primeiroVencimento, intervalo);
     if (novas.length === 0) return;
@@ -191,19 +200,19 @@ export default function ParcelasEditor({
   }
 
   function alterarData(indice: number, valor: string) {
-    setModelo("manual");
+    setAjustadoAMao(true);
     onChange(parcelas.map((p, i) => (i === indice ? { ...p, vencimento: valor } : p)));
   }
 
   function alterarValor(indice: number, texto: string) {
-    setModelo("manual");
+    setAjustadoAMao(true);
     setEdicao({ linha: indice, campo: "valor", texto });
     const valor = Math.max(0, parseMoeda(texto));
     onChange(comAjuste(parcelas.map((p, i) => (i === indice ? { ...p, valor } : p)), indice));
   }
 
   function alterarPct(indice: number, texto: string) {
-    setModelo("manual");
+    setAjustadoAMao(true);
     setEdicao({ linha: indice, campo: "pct", texto });
     const pct = Math.max(0, parseMoeda(texto));
     const valor = cents((basePercentual(parcelas[indice]) * pct) / 100);
@@ -211,7 +220,7 @@ export default function ParcelasEditor({
   }
 
   function remover(indice: number) {
-    setModelo("manual");
+    setAjustadoAMao(true);
     setEdicao(null);
     const removida = parcelas[indice];
     onChange(
@@ -225,7 +234,7 @@ export default function ParcelasEditor({
 
   function adicionar() {
     const ultima = parcelas[parcelas.length - 1];
-    setModelo("manual");
+    setAjustadoAMao(true);
     setEdicao(null);
     onChange(
       renumerar([
@@ -272,7 +281,9 @@ export default function ParcelasEditor({
               key={n}
               type="button"
               className={`${styles.atalho} ${
-                modelo === "manual" && quantidadeAtual === n ? styles.atalhoAtivo : ""
+                (modelo === "manual" || ajustadoAMao) && quantidadeAtual === n
+                  ? styles.atalhoAtivo
+                  : ""
               }`}
               onClick={() => dividirEm(n)}
               disabled={disabled}
@@ -294,21 +305,6 @@ export default function ParcelasEditor({
           ou digite % / valor numa linha — as outras fecham a conta
         </span>
         <label className={styles.splitCampo}>
-          <span>Tipo:</span>
-          <select
-            value={modelo}
-            disabled={disabled}
-            title={modeloAtivo.dica}
-            onChange={(e) => setModelo(e.target.value as CompraGastoModeloParcelamento)}
-          >
-            {MODELOS.map((m) => (
-              <option key={m.valor} value={m.valor}>
-                {m.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className={styles.splitCampo}>
           <span>a cada</span>
           <select
             value={intervalo}
@@ -321,7 +317,20 @@ export default function ParcelasEditor({
         </label>
       </div>
 
-      {modelo !== "manual" && <p className={styles.modeloDica}>{modeloAtivo.dica}</p>}
+      {fornecedorAtivo && (
+        <p className={styles.modeloDica}>
+          {ajustadoAMao ? (
+            <>
+              Ajustado à mão — o calendário de <b>{fornecedorAtivo.label}</b> não é mais aplicado.
+              Escolher o fornecedor de novo lá em cima refaz as parcelas.
+            </>
+          ) : (
+            <>
+              <b>{fornecedorAtivo.label}</b>: {fornecedorAtivo.dica}
+            </>
+          )}
+        </p>
+      )}
 
       <div className={styles.parcelaGrid}>
         <div

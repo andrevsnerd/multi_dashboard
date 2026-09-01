@@ -12,6 +12,7 @@ import {
   itensTotal,
   loteStatus,
   loteTotal,
+  rotuloFornecedor,
 } from "@/lib/utils/compra-gastos-agregacao";
 
 function dataBr(iso: string | null | undefined): string {
@@ -63,7 +64,7 @@ export function exportGastosCompraXlsx(
     PARCELA: `${linha.indice}/${linha.total}`,
     PAGAMENTO: linha.parcela.canal ? COMPRA_GASTO_CANAL_LABEL[linha.parcela.canal] : "",
     ETAPA: linha.parcela.etapa ?? "",
-    FORNECEDOR: linha.lote.fornecedor ?? "",
+    FORNECEDOR: rotuloFornecedor(linha.lote.fornecedor),
     SITUACAO: linha.parcela.pago
       ? "Pago"
       : linha.lote.estimado
@@ -91,7 +92,7 @@ export function exportGastosCompraXlsx(
     .map((l) => ({
       CODIGO: l.codigo,
       DESCRICAO: l.titulo,
-      FORNECEDOR: l.fornecedor ?? "",
+      FORNECEDOR: rotuloFornecedor(l.fornecedor),
       CATEGORIA: COMPRA_GASTO_TIPO_LABEL[l.tipo],
       ORIGEM: COMPRA_GASTO_ORIGEM_LABEL[l.origem],
       DATA_COMPRA: dataBr(l.dataCompra),

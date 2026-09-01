@@ -264,13 +264,17 @@ export default function GastosCompraPanel({ companyKey, companyName }: Props) {
   );
 
   const salvarParcelas = useCallback(
-    async (loteId: string, parcelas: CompraGastoParcela[]): Promise<boolean> => {
+    async (
+      loteId: string,
+      parcelas: CompraGastoParcela[],
+      fornecedor: string | null
+    ): Promise<boolean> => {
       setSalvando(true);
       try {
         const res = await fetch(`/api/compras-gastos/${loteId}?company=${companyKey}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json", "x-auth-username": username },
-          body: JSON.stringify({ parcelas }),
+          body: JSON.stringify({ parcelas, fornecedor }),
         });
         const json = (await res.json()) as { data?: CompraGastoLote; error?: string };
         if (!res.ok || !json.data) {
@@ -660,7 +664,9 @@ export default function GastosCompraPanel({ companyKey, companyName }: Props) {
           salvando={salvando}
           onClose={() => setLoteAberto(null)}
           onTogglePago={(indice, pago) => void togglePago(loteAberto, indice, pago)}
-          onSalvarParcelas={(parcelas) => salvarParcelas(loteAberto, parcelas)}
+          onSalvarParcelas={(parcelas, fornecedor) =>
+            salvarParcelas(loteAberto, parcelas, fornecedor)
+          }
           onDelete={() => void excluirLote(loteAberto)}
         />
       )}
@@ -820,9 +826,11 @@ function LinhaMes({
                                 ? "Compra em trânsito"
                                 : lote.origem === "salva"
                                   ? "Compra Salva"
-                                  : lote.origem === "itens"
-                                    ? `${lote.itens.length} linhas`
-                                    : "valor único"}
+                                  : lote.origem === "premier"
+                                    ? `Premier · ${lote.itens.length} itens`
+                                    : lote.origem === "itens"
+                                      ? `${lote.itens.length} linhas`
+                                      : "valor único"}
                             </span>
                             {ref.totalParcelas > 1 && (
                               <span className={styles.tag}>

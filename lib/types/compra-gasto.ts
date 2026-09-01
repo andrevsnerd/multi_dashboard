@@ -30,12 +30,32 @@ export type CompraGastoTipo =
  *    custo e previsão de chegada vêm dela). É a única origem vinculada ao
  *    estoque — compra confirmada em trânsito é compra que existe de verdade.
  *  - `itens`: linhas digitadas à mão.
- *  - `valor`: só descrição e valor total.
+ *  - `premier`: compra de embalagem/material da Premier. As linhas já vêm
+ *    prontas (sacola, caixa, tag…) e só quantidade e preço são digitados.
+ *  - `valor`: LEGADO. Só descrição e valor total. Saiu da tela de lançamento —
+ *    o valor continua aqui para os lotes já gravados serem lidos.
  *  - `salva`: LEGADO. Antes de a fonte passar a ser a Compra em trânsito, o
  *    vínculo era com a Compra Salva. Nenhuma compra nova nasce assim; o valor
  *    só existe para os lotes já gravados continuarem legíveis no painel.
  */
-export type CompraGastoOrigem = "transito" | "itens" | "valor" | "salva";
+export type CompraGastoOrigem = "transito" | "itens" | "premier" | "valor" | "salva";
+
+/**
+ * Itens fixos da compra Premier — embalagem e material de loja. A lista é o
+ * catálogo do fornecedor: aparece inteira no lançamento e o usuário preenche
+ * quantidade e preço só do que está comprando (linha sem quantidade é ignorada).
+ */
+export const COMPRA_GASTO_PREMIER_ITENS: string[] = [
+  "Sacola SP63",
+  "Caixa Lenço",
+  "Lamina",
+  "Faixinha",
+  "Tag",
+  "Sacola SP28",
+  "Caixa CTC-90",
+  "Caixa Rígida",
+  "Caixa Pashimina",
+];
 
 /**
  * Canal de pagamento de uma parcela.
@@ -65,18 +85,40 @@ export const COMPRA_GASTO_CANAL_CURTO: Record<CompraGastoCanal, string> = {
 export const COMPRA_GASTO_CANAIS: CompraGastoCanal[] = ["transferencia", "alibaba"];
 
 /**
- * Modelo de parcelamento: um gerador de parcelas, não um campo do lote.
+ * Fornecedor da compra. Não é só um rótulo: cada fornecedor paga do seu jeito,
+ * então escolher o nome no lançamento GERA o parcelamento (datas e valores).
  *
- *  - `manual`: divide em Nx / % à mão (o de sempre).
- *  - `salete`: 2x iguais, 90 e 120 dias depois da compra.
- *  - `china`: transferência 40% + Alibaba 60%, cada canal com 30% no ato do
- *    pedido, 50% no despacho (+30 dias) e 20% 60 dias depois do despacho (+90).
+ *  - `salete`, `telma`, `roseli`: 2x iguais, 90 e 120 dias depois da compra.
+ *  - `china` (Nick), `china_hannah`, `india_kunal`, `nepal`: transferência 40% +
+ *    Alibaba 60%, cada canal com 30% no ato do pedido, 50% no despacho (+30
+ *    dias) e 20% 60 dias depois do despacho (+90).
  *
- * Não é persistido: o que fica gravado é o resultado (datas, valores, canal e
- * etapa de cada parcela), porque depois de gerado o parcelamento pode ser
- * editado à mão e um "modelo" salvo viraria mentira.
+ * Fornecedores com a mesma regra são entradas SEPARADAS de propósito: hoje
+ * copiam o calendário do vizinho, e o dia em que um deles mudar mexe só na
+ * própria linha da tabela. As regras de cada um estão em
+ * [compra-gastos-agregacao.ts](../utils/compra-gastos-agregacao.ts), e a
+ * documentação para consulta em [docs/GASTOS_COMPRA_FORNECEDORES.md](../../docs/GASTOS_COMPRA_FORNECEDORES.md).
+ *
+ * O QUE FICA GRAVADO no lote é esta chave, no campo `fornecedor` — é ela que
+ * responde "de quem foi esta compra" depois. O parcelamento gerado também fica
+ * salvo (datas, valores, canal e etapa), porque pode ser ajustado à mão em
+ * seguida: o fornecedor diz de onde as parcelas vieram, não o que elas são.
+ * Compras antigas têm texto livre nesse campo — daí a leitura ser tolerante.
  */
-export type CompraGastoModeloParcelamento = "manual" | "salete" | "china";
+export type CompraGastoFornecedor =
+  | "salete"
+  | "telma"
+  | "roseli"
+  | "china"
+  | "china_hannah"
+  | "india_kunal"
+  | "nepal";
+
+/**
+ * Modelo de parcelamento = o calendário de um fornecedor, mais o `manual`
+ * (ninguém escolhido: quem divide é o usuário, em Nx / %).
+ */
+export type CompraGastoModeloParcelamento = CompraGastoFornecedor | "manual";
 
 export const COMPRA_GASTO_TIPO_LABEL: Record<CompraGastoTipo, string> = {
   mercadoria: "Mercadoria",
@@ -89,7 +131,8 @@ export const COMPRA_GASTO_TIPO_LABEL: Record<CompraGastoTipo, string> = {
 export const COMPRA_GASTO_ORIGEM_LABEL: Record<CompraGastoOrigem, string> = {
   transito: "Compra em trânsito",
   itens: "Itens digitados",
-  valor: "Valor único",
+  premier: "Premier",
+  valor: "Valor único (legado)",
   salva: "Compra Salva (legado)",
 };
 

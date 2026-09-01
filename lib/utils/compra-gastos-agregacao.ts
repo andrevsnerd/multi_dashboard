@@ -13,7 +13,9 @@
 import {
   COMPRA_GASTO_CANAIS,
   COMPRA_GASTO_CANAL_CURTO,
+  COMPRA_GASTO_CANAL_LABEL,
   type CompraGastoCanal,
+  type CompraGastoFornecedor,
   type CompraGastoItem,
   type CompraGastoLote,
   type CompraGastoMes,
@@ -338,8 +340,8 @@ interface EtapaModelo {
   etapa: string;
 }
 
-/** Salete: a compra fecha em 2x iguais, 90 e 120 dias depois. */
-const SALETE_ETAPAS: EtapaModelo[] = [
+/** 2x iguais, 90 e 120 dias depois da compra — o calendário da Salete. */
+const NOVENTA_CENTO_E_VINTE: EtapaModelo[] = [
   { dias: 90, pct: 50, etapa: "90 dias da compra" },
   { dias: 120, pct: 50, etapa: "120 dias da compra" },
 ];
@@ -359,6 +361,99 @@ const CHINA_ETAPAS: EtapaModelo[] = [
   { dias: 30, pct: 50, etapa: "no despacho (30 dias)" },
   { dias: 90, pct: 20, etapa: "60 dias após o despacho" },
 ];
+
+interface RegraModelo {
+  label: string;
+  /** Frase que explica o calendário — vai para o title do select e a dica. */
+  dica: string;
+  etapas: EtapaModelo[];
+  /**
+   * Canais paralelos. Cada um leva sua fatia do total e roda as etapas por
+   * conta própria, com as datas convergindo. Ausente = pagamento único.
+   */
+  canais?: { canal: CompraGastoCanal; pct: number }[];
+}
+
+const DICA_90_120 = "2x iguais: 90 e 120 dias depois da data da compra.";
+const DICA_CHINA = `${COMPRA_GASTO_CANAL_LABEL.transferencia} 40% + ${COMPRA_GASTO_CANAL_LABEL.alibaba} 60%, cada um 30% no ato do pedido, 50% no despacho (+30 dias) e 20% 60 dias depois do despacho (+90). As datas convergem: o dia soma os dois pagamentos.`;
+/** Fornecedor que ainda não tem calendário próprio — copia o do vizinho. */
+const COMO = (quem: string) => ` Por enquanto, mesmas regras de ${quem}.`;
+
+/**
+ * Regra de pagamento de cada fornecedor.
+ *
+ * Fornecedores que hoje pagam igual têm entradas separadas de propósito: o dia
+ * em que um deles mudar de calendário, muda só a própria linha desta tabela.
+ */
+const REGRAS: Record<CompraGastoFornecedor, RegraModelo> = {
+  salete: { label: "Salete", dica: DICA_90_120, etapas: NOVENTA_CENTO_E_VINTE },
+  telma: { label: "Telma", dica: DICA_90_120 + COMO("Salete"), etapas: NOVENTA_CENTO_E_VINTE },
+  roseli: {
+    label: "Roseli (Pashmina)",
+    dica: DICA_90_120 + COMO("Salete"),
+    etapas: NOVENTA_CENTO_E_VINTE,
+  },
+  china: {
+    label: "China (Nick)",
+    dica: DICA_CHINA,
+    etapas: CHINA_ETAPAS,
+    canais: CHINA_CANAIS,
+  },
+  china_hannah: {
+    label: "China (Hannah)",
+    dica: DICA_CHINA + COMO("China (Nick)"),
+    etapas: CHINA_ETAPAS,
+    canais: CHINA_CANAIS,
+  },
+  india_kunal: {
+    label: "Índia (Kunal)",
+    dica: DICA_CHINA + COMO("China (Nick)"),
+    etapas: CHINA_ETAPAS,
+    canais: CHINA_CANAIS,
+  },
+  nepal: {
+    label: "Nepal",
+    dica: DICA_CHINA + COMO("China (Nick)"),
+    etapas: CHINA_ETAPAS,
+    canais: CHINA_CANAIS,
+  },
+};
+
+/** Opções do select de fornecedor, na ordem em que aparecem na tela. */
+export const COMPRA_GASTO_FORNECEDORES: {
+  valor: CompraGastoFornecedor;
+  label: string;
+  dica: string;
+}[] = (
+  [
+    "salete",
+    "telma",
+    "roseli",
+    "china",
+    "china_hannah",
+    "india_kunal",
+    "nepal",
+  ] as CompraGastoFornecedor[]
+).map((valor) => ({ valor, label: REGRAS[valor].label, dica: REGRAS[valor].dica }));
+
+/** O valor gravado em `fornecedor` é um dos fornecedores com regra? */
+export function ehFornecedorConhecido(valor?: string | null): valor is CompraGastoFornecedor {
+  return !!valor && valor in REGRAS;
+}
+
+/**
+ * Nome de exibição do fornecedor gravado no lote. Compra antiga tem texto livre
+ * nesse campo (era um input) — nesse caso o próprio texto é o rótulo.
+ */
+export function rotuloFornecedor(valor?: string | null): string {
+  if (!valor) return "";
+  return ehFornecedorConhecido(valor) ? REGRAS[valor].label : String(valor);
+}
+
+/** A regra de pagamento do fornecedor gravado — "manual" quando não há. */
+export function modeloDoFornecedor(valor?: string | null): CompraGastoModeloParcelamento {
+  return ehFornecedorConhecido(valor) ? valor : "manual";
+}
 
 /**
  * Reparte um valor pelas etapas de um modelo. A última etapa absorve os
@@ -390,11 +485,11 @@ function parcelasDeEtapas(
 }
 
 /**
- * Gera as parcelas de um modelo de pagamento a partir da data da compra.
+ * Gera as parcelas de um fornecedor a partir da data da compra.
  *
- * `manual` não gera nada (quem divide é o usuário). No `china` os dois canais
- * saem numa lista só, ordenada por data — as parcelas do mesmo dia ficam lado a
- * lado, que é como o dinheiro sai: somadas na data, separadas por canal.
+ * `manual` não gera nada (quem divide é o usuário). Nos modelos com canais os
+ * dois saem numa lista só, ordenada por data — as parcelas do mesmo dia ficam
+ * lado a lado, que é como o dinheiro sai: somadas na data, separadas por canal.
  */
 export function gerarParcelasModelo(
   total: number,
@@ -402,21 +497,23 @@ export function gerarParcelasModelo(
   modelo: CompraGastoModeloParcelamento
 ): CompraGastoParcela[] {
   if (modelo === "manual" || !dataCompra) return [];
+  const regra = REGRAS[modelo];
+  if (!regra) return [];
 
-  if (modelo === "salete") {
-    return renumerarParcelas(parcelasDeEtapas(total, dataCompra, SALETE_ETAPAS, null));
+  if (!regra.canais) {
+    return renumerarParcelas(parcelasDeEtapas(total, dataCompra, regra.etapas, null));
   }
 
-  // China: fatia o total entre os canais primeiro (o último canal absorve os
+  // Com canais: fatia o total entre eles primeiro (o último canal absorve os
   // centavos), depois cada canal se divide nas suas etapas.
   const alvo = cents(total);
   let alocado = 0;
   const parcelas: CompraGastoParcela[] = [];
-  CHINA_CANAIS.forEach((c, i) => {
-    const ultimo = i === CHINA_CANAIS.length - 1;
+  regra.canais.forEach((c, i) => {
+    const ultimo = i === regra.canais!.length - 1;
     const valorCanal = ultimo ? cents(alvo - alocado) : cents((alvo * c.pct) / 100);
     alocado = cents(alocado + valorCanal);
-    parcelas.push(...parcelasDeEtapas(valorCanal, dataCompra, CHINA_ETAPAS, c.canal));
+    parcelas.push(...parcelasDeEtapas(valorCanal, dataCompra, regra.etapas, c.canal));
   });
 
   parcelas.sort(

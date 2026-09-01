@@ -11,8 +11,12 @@ import {
   type CompraGastoParcela,
 } from "@/lib/types/compra-gasto";
 import {
+  COMPRA_GASTO_FORNECEDORES,
   canaisDasParcelas,
   convergenciaPorData,
+  ehFornecedorConhecido,
+  modeloDoFornecedor,
+  rotuloFornecedor,
   itemTotal,
   itensSemCusto,
   itensTotal,
@@ -34,7 +38,8 @@ interface Props {
   salvando: boolean;
   onClose: () => void;
   onTogglePago: (indice: number, pago: boolean) => void;
-  onSalvarParcelas: (parcelas: CompraGastoParcela[]) => Promise<boolean>;
+  /** Salva o parcelamento e o fornecedor juntos — é ele que gera as parcelas. */
+  onSalvarParcelas: (parcelas: CompraGastoParcela[], fornecedor: string | null) => Promise<boolean>;
   onDelete: () => void;
 }
 
@@ -62,6 +67,7 @@ export default function GastosCompraDrawer({
   const [aba, setAba] = useState<Aba>("composicao");
   const [editandoParcelas, setEditandoParcelas] = useState(false);
   const [rascunho, setRascunho] = useState<CompraGastoParcela[]>([]);
+  const [fornecedorEdicao, setFornecedorEdicao] = useState("");
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -88,11 +94,12 @@ export default function GastosCompraDrawer({
 
   function abrirEdicao() {
     setRascunho(lote.parcelas.map((p) => ({ ...p })));
+    setFornecedorEdicao(lote.fornecedor ?? "");
     setEditandoParcelas(true);
   }
 
   async function salvarEdicao() {
-    const ok = await onSalvarParcelas(rascunho);
+    const ok = await onSalvarParcelas(rascunho, fornecedorEdicao || null);
     if (ok) setEditandoParcelas(false);
   }
 
@@ -438,11 +445,36 @@ export default function GastosCompraDrawer({
                 primeira parcela e vai para os meses dos vencimentos novos. Parcela já paga fica
                 travada e fora do rateio.
               </p>
+              <label className={styles.field} style={{ maxWidth: 260, marginBottom: 12 }}>
+                <span>Fornecedor</span>
+                <select
+                  value={fornecedorEdicao}
+                  disabled={salvando}
+                  onChange={(e) => setFornecedorEdicao(e.target.value)}
+                >
+                  <option value="">— sem fornecedor —</option>
+                  {COMPRA_GASTO_FORNECEDORES.map((f) => (
+                    <option key={f.valor} value={f.valor}>
+                      {f.label}
+                    </option>
+                  ))}
+                  {/* Compra antiga tem fornecedor em texto livre: fica na lista para
+                      não ser apagada sem querer ao salvar o parcelamento. */}
+                  {lote.fornecedor && !ehFornecedorConhecido(lote.fornecedor) && (
+                    <option value={lote.fornecedor}>{lote.fornecedor}</option>
+                  )}
+                </select>
+              </label>
+              <p className={styles.note} style={{ margin: "0 0 12px" }}>
+                Trocar o fornecedor refaz as parcelas pelo calendário dele. Depois disso dá para
+                ajustar linha a linha — o que você digitar não é sobrescrito.
+              </p>
               <ParcelasEditor
                 total={total}
                 parcelas={rascunho}
                 onChange={setRascunho}
                 vencimentoSugerido={lote.dataCompra}
+                modelo={modeloDoFornecedor(fornecedorEdicao)}
                 rodape="Soma das parcelas"
                 disabled={salvando}
               />
@@ -476,14 +508,24 @@ export default function GastosCompraDrawer({
                     ? `Compra em trânsito confirmada — ${lote.itens.length} itens. O valor veio de qtd × custo item por item.`
                     : lote.origem === "salva"
                       ? `Compra Salva vinculada — ${lote.itens.length} itens (vínculo antigo, de antes de a fonte passar a ser a Compra em trânsito). O valor veio de qtd × custo item por item.`
-                      : lote.origem === "itens"
-                        ? `Linhas digitadas nesta compra: ${lote.itens.filter((i) => i.produto).length} vinculadas a produto e ${lote.itens.filter((i) => !i.produto).length} livres.`
-                        : "Valor único informado à mão. Sem itens, sem impacto em estoque."}
+                      : lote.origem === "premier"
+                        ? `Compra Premier (embalagem e material): ${lote.itens.length} ${lote.itens.length === 1 ? "item" : "itens"} do catálogo, com quantidade e preço digitados.`
+                        : lote.origem === "itens"
+                          ? `Linhas digitadas nesta compra: ${lote.itens.filter((i) => i.produto).length} vinculadas a produto e ${lote.itens.filter((i) => !i.produto).length} livres.`
+                          : "Valor único informado à mão. Sem itens, sem impacto em estoque."}
                 </span>
               </div>
               <div className={styles.fact}>
                 <span className={styles.factK}>Fornecedor</span>
-                <span className={styles.factText}>{lote.fornecedor || "não informado"}</span>
+                <span className={styles.factText}>
+                  {rotuloFornecedor(lote.fornecedor) || "não informado"}
+                  {ehFornecedorConhecido(lote.fornecedor) && (
+                    <>
+                      {" — "}
+                      {COMPRA_GASTO_FORNECEDORES.find((f) => f.valor === lote.fornecedor)?.dica}
+                    </>
+                  )}
+                </span>
               </div>
               {temCanal && (
                 <div className={styles.fact}>

@@ -5,15 +5,21 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CompraTransitoListEntry } from "@/lib/types/compra-transito";
 import {
   COMPRA_GASTO_CANAL_LABEL,
+  COMPRA_GASTO_PREMIER_ITENS,
   COMPRA_GASTO_TIPO_LABEL,
   type CompraGastoCandidata,
+  type CompraGastoFornecedor,
   type CompraGastoItem,
   type CompraGastoLote,
   type CompraGastoOrigem,
   type CompraGastoParcela,
   type CompraGastoTipo,
 } from "@/lib/types/compra-gasto";
-import { cents } from "@/lib/utils/compra-gastos-agregacao";
+import {
+  COMPRA_GASTO_FORNECEDORES,
+  cents,
+  modeloDoFornecedor,
+} from "@/lib/utils/compra-gastos-agregacao";
 
 import ParcelasEditor from "./ParcelasEditor";
 import styles from "./GastosCompra.module.css";
@@ -48,9 +54,32 @@ interface LinhaLivre {
   custoUnitario: string;
 }
 
+/** Linha Premier: a descrição é fixa (vem do catálogo), só qtd e preço são digitados. */
+interface LinhaPremier {
+  descricao: string;
+  qtd: string;
+  custoUnitario: string;
+}
+
 const LINHA_VAZIA: LinhaLivre = { descricao: "", produto: "", corProduto: "", qtd: "", custoUnitario: "" };
 
 const TIPOS: CompraGastoTipo[] = ["mercadoria", "frete", "adiantamento", "material", "outros"];
+
+/**
+ * Origens lançáveis na tela. "valor" e "salva" existem no modelo só para os
+ * lotes antigos serem lidos — compra nova nasce sempre com itens.
+ */
+type OrigemLancavel = Extract<CompraGastoOrigem, "transito" | "itens" | "premier">;
+
+const TIPO_COMPRA_OPCOES: { valor: OrigemLancavel; label: string }[] = [
+  { valor: "transito", label: "Compra em trânsito" },
+  { valor: "itens", label: "Itens digitados" },
+  { valor: "premier", label: "Premier" },
+];
+
+function premierZerado(): LinhaPremier[] {
+  return COMPRA_GASTO_PREMIER_ITENS.map((descricao) => ({ descricao, qtd: "", custoUnitario: "" }));
+}
 
 export default function NovaCompraModal({
   companyKey,
@@ -62,7 +91,7 @@ export default function NovaCompraModal({
   onClose,
   onSaved,
 }: Props) {
-  const [origem, setOrigem] = useState<CompraGastoOrigem>("transito");
+  const [origem, setOrigem] = useState<OrigemLancavel>("transito");
 
   const [transitos, setTransitos] = useState<CompraTransitoListEntry[]>([]);
   const [transitosErro, setTransitosErro] = useState<string | null>(null);
@@ -71,10 +100,15 @@ export default function NovaCompraModal({
 
   // Uma linha só: a próxima aparece sozinha ao digitar nesta.
   const [linhas, setLinhas] = useState<LinhaLivre[]>([{ ...LINHA_VAZIA }]);
-  const [valorUnicoTexto, setValorUnicoTexto] = useState("");
+  /** Catálogo Premier inteiro na tela: o usuário preenche só o que está comprando. */
+  const [premier, setPremier] = useState<LinhaPremier[]>(premierZerado);
 
   const [titulo, setTitulo] = useState("");
-  const [fornecedor, setFornecedor] = useState("");
+  /**
+   * Fornecedor da compra — vazio por padrão. Não é só identificação: escolher um
+   * nome aplica o calendário de pagamento dele no parcelamento logo abaixo.
+   */
+  const [fornecedor, setFornecedor] = useState<CompraGastoFornecedor | "">("");
   const [tipo, setTipo] = useState<CompraGastoTipo>("mercadoria");
   const [dataCompra, setDataCompra] = useState(mesSugerido ? `${mesSugerido}-15` : hoje);
   const [chegadaIni, setChegadaIni] = useState("");
@@ -167,13 +201,31 @@ export default function NovaCompraModal({
     [linhas]
   );
 
+  /**
+   * Só as linhas Premier realmente compradas. O catálogo aparece inteiro na
+   * tela, mas item sem quantidade não é compra — fica fora do lote.
+   */
+  const itensPremier = useMemo<CompraGastoItem[]>(
+    () =>
+      premier
+        .map((l) => ({
+          descricao: l.descricao,
+          produto: null,
+          corProduto: null,
+          corDescricao: null,
+          qtd: parseMoeda(l.qtd) || 0,
+          custoUnitario: parseMoeda(l.custoUnitario) || 0,
+        }))
+        .filter((i) => i.qtd > 0),
+    [premier]
+  );
+
+  const itensDaCompra = origem === "premier" ? itensPremier : itensDasLinhas;
+
   const total = useMemo(() => {
     if (origem === "transito") return cents(previa?.total ?? transitoSelecionado?.totalValor ?? 0);
-    if (origem === "itens") {
-      return cents(itensDasLinhas.reduce((s, i) => s + i.qtd * i.custoUnitario, 0));
-    }
-    return parseMoeda(valorUnicoTexto);
-  }, [origem, previa, transitoSelecionado, itensDasLinhas, valorUnicoTexto]);
+    return cents(itensDaCompra.reduce((s, i) => s + i.qtd * i.custoUnitario, 0));
+  }, [origem, previa, transitoSelecionado, itensDaCompra]);
 
   // A compra nasce INTEIRA: uma parcela de 100% na data da compra. Só quando o
   // usuário divide é que o valor sai desse mês e vai para os vencimentos novos.
@@ -241,6 +293,36 @@ export default function NovaCompraModal({
     [transitos, companyKey]
   );
 
+  /**
+   * Trocar o tipo de compra zera o que era da origem anterior (a prévia do
+   * trânsito, sobretudo) para o total não ficar preso ao que já não está na
+   * tela. Premier já nasce com o tipo de gasto e a descrição certos.
+   */
+  const trocarTipoCompra = useCallback((proxima: OrigemLancavel) => {
+    setOrigem(proxima);
+    setErro(null);
+    setParcelasEditadas(false);
+    if (proxima !== "transito") {
+      setCompraTransitoId("");
+      setPrevia(null);
+    }
+    if (proxima === "premier") {
+      setTipo("material");
+      setTitulo((atual) => atual.trim() || "Compra Premier");
+    }
+  }, []);
+
+  const atualizarPremier = useCallback(
+    (i: number, campo: "qtd" | "custoUnitario", valor: string) => {
+      setPremier((prev) => {
+        const next = [...prev];
+        next[i] = { ...next[i], [campo]: valor };
+        return next;
+      });
+    },
+    []
+  );
+
   const atualizarLinha = useCallback((i: number, campo: keyof LinhaLivre, valor: string) => {
     setLinhas((prev) => {
       const next = [...prev];
@@ -275,8 +357,8 @@ export default function NovaCompraModal({
       setErro("Adicione pelo menos uma linha à compra.");
       return;
     }
-    if (origem === "valor" && total <= 0) {
-      setErro("Informe o valor total da compra.");
+    if (origem === "premier" && itensPremier.length === 0) {
+      setErro("Informe a quantidade de pelo menos um item Premier.");
       return;
     }
     if (!parcelas.length || parcelas.some((p) => !p.vencimento)) {
@@ -290,7 +372,9 @@ export default function NovaCompraModal({
         companyKey,
         origem,
         titulo: titulo.trim(),
-        fornecedor: fornecedor.trim() || null,
+        // A chave do fornecedor é o que fica gravado no lote — é ela que diz
+        // depois de quem foi a compra e qual calendário gerou as parcelas.
+        fornecedor: fornecedor || null,
         tipo,
         dataCompra,
         chegadaIni: chegadaIni || null,
@@ -303,11 +387,8 @@ export default function NovaCompraModal({
         // mostra o valor arredondado, e usá-lo aqui deixaria centavos sobrando).
         if (parcelasEditadas) body.parcelas = parcelas;
         else body.parcelasConfig = { quantidade: 1, primeiroVencimento: dataCompra };
-      } else if (origem === "itens") {
-        body.itens = itensDasLinhas;
-        body.parcelas = parcelas;
       } else {
-        body.valorUnico = total;
+        body.itens = itensDaCompra;
         body.parcelas = parcelas;
       }
 
@@ -336,8 +417,8 @@ export default function NovaCompraModal({
         <div className={styles.modalHead}>
           <div className={styles.drawerTop}>
             <div>
-              <div className={styles.drawerCode}>Nova compra</div>
-              <h3 className={styles.drawerTitle}>De onde vem essa compra?</h3>
+              <div className={styles.drawerCode}>Gastos de compra</div>
+              <h3 className={styles.drawerTitle}>Nova compra</h3>
             </div>
             <button type="button" className={styles.closeX} onClick={onClose} aria-label="Fechar">
               ✕
@@ -346,42 +427,19 @@ export default function NovaCompraModal({
         </div>
 
         <div className={styles.modalBody}>
-          <div className={styles.originGrid} role="group" aria-label="Origem da compra">
-            <button
-              type="button"
-              className={`${styles.origin} ${origem === "transito" ? styles.originActive : ""}`}
-              aria-pressed={origem === "transito"}
-              onClick={() => setOrigem("transito")}
+          <label className={styles.field}>
+            <span>Tipo de Compra</span>
+            <select
+              value={origem}
+              onChange={(e) => trocarTipoCompra(e.target.value as OrigemLancavel)}
             >
-              <span className={styles.originName}>Compra em trânsito</span>
-              <span className={styles.originDesc}>
-                Vincula uma compra já confirmada em trânsito. Valor, itens, data e previsão de
-                chegada vêm dela.
-              </span>
-            </button>
-            <button
-              type="button"
-              className={`${styles.origin} ${origem === "itens" ? styles.originActive : ""}`}
-              aria-pressed={origem === "itens"}
-              onClick={() => setOrigem("itens")}
-            >
-              <span className={styles.originName}>Itens digitados</span>
-              <span className={styles.originDesc}>
-                Você escreve as linhas. Cada uma pode apontar para um produto — ou ser só texto.
-              </span>
-            </button>
-            <button
-              type="button"
-              className={`${styles.origin} ${origem === "valor" ? styles.originActive : ""}`}
-              aria-pressed={origem === "valor"}
-              onClick={() => setOrigem("valor")}
-            >
-              <span className={styles.originName}>Só valor</span>
-              <span className={styles.originDesc}>
-                Uma descrição e um valor. Para adiantamento, frete, verba de coleção, serviço.
-              </span>
-            </button>
-          </div>
+              {TIPO_COMPRA_OPCOES.map((o) => (
+                <option key={o.valor} value={o.valor}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
 
           {origem === "transito" && (
             <div>
@@ -558,29 +616,53 @@ export default function NovaCompraModal({
             </div>
           )}
 
-          {origem === "valor" && (
-            <div className={styles.fieldGrid}>
-              <label className={styles.field} style={{ gridColumn: "1 / -1" }}>
-                <span>Descrição do gasto</span>
-                <input
-                  value={titulo}
-                  placeholder="ex: sinal 30% Consuelo Annexe"
-                  onChange={(e) => setTitulo(e.target.value)}
-                />
-              </label>
-              <label className={styles.field}>
-                <span>Valor total</span>
-                <input
-                  className={styles.money}
-                  value={valorUnicoTexto}
-                  placeholder="0,00"
-                  inputMode="decimal"
-                  onChange={(e) => {
-                    setValorUnicoTexto(e.target.value);
-                    setParcelasEditadas(false);
-                  }}
-                />
-              </label>
+          {origem === "premier" && (
+            <div>
+              <div className={styles.blockTitle}>Itens Premier</div>
+              <div className={styles.freeLines}>
+                <div className={styles.premierLine}>
+                  <span className={styles.freeLineHead}>Item</span>
+                  <span className={styles.freeLineHead}>Qtd</span>
+                  <span className={styles.freeLineHead}>Preço un.</span>
+                  <span className={`${styles.freeLineHead} ${styles.freeLineTotal}`}>Total</span>
+                </div>
+                {premier.map((l, i) => {
+                  const totalLinha = (parseMoeda(l.qtd) || 0) * (parseMoeda(l.custoUnitario) || 0);
+                  return (
+                    <div className={styles.premierLine} key={l.descricao}>
+                      <span className={styles.premierName}>{l.descricao}</span>
+                      <input
+                        value={l.qtd}
+                        placeholder="qtd"
+                        inputMode="decimal"
+                        onChange={(e) => atualizarPremier(i, "qtd", e.target.value)}
+                      />
+                      <input
+                        value={l.custoUnitario}
+                        placeholder="preço"
+                        inputMode="decimal"
+                        onChange={(e) => atualizarPremier(i, "custoUnitario", e.target.value)}
+                      />
+                      <span className={styles.freeLineTotal}>
+                        {totalLinha > 0 ? money(totalLinha) : "—"}
+                      </span>
+                    </div>
+                  );
+                })}
+                <div className={styles.premierLine}>
+                  <span className={styles.premierTotalLabel}>Total da compra</span>
+                  <span />
+                  <span />
+                  <span className={`${styles.freeLineTotal} ${styles.premierTotalValor}`}>
+                    {total > 0 ? money(total) : "—"}
+                  </span>
+                </div>
+              </div>
+              <p className={styles.note}>
+                A lista é o catálogo Premier inteiro — embalagem e material de loja. Preencha
+                quantidade e preço só do que está comprando: item sem quantidade fica de fora da
+                compra.
+              </p>
             </div>
           )}
 
@@ -589,15 +671,27 @@ export default function NovaCompraModal({
           <div>
             <div className={styles.blockTitle}>Identificação e datas</div>
             <div className={styles.fieldGrid}>
-              {origem !== "valor" && (
-                <label className={styles.field}>
-                  <span>Descrição</span>
-                  <input value={titulo} onChange={(e) => setTitulo(e.target.value)} />
-                </label>
-              )}
+              <label className={styles.field}>
+                <span>Descrição</span>
+                <input value={titulo} onChange={(e) => setTitulo(e.target.value)} />
+              </label>
               <label className={styles.field}>
                 <span>Fornecedor</span>
-                <input value={fornecedor} onChange={(e) => setFornecedor(e.target.value)} />
+                <select
+                  value={fornecedor}
+                  title={
+                    COMPRA_GASTO_FORNECEDORES.find((f) => f.valor === fornecedor)?.dica ??
+                    "Sem fornecedor: o parcelamento fica por sua conta."
+                  }
+                  onChange={(e) => setFornecedor(e.target.value as CompraGastoFornecedor | "")}
+                >
+                  <option value="">— sem fornecedor —</option>
+                  {COMPRA_GASTO_FORNECEDORES.map((f) => (
+                    <option key={f.valor} value={f.valor}>
+                      {f.label}
+                    </option>
+                  ))}
+                </select>
               </label>
               <label className={styles.field}>
                 <span>Tipo de gasto</span>
@@ -630,17 +724,19 @@ export default function NovaCompraModal({
           <div>
             <div className={styles.blockTitle}>Parcelamento</div>
             <p className={styles.note} style={{ margin: "0 0 10px" }}>
-              Por padrão a compra vem inteira, vencendo na data da compra. Ao dividir, esse mês fica
-              só com a primeira parcela e o restante vai para os meses dos novos vencimentos. Em{" "}
-              <b>Tipo</b> você aplica um modelo pronto: Salete (2x, 90 e 120 dias) ou China (
-              {COMPRA_GASTO_CANAL_LABEL.transferencia} 40% + {COMPRA_GASTO_CANAL_LABEL.alibaba} 60%,
-              somados nas mesmas datas).
+              Sem fornecedor a compra vem inteira, vencendo na data da compra, e você divide como
+              quiser — esse mês fica só com a primeira parcela e o restante vai para os meses dos
+              novos vencimentos. Escolher o <b>fornecedor</b> acima já monta o parcelamento dele:
+              Salete, Telma e Roseli pagam 2x (90 e 120 dias); os importados (China, Índia, Nepal)
+              pagam {COMPRA_GASTO_CANAL_LABEL.transferencia} 40% +{" "}
+              {COMPRA_GASTO_CANAL_LABEL.alibaba} 60%, somados nas mesmas datas.
             </p>
             <ParcelasEditor
               total={total}
               parcelas={parcelas}
               onChange={alterarParcelas}
               vencimentoSugerido={dataCompra}
+              modelo={modeloDoFornecedor(fornecedor)}
               rodape={
                 origem === "transito" && !parcelasEditadas
                   ? "Prévia: o valor exato dos itens é confirmado ao salvar"

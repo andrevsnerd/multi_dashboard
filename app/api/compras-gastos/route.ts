@@ -41,13 +41,15 @@ export async function GET(request: Request) {
 /**
  * Cria um lote de compra.
  *
- * Três origens:
+ * Origens:
  *  - "transito": os itens são materializados a partir de uma Compra em trânsito
  *    CONFIRMADA (qtd × custo, com fallback de custo no ERP). Rascunho é recusado.
  *    Item sem custo NÃO vira zero em silêncio — o lote nasce marcado como
  *    estimativa e a observação registra quantos.
- *  - "itens": as linhas vêm do corpo da requisição (com ou sem vínculo a produto).
- *  - "valor": só descrição e valor total.
+ *  - "itens" / "premier": as linhas vêm do corpo da requisição (com ou sem
+ *    vínculo a produto). Premier é a compra de embalagem/material, cujas linhas
+ *    a tela já apresenta prontas.
+ *  - "valor": LEGADO — só descrição e valor total. Não é mais lançável na tela.
  *
  * As parcelas podem vir prontas (`parcelas`) ou ser geradas do total resolvido
  * (`parcelasConfig`). Cada parcela conta uma vez, no mês do próprio vencimento.
@@ -72,7 +74,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "A data da compra é obrigatória" }, { status: 400 });
     }
 
-    const origem = body.origem === "transito" || body.origem === "itens" ? body.origem : "valor";
+    // "premier" é a compra de embalagem/material: linhas prontas, digitadas com
+    // quantidade e preço — do ponto de vista do valor, é igual a "itens".
+    const origem =
+      body.origem === "transito" || body.origem === "itens" || body.origem === "premier"
+        ? body.origem
+        : "valor";
+    const porLinhas = origem === "itens" || origem === "premier";
     let itens: CompraGastoItem[] = Array.isArray(body.itens) ? body.itens : [];
     let estimado = !!body.estimado;
     let observacao = body.observacao ? String(body.observacao).trim() : null;
@@ -124,7 +132,7 @@ export async function POST(request: Request) {
       }
     }
 
-    if (origem === "itens" && itens.length === 0) {
+    if (porLinhas && itens.length === 0) {
       return NextResponse.json({ error: "Adicione pelo menos uma linha à compra" }, { status: 400 });
     }
     if (origem === "valor") {
