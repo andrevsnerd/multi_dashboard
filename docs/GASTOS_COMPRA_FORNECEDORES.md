@@ -20,19 +20,30 @@ sozinho** (datas, valores e, quando tem, os canais de pagamento).
 
 ## Os fornecedores e como cada um paga
 
+Os prazos são **dias corridos contados da data da compra** (30/60/90…), não meses
+de calendário. Parcelas iguais: o último centavo cai na última parcela, então a
+soma fecha exata.
+
 | Fornecedor | Como paga |
 |---|---|
-| **Salete** | 2x iguais: 50% em **90 dias** e 50% em **120 dias** da data da compra. |
-| **Telma** | Igual à Salete (por enquanto). |
-| **Roseli (Pashmina)** | Igual à Salete (por enquanto). |
+| **Salete** | 2x iguais: **90** e **120** dias. |
+| **Telma** | 1x: **30** dias. |
+| **Roseli (Pashmina)** | 3x iguais: **90**, **120** e **150** dias. |
+| **Fátima (Fashion)** | 2x iguais: **30** e **60** dias. |
+| **Premier** | 3x iguais: **30**, **60** e **90** dias. |
+| **Índia (Kunal)** | **13x iguais**: entrada à vista (dia 0) + 12 parcelas de 30 em 30 dias (30 a 360). Sem canais. |
 | **China (Nick)** | Dois pagamentos **paralelos** sobre o mesmo total: Transferência bancária 40% + Alibaba 60%. Cada canal se divide em 30% **no ato do pedido**, 50% **no despacho** (+30 dias) e 20% **60 dias após o despacho** (+90 dias). As datas coincidem — o dia soma os dois. |
-| **China (Hannah)** | Igual à China (Nick) (por enquanto). |
-| **Índia (Kunal)** | Igual à China (Nick) (por enquanto). |
+| **China (Hannah)** | Mesmos canais do Nick (Transferência 40% + Alibaba 60%), mas fecha no despacho: 30% **no ato do pedido** e os **70% restantes no despacho** (+30 dias). Sem a parcela de 60 dias depois. |
 | **Nepal** | Igual à China (Nick) (por enquanto). |
 
-**Por que fornecedores iguais são entradas separadas:** eles copiam o calendário
-do vizinho **hoje**. Cada um tem a própria linha na tabela de regras justamente
-para que, no dia em que um mudar, mude só a linha dele — sem tocar nos outros.
+> **Índia — entrada:** os 13 pagamentos são **iguais** (a entrada é 1/13 do
+> total, como cada uma das 12). Se a entrada passar a ter percentual próprio,
+> muda só a linha `india_kunal` da tabela de regras.
+
+**Por que fornecedores iguais são entradas separadas:** só o Nepal ainda copia o
+calendário do Nick. Cada fornecedor tem a própria linha na tabela de regras
+justamente para que, quando um mudar, mude só a linha dele — foi o que aconteceu
+com a Hannah, que saiu do 30/50/20 para 30/70 sem tocar em ninguém.
 
 ### Sobre os canais (China e afins)
 
@@ -96,5 +107,10 @@ fornecedor de novo).
 - **O parcelamento da Compra em trânsito é gravado em dias/%** sobre a data da
   compra, então ele reancora sozinho na confirmação. Escolher o fornecedor lá
   monta o plano; o que vai para o painel é o plano, não o nome do calendário.
-- **Premier** é *tipo de compra* (catálogo de embalagem/material), não
-  fornecedor — são coisas diferentes no mesmo lançamento.
+- **Premier é as duas coisas**: um *tipo de compra* (o catálogo de embalagem e
+  material, com os itens prontos para preencher quantidade e preço) e um
+  *fornecedor* (3x, 30/60/90). Escolher o tipo de compra Premier já marca o
+  fornecedor Premier — dá para trocar depois, se a compra for de outro.
+- **Parcelas iguais** vêm do helper `iguaisEm([dias…])`: para mudar um prazo,
+  mexa só na lista de dias. Percentual diferente por etapa (como a China) é
+  escrito à mão na própria linha.

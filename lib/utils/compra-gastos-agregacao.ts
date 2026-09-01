@@ -340,11 +340,24 @@ interface EtapaModelo {
   etapa: string;
 }
 
-/** 2x iguais, 90 e 120 dias depois da compra — o calendário da Salete. */
-const NOVENTA_CENTO_E_VINTE: EtapaModelo[] = [
-  { dias: 90, pct: 50, etapa: "90 dias da compra" },
-  { dias: 120, pct: 50, etapa: "120 dias da compra" },
-];
+/**
+ * Parcelas IGUAIS, uma para cada prazo em dias contados da data da compra.
+ * O último centavo é absorvido pela última parcela em `parcelasDeEtapas`, então
+ * a soma fecha exata mesmo quando 100 não divide redondo (3x = 33,33…).
+ *
+ * Dia 0 é entrada — sai no ato, no mês da própria compra.
+ */
+function iguaisEm(dias: number[]): EtapaModelo[] {
+  const pct = 100 / dias.length;
+  return dias.map((d) => ({
+    dias: d,
+    pct,
+    etapa: d === 0 ? "entrada, no ato" : `${d} dias da compra`,
+  }));
+}
+
+/** Entrada à vista + 12 parcelas iguais, de 30 em 30 dias (Índia). */
+const ENTRADA_MAIS_12X = iguaisEm([0, ...Array.from({ length: 12 }, (_, i) => (i + 1) * 30)]);
 
 /**
  * China: dois pagamentos paralelos sobre o MESMO total — transferência bancária
@@ -362,6 +375,16 @@ const CHINA_ETAPAS: EtapaModelo[] = [
   { dias: 90, pct: 20, etapa: "60 dias após o despacho" },
 ];
 
+/**
+ * Hannah usa os mesmos dois canais do Nick, mas fecha no despacho: 30% no ato e
+ * os 70% restantes na saída da mercadoria — não existe a parcela de 60 dias
+ * depois.
+ */
+const HANNAH_ETAPAS: EtapaModelo[] = [
+  { dias: 0, pct: 30, etapa: "no ato do pedido" },
+  { dias: 30, pct: 70, etapa: "no despacho (30 dias)" },
+];
+
 interface RegraModelo {
   label: string;
   /** Frase que explica o calendário — vai para o title do select e a dica. */
@@ -374,24 +397,45 @@ interface RegraModelo {
   canais?: { canal: CompraGastoCanal; pct: number }[];
 }
 
-const DICA_90_120 = "2x iguais: 90 e 120 dias depois da data da compra.";
 const DICA_CHINA = `${COMPRA_GASTO_CANAL_LABEL.transferencia} 40% + ${COMPRA_GASTO_CANAL_LABEL.alibaba} 60%, cada um 30% no ato do pedido, 50% no despacho (+30 dias) e 20% 60 dias depois do despacho (+90). As datas convergem: o dia soma os dois pagamentos.`;
 /** Fornecedor que ainda não tem calendário próprio — copia o do vizinho. */
 const COMO = (quem: string) => ` Por enquanto, mesmas regras de ${quem}.`;
 
 /**
- * Regra de pagamento de cada fornecedor.
+ * Regra de pagamento de cada fornecedor — a tabela que manda no parcelamento.
+ *
+ * Prazos são contados em DIAS corridos sobre a data da compra (30/60/90…), não
+ * em meses de calendário: é assim que os fornecedores combinam e é o que o
+ * gerador aplica.
  *
  * Fornecedores que hoje pagam igual têm entradas separadas de propósito: o dia
  * em que um deles mudar de calendário, muda só a própria linha desta tabela.
  */
 const REGRAS: Record<CompraGastoFornecedor, RegraModelo> = {
-  salete: { label: "Salete", dica: DICA_90_120, etapas: NOVENTA_CENTO_E_VINTE },
-  telma: { label: "Telma", dica: DICA_90_120 + COMO("Salete"), etapas: NOVENTA_CENTO_E_VINTE },
+  salete: {
+    label: "Salete",
+    dica: "2x iguais: 90 e 120 dias depois da data da compra.",
+    etapas: iguaisEm([90, 120]),
+  },
+  telma: {
+    label: "Telma",
+    dica: "Pagamento único, 30 dias depois da data da compra.",
+    etapas: iguaisEm([30]),
+  },
   roseli: {
     label: "Roseli (Pashmina)",
-    dica: DICA_90_120 + COMO("Salete"),
-    etapas: NOVENTA_CENTO_E_VINTE,
+    dica: "3x iguais: 90, 120 e 150 dias depois da data da compra.",
+    etapas: iguaisEm([90, 120, 150]),
+  },
+  fatima: {
+    label: "Fátima (Fashion)",
+    dica: "2x iguais: 30 e 60 dias depois da data da compra.",
+    etapas: iguaisEm([30, 60]),
+  },
+  premier: {
+    label: "Premier",
+    dica: "3x iguais: 30, 60 e 90 dias depois da data da compra.",
+    etapas: iguaisEm([30, 60, 90]),
   },
   china: {
     label: "China (Nick)",
@@ -401,15 +445,16 @@ const REGRAS: Record<CompraGastoFornecedor, RegraModelo> = {
   },
   china_hannah: {
     label: "China (Hannah)",
-    dica: DICA_CHINA + COMO("China (Nick)"),
-    etapas: CHINA_ETAPAS,
+    dica: `${COMPRA_GASTO_CANAL_LABEL.transferencia} 40% + ${COMPRA_GASTO_CANAL_LABEL.alibaba} 60%, cada um 30% no ato do pedido e os 70% restantes no despacho (+30 dias). As datas convergem: o dia soma os dois pagamentos.`,
+    etapas: HANNAH_ETAPAS,
     canais: CHINA_CANAIS,
   },
   india_kunal: {
     label: "Índia (Kunal)",
-    dica: DICA_CHINA + COMO("China (Nick)"),
-    etapas: CHINA_ETAPAS,
-    canais: CHINA_CANAIS,
+    // 13 pagamentos IGUAIS: a entrada é 1/13 do total, como o restante em 12x.
+    // Se a entrada passar a ter percentual próprio, é aqui que muda.
+    dica: "13x iguais: entrada à vista + 12 parcelas, de 30 em 30 dias (30 a 360).",
+    etapas: ENTRADA_MAIS_12X,
   },
   nepal: {
     label: "Nepal",
@@ -429,6 +474,8 @@ export const COMPRA_GASTO_FORNECEDORES: {
     "salete",
     "telma",
     "roseli",
+    "fatima",
+    "premier",
     "china",
     "china_hannah",
     "india_kunal",

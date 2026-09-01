@@ -88,10 +88,15 @@ export const COMPRA_GASTO_CANAIS: CompraGastoCanal[] = ["transferencia", "alibab
  * Fornecedor da compra. Não é só um rótulo: cada fornecedor paga do seu jeito,
  * então escolher o nome no lançamento GERA o parcelamento (datas e valores).
  *
- *  - `salete`, `telma`, `roseli`: 2x iguais, 90 e 120 dias depois da compra.
- *  - `china` (Nick), `china_hannah`, `india_kunal`, `nepal`: transferência 40% +
- *    Alibaba 60%, cada canal com 30% no ato do pedido, 50% no despacho (+30
- *    dias) e 20% 60 dias depois do despacho (+90).
+ *  - `salete`: 2x, 90 e 120 dias.
+ *  - `telma`: 1x, 30 dias.
+ *  - `roseli` (Pashmina): 3x, 90/120/150 dias.
+ *  - `fatima` (Fashion): 2x, 30/60 dias.
+ *  - `premier` (embalagem e material): 3x, 30/60/90 dias.
+ *  - `india_kunal`: 13x iguais — entrada à vista + 12 parcelas de 30 em 30 dias.
+ *  - `china` (Nick), `china_hannah`, `nepal`: transferência 40% + Alibaba 60%,
+ *    cada canal com 30% no ato do pedido, 50% no despacho (+30 dias) e 20% 60
+ *    dias depois do despacho (+90).
  *
  * Fornecedores com a mesma regra são entradas SEPARADAS de propósito: hoje
  * copiam o calendário do vizinho, e o dia em que um deles mudar mexe só na
@@ -109,6 +114,8 @@ export type CompraGastoFornecedor =
   | "salete"
   | "telma"
   | "roseli"
+  | "fatima"
+  | "premier"
   | "china"
   | "china_hannah"
   | "india_kunal"

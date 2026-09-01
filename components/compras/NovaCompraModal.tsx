@@ -309,6 +309,9 @@ export default function NovaCompraModal({
     if (proxima === "premier") {
       setTipo("material");
       setTitulo((atual) => atual.trim() || "Compra Premier");
+      // Compra Premier é compra DA Premier: o fornecedor (e o parcelamento
+      // 30/60/90 dele) vem junto, sem precisar escolher de novo lá embaixo.
+      setFornecedor("premier");
     }
   }, []);
 

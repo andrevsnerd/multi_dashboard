@@ -471,21 +471,15 @@
   "469": "page.tsx",
   "470": "ProductDetailKPIs.tsx",
   "471": "RomaneioDeleteModal.tsx",
-  "472": "route.ts",
   "473": "exportGastosCompraXlsx.ts",
-  "474": "page.tsx",
   "475": "route.ts",
   "476": "RomaneioDeleteModal.tsx",
-  "477": "distribuicao-matriz.ts",
   "478": "giroCache.ts",
   "479": "route.ts",
   "480": "discovery.ts",
   "481": "vendas.ts",
   "482": "liberar-vm-gerentes-nerd.mjs",
-  "483": "exportRelatorios.ts",
-  "484": "page.tsx",
   "485": "page.tsx",
-  "486": "page.tsx",
-  "487": "page.tsx",
-  "490": "page.tsx"
+  "489": "compra-transito-analytics.ts",
+  "491": "vendas.ts"
 }

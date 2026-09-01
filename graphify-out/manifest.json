@@ -4235,8 +4235,8 @@
     "semantic_hash": ""
   },
   "components/compras/NovaCompraModal.tsx": {
-    "mtime": 1788281743.8606372,
-    "ast_hash": "11098dad85b78a8c82361a15f749e58d",
+    "mtime": 1788284931.624625,
+    "ast_hash": "6e048b4bbc4e64c08d7c6e59de648702",
     "semantic_hash": ""
   },
   "components/compras/ParcelasEditor.tsx": {
@@ -4255,13 +4255,13 @@
     "semantic_hash": ""
   },
   "lib/types/compra-gasto.ts": {
-    "mtime": 1788281404.8811834,
-    "ast_hash": "a560a5dd03d862c039dc6d770b27451f",
+    "mtime": 1788284918.515517,
+    "ast_hash": "db64e03f6ffac9f361a49192d8952ae1",
     "semantic_hash": ""
   },
   "lib/utils/compra-gastos-agregacao.ts": {
-    "mtime": 1788281419.6156497,
-    "ast_hash": "c08f2d4d65f8f4d6ce01c7bb2e06f644",
+    "mtime": 1788285251.368505,
+    "ast_hash": "d7b8aef2025f90e108a3b363a72e460c",
     "semantic_hash": ""
   },
   "lib/utils/compra-gastos-import.ts": {
@@ -4375,8 +4375,8 @@
     "semantic_hash": ""
   },
   "docs/GASTOS_COMPRA_FORNECEDORES.md": {
-    "mtime": 1788282170.7683654,
-    "ast_hash": "62117fedbeb2e72d699ce3af2885d6af",
+    "mtime": 1788285261.7647333,
+    "ast_hash": "38ee2549513df7c83f94d4bcafd4398c",
     "semantic_hash": ""
   }
 }
