@@ -7,6 +7,10 @@ import {
   listComprasTransito,
 } from "@/lib/utils/compra-transito-store";
 import { fillMissingBarcodes } from "@/lib/server/compra-transito-barcodes";
+import {
+  sincronizarGastoDaCompraTransito,
+  type GastoSyncResultado,
+} from "@/lib/server/compra-transito-gasto";
 import { applyAutoRecebimento } from "@/lib/server/compra-transito-recebimento";
 
 function formatDefaultTitle() {
@@ -46,7 +50,7 @@ export async function POST(request: Request) {
   try {
     const createdByName = request.headers.get("x-auth-username") ?? undefined;
     const body = await request.json();
-    const { companyKey, title, items, draft, compraSalvaId } = body ?? {};
+    const { companyKey, title, items, draft, compraSalvaId, pagamento } = body ?? {};
 
     if (!companyKey) {
       return NextResponse.json({ error: "companyKey é obrigatório" }, { status: 400 });
@@ -117,9 +121,19 @@ export async function POST(request: Request) {
       // Vínculo com a Compra Salva de origem: é por ele que Gastos de Compra acha
       // a previsão de chegada desta compra ao importar a Compra Salva.
       compraSalvaId: compraSalvaId ? String(compraSalvaId) : null,
+      // Forma de pagamento configurada na tela: é ela que faz a confirmação já
+      // nascer lançada em Gastos de Compra.
+      pagamento: pagamento ?? null,
     });
 
-    return NextResponse.json({ data: created });
+    // Confirmar a compra é o que a torna real: já lança em Gastos de Compra.
+    // Falhar aqui NÃO desfaz a confirmação (o trânsito é quem manda no estoque),
+    // mas o resultado volta para a tela avisar — nada some em silêncio.
+    const gasto: GastoSyncResultado | null = draft
+      ? null
+      : await sincronizarGastoDaCompraTransito(created, createdByName);
+
+    return NextResponse.json({ data: created, gasto });
   } catch (error) {
     console.error("Erro ao criar compra em trânsito", error);
     return NextResponse.json(

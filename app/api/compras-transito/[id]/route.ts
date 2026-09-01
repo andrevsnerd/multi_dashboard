@@ -7,6 +7,10 @@ import {
   updateCompraTransito,
 } from "@/lib/utils/compra-transito-store";
 import { fillMissingBarcodes } from "@/lib/server/compra-transito-barcodes";
+import {
+  sincronizarGastoDaCompraTransito,
+  type GastoSyncResultado,
+} from "@/lib/server/compra-transito-gasto";
 import { applyAutoRecebimento } from "@/lib/server/compra-transito-recebimento";
 
 export async function GET(
@@ -47,7 +51,7 @@ export async function PUT(
     const { id } = await params;
     const createdByName = request.headers.get("x-auth-username") ?? undefined;
     const body = await request.json();
-    const { companyKey, title, items, draft } = body ?? {};
+    const { companyKey, title, items, draft, pagamento } = body ?? {};
 
     if (!companyKey) {
       return NextResponse.json({ error: "companyKey é obrigatório" }, { status: 400 });
@@ -90,12 +94,21 @@ export async function PUT(
       forceStatus: draft ? "rascunho" : undefined,
       reconfirm: !draft,
       createdByName,
+      // Ausente = mantém o pagamento já gravado (a tela sempre manda o dela).
+      pagamento: pagamento === undefined ? undefined : pagamento ?? null,
     });
 
     if (!updated) {
       return NextResponse.json({ error: "Compra em trânsito não encontrada" }, { status: 404 });
     }
-    return NextResponse.json({ data: updated });
+
+    // Reconfirmação sincroniza o lote de Gastos de Compra (itens e valor podem
+    // ter mudado) em vez de criar um segundo com o mesmo dinheiro.
+    const gasto: GastoSyncResultado | null = draft
+      ? null
+      : await sincronizarGastoDaCompraTransito(updated, createdByName);
+
+    return NextResponse.json({ data: updated, gasto });
   } catch (error) {
     console.error("Erro ao atualizar compra em trânsito", error);
     return NextResponse.json({ error: "Erro ao atualizar compra em trânsito" }, { status: 500 });

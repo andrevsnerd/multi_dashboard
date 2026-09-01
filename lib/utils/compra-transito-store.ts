@@ -7,8 +7,10 @@ import type {
   CompraTransito,
   CompraTransitoItemRow,
   CompraTransitoListEntry,
+  CompraTransitoPagamento,
   CompraTransitoStatus,
 } from "@/lib/types/compra-transito";
+import { normalizePagamento } from "@/lib/utils/compra-transito-pagamento";
 import {
   getCompraTransitoItemStatus,
   getCompraTransitoStatusFromItems,
@@ -23,6 +25,7 @@ export type {
 const FILE_PATH = path.join(process.cwd(), "data", "compras-transito.json");
 
 let tableChecked = false;
+let ensurePromise: Promise<void> | null = null;
 
 async function ensureDataFile() {
   const dir = path.join(process.cwd(), "data");
@@ -39,10 +42,44 @@ async function ensureDataFile() {
   }
 }
 
-async function ensureTable() {
+/**
+ * `CREATE TABLE IF NOT EXISTS` NAO e atomico contra criacao concorrente: dois
+ * pedidos simultaneos disparam o DDL ao mesmo tempo e um morre com unique
+ * violation em `pg_type` (23505) ou "relation already exists" (42P07). Nos dois
+ * casos o objeto passou a existir — e sucesso, nao erro.
+ */
+function objetoJaExiste(erro: unknown): boolean {
+  const code = (erro as { code?: string } | null)?.code;
+  return code === "23505" || code === "42P07" || code === "42710";
+}
+
+async function ddl(exec: () => Promise<unknown>): Promise<void> {
+  try {
+    await exec();
+  } catch (erro) {
+    if (!objetoJaExiste(erro)) throw erro;
+  }
+}
+
+/** Migracao preguicosa, memoizada: chamadas concorrentes esperam a MESMA execucao. */
+async function ensureTable(): Promise<void> {
   if (tableChecked) return;
+  if (!ensurePromise) {
+    ensurePromise = runMigrations()
+      .then(() => {
+        tableChecked = true;
+      })
+      .catch((erro) => {
+        ensurePromise = null;
+        throw erro;
+      });
+  }
+  return ensurePromise;
+}
+
+async function runMigrations(): Promise<void> {
   const sql = getNeonSql();
-  await sql`
+  await ddl(() => sql`
     CREATE TABLE IF NOT EXISTS compras_transito (
       id TEXT PRIMARY KEY,
       company_key TEXT NOT NULL,
@@ -54,10 +91,12 @@ async function ensureTable() {
       confirmed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       created_by TEXT
     )
-  `;
-  await sql`ALTER TABLE compras_transito ADD COLUMN IF NOT EXISTS created_by TEXT`;
-  await sql`ALTER TABLE compras_transito ADD COLUMN IF NOT EXISTS compra_salva_id TEXT`;
-  tableChecked = true;
+  `);
+  await ddl(() => sql`ALTER TABLE compras_transito ADD COLUMN IF NOT EXISTS created_by TEXT`);
+  await ddl(() => sql`ALTER TABLE compras_transito ADD COLUMN IF NOT EXISTS compra_salva_id TEXT`);
+  // Forma de pagamento configurada na propria compra: e o que faz a confirmacao
+  // ja nascer lancada em Gastos de Compra.
+  await ddl(() => sql`ALTER TABLE compras_transito ADD COLUMN IF NOT EXISTS pagamento JSONB`);
 }
 
 function normalizeDate(value?: string | null): string {
@@ -105,6 +144,7 @@ function rowToCompraTransito(row: {
   confirmed_at: Date | string;
   created_by?: string | null;
   compra_salva_id?: string | null;
+  pagamento?: unknown;
 }): CompraTransito {
   const items = Array.isArray(row.items)
     ? (row.items as CompraTransitoItemRow[]).map(normalizeItem)
@@ -121,6 +161,7 @@ function rowToCompraTransito(row: {
     updatedAt: new Date(row.updated_at).toISOString(),
     confirmedAt: new Date(row.confirmed_at).toISOString(),
     createdByName: row.created_by ?? undefined,
+    pagamento: normalizePagamento(row.pagamento),
   };
 }
 
@@ -169,6 +210,7 @@ function toListEntry(compra: CompraTransito): CompraTransitoListEntry {
     updatedAt: compra.updatedAt,
     confirmedAt: compra.confirmedAt,
     createdByName: compra.createdByName,
+    pagamento: compra.pagamento ?? null,
   };
 }
 
@@ -177,7 +219,7 @@ export async function listComprasTransitoFull(companyKey: string): Promise<Compr
     await ensureTable();
     const sql = getNeonSql();
     const rows = await sql`
-      SELECT id, company_key, title, status, items, created_at, updated_at, confirmed_at, created_by, compra_salva_id
+      SELECT id, company_key, title, status, items, created_at, updated_at, confirmed_at, created_by, compra_salva_id, pagamento
       FROM compras_transito
       WHERE company_key = ${companyKey}
       ORDER BY confirmed_at DESC
@@ -194,6 +236,7 @@ export async function listComprasTransitoFull(companyKey: string): Promise<Compr
         ...item,
         status: getCompraTransitoStatusFromItems(normalizedItems),
         items: normalizedItems,
+        pagamento: normalizePagamento(item.pagamento),
       };
     })
     .sort(
@@ -214,7 +257,7 @@ export async function getCompraTransito(
     await ensureTable();
     const sql = getNeonSql();
     const rows = await sql`
-      SELECT id, company_key, title, status, items, created_at, updated_at, confirmed_at, created_by, compra_salva_id
+      SELECT id, company_key, title, status, items, created_at, updated_at, confirmed_at, created_by, compra_salva_id, pagamento
       FROM compras_transito
       WHERE id = ${id} AND company_key = ${companyKey}
       LIMIT 1
@@ -230,6 +273,7 @@ export async function getCompraTransito(
         ...found,
         status: getCompraTransitoStatusFromItems(found.items ?? []),
         items: (found.items ?? []).map(normalizeItem),
+        pagamento: normalizePagamento(found.pagamento),
       }
     : null;
 }
@@ -242,6 +286,8 @@ export async function createCompraTransito(input: {
   createdByName?: string;
   /** Compra Salva de origem, quando a compra nasceu do "Exportar para trânsito". */
   compraSalvaId?: string | null;
+  /** Forma de pagamento (parcelamento, tipo, fornecedor) da compra. */
+  pagamento?: CompraTransitoPagamento | null;
 }): Promise<CompraTransito> {
   const id = randomUUID();
   const now = new Date().toISOString();
@@ -256,6 +302,7 @@ export async function createCompraTransito(input: {
     updatedAt: now,
     confirmedAt: now,
     createdByName: input.createdByName || undefined,
+    pagamento: normalizePagamento(input.pagamento),
   };
 
   if (hasPostgres()) {
@@ -263,7 +310,7 @@ export async function createCompraTransito(input: {
     const sql = getNeonSql();
     await sql`
       INSERT INTO compras_transito (
-        id, company_key, title, status, items, created_at, updated_at, confirmed_at, created_by, compra_salva_id
+        id, company_key, title, status, items, created_at, updated_at, confirmed_at, created_by, compra_salva_id, pagamento
       ) VALUES (
         ${row.id},
         ${row.companyKey},
@@ -274,7 +321,8 @@ export async function createCompraTransito(input: {
         ${row.updatedAt},
         ${row.confirmedAt},
         ${row.createdByName ?? null},
-        ${row.compraSalvaId ?? null}
+        ${row.compraSalvaId ?? null},
+        ${row.pagamento ? JSON.stringify(row.pagamento) : null}::jsonb
       )
     `;
     return row;
@@ -289,7 +337,15 @@ export async function createCompraTransito(input: {
 export async function updateCompraTransito(
   companyKey: string,
   id: string,
-  input: { title?: string; items?: CompraTransitoItemRow[]; forceStatus?: CompraTransitoStatus; reconfirm?: boolean; createdByName?: string }
+  input: {
+    title?: string;
+    items?: CompraTransitoItemRow[];
+    forceStatus?: CompraTransitoStatus;
+    reconfirm?: boolean;
+    createdByName?: string;
+    /** `undefined` mantém o pagamento gravado; `null` apaga a configuração. */
+    pagamento?: CompraTransitoPagamento | null;
+  }
 ): Promise<CompraTransito | null> {
   const now = new Date().toISOString();
 
@@ -303,6 +359,8 @@ export async function updateCompraTransito(
     const newStatus = input.forceStatus ?? getCompraTransitoStatusFromItems(normalizedItems);
     const newConfirmedAt = input.reconfirm ? now : existing.confirmedAt;
     const newCreatedBy = existing.createdByName ?? input.createdByName ?? null;
+    const newPagamento =
+      input.pagamento !== undefined ? normalizePagamento(input.pagamento) : existing.pagamento ?? null;
     await sql`
       UPDATE compras_transito
       SET title = ${newTitle},
@@ -310,10 +368,11 @@ export async function updateCompraTransito(
           status = ${newStatus},
           updated_at = ${now},
           confirmed_at = ${newConfirmedAt},
-          created_by = ${newCreatedBy}
+          created_by = ${newCreatedBy},
+          pagamento = ${newPagamento ? JSON.stringify(newPagamento) : null}::jsonb
       WHERE id = ${id} AND company_key = ${companyKey}
     `;
-    return { ...existing, title: newTitle, items: normalizedItems, status: newStatus, updatedAt: now, confirmedAt: newConfirmedAt, createdByName: newCreatedBy ?? undefined };
+    return { ...existing, title: newTitle, items: normalizedItems, status: newStatus, updatedAt: now, confirmedAt: newConfirmedAt, createdByName: newCreatedBy ?? undefined, pagamento: newPagamento };
   }
 
   const all = await readFileAll();
@@ -325,7 +384,9 @@ export async function updateCompraTransito(
   const newStatus = input.forceStatus ?? getCompraTransitoStatusFromItems(normalizedItems);
   const newConfirmedAt = input.reconfirm ? now : existing.confirmedAt;
   const newCreatedBy = existing.createdByName ?? input.createdByName;
-  const updated: CompraTransito = { ...existing, title: newTitle, items: normalizedItems, status: newStatus, updatedAt: now, confirmedAt: newConfirmedAt, createdByName: newCreatedBy };
+  const newPagamento =
+    input.pagamento !== undefined ? normalizePagamento(input.pagamento) : existing.pagamento ?? null;
+  const updated: CompraTransito = { ...existing, title: newTitle, items: normalizedItems, status: newStatus, updatedAt: now, confirmedAt: newConfirmedAt, createdByName: newCreatedBy, pagamento: newPagamento };
   all[idx] = updated;
   await writeFileAll(all);
   return updated;

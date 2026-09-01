@@ -470,9 +470,9 @@
     "semantic_hash": "302ff0f89fa8c812985a9e8830559be4"
   },
   "app/api/compras-transito/[id]/route.ts": {
-    "mtime": 1788264818.1222873,
-    "ast_hash": "acc7cd78223a03fdfb22f49258b4dbcc",
-    "semantic_hash": ""
+    "mtime": 1782496253.750637,
+    "ast_hash": "41208d3879346c391d1a3defc54a94bf",
+    "semantic_hash": "41208d3879346c391d1a3defc54a94bf"
   },
   "app/api/compras-transito/backfill-barcodes/route.ts": {
     "mtime": 1782495408.1037233,
@@ -485,8 +485,8 @@
     "semantic_hash": "d49f2273e7d8c35208a05b59ff588a00"
   },
   "app/api/compras-transito/route.ts": {
-    "mtime": 1788264818.1163743,
-    "ast_hash": "35dfebb6c3115be50df16843867a3773",
+    "mtime": 1787837454.517049,
+    "ast_hash": "424f9ce344ebb2a40187f435acecc380",
     "semantic_hash": ""
   },
   "app/api/controle-estoque/compra-data-fixa/route.ts": {
@@ -1445,8 +1445,8 @@
     "semantic_hash": "112092fcd4095eef665d855cde38d203"
   },
   "components/lista-loja/ComprasTransitoPage.tsx": {
-    "mtime": 1788264974.2970583,
-    "ast_hash": "6bf6d894fb3eef306eda8cfd5f4c561e",
+    "mtime": 1783539151.5372016,
+    "ast_hash": "0a40bb5d9c0c7459b8e1ac1b07975135",
     "semantic_hash": ""
   },
   "components/lista-loja/ComprasTransitoPickerModal.tsx": {
@@ -1590,8 +1590,8 @@
     "semantic_hash": "7100ad93329f4cae6f0cf2636fa8a06f"
   },
   "components/relatorios/GeradorRelatoriosPage.tsx": {
-    "mtime": 1788185563.0453906,
-    "ast_hash": "eee819b214e1cdff84e7db99b043b767",
+    "mtime": 1787844585.217946,
+    "ast_hash": "46f4747f8cdd1ae1cbce8b5111135bb2",
     "semantic_hash": ""
   },
   "components/romaneios/RomaneioDeleteModal.tsx": {
@@ -2360,8 +2360,8 @@
     "semantic_hash": ""
   },
   "lib/reports/registry.ts": {
-    "mtime": 1788185563.0453906,
-    "ast_hash": "ecc9fee9d0755619dca5297ab2acfa4d",
+    "mtime": 1787842233.3466256,
+    "ast_hash": "5adc6c32d2496f99a46ab9cf2dd48ab5",
     "semantic_hash": ""
   },
   "lib/reports/types.ts": {
@@ -2650,8 +2650,8 @@
     "semantic_hash": "81d1d82896e1c079861572ceb253feb5"
   },
   "lib/types/compra-transito.ts": {
-    "mtime": 1788264675.5397868,
-    "ast_hash": "ab14b2887756a49f1af2c06f0c6c26d1",
+    "mtime": 1788184676.7750857,
+    "ast_hash": "b7b5780d3ce56f273054e91890e23889",
     "semantic_hash": ""
   },
   "lib/types/report-preset.ts": {
@@ -2715,8 +2715,8 @@
     "semantic_hash": "3435db708a6771659868eb96b21c0cde"
   },
   "lib/utils/compra-transito-store.ts": {
-    "mtime": 1788264754.2909975,
-    "ast_hash": "ef58a8c38028f301ed9c89ba624533fc",
+    "mtime": 1788184676.756601,
+    "ast_hash": "413be3f8906ed622b5e55f25c38f4d1c",
     "semantic_hash": ""
   },
   "lib/utils/controle-estoque-metricas.ts": {
@@ -4270,8 +4270,8 @@
     "semantic_hash": ""
   },
   "lib/utils/compra-gastos-store.ts": {
-    "mtime": 1788264768.9641204,
-    "ast_hash": "611b0d17b0ca727b886d45bed5cb7058",
+    "mtime": 1788184411.6708822,
+    "ast_hash": "5eeba6347c62297ac0d191670ae298dd",
     "semantic_hash": ""
   },
   "lib/utils/exportGastosCompraXlsx.ts": {
@@ -4337,41 +4337,6 @@
   "lib/repositories/produtoCodigos.ts": {
     "mtime": 1787844730.9815056,
     "ast_hash": "707d0784fb7f21f9c8843621b6d32246",
-    "semantic_hash": ""
-  },
-  "app/api/relatorios/custos-defeitos/route.ts": {
-    "mtime": 1788185563.041312,
-    "ast_hash": "3e0d81fe9b82c5392ffcec7971e785a5",
-    "semantic_hash": ""
-  },
-  "lib/reports/custos-defeitos.ts": {
-    "mtime": 1788185563.0453906,
-    "ast_hash": "2746de6038559c83ba1211773b117a3b",
-    "semantic_hash": ""
-  },
-  "lib/repositories/reportCustosDefeitos.ts": {
-    "mtime": 1788185563.048862,
-    "ast_hash": "ba324c74f2f43a3d0e5a94207d26b255",
-    "semantic_hash": ""
-  },
-  "lib/server/compra-transito-gasto.ts": {
-    "mtime": 1788264798.985681,
-    "ast_hash": "da9731ff53b1d5c49d8d6f9b4c58200e",
-    "semantic_hash": ""
-  },
-  "lib/utils/compra-transito-pagamento.ts": {
-    "mtime": 1788264706.7299125,
-    "ast_hash": "c76c73e7ff6e60442573d7b6cb4fcce2",
-    "semantic_hash": ""
-  },
-  "lib/utils/exportCustosDefeitosXlsx.ts": {
-    "mtime": 1788185563.048862,
-    "ast_hash": "c1e378cf08ccf650c396d8659c82c3b0",
-    "semantic_hash": ""
-  },
-  "docs/INVESTIGACAO_B1.10.0023_FONE_TWS_VOLT.md": {
-    "mtime": 1788202737.2767615,
-    "ast_hash": "ddc464acc4060af05bc67808f55df8b0",
     "semantic_hash": ""
   }
 }

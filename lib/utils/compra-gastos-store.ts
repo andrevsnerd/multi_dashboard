@@ -247,23 +247,45 @@ export async function existeLoteDaCompraTransito(
   companyKey: string,
   compraTransitoId: string
 ): Promise<boolean> {
-  if (!compraTransitoId) return false;
+  return (await getLoteDaCompraTransito(companyKey, compraTransitoId)) !== null;
+}
+
+/**
+ * A compra do painel que nasceu desta Compra em trânsito, se existir.
+ *
+ * A confirmação do trânsito usa isto para SINCRONIZAR em vez de duplicar:
+ * reconfirmar uma compra (itens ou custo mudaram) tem de corrigir o lote que já
+ * existe, não criar um segundo com o mesmo dinheiro.
+ */
+export async function getLoteDaCompraTransito(
+  companyKey: string,
+  compraTransitoId: string
+): Promise<CompraGastoLote | null> {
+  if (!compraTransitoId) return null;
 
   if (hasPostgres()) {
     await ensureTable();
     const sql = getNeonSql();
     const rows = await sql`
-      SELECT 1
+      SELECT
+        id, company_key, codigo, titulo, colecao, fornecedor, tipo, origem,
+        compra_transito_id, compra_salva_id,
+        data_compra, chegada_ini, chegada_real, estimado, valor_unico,
+        observacao, itens, parcelas, criado_por, created_at, updated_at
       FROM compra_gastos_lotes
       WHERE company_key = ${companyKey} AND compra_transito_id = ${compraTransitoId}
+      ORDER BY created_at ASC
       LIMIT 1
     `;
-    return rows.length > 0;
+    const row = rows[0] as Record<string, unknown> | undefined;
+    return row ? rowToLote(row) : null;
   }
 
   const all = await readFileAll();
-  return all.lotes.some(
-    (l) => l.companyKey === companyKey && l.compraTransitoId === compraTransitoId
+  return (
+    all.lotes.find(
+      (l) => l.companyKey === companyKey && l.compraTransitoId === compraTransitoId
+    ) ?? null
   );
 }
 

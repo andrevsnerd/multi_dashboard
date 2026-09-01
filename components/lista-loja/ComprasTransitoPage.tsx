@@ -5,21 +5,65 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 
 import type { CompanyKey } from "@/lib/config/company";
+import {
+  COMPRA_GASTO_CANAL_CURTO,
+  COMPRA_GASTO_TIPO_LABEL,
+  type CompraGastoParcela,
+  type CompraGastoTipo,
+} from "@/lib/types/compra-gasto";
 import type {
   CompraTransito,
   CompraTransitoItemRow,
   CompraTransitoListEntry,
+  CompraTransitoPagamento,
   CompraTransitoStatus,
   CompraTransitoItemReconciliacao,
   CompraTransitoReconciliacaoResposta,
   CompraTransitoStatusReal,
 } from "@/lib/types/compra-transito";
+import { cents } from "@/lib/utils/compra-gastos-agregacao";
+import {
+  PAGAMENTO_PADRAO,
+  parcelasDoPagamento,
+  planoDeParcelas,
+} from "@/lib/utils/compra-transito-pagamento";
 import { getCompraTransitoItemStatus } from "@/lib/utils/compra-transito-status";
 import { useAuth } from "@/components/auth/AuthContext";
-import { canSeeCusto } from "@/lib/auth/permissions";
+import { canSeeCusto, userHasPagePermission } from "@/lib/auth/permissions";
+import ParcelasEditor from "@/components/compras/ParcelasEditor";
+import {
+  brl as brlGasto,
+  dataBrasiliaDeIso,
+  dataBrCompleta,
+  hojeIso,
+} from "@/components/compras/gastos-compra-format";
 
 import ComprasTransitoPickerModal from "./ComprasTransitoPickerModal";
 import styles from "./ComprasTransitoPage.module.css";
+
+/** Resultado do lançamento automático em Gastos de Compra, devolvido pela API. */
+type GastoSyncResposta = {
+  status: "criado" | "atualizado" | "ignorado" | "preservado" | "erro";
+  loteId?: string;
+  mensagem: string;
+};
+
+const TIPOS_GASTO: CompraGastoTipo[] = [
+  "mercadoria",
+  "frete",
+  "adiantamento",
+  "material",
+  "outros",
+];
+
+/**
+ * Hoje em Brasília (YYYY-MM-DD) — a data que a compra terá em Gastos de Compra.
+ *
+ * O servidor deriva a data da compra de `confirmedAt` em UTC-3; calcular pelo
+ * fuso do navegador faria a tela ancorar o parcelamento num dia e o lançamento
+ * cair em outro para quem confirma de madrugada.
+ */
+const hojeBrasilia = hojeIso;
 
 type ViewMode = "list" | "editor" | "detail";
 
@@ -336,6 +380,10 @@ export default function ComprasTransitoPage({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [bulkDate, setBulkDate] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
+  // Forma de pagamento da compra: é ela que faz a confirmação já nascer lançada
+  // em Gastos de Compra, sem redigitar nada lá.
+  const [pagamento, setPagamento] = useState<CompraTransitoPagamento>(PAGAMENTO_PADRAO);
+  const [parcelas, setParcelas] = useState<CompraGastoParcela[]>([]);
   const [recon, setRecon] = useState<Record<string, CompraTransitoItemReconciliacao> | null>(null);
   const [reconResumo, setReconResumo] = useState<
     CompraTransitoReconciliacaoResposta["resumo"] | null
@@ -395,6 +443,66 @@ export default function ComprasTransitoPage({
     }, 0);
     return { totalItens, totalQuantidade, totalValor };
   }, [draftItems]);
+
+  /**
+   * Quem pode configurar o pagamento: a mesma porta do painel de Gastos de
+   * Compra (admin/diretor/logística — gerente e supervisor nunca veem custo), e
+   * só nas empresas que têm o painel.
+   */
+  const podeLancarGasto =
+    userHasPagePermission(user, "gastos-compra") &&
+    (companyKey === "nerd" || companyKey === "scarfme");
+
+  /** Data que a compra terá no painel: o dia da confirmação, que é hoje. */
+  const dataCompraPrevista = useMemo(() => hojeBrasilia(), []);
+
+  const pagamentoRef = useRef(pagamento);
+  useEffect(() => {
+    pagamentoRef.current = pagamento;
+  }, [pagamento]);
+
+  /**
+   * O parcelamento acompanha o valor da compra: adicionar produto não pode
+   * deixar as parcelas sem fechar. Reescala pelas PROPORÇÕES atuais (que é o
+   * que será gravado), preservando datas e canais — e sem depender das próprias
+   * parcelas, senão editar uma linha reentraria aqui em laço.
+   */
+  useEffect(() => {
+    const total = totals.totalValor;
+    setParcelas((anteriores) => {
+      if (total <= 0) return [];
+      if (anteriores.length === 0) {
+        return parcelasDoPagamento(total, dataCompraPrevista, pagamentoRef.current);
+      }
+      const base = cents(anteriores.reduce((soma, p) => soma + (Number(p.valor) || 0), 0));
+      const plano = planoDeParcelas(anteriores, dataCompraPrevista, base);
+      return parcelasDoPagamento(total, dataCompraPrevista, {
+        ...pagamentoRef.current,
+        plano,
+      });
+    });
+  }, [totals.totalValor, dataCompraPrevista]);
+
+  /**
+   * O pagamento da compra aberta no detalhe, já como parcelas de verdade:
+   * o plano (dias/%) reancorado na data em que ela foi confirmada e no valor
+   * dos itens. É a leitura do que foi (ou será) lançado em Gastos de Compra.
+   */
+  const pagamentoDoDetalhe = useMemo(() => {
+    const compra = selectedCompra;
+    if (!compra?.pagamento || compra.pagamento.lancar === false) return null;
+    const total = compra.items.reduce((soma, item) => {
+      const custo = Number(item.custoUnitario ?? 0);
+      return custo > 0 ? soma + Math.round((item.quantidade ?? 0) * custo) : soma;
+    }, 0);
+    const dataCompra = dataBrasiliaDeIso(compra.confirmedAt);
+    return {
+      config: compra.pagamento,
+      dataCompra,
+      total,
+      parcelas: parcelasDoPagamento(total, dataCompra, compra.pagamento),
+    };
+  }, [selectedCompra]);
 
   const statusCounts = useMemo(() => {
     let emTransito = 0;
@@ -468,6 +576,8 @@ export default function ComprasTransitoPage({
     setEditingId(null);
     setBulkDate("");
     setSelectedCompra(null);
+    setPagamento(PAGAMENTO_PADRAO);
+    setParcelas([]);
     setView("editor");
   }, []);
 
@@ -488,6 +598,15 @@ export default function ComprasTransitoPage({
     setDraftTitle(compra.title);
     setEditingId(compra.id);
     setBulkDate("");
+    // Reabre a forma de pagamento gravada. O plano é em dias/% sobre a data da
+    // compra, então reancora sozinho na data desta (re)confirmação.
+    const pag = compra.pagamento ?? PAGAMENTO_PADRAO;
+    const total = compra.items.reduce((soma, item) => {
+      const custo = Number(item.custoUnitario ?? 0);
+      return custo > 0 ? soma + Math.round((item.quantidade ?? 0) * custo) : soma;
+    }, 0);
+    setPagamento(pag);
+    setParcelas(total > 0 ? parcelasDoPagamento(total, hojeBrasilia(), pag) : []);
     setView("editor");
   }, []);
 
@@ -621,54 +740,76 @@ export default function ComprasTransitoPage({
           "Content-Type": "application/json",
           ...(displayName ? { "x-auth-username": displayName } : {}),
         };
+        // O que é gravado é o PLANO (dias + % sobre a data da compra), não as
+        // datas e valores da tela: quem define a data e o valor final é a
+        // confirmação, que pode acontecer depois — e aí o plano reancora sozinho.
+        const pagamentoParaSalvar: CompraTransitoPagamento | null = podeLancarGasto
+          ? {
+              ...pagamento,
+              plano: planoDeParcelas(parcelas, dataCompraPrevista, totals.totalValor),
+            }
+          : null;
+
+        const payload = {
+          companyKey,
+          title: draftTitle.trim() || undefined,
+          items: draftItems,
+          draft: isDraft,
+          // Sem permissão para o painel, a tela não manda pagamento: `undefined`
+          // preserva o que já estava gravado em vez de apagá-lo.
+          ...(pagamentoParaSalvar ? { pagamento: pagamentoParaSalvar } : {}),
+        };
+
         let res: Response;
         if (editingId) {
           res = await fetch(`/api/compras-transito/${editingId}`, {
             method: "PUT",
             headers: authHeaders,
-            body: JSON.stringify({
-              companyKey,
-              title: draftTitle.trim() || undefined,
-              items: draftItems,
-              draft: isDraft,
-            }),
+            body: JSON.stringify(payload),
           });
         } else {
           res = await fetch("/api/compras-transito", {
             method: "POST",
             headers: authHeaders,
-            body: JSON.stringify({
-              companyKey,
-              title: draftTitle.trim() || undefined,
-              items: draftItems,
-              draft: isDraft,
-            }),
+            body: JSON.stringify(payload),
           });
         }
-        const json = (await res.json()) as { data?: CompraTransito; error?: string };
+        const json = (await res.json()) as {
+          data?: CompraTransito;
+          gasto?: GastoSyncResposta | null;
+          error?: string;
+        };
         if (!res.ok || !json.data) {
           throw new Error(json.error ?? "Erro ao salvar compra");
         }
         const savedId = json.data.id;
         const wasEditing = !!editingId;
+        const gasto = json.gasto ?? null;
         setDraftItems([]);
         setDraftTitle("");
         setEditingId(null);
         setBulkDate("");
         setModalOpen(false);
+        setPagamento(PAGAMENTO_PADRAO);
+        setParcelas([]);
         await loadCompras();
         if (!isDraft && wasEditing) {
           await openDetail(savedId);
         } else {
           setView("list");
         }
+        const base = isDraft
+          ? "Rascunho salvo. Você pode editar as datas depois."
+          : wasEditing
+          ? "Compra atualizada e reconfirmada."
+          : "Compra confirmada e marcada como em trânsito.";
+        // O lançamento em Gastos de Compra nunca é silencioso: deu certo, foi
+        // ignorado ou falhou, a tela diz qual dos três.
+        const detalhe =
+          gasto && gasto.status !== "ignorado" ? ` ${gasto.mensagem}` : "";
         setToast({
-          tipo: "success",
-          mensagem: isDraft
-            ? "Rascunho salvo. Você pode editar as datas depois."
-            : wasEditing
-            ? "Compra atualizada e reconfirmada."
-            : "Compra confirmada e marcada como em trânsito.",
+          tipo: gasto?.status === "erro" ? "error" : "success",
+          mensagem: `${base}${detalhe}`,
         });
       } catch (err) {
         setToast({
@@ -679,7 +820,23 @@ export default function ComprasTransitoPage({
         setSaving(false);
       }
     },
-    [canConfirm, canSaveDraft, companyKey, draftItems, draftTitle, editingId, loadCompras, openDetail, saving, user]
+    [
+      canConfirm,
+      canSaveDraft,
+      companyKey,
+      dataCompraPrevista,
+      draftItems,
+      draftTitle,
+      editingId,
+      loadCompras,
+      openDetail,
+      pagamento,
+      parcelas,
+      podeLancarGasto,
+      saving,
+      totals.totalValor,
+      user,
+    ]
   );
 
   const cancelCompra = useCallback(async () => {
@@ -1294,6 +1451,111 @@ export default function ComprasTransitoPage({
                   Para confirmar, cada item precisa de quantidade maior que zero (a data é automática). Itens com data fixada manualmente precisam ter a data preenchida — ou limpe para voltar ao automático.
                 </div>
               )}
+
+              {podeLancarGasto && (
+                <section className={styles.pagamentoBox}>
+                  <header className={styles.pagamentoHead}>
+                    <div>
+                      <h2 className={styles.pagamentoTitle}>Pagamento</h2>
+                      <p className={styles.pagamentoSub}>
+                        Ao confirmar, esta compra entra automaticamente em{" "}
+                        <strong>Gastos de Compra</strong> com o parcelamento definido aqui. O plano
+                        é gravado em dias e percentual sobre a data da compra — então vale mesmo se
+                        a confirmação acontecer daqui a uma semana, e o valor acompanha o total real
+                        dos itens.
+                      </p>
+                    </div>
+                    <label className={styles.pagamentoToggle}>
+                      <input
+                        type="checkbox"
+                        checked={pagamento.lancar}
+                        onChange={(e) =>
+                          setPagamento((prev) => ({ ...prev, lancar: e.target.checked }))
+                        }
+                      />
+                      <span>Lançar em Gastos de Compra</span>
+                    </label>
+                  </header>
+
+                  {!pagamento.lancar ? (
+                    <p className={styles.helperText}>
+                      Confirmar não vai criar compra em Gastos de Compra. Dá para lançar depois, à
+                      mão, pelo painel.
+                    </p>
+                  ) : (
+                    <>
+                      <div className={styles.pagamentoGrid}>
+                        <label className={styles.pagamentoField}>
+                          <span>Fornecedor</span>
+                          <input
+                            type="text"
+                            className={styles.input}
+                            placeholder="ex: Alibaba, Salete, Consuelo"
+                            value={pagamento.fornecedor ?? ""}
+                            onChange={(e) =>
+                              setPagamento((prev) => ({ ...prev, fornecedor: e.target.value }))
+                            }
+                          />
+                        </label>
+                        <label className={styles.pagamentoField}>
+                          <span>Tipo de gasto</span>
+                          <select
+                            className={styles.input}
+                            value={pagamento.tipo}
+                            onChange={(e) =>
+                              setPagamento((prev) => ({
+                                ...prev,
+                                tipo: e.target.value as CompraGastoTipo,
+                              }))
+                            }
+                          >
+                            {TIPOS_GASTO.map((t) => (
+                              <option key={t} value={t}>
+                                {COMPRA_GASTO_TIPO_LABEL[t]}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className={styles.pagamentoField}>
+                          <span>Observação</span>
+                          <input
+                            type="text"
+                            className={styles.input}
+                            placeholder="ex: sinal de 30% já dentro das parcelas"
+                            value={pagamento.observacao ?? ""}
+                            onChange={(e) =>
+                              setPagamento((prev) => ({ ...prev, observacao: e.target.value }))
+                            }
+                          />
+                        </label>
+                      </div>
+
+                      {totals.totalValor > 0 ? (
+                        <ParcelasEditor
+                          total={totals.totalValor}
+                          parcelas={parcelas}
+                          onChange={setParcelas}
+                          vencimentoSugerido={dataCompraPrevista}
+                          rodape="Soma das parcelas (valor exato confirmado ao lançar)"
+                        />
+                      ) : (
+                        <p className={styles.helperText}>
+                          Os itens ainda não têm custo: sem valor não há parcelamento a definir. A
+                          compra será lançada em Gastos de Compra como estimativa, à vista.
+                        </p>
+                      )}
+
+                      <p className={styles.helperText}>
+                        Em <strong>Tipo</strong>, dentro do parcelamento, você aplica um modelo
+                        pronto: <strong>Salete</strong> (2x, 90 e 120 dias) ou <strong>China</strong>{" "}
+                        (transferência 40% + Alibaba 60%, cada um 30% no pedido, 50% no despacho e
+                        20% depois). Mexer em qualquer linha volta para manual — o que você digitou
+                        nunca é sobrescrito.
+                      </p>
+                    </>
+                  )}
+                </section>
+              )}
             </>
           )}
         </>
@@ -1431,6 +1693,47 @@ export default function ComprasTransitoPage({
               <div className={styles.detailTitleBox}>
                 <h2 className={styles.detailTitle}>{selectedCompra.title}</h2>
               </div>
+
+              {podeLancarGasto && pagamentoDoDetalhe && (
+                <section className={styles.pagamentoBox}>
+                  <header className={styles.pagamentoHead}>
+                    <div>
+                      <h2 className={styles.pagamentoTitle}>Pagamento</h2>
+                      <p className={styles.pagamentoSub}>
+                        Lançado em <strong>Gastos de Compra</strong> como{" "}
+                        {COMPRA_GASTO_TIPO_LABEL[pagamentoDoDetalhe.config.tipo]}
+                        {pagamentoDoDetalhe.config.fornecedor
+                          ? ` · ${pagamentoDoDetalhe.config.fornecedor}`
+                          : ""}
+                        , compra de {dataBrCompleta(pagamentoDoDetalhe.dataCompra)}.
+                      </p>
+                    </div>
+                    <strong className={styles.summaryValue}>
+                      {brlGasto(pagamentoDoDetalhe.total)}
+                    </strong>
+                  </header>
+                  <ul className={styles.parcelaLista}>
+                    {pagamentoDoDetalhe.parcelas.map((p, i) => (
+                      <li className={styles.parcelaLinha} key={i}>
+                        <span className={styles.parcelaNumero}>{i + 1}</span>
+                        <span>{dataBrCompleta(p.vencimento)}</span>
+                        <span className={styles.parcelaEtapa}>
+                          {p.canal ? COMPRA_GASTO_CANAL_CURTO[p.canal] : ""}
+                          {p.canal && p.etapa ? " · " : ""}
+                          {p.etapa ?? ""}
+                        </span>
+                        <strong>{brlGasto(p.valor)}</strong>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className={styles.helperText}>
+                    Os valores acima são o plano reancorado na data desta compra. O que vale para o
+                    financeiro é o lote em Gastos de Compra — ajustes e baixas de parcela são feitos
+                    por lá.
+                  </p>
+                </section>
+              )}
+
               {renderTableRows(selectedCompra.items, true)}
             </>
           )}

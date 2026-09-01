@@ -1087,3 +1087,111 @@
 :global(:root[data-theme="dark"]) .ghostBtn {
   border-color: var(--b-300);
 }
+
+/* ── Pagamento (o que vira compra em Gastos de Compra) ───────────────────── */
+
+.pagamentoBox {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 20px;
+  background: var(--s-white);
+  border: 1px solid var(--b-300);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.06);
+}
+
+.pagamentoHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.pagamentoTitle {
+  margin: 0 0 4px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--t-900);
+}
+
+.pagamentoSub {
+  margin: 0;
+  max-width: 68ch;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--t-600);
+}
+
+.pagamentoToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--b-300);
+  background: var(--s-50);
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--t-700);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.pagamentoGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.pagamentoField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--t-500);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+/* Parcelamento já lançado, em leitura (detalhe da compra). */
+.parcelaLista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.parcelaLinha {
+  display: grid;
+  grid-template-columns: 28px minmax(90px, auto) 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  color: var(--t-700);
+  background: var(--s-50);
+}
+
+.parcelaNumero {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--b-200);
+  color: var(--t-600);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.parcelaEtapa {
+  color: var(--t-500);
+  font-size: 0.82rem;
+}
