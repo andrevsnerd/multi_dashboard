@@ -1445,8 +1445,8 @@
     "semantic_hash": "112092fcd4095eef665d855cde38d203"
   },
   "components/lista-loja/ComprasTransitoPage.tsx": {
-    "mtime": 1788264974.2970583,
-    "ast_hash": "6bf6d894fb3eef306eda8cfd5f4c561e",
+    "mtime": 1788282144.8236587,
+    "ast_hash": "1eb1901547c9d365c6ef5655fb3f1861",
     "semantic_hash": ""
   },
   "components/lista-loja/ComprasTransitoPickerModal.tsx": {
@@ -4375,8 +4375,8 @@
     "semantic_hash": ""
   },
   "docs/GASTOS_COMPRA_FORNECEDORES.md": {
-    "mtime": 1788281666.122289,
-    "ast_hash": "403afc9916e733c83f78be9f81364a7e",
+    "mtime": 1788282170.7683654,
+    "ast_hash": "62117fedbeb2e72d699ce3af2885d6af",
     "semantic_hash": ""
   }
 }

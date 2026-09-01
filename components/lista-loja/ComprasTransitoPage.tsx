@@ -21,7 +21,12 @@ import type {
   CompraTransitoReconciliacaoResposta,
   CompraTransitoStatusReal,
 } from "@/lib/types/compra-transito";
-import { cents } from "@/lib/utils/compra-gastos-agregacao";
+import {
+  COMPRA_GASTO_FORNECEDORES,
+  cents,
+  ehFornecedorConhecido,
+  modeloDoFornecedor,
+} from "@/lib/utils/compra-gastos-agregacao";
 import {
   PAGAMENTO_PADRAO,
   parcelasDoPagamento,
@@ -47,6 +52,13 @@ type GastoSyncResposta = {
   loteId?: string;
   mensagem: string;
 };
+
+/**
+ * Valor sentinela do select de fornecedor: "Outro (digitar)". Não é fornecedor
+ * nenhum — só liga o campo de texto para nomes fora da lista (os que não têm
+ * calendário de pagamento cadastrado).
+ */
+const OUTRO_FORNECEDOR = "__outro";
 
 const TIPOS_GASTO: CompraGastoTipo[] = [
   "mercadoria",
@@ -383,6 +395,11 @@ export default function ComprasTransitoPage({
   // Forma de pagamento da compra: é ela que faz a confirmação já nascer lançada
   // em Gastos de Compra, sem redigitar nada lá.
   const [pagamento, setPagamento] = useState<CompraTransitoPagamento>(PAGAMENTO_PADRAO);
+  /**
+   * O usuário pediu para digitar um fornecedor fora da lista. Fornecedor já
+   * gravado em texto livre (compra antiga) cai sozinho nesse modo — daí o `||`.
+   */
+  const [fornecedorOutro, setFornecedorOutro] = useState(false);
   const [parcelas, setParcelas] = useState<CompraGastoParcela[]>([]);
   const [recon, setRecon] = useState<Record<string, CompraTransitoItemReconciliacao> | null>(null);
   const [reconResumo, setReconResumo] = useState<
@@ -460,6 +477,10 @@ export default function ComprasTransitoPage({
   useEffect(() => {
     pagamentoRef.current = pagamento;
   }, [pagamento]);
+
+  /** Fornecedor fora da lista (digitado agora ou vindo de compra antiga). */
+  const fornecedorLivre =
+    fornecedorOutro || (!!pagamento.fornecedor && !ehFornecedorConhecido(pagamento.fornecedor));
 
   /**
    * O parcelamento acompanha o valor da compra: adicionar produto não pode
@@ -577,6 +598,7 @@ export default function ComprasTransitoPage({
     setBulkDate("");
     setSelectedCompra(null);
     setPagamento(PAGAMENTO_PADRAO);
+    setFornecedorOutro(false);
     setParcelas([]);
     setView("editor");
   }, []);
@@ -606,6 +628,7 @@ export default function ComprasTransitoPage({
       return custo > 0 ? soma + Math.round((item.quantidade ?? 0) * custo) : soma;
     }, 0);
     setPagamento(pag);
+    setFornecedorOutro(false);
     setParcelas(total > 0 ? parcelasDoPagamento(total, hojeBrasilia(), pag) : []);
     setView("editor");
   }, []);
@@ -1487,15 +1510,41 @@ export default function ComprasTransitoPage({
                       <div className={styles.pagamentoGrid}>
                         <label className={styles.pagamentoField}>
                           <span>Fornecedor</span>
-                          <input
-                            type="text"
+                          <select
                             className={styles.input}
-                            placeholder="ex: Alibaba, Salete, Consuelo"
-                            value={pagamento.fornecedor ?? ""}
-                            onChange={(e) =>
-                              setPagamento((prev) => ({ ...prev, fornecedor: e.target.value }))
-                            }
-                          />
+                            value={fornecedorLivre ? OUTRO_FORNECEDOR : (pagamento.fornecedor ?? "")}
+                            onChange={(e) => {
+                              const escolhido = e.target.value;
+                              if (escolhido === OUTRO_FORNECEDOR) {
+                                setFornecedorOutro(true);
+                                return;
+                              }
+                              setFornecedorOutro(false);
+                              setPagamento((prev) => ({ ...prev, fornecedor: escolhido || null }));
+                            }}
+                          >
+                            <option value="">— sem fornecedor —</option>
+                            {COMPRA_GASTO_FORNECEDORES.map((f) => (
+                              <option key={f.valor} value={f.valor}>
+                                {f.label}
+                              </option>
+                            ))}
+                            <option value={OUTRO_FORNECEDOR}>Outro (digitar)</option>
+                          </select>
+                          {fornecedorLivre && (
+                            <input
+                              type="text"
+                              className={styles.input}
+                              placeholder="ex: Consuelo Annexe"
+                              value={pagamento.fornecedor ?? ""}
+                              onChange={(e) =>
+                                setPagamento((prev) => ({
+                                  ...prev,
+                                  fornecedor: e.target.value || null,
+                                }))
+                              }
+                            />
+                          )}
                         </label>
                         <label className={styles.pagamentoField}>
                           <span>Tipo de gasto</span>
@@ -1536,6 +1585,7 @@ export default function ComprasTransitoPage({
                           parcelas={parcelas}
                           onChange={setParcelas}
                           vencimentoSugerido={dataCompraPrevista}
+                          modelo={modeloDoFornecedor(pagamento.fornecedor)}
                           rodape="Soma das parcelas (valor exato confirmado ao lançar)"
                         />
                       ) : (
@@ -1546,11 +1596,12 @@ export default function ComprasTransitoPage({
                       )}
 
                       <p className={styles.helperText}>
-                        Em <strong>Tipo</strong>, dentro do parcelamento, você aplica um modelo
-                        pronto: <strong>Salete</strong> (2x, 90 e 120 dias) ou <strong>China</strong>{" "}
-                        (transferência 40% + Alibaba 60%, cada um 30% no pedido, 50% no despacho e
-                        20% depois). Mexer em qualquer linha volta para manual — o que você digitou
-                        nunca é sobrescrito.
+                        Escolher o <strong>fornecedor</strong> acima já monta o parcelamento dele:
+                        Salete, Telma e Roseli pagam 2x (90 e 120 dias); os importados (China,
+                        Índia, Nepal) pagam transferência 40% + Alibaba 60%, cada um 30% no pedido,
+                        50% no despacho e 20% depois. Fornecedor digitado à mão (“Outro”) não tem
+                        calendário — o parcelamento fica por sua conta. Mexer em qualquer linha
+                        para de aplicar o modelo: o que você digitou nunca é sobrescrito.
                       </p>
                     </>
                   )}

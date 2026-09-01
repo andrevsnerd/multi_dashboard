@@ -4205,8 +4205,8 @@
     "semantic_hash": ""
   },
   "app/api/compras-gastos/route.ts": {
-    "mtime": 1788184474.0226023,
-    "ast_hash": "0362aa0fd1c0733188a00339438e3c4a",
+    "mtime": 1788279444.739215,
+    "ast_hash": "f1df9fbf78874ae1766828f221652487",
     "semantic_hash": ""
   },
   "app/api/saidas-entradas-produtos/rascunhos/route.ts": {
@@ -4220,8 +4220,8 @@
     "semantic_hash": ""
   },
   "components/compras/GastosCompraDrawer.tsx": {
-    "mtime": 1788184649.6247504,
-    "ast_hash": "2fa6500640387ecaa3f5c826d98316db",
+    "mtime": 1788281530.3815513,
+    "ast_hash": "4b86679ed39543bf689e8367fa2e3297",
     "semantic_hash": ""
   },
   "components/compras/GastosCompraGrafico.tsx": {
@@ -4230,18 +4230,18 @@
     "semantic_hash": ""
   },
   "components/compras/GastosCompraPanel.tsx": {
-    "mtime": 1788184806.6112018,
-    "ast_hash": "af32e0cd22139a840349c972e2718694",
+    "mtime": 1788281539.4471848,
+    "ast_hash": "6ad69feadd1251af455d0f05ac444dd0",
     "semantic_hash": ""
   },
   "components/compras/NovaCompraModal.tsx": {
-    "mtime": 1788184806.6120112,
-    "ast_hash": "5dc8797943104cf59a09f74ae52c29b8",
+    "mtime": 1788281743.8606372,
+    "ast_hash": "11098dad85b78a8c82361a15f749e58d",
     "semantic_hash": ""
   },
   "components/compras/ParcelasEditor.tsx": {
-    "mtime": 1787843543.7524426,
-    "ast_hash": "baaf28d1a90462787764e8aa6501e896",
+    "mtime": 1788281709.143732,
+    "ast_hash": "1e7a2501803dc964409dcd6c55c3e04d",
     "semantic_hash": ""
   },
   "components/compras/gastos-compra-format.ts": {
@@ -4255,13 +4255,13 @@
     "semantic_hash": ""
   },
   "lib/types/compra-gasto.ts": {
-    "mtime": 1788184354.2528567,
-    "ast_hash": "f4ccf50b3c286043528dd1a29f899c0a",
+    "mtime": 1788281404.8811834,
+    "ast_hash": "a560a5dd03d862c039dc6d770b27451f",
     "semantic_hash": ""
   },
   "lib/utils/compra-gastos-agregacao.ts": {
-    "mtime": 1787838706.8818333,
-    "ast_hash": "4ffde963a99a06cbf3ba8c0186fee005",
+    "mtime": 1788281419.6156497,
+    "ast_hash": "c08f2d4d65f8f4d6ce01c7bb2e06f644",
     "semantic_hash": ""
   },
   "lib/utils/compra-gastos-import.ts": {
@@ -4270,13 +4270,13 @@
     "semantic_hash": ""
   },
   "lib/utils/compra-gastos-store.ts": {
-    "mtime": 1788264768.9641204,
-    "ast_hash": "611b0d17b0ca727b886d45bed5cb7058",
+    "mtime": 1788279431.0218,
+    "ast_hash": "7367d166a2ae0da29aa2f5d58258b23c",
     "semantic_hash": ""
   },
   "lib/utils/exportGastosCompraXlsx.ts": {
-    "mtime": 1787838989.9490705,
-    "ast_hash": "0c37f9ee76a501c3e08785bf2711eba8",
+    "mtime": 1788281559.8740509,
+    "ast_hash": "6d90888d7228680222fc22a42d5b582a",
     "semantic_hash": ""
   },
   "lib/utils/exportRelatorioAbasXlsx.ts": {
@@ -4372,6 +4372,11 @@
   "docs/INVESTIGACAO_B1.10.0023_FONE_TWS_VOLT.md": {
     "mtime": 1788202737.2767615,
     "ast_hash": "ddc464acc4060af05bc67808f55df8b0",
+    "semantic_hash": ""
+  },
+  "docs/GASTOS_COMPRA_FORNECEDORES.md": {
+    "mtime": 1788281666.122289,
+    "ast_hash": "403afc9916e733c83f78be9f81364a7e",
     "semantic_hash": ""
   }
 }

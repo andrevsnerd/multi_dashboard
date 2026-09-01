@@ -9,7 +9,9 @@ No painel **Gastos de Compra** o fornecedor não é só um rótulo: **cada forne
 paga do seu jeito**, então escolher o nome no lançamento **monta o parcelamento
 sozinho** (datas, valores e, quando tem, os canais de pagamento).
 
-- O campo fica em **Nova compra → Identificação e datas → Fornecedor**.
+- O campo fica em **Nova compra → Identificação e datas → Fornecedor**, e também
+  em **Compra em trânsito → Pagamento → Fornecedor** (é de lá que sai o
+  fornecedor da compra lançada automaticamente ao confirmar o trânsito).
 - O padrão é **vazio** (`— sem fornecedor —`): nesse caso a compra nasce inteira,
   vencendo na data da compra, e quem divide é o usuário (2x, 3x, % à mão).
 - Escolher um fornecedor aplica o calendário dele na hora. Depois disso dá para
@@ -63,6 +65,7 @@ parcela conta **uma vez**, no mês do próprio vencimento.
 | Geração das parcelas | `gerarParcelasModelo` (mesmo arquivo) |
 | Select no lançamento | [components/compras/NovaCompraModal.tsx](../components/compras/NovaCompraModal.tsx) |
 | Select ao editar parcelamento | [components/compras/GastosCompraDrawer.tsx](../components/compras/GastosCompraDrawer.tsx) |
+| Select no pagamento da Compra em trânsito | [components/lista-loja/ComprasTransitoPage.tsx](../components/lista-loja/ComprasTransitoPage.tsx) |
 | Editor de parcelas (aplica o calendário) | [components/compras/ParcelasEditor.tsx](../components/compras/ParcelasEditor.tsx) |
 
 ### Adicionar um fornecedor novo
@@ -85,11 +88,13 @@ fornecedor de novo).
 
 ## Pontos de atenção
 
-- **Compra em trânsito → Gastos de Compra:** ao configurar o pagamento da compra
-  em trânsito ([ComprasTransitoPage](../components/lista-loja/ComprasTransitoPage.tsx))
-  o fornecedor ainda é **texto livre**, e é ele que vai para o lote quando a
-  compra é confirmada. Ou seja: compra lançada por esse caminho pode gravar um
-  fornecedor fora da lista (exibido como texto). Se a ideia for ter só nomes
-  canônicos, esse campo também precisa virar o mesmo select.
+- **Compra em trânsito → Pagamento:** o select é o mesmo, mais uma opção
+  **"Outro (digitar)"** que abre um campo de texto para nome fora da lista
+  (fornecedor eventual, sem calendário cadastrado). Fornecedor digitado assim é
+  gravado como texto e **não gera parcelamento** — o plano fica por conta de quem
+  está lançando. Compras antigas com texto livre abrem já nesse modo.
+- **O parcelamento da Compra em trânsito é gravado em dias/%** sobre a data da
+  compra, então ele reancora sozinho na confirmação. Escolher o fornecedor lá
+  monta o plano; o que vai para o painel é o plano, não o nome do calendário.
 - **Premier** é *tipo de compra* (catálogo de embalagem/material), não
   fornecedor — são coisas diferentes no mesmo lançamento.
