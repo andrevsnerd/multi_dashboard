@@ -2947,7 +2947,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_companies_company_produtos_recentes_page",
-      "community": 92,
+      "community": 160,
       "norm_label": "page.tsx"
     },
     {
@@ -2957,7 +2957,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "app_companies_company_produtos_recentes_page_productsrecentpageprops",
-      "community": 92,
+      "community": 160,
       "norm_label": "productsrecentpageprops"
     },
     {
@@ -2967,7 +2967,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "app_companies_company_produtos_recentes_page_generatemetadata",
-      "community": 92,
+      "community": 160,
       "norm_label": "generatemetadata()"
     },
     {
@@ -2977,7 +2977,7 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "app_companies_company_produtos_recentes_page_productsrecentpageroute",
-      "community": 92,
+      "community": 160,
       "norm_label": "productsrecentpageroute()"
     },
     {
@@ -5067,7 +5067,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_compras_transito_backfill_barcodes_route",
-      "community": 174,
+      "community": 138,
       "norm_label": "route.ts"
     },
     {
@@ -5077,7 +5077,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "app_api_compras_transito_backfill_barcodes_route_post",
-      "community": 174,
+      "community": 138,
       "norm_label": "post()"
     },
     {
@@ -5787,7 +5787,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_corporativo_catalogo_buscar_route",
-      "community": 107,
+      "community": 232,
       "norm_label": "route.ts"
     },
     {
@@ -5797,7 +5797,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "app_api_corporativo_catalogo_buscar_route_get",
-      "community": 107,
+      "community": 232,
       "norm_label": "get()"
     },
     {
@@ -6727,7 +6727,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_extrato_produto_filiais_route",
-      "community": 18,
+      "community": 107,
       "norm_label": "route.ts"
     },
     {
@@ -6737,7 +6737,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "app_api_extrato_produto_filiais_route_canaccessextrato",
-      "community": 18,
+      "community": 107,
       "norm_label": "canaccessextrato()"
     },
     {
@@ -6747,7 +6747,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "app_api_extrato_produto_filiais_route_trimvalue",
-      "community": 18,
+      "community": 107,
       "norm_label": "trimvalue()"
     },
     {
@@ -6757,7 +6757,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "app_api_extrato_produto_filiais_route_adminfilialoption",
-      "community": 18,
+      "community": 107,
       "norm_label": "adminfilialoption"
     },
     {
@@ -6767,7 +6767,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "app_api_extrato_produto_filiais_route_get",
-      "community": 18,
+      "community": 107,
       "norm_label": "get()"
     },
     {
@@ -6777,7 +6777,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_extrato_produto_produtos_route",
-      "community": 18,
+      "community": 107,
       "norm_label": "route.ts"
     },
     {
@@ -6787,7 +6787,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "app_api_extrato_produto_produtos_route_canaccessextrato",
-      "community": 18,
+      "community": 107,
       "norm_label": "canaccessextrato()"
     },
     {
@@ -6797,7 +6797,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "app_api_extrato_produto_produtos_route_sqltext",
-      "community": 18,
+      "community": 107,
       "norm_label": "sqltext()"
     },
     {
@@ -6807,7 +6807,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "app_api_extrato_produto_produtos_route_trimvalue",
-      "community": 18,
+      "community": 107,
       "norm_label": "trimvalue()"
     },
     {
@@ -6817,7 +6817,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "app_api_extrato_produto_produtos_route_produtoativoitem",
-      "community": 18,
+      "community": 107,
       "norm_label": "produtoativoitem"
     },
     {
@@ -6827,7 +6827,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "app_api_extrato_produto_produtos_route_produtosativosresponse",
-      "community": 18,
+      "community": 107,
       "norm_label": "produtosativosresponse"
     },
     {
@@ -6837,7 +6837,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "app_api_extrato_produto_produtos_route_get",
-      "community": 18,
+      "community": 107,
       "norm_label": "get()"
     },
     {
@@ -8337,7 +8337,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_products_colecoes_descricoes_route",
-      "community": 63,
+      "community": 25,
       "norm_label": "route.ts"
     },
     {
@@ -8347,7 +8347,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "app_api_products_colecoes_descricoes_route_get",
-      "community": 63,
+      "community": 25,
       "norm_label": "get()"
     },
     {
@@ -8477,7 +8477,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_products_search_route",
-      "community": 37,
+      "community": 447,
       "norm_label": "route.ts"
     },
     {
@@ -8487,7 +8487,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "app_api_products_search_route_get",
-      "community": 37,
+      "community": 447,
       "norm_label": "get()"
     },
     {
@@ -8927,7 +8927,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_produtos_parados_entradas_por_filial_route",
-      "community": 2,
+      "community": 447,
       "norm_label": "route.ts"
     },
     {
@@ -8937,7 +8937,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "app_api_produtos_parados_entradas_por_filial_route_get",
-      "community": 2,
+      "community": 447,
       "norm_label": "get()"
     },
     {
@@ -8997,7 +8997,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_relatorios_compra_sugerida_abc_stream_route",
-      "community": 25,
+      "community": 125,
       "norm_label": "route.ts"
     },
     {
@@ -9007,7 +9007,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "app_api_relatorios_compra_sugerida_abc_stream_route_get",
-      "community": 25,
+      "community": 125,
       "norm_label": "get()"
     },
     {
@@ -9037,7 +9037,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_relatorios_dados_route",
-      "community": 25,
+      "community": 125,
       "norm_label": "route.ts"
     },
     {
@@ -9047,7 +9047,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "app_api_relatorios_dados_route_get",
-      "community": 25,
+      "community": 125,
       "norm_label": "get()"
     },
     {
@@ -9337,7 +9337,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_relatorios_stream_route",
-      "community": 25,
+      "community": 125,
       "norm_label": "route.ts"
     },
     {
@@ -9347,7 +9347,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "app_api_relatorios_stream_route_get",
-      "community": 25,
+      "community": 125,
       "norm_label": "get()"
     },
     {
@@ -9924,7 +9924,7 @@
       "label": "getUsername()",
       "file_type": "code",
       "source_file": "app/api/saidas-entradas-produtos/rascunhos/route.ts",
-      "source_location": "L23",
+      "source_location": "L22",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_rascunhos_route_getusername",
       "community": 127,
@@ -9934,7 +9934,7 @@
       "label": "normalizeTipo()",
       "file_type": "code",
       "source_file": "app/api/saidas-entradas-produtos/rascunhos/route.ts",
-      "source_location": "L27",
+      "source_location": "L26",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_rascunhos_route_normalizetipo",
       "community": 127,
@@ -9944,7 +9944,7 @@
       "label": "GET()",
       "file_type": "code",
       "source_file": "app/api/saidas-entradas-produtos/rascunhos/route.ts",
-      "source_location": "L31",
+      "source_location": "L30",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_rascunhos_route_get",
       "community": 127,
@@ -9954,7 +9954,7 @@
       "label": "PUT()",
       "file_type": "code",
       "source_file": "app/api/saidas-entradas-produtos/rascunhos/route.ts",
-      "source_location": "L48",
+      "source_location": "L47",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_rascunhos_route_put",
       "community": 127,
@@ -9964,7 +9964,7 @@
       "label": "DELETE()",
       "file_type": "code",
       "source_file": "app/api/saidas-entradas-produtos/rascunhos/route.ts",
-      "source_location": "L100",
+      "source_location": "L97",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_rascunhos_route_delete",
       "community": 127,
@@ -10217,7 +10217,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_log_debug_route",
-      "community": 37,
+      "community": 447,
       "norm_label": "route.ts"
     },
     {
@@ -10227,7 +10227,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_log_debug_route_get",
-      "community": 37,
+      "community": 447,
       "norm_label": "get()"
     },
     {
@@ -10237,7 +10237,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_log_detalhes_route",
-      "community": 37,
+      "community": 447,
       "norm_label": "route.ts"
     },
     {
@@ -10247,7 +10247,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_log_detalhes_route_logdetalheitem",
-      "community": 37,
+      "community": 447,
       "norm_label": "logdetalheitem"
     },
     {
@@ -10257,7 +10257,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_log_detalhes_route_get",
-      "community": 37,
+      "community": 447,
       "norm_label": "get()"
     },
     {
@@ -10327,7 +10327,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_produto_por_codigo_barras_route",
-      "community": 37,
+      "community": 447,
       "norm_label": "route.ts"
     },
     {
@@ -10337,7 +10337,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_produto_por_codigo_barras_route_get",
-      "community": 37,
+      "community": 447,
       "norm_label": "get()"
     },
     {
@@ -10397,7 +10397,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_responsaveis_route",
-      "community": 37,
+      "community": 447,
       "norm_label": "route.ts"
     },
     {
@@ -10407,7 +10407,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_responsaveis_route_get",
-      "community": 37,
+      "community": 447,
       "norm_label": "get()"
     },
     {
@@ -10417,7 +10417,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_tipos_romaneio_route",
-      "community": 37,
+      "community": 447,
       "norm_label": "route.ts"
     },
     {
@@ -10427,7 +10427,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_tipos_romaneio_route_get",
-      "community": 37,
+      "community": 447,
       "norm_label": "get()"
     },
     {
@@ -10527,7 +10527,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_transferencias_quantidade_real_route",
-      "community": 160,
+      "community": 174,
       "norm_label": "route.ts"
     },
     {
@@ -10537,7 +10537,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "app_api_transferencias_quantidade_real_route_get",
-      "community": 160,
+      "community": 174,
       "norm_label": "get()"
     },
     {
@@ -10547,7 +10547,7 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "app_api_transferencias_quantidade_real_route_post",
-      "community": 160,
+      "community": 174,
       "norm_label": "post()"
     },
     {
@@ -10557,7 +10557,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_transferencias_realizadas_export_route",
-      "community": 125,
+      "community": 138,
       "norm_label": "route.ts"
     },
     {
@@ -10567,7 +10567,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "app_api_transferencias_realizadas_export_route_get",
-      "community": 125,
+      "community": 138,
       "norm_label": "get()"
     },
     {
@@ -10577,7 +10577,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_transferencias_realizadas_migrate_route",
-      "community": 125,
+      "community": 138,
       "norm_label": "route.ts"
     },
     {
@@ -10587,7 +10587,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "app_api_transferencias_realizadas_migrate_route_post",
-      "community": 125,
+      "community": 138,
       "norm_label": "post()"
     },
     {
@@ -10597,7 +10597,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_transferencias_realizadas_route",
-      "community": 125,
+      "community": 138,
       "norm_label": "route.ts"
     },
     {
@@ -10607,7 +10607,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "app_api_transferencias_realizadas_route_get",
-      "community": 125,
+      "community": 138,
       "norm_label": "get()"
     },
     {
@@ -10617,7 +10617,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "app_api_transferencias_realizadas_route_post",
-      "community": 125,
+      "community": 138,
       "norm_label": "post()"
     },
     {
@@ -11247,7 +11247,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_corporativo_layout",
-      "community": 107,
+      "community": 232,
       "norm_label": "layout.tsx"
     },
     {
@@ -11257,7 +11257,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "app_corporativo_layout_corporativolayout",
-      "community": 107,
+      "community": 232,
       "norm_label": "corporativolayout()"
     },
     {
@@ -11747,7 +11747,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_layout",
-      "community": 120,
+      "community": 107,
       "norm_label": "layout.tsx"
     },
     {
@@ -11757,7 +11757,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "app_layout_metadata",
-      "community": 120,
+      "community": 107,
       "norm_label": "metadata"
     },
     {
@@ -11767,7 +11767,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "app_layout_rootlayout",
-      "community": 120,
+      "community": 107,
       "norm_label": "rootlayout()"
     },
     {
@@ -12339,7 +12339,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "components_auth_authcontext_authcontextvalue",
-      "community": 18,
+      "community": 120,
       "norm_label": "authcontextvalue"
     },
     {
@@ -12359,7 +12359,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "components_auth_authcontext_authprovider",
-      "community": 120,
+      "community": 107,
       "norm_label": "authprovider()"
     },
     {
@@ -14199,7 +14199,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_dashboard_goalsmodal",
-      "community": 232,
+      "community": 30,
       "norm_label": "goalsmodal.tsx"
     },
     {
@@ -14209,7 +14209,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "components_dashboard_goalsmodal_goalsmodalprops",
-      "community": 232,
+      "community": 30,
       "norm_label": "goalsmodalprops"
     },
     {
@@ -14219,7 +14219,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "components_dashboard_goalsmodal_goaldata",
-      "community": 232,
+      "community": 30,
       "norm_label": "goaldata"
     },
     {
@@ -14229,7 +14229,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "components_dashboard_goalsmodal_loadgoals",
-      "community": 232,
+      "community": 30,
       "norm_label": "loadgoals()"
     },
     {
@@ -14239,7 +14239,7 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "components_dashboard_goalsmodal_savegoals",
-      "community": 232,
+      "community": 30,
       "norm_label": "savegoals()"
     },
     {
@@ -14249,7 +14249,7 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "components_dashboard_goalsmodal_goalsmodal",
-      "community": 232,
+      "community": 30,
       "norm_label": "goalsmodal()"
     },
     {
@@ -15529,7 +15529,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_filters_filialfilter",
-      "community": 92,
+      "community": 160,
       "norm_label": "filialfilter.tsx"
     },
     {
@@ -15539,7 +15539,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "components_filters_filialfilter_filialfilterprops",
-      "community": 92,
+      "community": 160,
       "norm_label": "filialfilterprops"
     },
     {
@@ -15549,7 +15549,7 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "components_filters_filialfilter_filialfilter",
-      "community": 92,
+      "community": 160,
       "norm_label": "filialfilter()"
     },
     {
@@ -16409,7 +16409,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_layout_corporativosidebar",
-      "community": 107,
+      "community": 232,
       "norm_label": "corporativosidebar.tsx"
     },
     {
@@ -16419,7 +16419,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "components_layout_corporativosidebar_item",
-      "community": 107,
+      "community": 232,
       "norm_label": "item"
     },
     {
@@ -16429,7 +16429,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "components_layout_corporativosidebar_section",
-      "community": 107,
+      "community": 232,
       "norm_label": "section"
     },
     {
@@ -16439,7 +16439,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "components_layout_corporativosidebar_sections",
-      "community": 107,
+      "community": 232,
       "norm_label": "sections"
     },
     {
@@ -16449,7 +16449,7 @@
       "source_location": "L81",
       "_origin": "ast",
       "id": "components_layout_corporativosidebar_corporativosidebar",
-      "community": 107,
+      "community": 232,
       "norm_label": "corporativosidebar()"
     },
     {
@@ -16489,7 +16489,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_layout_maincontent",
-      "community": 107,
+      "community": 232,
       "norm_label": "maincontent.tsx"
     },
     {
@@ -16499,7 +16499,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "components_layout_maincontent_maincontentprops",
-      "community": 107,
+      "community": 232,
       "norm_label": "maincontentprops"
     },
     {
@@ -16509,7 +16509,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "components_layout_maincontent_maincontent",
-      "community": 107,
+      "community": 232,
       "norm_label": "maincontent()"
     },
     {
@@ -16609,7 +16609,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_layout_sidebarcontext",
-      "community": 107,
+      "community": 232,
       "norm_label": "sidebarcontext.tsx"
     },
     {
@@ -16619,7 +16619,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "components_layout_sidebarcontext_sidebarcontexttype",
-      "community": 107,
+      "community": 232,
       "norm_label": "sidebarcontexttype"
     },
     {
@@ -16629,7 +16629,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "components_layout_sidebarcontext_sidebarcontext",
-      "community": 107,
+      "community": 232,
       "norm_label": "sidebarcontext"
     },
     {
@@ -16639,7 +16639,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "components_layout_sidebarcontext_sidebarprovider",
-      "community": 107,
+      "community": 232,
       "norm_label": "sidebarprovider()"
     },
     {
@@ -16649,7 +16649,7 @@
       "source_location": "L57",
       "_origin": "ast",
       "id": "components_layout_sidebarcontext_usesidebar",
-      "community": 107,
+      "community": 232,
       "norm_label": "usesidebar()"
     },
     {
@@ -21629,7 +21629,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_products_productsrecentpage",
-      "community": 92,
+      "community": 160,
       "norm_label": "productsrecentpage.tsx"
     },
     {
@@ -21639,7 +21639,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "components_products_productsrecentpage_productsrecentpageprops",
-      "community": 92,
+      "community": 160,
       "norm_label": "productsrecentpageprops"
     },
     {
@@ -21649,7 +21649,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "components_products_productsrecentpage_empty_summary",
-      "community": 92,
+      "community": 160,
       "norm_label": "empty_summary"
     },
     {
@@ -21659,7 +21659,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "components_products_productsrecentpage_fetchproducts",
-      "community": 92,
+      "community": 160,
       "norm_label": "fetchproducts()"
     },
     {
@@ -21669,7 +21669,7 @@
       "source_location": "L106",
       "_origin": "ast",
       "id": "components_products_productsrecentpage_fetchsummary",
-      "community": 92,
+      "community": 160,
       "norm_label": "fetchsummary()"
     },
     {
@@ -21679,7 +21679,7 @@
       "source_location": "L174",
       "_origin": "ast",
       "id": "components_products_productsrecentpage_searchproducts",
-      "community": 92,
+      "community": 160,
       "norm_label": "searchproducts()"
     },
     {
@@ -21689,7 +21689,7 @@
       "source_location": "L200",
       "_origin": "ast",
       "id": "components_products_productsrecentpage_productsrecentpage",
-      "community": 92,
+      "community": 160,
       "norm_label": "productsrecentpage()"
     },
     {
@@ -23246,7 +23246,7 @@
       "label": "RascunhoStatus",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L109",
+      "source_location": "L107",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_rascunhostatus",
       "community": 26,
@@ -23256,7 +23256,7 @@
       "label": "defeitoFilialOption()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L111",
+      "source_location": "L109",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_defeitofilialoption",
       "community": 26,
@@ -23266,7 +23266,7 @@
       "label": "TIPOS_SEM_FILIAL_DESTINO",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L117",
+      "source_location": "L115",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_tipos_sem_filial_destino",
       "community": 26,
@@ -23276,7 +23276,7 @@
       "label": "isTipoSemDestino()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L121",
+      "source_location": "L119",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_istiposemdestino",
       "community": 26,
@@ -23286,7 +23286,7 @@
       "label": "isTransferenciaEntreLojas()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L126",
+      "source_location": "L124",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_istransferenciaentrelojas",
       "community": 26,
@@ -23296,7 +23296,7 @@
       "label": "isTipoDefeito()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L131",
+      "source_location": "L129",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_istipodefeito",
       "community": 26,
@@ -23306,7 +23306,7 @@
       "label": "DefeitoDoDia",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L136",
+      "source_location": "L134",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_defeitododia",
       "community": 26,
@@ -23316,7 +23316,7 @@
       "label": "SaidasEntradasProdutosPageProps",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L147",
+      "source_location": "L145",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospageprops",
       "community": 26,
@@ -23326,7 +23326,7 @@
       "label": "TransferenciaPermissao",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L152",
+      "source_location": "L150",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_transferenciapermissao",
       "community": 26,
@@ -23336,7 +23336,7 @@
       "label": "TipoOperacao",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L169",
+      "source_location": "L167",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_tipooperacao",
       "community": 26,
@@ -23346,7 +23346,7 @@
       "label": "normalizarTipoRomaneio()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L173",
+      "source_location": "L171",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_normalizartiporomaneio",
       "community": 26,
@@ -23356,7 +23356,7 @@
       "label": "textoCorProduto()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L182",
+      "source_location": "L180",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_textocorproduto",
       "community": 26,
@@ -23366,7 +23366,7 @@
       "label": "parseBackendDateTime()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L188",
+      "source_location": "L186",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_parsebackenddatetime",
       "community": 26,
@@ -23376,7 +23376,7 @@
       "label": "formatLogDateTime()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L214",
+      "source_location": "L212",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_formatlogdatetime",
       "community": 26,
@@ -23386,7 +23386,7 @@
       "label": "formatLogDate()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L226",
+      "source_location": "L224",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_formatlogdate",
       "community": 26,
@@ -23396,7 +23396,7 @@
       "label": "formatLogRoute()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L236",
+      "source_location": "L234",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_formatlogroute",
       "community": 26,
@@ -23406,7 +23406,7 @@
       "label": "normalizeFilialValue()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L256",
+      "source_location": "L254",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_normalizefilialvalue",
       "community": 26,
@@ -23416,7 +23416,7 @@
       "label": "getFilialMatchTokens()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L263",
+      "source_location": "L261",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_getfilialmatchtokens",
       "community": 26,
@@ -23426,7 +23426,7 @@
       "label": "matchesFilialOption()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L274",
+      "source_location": "L272",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_matchesfilialoption",
       "community": 26,
@@ -23436,7 +23436,7 @@
       "label": "normalizeDigits()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L280",
+      "source_location": "L278",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_normalizedigits",
       "community": 26,
@@ -23446,7 +23446,7 @@
       "label": "matchFilial()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L285",
+      "source_location": "L283",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_matchfilial",
       "community": 26,
@@ -23456,7 +23456,7 @@
       "label": "sameModalCart()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L317",
+      "source_location": "L315",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_samemodalcart",
       "community": 26,
@@ -23466,7 +23466,7 @@
       "label": "fetchPermissoes()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L330",
+      "source_location": "L328",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_fetchpermissoes",
       "community": 26,
@@ -23476,7 +23476,7 @@
       "label": "fetchFiliais()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L351",
+      "source_location": "L349",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_fetchfiliais",
       "community": 26,
@@ -23486,7 +23486,7 @@
       "label": "buscarProdutoPorCodigoBarras()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L367",
+      "source_location": "L365",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_buscarprodutoporcodigobarras",
       "community": 26,
@@ -23496,7 +23496,7 @@
       "label": "searchProdutos()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L389",
+      "source_location": "L387",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_searchprodutos",
       "community": 26,
@@ -23506,7 +23506,7 @@
       "label": "fetchTiposRomaneio()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L437",
+      "source_location": "L435",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_fetchtiposromaneio",
       "community": 26,
@@ -23516,7 +23516,7 @@
       "label": "fetchResponsaveis()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L450",
+      "source_location": "L448",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_fetchresponsaveis",
       "community": 26,
@@ -23526,7 +23526,7 @@
       "label": "executarOperacaoLote()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L463",
+      "source_location": "L461",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_executaroperacaolote",
       "community": 26,
@@ -23536,7 +23536,7 @@
       "label": "fetchLogSaidas()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L505",
+      "source_location": "L503",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_fetchlogsaidas",
       "community": 26,
@@ -23546,7 +23546,7 @@
       "label": "fetchLogEntradas()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L518",
+      "source_location": "L516",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_fetchlogentradas",
       "community": 26,
@@ -23556,7 +23556,7 @@
       "label": "fetchDefeitoDoDia()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L535",
+      "source_location": "L533",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_fetchdefeitododia",
       "community": 26,
@@ -23566,7 +23566,7 @@
       "label": "biparCodigo()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L556",
+      "source_location": "L554",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_biparcodigo",
       "community": 26,
@@ -23576,7 +23576,7 @@
       "label": "fetchRascunhos()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L583",
+      "source_location": "L581",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_fetchrascunhos",
       "community": 26,
@@ -23586,7 +23586,7 @@
       "label": "salvarRascunhoApi()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L595",
+      "source_location": "L593",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_salvarrascunhoapi",
       "community": 26,
@@ -23596,7 +23596,7 @@
       "label": "removerRascunhoApi()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L607",
+      "source_location": "L605",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_removerrascunhoapi",
       "community": 26,
@@ -23606,7 +23606,7 @@
       "label": "salvarDestinoRomaneio()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L638",
+      "source_location": "L628",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_salvardestinoromaneio",
       "community": 26,
@@ -23616,7 +23616,7 @@
       "label": "ItemEntradaExistente",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L659",
+      "source_location": "L649",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_itementradaexistente",
       "community": 26,
@@ -23626,7 +23626,7 @@
       "label": "EntradaEditando",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L669",
+      "source_location": "L659",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_entradaeditando",
       "community": 26,
@@ -23636,7 +23636,7 @@
       "label": "fetchEntradaParaEdicao()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L676",
+      "source_location": "L666",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_fetchentradaparaedicao",
       "community": 26,
@@ -23646,7 +23646,7 @@
       "label": "salvarItensNoRomaneioEntrada()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L700",
+      "source_location": "L690",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_salvaritensnoromaneioentrada",
       "community": 26,
@@ -23656,7 +23656,7 @@
       "label": "SaidasEntradasProdutosPage()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L721",
+      "source_location": "L711",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "community": 26,
@@ -33299,7 +33299,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "lib_auth_permissions_catalogo_manager_roles",
-      "community": 107,
+      "community": 232,
       "norm_label": "catalogo_manager_roles"
     },
     {
@@ -33309,7 +33309,7 @@
       "source_location": "L53",
       "_origin": "ast",
       "id": "lib_auth_permissions_canmanagecatalogo",
-      "community": 107,
+      "community": 232,
       "norm_label": "canmanagecatalogo()"
     },
     {
@@ -34519,7 +34519,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "lib_config_company_companyconfig",
-      "community": 92,
+      "community": 160,
       "norm_label": "companyconfig"
     },
     {
@@ -35849,7 +35849,7 @@
       "source_location": "L159",
       "_origin": "ast",
       "id": "lib_db_connection_withrequest",
-      "community": 37,
+      "community": 447,
       "norm_label": "withrequest()"
     },
     {
@@ -35869,7 +35869,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_db_neon",
-      "community": 125,
+      "community": 138,
       "norm_label": "neon.ts"
     },
     {
@@ -35879,7 +35879,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "lib_db_neon_getpostgresurl",
-      "community": 125,
+      "community": 138,
       "norm_label": "getpostgresurl()"
     },
     {
@@ -38269,7 +38269,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "lib_reports_column_sources_sourceid",
-      "community": 25,
+      "community": 125,
       "norm_label": "sourceid"
     },
     {
@@ -38509,7 +38509,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_reports_enrich_server",
-      "community": 25,
+      "community": 449,
       "norm_label": "enrich.server.ts"
     },
     {
@@ -38529,7 +38529,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "lib_reports_enrich_server_round2",
-      "community": 25,
+      "community": 449,
       "norm_label": "round2()"
     },
     {
@@ -38539,7 +38539,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "lib_reports_enrich_server_roundint",
-      "community": 25,
+      "community": 449,
       "norm_label": "roundint()"
     },
     {
@@ -38549,7 +38549,7 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "lib_reports_enrich_server_enrichvendas",
-      "community": 25,
+      "community": 449,
       "norm_label": "enrichvendas()"
     },
     {
@@ -38559,7 +38559,7 @@
       "source_location": "L105",
       "_origin": "ast",
       "id": "lib_reports_enrich_server_enrichparados",
-      "community": 25,
+      "community": 449,
       "norm_label": "enrichparados()"
     },
     {
@@ -38569,7 +38569,7 @@
       "source_location": "L130",
       "_origin": "ast",
       "id": "lib_reports_enrich_server_enrichestoque",
-      "community": 25,
+      "community": 449,
       "norm_label": "enrichestoque()"
     },
     {
@@ -38579,7 +38579,7 @@
       "source_location": "L152",
       "_origin": "ast",
       "id": "lib_reports_enrich_server_enrichcadastro",
-      "community": 25,
+      "community": 449,
       "norm_label": "enrichcadastro()"
     },
     {
@@ -38589,7 +38589,7 @@
       "source_location": "L182",
       "_origin": "ast",
       "id": "lib_reports_enrich_server_runenricher",
-      "community": 25,
+      "community": 449,
       "norm_label": "runenricher()"
     },
     {
@@ -38709,7 +38709,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_reports_keys",
-      "community": 63,
+      "community": 449,
       "norm_label": "keys.ts"
     },
     {
@@ -38719,7 +38719,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "lib_reports_keys_corinput",
-      "community": 63,
+      "community": 449,
       "norm_label": "corinput"
     },
     {
@@ -38729,7 +38729,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "lib_reports_keys_canonicalcor",
-      "community": 63,
+      "community": 449,
       "norm_label": "canonicalcor()"
     },
     {
@@ -38739,7 +38739,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "lib_reports_keys_canonicalkey",
-      "community": 25,
+      "community": 449,
       "norm_label": "canonicalkey()"
     },
     {
@@ -38749,7 +38749,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "lib_reports_keys_rawkey",
-      "community": 25,
+      "community": 449,
       "norm_label": "rawkey()"
     },
     {
@@ -38759,7 +38759,7 @@
       "source_location": "L35",
       "_origin": "ast",
       "id": "lib_reports_keys_diasdesde",
-      "community": 63,
+      "community": 449,
       "norm_label": "diasdesde()"
     },
     {
@@ -38769,7 +38769,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_reports_params",
-      "community": 25,
+      "community": 125,
       "norm_label": "params.ts"
     },
     {
@@ -38779,7 +38779,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "lib_reports_params_valid_sources",
-      "community": 25,
+      "community": 125,
       "norm_label": "valid_sources"
     },
     {
@@ -38789,7 +38789,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "lib_reports_params_parsereportfilters",
-      "community": 25,
+      "community": 125,
       "norm_label": "parsereportfilters()"
     },
     {
@@ -38799,7 +38799,7 @@
       "source_location": "L70",
       "_origin": "ast",
       "id": "lib_reports_params_parseextrasources",
-      "community": 25,
+      "community": 125,
       "norm_label": "parseextrasources()"
     },
     {
@@ -39039,7 +39039,7 @@
       "source_location": "L54",
       "_origin": "ast",
       "id": "lib_reports_registry_server_getreportfetcher",
-      "community": 25,
+      "community": 125,
       "norm_label": "getreportfetcher()"
     },
     {
@@ -39049,7 +39049,7 @@
       "source_location": "L63",
       "_origin": "ast",
       "id": "lib_reports_registry_server_runreport",
-      "community": 25,
+      "community": 125,
       "norm_label": "runreport()"
     },
     {
@@ -39069,7 +39069,7 @@
       "source_location": "L147",
       "_origin": "ast",
       "id": "lib_reports_registry_server_appendcodigobarra",
-      "community": 25,
+      "community": 125,
       "norm_label": "appendcodigobarra()"
     },
     {
@@ -39219,7 +39219,7 @@
       "source_location": "L192",
       "_origin": "ast",
       "id": "lib_reports_types_reportsummarymetric",
-      "community": 63,
+      "community": 25,
       "norm_label": "reportsummarymetric"
     },
     {
@@ -39229,7 +39229,7 @@
       "source_location": "L198",
       "_origin": "ast",
       "id": "lib_reports_types_reportresult",
-      "community": 63,
+      "community": 25,
       "norm_label": "reportresult"
     },
     {
@@ -41639,7 +41639,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_colecao",
-      "community": 63,
+      "community": 25,
       "norm_label": "colecao.ts"
     },
     {
@@ -41649,7 +41649,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "lib_repositories_colecao_getcolecaodescmap",
-      "community": 63,
+      "community": 25,
       "norm_label": "getcolecaodescmap()"
     },
     {
@@ -41679,7 +41679,7 @@
       "source_location": "L131",
       "_origin": "ast",
       "id": "lib_repositories_colecao_applycolecaolabels",
-      "community": 63,
+      "community": 25,
       "norm_label": "applycolecaolabels()"
     },
     {
@@ -42809,7 +42809,7 @@
       "source_location": "L1193",
       "_origin": "ast",
       "id": "lib_repositories_controleestoque_fetchultimasentradasporfilial",
-      "community": 2,
+      "community": 447,
       "norm_label": "fetchultimasentradasporfilial()"
     },
     {
@@ -43319,7 +43319,7 @@
       "source_location": "L8998",
       "_origin": "ast",
       "id": "lib_repositories_controleestoque_estoqueredeitemrow",
-      "community": 63,
+      "community": 25,
       "norm_label": "estoqueredeitemrow"
     },
     {
@@ -43779,7 +43779,7 @@
       "source_location": "L111",
       "_origin": "ast",
       "id": "lib_repositories_corporativoprodutos_buscarprodutos",
-      "community": 107,
+      "community": 232,
       "norm_label": "buscarprodutos()"
     },
     {
@@ -45019,7 +45019,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_inventory",
-      "community": 37,
+      "community": 447,
       "norm_label": "inventory.ts"
     },
     {
@@ -45029,7 +45029,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "lib_repositories_inventory_buildfilialfilter",
-      "community": 37,
+      "community": 447,
       "norm_label": "buildfilialfilter()"
     },
     {
@@ -45039,7 +45039,7 @@
       "source_location": "L109",
       "_origin": "ast",
       "id": "lib_repositories_inventory_productstockparams",
-      "community": 37,
+      "community": 447,
       "norm_label": "productstockparams"
     },
     {
@@ -45049,7 +45049,7 @@
       "source_location": "L116",
       "_origin": "ast",
       "id": "lib_repositories_inventory_productstock",
-      "community": 37,
+      "community": 447,
       "norm_label": "productstock"
     },
     {
@@ -45059,7 +45059,7 @@
       "source_location": "L126",
       "_origin": "ast",
       "id": "lib_repositories_inventory_fetchproductstock",
-      "community": 37,
+      "community": 447,
       "norm_label": "fetchproductstock()"
     },
     {
@@ -45069,7 +45069,7 @@
       "source_location": "L189",
       "_origin": "ast",
       "id": "lib_repositories_inventory_fetchmultipleproductsstock",
-      "community": 37,
+      "community": 447,
       "norm_label": "fetchmultipleproductsstock()"
     },
     {
@@ -45079,7 +45079,7 @@
       "source_location": "L286",
       "_origin": "ast",
       "id": "lib_repositories_inventory_fetchmultipleproductsstockbycolor",
-      "community": 37,
+      "community": 447,
       "norm_label": "fetchmultipleproductsstockbycolor()"
     },
     {
@@ -45099,7 +45099,7 @@
       "source_location": "L450",
       "_origin": "ast",
       "id": "lib_repositories_inventory_fetchmultipleproductsstockbycolorporfilial",
-      "community": 37,
+      "community": 447,
       "norm_label": "fetchmultipleproductsstockbycolorporfilial()"
     },
     {
@@ -45109,7 +45109,7 @@
       "source_location": "L560",
       "_origin": "ast",
       "id": "lib_repositories_inventory_stocksummaryparams",
-      "community": 37,
+      "community": 447,
       "norm_label": "stocksummaryparams"
     },
     {
@@ -45119,7 +45119,7 @@
       "source_location": "L580",
       "_origin": "ast",
       "id": "lib_repositories_inventory_stocksummary",
-      "community": 37,
+      "community": 447,
       "norm_label": "stocksummary"
     },
     {
@@ -45129,7 +45129,7 @@
       "source_location": "L590",
       "_origin": "ast",
       "id": "lib_repositories_inventory_fetchstocksummary",
-      "community": 37,
+      "community": 447,
       "norm_label": "fetchstocksummary()"
     },
     {
@@ -47339,7 +47339,7 @@
       "source_location": "L1302",
       "_origin": "ast",
       "id": "lib_repositories_products_fetchproductswithdetailsecommerce",
-      "community": 37,
+      "community": 447,
       "norm_label": "fetchproductswithdetailsecommerce()"
     },
     {
@@ -48719,7 +48719,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_reportestoque",
-      "community": 63,
+      "community": 25,
       "norm_label": "reportestoque.ts"
     },
     {
@@ -48729,7 +48729,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "lib_repositories_reportestoque_excluded_filial_labels",
-      "community": 63,
+      "community": 25,
       "norm_label": "excluded_filial_labels"
     },
     {
@@ -48739,7 +48739,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "lib_repositories_reportestoque_isexcludedlabel",
-      "community": 63,
+      "community": 25,
       "norm_label": "isexcludedlabel()"
     },
     {
@@ -48749,7 +48749,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "lib_repositories_reportestoque_roundint",
-      "community": 63,
+      "community": 25,
       "norm_label": "roundint()"
     },
     {
@@ -48759,7 +48759,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "lib_repositories_reportestoque_agg",
-      "community": 63,
+      "community": 25,
       "norm_label": "agg"
     },
     {
@@ -48769,7 +48769,7 @@
       "source_location": "L54",
       "_origin": "ast",
       "id": "lib_repositories_reportestoque_fetchestoquerede",
-      "community": 63,
+      "community": 25,
       "norm_label": "fetchestoquerede()"
     },
     {
@@ -48779,7 +48779,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_reportprodutoscadastro",
-      "community": 63,
+      "community": 25,
       "norm_label": "reportprodutoscadastro.ts"
     },
     {
@@ -48789,7 +48789,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "lib_repositories_reportprodutoscadastro_roundint",
-      "community": 63,
+      "community": 25,
       "norm_label": "roundint()"
     },
     {
@@ -48799,7 +48799,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "lib_repositories_reportprodutoscadastro_fetchprodutoscadastro",
-      "community": 63,
+      "community": 25,
       "norm_label": "fetchprodutoscadastro()"
     },
     {
@@ -48809,7 +48809,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_reportprodutosparados",
-      "community": 63,
+      "community": 25,
       "norm_label": "reportprodutosparados.ts"
     },
     {
@@ -48819,7 +48819,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "lib_repositories_reportprodutosparados_up",
-      "community": 63,
+      "community": 25,
       "norm_label": "up()"
     },
     {
@@ -48829,7 +48829,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "lib_repositories_reportprodutosparados_normalizeset",
-      "community": 63,
+      "community": 25,
       "norm_label": "normalizeset()"
     },
     {
@@ -48839,7 +48839,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "lib_repositories_reportprodutosparados_roundint",
-      "community": 63,
+      "community": 25,
       "norm_label": "roundint()"
     },
     {
@@ -48849,7 +48849,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "lib_repositories_reportprodutosparados_fetchprodutosparados",
-      "community": 63,
+      "community": 25,
       "norm_label": "fetchprodutosparados()"
     },
     {
@@ -49059,7 +49059,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_reportvendashistorico",
-      "community": 41,
+      "community": 25,
       "norm_label": "reportvendashistorico.ts"
     },
     {
@@ -49069,7 +49069,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "lib_repositories_reportvendashistorico_round2",
-      "community": 41,
+      "community": 25,
       "norm_label": "round2()"
     },
     {
@@ -49079,7 +49079,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "lib_repositories_reportvendashistorico_roundint",
-      "community": 41,
+      "community": 25,
       "norm_label": "roundint()"
     },
     {
@@ -49089,7 +49089,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "lib_repositories_reportvendashistorico_toisodate",
-      "community": 41,
+      "community": 25,
       "norm_label": "toisodate()"
     },
     {
@@ -49099,7 +49099,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "lib_repositories_reportvendashistorico_prepinlist",
-      "community": 41,
+      "community": 25,
       "norm_label": "prepinlist()"
     },
     {
@@ -49109,7 +49109,7 @@
       "source_location": "L53",
       "_origin": "ast",
       "id": "lib_repositories_reportvendashistorico_rawrow",
-      "community": 41,
+      "community": 25,
       "norm_label": "rawrow"
     },
     {
@@ -49119,7 +49119,7 @@
       "source_location": "L83",
       "_origin": "ast",
       "id": "lib_repositories_reportvendashistorico_fetchvendashistorico",
-      "community": 41,
+      "community": 25,
       "norm_label": "fetchvendashistorico()"
     },
     {
@@ -54949,7 +54949,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "lib_utils_destino_romaneio_store_key",
-      "community": 37,
+      "community": 447,
       "norm_label": "key()"
     },
     {
@@ -58059,7 +58059,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_utils_generatestockactionspdf",
-      "community": 75,
+      "community": 92,
       "norm_label": "generatestockactionspdf.ts"
     },
     {
@@ -58069,7 +58069,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "lib_utils_generatestockactionspdf_transferaction",
-      "community": 75,
+      "community": 92,
       "norm_label": "transferaction"
     },
     {
@@ -58079,7 +58079,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "lib_utils_generatestockactionspdf_purchaseaction",
-      "community": 75,
+      "community": 92,
       "norm_label": "purchaseaction"
     },
     {
@@ -58089,7 +58089,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "lib_utils_generatestockactionspdf_calculatemonthlyprojection",
-      "community": 75,
+      "community": 92,
       "norm_label": "calculatemonthlyprojection()"
     },
     {
@@ -58099,7 +58099,7 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "lib_utils_generatestockactionspdf_formatproductdescription",
-      "community": 75,
+      "community": 92,
       "norm_label": "formatproductdescription()"
     },
     {
@@ -58109,7 +58109,7 @@
       "source_location": "L71",
       "_origin": "ast",
       "id": "lib_utils_generatestockactionspdf_analyzestockactions",
-      "community": 75,
+      "community": 92,
       "norm_label": "analyzestockactions()"
     },
     {
@@ -58119,7 +58119,7 @@
       "source_location": "L260",
       "_origin": "ast",
       "id": "lib_utils_generatestockactionspdf_generatestockactionspdf",
-      "community": 75,
+      "community": 92,
       "norm_label": "generatestockactionspdf()"
     },
     {
@@ -59789,7 +59789,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_utils_redis_client",
-      "community": 125,
+      "community": 138,
       "norm_label": "redis-client.ts"
     },
     {
@@ -59799,7 +59799,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "lib_utils_redis_client_getredisenv",
-      "community": 125,
+      "community": 138,
       "norm_label": "getredisenv()"
     },
     {
@@ -59809,7 +59809,7 @@
       "source_location": "L42",
       "_origin": "ast",
       "id": "lib_utils_redis_client_getredis",
-      "community": 125,
+      "community": 138,
       "norm_label": "getredis()"
     },
     {
@@ -59819,7 +59819,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "lib_utils_redis_client_isredisconfigured",
-      "community": 125,
+      "community": 138,
       "norm_label": "isredisconfigured()"
     },
     {
@@ -59989,7 +59989,7 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "lib_utils_romaneio_confirmacao_store_itemkey",
-      "community": 125,
+      "community": 138,
       "norm_label": "itemkey()"
     },
     {
@@ -60136,7 +60136,7 @@
       "label": "DATA_FILE",
       "file_type": "code",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L28",
+      "source_location": "L22",
       "_origin": "ast",
       "id": "lib_utils_saida_entrada_draft_store_data_file",
       "community": 127,
@@ -60146,7 +60146,7 @@
       "label": "TipoOperacaoRascunho",
       "file_type": "code",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L30",
+      "source_location": "L24",
       "_origin": "ast",
       "id": "lib_utils_saida_entrada_draft_store_tipooperacaorascunho",
       "community": 127,
@@ -60156,7 +60156,7 @@
       "label": "RascunhoItem",
       "file_type": "code",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L32",
+      "source_location": "L26",
       "_origin": "ast",
       "id": "lib_utils_saida_entrada_draft_store_rascunhoitem",
       "community": 127,
@@ -60166,7 +60166,7 @@
       "label": "SaidaEntradaRascunho",
       "file_type": "code",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L43",
+      "source_location": "L37",
       "_origin": "ast",
       "id": "lib_utils_saida_entrada_draft_store_saidaentradarascunho",
       "community": 127,
@@ -60176,7 +60176,7 @@
       "label": "SalvarRascunhoInput",
       "file_type": "code",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L62",
+      "source_location": "L54",
       "_origin": "ast",
       "id": "lib_utils_saida_entrada_draft_store_salvarrascunhoinput",
       "community": 127,
@@ -60186,7 +60186,7 @@
       "label": "norm()",
       "file_type": "code",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L78",
+      "source_location": "L69",
       "_origin": "ast",
       "id": "lib_utils_saida_entrada_draft_store_norm",
       "community": 127,
@@ -60196,7 +60196,7 @@
       "label": "rascunhoId()",
       "file_type": "code",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L86",
+      "source_location": "L77",
       "_origin": "ast",
       "id": "lib_utils_saida_entrada_draft_store_rascunhoid",
       "community": 127,
@@ -60206,7 +60206,7 @@
       "label": "sanitizeItens()",
       "file_type": "code",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L104",
+      "source_location": "L91",
       "_origin": "ast",
       "id": "lib_utils_saida_entrada_draft_store_sanitizeitens",
       "community": 127,
@@ -60216,7 +60216,7 @@
       "label": "toIso()",
       "file_type": "code",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L122",
+      "source_location": "L109",
       "_origin": "ast",
       "id": "lib_utils_saida_entrada_draft_store_toiso",
       "community": 127,
@@ -60226,7 +60226,7 @@
       "label": "rowToRascunho()",
       "file_type": "code",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L128",
+      "source_location": "L115",
       "_origin": "ast",
       "id": "lib_utils_saida_entrada_draft_store_rowtorascunho",
       "community": 127,
@@ -60236,7 +60236,7 @@
       "label": "ensureDataDir()",
       "file_type": "code",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L151",
+      "source_location": "L137",
       "_origin": "ast",
       "id": "lib_utils_saida_entrada_draft_store_ensuredatadir",
       "community": 127,
@@ -60246,7 +60246,7 @@
       "label": "readFileRascunhos()",
       "file_type": "code",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L156",
+      "source_location": "L142",
       "_origin": "ast",
       "id": "lib_utils_saida_entrada_draft_store_readfilerascunhos",
       "community": 127,
@@ -60256,7 +60256,7 @@
       "label": "writeFileRascunhos()",
       "file_type": "code",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L167",
+      "source_location": "L153",
       "_origin": "ast",
       "id": "lib_utils_saida_entrada_draft_store_writefilerascunhos",
       "community": 127,
@@ -60266,7 +60266,7 @@
       "label": "objetoJaExiste()",
       "file_type": "code",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L182",
+      "source_location": "L168",
       "_origin": "ast",
       "id": "lib_utils_saida_entrada_draft_store_objetojaexiste",
       "community": 127,
@@ -60276,7 +60276,7 @@
       "label": "ddl()",
       "file_type": "code",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L187",
+      "source_location": "L173",
       "_origin": "ast",
       "id": "lib_utils_saida_entrada_draft_store_ddl",
       "community": 127,
@@ -60286,7 +60286,7 @@
       "label": "runMigrations()",
       "file_type": "code",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L195",
+      "source_location": "L181",
       "_origin": "ast",
       "id": "lib_utils_saida_entrada_draft_store_runmigrations",
       "community": 127,
@@ -60296,7 +60296,7 @@
       "label": "ensureTable()",
       "file_type": "code",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L225",
+      "source_location": "L206",
       "_origin": "ast",
       "id": "lib_utils_saida_entrada_draft_store_ensuretable",
       "community": 127,
@@ -60306,7 +60306,7 @@
       "label": "salvarRascunho()",
       "file_type": "code",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L241",
+      "source_location": "L222",
       "_origin": "ast",
       "id": "lib_utils_saida_entrada_draft_store_salvarrascunho",
       "community": 127,
@@ -60316,7 +60316,7 @@
       "label": "listarRascunhos()",
       "file_type": "code",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L321",
+      "source_location": "L298",
       "_origin": "ast",
       "id": "lib_utils_saida_entrada_draft_store_listarrascunhos",
       "community": 127,
@@ -60326,7 +60326,7 @@
       "label": "buscarRascunho()",
       "file_type": "code",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L344",
+      "source_location": "L321",
       "_origin": "ast",
       "id": "lib_utils_saida_entrada_draft_store_buscarrascunho",
       "community": 127,
@@ -60336,7 +60336,7 @@
       "label": "removerRascunho()",
       "file_type": "code",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L359",
+      "source_location": "L336",
       "_origin": "ast",
       "id": "lib_utils_saida_entrada_draft_store_removerrascunho",
       "community": 127,
@@ -61349,7 +61349,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_utils_transferencias_quantidade_real_storage",
-      "community": 160,
+      "community": 174,
       "norm_label": "transferencias-quantidade-real-storage.ts"
     },
     {
@@ -61359,7 +61359,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "lib_utils_transferencias_quantidade_real_storage_ensuretable",
-      "community": 160,
+      "community": 174,
       "norm_label": "ensuretable()"
     },
     {
@@ -61369,7 +61369,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "lib_utils_transferencias_quantidade_real_storage_quantidadesreaismap",
-      "community": 160,
+      "community": 174,
       "norm_label": "quantidadesreaismap"
     },
     {
@@ -61379,7 +61379,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "lib_utils_transferencias_quantidade_real_storage_readquantidadesreais",
-      "community": 160,
+      "community": 174,
       "norm_label": "readquantidadesreais()"
     },
     {
@@ -61389,7 +61389,7 @@
       "source_location": "L57",
       "_origin": "ast",
       "id": "lib_utils_transferencias_quantidade_real_storage_writequantidadesreais",
-      "community": 160,
+      "community": 174,
       "norm_label": "writequantidadesreais()"
     },
     {
@@ -61399,7 +61399,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_utils_transferencias_realizadas_storage",
-      "community": 125,
+      "community": 138,
       "norm_label": "transferencias-realizadas-storage.ts"
     },
     {
@@ -61409,7 +61409,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "lib_utils_transferencias_realizadas_storage_transferenciasrealizadasdata",
-      "community": 125,
+      "community": 138,
       "norm_label": "transferenciasrealizadasdata"
     },
     {
@@ -61419,7 +61419,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "lib_utils_transferencias_realizadas_storage_ensuretable",
-      "community": 125,
+      "community": 138,
       "norm_label": "ensuretable()"
     },
     {
@@ -61429,7 +61429,7 @@
       "source_location": "L42",
       "_origin": "ast",
       "id": "lib_utils_transferencias_realizadas_storage_readtransferenciasrealizadas",
-      "community": 125,
+      "community": 138,
       "norm_label": "readtransferenciasrealizadas()"
     },
     {
@@ -61439,7 +61439,7 @@
       "source_location": "L124",
       "_origin": "ast",
       "id": "lib_utils_transferencias_realizadas_storage_writetransferenciasrealizadas",
-      "community": 125,
+      "community": 138,
       "norm_label": "writetransferenciasrealizadas()"
     },
     {
@@ -62519,7 +62519,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "proxy_server_proxy_helpers",
-      "community": 37,
+      "community": 447,
       "norm_label": "proxy-helpers.js"
     },
     {
@@ -62529,7 +62529,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "proxy_server_proxy_helpers_executequerywithparams",
-      "community": 37,
+      "community": 447,
       "norm_label": "executequerywithparams()"
     },
     {
@@ -62539,7 +62539,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "proxy_server_proxy_helpers_getsqltype",
-      "community": 37,
+      "community": 447,
       "norm_label": "getsqltype()"
     },
     {
@@ -66129,7 +66129,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "types_auth_usersession",
-      "community": 18,
+      "community": 120,
       "norm_label": "usersession"
     },
     {
@@ -108442,7 +108442,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "app/api/saidas-entradas-produtos/rascunhos/route.ts",
-      "source_location": "L100",
+      "source_location": "L97",
       "weight": 1.0,
       "source": "app_api_saidas_entradas_produtos_rascunhos_route",
       "target": "app_api_saidas_entradas_produtos_rascunhos_route_delete",
@@ -108452,7 +108452,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "app/api/saidas-entradas-produtos/rascunhos/route.ts",
-      "source_location": "L31",
+      "source_location": "L30",
       "weight": 1.0,
       "source": "app_api_saidas_entradas_produtos_rascunhos_route",
       "target": "app_api_saidas_entradas_produtos_rascunhos_route_get",
@@ -108462,7 +108462,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "app/api/saidas-entradas-produtos/rascunhos/route.ts",
-      "source_location": "L23",
+      "source_location": "L22",
       "weight": 1.0,
       "source": "app_api_saidas_entradas_produtos_rascunhos_route",
       "target": "app_api_saidas_entradas_produtos_rascunhos_route_getusername",
@@ -108472,7 +108472,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "app/api/saidas-entradas-produtos/rascunhos/route.ts",
-      "source_location": "L27",
+      "source_location": "L26",
       "weight": 1.0,
       "source": "app_api_saidas_entradas_produtos_rascunhos_route",
       "target": "app_api_saidas_entradas_produtos_rascunhos_route_normalizetipo",
@@ -108482,7 +108482,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "app/api/saidas-entradas-produtos/rascunhos/route.ts",
-      "source_location": "L48",
+      "source_location": "L47",
       "weight": 1.0,
       "source": "app_api_saidas_entradas_produtos_rascunhos_route",
       "target": "app_api_saidas_entradas_produtos_rascunhos_route_put",
@@ -108581,7 +108581,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "app/api/saidas-entradas-produtos/rascunhos/route.ts",
-      "source_location": "L101",
+      "source_location": "L98",
       "weight": 1.0,
       "source": "app_api_saidas_entradas_produtos_rascunhos_route_delete",
       "target": "app_api_saidas_entradas_produtos_rascunhos_route_getusername",
@@ -108592,7 +108592,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "app/api/saidas-entradas-produtos/rascunhos/route.ts",
-      "source_location": "L49",
+      "source_location": "L48",
       "weight": 1.0,
       "source": "app_api_saidas_entradas_produtos_rascunhos_route_put",
       "target": "app_api_saidas_entradas_produtos_rascunhos_route_getusername",
@@ -108603,7 +108603,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "app/api/saidas-entradas-produtos/rascunhos/route.ts",
-      "source_location": "L122",
+      "source_location": "L119",
       "weight": 1.0,
       "source": "app_api_saidas_entradas_produtos_rascunhos_route_delete",
       "target": "app_api_saidas_entradas_produtos_rascunhos_route_normalizetipo",
@@ -108614,7 +108614,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "app/api/saidas-entradas-produtos/rascunhos/route.ts",
-      "source_location": "L82",
+      "source_location": "L80",
       "weight": 1.0,
       "source": "app_api_saidas_entradas_produtos_rascunhos_route_put",
       "target": "app_api_saidas_entradas_produtos_rascunhos_route_normalizetipo",
@@ -108626,7 +108626,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/api/saidas-entradas-produtos/rascunhos/route.ts",
-      "source_location": "L40",
+      "source_location": "L39",
       "weight": 1.0,
       "source": "app_api_saidas_entradas_produtos_rascunhos_route_get",
       "target": "lib_utils_saida_entrada_draft_store_listarrascunhos"
@@ -108637,7 +108637,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/api/saidas-entradas-produtos/rascunhos/route.ts",
-      "source_location": "L79",
+      "source_location": "L77",
       "weight": 1.0,
       "source": "app_api_saidas_entradas_produtos_rascunhos_route_put",
       "target": "lib_utils_saida_entrada_draft_store_salvarrascunho"
@@ -108648,7 +108648,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/api/saidas-entradas-produtos/rascunhos/route.ts",
-      "source_location": "L110",
+      "source_location": "L107",
       "weight": 1.0,
       "source": "app_api_saidas_entradas_produtos_rascunhos_route_delete",
       "target": "lib_utils_saida_entrada_draft_store_buscarrascunho"
@@ -108659,7 +108659,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/api/saidas-entradas-produtos/rascunhos/route.ts",
-      "source_location": "L132",
+      "source_location": "L128",
       "weight": 1.0,
       "source": "app_api_saidas_entradas_produtos_rascunhos_route_delete",
       "target": "lib_utils_saida_entrada_draft_store_rascunhoid"
@@ -108670,7 +108670,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/api/saidas-entradas-produtos/rascunhos/route.ts",
-      "source_location": "L112",
+      "source_location": "L109",
       "weight": 1.0,
       "source": "app_api_saidas_entradas_produtos_rascunhos_route_delete",
       "target": "lib_utils_saida_entrada_draft_store_removerrascunho"
@@ -115123,7 +115123,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L1648",
+      "source_location": "L1638",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_ajuste_estoque_ajustaritempanel_chave"
@@ -117218,7 +117218,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L725",
+      "source_location": "L715",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_auth_authcontext_useauth"
@@ -150559,7 +150559,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L556",
+      "source_location": "L554",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_biparcodigo",
@@ -150599,7 +150599,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L367",
+      "source_location": "L365",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_buscarprodutoporcodigobarras",
@@ -150609,7 +150609,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L136",
+      "source_location": "L134",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_defeitododia",
@@ -150619,7 +150619,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L111",
+      "source_location": "L109",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_defeitofilialoption",
@@ -150629,7 +150629,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L669",
+      "source_location": "L659",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_entradaeditando",
@@ -150639,7 +150639,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L463",
+      "source_location": "L461",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_executaroperacaolote",
@@ -150649,7 +150649,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L535",
+      "source_location": "L533",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_fetchdefeitododia",
@@ -150659,7 +150659,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L676",
+      "source_location": "L666",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_fetchentradaparaedicao",
@@ -150669,7 +150669,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L351",
+      "source_location": "L349",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_fetchfiliais",
@@ -150679,7 +150679,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L518",
+      "source_location": "L516",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_fetchlogentradas",
@@ -150689,7 +150689,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L505",
+      "source_location": "L503",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_fetchlogsaidas",
@@ -150699,7 +150699,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L330",
+      "source_location": "L328",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_fetchpermissoes",
@@ -150709,7 +150709,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L583",
+      "source_location": "L581",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_fetchrascunhos",
@@ -150719,7 +150719,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L450",
+      "source_location": "L448",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_fetchresponsaveis",
@@ -150729,7 +150729,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L437",
+      "source_location": "L435",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_fetchtiposromaneio",
@@ -150749,7 +150749,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L226",
+      "source_location": "L224",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_formatlogdate",
@@ -150759,7 +150759,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L214",
+      "source_location": "L212",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_formatlogdatetime",
@@ -150769,7 +150769,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L236",
+      "source_location": "L234",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_formatlogroute",
@@ -150779,7 +150779,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L263",
+      "source_location": "L261",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_getfilialmatchtokens",
@@ -150789,7 +150789,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L131",
+      "source_location": "L129",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_istipodefeito",
@@ -150799,7 +150799,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L121",
+      "source_location": "L119",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_istiposemdestino",
@@ -150809,7 +150809,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L126",
+      "source_location": "L124",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_istransferenciaentrelojas",
@@ -150819,7 +150819,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L659",
+      "source_location": "L649",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_itementradaexistente",
@@ -150829,7 +150829,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L274",
+      "source_location": "L272",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_matchesfilialoption",
@@ -150839,7 +150839,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L285",
+      "source_location": "L283",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_matchfilial",
@@ -150849,7 +150849,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L173",
+      "source_location": "L171",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_normalizartiporomaneio",
@@ -150859,7 +150859,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L280",
+      "source_location": "L278",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_normalizedigits",
@@ -150869,7 +150869,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L256",
+      "source_location": "L254",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_normalizefilialvalue",
@@ -150879,7 +150879,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L188",
+      "source_location": "L186",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_parsebackenddatetime",
@@ -150919,7 +150919,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L109",
+      "source_location": "L107",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_rascunhostatus",
@@ -150929,7 +150929,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L607",
+      "source_location": "L605",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_removerrascunhoapi",
@@ -150939,7 +150939,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L721",
+      "source_location": "L711",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
@@ -150949,7 +150949,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L147",
+      "source_location": "L145",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospageprops",
@@ -150959,7 +150959,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L638",
+      "source_location": "L628",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_salvardestinoromaneio",
@@ -150969,7 +150969,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L700",
+      "source_location": "L690",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_salvaritensnoromaneioentrada",
@@ -150979,7 +150979,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L595",
+      "source_location": "L593",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_salvarrascunhoapi",
@@ -150989,7 +150989,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L317",
+      "source_location": "L315",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_samemodalcart",
@@ -150999,7 +150999,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L389",
+      "source_location": "L387",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_searchprodutos",
@@ -151009,7 +151009,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L182",
+      "source_location": "L180",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_textocorproduto",
@@ -151019,7 +151019,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L169",
+      "source_location": "L167",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_tipooperacao",
@@ -151029,7 +151029,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L117",
+      "source_location": "L115",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_tipos_sem_filial_destino",
@@ -151049,7 +151049,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L152",
+      "source_location": "L150",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_transferenciapermissao",
@@ -151137,7 +151137,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L112",
+      "source_location": "L110",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_defeitofilialoption",
       "target": "lib_config_filiais_especiais_getdefeitofilial",
@@ -151148,7 +151148,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L851",
+      "source_location": "L841",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_defeitofilialoption",
@@ -151160,7 +151160,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L123",
+      "source_location": "L121",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_istiposemdestino",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_tipos_sem_filial_destino"
@@ -151170,7 +151170,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L864",
+      "source_location": "L854",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_istiposemdestino",
@@ -151181,7 +151181,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L2225",
+      "source_location": "L2188",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_istransferenciaentrelojas",
@@ -151192,7 +151192,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L874",
+      "source_location": "L864",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_istipodefeito",
@@ -151203,7 +151203,7 @@
       "context": "field",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L148",
+      "source_location": "L146",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospageprops",
       "target": "lib_config_company_companykey",
@@ -151214,7 +151214,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L781",
+      "source_location": "L771",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_normalizartiporomaneio",
@@ -151225,7 +151225,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L1665",
+      "source_location": "L1655",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_textocorproduto",
@@ -151236,7 +151236,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L227",
+      "source_location": "L225",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_formatlogdate",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_parsebackenddatetime",
@@ -151247,7 +151247,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L215",
+      "source_location": "L213",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_formatlogdatetime",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_parsebackenddatetime",
@@ -151258,7 +151258,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L2919",
+      "source_location": "L2857",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_formatlogdatetime",
@@ -151269,7 +151269,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L3026",
+      "source_location": "L2964",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_formatlogdate",
@@ -151280,7 +151280,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L244",
+      "source_location": "L242",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_formatlogroute",
       "target": "lib_config_company_getfiliallabelfordisplay",
@@ -151291,7 +151291,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L3000",
+      "source_location": "L2938",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_formatlogroute",
@@ -151302,7 +151302,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L275",
+      "source_location": "L273",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_matchesfilialoption",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_normalizefilialvalue",
@@ -151313,7 +151313,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L287",
+      "source_location": "L285",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_matchfilial",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_normalizefilialvalue",
@@ -151324,7 +151324,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L277",
+      "source_location": "L275",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_matchesfilialoption",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_getfilialmatchtokens",
@@ -151335,7 +151335,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L975",
+      "source_location": "L965",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_matchesfilialoption",
@@ -151346,7 +151346,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L304",
+      "source_location": "L302",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_matchfilial",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_normalizedigits",
@@ -151357,7 +151357,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L2587",
+      "source_location": "L2533",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_matchfilial",
@@ -151368,7 +151368,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L1235",
+      "source_location": "L1225",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_samemodalcart",
@@ -151379,7 +151379,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L959",
+      "source_location": "L949",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_fetchfiliais",
@@ -151390,7 +151390,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L1305",
+      "source_location": "L1295",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_buscarprodutoporcodigobarras",
@@ -151401,7 +151401,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L1310",
+      "source_location": "L1300",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_searchprodutos",
@@ -151412,7 +151412,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L1859",
+      "source_location": "L1849",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_executaroperacaolote",
@@ -151423,7 +151423,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L1907",
+      "source_location": "L1897",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_fetchlogsaidas",
@@ -151434,7 +151434,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L1907",
+      "source_location": "L1897",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_fetchlogentradas",
@@ -151445,7 +151445,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L892",
+      "source_location": "L882",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_fetchdefeitododia",
@@ -151456,7 +151456,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L1733",
+      "source_location": "L1723",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_biparcodigo",
@@ -151467,7 +151467,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L1903",
+      "source_location": "L1893",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_fetchrascunhos",
@@ -151478,7 +151478,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L2400",
+      "source_location": "L2358",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_salvarrascunhoapi",
@@ -151489,7 +151489,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L1893",
+      "source_location": "L1883",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_removerrascunhoapi",
@@ -151500,7 +151500,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L1874",
+      "source_location": "L1864",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_salvardestinoromaneio",
@@ -151511,7 +151511,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L1932",
+      "source_location": "L1922",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_fetchentradaparaedicao",
@@ -151522,7 +151522,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L2007",
+      "source_location": "L1995",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_salvaritensnoromaneioentrada",
@@ -151534,7 +151534,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L840",
+      "source_location": "L830",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "lib_config_company_getfiliallabelfordisplay"
@@ -151545,7 +151545,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L837",
+      "source_location": "L827",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "lib_config_company_resolvecompany"
@@ -151556,7 +151556,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L2099",
+      "source_location": "L2062",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "scripts_migrar_destino_galeao_log"
@@ -189222,7 +189222,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L348",
+      "source_location": "L325",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store_buscarrascunho",
       "target": "lib_db_neon_haspostgres"
@@ -189233,7 +189233,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L325",
+      "source_location": "L302",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store_listarrascunhos",
       "target": "lib_db_neon_haspostgres"
@@ -189244,7 +189244,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L363",
+      "source_location": "L340",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store_removerrascunho",
       "target": "lib_db_neon_haspostgres"
@@ -189255,7 +189255,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L266",
+      "source_location": "L246",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store_salvarrascunho",
       "target": "lib_db_neon_haspostgres"
@@ -190817,7 +190817,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L352",
+      "source_location": "L329",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store_buscarrascunho",
       "target": "lib_db_neon_getneonsql"
@@ -190828,7 +190828,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L331",
+      "source_location": "L308",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store_listarrascunhos",
       "target": "lib_db_neon_getneonsql"
@@ -190839,7 +190839,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L370",
+      "source_location": "L347",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store_removerrascunho",
       "target": "lib_db_neon_getneonsql"
@@ -190849,7 +190849,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L196",
+      "source_location": "L182",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store_runmigrations",
       "target": "lib_db_neon_getneonsql",
@@ -190861,7 +190861,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L292",
+      "source_location": "L271",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store_salvarrascunho",
       "target": "lib_db_neon_getneonsql"
@@ -256945,7 +256945,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L344",
+      "source_location": "L321",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store",
       "target": "lib_utils_saida_entrada_draft_store_buscarrascunho",
@@ -256955,7 +256955,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L28",
+      "source_location": "L22",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store",
       "target": "lib_utils_saida_entrada_draft_store_data_file",
@@ -256965,7 +256965,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L187",
+      "source_location": "L173",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store",
       "target": "lib_utils_saida_entrada_draft_store_ddl",
@@ -256975,7 +256975,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L151",
+      "source_location": "L137",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store",
       "target": "lib_utils_saida_entrada_draft_store_ensuredatadir",
@@ -256985,7 +256985,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L225",
+      "source_location": "L206",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store",
       "target": "lib_utils_saida_entrada_draft_store_ensuretable",
@@ -256995,7 +256995,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L321",
+      "source_location": "L298",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store",
       "target": "lib_utils_saida_entrada_draft_store_listarrascunhos",
@@ -257005,7 +257005,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L78",
+      "source_location": "L69",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store",
       "target": "lib_utils_saida_entrada_draft_store_norm",
@@ -257015,7 +257015,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L182",
+      "source_location": "L168",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store",
       "target": "lib_utils_saida_entrada_draft_store_objetojaexiste",
@@ -257025,7 +257025,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L86",
+      "source_location": "L77",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store",
       "target": "lib_utils_saida_entrada_draft_store_rascunhoid",
@@ -257035,7 +257035,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L32",
+      "source_location": "L26",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store",
       "target": "lib_utils_saida_entrada_draft_store_rascunhoitem",
@@ -257045,7 +257045,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L156",
+      "source_location": "L142",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store",
       "target": "lib_utils_saida_entrada_draft_store_readfilerascunhos",
@@ -257055,7 +257055,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L359",
+      "source_location": "L336",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store",
       "target": "lib_utils_saida_entrada_draft_store_removerrascunho",
@@ -257065,7 +257065,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L128",
+      "source_location": "L115",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store",
       "target": "lib_utils_saida_entrada_draft_store_rowtorascunho",
@@ -257075,7 +257075,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L195",
+      "source_location": "L181",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store",
       "target": "lib_utils_saida_entrada_draft_store_runmigrations",
@@ -257085,7 +257085,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L43",
+      "source_location": "L37",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store",
       "target": "lib_utils_saida_entrada_draft_store_saidaentradarascunho",
@@ -257095,7 +257095,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L241",
+      "source_location": "L222",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store",
       "target": "lib_utils_saida_entrada_draft_store_salvarrascunho",
@@ -257105,7 +257105,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L62",
+      "source_location": "L54",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store",
       "target": "lib_utils_saida_entrada_draft_store_salvarrascunhoinput",
@@ -257115,7 +257115,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L104",
+      "source_location": "L91",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store",
       "target": "lib_utils_saida_entrada_draft_store_sanitizeitens",
@@ -257125,7 +257125,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L30",
+      "source_location": "L24",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store",
       "target": "lib_utils_saida_entrada_draft_store_tipooperacaorascunho",
@@ -257135,7 +257135,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L122",
+      "source_location": "L109",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store",
       "target": "lib_utils_saida_entrada_draft_store_toiso",
@@ -257145,7 +257145,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L167",
+      "source_location": "L153",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store",
       "target": "lib_utils_saida_entrada_draft_store_writefilerascunhos",
@@ -257156,7 +257156,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L345",
+      "source_location": "L322",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store_buscarrascunho",
       "target": "lib_utils_saida_entrada_draft_store_norm",
@@ -257167,7 +257167,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L322",
+      "source_location": "L299",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store_listarrascunhos",
       "target": "lib_utils_saida_entrada_draft_store_norm",
@@ -257178,7 +257178,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L94",
+      "source_location": "L84",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store_rascunhoid",
       "target": "lib_utils_saida_entrada_draft_store_norm",
@@ -257189,7 +257189,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L360",
+      "source_location": "L337",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store_removerrascunho",
       "target": "lib_utils_saida_entrada_draft_store_norm",
@@ -257200,7 +257200,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L132",
+      "source_location": "L119",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store_rowtorascunho",
       "target": "lib_utils_saida_entrada_draft_store_norm",
@@ -257211,7 +257211,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L244",
+      "source_location": "L225",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store_salvarrascunho",
       "target": "lib_utils_saida_entrada_draft_store_norm",
@@ -257222,7 +257222,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L110",
+      "source_location": "L97",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store_sanitizeitens",
       "target": "lib_utils_saida_entrada_draft_store_norm",
@@ -257233,7 +257233,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L253",
+      "source_location": "L233",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store_salvarrascunho",
       "target": "lib_utils_saida_entrada_draft_store_rascunhoid",
@@ -257244,7 +257244,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L143",
+      "source_location": "L129",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store_rowtorascunho",
       "target": "lib_utils_saida_entrada_draft_store_sanitizeitens",
@@ -257255,7 +257255,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L251",
+      "source_location": "L232",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store_salvarrascunho",
       "target": "lib_utils_saida_entrada_draft_store_sanitizeitens",
@@ -257266,7 +257266,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L144",
+      "source_location": "L130",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store_rowtorascunho",
       "target": "lib_utils_saida_entrada_draft_store_toiso",
@@ -257277,7 +257277,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L356",
+      "source_location": "L333",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store_buscarrascunho",
       "target": "lib_utils_saida_entrada_draft_store_rowtorascunho",
@@ -257288,7 +257288,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L341",
+      "source_location": "L318",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store_listarrascunhos",
       "target": "lib_utils_saida_entrada_draft_store_rowtorascunho",
@@ -257299,7 +257299,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L317",
+      "source_location": "L294",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store_salvarrascunho",
       "target": "lib_utils_saida_entrada_draft_store_rowtorascunho",
@@ -257310,7 +257310,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L157",
+      "source_location": "L143",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store_readfilerascunhos",
       "target": "lib_utils_saida_entrada_draft_store_ensuredatadir",
@@ -257321,7 +257321,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L168",
+      "source_location": "L154",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store_writefilerascunhos",
       "target": "lib_utils_saida_entrada_draft_store_ensuredatadir",
@@ -257332,7 +257332,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L349",
+      "source_location": "L326",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store_buscarrascunho",
       "target": "lib_utils_saida_entrada_draft_store_readfilerascunhos",
@@ -257343,7 +257343,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L326",
+      "source_location": "L303",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store_listarrascunhos",
       "target": "lib_utils_saida_entrada_draft_store_readfilerascunhos",
@@ -257354,10 +257354,32 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L364",
+      "source_location": "L341",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store_removerrascunho",
       "target": "lib_utils_saida_entrada_draft_store_readfilerascunhos",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "lib/utils/saida-entrada-draft-store.ts",
+      "source_location": "L247",
+      "weight": 1.0,
+      "source": "lib_utils_saida_entrada_draft_store_salvarrascunho",
+      "target": "lib_utils_saida_entrada_draft_store_readfilerascunhos",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "lib/utils/saida-entrada-draft-store.ts",
+      "source_location": "L343",
+      "weight": 1.0,
+      "source": "lib_utils_saida_entrada_draft_store_removerrascunho",
+      "target": "lib_utils_saida_entrada_draft_store_writefilerascunhos",
       "confidence_score": 1.0
     },
     {
@@ -257368,17 +257390,6 @@
       "source_location": "L267",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store_salvarrascunho",
-      "target": "lib_utils_saida_entrada_draft_store_readfilerascunhos",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L366",
-      "weight": 1.0,
-      "source": "lib_utils_saida_entrada_draft_store_removerrascunho",
       "target": "lib_utils_saida_entrada_draft_store_writefilerascunhos",
       "confidence_score": 1.0
     },
@@ -257387,18 +257398,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L288",
-      "weight": 1.0,
-      "source": "lib_utils_saida_entrada_draft_store_salvarrascunho",
-      "target": "lib_utils_saida_entrada_draft_store_writefilerascunhos",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L191",
+      "source_location": "L177",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store_ddl",
       "target": "lib_utils_saida_entrada_draft_store_objetojaexiste",
@@ -257409,7 +257409,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L197",
+      "source_location": "L183",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store_runmigrations",
       "target": "lib_utils_saida_entrada_draft_store_ddl",
@@ -257420,7 +257420,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L227",
+      "source_location": "L208",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store_ensuretable",
       "target": "lib_utils_saida_entrada_draft_store_runmigrations",
@@ -257431,7 +257431,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L353",
+      "source_location": "L330",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store_buscarrascunho",
       "target": "lib_utils_saida_entrada_draft_store_ensuretable",
@@ -257442,7 +257442,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L332",
+      "source_location": "L309",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store_listarrascunhos",
       "target": "lib_utils_saida_entrada_draft_store_ensuretable",
@@ -257453,7 +257453,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L371",
+      "source_location": "L348",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store_removerrascunho",
       "target": "lib_utils_saida_entrada_draft_store_ensuretable",
@@ -257464,7 +257464,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L293",
+      "source_location": "L272",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store_salvarrascunho",
       "target": "lib_utils_saida_entrada_draft_store_ensuretable",
@@ -257475,7 +257475,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/utils/saida-entrada-draft-store.ts",
-      "source_location": "L256",
+      "source_location": "L236",
       "weight": 1.0,
       "source": "lib_utils_saida_entrada_draft_store_salvarrascunho",
       "target": "lib_utils_saida_entrada_draft_store_removerrascunho",

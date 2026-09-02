@@ -1950,3 +1950,133 @@
   border-color: #4ade80 !important;
   box-shadow: 0 0 0 3px rgba(74, 222, 128, .2);
 }
+
+/* ─── Edição de romaneio de entrada (logística+) ────────────────── */
+/* Reabrir uma entrada já gravada e acrescentar itens. Os tokens de tema
+   (--entrada*) já viram dark sozinhos, então não há bloco dark aqui. */
+
+.logAddItensBtn {
+  background: var(--entrada-bg);
+  border: 1px solid var(--entrada-border);
+  color: var(--entrada);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  transition: background 120ms, border-color 120ms;
+}
+.logAddItensBtn:hover:not(:disabled) { background: #dbeafe; border-color: var(--entrada); }
+.logAddItensBtn:disabled { opacity: .5; cursor: not-allowed; }
+
+.edicaoEntradaBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--entrada-border);
+  border-left: 4px solid var(--entrada);
+  border-radius: var(--radius);
+  background: var(--entrada-bg);
+}
+
+.edicaoEntradaBannerTexto {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.edicaoEntradaBannerTexto strong { font-size: 15px; color: var(--entrada); }
+.edicaoEntradaBannerTexto span { font-size: 13px; color: var(--text-2); }
+
+.edicaoEntradaCancelarBtn {
+  flex-shrink: 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 120ms, color 120ms;
+}
+.edicaoEntradaCancelarBtn:hover:not(:disabled) { border-color: var(--text-2); color: var(--text); }
+.edicaoEntradaCancelarBtn:disabled { opacity: .5; cursor: not-allowed; }
+
+.itensJaEntradosBloco {
+  margin-bottom: 12px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.itensJaEntradosTitulo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-2);
+  border-bottom: 1px dashed var(--border);
+}
+
+.itensJaEntradosBadge {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--entrada);
+  background: var(--entrada-bg);
+  border: 1px solid var(--entrada-border);
+  border-radius: 999px;
+  padding: 1px 8px;
+  white-space: nowrap;
+}
+
+.itensJaEntradosLista {
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.itemJaEntrado {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border);
+  opacity: .8;
+}
+.itemJaEntrado:last-child { border-bottom: none; }
+
+.itemJaEntradoQtd {
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text-2);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 2px 10px;
+}
+
+/* pill do rascunho de EDIÇÃO de romaneio (aba Rascunhos) */
+.rascunhoEdicaoPill {
+  padding: 2px 7px;
+  border-radius: 9px;
+  background: rgba(217, 119, 6, .14);
+  color: #b45309;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+:global(:root[data-theme="dark"]) .rascunhoEdicaoPill {
+  background: rgba(251, 191, 36, .18);
+  color: #fcd34d;
+}

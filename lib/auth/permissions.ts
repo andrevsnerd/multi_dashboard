@@ -89,6 +89,20 @@ export function canSeeRomaneioAjuste(role: RoleKey | undefined | null): boolean 
 }
 
 /**
+ * Reabrir um romaneio de ENTRADA para acrescentar itens (igual ao Linx) e de
+ * logistica pra cima. O gerente registra a entrada da loja dele, mas NUNCA
+ * reabre um romaneio ja gravado — corrigir movimento de estoque e da logistica.
+ * Diretor/supervisor ficam de fora por serem somente-leitura (READ_ONLY_ROLES),
+ * entao o conjunto efetivo e admin + logistica.
+ */
+export const EDITAR_ENTRADA_ROLES: RoleKey[] = ["admin", "logistica"];
+
+/** True se a funcao pode acrescentar itens a um romaneio de entrada existente. */
+export function canEditarRomaneioEntrada(role: RoleKey | undefined | null): boolean {
+  return !!role && EDITAR_ENTRADA_ROLES.includes(role);
+}
+
+/**
  * Excecao pontual a filialAtribuida: quem aprova os romaneios de DEFEITO e a
  * MATRIZ (logistica), nao a loja que enviou. Entao a logistica confirma entrada
  * na filial de defeito da empresa (NERD DEFEITOS / BAZAR SCARF ME) ALEM da sua

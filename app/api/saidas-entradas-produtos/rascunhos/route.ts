@@ -15,7 +15,8 @@ import {
  *
  * GET    ?company=nerd                      → rascunhos pendentes da empresa
  * PUT    { company, tipoOperacao, filial, itens, … }  → salva/atualiza (lista vazia apaga)
- * DELETE ?company=&tipoOperacao=&filial=    → apaga o rascunho do usuário naquela filial
+ * DELETE ?company=&tipoOperacao=&filial=[&romaneioEdicao=] → apaga o rascunho do usuário
+ *                                            naquela filial (ou o da edição daquele romaneio)
  * DELETE ?id=…                              → apaga um rascunho específico (aba Rascunhos)
  */
 
@@ -61,6 +62,7 @@ export async function PUT(request: Request) {
       filialDestinoLabel?: string | null;
       tipoRomaneio?: string | null;
       observacao?: string | null;
+      romaneioEdicao?: string | null;
       itens?: RascunhoItem[];
     };
 
@@ -84,6 +86,7 @@ export async function PUT(request: Request) {
       filialDestinoLabel: body.filialDestinoLabel ?? null,
       tipoRomaneio: body.tipoRomaneio ?? null,
       observacao: body.observacao ?? null,
+      romaneioEdicao: body.romaneioEdicao ?? null,
       itens: Array.isArray(body.itens) ? body.itens : [],
     });
 
@@ -125,7 +128,8 @@ export async function DELETE(request: Request) {
       );
     }
 
-    await removerRascunho(rascunhoId(companyKey, username, tipoOperacao, filial));
+    const romaneioEdicao = (searchParams.get('romaneioEdicao') || '').trim() || null;
+    await removerRascunho(rascunhoId(companyKey, username, tipoOperacao, filial, romaneioEdicao));
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error('Erro ao remover rascunho de saída/entrada', error);

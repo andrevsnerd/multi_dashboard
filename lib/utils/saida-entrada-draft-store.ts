@@ -14,9 +14,15 @@ import { getNeonSql, hasPostgres } from "@/lib/db/neon";
  * sessão expirar antes de registrar o romaneio, tudo o que foi bipado se perde.
  * O rascunho é gravado a cada item, então a tela sempre volta de onde parou.
  *
- * Ciclo de vida: existe UM rascunho por (empresa × usuário × tipo × filial) — ele
- * É a lista da tela, não uma cópia. Ao registrar o romaneio com sucesso o
- * rascunho é apagado; enquanto não for registrado, aparece na aba "Rascunhos".
+ * Ciclo de vida: existe UM rascunho por (empresa × usuário × tipo × filial ×
+ * romaneio em edição) — ele É a lista da tela, não uma cópia. Ao registrar o
+ * romaneio com sucesso o rascunho é apagado; enquanto não for registrado,
+ * aparece na aba "Rascunhos".
+ *
+ * `romaneioEdicao` separa dois trabalhos que acontecem na MESMA filial e no
+ * mesmo tipo: montar um romaneio novo (vazio) e acrescentar itens a um romaneio
+ * de entrada já gravado. Sem essa dimensão os dois disputariam a mesma chave e
+ * um apagaria o outro.
  */
 
 const DATA_FILE = path.join(process.cwd(), "data", "saida-entrada-rascunhos.json");
@@ -46,6 +52,8 @@ export interface SaidaEntradaRascunho {
   filialDestinoLabel: string | null;
   tipoRomaneio: string;
   observacao: string;
+  /** Romaneio de entrada sendo editado; null quando o rascunho é de romaneio novo. */
+  romaneioEdicao: string | null;
   itens: RascunhoItem[];
   createdAt: string;
   updatedAt: string;
@@ -61,6 +69,7 @@ export interface SalvarRascunhoInput {
   filialDestinoLabel?: string | null;
   tipoRomaneio?: string | null;
   observacao?: string | null;
+  romaneioEdicao?: string | null;
   itens: RascunhoItem[];
 }
 
@@ -78,14 +87,18 @@ export function rascunhoId(
   companyKey: string,
   username: string,
   tipoOperacao: string,
-  filial: string
+  filial: string,
+  romaneioEdicao?: string | null
 ): string {
-  return [
+  const base = [
     norm(companyKey).toLowerCase(),
     norm(username).toLowerCase(),
     norm(tipoOperacao).toLowerCase(),
     norm(filial).toUpperCase(),
   ].join("::");
+  // Sufixo só quando há romaneio em edição: as chaves antigas continuam válidas.
+  const romaneio = norm(romaneioEdicao).toUpperCase();
+  return romaneio ? `${base}::R${romaneio}` : base;
 }
 
 function sanitizeItens(itens: unknown): RascunhoItem[] {
@@ -126,6 +139,7 @@ function rowToRascunho(row: Record<string, unknown>): SaidaEntradaRascunho {
     filialDestinoLabel: norm(row.filial_destino_label) || null,
     tipoRomaneio: norm(row.tipo_romaneio),
     observacao: norm(row.observacao),
+    romaneioEdicao: norm(row.romaneio_edicao) || null,
     itens: sanitizeItens(itens),
     createdAt: toIso(row.created_at),
     updatedAt: toIso(row.updated_at),
@@ -201,6 +215,11 @@ async function runMigrations(): Promise<void> {
     CREATE INDEX IF NOT EXISTS saida_entrada_rascunhos_company_idx
       ON saida_entrada_rascunhos (company_key, updated_at DESC)
   `);
+  // Coluna nova em base já criada: rascunho de edição de romaneio de entrada.
+  await ddl(() => sql`
+    ALTER TABLE saida_entrada_rascunhos
+      ADD COLUMN IF NOT EXISTS romaneio_edicao TEXT
+  `);
 }
 
 async function ensureTable(): Promise<void> {
@@ -230,7 +249,8 @@ export async function salvarRascunho(
   if (!companyKey || !username || !filial) return null;
 
   const itens = sanitizeItens(input.itens);
-  const id = rascunhoId(companyKey, username, tipoOperacao, filial);
+  const romaneioEdicao = norm(input.romaneioEdicao) || null;
+  const id = rascunhoId(companyKey, username, tipoOperacao, filial, romaneioEdicao);
 
   if (itens.length === 0) {
     await removerRascunho(id);
@@ -258,6 +278,7 @@ export async function salvarRascunho(
       filialDestinoLabel,
       tipoRomaneio,
       observacao,
+      romaneioEdicao,
       itens,
       createdAt: idx >= 0 ? rows[idx].createdAt : agora,
       updatedAt: agora,
@@ -274,11 +295,12 @@ export async function salvarRascunho(
   const result = await sql`
     INSERT INTO saida_entrada_rascunhos (
       id, company_key, username, tipo_operacao, filial, filial_label,
-      filial_destino, filial_destino_label, tipo_romaneio, observacao, itens, updated_at
+      filial_destino, filial_destino_label, tipo_romaneio, observacao,
+      romaneio_edicao, itens, updated_at
     ) VALUES (
       ${id}, ${companyKey}, ${username}, ${tipoOperacao}, ${filial}, ${filialLabel},
       ${filialDestino}, ${filialDestinoLabel}, ${tipoRomaneio}, ${observacao},
-      ${JSON.stringify(itens)}::jsonb, NOW()
+      ${romaneioEdicao}, ${JSON.stringify(itens)}::jsonb, NOW()
     )
     ON CONFLICT (id) DO UPDATE SET
       filial_label = EXCLUDED.filial_label,
@@ -286,6 +308,7 @@ export async function salvarRascunho(
       filial_destino_label = EXCLUDED.filial_destino_label,
       tipo_romaneio = EXCLUDED.tipo_romaneio,
       observacao = EXCLUDED.observacao,
+      romaneio_edicao = EXCLUDED.romaneio_edicao,
       itens = EXCLUDED.itens,
       updated_at = NOW()
     RETURNING *

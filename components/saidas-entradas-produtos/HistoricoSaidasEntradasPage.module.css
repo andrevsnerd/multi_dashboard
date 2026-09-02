@@ -46,6 +46,25 @@
 .itemOpenLink svg { width: 14px; height: 14px; }
 .itemOpenLink:hover { background: var(--s-100); }
 
+/* "+ itens": reabre a entrada na tela de Saídas e Entradas para acrescentar peça */
+.itemEditLink {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 700;
+  color: #2563eb;
+  border: 1px solid rgba(37, 99, 235, .45);
+  /* rgba em vez de cor sólida: o mesmo chip serve no claro e no dark. */
+  background: rgba(37, 99, 235, .10);
+  border-radius: 999px;
+  padding: 1px 8px;
+  transition: background 120ms, border-color 120ms;
+}
+.itemEditLink:hover { background: rgba(37, 99, 235, .20); border-color: #2563eb; }
+:global(:root[data-theme="dark"]) .itemEditLink { color: #93c5fd; }
+
 /* coluna direita: status + data */
 .itemRight { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
 .itemStatusPill {
