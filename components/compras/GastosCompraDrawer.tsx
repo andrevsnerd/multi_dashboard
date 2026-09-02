@@ -29,7 +29,7 @@ import {
 
 import ParcelasEditor from "./ParcelasEditor";
 import styles from "./GastosCompra.module.css";
-import { brl, codigoDistinto, dataBr, dataBrCompleta, money } from "./gastos-compra-format";
+import { brl, codigoDistinto, dataBr, dataBrCompleta, money, moneyUnit } from "./gastos-compra-format";
 
 interface Props {
   lote: CompraGastoLote;
@@ -237,7 +237,7 @@ export default function GastosCompraDrawer({
                         </td>
                         <td className={styles.num}>{item.qtd.toLocaleString("pt-BR")}</td>
                         <td className={styles.num}>
-                          {item.custoUnitario > 0 ? money(item.custoUnitario) : "—"}
+                          {item.custoUnitario > 0 ? moneyUnit(item.custoUnitario) : "—"}
                         </td>
                         <td className={styles.num}>{money(itemTotal(item))}</td>
                       </tr>

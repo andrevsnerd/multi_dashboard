@@ -97,6 +97,40 @@ lançadas não mudam** — o parcelamento delas está salvo. A regra nova vale p
 que for gerado dali em diante (ou para quem reabrir a compra e escolher o
 fornecedor de novo).
 
+## Catálogo Premier — preço padrão
+
+O tipo de compra **Premier** abre o catálogo inteiro com o **preço unitário de
+tabela já preenchido**: na prática o que muda de uma compra para a outra é a
+quantidade. O preço continua **editável** — reajuste é corrigido na linha, e o
+que a compra grava é o valor digitado, não o padrão.
+
+| Item | Preço un. padrão |
+| --- | --- |
+| Sacola SP63 | 3,1200 |
+| Caixa Lenço | 3,6500 |
+| Lamina | 0,3710 |
+| Faixinha | 0,1007 |
+| Tag | 0,1290 |
+| Sacola SP28 | *(sem preço de tabela)* |
+| Caixa CTC-90 | *(sem preço de tabela)* |
+| Caixa Rígida | *(sem preço de tabela)* |
+| Caixa Pashimina | 5,4790 |
+| Sacola SP11 | 5,8400 |
+
+A lista vive em `COMPRA_GASTO_PREMIER_CATALOGO`
+([lib/types/compra-gasto.ts](../lib/types/compra-gasto.ts)) — é lá que se muda
+preço ou se acrescenta item; a tela deriva tudo dela.
+
+⚠️ **São centavos com quatro casas, não milhar.** Faixinha e Tag custam décimos
+de centavo e a compra vem em milhares de unidades, então o preço unitário desta
+tela é lido, gravado e exibido com 4 casas (5.800 faixinhas: 0,1007 = R$ 584,06;
+arredondado para 0,10 daria R$ 580,00). Por isso `parsePrecoUnitario`/`moneyUnit`
+em vez de `parseMoeda`/`money`, e `numUnit` no store.
+
+Na mesma tela, **quantidade** é lida com `parseQtd`: em pt-BR "5.800 unidades"
+é cinco mil e oitocentos, e o ponto só vale como decimal quando não forma grupos
+de três ("1.5" = 1,5).
+
 ## Pontos de atenção
 
 - **Compra em trânsito → Pagamento:** o select é o mesmo, mais uma opção
@@ -108,7 +142,7 @@ fornecedor de novo).
   compra, então ele reancora sozinho na confirmação. Escolher o fornecedor lá
   monta o plano; o que vai para o painel é o plano, não o nome do calendário.
 - **Premier é as duas coisas**: um *tipo de compra* (o catálogo de embalagem e
-  material, com os itens prontos para preencher quantidade e preço) e um
+  material, já com o preço de tabela preenchido — só a quantidade é digitada) e um
   *fornecedor* (3x, 30/60/90). Escolher o tipo de compra Premier já marca o
   fornecedor Premier — dá para trocar depois, se a compra for de outro.
 - **Parcelas iguais** vêm do helper `iguaisEm([dias…])`: para mudar um prazo,

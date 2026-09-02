@@ -79,6 +79,51 @@ export function parseMoeda(texto: string): number {
   return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0;
 }
 
+/**
+ * Preço unitário: 2 casas no caso normal, até 4 quando o item custa décimos de
+ * centavo (embalagem Premier — faixinha a 0,1007). Formatar com `money` esconde
+ * a diferença que multiplicada por milhares de unidades vira dezenas de reais.
+ */
+export function moneyUnit(v: number): string {
+  return (Number(v) || 0).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  });
+}
+
+/**
+ * Preço unitário digitado — igual a `parseMoeda`, mas guardando 4 casas em vez
+ * de 2. Embalagem custa décimos de centavo: cortar em centavos aqui erra o
+ * total da compra (ver COMPRA_GASTO_PREMIER_CATALOGO).
+ */
+export function parsePrecoUnitario(texto: string): number {
+  const limpo = String(texto ?? "").trim().replace(/[^\d,.-]/g, "");
+  if (!limpo) return 0;
+  const temVirgula = limpo.includes(",");
+  const normalizado = temVirgula ? limpo.replace(/\./g, "").replace(",", ".") : limpo;
+  const n = Number(normalizado);
+  return Number.isFinite(n) ? Math.round(n * 10000) / 10000 : 0;
+}
+
+/**
+ * Quantidade digitada. Diferente do dinheiro: em pt-BR ninguém escreve "5.800
+ * unidades" querendo dizer 5,8 — o ponto é separador de milhar. Só é tratado
+ * como decimal quando NÃO forma grupos de 3 ("1.5" = 1,5); com vírgula na
+ * frente, o ponto é sempre milhar ("11.984,5").
+ */
+export function parseQtd(texto: string): number {
+  const limpo = String(texto ?? "").trim().replace(/[^\d,.-]/g, "");
+  if (!limpo) return 0;
+  const milharPuro = /^-?\d{1,3}(\.\d{3})+$/.test(limpo);
+  const normalizado = limpo.includes(",")
+    ? limpo.replace(/\./g, "").replace(",", ".")
+    : milharPuro
+      ? limpo.replace(/\./g, "")
+      : limpo;
+  const n = Number(normalizado);
+  return Number.isFinite(n) ? Math.round(n * 10000) / 10000 : 0;
+}
+
 /** Hoje no fuso de Brasília, YYYY-MM-DD (a tela compara datas como string). */
 export function hojeIso(): string {
   const agora = new Date();

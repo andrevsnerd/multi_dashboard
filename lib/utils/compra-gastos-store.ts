@@ -173,6 +173,16 @@ function num(v: unknown): number {
   return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0;
 }
 
+/**
+ * Preço unitário: 4 casas, não 2. Embalagem Premier custa décimos de centavo
+ * (faixinha a 0,1007) e a compra vem em milhares de unidades — arredondar aqui
+ * grava um item cujo total não fecha com o valor da parcela.
+ */
+function numUnit(v: unknown): number {
+  const n = typeof v === "string" ? Number(v) : (v as number);
+  return Number.isFinite(n) ? Math.round(n * 10000) / 10000 : 0;
+}
+
 function dateOnly(v: unknown): string | null {
   if (!v) return null;
   if (v instanceof Date) return v.toISOString().slice(0, 10);
@@ -187,7 +197,7 @@ export function normalizeItem(raw: Partial<CompraGastoItem>): CompraGastoItem {
     corProduto: raw?.corProduto ? String(raw.corProduto).trim() : null,
     corDescricao: raw?.corDescricao ? String(raw.corDescricao).trim() : null,
     qtd: num(raw?.qtd),
-    custoUnitario: num(raw?.custoUnitario),
+    custoUnitario: numUnit(raw?.custoUnitario),
   };
 }
 

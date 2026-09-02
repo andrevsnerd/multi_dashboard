@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CompraTransitoListEntry } from "@/lib/types/compra-transito";
 import {
   COMPRA_GASTO_CANAL_LABEL,
-  COMPRA_GASTO_PREMIER_ITENS,
+  COMPRA_GASTO_PREMIER_CATALOGO,
   COMPRA_GASTO_TIPO_LABEL,
   type CompraGastoCandidata,
   type CompraGastoFornecedor,
@@ -23,7 +23,16 @@ import {
 
 import ParcelasEditor from "./ParcelasEditor";
 import styles from "./GastosCompra.module.css";
-import { brl, dataBr, dataBrasiliaDeIso, dataBrCompleta, money, parseMoeda } from "./gastos-compra-format";
+import {
+  brl,
+  dataBr,
+  dataBrasiliaDeIso,
+  dataBrCompleta,
+  money,
+  moneyUnit,
+  parsePrecoUnitario,
+  parseQtd,
+} from "./gastos-compra-format";
 
 interface Props {
   companyKey: string;
@@ -77,8 +86,18 @@ const TIPO_COMPRA_OPCOES: { valor: OrigemLancavel; label: string }[] = [
   { valor: "premier", label: "Premier" },
 ];
 
-function premierZerado(): LinhaPremier[] {
-  return COMPRA_GASTO_PREMIER_ITENS.map((descricao) => ({ descricao, qtd: "", custoUnitario: "" }));
+/**
+ * Catálogo Premier pronto para digitar: as linhas já nascem com o preço de
+ * tabela do fornecedor (o que muda de uma compra para a outra é a quantidade).
+ * O preço fica editável — reajuste é corrigido na linha e é o valor digitado
+ * que a compra grava.
+ */
+function premierPadrao(): LinhaPremier[] {
+  return COMPRA_GASTO_PREMIER_CATALOGO.map((item) => ({
+    descricao: item.descricao,
+    qtd: "",
+    custoUnitario: item.custoPadrao != null ? moneyUnit(item.custoPadrao) : "",
+  }));
 }
 
 export default function NovaCompraModal({
@@ -101,7 +120,7 @@ export default function NovaCompraModal({
   // Uma linha só: a próxima aparece sozinha ao digitar nesta.
   const [linhas, setLinhas] = useState<LinhaLivre[]>([{ ...LINHA_VAZIA }]);
   /** Catálogo Premier inteiro na tela: o usuário preenche só o que está comprando. */
-  const [premier, setPremier] = useState<LinhaPremier[]>(premierZerado);
+  const [premier, setPremier] = useState<LinhaPremier[]>(premierPadrao);
 
   const [titulo, setTitulo] = useState("");
   /**
@@ -195,8 +214,8 @@ export default function NovaCompraModal({
           produto: l.produto.trim() || null,
           corProduto: l.corProduto.trim() || null,
           corDescricao: null,
-          qtd: parseMoeda(l.qtd) || 0,
-          custoUnitario: parseMoeda(l.custoUnitario) || 0,
+          qtd: parseQtd(l.qtd) || 0,
+          custoUnitario: parsePrecoUnitario(l.custoUnitario) || 0,
         })),
     [linhas]
   );
@@ -213,8 +232,8 @@ export default function NovaCompraModal({
           produto: null,
           corProduto: null,
           corDescricao: null,
-          qtd: parseMoeda(l.qtd) || 0,
-          custoUnitario: parseMoeda(l.custoUnitario) || 0,
+          qtd: parseQtd(l.qtd) || 0,
+          custoUnitario: parsePrecoUnitario(l.custoUnitario) || 0,
         }))
         .filter((i) => i.qtd > 0),
     [premier]
@@ -564,7 +583,7 @@ export default function NovaCompraModal({
                   <span />
                 </div>
                 {linhas.map((l, i) => {
-                  const totalLinha = (parseMoeda(l.qtd) || 0) * (parseMoeda(l.custoUnitario) || 0);
+                  const totalLinha = (parseQtd(l.qtd) || 0) * (parsePrecoUnitario(l.custoUnitario) || 0);
                   return (
                     <div className={styles.freeLine} key={i}>
                       <input
@@ -630,7 +649,7 @@ export default function NovaCompraModal({
                   <span className={`${styles.freeLineHead} ${styles.freeLineTotal}`}>Total</span>
                 </div>
                 {premier.map((l, i) => {
-                  const totalLinha = (parseMoeda(l.qtd) || 0) * (parseMoeda(l.custoUnitario) || 0);
+                  const totalLinha = (parseQtd(l.qtd) || 0) * (parsePrecoUnitario(l.custoUnitario) || 0);
                   return (
                     <div className={styles.premierLine} key={l.descricao}>
                       <span className={styles.premierName}>{l.descricao}</span>
@@ -662,9 +681,10 @@ export default function NovaCompraModal({
                 </div>
               </div>
               <p className={styles.note}>
-                A lista é o catálogo Premier inteiro — embalagem e material de loja. Preencha
-                quantidade e preço só do que está comprando: item sem quantidade fica de fora da
-                compra.
+                A lista é o catálogo Premier inteiro — embalagem e material de loja, com o preço
+                de tabela já preenchido. Digite a quantidade só do que está comprando: item sem
+                quantidade fica de fora da compra. O preço é editável — se a Premier reajustou,
+                corrija na linha e a compra grava o valor digitado.
               </p>
             </div>
           )}

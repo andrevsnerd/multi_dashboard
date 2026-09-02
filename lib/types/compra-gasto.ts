@@ -41,21 +41,57 @@ export type CompraGastoTipo =
 export type CompraGastoOrigem = "transito" | "itens" | "premier" | "valor" | "salva";
 
 /**
- * Itens fixos da compra Premier — embalagem e material de loja. A lista é o
- * catálogo do fornecedor: aparece inteira no lançamento e o usuário preenche
- * quantidade e preço só do que está comprando (linha sem quantidade é ignorada).
+ * Catálogo Premier — embalagem e material de loja.
+ *
+ * A lista aparece INTEIRA no lançamento e o usuário preenche quantidade só do
+ * que está comprando (linha sem quantidade é ignorada).
+ *
+ * `custoPadrao` é o preço unitário da última tabela da Premier e já vem
+ * preenchido na tela — é o que agiliza o lançamento, porque na prática só a
+ * quantidade muda de uma compra para a outra. O valor continua EDITÁVEL: quando
+ * a Premier reajustar, quem lança corrige na linha e a compra grava o preço
+ * digitado, não o padrão.
+ *
+ * ⚠️ São centavos, com QUATRO casas: `0.1007` é dez centavos e meio, não R$ 1
+ * mil. Faixinha e Tag custam décimos de centavo e a compra vem em milhares de
+ * unidades — arredondar para dois dígitos erra o total da compra em reais
+ * (5.800 faixinhas: 0,1007 = R$ 584,06; 0,10 = R$ 580,00). Por isso o preço
+ * unitário desta tela é lido e gravado com 4 casas.
+ *
+ * `custoPadrao: null` = item do catálogo que ainda não tem preço na tabela; a
+ * linha nasce em branco e quem lança digita.
  */
-export const COMPRA_GASTO_PREMIER_ITENS: string[] = [
-  "Sacola SP63",
-  "Caixa Lenço",
-  "Lamina",
-  "Faixinha",
-  "Tag",
-  "Sacola SP28",
-  "Caixa CTC-90",
-  "Caixa Rígida",
-  "Caixa Pashimina",
+export interface CompraGastoPremierItem {
+  descricao: string;
+  custoPadrao: number | null;
+}
+
+export const COMPRA_GASTO_PREMIER_CATALOGO: CompraGastoPremierItem[] = [
+  { descricao: "Sacola SP63", custoPadrao: 3.12 },
+  { descricao: "Caixa Lenço", custoPadrao: 3.65 },
+  { descricao: "Lamina", custoPadrao: 0.371 },
+  { descricao: "Faixinha", custoPadrao: 0.1007 },
+  { descricao: "Tag", custoPadrao: 0.129 },
+  { descricao: "Sacola SP28", custoPadrao: null },
+  { descricao: "Caixa CTC-90", custoPadrao: null },
+  { descricao: "Caixa Rígida", custoPadrao: null },
+  { descricao: "Caixa Pashimina", custoPadrao: 5.479 },
+  { descricao: "Sacola SP11", custoPadrao: 5.84 },
 ];
+
+/** Só as descrições, na ordem do catálogo. */
+export const COMPRA_GASTO_PREMIER_ITENS: string[] = COMPRA_GASTO_PREMIER_CATALOGO.map(
+  (i) => i.descricao
+);
+
+/** Preço padrão de um item do catálogo (null quando não há preço de tabela). */
+export function custoPadraoPremier(descricao: string): number | null {
+  const alvo = (descricao ?? "").trim().toLowerCase();
+  return (
+    COMPRA_GASTO_PREMIER_CATALOGO.find((i) => i.descricao.toLowerCase() === alvo)?.custoPadrao ??
+    null
+  );
+}
 
 /**
  * Canal de pagamento de uma parcela.
