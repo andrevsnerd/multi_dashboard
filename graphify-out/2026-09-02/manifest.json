@@ -1680,8 +1680,8 @@
     "semantic_hash": ""
   },
   "components/stock/EstoqueItemPage.tsx": {
-    "mtime": 1787155431.7373245,
-    "ast_hash": "3cb9c7804db63eed0d043016a63863a4",
+    "mtime": 1788368544.365322,
+    "ast_hash": "e2dd7ab00138011206b72a6efc61f3a9",
     "semantic_hash": ""
   },
   "components/stock/ListaCompraSugeridaPage.tsx": {
@@ -2435,8 +2435,8 @@
     "semantic_hash": "8c1d93a8e7b6ea254bb47828f9553e06"
   },
   "lib/repositories/controleEstoque.ts": {
-    "mtime": 1787842696.0090792,
-    "ast_hash": "72141d994ee389aaf48cf6b93d5b3f5e",
+    "mtime": 1788368351.3580096,
+    "ast_hash": "c38a52966018af0d6f3652015ed820aa",
     "semantic_hash": ""
   },
   "lib/repositories/controleMovimento.ts": {
@@ -4382,6 +4382,11 @@
   "app/api/saidas-entradas-produtos/entrada-editar/route.ts": {
     "mtime": 1788352827.7080126,
     "ast_hash": "3bd4100cf4d7c280dc1ca67f232a66e7",
+    "semantic_hash": ""
+  },
+  "app/api/controle-estoque/filtro-opcoes/route.ts": {
+    "mtime": 1788368364.6820726,
+    "ast_hash": "6bc709e3412280d2de36fa192c3f6c8c",
     "semantic_hash": ""
   }
 }

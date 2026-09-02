@@ -7,6 +7,7 @@ import type { DateRangeValue } from "@/components/filters/DateRangeFilter";
 import { useAuth } from "@/components/auth/AuthContext";
 import { seesAllFiliais } from "@/lib/auth/permissions";
 import { exportTransfersToPDF } from "./exportToPDF";
+import { exportTransfersToXlsx } from "./exportToXlsx";
 import TransferenciaConfirmModal from "./TransferenciaConfirmModal";
 import RealizadasPanel from "./RealizadasPanel";
 
@@ -805,22 +806,27 @@ export default function ControleTransferenciasTable({
     );
   }
 
-  // Função para exportar PDF
-  const handleExportPDF = () => {
-    // Preparar dados para exportação incluindo estoqueOrigem
-    const dataForExport = filteredTransfersByOriginAndDestination.map((group) => ({
+  // Dados de exportação (superset usado por PDF e Excel): além do item, carrega o
+  // contexto de origem e destino (estoque e venda 30d) que justifica a quantidade.
+  const buildExportData = () =>
+    filteredTransfersByOriginAndDestination.map((group) => ({
       origem: group.origem,
       totalQuantidade: group.totalQuantidade,
       destinationGroups: group.destinationGroups.map((destGroup) => ({
         destino: destGroup.destino,
         totalQuantidade: destGroup.totalQuantidade,
         items: destGroup.items.map((item) => {
-          // Buscar estoque da origem
           const filialOrigemData = getFilialData(
             item.itemOriginal,
             company,
             item.origemCanonico,
             item.origem
+          );
+          const filialDestinoData = getFilialData(
+            item.itemOriginal,
+            company,
+            item.destinoCanonico,
+            item.destino
           );
           return {
             produto: item.produto,
@@ -830,22 +836,50 @@ export default function ControleTransferenciasTable({
             subgrupo: item.subgrupo,
             grade: item.grade,
             cor: item.cor,
+            curva: item.curva,
             origem: item.origem,
             destino: item.destino,
             quantidade: item.quantidade,
             estoqueOrigem: filialOrigemData?.stock || 0,
+            estoqueDestino: filialDestinoData?.stock || 0,
+            vendas30dOrigem: filialOrigemData?.salesLast30Days || 0,
+            vendas30dDestino: filialDestinoData?.salesLast30Days || 0,
           };
         }),
       })),
     }));
 
-    exportTransfersToPDF(dataForExport, companyKey, dateRange, new Set());
+  // Função para exportar PDF
+  const handleExportPDF = () => {
+    exportTransfersToPDF(buildExportData(), companyKey, dateRange, new Set());
+  };
+
+  // Função para exportar Excel
+  const handleExportXlsx = () => {
+    void exportTransfersToXlsx(buildExportData(), companyKey, {
+      companyName: company?.name,
+      dateRange,
+      filialSelecionada: selectedFilial ?? null,
+    });
   };
 
   return (
     <div className={styles.wrapper}>
-      {/* Botão de exportar PDF */}
+      {/* Botões de exportação */}
       <div className={styles.exportButtonContainer}>
+        <button
+          onClick={handleExportXlsx}
+          className={`${styles.exportButton} ${styles.exportButtonExcel}`}
+          title="Planilha com resumo, uma aba por filial de origem e base para tabela dinâmica"
+        >
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12.5 1.66667H5C4.55797 1.66667 4.13405 1.84226 3.82149 2.15482C3.50893 2.46738 3.33333 2.89131 3.33333 3.33333V16.6667C3.33333 17.1087 3.50893 17.5326 3.82149 17.8452C4.13405 18.1577 4.55797 18.3333 5 18.3333H15C15.442 18.3333 15.866 18.1577 16.1785 17.8452C16.4911 17.5326 16.6667 17.1087 16.6667 16.6667V5.83333L12.5 1.66667Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M11.6667 1.66667V5.83333H16.6667" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M7.5 10L12.5 15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M12.5 10L7.5 15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          Exportar Excel
+        </button>
         <button onClick={handleExportPDF} className={styles.exportButton}>
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M17.5 12.5V15.8333C17.5 16.2754 17.3244 16.6993 17.0118 17.0118C16.6993 17.3244 16.2754 17.5 15.8333 17.5H4.16667C3.72464 17.5 3.30072 17.3244 2.98816 17.0118C2.67559 16.6993 2.5 16.2754 2.5 15.8333V12.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
