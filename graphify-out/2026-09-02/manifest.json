@@ -4220,8 +4220,8 @@
     "semantic_hash": ""
   },
   "components/compras/GastosCompraDrawer.tsx": {
-    "mtime": 1788281530.3815513,
-    "ast_hash": "4b86679ed39543bf689e8367fa2e3297",
+    "mtime": 1788355825.3613641,
+    "ast_hash": "368a05ebac3d7a3975d8fb2408d65152",
     "semantic_hash": ""
   },
   "components/compras/GastosCompraGrafico.tsx": {
@@ -4235,8 +4235,8 @@
     "semantic_hash": ""
   },
   "components/compras/NovaCompraModal.tsx": {
-    "mtime": 1788284931.624625,
-    "ast_hash": "6e048b4bbc4e64c08d7c6e59de648702",
+    "mtime": 1788355807.5523124,
+    "ast_hash": "bc97590625710b16644bb83f960732a2",
     "semantic_hash": ""
   },
   "components/compras/ParcelasEditor.tsx": {
@@ -4245,8 +4245,8 @@
     "semantic_hash": ""
   },
   "components/compras/gastos-compra-format.ts": {
-    "mtime": 1787746027.3136525,
-    "ast_hash": "06664341d5f789bdae7485c03a818603",
+    "mtime": 1788355774.8163486,
+    "ast_hash": "3220d2d2e368b974dc0860884469e122",
     "semantic_hash": ""
   },
   "lib/reports/abas.ts": {
@@ -4255,8 +4255,8 @@
     "semantic_hash": ""
   },
   "lib/types/compra-gasto.ts": {
-    "mtime": 1788284918.515517,
-    "ast_hash": "db64e03f6ffac9f361a49192d8952ae1",
+    "mtime": 1788355758.464805,
+    "ast_hash": "83e1f5367ed29d8ac20b9adada976289",
     "semantic_hash": ""
   },
   "lib/utils/compra-gastos-agregacao.ts": {
@@ -4270,8 +4270,8 @@
     "semantic_hash": ""
   },
   "lib/utils/compra-gastos-store.ts": {
-    "mtime": 1788279431.0218,
-    "ast_hash": "7367d166a2ae0da29aa2f5d58258b23c",
+    "mtime": 1788355825.3623655,
+    "ast_hash": "e3420fb19e82a533fd1690bd4ff3a2a3",
     "semantic_hash": ""
   },
   "lib/utils/exportGastosCompraXlsx.ts": {
@@ -4375,8 +4375,8 @@
     "semantic_hash": ""
   },
   "docs/GASTOS_COMPRA_FORNECEDORES.md": {
-    "mtime": 1788285261.7647333,
-    "ast_hash": "38ee2549513df7c83f94d4bcafd4398c",
+    "mtime": 1788355885.840722,
+    "ast_hash": "7be001c3a0d0c2fc458b398480214103",
     "semantic_hash": ""
   },
   "app/api/saidas-entradas-produtos/entrada-editar/route.ts": {

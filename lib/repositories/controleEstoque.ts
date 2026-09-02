@@ -11,6 +11,7 @@ import {
 import { resolveCompanyLive, liveNameForIncoming, liveNamesForIncoming } from '@/lib/server/company-live';
 import { resolveCompanyDynamic } from '@/lib/config/company-server';
 import { getFilialById } from '@/lib/config/filial-registry';
+import { getColecaoDescMap } from '@/lib/repositories/colecao';
 import { withRequest } from '@/lib/db/connection';
 import { RequestLike } from '@/lib/db/proxy';
 import { getCurrentMonthRange, normalizeRangeForQuery, shiftRangeByMonths } from '@/lib/utils/date';
@@ -8956,6 +8957,96 @@ export async function fetchCustosPorProdutos(
     }
     return map;
   });
+}
+
+/**
+ * Combinações (categoria × subgrupo × grade × coleção) presentes NO ESTOQUE da
+ * filial — fonte dos selects da Estoque Consulta.
+ *
+ * Antes esses selects vinham das VENDAS DO MÊS CORRENTE (`/api/products/{linhas,
+ * subgrupos,grades,colecoes,grupos}`). Numa tela de ESTOQUE isso mostrava opções
+ * erradas: loja de baixo giro (ex.: GALEÃO RJ, 807 itens em estoque e 1 venda no
+ * mês) abria a tela com os filtros praticamente vazios, e no dia 1º de cada mês
+ * isso acontecia em TODAS as filiais. As expressões abaixo são as MESMAS de
+ * `fetchProdutoDetalhesPorFilial` (UPPER/LTRIM/RTRIM sobre p.LINHA /
+ * p.GRUPO_PRODUTO / p.SUBGRUPO_PRODUTO / CONVERT(VARCHAR, p.GRADE) / p.COLECAO),
+ * então toda opção listada casa com linhas da tabela.
+ */
+export interface EstoqueFiltroCombo {
+  /** LINHA (scarfme) ou GRUPO_PRODUTO (nerd) — o que a tela chama de Linha/Grupo. */
+  categoria: string;
+  subgrupo: string;
+  grade: string;
+  colecao: string;
+}
+
+export interface EstoqueFiltroOpcoes {
+  combos: EstoqueFiltroCombo[];
+  /** código da coleção -> rótulo "DESCRIÇÃO (CÓDIGO)" (ver [[colecao-fonte-mestre-COLECOES]]). */
+  colecaoLabels: Record<string, string>;
+}
+
+export async function fetchEstoqueFiltroOpcoes({
+  company,
+  filial,
+  mostrarZerados = false,
+  mostrarNegativos = false,
+}: {
+  company?: string;
+  filial?: string | null;
+  mostrarZerados?: boolean;
+  mostrarNegativos?: boolean;
+}): Promise<EstoqueFiltroOpcoes> {
+  if (!company) return { combos: [], colecaoLabels: {} };
+
+  const combos = await withRequest(async (request) => {
+    const estoqueFilialFilter = await buildFilialFilter(request, company, filial, 'e');
+    const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
+    const categoriaField = company === 'nerd' ? 'p.GRUPO_PRODUTO' : 'p.LINHA';
+
+    // Mesmo recorte de sinal da tabela: positivos sempre; zerados/negativos só com
+    // o toggle ligado (ver shouldKeepRow em fetchProdutoDetalhesPorFilial).
+    const sinais = ['e.ESTOQUE > 0'];
+    if (mostrarZerados) sinais.push('e.ESTOQUE = 0');
+    if (mostrarNegativos) sinais.push('e.ESTOQUE < 0');
+
+    const result = await request.query<{
+      categoria: string | null;
+      subgrupo: string | null;
+      grade: string | null;
+      colecao: string | null;
+    }>(`
+      SELECT DISTINCT
+        UPPER(LTRIM(RTRIM(ISNULL(${categoriaField}, '')))) AS categoria,
+        UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) AS subgrupo,
+        UPPER(LTRIM(RTRIM(CONVERT(VARCHAR, p.GRADE)))) AS grade,
+        UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) AS colecao
+      FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
+      WHERE ISNULL(${categoriaField}, '') <> ''
+        AND (${sinais.join(' OR ')})
+        ${estoqueFilialFilter}
+        ${nerdOnlyEletronicosFilter}
+    `);
+
+    return result.recordset.map((row) => ({
+      categoria: (row.categoria ?? '').trim(),
+      subgrupo: (row.subgrupo ?? '').trim(),
+      grade: (row.grade ?? '').trim(),
+      colecao: (row.colecao ?? '').trim(),
+    }));
+  });
+
+  const descByCode = await getColecaoDescMap().catch(() => new Map<string, string>());
+  const colecaoLabels: Record<string, string> = {};
+  for (const combo of combos) {
+    const code = combo.colecao;
+    if (!code || colecaoLabels[code]) continue;
+    const desc = (descByCode.get(code) || '').trim();
+    colecaoLabels[code] = desc && desc.toUpperCase() !== code ? `${desc} (${code})` : code;
+  }
+
+  return { combos, colecaoLabels };
 }
 
 export async function fetchAvailableCores({

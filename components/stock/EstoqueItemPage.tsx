@@ -12,7 +12,6 @@ import {
   VAREJO_VALUE,
   type CompanyKey,
 } from "@/lib/config/company";
-import { getCurrentMonthRange } from "@/lib/utils/date";
 import { exportEstoqueConsultaItemXlsx } from "@/lib/utils/exportEstoqueConsultaItemXlsx";
 
 import styles from "./EstoqueItemPage.module.css";
@@ -34,6 +33,33 @@ interface VariacaoPorFilial {
   estoque: number;
   /** Estoque por tamanho da grade; só vem em grade P/M/G (ver `tamanhosPorGrade`). */
   estoquePorTamanho: number[] | null;
+}
+
+/** Combinação presente no estoque da filial — base dos selects da tela. */
+interface FiltroCombo {
+  /** LINHA (scarfme) ou GRUPO_PRODUTO (nerd). */
+  categoria: string;
+  subgrupo: string;
+  grade: string;
+  colecao: string;
+}
+
+interface FiltroOpcoesResponse {
+  combos: FiltroCombo[];
+  /** código da coleção -> rótulo "DESCRIÇÃO (CÓDIGO)". */
+  colecaoLabels: Record<string, string>;
+}
+
+const EMPTY_FILTRO_OPCOES: FiltroOpcoesResponse = { combos: [], colecaoLabels: {} };
+
+type FiltroDimensao = keyof FiltroCombo;
+
+const FILTRO_DIMENSOES: FiltroDimensao[] = ["categoria", "subgrupo", "grade", "colecao"];
+
+/** Seleção do select -> mesma forma das opções (UPPER/trim), para casar os combos. */
+function normalizeFiltro(value: string | null): string | null {
+  const normalized = value?.trim().toUpperCase() ?? "";
+  return normalized || null;
 }
 
 interface DetalhesPorFilialResponse {
@@ -259,11 +285,6 @@ export default function EstoqueItemPage({
   companyName,
 }: EstoqueItemPageProps) {
   const companyCfg = useMemo(() => resolveCompany(companyKey), [companyKey]);
-  const range = useMemo(() => {
-    const currentRange = getCurrentMonthRange();
-    return { startDate: currentRange.start, endDate: currentRange.end };
-  }, []);
-
   const linhasExcluidas = useMemo(() => {
     if (companyCfg?.excludedLines && companyCfg.excludedLines.length > 0) {
       return new Set(companyCfg.excludedLines.map((linha) => linha.toUpperCase().trim()));
@@ -293,12 +314,7 @@ export default function EstoqueItemPage({
   const [hiddenFiliais, setHiddenFiliais] = useState<Set<string>>(new Set());
 
   const [apiCores, setApiCores] = useState<string[]>([]);
-  const [apiGrupos, setApiGrupos] = useState<string[]>([]);
-  const [apiLinhas, setApiLinhas] = useState<string[]>([]);
-  const [apiSubgrupos, setApiSubgrupos] = useState<string[]>([]);
-  const [apiGrades, setApiGrades] = useState<string[]>([]);
-  // { value: código, label: "DESCRIÇÃO (CÓDIGO)" } — o filtro segue pelo código.
-  const [apiColecoes, setApiColecoes] = useState<ColecaoOption[]>([]);
+  const [filtroOpcoes, setFiltroOpcoes] = useState<FiltroOpcoesResponse>(EMPTY_FILTRO_OPCOES);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -330,31 +346,28 @@ export default function EstoqueItemPage({
     };
   }, [companyKey, selectedFilial]);
 
+  // Opções dos selects (Grupo/Linha, Subgrupo, Grade, Coleção): saem do ESTOQUE da
+  // filial. Antes vinham das VENDAS DO MÊS CORRENTE, então numa tela de estoque a
+  // loja de baixo giro abria com os filtros vazios — GALEÃO RJ tem 807 itens em
+  // estoque e teve 1 venda no mês —, e no dia 1º isso valia para toda filial.
   useEffect(() => {
-    if (companyKey !== "nerd") {
-      setApiGrupos([]);
-      return;
-    }
-
     let active = true;
 
     void (async () => {
       try {
-        const searchParams = new URLSearchParams({
-          company: companyKey,
-          start: range.startDate.toISOString(),
-          end: range.endDate.toISOString(),
-        });
-
+        const searchParams = new URLSearchParams({ company: companyKey });
         if (selectedFilial) searchParams.set("filial", selectedFilial);
+        if (mostrarZerados) searchParams.set("mostrarZerados", "1");
+        if (mostrarNegativos) searchParams.set("mostrarNegativos", "1");
 
-        const response = await fetch(`/api/products/grupos?${searchParams.toString()}`, {
-          cache: "no-store",
-        });
+        const response = await fetch(
+          `/api/controle-estoque/filtro-opcoes?${searchParams.toString()}`,
+          { cache: "no-store" },
+        );
         if (!response.ok) return;
 
-        const json = (await response.json()) as { data: string[] };
-        if (active) setApiGrupos(json.data || []);
+        const json = (await response.json()) as { data?: FiltroOpcoesResponse };
+        if (active) setFiltroOpcoes(json.data ?? EMPTY_FILTRO_OPCOES);
       } catch {
         /* ignore */
       }
@@ -363,172 +376,68 @@ export default function EstoqueItemPage({
     return () => {
       active = false;
     };
-  }, [companyKey, range.startDate, range.endDate, selectedFilial]);
+  }, [companyKey, selectedFilial, mostrarZerados, mostrarNegativos]);
 
-  useEffect(() => {
-    if (companyKey !== "scarfme") {
-      setApiLinhas([]);
-      return;
-    }
-
-    let active = true;
-
-    void (async () => {
-      try {
-        const searchParams = new URLSearchParams({
-          company: companyKey,
-          start: range.startDate.toISOString(),
-          end: range.endDate.toISOString(),
-        });
-
-        if (selectedFilial) searchParams.set("filial", selectedFilial);
-        if (colecao) searchParams.append("colecoes", colecao);
-        if (subgrupo) searchParams.append("subgrupos", subgrupo);
-        if (grade) searchParams.append("grades", grade);
-
-        const response = await fetch(`/api/products/linhas?${searchParams.toString()}`, {
-          cache: "no-store",
-        });
-        if (!response.ok) return;
-
-        const json = (await response.json()) as { data: string[] };
-        if (active) {
-          const raw = json.data || [];
-          setApiLinhas(raw.filter((item) => !linhasExcluidas.has(item.toUpperCase().trim())));
-        }
-      } catch {
-        /* ignore */
-      }
-    })();
-
-    return () => {
-      active = false;
+  // Cascata: cada lista respeita os OUTROS filtros selecionados, nunca o dela mesma
+  // (mesma regra dos endpoints antigos de vendas).
+  const opcoesPorDimensao = useMemo(() => {
+    const selecoes: Record<FiltroDimensao, string | null> = {
+      categoria: normalizeFiltro(companyKey === "nerd" ? grupo : linha),
+      subgrupo: normalizeFiltro(subgrupo),
+      grade: normalizeFiltro(grade),
+      colecao: normalizeFiltro(colecao),
     };
-  }, [
-    companyKey,
-    range.startDate,
-    range.endDate,
-    selectedFilial,
-    colecao,
-    subgrupo,
-    grade,
-    linhasExcluidas,
-  ]);
 
-  useEffect(() => {
-    if (companyKey !== "scarfme") {
-      setApiColecoes([]);
-      return;
-    }
-
-    let active = true;
-
-    void (async () => {
-      try {
-        const searchParams = new URLSearchParams({
-          company: companyKey,
-          start: range.startDate.toISOString(),
-          end: range.endDate.toISOString(),
-          includeDescriptions: "1",
-        });
-
-        if (selectedFilial) searchParams.set("filial", selectedFilial);
-        if (linha) searchParams.append("linhas", linha);
-        if (subgrupo) searchParams.append("subgrupos", subgrupo);
-        if (grade) searchParams.append("grades", grade);
-
-        const response = await fetch(`/api/products/colecoes?${searchParams.toString()}`, {
-          cache: "no-store",
-        });
-        if (!response.ok) return;
-
-        const json = (await response.json()) as { data: ColecaoOption[] };
-        if (active) setApiColecoes(json.data || []);
-      } catch {
-        /* ignore */
+    const out = {} as Record<FiltroDimensao, string[]>;
+    for (const dimensao of FILTRO_DIMENSOES) {
+      const seen = new Set<string>();
+      for (const combo of filtroOpcoes.combos) {
+        const casa = FILTRO_DIMENSOES.every(
+          (outra) =>
+            outra === dimensao || !selecoes[outra] || combo[outra] === selecoes[outra],
+        );
+        if (casa && combo[dimensao]) seen.add(combo[dimensao]);
       }
-    })();
-
-    return () => {
-      active = false;
-    };
-  }, [companyKey, range.startDate, range.endDate, selectedFilial, linha, subgrupo, grade]);
-
-  useEffect(() => {
-    if (companyKey !== "scarfme") {
-      setApiSubgrupos([]);
-      return;
+      out[dimensao] = Array.from(seen).sort();
     }
+    return out;
+  }, [filtroOpcoes, companyKey, grupo, linha, subgrupo, grade, colecao]);
 
-    let active = true;
+  const apiGrupos = useMemo(
+    () => (companyKey === "nerd" ? opcoesPorDimensao.categoria : []),
+    [companyKey, opcoesPorDimensao],
+  );
 
-    void (async () => {
-      try {
-        const searchParams = new URLSearchParams({
-          company: companyKey,
-          start: range.startDate.toISOString(),
-          end: range.endDate.toISOString(),
-        });
+  const apiLinhas = useMemo(
+    () =>
+      companyKey === "nerd"
+        ? []
+        : opcoesPorDimensao.categoria.filter(
+            (item) => !linhasExcluidas.has(item.toUpperCase().trim()),
+          ),
+    [companyKey, opcoesPorDimensao, linhasExcluidas],
+  );
 
-        if (selectedFilial) searchParams.set("filial", selectedFilial);
-        if (linha) searchParams.append("linhas", linha);
-        if (colecao) searchParams.append("colecoes", colecao);
-        if (grade) searchParams.append("grades", grade);
+  const apiSubgrupos = useMemo(
+    () => (companyKey === "nerd" ? [] : opcoesPorDimensao.subgrupo),
+    [companyKey, opcoesPorDimensao],
+  );
 
-        const response = await fetch(`/api/products/subgrupos?${searchParams.toString()}`, {
-          cache: "no-store",
-        });
-        if (!response.ok) return;
+  const apiGrades = useMemo(
+    () => (companyKey === "nerd" ? [] : opcoesPorDimensao.grade),
+    [companyKey, opcoesPorDimensao],
+  );
 
-        const json = (await response.json()) as { data: string[] };
-        if (active) setApiSubgrupos(json.data || []);
-      } catch {
-        /* ignore */
-      }
-    })();
-
-    return () => {
-      active = false;
-    };
-  }, [companyKey, range.startDate, range.endDate, selectedFilial, linha, colecao, grade]);
-
-  useEffect(() => {
-    if (companyKey !== "scarfme") {
-      setApiGrades([]);
-      return;
-    }
-
-    let active = true;
-
-    void (async () => {
-      try {
-        const searchParams = new URLSearchParams({
-          company: companyKey,
-          start: range.startDate.toISOString(),
-          end: range.endDate.toISOString(),
-        });
-
-        if (selectedFilial) searchParams.set("filial", selectedFilial);
-        if (linha) searchParams.append("linhas", linha);
-        if (colecao) searchParams.append("colecoes", colecao);
-        if (subgrupo) searchParams.append("subgrupos", subgrupo);
-
-        const response = await fetch(`/api/products/grades?${searchParams.toString()}`, {
-          cache: "no-store",
-        });
-        if (!response.ok) return;
-
-        const json = (await response.json()) as { data: string[] };
-        if (active) setApiGrades(json.data || []);
-      } catch {
-        /* ignore */
-      }
-    })();
-
-    return () => {
-      active = false;
-    };
-  }, [companyKey, range.startDate, range.endDate, selectedFilial, linha, colecao, subgrupo]);
+  // { value: código, label: "DESCRIÇÃO (CÓDIGO)" } — o filtro segue pelo código.
+  const apiColecoes = useMemo<ColecaoOption[]>(
+    () =>
+      companyKey === "nerd"
+        ? []
+        : opcoesPorDimensao.colecao
+            .map((code) => ({ value: code, label: filtroOpcoes.colecaoLabels[code] ?? code }))
+            .sort((a, b) => a.label.localeCompare(b.label, "pt-BR")),
+    [companyKey, opcoesPorDimensao, filtroOpcoes],
+  );
 
   const consultar = useCallback(async () => {
     setLoading(true);
