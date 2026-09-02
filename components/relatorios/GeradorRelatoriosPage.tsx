@@ -422,8 +422,61 @@ export default function GeradorRelatoriosPage({
   const startStr = formatDateForQuery(range.startDate);
   const endStr = formatDateForQuery(range.endDate);
 
+  // Análise de ESTOQUE = sem filtro de período (o estoque é o saldo atual). Nessas, as
+  // opções dos selects TÊM que sair do estoque: as rotas /api/products/* listam só o que
+  // teve VENDA numa janela invisível (o mês corrente), então no começo do mês o select de
+  // Coleção mostrava um punhado das ~200 coleções em estoque (as 4 ADRIANE GALISTEU
+  // viravam 2). Cor já vem do estoque em /api/products/cores.
+  const optionsFromStock = !!meta && !meta.supportedFilters.includes("periodo" as never);
+
+  const loadStockOptions = useCallback(async () => {
+    const kinds = ["grupo", "linha", "subgrupo", "grade", "colecao", "tipo"] as const;
+    setLoadingOpt((s) => {
+      const next = { ...s };
+      kinds.forEach((k) => (next[k] = true));
+      return next;
+    });
+    try {
+      const params = new URLSearchParams({ company: companyKey });
+      if (filial) params.set("filial", filial);
+      if (incluirZerados) params.set("incluirZerados", "1");
+      if (incluirNegativos) params.set("incluirNegativos", "1");
+      const res = await fetch(`/api/relatorios/filtro-opcoes?${params}`, { cache: "no-store" });
+      const json = (await res.json()) as {
+        data?: {
+          grupos?: string[];
+          linhas?: string[];
+          subgrupos?: string[];
+          grades?: string[];
+          tipos?: string[];
+          colecoes?: MultiSelectOption[];
+        };
+      };
+      const d = json.data ?? {};
+      setOptGrupos(d.grupos ?? []);
+      setOptLinhas(d.linhas ?? []);
+      setOptSubgrupos(d.subgrupos ?? []);
+      setOptGrades(d.grades ?? []);
+      setOptTipos(d.tipos ?? []);
+      setOptColecoes(d.colecoes ?? []);
+    } catch {
+      // ignora — multiselects ficam vazios
+    } finally {
+      setLoadingOpt((s) => {
+        const next = { ...s };
+        kinds.forEach((k) => (next[k] = false));
+        return next;
+      });
+    }
+  }, [companyKey, filial, incluirZerados, incluirNegativos]);
+
   const loadOptions = useCallback(
     async (kind: "grupo" | "linha" | "subgrupo" | "grade" | "colecao" | "cor" | "tipo") => {
+      // Nas análises de estoque tudo (menos cor) sai de /api/relatorios/filtro-opcoes.
+      if (optionsFromStock && kind !== "cor") {
+        await loadStockOptions();
+        return;
+      }
       setLoadingOpt((s) => ({ ...s, [kind]: true }));
       try {
         const params = new URLSearchParams({ company: companyKey });
@@ -461,7 +514,7 @@ export default function GeradorRelatoriosPage({
         setLoadingOpt((s) => ({ ...s, [kind]: false }));
       }
     },
-    [companyKey, filial, startStr, endStr]
+    [companyKey, filial, startStr, endStr, optionsFromStock, loadStockOptions]
   );
 
   // Carrega as opções de TODOS os filtros suportados de forma antecipada (ao
@@ -469,10 +522,16 @@ export default function GeradorRelatoriosPage({
   // que realmente têm opções para a empresa (ex.: NERD não mostra Subgrupo/Grade).
   useEffect(() => {
     if (!meta) return;
+    if (optionsFromStock) {
+      // Uma chamada só cobre grupo/linha/subgrupo/grade/coleção/tipo.
+      void loadStockOptions();
+      if (meta.supportedFilters.includes("cor" as never)) void loadOptions("cor");
+      return;
+    }
     (["grupo", "linha", "subgrupo", "grade", "colecao", "cor", "tipo"] as const).forEach((k) => {
       if (meta.supportedFilters.includes(k as never)) void loadOptions(k);
     });
-  }, [meta, loadOptions]);
+  }, [meta, loadOptions, optionsFromStock, loadStockOptions]);
 
   // ---------- busca de produto ----------
   const runSearch = useCallback(

@@ -9049,6 +9049,128 @@ export async function fetchEstoqueFiltroOpcoes({
   return { combos, colecaoLabels };
 }
 
+/**
+ * Opções dos selects do GERADOR DE RELATÓRIOS nas análises de ESTOQUE (Estoque por
+ * filial, Produtos parados, Produtos por cadastro) — tiradas do ESTOQUE, não das vendas.
+ *
+ * Essas análises não têm filtro de período (estoque é o saldo atual), mas o Gerador
+ * carregava as opções de `/api/products/{grupos,linhas,subgrupos,grades,colecoes,tipos}`,
+ * que lista só o que TEVE VENDA numa janela invisível (o mês corrente por padrão). No
+ * dia 2 do mês, por exemplo, o select de Coleção mostrava 55 coleções quando a rede tem
+ * 200 com estoque — as 4 coleções ADRIANE GALISTEU viravam 2 (só T6 e U5 venderam).
+ *
+ * A base (filial, exclusões, escopo ELETRONICOS da NERD, categoria não vazia) é a MESMA
+ * de `fetchEstoqueRedePorProduto`, então toda opção listada casa com linhas do relatório.
+ * Cor fica de fora: `fetchAvailableCores` já sai do estoque.
+ */
+export interface EstoqueDimensaoOpcoes {
+  grupos: string[];
+  linhas: string[];
+  subgrupos: string[];
+  grades: string[];
+  tipos: string[];
+  /** {value: código, label: "DESCRIÇÃO (CÓDIGO)"} — ver [[colecao-fonte-mestre-COLECOES]]. */
+  colecoes: Array<{ value: string; label: string }>;
+}
+
+export async function fetchEstoqueDimensaoOpcoes({
+  company,
+  filial,
+  incluirZerados = false,
+  incluirNegativos = false,
+}: {
+  company?: string;
+  filial?: string | null;
+  incluirZerados?: boolean;
+  incluirNegativos?: boolean;
+}): Promise<EstoqueDimensaoOpcoes> {
+  const empty: EstoqueDimensaoOpcoes = {
+    grupos: [],
+    linhas: [],
+    subgrupos: [],
+    grades: [],
+    tipos: [],
+    colecoes: [],
+  };
+  if (!company) return empty;
+
+  const combos = await withRequest(async (request) => {
+    const estoqueFilialFilter = await buildFilialFilter(request, company, filial ?? null, 'e');
+    const exclusionFilter = buildExclusionFilter(request, company, 'p', 'excludedLineEstDim');
+    const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
+    const categoriaNotEmpty =
+      company === 'nerd'
+        ? `AND ISNULL(p.GRUPO_PRODUTO, '') <> ''`
+        : `AND ISNULL(p.LINHA, '') <> ''`;
+
+    // Mesmo recorte de sinal da Estoque Consulta: positivos sempre; zerados/negativos
+    // só com o toggle ligado (espelha os toggles do Gerador).
+    const sinais = ['e.ESTOQUE > 0'];
+    if (incluirZerados) sinais.push('e.ESTOQUE = 0');
+    if (incluirNegativos) sinais.push('e.ESTOQUE < 0');
+
+    const result = await request.query<{
+      grupo: string | null;
+      linha: string | null;
+      subgrupo: string | null;
+      grade: string | null;
+      tipo: string | null;
+      colecao: string | null;
+    }>(`
+      SELECT DISTINCT
+        UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, '')))) AS grupo,
+        UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) AS linha,
+        UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) AS subgrupo,
+        UPPER(LTRIM(RTRIM(CONVERT(VARCHAR, p.GRADE)))) AS grade,
+        UPPER(LTRIM(RTRIM(ISNULL(p.TIPO_PRODUTO, '')))) AS tipo,
+        UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) AS colecao
+      FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON e.PRODUTO = p.PRODUTO
+      WHERE (${sinais.join(' OR ')})
+        ${estoqueFilialFilter}
+        ${exclusionFilter}
+        ${nerdOnlyEletronicosFilter}
+        ${categoriaNotEmpty}
+    `);
+
+    return result.recordset;
+  });
+
+  const grupos = new Set<string>();
+  const linhas = new Set<string>();
+  const subgrupos = new Set<string>();
+  const grades = new Set<string>();
+  const tipos = new Set<string>();
+  const colecoes = new Set<string>();
+  for (const row of combos) {
+    const push = (set: Set<string>, value: string | null) => {
+      const v = (value ?? '').trim();
+      if (v) set.add(v);
+    };
+    push(grupos, row.grupo);
+    push(linhas, row.linha);
+    push(subgrupos, row.subgrupo);
+    push(grades, row.grade);
+    push(tipos, row.tipo);
+    push(colecoes, row.colecao);
+  }
+
+  const sortPtBr = (set: Set<string>) => Array.from(set).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  const descByCode = await getColecaoDescMap().catch(() => new Map<string, string>());
+
+  return {
+    grupos: sortPtBr(grupos),
+    linhas: sortPtBr(linhas),
+    subgrupos: sortPtBr(subgrupos),
+    grades: sortPtBr(grades),
+    tipos: sortPtBr(tipos),
+    colecoes: sortPtBr(colecoes).map((code) => {
+      const desc = (descByCode.get(code) || '').trim();
+      return { value: code, label: desc && desc.toUpperCase() !== code ? `${desc} (${code})` : code };
+    }),
+  };
+}
+
 export async function fetchAvailableCores({
   company,
   filial,

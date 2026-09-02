@@ -1590,8 +1590,8 @@
     "semantic_hash": "7100ad93329f4cae6f0cf2636fa8a06f"
   },
   "components/relatorios/GeradorRelatoriosPage.tsx": {
-    "mtime": 1788185563.0453906,
-    "ast_hash": "eee819b214e1cdff84e7db99b043b767",
+    "mtime": 1788372521.9043384,
+    "ast_hash": "ee8d2c9499dc5d424b16445727198e50",
     "semantic_hash": ""
   },
   "components/romaneios/RomaneioDeleteModal.tsx": {
@@ -2435,8 +2435,8 @@
     "semantic_hash": "8c1d93a8e7b6ea254bb47828f9553e06"
   },
   "lib/repositories/controleEstoque.ts": {
-    "mtime": 1788368351.3580096,
-    "ast_hash": "c38a52966018af0d6f3652015ed820aa",
+    "mtime": 1788372467.024648,
+    "ast_hash": "956d0e5b1fc34eabd2f6282ad71b656e",
     "semantic_hash": ""
   },
   "lib/repositories/controleMovimento.ts": {
@@ -4392,6 +4392,11 @@
   "components/controle-transferencias/exportToXlsx.ts": {
     "mtime": 1788369643.1517365,
     "ast_hash": "6f31a972aff1a21de957b6f1d76784a9",
+    "semantic_hash": ""
+  },
+  "app/api/relatorios/filtro-opcoes/route.ts": {
+    "mtime": 1788372494.7971213,
+    "ast_hash": "f566319d12a676a5b5d4adccbf13c85d",
     "semantic_hash": ""
   }
 }

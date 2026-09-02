@@ -1285,8 +1285,8 @@
     "semantic_hash": ""
   },
   "components/controle-transferencias/ControleTransferenciasTable.tsx": {
-    "mtime": 1786557125.6690736,
-    "ast_hash": "662921883cea6ae1a9dcbdad5a3cc6d7",
+    "mtime": 1788369683.7373984,
+    "ast_hash": "60419b88fe499bf27ba39d3fc29810b5",
     "semantic_hash": ""
   },
   "components/controle-transferencias/RealizadasPanel.tsx": {
@@ -4387,6 +4387,11 @@
   "app/api/controle-estoque/filtro-opcoes/route.ts": {
     "mtime": 1788368364.6820726,
     "ast_hash": "6bc709e3412280d2de36fa192c3f6c8c",
+    "semantic_hash": ""
+  },
+  "components/controle-transferencias/exportToXlsx.ts": {
+    "mtime": 1788369643.1517365,
+    "ast_hash": "6f31a972aff1a21de957b6f1d76784a9",
     "semantic_hash": ""
   }
 }
