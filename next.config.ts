@@ -2,6 +2,16 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   transpilePackages: ["recharts"],
+  // "Produto Projeção Compra" virou "Projeção Compra": link antigo/salvo continua abrindo.
+  async redirects() {
+    return [
+      {
+        source: "/:company/produto-projecao-compra",
+        destination: "/:company/projecao-compra",
+        permanent: false,
+      },
+    ];
+  },
   // Reduzir tamanho das Serverless Functions (limite 250 MB descomprimido na Vercel)
   // Ver: https://vercel.com/docs/functions/troubleshooting/serverless-function-size
   // Next.js 16+: outputFileTracingExcludes é de nível superior (não mais em experimental)

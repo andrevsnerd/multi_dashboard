@@ -126,8 +126,8 @@ export default function Sidebar({ companyName }: SidebarProps) {
     basePath && basePath !== "/" ? `${basePath}/controle-giro` : "/controle-giro";
   const produtoGiroHref =
     basePath && basePath !== "/" ? `${basePath}/produto-giro` : "/produto-giro";
-  const produtoProjecaoCompraHref =
-    basePath && basePath !== "/" ? `${basePath}/produto-projecao-compra` : "/produto-projecao-compra";
+  const projecaoCompraHref =
+    basePath && basePath !== "/" ? `${basePath}/projecao-compra` : "/projecao-compra";
   const produtosParadosHref =
     basePath && basePath !== "/" ? `${basePath}/produtos-parados` : "/produtos-parados";
   const controlePerformanceHref =
@@ -250,7 +250,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     "/estoque-consulta",
     "/controle-giro",
     "/produto-giro",
-    "/produto-projecao-compra",
+    "/projecao-compra",
     "/produtos-parados",
     "/controle-performance",
     "/loja-raio-x",
@@ -407,12 +407,12 @@ export default function Sidebar({ companyName }: SidebarProps) {
             matchesSegment(currentPathname, "/produto-giro", produtoGiroHref),
         },
         {
-          key: "produto-projecao-compra",
-          label: "Produto Projeção Compra",
-          href: produtoProjecaoCompraHref,
-          permission: "produto-projecao-compra",
+          key: "projecao-compra",
+          label: "Projeção Compra",
+          href: projecaoCompraHref,
+          permission: "projecao-compra",
           isActive: (currentPathname) =>
-            matchesSegment(currentPathname, "/produto-projecao-compra", produtoProjecaoCompraHref),
+            matchesSegment(currentPathname, "/projecao-compra", projecaoCompraHref),
         },
         {
           key: "produtos-parados",

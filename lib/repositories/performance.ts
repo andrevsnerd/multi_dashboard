@@ -317,7 +317,10 @@ export async function fetchPerformanceData(
 export interface FilialProdutoSalesRow {
   produto: string;
   descricao: string;
+  /** GRUPO_PRODUTO na NERD, LINHA na Scarf Me (a "categoria" das telas). */
   categoria: string;
+  /** GRUPO_PRODUTO cru — existe nas duas empresas, ao contrario de `categoria`. */
+  grupo?: string;
   subgrupo?: string;
   linha?: string;
   tipoProduto?: string;
@@ -367,6 +370,24 @@ export async function fetchFilialProdutoSales(
     produtoIds?: string[] | null;
     /** Quando false, não busca o período anterior (vendasPrevious = 0) — economiza metade das queries. */
     includePrevious?: boolean;
+    /**
+     * Recortes por dimensão do cadastro (aditivos, na MESMA query validada). Usados pela
+     * Projeção Compra, que projeta o giro de um grupo/subgrupo/coleção/grade/cor inteiro sem
+     * precisar enumerar milhares de códigos de produto num `WHERE PRODUTO IN (...)`.
+     *
+     * `dimensoes.linhas` é um filtro comum (vale para qualquer empresa) — não confundir com a
+     * opção `linhas` de cima, que é o escopo de LINHA da NERD e só se aplica a ela.
+     * `dimensoes.cores` casa pela DESCRIÇÃO da cor e só funciona com `groupByCor`.
+     */
+    dimensoes?: {
+      grupos?: string[] | null;
+      linhas?: string[] | null;
+      subgrupos?: string[] | null;
+      grades?: string[] | null;
+      colecoes?: string[] | null;
+      cores?: string[] | null;
+      tipos?: string[] | null;
+    } | null;
   },
 ): Promise<FilialProdutoSalesRow[]> {
   const groupByCor = options?.groupByCor === true;
@@ -391,6 +412,48 @@ export async function fetchFilialProdutoSales(
     : `''`;
   // SQL Server rejects GROUP BY on a literal constant — only include gradeExpr if it references a column
   const gradeGroupBy = gradeExpr === `''` ? '' : `, ${gradeExpr}`;
+
+  // ── Recortes por dimensão do cadastro (categoria/subgrupo/coleção/grade) ──────────
+  // Filtram na tabela PRODUTOS (p), que as duas queries (POS e e-commerce) já juntam
+  // para trazer os metadados. Nada da lógica de venda muda: é só um AND a mais.
+  type DbRequest = Parameters<Parameters<typeof withRequest>[0]>[0];
+  const dimFilters = (() => {
+    const dim = options?.dimensoes;
+    const clean = (values?: string[] | null) =>
+      Array.from(new Set((values ?? []).map((v) => (v ?? '').trim().toUpperCase()).filter(Boolean)));
+    const entries = [
+      { name: 'DimGrp', expr: `UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, ''))))`, values: clean(dim?.grupos) },
+      { name: 'DimLin', expr: `UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, ''))))`, values: clean(dim?.linhas) },
+      {
+        name: 'DimSub',
+        expr: `UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, ''))))`,
+        values: clean(dim?.subgrupos),
+      },
+      {
+        name: 'DimGra',
+        expr: `UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), ''))))`,
+        values: clean(dim?.grades),
+      },
+      { name: 'DimCol', expr: `UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, ''))))`, values: clean(dim?.colecoes) },
+      { name: 'DimTip', expr: `UPPER(LTRIM(RTRIM(ISNULL(p.TIPO_PRODUTO, ''))))`, values: clean(dim?.tipos) },
+      // Cor entra pela descrição (é o que o usuário escolhe); o join cor_ref só existe por cor.
+      {
+        name: 'DimCor',
+        expr: `UPPER(LTRIM(RTRIM(ISNULL(cor_ref.DESC_COR, ''))))`,
+        values: groupByCor ? clean(dim?.cores) : [],
+      },
+    ];
+    return entries.filter((entry) => entry.values.length > 0);
+  })();
+  const buildDimClauses = (request: DbRequest, prefix: string): string =>
+    dimFilters
+      .map(({ name, expr, values }) => {
+        values.forEach((v, i) => request.input(`${prefix}${name}${i}`, sql.VarChar, v));
+        const placeholders = values.map((_, i) => `@${prefix}${name}${i}`).join(', ');
+        return `AND ${expr} IN (${placeholders})`;
+      })
+      .join('\n          ');
+
   const requestedLimitRaw = Number(options?.limit ?? NaN);
   const requestedLimit = Number.isFinite(requestedLimitRaw)
     ? Math.floor(requestedLimitRaw)
@@ -404,6 +467,7 @@ export async function fetchFilialProdutoSales(
     PRODUTO: string;
     DESCRICAO: string;
     CATEGORIA: string;
+    GRUPO?: string;
     SUBGRUPO?: string;
     LINHA?: string;
     TIPO_PRODUTO?: string;
@@ -422,6 +486,7 @@ export async function fetchFilialProdutoSales(
       produto: r.PRODUTO?.trim() ?? '',
       descricao: r.DESCRICAO?.trim() ?? '',
       categoria: r.CATEGORIA?.trim() ?? '',
+      grupo: r.GRUPO?.trim() ?? '',
       subgrupo: r.SUBGRUPO?.trim() ?? '',
       linha: r.LINHA?.trim() ?? '',
       tipoProduto: r.TIPO_PRODUTO?.trim() ?? '',
@@ -481,6 +546,7 @@ export async function fetchFilialProdutoSales(
         produtoVpClause = `AND vp.PRODUTO IN (${prodPlaceholders})`;
         produtoVtClause = `AND vt.PRODUTO IN (${prodPlaceholders})`;
       }
+      const dimFinalClauses = buildDimClauses(request, prefix);
       const query = `
         WITH vendas_base AS (
           SELECT
@@ -600,6 +666,7 @@ export async function fetchFilialProdutoSales(
           ISNULL(m.PRODUTO, '') AS PRODUTO,
           UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))) AS DESCRICAO,
           ${categoriaExpr} AS CATEGORIA,
+          MAX(UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, ''))))) AS GRUPO,
           MAX(UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, ''))))) AS SUBGRUPO,
           MAX(UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, ''))))) AS LINHA,
           MAX(UPPER(LTRIM(RTRIM(ISNULL(p.TIPO_PRODUTO, ''))))) AS TIPO_PRODUTO,
@@ -624,6 +691,7 @@ export async function fetchFilialProdutoSales(
         ${corJoin}
         WHERE m.FILIAL IS NOT NULL
           ${linhaFinalClause}
+          ${dimFinalClauses}
         GROUP BY ISNULL(m.PRODUTO, ''), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))), ${categoriaExpr}${gradeGroupBy}${corGroupBy}
         ORDER BY VENDAS DESC
       `;
@@ -671,12 +739,14 @@ export async function fetchFilialProdutoSales(
         const prodPlaceholders = produtoIdList.map((_, i) => `@${prefix}EcomProd${i}`).join(', ');
         produtoFpClause = `AND fp.PRODUTO IN (${prodPlaceholders})`;
       }
+      const dimEcomClauses = buildDimClauses(request, `${prefix}Ecom`);
 
       const query = `
         SELECT ${topClause}
           ISNULL(fp.PRODUTO, '') AS PRODUTO,
           UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))) AS DESCRICAO,
           ${categoriaExpr} AS CATEGORIA,
+          MAX(UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, ''))))) AS GRUPO,
           MAX(UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, ''))))) AS SUBGRUPO,
           MAX(UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, ''))))) AS LINHA,
           MAX(UPPER(LTRIM(RTRIM(ISNULL(p.TIPO_PRODUTO, ''))))) AS TIPO_PRODUTO,
@@ -708,6 +778,7 @@ export async function fetchFilialProdutoSales(
           AND f.FILIAL IN (${placeholders})
           ${linhaEcomClause}
           ${produtoFpClause}
+          ${dimEcomClauses}
         GROUP BY ISNULL(fp.PRODUTO, ''), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))), ${categoriaExpr}${gradeGroupBy}, ISNULL(p.CUSTO_REPOSICAO1, 0)${corGroupBy}
         ORDER BY VENDAS DESC
       `;

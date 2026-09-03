@@ -13,6 +13,8 @@ const LEGACY_PERMISSION_ALIASES: Record<string, PermissionKey> = {
   compras_em_transito: "compras-transito",
   "compras em transito": "compras-transito",
   "compras em trânsito": "compras-transito",
+  // Renomeada: "Produto Projecao Compra" virou "Projecao Compra" (rota /projecao-compra).
+  "produto-projecao-compra": "projecao-compra",
   compras_salvas: "compras-salvas",
   "compras salvas": "compras-salvas",
 };

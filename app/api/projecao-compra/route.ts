@@ -48,13 +48,37 @@ export async function GET(request: Request) {
     .map((p) => p.trim())
     .filter(Boolean);
 
+  // Recortes por dimensão do cadastro (um select por dimensão na tela, cada um repetível).
+  const readDim = (name: string) =>
+    Array.from(
+      new Set(
+        searchParams
+          .getAll(name)
+          .flatMap((v) => v.split(','))
+          .map((v) => v.trim().toUpperCase())
+          .filter(Boolean)
+      )
+    );
+  const dimensoes = {
+    grupos: readDim('grupo'),
+    linhas: readDim('linha'),
+    subgrupos: readDim('subgrupo'),
+    grades: readDim('grade'),
+    colecoes: readDim('colecao'),
+    cores: readDim('cor'),
+    tipos: readDim('tipo'),
+  };
+  const temDimensao = Object.values(dimensoes).some((values) => values.length > 0);
+
   if (!companyKey) {
     return NextResponse.json({ error: 'Parâmetro "company" obrigatório' }, { status: 400 });
   }
   if (!isValidYmd(baseParam)) {
     return NextResponse.json({ error: 'Parâmetro "base" (yyyy-MM-dd) inválido' }, { status: 400 });
   }
-  if (produtoIds.length === 0) {
+  // Sem escopo algum a projeção seria "a rede inteira somada", que não é um cenário de
+  // compra útil (e custaria 5 varreduras completas). A tela cobra ao menos um recorte.
+  if (produtoIds.length === 0 && !temDimensao) {
     return NextResponse.json({ dataBase: baseParam, windows: WINDOWS, itens: [] });
   }
 
@@ -82,7 +106,8 @@ export async function GET(request: Request) {
         });
         const rows = await fetchFilialProdutoSales(companyKey, posMembers, ecomMembers, range, 'month', {
           groupByCor: true,
-          produtoIds,
+          produtoIds: produtoIds.length > 0 ? produtoIds : null,
+          dimensoes,
           includePrevious: false,
           limit: 0,
         });
@@ -149,7 +174,7 @@ export async function GET(request: Request) {
       { headers: { 'Cache-Control': 'no-store' } }
     );
   } catch (error) {
-    console.error('Erro em /api/produto-projecao-compra:', error);
+    console.error('Erro em /api/projecao-compra:', error);
     return NextResponse.json({ error: 'Erro ao calcular projeção' }, { status: 500 });
   }
 }

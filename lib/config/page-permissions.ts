@@ -24,7 +24,13 @@ export const PAGE_PERMISSION_DEFINITIONS = [
   { key: "estoque-consulta", label: "Estoque Consulta", routeSegments: ["estoque-consulta"] },
   { key: "controle-giro", label: "Controle de Giro", routeSegments: ["controle-giro"] },
   { key: "produto-giro", label: "Produto Giro", routeSegments: ["produto-giro"] },
-  { key: "produto-projecao-compra", label: "Produto Projecao Compra", routeSegments: ["produto-projecao-compra"] },
+  // Rota renomeada de "produto-projecao-compra" -> "projecao-compra"; o segmento antigo
+  // fica mapeado para nao derrubar link salvo (ver LEGACY_PERMISSION_ALIASES no normalizer).
+  {
+    key: "projecao-compra",
+    label: "Projecao Compra",
+    routeSegments: ["projecao-compra", "produto-projecao-compra"],
+  },
   { key: "produtos-parados", label: "Produtos Parados", routeSegments: ["produtos-parados"] },
   { key: "controle-performance", label: "Controle de Performance", routeSegments: ["controle-performance"] },
   { key: "loja-raio-x", label: "Loja Raio X", routeSegments: ["loja-raio-x"] },
