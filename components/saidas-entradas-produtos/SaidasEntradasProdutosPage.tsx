@@ -9,6 +9,7 @@ import {
   getFilialLabelForDisplay,
 } from "@/lib/config/company";
 import { getDefeitoFilial } from "@/lib/config/filiais-especiais";
+import { permiteSaidaEstoqueNegativo } from "@/lib/config/saida-estoque-negativo";
 import { useAuth } from "@/components/auth/AuthContext";
 
 import styles from "./SaidasEntradasProdutosPage.module.css";
@@ -880,6 +881,21 @@ export default function SaidasEntradasProdutosPage({
   // (mesma loja, nova referência) e não deve refazer a consulta.
   const codFilialSelecionada = filialSelecionada?.codFilial ?? null;
 
+  /**
+   * EXCEÇÃO da NERD MATRIZ: a saída pode passar do saldo (item negativo).
+   * Ver `lib/config/saida-estoque-negativo.ts`. Só relaxa a trava de estoque
+   * da SAÍDA — em qualquer outra filial a saída continua limitada ao saldo.
+   */
+  const saidaPodeEstourarEstoque = useMemo(
+    () =>
+      tipoOperacao === "saida" &&
+      permiteSaidaEstoqueNegativo(companyKey, getFilialMatchTokens(filialSelecionada)),
+    [tipoOperacao, companyKey, filialSelecionada]
+  );
+
+  /** True quando a linha não deve ter teto de quantidade (entrada ou MATRIZ). */
+  const semTetoDeEstoque = tipoOperacao === "entrada" || saidaPodeEstourarEstoque;
+
   useEffect(() => {
     if (!saidaDeDefeito || !codFilialSelecionada) {
       setDefeitoDoDia(null);
@@ -1534,11 +1550,11 @@ export default function SaidasEntradasProdutosPage({
       }
 
       const atual = prev[idx];
-      const proxQtd = tipoOperacao === "entrada" ? atual.quantidade + 1 : Math.min(atual.estoque, atual.quantidade + 1);
+      const proxQtd = semTetoDeEstoque ? atual.quantidade + 1 : Math.min(atual.estoque, atual.quantidade + 1);
       const next = [...prev];
       next[idx] = { ...atual, quantidade: proxQtd };
 
-      if (tipoOperacao === "saida" && proxQtd === atual.estoque) {
+      if (tipoOperacao === "saida" && !saidaPodeEstourarEstoque && proxQtd === atual.estoque) {
         mostrarNotificacao(`Quantidade máxima atingida (estoque ${atual.estoque})`, "error");
       } else {
         mostrarNotificacao(`${novoItem.descProduto} adicionado`);
@@ -1546,7 +1562,7 @@ export default function SaidasEntradasProdutosPage({
 
       return next;
     });
-  }, [criarProdutoSelecionado, mostrarNotificacao, tipoOperacao]);
+  }, [criarProdutoSelecionado, mostrarNotificacao, tipoOperacao, semTetoDeEstoque, saidaPodeEstourarEstoque]);
 
   const adicionarComCorSelecionada = useCallback((produtoComCor: Produto) => {
     setColorPickerProduto(null);
@@ -1567,11 +1583,11 @@ export default function SaidasEntradasProdutosPage({
       }
 
       const atual = prev[idx];
-      const proxQtd = tipoOperacao === "entrada" ? atual.quantidade + 1 : Math.min(atual.estoque, atual.quantidade + 1);
+      const proxQtd = semTetoDeEstoque ? atual.quantidade + 1 : Math.min(atual.estoque, atual.quantidade + 1);
       const next = [...prev];
       next[idx] = { ...atual, quantidade: proxQtd };
 
-      if (tipoOperacao === "saida" && proxQtd === atual.estoque) {
+      if (tipoOperacao === "saida" && !saidaPodeEstourarEstoque && proxQtd === atual.estoque) {
         mostrarNotificacao(`Quantidade máxima atingida (estoque ${atual.estoque})`, "error");
       } else {
         mostrarNotificacao(`${novoItem.descProduto} adicionado`);
@@ -1579,7 +1595,7 @@ export default function SaidasEntradasProdutosPage({
 
       return next;
     });
-  }, [criarProdutoSelecionado, mostrarNotificacao, tipoOperacao]);
+  }, [criarProdutoSelecionado, mostrarNotificacao, tipoOperacao, semTetoDeEstoque, saidaPodeEstourarEstoque]);
 
   const removerProduto = useCallback((index: number) => {
     setProdutosSelecionados(prev => prev.filter((_, i) => i !== index));
@@ -1677,7 +1693,7 @@ export default function SaidasEntradasProdutosPage({
     let quantidade: number;
 
     if (idx === -1) {
-      if (tipoOperacao === "saida" && item.estoque <= 0) {
+      if (tipoOperacao === "saida" && !saidaPodeEstourarEstoque && item.estoque <= 0) {
         registrarBipe(false, "Sem estoque", `${rotulo} não tem saldo em ${filialOptionLabel(filialSelecionada)}.`);
         return;
       }
@@ -1698,7 +1714,7 @@ export default function SaidasEntradasProdutosPage({
       ];
     } else {
       const linha = atual[idx];
-      if (tipoOperacao === "saida" && linha.quantidade >= item.estoque) {
+      if (tipoOperacao === "saida" && !saidaPodeEstourarEstoque && linha.quantidade >= item.estoque) {
         registrarBipe(false, "Quantidade máxima", `${rotulo} já está com o estoque todo (${item.estoque}).`);
         return;
       }
@@ -1716,7 +1732,7 @@ export default function SaidasEntradasProdutosPage({
       rotulo,
       `${item.produto}${item.codigoBarra ? ` · ${item.codigoBarra}` : ""} · qtd ${quantidade}`
     );
-  }, [filialSelecionada, tipoOperacao, filialOptionLabel, registrarBipe, destacarItem]);
+  }, [filialSelecionada, tipoOperacao, saidaPodeEstourarEstoque, filialOptionLabel, registrarBipe, destacarItem]);
 
   const processarBipe = useCallback(async (codigoRaw: string) => {
     const codigo = codigoRaw.trim();
@@ -1814,14 +1830,14 @@ export default function SaidasEntradasProdutosPage({
     setProdutosSelecionados(prev => {
       const novo = [...prev];
       const produto = novo[index];
-      if (tipoOperacao === "saida" && quantidade > produto.estoque) {
+      if (tipoOperacao === "saida" && !saidaPodeEstourarEstoque && quantidade > produto.estoque) {
         mostrarNotificacao(`Quantidade não pode ser maior que o estoque disponível (${produto.estoque})`, "error");
         return prev;
       }
       novo[index] = { ...produto, quantidade };
       return novo;
     });
-  }, [mostrarNotificacao, tipoOperacao]);
+  }, [mostrarNotificacao, tipoOperacao, saidaPodeEstourarEstoque]);
 
   const atualizarQuantidadeModal = useCallback((index: number, quantidade: number) => {
     if (quantidade < 1) return;
@@ -1830,14 +1846,14 @@ export default function SaidasEntradasProdutosPage({
       const novo = [...prev];
       const produto = novo[index];
       if (!produto) return prev;
-      if (tipoOperacao === "saida" && quantidade > produto.estoque) {
+      if (tipoOperacao === "saida" && !saidaPodeEstourarEstoque && quantidade > produto.estoque) {
         mostrarNotificacao(`Quantidade não pode ser maior que o estoque disponível (${produto.estoque})`, "error");
         return prev;
       }
       novo[index] = { ...produto, quantidade };
       return novo;
     });
-  }, [mostrarNotificacao, tipoOperacao]);
+  }, [mostrarNotificacao, tipoOperacao, saidaPodeEstourarEstoque]);
 
   const removerProdutoModal = useCallback((index: number) => {
     setProdutosSelecionadosModal(prev => prev.filter((_, i) => i !== index));
@@ -3315,12 +3331,12 @@ export default function SaidasEntradasProdutosPage({
                             value={produto.quantidade}
                             onChange={(e) => atualizarQuantidade(index, parseInt(e.target.value) || 1)}
                             min={1}
-                            max={tipoOperacao === "saida" ? produto.estoque : undefined}
+                            max={semTetoDeEstoque ? undefined : produto.estoque}
                           />
                           <button
                             className={styles.qtyBtn}
                             onClick={() => atualizarQuantidade(index, produto.quantidade + 1)}
-                            disabled={tipoOperacao === "saida" && produto.quantidade >= produto.estoque}
+                            disabled={!semTetoDeEstoque && produto.quantidade >= produto.estoque}
                           >+</button>
                         </div>
                         <div className={styles.stockPill}>{produto.quantidade}/{produto.estoque}</div>
@@ -3658,12 +3674,12 @@ export default function SaidasEntradasProdutosPage({
                               value={p.quantidade}
                               onChange={(e) => atualizarQuantidadeModal(idx, parseInt(e.target.value) || 1)}
                               min={1}
-                              max={tipoOperacao === "saida" ? p.estoque : undefined}
+                              max={semTetoDeEstoque ? undefined : p.estoque}
                             />
                             <button
                               className={styles.qtyBtn}
                               onClick={() => atualizarQuantidadeModal(idx, p.quantidade + 1)}
-                              disabled={tipoOperacao === "saida" && p.quantidade >= p.estoque}
+                              disabled={!semTetoDeEstoque && p.quantidade >= p.estoque}
                             >+</button>
                           </div>
                           <div className={styles.stockPill}>{p.quantidade}/{p.estoque}</div>

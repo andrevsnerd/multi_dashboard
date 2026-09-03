@@ -1430,8 +1430,8 @@
     "semantic_hash": "7a672d31b6ac254cb25f6a420501049d"
   },
   "components/layout/Sidebar.tsx": {
-    "mtime": 1788442653.457553,
-    "ast_hash": "71cc9137e71f2e54d6a5f6c611ac597a",
+    "mtime": 1787679046.639722,
+    "ast_hash": "5808b5335da40dead5527044a37a5d9a",
     "semantic_hash": ""
   },
   "components/layout/SidebarContext.tsx": {
@@ -1620,8 +1620,8 @@
     "semantic_hash": ""
   },
   "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx": {
-    "mtime": 1788446843.351804,
-    "ast_hash": "00d370165f8b4c36606bafc47c929c8b",
+    "mtime": 1788354066.764366,
+    "ast_hash": "d9b07316ce0e87496dae645482fae931",
     "semantic_hash": ""
   },
   "components/shared/CompraIdealCell.tsx": {
@@ -2070,9 +2070,9 @@
     "semantic_hash": ""
   },
   "lib/auth/permission-normalizer.ts": {
-    "mtime": 1788442640.384259,
-    "ast_hash": "0933a2f684b0e3f73f36d7b20f27cf61",
-    "semantic_hash": ""
+    "mtime": 1780073682.818882,
+    "ast_hash": "81efc3f077be8b7a4d9bf83f5dcc06e5",
+    "semantic_hash": "81efc3f077be8b7a4d9bf83f5dcc06e5"
   },
   "lib/auth/permissions.ts": {
     "mtime": 1788352732.9011302,
@@ -2155,8 +2155,8 @@
     "semantic_hash": "29590f1b0f773ebbcd60e9dc314eec58"
   },
   "lib/config/page-permissions.ts": {
-    "mtime": 1788442640.381323,
-    "ast_hash": "99f727dfcebb660ecd931da3e4c0b55a",
+    "mtime": 1787679031.2651157,
+    "ast_hash": "4b1b6590516537129b2a81ae0cf55536",
     "semantic_hash": ""
   },
   "lib/constants/columns.ts": {
@@ -2505,8 +2505,8 @@
     "semantic_hash": "e7b25fbf2e0069ee8a6c5a9fdf73a34d"
   },
   "lib/repositories/performance.ts": {
-    "mtime": 1788444332.331631,
-    "ast_hash": "8e31d343d50fe68ec0eaa81eea944849",
+    "mtime": 1786368588.6929264,
+    "ast_hash": "3d3a31d87ee188cca9be5850746f7103",
     "semantic_hash": ""
   },
   "lib/repositories/productDetail.ts": {
@@ -2595,8 +2595,8 @@
     "semantic_hash": ""
   },
   "lib/saida-entrada-executor.js": {
-    "mtime": 1788375377.8322284,
-    "ast_hash": "f452604eee5d4cb329752120c884e3b4",
+    "mtime": 1788353386.6858857,
+    "ast_hash": "eeeded154f7a3675d574d4a815ca0a87",
     "semantic_hash": ""
   },
   "lib/server/company-live.ts": {
@@ -2970,9 +2970,9 @@
     "semantic_hash": "faf4e030ab1a328553b74e366e2a81dd"
   },
   "next.config.ts": {
-    "mtime": 1788442658.3620396,
-    "ast_hash": "f2968dd5cc0c4284c42fb7c86aceb9b6",
-    "semantic_hash": ""
+    "mtime": 1780073682.8843808,
+    "ast_hash": "3d3af6c6d935100fa8685321698cea14",
+    "semantic_hash": "3d3af6c6d935100fa8685321698cea14"
   },
   "package.json": {
     "mtime": 1784811901.8894634,
@@ -3647,6 +3647,21 @@
   "components/stock/ProdutoGiroPerformanceChart.tsx": {
     "mtime": 1784816472.4457502,
     "ast_hash": "8f1fa8fb34e5f6edd3bbd1e6c2da8082",
+    "semantic_hash": ""
+  },
+  "app/(companies)/[company]/produto-projecao-compra/page.tsx": {
+    "mtime": 1784730717.4802241,
+    "ast_hash": "0334a6ccbca4f218ab5288f6fb07f393",
+    "semantic_hash": ""
+  },
+  "app/api/produto-projecao-compra/route.ts": {
+    "mtime": 1784730545.432794,
+    "ast_hash": "83cadd00c43f9b3a84c40faea3a1146e",
+    "semantic_hash": ""
+  },
+  "components/stock/ProdutoProjecaoCompraPage.tsx": {
+    "mtime": 1784730668.5220857,
+    "ast_hash": "a97be4856367a14b4878484326e888e3",
     "semantic_hash": ""
   },
   "app/api/produto-giro/diario/route.ts": {
@@ -4382,31 +4397,6 @@
   "app/api/relatorios/filtro-opcoes/route.ts": {
     "mtime": 1788372494.7971213,
     "ast_hash": "f566319d12a676a5b5d4adccbf13c85d",
-    "semantic_hash": ""
-  },
-  "app/(companies)/[company]/projecao-compra/page.tsx": {
-    "mtime": 1788442145.2792056,
-    "ast_hash": "d903d5ff142007ec9d8850f9bd65bb0e",
-    "semantic_hash": ""
-  },
-  "app/api/projecao-compra/route.ts": {
-    "mtime": 1788445614.756677,
-    "ast_hash": "7e6476da4a44d36f44a3e5dfb268af44",
-    "semantic_hash": ""
-  },
-  "components/stock/ProjecaoCompraPage.tsx": {
-    "mtime": 1788445830.3602965,
-    "ast_hash": "a5a8d58f410198066e4c8d7b3d13c7fd",
-    "semantic_hash": ""
-  },
-  "lib/config/saida-estoque-negativo.ts": {
-    "mtime": 1788446768.450554,
-    "ast_hash": "6fcf5da2dd246d2b33fbb9b4b2a51969",
-    "semantic_hash": ""
-  },
-  "scripts/backfill-custo-entradas.mjs": {
-    "mtime": 1788436458.3682394,
-    "ast_hash": "acd1a7c658b0143018a36ca9559c10f1",
     "semantic_hash": ""
   }
 }
