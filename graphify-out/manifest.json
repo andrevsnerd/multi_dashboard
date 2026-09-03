@@ -2595,8 +2595,8 @@
     "semantic_hash": ""
   },
   "lib/saida-entrada-executor.js": {
-    "mtime": 1788448583.6624362,
-    "ast_hash": "227258bb7d7040b91545b27972bca273",
+    "mtime": 1788455091.959301,
+    "ast_hash": "40b64733585816cff3f17eace4c305d7",
     "semantic_hash": ""
   },
   "lib/server/company-live.ts": {
@@ -4395,8 +4395,8 @@
     "semantic_hash": ""
   },
   "components/stock/ProjecaoCompraPage.tsx": {
-    "mtime": 1788445830.3602965,
-    "ast_hash": "a5a8d58f410198066e4c8d7b3d13c7fd",
+    "mtime": 1788453357.7845545,
+    "ast_hash": "d4bb0f1cb6665d327df873cc1aeb9937",
     "semantic_hash": ""
   },
   "lib/config/saida-estoque-negativo.ts": {

@@ -1615,13 +1615,13 @@
     "semantic_hash": "782def41eef3db810a199a20a827b758"
   },
   "components/saidas-entradas-produtos/HistoricoSaidasEntradasPage.tsx": {
-    "mtime": 1788353183.5828805,
-    "ast_hash": "108d07c69e27cb6ccd23ba48b940fa68",
+    "mtime": 1788448906.4890332,
+    "ast_hash": "fbb25fc59116239c5a7167f924ecd7c8",
     "semantic_hash": ""
   },
   "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx": {
-    "mtime": 1788446843.351804,
-    "ast_hash": "00d370165f8b4c36606bafc47c929c8b",
+    "mtime": 1788448971.3690128,
+    "ast_hash": "2166ec2d99eda0228b46f3b453502ee2",
     "semantic_hash": ""
   },
   "components/shared/CompraIdealCell.tsx": {
@@ -2075,8 +2075,8 @@
     "semantic_hash": ""
   },
   "lib/auth/permissions.ts": {
-    "mtime": 1788352732.9011302,
-    "ast_hash": "abb9f91a028e20acf2ff7be5b14a62d5",
+    "mtime": 1788448540.9444518,
+    "ast_hash": "2d09ebc72dcea0a700d146bb5c80472e",
     "semantic_hash": ""
   },
   "lib/auth/users-store-neon.ts": {
@@ -2595,8 +2595,8 @@
     "semantic_hash": ""
   },
   "lib/saida-entrada-executor.js": {
-    "mtime": 1788375377.8322284,
-    "ast_hash": "f452604eee5d4cb329752120c884e3b4",
+    "mtime": 1788448583.6624362,
+    "ast_hash": "227258bb7d7040b91545b27972bca273",
     "semantic_hash": ""
   },
   "lib/server/company-live.ts": {
@@ -4407,6 +4407,11 @@
   "scripts/backfill-custo-entradas.mjs": {
     "mtime": 1788436458.3682394,
     "ast_hash": "acd1a7c658b0143018a36ca9559c10f1",
+    "semantic_hash": ""
+  },
+  "app/api/saidas-entradas-produtos/saida-editar/route.ts": {
+    "mtime": 1788448647.6849658,
+    "ast_hash": "0c5aab9460ce44c10299cc6b611eef75",
     "semantic_hash": ""
   }
 }
