@@ -652,12 +652,13 @@ async function salvarDestinoRomaneio(
   });
 }
 
-// ── EDIÇÃO DE ROMANEIO DE ENTRADA ────────────────────────────────────────────
-// O Linx deixa reabrir uma entrada já gravada e continuar digitando itens. Aqui
-// é a mesma ideia: a tela volta a mostrar os itens que já entraram e o que for
-// bipado depois é SOMADO ao mesmo romaneio (não nasce romaneio novo).
+// ── EDIÇÃO DE ROMANEIO (SAÍDA E ENTRADA) ─────────────────────────────────────
+// O Linx deixa reabrir um romaneio já gravado e continuar digitando itens. Aqui
+// é a mesma ideia: a tela volta a mostrar os itens que já foram lançados e o que
+// for bipado depois é SOMADO ao mesmo romaneio (não nasce romaneio novo).
+// Saída e entrada usam o MESMO contrato — só muda a rota.
 
-interface ItemEntradaExistente {
+interface ItemRomaneioExistente {
   produto: string;
   corProduto: string | null;
   descProduto: string;
@@ -667,45 +668,62 @@ interface ItemEntradaExistente {
   estoque: number;
 }
 
-interface EntradaEditando {
+interface RomaneioEditando {
+  /** Saída ou entrada: decide a rota, o texto e a cor da tela. */
+  tipo: TipoOperacao;
   romaneio: string;
   /** Nome da filial como está no romaneio (ERP) — é por ele que o backend acha o cabeçalho. */
   filial: string;
-  itensExistentes: ItemEntradaExistente[];
+  itensExistentes: ItemRomaneioExistente[];
+  /** Alerta que não bloqueia (ex.: destino da saída já começou a conferir). */
+  aviso: string | null;
 }
 
-async function fetchEntradaParaEdicao(
+/** Rota de edição de cada tipo — as duas expõem o mesmo GET/POST. */
+function rotaEdicaoRomaneio(tipo: TipoOperacao): string {
+  return tipo === "saida"
+    ? "/api/saidas-entradas-produtos/saida-editar"
+    : "/api/saidas-entradas-produtos/entrada-editar";
+}
+
+interface RespostaEdicaoRomaneio {
+  filial: string;
+  editavel: boolean;
+  motivo: string | null;
+  aviso?: string | null;
+  itens: ItemRomaneioExistente[];
+}
+
+async function fetchRomaneioParaEdicao(
+  tipo: TipoOperacao,
   romaneio: string,
   filial: string,
-  username: string
-): Promise<{ filial: string; editavel: boolean; motivo: string | null; itens: ItemEntradaExistente[] }> {
-  const params = new URLSearchParams({ romaneio, filial });
-  const response = await fetch(`/api/saidas-entradas-produtos/entrada-editar?${params.toString()}`, {
+  username: string,
+  companyKey: string
+): Promise<RespostaEdicaoRomaneio> {
+  const params = new URLSearchParams({ romaneio, filial, company: companyKey });
+  const response = await fetch(`${rotaEdicaoRomaneio(tipo)}?${params.toString()}`, {
     cache: "no-store",
     headers: { "x-auth-username": username },
   });
 
   if (!response.ok) {
     const erro = (await response.json().catch(() => null)) as { error?: string } | null;
-    throw new Error(erro?.error || "Erro ao carregar o romaneio de entrada");
+    throw new Error(erro?.error || `Erro ao carregar o romaneio de ${tipo === "saida" ? "saída" : "entrada"}`);
   }
 
-  return (await response.json()) as {
-    filial: string;
-    editavel: boolean;
-    motivo: string | null;
-    itens: ItemEntradaExistente[];
-  };
+  return (await response.json()) as RespostaEdicaoRomaneio;
 }
 
-async function salvarItensNoRomaneioEntrada(
+async function salvarItensNoRomaneio(
+  tipo: TipoOperacao,
   romaneio: string,
   filial: string,
   itens: Array<{ produto: string; corProduto: string | null; quantidade: number }>,
   username: string,
   companyKey: string
 ): Promise<{ romaneio: string; qtdeAdicionada: number; message: string }> {
-  const response = await fetch("/api/saidas-entradas-produtos/entrada-editar", {
+  const response = await fetch(rotaEdicaoRomaneio(tipo), {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-auth-username": username },
     body: JSON.stringify({ romaneio, filial, itens, companyKey }),
@@ -770,9 +788,9 @@ export default function SaidasEntradasProdutosPage({
   const [defeitoDoDia, setDefeitoDoDia] = useState<{ romaneio: DefeitoDoDia; mensagem: string } | null>(null);
   const [checandoDefeitoDoDia, setChecandoDefeitoDoDia] = useState(false);
   const [defeitoRefreshKey, setDefeitoRefreshKey] = useState(0);
-  // ── EDIÇÃO DE ROMANEIO DE ENTRADA (logística+) ─────────────────────────────
-  const [entradaEditando, setEntradaEditando] = useState<EntradaEditando | null>(null);
-  const [carregandoEntradaEdicao, setCarregandoEntradaEdicao] = useState(false);
+  // ── EDIÇÃO DE ROMANEIO — SAÍDA E ENTRADA (logística+) ──────────────────────
+  const [romaneioEditando, setRomaneioEditando] = useState<RomaneioEditando | null>(null);
+  const [carregandoEdicaoRomaneio, setCarregandoEdicaoRomaneio] = useState(false);
 
   const isEntradaNerd = tipoOperacao === "entrada" && companyKey === "nerd";
   const tiposRomaneioExibidos = useMemo(() => {
@@ -828,12 +846,12 @@ export default function SaidasEntradasProdutosPage({
 
   const isAdmin = user?.role === "admin";
   /**
-   * Reabrir romaneio de ENTRADA é de logística pra cima — gerente registra a
-   * entrada da loja dele, mas nunca reabre romaneio já gravado. Espelha
-   * `canEditarRomaneioEntrada` (lib/auth/permissions.ts); quem barra de verdade
-   * é a rota /api/saidas-entradas-produtos/entrada-editar.
+   * Reabrir romaneio (saída OU entrada) é de logística pra cima — a loja registra
+   * o movimento dela, mas nunca reabre romaneio já gravado. Espelha
+   * `canEditarRomaneioEntrada` / `canEditarRomaneioSaida` (lib/auth/permissions.ts);
+   * quem barra de verdade são as rotas /entrada-editar e /saida-editar.
    */
-  const podeEditarEntrada = isAdmin || user?.role === "logistica";
+  const podeEditarRomaneio = isAdmin || user?.role === "logistica";
 
   const companyConfig = useMemo(() => resolveCompany(companyKey), [companyKey]);
   const filialLabel = useCallback(
@@ -871,6 +889,9 @@ export default function SaidasEntradasProdutosPage({
    * quem bloqueia de verdade é `/api/saidas-entradas-produtos/executar` (409).
    */
   const saidaDeDefeito =
+    // Editando um romaneio que já existe, a trava não se aplica: ela existe para
+    // que o dia tenha UM romaneio de defeito, e acrescentar item é o caminho certo.
+    !romaneioEditando &&
     tipoOperacao === "saida" &&
     (isTipoDefeito(tipoRomaneioSelecionado) ||
       (!!filialDestinoSaida && !!defeitoFilialOption(companyKey) &&
@@ -1229,7 +1250,7 @@ export default function SaidasEntradasProdutosPage({
     setFilialDestinoSaida(null);
     // Trocar de operação sai da edição de romaneio: a lista de trabalho passa a
     // ser um romaneio novo, não mais o que estava aberto.
-    setEntradaEditando(null);
+    setRomaneioEditando(null);
   }, [companyKey, tiposRomaneio, tiposRomaneioDisponiveis]);
 
   const observacaoAtual = tipoOperacao === "saida" ? observacaoSaida : observacaoEntrada;
@@ -1934,25 +1955,31 @@ export default function SaidasEntradasProdutosPage({
   }, [processandoOperacao, filialSelecionada, tipoOperacao, tipoRomaneioSelecionado, responsavelFinal, user?.username, filialDestinoSaida, companyKey, mostrarNotificacao]);
 
   /**
-   * Abre um romaneio de ENTRADA já gravado para acrescentar itens. Traz os itens
-   * que já entraram (só para conferência) e deixa a lista de trabalho vazia: o
-   * que for bipado agora é o que será SOMADO ao romaneio.
+   * Abre um romaneio já gravado (saída OU entrada) para acrescentar itens. Traz
+   * os itens que já foram lançados (só para conferência) e deixa a lista de
+   * trabalho vazia: o que for bipado agora é o que será SOMADO ao romaneio.
    */
-  const abrirEdicaoEntrada = useCallback(
-    async (romaneio: string, filialRomaneio: string): Promise<boolean> => {
-      if (!user?.username || !podeEditarEntrada) return false;
-      if (carregandoEntradaEdicao || processandoOperacao) return false;
+  const abrirEdicaoRomaneio = useCallback(
+    async (tipo: TipoOperacao, romaneio: string, filialRomaneio: string): Promise<boolean> => {
+      if (!user?.username || !podeEditarRomaneio) return false;
+      if (carregandoEdicaoRomaneio || processandoOperacao) return false;
 
-      setCarregandoEntradaEdicao(true);
+      setCarregandoEdicaoRomaneio(true);
       try {
-        const dados = await fetchEntradaParaEdicao(romaneio, filialRomaneio, user.username);
+        const dados = await fetchRomaneioParaEdicao(
+          tipo,
+          romaneio,
+          filialRomaneio,
+          user.username,
+          companyKey
+        );
         if (!dados.editavel) {
           mostrarNotificacao(dados.motivo || "Este romaneio não pode receber novos itens.", "error");
           return false;
         }
 
         // A operação (bipe, busca de produto, estoque) segue pela filial do
-        // romaneio — sem isso o item entraria na loja errada.
+        // romaneio — sem isso o item sairia/entraria na loja errada.
         const filialDoRomaneio =
           filiaisDisponiveis.find((f) => matchesFilialOption(f, dados.filial)) ??
           filiais.find((f) => matchesFilialOption(f, dados.filial)) ??
@@ -1966,7 +1993,7 @@ export default function SaidasEntradasProdutosPage({
           return false;
         }
 
-        setTipoOperacao("entrada");
+        setTipoOperacao(tipo);
         setModalAberto(false);
         setProdutosSelecionadosModal([]);
         setProdutos([]);
@@ -1976,28 +2003,33 @@ export default function SaidasEntradasProdutosPage({
         produtosSelecionadosRef.current = [];
         setObservacaoAtual("");
         setFilialSelecionada(filialDoRomaneio);
-        setEntradaEditando({
+        setRomaneioEditando({
+          tipo,
           romaneio,
           filial: dados.filial,
           itensExistentes: dados.itens,
+          aviso: dados.aviso ?? null,
         });
         setAbaLateral("historico");
         return true;
       } catch (error) {
         mostrarNotificacao(
-          error instanceof Error ? error.message : "Erro ao abrir o romaneio de entrada",
+          error instanceof Error
+            ? error.message
+            : `Erro ao abrir o romaneio de ${tipo === "saida" ? "saída" : "entrada"}`,
           "error"
         );
         return false;
       } finally {
-        setCarregandoEntradaEdicao(false);
+        setCarregandoEdicaoRomaneio(false);
       }
     },
     [
       user?.username,
-      podeEditarEntrada,
-      carregandoEntradaEdicao,
+      podeEditarRomaneio,
+      carregandoEdicaoRomaneio,
       processandoOperacao,
+      companyKey,
       filiaisDisponiveis,
       filiais,
       filialLabel,
@@ -2006,8 +2038,8 @@ export default function SaidasEntradasProdutosPage({
     ]
   );
 
-  const cancelarEdicaoEntrada = useCallback(() => {
-    setEntradaEditando(null);
+  const cancelarEdicaoRomaneio = useCallback(() => {
+    setRomaneioEditando(null);
     setProdutosSelecionados([]);
     produtosSelecionadosRef.current = [];
     setObservacaoAtual("");
@@ -2015,14 +2047,15 @@ export default function SaidasEntradasProdutosPage({
 
   /** Grava os itens novos DENTRO do romaneio aberto (não cria romaneio novo). */
   const salvarItensDaEdicao = useCallback(async () => {
-    if (!entradaEditando || !user?.username) return;
+    if (!romaneioEditando || !user?.username) return;
     if (produtosSelecionados.length === 0 || processandoOperacao) return;
 
     setProcessandoOperacao(true);
     try {
-      const resultado = await salvarItensNoRomaneioEntrada(
-        entradaEditando.romaneio,
-        entradaEditando.filial,
+      const resultado = await salvarItensNoRomaneio(
+        romaneioEditando.tipo,
+        romaneioEditando.romaneio,
+        romaneioEditando.filial,
         produtosSelecionados.map((p) => ({
           produto: p.produto,
           corProduto: p.corProduto,
@@ -2044,9 +2077,9 @@ export default function SaidasEntradasProdutosPage({
           await removerRascunhoApi(
             {
               companyKey,
-              tipoOperacao: "entrada",
+              tipoOperacao: romaneioEditando.tipo,
               filial: filialSelecionada.codFilial,
-              romaneioEdicao: entradaEditando.romaneio,
+              romaneioEdicao: romaneioEditando.romaneio,
             },
             user.username
           );
@@ -2055,7 +2088,7 @@ export default function SaidasEntradasProdutosPage({
         }
       }
 
-      setEntradaEditando(null);
+      setRomaneioEditando(null);
       setProdutosSelecionados([]);
       produtosSelecionadosRef.current = [];
       setObservacaoAtual("");
@@ -2067,7 +2100,7 @@ export default function SaidasEntradasProdutosPage({
 
       mostrarNotificacao(
         resultado.message ||
-          `Romaneio ${entradaEditando.romaneio} atualizado com ${resultado.qtdeAdicionada} item(ns).`
+          `Romaneio ${romaneioEditando.romaneio} atualizado com ${resultado.qtdeAdicionada} item(ns).`
       );
     } catch (error) {
       mostrarNotificacao(
@@ -2078,7 +2111,7 @@ export default function SaidasEntradasProdutosPage({
       setProcessandoOperacao(false);
     }
   }, [
-    entradaEditando,
+    romaneioEditando,
     user?.username,
     produtosSelecionados,
     processandoOperacao,
@@ -2089,8 +2122,9 @@ export default function SaidasEntradasProdutosPage({
   ]);
 
   /**
-   * Entrada aberta a partir do histórico completo:
+   * Romaneio aberto a partir do histórico completo:
    * /saidas-entradas-produtos?editarEntrada=016123&filialEntrada=NERD%20MATRIZ
+   * /saidas-entradas-produtos?editarSaida=016123&filialSaida=NERD%20MATRIZ
    * Lê de `window.location` (e não de useSearchParams) para não exigir um
    * Suspense em volta da tela inteira. A URL é limpa depois, senão um F5
    * reabriria a edição sozinho.
@@ -2098,18 +2132,19 @@ export default function SaidasEntradasProdutosPage({
   const edicaoViaUrlRef = useRef(false);
   useEffect(() => {
     if (edicaoViaUrlRef.current) return;
-    if (!permissoesCarregadas || !podeEditarEntrada) return;
+    if (!permissoesCarregadas || !podeEditarRomaneio) return;
     if (filiaisDisponiveis.length === 0) return;
 
     const params = new URLSearchParams(window.location.search);
-    const romaneio = (params.get("editarEntrada") || "").trim();
-    const filial = (params.get("filialEntrada") || "").trim();
+    const tipo: TipoOperacao = params.get("editarSaida") ? "saida" : "entrada";
+    const romaneio = (params.get(tipo === "saida" ? "editarSaida" : "editarEntrada") || "").trim();
+    const filial = (params.get(tipo === "saida" ? "filialSaida" : "filialEntrada") || "").trim();
     if (!romaneio || !filial) return;
 
     edicaoViaUrlRef.current = true;
     window.history.replaceState(null, "", window.location.pathname);
-    void abrirEdicaoEntrada(romaneio, filial);
-  }, [permissoesCarregadas, podeEditarEntrada, filiaisDisponiveis, abrirEdicaoEntrada]);
+    void abrirEdicaoRomaneio(tipo, romaneio, filial);
+  }, [permissoesCarregadas, podeEditarRomaneio, filiaisDisponiveis, abrirEdicaoRomaneio]);
 
   const abrirModalEdicao = useCallback((log: TransferenciaLog) => {
     setLogEditando(log);
@@ -2227,9 +2262,9 @@ export default function SaidasEntradasProdutosPage({
       mostrarNotificacao("Adicione pelo menos um produto", "error");
       return;
     }
-    // Editando romaneio de entrada: não há destino nem trava de defeito a checar —
-    // os itens vão para um romaneio que já existe.
-    if (entradaEditando) {
+    // Editando romaneio: não há destino nem trava de defeito a checar — os itens
+    // vão para um romaneio que já existe (o cabeçalho não é reescrito).
+    if (romaneioEditando) {
       setMostrarConfirmacaoRegistro(true);
       return;
     }
@@ -2249,19 +2284,19 @@ export default function SaidasEntradasProdutosPage({
       }
     }
     setMostrarConfirmacaoRegistro(true);
-  }, [filialSelecionada, produtosSelecionados.length, tipoOperacao, filiaisDestinoVisiveis.length, filialDestinoSaida, tipoRomaneioSelecionado, travaDefeitoAtiva, defeitoDoDia, entradaEditando, mostrarNotificacao]);
+  }, [filialSelecionada, produtosSelecionados.length, tipoOperacao, filiaisDestinoVisiveis.length, filialDestinoSaida, tipoRomaneioSelecionado, travaDefeitoAtiva, defeitoDoDia, romaneioEditando, mostrarNotificacao]);
 
   const confirmarRegistro = useCallback(() => {
     setMostrarConfirmacaoRegistro(false);
     // Romaneio aberto para edição: os itens entram NELE, sem gerar romaneio novo.
-    if (entradaEditando) {
+    if (romaneioEditando) {
       void salvarItensDaEdicao();
       return;
     }
     const obs = observacaoAtual;
     setObservacaoAtual("");
     executarLote(produtosSelecionados, obs);
-  }, [executarLote, produtosSelecionados, observacaoAtual, setObservacaoAtual, entradaEditando, salvarItensDaEdicao]);
+  }, [executarLote, produtosSelecionados, observacaoAtual, setObservacaoAtual, romaneioEditando, salvarItensDaEdicao]);
 
   // Limpar produtos selecionados somente quando mudar a filial DE FATO (por codFilial real).
   // Comparar por codFilial e não por referência: o refresh em foco/visibilidade recria os
@@ -2297,10 +2332,10 @@ export default function SaidasEntradasProdutosPage({
 
   /**
    * Escopo do rascunho ativo: um por empresa × usuário × tipo × filial × romaneio
-   * em edição. Editar a entrada #X e montar um romaneio novo na MESMA filial são
+   * em edição. Editar o romaneio #X e montar um romaneio novo na MESMA filial são
    * dois trabalhos independentes — cada um com o seu rascunho.
    */
-  const romaneioEmEdicao = entradaEditando?.romaneio ?? null;
+  const romaneioEmEdicao = romaneioEditando?.romaneio ?? null;
   const escopoRascunho =
     user?.username && filialSelecionada
       ? `${companyKey}|${user.username}|${tipoOperacao}|${filialSelecionada.codFilial}|${romaneioEmEdicao ?? ""}`
@@ -2462,14 +2497,18 @@ export default function SaidasEntradasProdutosPage({
       : null;
 
     if (rascunho.romaneioEdicao) {
-      // Rascunho de EDIÇÃO: volta reabrindo a mesma entrada, não montando um
+      // Rascunho de EDIÇÃO: volta reabrindo o mesmo romaneio, não montando um
       // romaneio novo. Se o romaneio deixou de aceitar itens, a própria
-      // abrirEdicaoEntrada avisa e nada é sobrescrito na tela.
-      const aberto = await abrirEdicaoEntrada(rascunho.romaneioEdicao, rascunho.filial);
+      // abrirEdicaoRomaneio avisa e nada é sobrescrito na tela.
+      const aberto = await abrirEdicaoRomaneio(
+        rascunho.tipoOperacao,
+        rascunho.romaneioEdicao,
+        rascunho.filial
+      );
       if (!aberto) return;
     } else {
       // Retomar rascunho comum é montar um romaneio NOVO: sai da edição.
-      setEntradaEditando(null);
+      setRomaneioEditando(null);
       setTipoOperacao(rascunho.tipoOperacao);
       setFilialSelecionada(filial);
       setFilialDestinoSaida(destino);
@@ -2558,7 +2597,7 @@ export default function SaidasEntradasProdutosPage({
     filialOptionLabel,
     tipoRomaneioSelecionado,
     user?.username,
-    abrirEdicaoEntrada,
+    abrirEdicaoRomaneio,
     mostrarNotificacao,
     carregarRascunhos,
   ]);
@@ -2575,8 +2614,8 @@ export default function SaidasEntradasProdutosPage({
         rascunho.tipoOperacao === tipoOperacao &&
         rascunho.filial.trim().toUpperCase() === filialSelecionada.codFilial.trim().toUpperCase() &&
         rascunho.username.toLowerCase() === (user?.username || "").toLowerCase() &&
-        // Editando a entrada #X, o rascunho comum da mesma filial NÃO é o da tela.
-        (rascunho.romaneioEdicao ?? null) === (entradaEditando?.romaneio ?? null);
+        // Editando o romaneio #X, o rascunho comum da mesma filial NÃO é o da tela.
+        (rascunho.romaneioEdicao ?? null) === (romaneioEditando?.romaneio ?? null);
       if (ehOAtual) {
         rascunhoSalvoRef.current = false;
         rascunhoPayloadRef.current = "";
@@ -2590,7 +2629,7 @@ export default function SaidasEntradasProdutosPage({
     } catch {
       mostrarNotificacao("Erro ao descartar o rascunho", "error");
     }
-  }, [user?.username, filialSelecionada, tipoOperacao, entradaEditando, carregarRascunhos, mostrarNotificacao]);
+  }, [user?.username, filialSelecionada, tipoOperacao, romaneioEditando, carregarRascunhos, mostrarNotificacao]);
 
   const totalItens = produtosSelecionados.reduce((sum, p) => sum + p.quantidade, 0);
   const totalProdutos = produtosSelecionados.length;
@@ -2712,7 +2751,7 @@ export default function SaidasEntradasProdutosPage({
           </span>
           {/* Romaneio aberto para edição fica preso à filial dele: trocar de loja aqui
               mandaria a peça para o estoque errado. */}
-          {(filiaisDisponiveis.length === 1 || entradaEditando) && filialSelecionada ? (
+          {(filiaisDisponiveis.length === 1 || romaneioEditando) && filialSelecionada ? (
             <span className={styles.configBarText}>{filialOptionLabel(filialSelecionada)}</span>
           ) : (
             <div className={styles.selectWrap}>
@@ -2742,8 +2781,9 @@ export default function SaidasEntradasProdutosPage({
 
         {/* Tipo Romaneio + Responsável (alinha com Produtos) */}
         <div className={styles.configCardWide}>
-          {/* Filial Destino (apenas saída) */}
-          {tipoOperacao === "saida" && (
+          {/* Filial Destino (apenas saída, e nunca na edição: acrescentar item não
+              reescreve o cabeçalho, então o destino continua o do romaneio aberto) */}
+          {tipoOperacao === "saida" && !romaneioEditando && (
             <div className={styles.configSegment}>
               <div className={styles.configIcon} aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="none">
@@ -2797,9 +2837,9 @@ export default function SaidasEntradasProdutosPage({
               <span className={styles.configBarLabel}>Tipo de Romaneio</span>
               {/* Acrescentar item não reescreve o cabeçalho: o tipo continua o do
                   romaneio aberto, então o seletor sai de cena para não enganar. */}
-              {entradaEditando ? (
+              {romaneioEditando ? (
                 <span className={styles.configBarText}>
-                  Romaneio #{entradaEditando.romaneio} (tipo não muda)
+                  Romaneio #{romaneioEditando.romaneio} (tipo não muda)
                 </span>
               ) : tiposRomaneioExibidos.length === 1 || permissoes?.tipoRomaneioFixo ? (
                 <span className={styles.configBarText}>{tipoRomaneioSelecionado}</span>
@@ -2899,7 +2939,7 @@ export default function SaidasEntradasProdutosPage({
                           rascunho.filial.trim().toUpperCase() ===
                             filialSelecionada.codFilial.trim().toUpperCase() &&
                           rascunho.username.toLowerCase() === (user?.username || "").toLowerCase() &&
-                          (rascunho.romaneioEdicao ?? null) === (entradaEditando?.romaneio ?? null);
+                          (rascunho.romaneioEdicao ?? null) === (romaneioEditando?.romaneio ?? null);
                         return (
                           <div key={rascunho.id} className={styles.rascunhoItem}>
                             <div className={styles.rascunhoTopo}>
@@ -2989,18 +3029,26 @@ export default function SaidasEntradasProdutosPage({
                               <span className={styles.logCount}>
                                 {log.qtdProdutos} prod · {log.qtdItens} {log.qtdItens === 1 ? "item" : "itens"}
                               </span>
-                              {/* Reabrir a entrada e acrescentar itens (igual ao Linx) — só logistica+ */}
-                              {tipoOperacao === "entrada" && podeEditarEntrada && (
+                              {/* Reabrir o romaneio e acrescentar itens (igual ao Linx) — só
+                                  logistica+. Na saída a filial é a de ORIGEM; na entrada, a que
+                                  recebeu. */}
+                              {podeEditarRomaneio && (
                                 <button
-                                  className={styles.logAddItensBtn}
+                                  className={`${styles.logAddItensBtn} ${
+                                    tipoOperacao === "saida" ? styles.logAddItensBtnSaida : ""
+                                  }`}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    void abrirEdicaoEntrada(log.romaneio, log.filialDestino);
+                                    void abrirEdicaoRomaneio(
+                                      tipoOperacao,
+                                      log.romaneio,
+                                      tipoOperacao === "saida" ? log.filialOrigem : log.filialDestino
+                                    );
                                   }}
-                                  disabled={isBusy || carregandoEntradaEdicao}
-                                  title="Editar romaneio: adicionar mais itens a esta entrada"
+                                  disabled={isBusy || carregandoEdicaoRomaneio}
+                                  title={`Editar romaneio: adicionar mais itens a esta ${tipoOperacao === "saida" ? "saída" : "entrada"}`}
                                 >
-                                  {entradaEditando?.romaneio === log.romaneio ? "editando" : "+ itens"}
+                                  {romaneioEditando?.romaneio === log.romaneio ? "editando" : "+ itens"}
                                 </button>
                               )}
                               {isAdmin && (
@@ -3075,8 +3123,8 @@ export default function SaidasEntradasProdutosPage({
                       <path d="M12 12v10" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
                     </svg>
                   </span>
-                  {entradaEditando
-                    ? `Itens a acrescentar ao romaneio #${entradaEditando.romaneio}`
+                  {romaneioEditando
+                    ? `Itens a acrescentar ao romaneio #${romaneioEditando.romaneio}`
                     : `Produtos para ${tipoOperacao === "saida" ? "Saída" : "Entrada"}`}
                 </span>
                 <div className={styles.cardHeaderRight}>
@@ -3109,19 +3157,34 @@ export default function SaidasEntradasProdutosPage({
 
               {/* EDIÇÃO DE ROMANEIO: deixa evidente que a tela não está montando um
                   romaneio novo — o que for bipado agora entra no romaneio aberto. */}
-              {entradaEditando && (
-                <div className={styles.edicaoEntradaBanner}>
-                  <div className={styles.edicaoEntradaBannerTexto}>
-                    <strong>Editando a entrada #{entradaEditando.romaneio}</strong>
+              {romaneioEditando && (
+                <div
+                  className={`${styles.edicaoRomaneioBanner} ${
+                    romaneioEditando.tipo === "saida"
+                      ? styles.edicaoRomaneioBannerSaida
+                      : styles.edicaoRomaneioBannerEntrada
+                  }`}
+                >
+                  <div className={styles.edicaoRomaneioBannerTexto}>
+                    <strong>
+                      Editando a {romaneioEditando.tipo === "saida" ? "saída" : "entrada"} #
+                      {romaneioEditando.romaneio}
+                    </strong>
                     <span>
-                      {filialLabel(entradaEditando.filial)} · {entradaEditando.itensExistentes.length} produto(s)
-                      já entrados. O que você adicionar aqui será somado a este romaneio.
+                      {filialLabel(romaneioEditando.filial)} · {romaneioEditando.itensExistentes.length} produto(s)
+                      já {romaneioEditando.tipo === "saida" ? "lançados" : "entrados"}. O que você adicionar aqui
+                      será somado a este romaneio
+                      {romaneioEditando.tipo === "saida" ? " e sai do estoque da filial na hora" : ""}.
                     </span>
+                    {/* Conferência já iniciada no destino: avisa, mas não trava. */}
+                    {romaneioEditando.aviso && (
+                      <span className={styles.edicaoRomaneioAviso}>{romaneioEditando.aviso}</span>
+                    )}
                   </div>
                   <button
                     type="button"
-                    className={styles.edicaoEntradaCancelarBtn}
-                    onClick={cancelarEdicaoEntrada}
+                    className={styles.edicaoRomaneioCancelarBtn}
+                    onClick={cancelarEdicaoRomaneio}
                     disabled={isBusy}
                   >
                     Cancelar edição
@@ -3236,25 +3299,32 @@ export default function SaidasEntradasProdutosPage({
                 </div>
               )}
 
-              {/* Itens que JÁ entraram neste romaneio — conferência, não edição.
-                  Mudar quantidade de item já entrado continua sendo a tela de
+              {/* Itens que JÁ estão neste romaneio — conferência, não edição.
+                  Mudar quantidade de item já lançado continua sendo a tela de
                   Romaneios (editar-qtd); aqui só se acrescenta. */}
-              {entradaEditando && entradaEditando.itensExistentes.length > 0 && (
-                <div className={styles.itensJaEntradosBloco}>
-                  <div className={styles.itensJaEntradosTitulo}>
-                    Já entrados no romaneio #{entradaEditando.romaneio}
-                    <span className={styles.itensJaEntradosBadge}>
-                      {entradaEditando.itensExistentes.length} prod ·{" "}
-                      {entradaEditando.itensExistentes.reduce((sum, i) => sum + i.quantidade, 0)} itens
+              {romaneioEditando && romaneioEditando.itensExistentes.length > 0 && (
+                <div className={styles.itensJaLancadosBloco}>
+                  <div className={styles.itensJaLancadosTitulo}>
+                    Já {romaneioEditando.tipo === "saida" ? "lançados" : "entrados"} no romaneio #
+                    {romaneioEditando.romaneio}
+                    <span
+                      className={`${styles.itensJaLancadosBadge} ${
+                        romaneioEditando.tipo === "saida"
+                          ? styles.itensJaLancadosBadgeSaida
+                          : styles.itensJaLancadosBadgeEntrada
+                      }`}
+                    >
+                      {romaneioEditando.itensExistentes.length} prod ·{" "}
+                      {romaneioEditando.itensExistentes.reduce((sum, i) => sum + i.quantidade, 0)} itens
                     </span>
                   </div>
-                  <div className={styles.itensJaEntradosLista}>
-                    {entradaEditando.itensExistentes.map((item) => {
+                  <div className={styles.itensJaLancadosLista}>
+                    {romaneioEditando.itensExistentes.map((item) => {
                       const corTxt = textoCorProduto(item.descCor, item.corProduto);
                       return (
                         <div
                           key={`${item.produto}|${item.corProduto ?? ""}`}
-                          className={styles.itemJaEntrado}
+                          className={styles.itemJaLancado}
                         >
                           <div className={styles.produtoInfo}>
                             <div className={styles.produtoName}>{item.descProduto || item.produto}</div>
@@ -3264,7 +3334,7 @@ export default function SaidasEntradasProdutosPage({
                               {item.codigoBarra ? ` · ${item.codigoBarra}` : ""}
                             </div>
                           </div>
-                          <span className={styles.itemJaEntradoQtd}>{item.quantidade}</span>
+                          <span className={styles.itemJaLancadoQtd}>{item.quantidade}</span>
                         </div>
                       );
                     })}
@@ -3287,8 +3357,8 @@ export default function SaidasEntradasProdutosPage({
                   </div>
                   <div className={styles.emptyProductsTitle}>Nenhum produto adicionado</div>
                   <div className={styles.emptyProductsSub}>
-                    {entradaEditando
-                      ? `Bipe o código de barras acima ou use “Adicionar Produto” para acrescentar ao romaneio #${entradaEditando.romaneio}`
+                    {romaneioEditando
+                      ? `Bipe o código de barras acima ou use “Adicionar Produto” para acrescentar ao romaneio #${romaneioEditando.romaneio}`
                       : `Bipe o código de barras acima ou use “Adicionar Produto” para montar a ${tipoOperacao === "saida" ? "saída" : "entrada"}`}
                   </div>
                 </div>
@@ -3379,7 +3449,7 @@ export default function SaidasEntradasProdutosPage({
             <div className={styles.bottomArea}>
               {/* Observação pertence ao cabeçalho do romaneio; acrescentar item não
                   reescreve o cabeçalho, então o campo sai de cena na edição. */}
-              {!entradaEditando && (
+              {!romaneioEditando && (
                 <>
                   <div className={styles.obsLabel}>Observação (opcional)</div>
                   <textarea
@@ -3452,8 +3522,8 @@ export default function SaidasEntradasProdutosPage({
                   </span>
                   {isBusy
                     ? "⏳ Processando…"
-                    : entradaEditando
-                      ? `Salvar no romaneio #${entradaEditando.romaneio}`
+                    : romaneioEditando
+                      ? `Salvar no romaneio #${romaneioEditando.romaneio}`
                       : travaDefeitoAtiva
                         ? "Defeito do dia já enviado"
                         : tipoOperacao === "saida" ? "Registrar Saída" : "Registrar Entrada"}
@@ -3470,16 +3540,16 @@ export default function SaidasEntradasProdutosPage({
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <div className={styles.modalHeader}>
               <h2 className={styles.modalTitle}>
-                {entradaEditando
-                  ? `Adicionar ao romaneio #${entradaEditando.romaneio}?`
+                {romaneioEditando
+                  ? `Adicionar ao romaneio #${romaneioEditando.romaneio}?`
                   : tipoOperacao === "saida" ? "Confirma a SAÍDA?" : "Confirma a ENTRADA?"}
               </h2>
               <button className={styles.modalCloseBtn} onClick={() => setMostrarConfirmacaoRegistro(false)}>×</button>
             </div>
             <div className={styles.modalBody}>
               <p className={styles.confirmacaoTexto}>
-                {entradaEditando
-                  ? `Os ${totalProdutos} produto(s) / ${totalItens} item(ns) da lista serão somados à entrada #${entradaEditando.romaneio} em ${filialLabel(entradaEditando.filial)}. O estoque da filial sobe na hora.`
+                {romaneioEditando
+                  ? `Os ${totalProdutos} produto(s) / ${totalItens} item(ns) da lista serão somados à ${romaneioEditando.tipo === "saida" ? "saída" : "entrada"} #${romaneioEditando.romaneio} em ${filialLabel(romaneioEditando.filial)}. O estoque da filial ${romaneioEditando.tipo === "saida" ? "baixa" : "sobe"} na hora.`
                   : tipoOperacao === "saida"
                     ? "Deseja registrar a saída dos produtos selecionados?"
                     : "Deseja registrar a entrada dos produtos selecionados?"}
@@ -3498,7 +3568,7 @@ export default function SaidasEntradasProdutosPage({
                 className={tipoOperacao === "saida" ? styles.btnConfirmarSaida : styles.btnConfirmarEntrada}
                 onClick={confirmarRegistro}
               >
-                {entradaEditando
+                {romaneioEditando
                   ? "Adicionar ao romaneio"
                   : tipoOperacao === "saida" ? "Confirmar Saída" : "Confirmar Entrada"}
               </button>

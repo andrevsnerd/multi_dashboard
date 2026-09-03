@@ -103,6 +103,19 @@ export function canEditarRomaneioEntrada(role: RoleKey | undefined | null): bool
 }
 
 /**
+ * Reabrir um romaneio de SAIDA para acrescentar itens — mesma regra da entrada
+ * (ver EDITAR_ENTRADA_ROLES): de logistica pra cima. Aqui pesa ainda mais, porque
+ * acrescentar item na saida TIRA estoque da loja de origem na hora; a loja
+ * registra a saida dela, mas quem corrige movimento ja gravado e a logistica.
+ */
+export const EDITAR_SAIDA_ROLES: RoleKey[] = ["admin", "logistica"];
+
+/** True se a funcao pode acrescentar itens a um romaneio de saida existente. */
+export function canEditarRomaneioSaida(role: RoleKey | undefined | null): boolean {
+  return !!role && EDITAR_SAIDA_ROLES.includes(role);
+}
+
+/**
  * Excecao pontual a filialAtribuida: quem aprova os romaneios de DEFEITO e a
  * MATRIZ (logistica), nao a loja que enviou. Entao a logistica confirma entrada
  * na filial de defeito da empresa (NERD DEFEITOS / BAZAR SCARF ME) ALEM da sua

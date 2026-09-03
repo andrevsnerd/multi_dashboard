@@ -71,11 +71,12 @@ export default function HistoricoSaidasEntradasPage({ companyKey }: { companyKey
   const searchParams = useSearchParams();
   const { user } = useAuth();
   /**
-   * Reabrir romaneio de ENTRADA para acrescentar itens é de logística pra cima
-   * (espelha `canEditarRomaneioEntrada`). Daqui só sai o link: quem valida é a
-   * tela de Saídas e Entradas e, no fim, a rota /entrada-editar.
+   * Reabrir romaneio (saída OU entrada) para acrescentar itens é de logística pra
+   * cima (espelha `canEditarRomaneioEntrada` / `canEditarRomaneioSaida`). Daqui só
+   * sai o link: quem valida é a tela de Saídas e Entradas e, no fim, as rotas
+   * /entrada-editar e /saida-editar.
    */
-  const podeEditarEntrada = user?.role === "admin" || user?.role === "logistica";
+  const podeEditarRomaneio = user?.role === "admin" || user?.role === "logistica";
   const company = useMemo(() => resolveCompany(companyKey), [companyKey]);
   const filialInicial = (searchParams.get("filial") || "").trim();
   const tipoInicial = (searchParams.get("tipo") || "saida").trim().toLowerCase() === "entrada" ? "entrada" : "saida";
@@ -199,13 +200,20 @@ export default function HistoricoSaidasEntradasPage({ companyKey }: { companyKey
                     {getFilialLabelForDisplay(company, log.filialOrigem)}
                     {destinoLabel(log) ? ` → ${destinoLabel(log)}` : ""}
                   </span>
-                  {tipo === "entrada" && podeEditarEntrada && (
+                  {/* Na saída a filial do romaneio é a de ORIGEM; na entrada, a que recebeu. */}
+                  {podeEditarRomaneio && (
                     <Link
-                      href={`/${companyKey}/saidas-entradas-produtos?editarEntrada=${encodeURIComponent(
-                        log.romaneio
-                      )}&filialEntrada=${encodeURIComponent(log.filialDestino)}`}
+                      href={
+                        tipo === "saida"
+                          ? `/${companyKey}/saidas-entradas-produtos?editarSaida=${encodeURIComponent(
+                              log.romaneio
+                            )}&filialSaida=${encodeURIComponent(log.filialOrigem)}`
+                          : `/${companyKey}/saidas-entradas-produtos?editarEntrada=${encodeURIComponent(
+                              log.romaneio
+                            )}&filialEntrada=${encodeURIComponent(log.filialDestino)}`
+                      }
                       className={styles.itemEditLink}
-                      title="Editar romaneio: adicionar mais itens a esta entrada"
+                      title={`Editar romaneio: adicionar mais itens a esta ${tipo === "saida" ? "saída" : "entrada"}`}
                     >
                       + itens
                     </Link>

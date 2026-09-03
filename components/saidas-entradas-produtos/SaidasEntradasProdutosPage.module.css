@@ -1970,7 +1970,15 @@
 .logAddItensBtn:hover:not(:disabled) { background: #dbeafe; border-color: var(--entrada); }
 .logAddItensBtn:disabled { opacity: .5; cursor: not-allowed; }
 
-.edicaoEntradaBanner {
+/* Mesmo botão na aba de saídas: acompanha a cor da operação. */
+.logAddItensBtnSaida {
+  background: var(--saida-bg);
+  border-color: var(--saida-border);
+  color: var(--saida);
+}
+.logAddItensBtnSaida:hover:not(:disabled) { background: #fee2e2; border-color: var(--saida); }
+
+.edicaoRomaneioBanner {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1978,22 +1986,45 @@
   flex-wrap: wrap;
   margin-bottom: 10px;
   padding: 10px 14px;
-  border: 1px solid var(--entrada-border);
-  border-left: 4px solid var(--entrada);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--text-2);
   border-radius: var(--radius);
+  background: var(--bg);
+}
+
+.edicaoRomaneioBannerEntrada {
+  border-color: var(--entrada-border);
+  border-left-color: var(--entrada);
   background: var(--entrada-bg);
 }
 
-.edicaoEntradaBannerTexto {
+.edicaoRomaneioBannerSaida {
+  border-color: var(--saida-border);
+  border-left-color: var(--saida);
+  background: var(--saida-bg);
+}
+
+.edicaoRomaneioBannerTexto {
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
 }
-.edicaoEntradaBannerTexto strong { font-size: 15px; color: var(--entrada); }
-.edicaoEntradaBannerTexto span { font-size: 13px; color: var(--text-2); }
+.edicaoRomaneioBannerTexto strong { font-size: 15px; }
+.edicaoRomaneioBannerTexto span { font-size: 13px; color: var(--text-2); }
+.edicaoRomaneioBannerEntrada .edicaoRomaneioBannerTexto strong { color: var(--entrada); }
+.edicaoRomaneioBannerSaida .edicaoRomaneioBannerTexto strong { color: var(--saida); }
 
-.edicaoEntradaCancelarBtn {
+/* Alerta que não bloqueia (destino já começou a conferir a saída). */
+.edicaoRomaneioAviso {
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #b45309;
+}
+:global(:root[data-theme="dark"]) .edicaoRomaneioAviso { color: #fcd34d; }
+
+.edicaoRomaneioCancelarBtn {
   flex-shrink: 0;
   background: var(--card);
   border: 1px solid var(--border);
@@ -2005,10 +2036,10 @@
   cursor: pointer;
   transition: border-color 120ms, color 120ms;
 }
-.edicaoEntradaCancelarBtn:hover:not(:disabled) { border-color: var(--text-2); color: var(--text); }
-.edicaoEntradaCancelarBtn:disabled { opacity: .5; cursor: not-allowed; }
+.edicaoRomaneioCancelarBtn:hover:not(:disabled) { border-color: var(--text-2); color: var(--text); }
+.edicaoRomaneioCancelarBtn:disabled { opacity: .5; cursor: not-allowed; }
 
-.itensJaEntradosBloco {
+.itensJaLancadosBloco {
   margin-bottom: 12px;
   border: 1px dashed var(--border);
   border-radius: var(--radius);
@@ -2016,7 +2047,7 @@
   overflow: hidden;
 }
 
-.itensJaEntradosTitulo {
+.itensJaLancadosTitulo {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2028,23 +2059,35 @@
   border-bottom: 1px dashed var(--border);
 }
 
-.itensJaEntradosBadge {
+.itensJaLancadosBadge {
   font-size: 12px;
   font-weight: 700;
-  color: var(--entrada);
-  background: var(--entrada-bg);
-  border: 1px solid var(--entrada-border);
+  color: var(--text-2);
+  background: var(--card);
+  border: 1px solid var(--border);
   border-radius: 999px;
   padding: 1px 8px;
   white-space: nowrap;
 }
 
-.itensJaEntradosLista {
+.itensJaLancadosBadgeEntrada {
+  color: var(--entrada);
+  background: var(--entrada-bg);
+  border-color: var(--entrada-border);
+}
+
+.itensJaLancadosBadgeSaida {
+  color: var(--saida);
+  background: var(--saida-bg);
+  border-color: var(--saida-border);
+}
+
+.itensJaLancadosLista {
   max-height: 220px;
   overflow-y: auto;
 }
 
-.itemJaEntrado {
+.itemJaLancado {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2053,9 +2096,9 @@
   border-bottom: 1px solid var(--border);
   opacity: .8;
 }
-.itemJaEntrado:last-child { border-bottom: none; }
+.itemJaLancado:last-child { border-bottom: none; }
 
-.itemJaEntradoQtd {
+.itemJaLancadoQtd {
   flex-shrink: 0;
   font-size: 14px;
   font-weight: 800;
