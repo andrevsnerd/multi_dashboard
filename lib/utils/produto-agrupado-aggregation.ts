@@ -5,14 +5,47 @@ import {
   buildProdutoAgrupadoLookup,
   buildProdutoAgrupadoProductKey,
   buildProdutoAgrupadoSyntheticId,
+  normalizeProdutoAgrupadoCorCode,
+  resolveProdutoAgrupadoCor,
+  type ProdutoAgrupadoCorLookup,
   type ProdutoAgrupadoGroup,
   type ProdutoAgrupadoMember,
 } from "@/lib/utils/produtos-agrupados";
 
+/*
+ * Agregação dos PRODUTOS AGRUPADOS.
+ *
+ * O grupo é montado no nível PRODUTO (CAPA BASIC = CP BASIC 1 + CP BASIC 2),
+ * mas quando a tela/relatório está por COR o grupo continua quebrando por cor:
+ *
+ *   CAPA BASIC AZUL     = CP BASIC 1 AZUL     + CP BASIC 2 AZUL
+ *   CAPA BASIC VERMELHO = CP BASIC 1 VERMELHO + CP BASIC 2 VERMELHO
+ *
+ * A fusão casa pela DESCRIÇÃO da cor, nunca pelo código: o código é escopado por
+ * produto (o 06 de um produto é outra cor em outro). Sem descrição, o membro
+ * fica na sua própria linha — separar demais é o lado seguro do erro.
+ *
+ * ESTOQUE NUNCA SOMA NEGATIVO. Se uma loja tem 5 de CP BASIC 1 AZUL e -3 de
+ * CP BASIC 2 AZUL, o grupo tem 5 (e não 2). Só quando NENHUM membro tem saldo
+ * positivo é que o negativo aparece — mesma regra do produto individual
+ * (pos > 0 ? pos : neg), só que um nível acima.
+ */
+
 type ProductDetailAccumulator = ProductDetail & {
   _groupPreviousRevenue?: number;
   _groupPreviousQuantity?: number;
+  _groupPositiveStock?: number;
+  _groupNegativeStock?: number;
+  _groupPositiveEstoqueRede?: number;
+  _groupNegativeEstoqueRede?: number;
 };
+
+export interface ProdutoAgrupadoAggregationOptions {
+  /** Quebra o grupo por cor (espelha o toggle "por cor" da tela/relatório). */
+  groupByCor?: boolean;
+  /** produto+cor -> DESC_COR_PRODUTO, para casar a mesma cor entre produtos. */
+  corDescricoes?: ProdutoAgrupadoCorLookup | null;
+}
 
 function joinDistinct(values: Array<string | null | undefined>): string {
   const unique = Array.from(
@@ -55,8 +88,13 @@ function estimatePreviousValueFromVariance(current: number, variance: number | n
   return current / factor;
 }
 
-function buildProductDetailKey(row: ProductDetail, groupByColor: boolean): string {
-  const cor = groupByColor ? (row.corProduto ?? "").trim() : "";
+/** Estoque do grupo: soma só os positivos; o negativo só aparece se não houver nenhum positivo. */
+function resolveGroupStock(positive: number, negative: number): number {
+  return positive > 0 ? positive : negative;
+}
+
+function buildProductDetailKey(row: ProductDetail, groupByCor: boolean): string {
+  const cor = groupByCor ? (row.corProduto ?? "").trim() : "";
   return `${row.productId}||${cor}`;
 }
 
@@ -81,16 +119,29 @@ function buildEstoqueRowKey(
   return `${row.produto}||${cor}||${row.filial}`;
 }
 
-function buildGroupAggregationKey(groupId: string, cor: string): string {
-  return `${buildProdutoAgrupadoSyntheticId(groupId)}||${cor}`;
+/** Chave do balde do grupo: um balde por cor quando `groupByCor`, senão um só. */
+function buildGroupAggregationKey(groupId: string, corKey: string): string {
+  return `${buildProdutoAgrupadoSyntheticId(groupId)}||${corKey}`;
 }
 
-function buildGroupedMembers(members: ProdutoAgrupadoMember[]): ProdutoAgrupadoMember[] {
+/**
+ * Membros do balde. Com quebra por cor, cada (produto, código de cor) vira um
+ * membro próprio — o código REAL precisa sobreviver, porque é ele que a tela usa
+ * para buscar métricas/trânsito de cada membro. Sem quebra por cor, dedup por
+ * produto e as cores viram um rótulo só.
+ */
+function buildGroupedMembers(
+  members: ProdutoAgrupadoMember[],
+  groupByCor: boolean
+): ProdutoAgrupadoMember[] {
   const unique = new Map<string, ProdutoAgrupadoMember>();
   for (const member of members) {
-    const key = `${buildProdutoAgrupadoProductKey(member.produto)}||${member.cor.trim().toUpperCase()}`;
+    const produtoKey = buildProdutoAgrupadoProductKey(member.produto);
+    const key = groupByCor
+      ? `${produtoKey}||${normalizeProdutoAgrupadoCorCode(member.cor)}`
+      : produtoKey;
     if (!unique.has(key)) {
-      unique.set(key, member);
+      unique.set(key, { ...member });
     }
   }
   return Array.from(unique.values()).sort((a, b) =>
@@ -98,11 +149,17 @@ function buildGroupedMembers(members: ProdutoAgrupadoMember[]): ProdutoAgrupadoM
   );
 }
 
-// Dedup por produto (ignora cor), acumulando vendas e qtde de cada membro
-function buildGroupedMembersWithSales(members: ProdutoAgrupadoMember[]): ProdutoAgrupadoMember[] {
+/** Igual a `buildGroupedMembers`, mas acumula vendas/qtde dos membros que colapsam. */
+function buildGroupedMembersWithSales(
+  members: ProdutoAgrupadoMember[],
+  groupByCor: boolean
+): ProdutoAgrupadoMember[] {
   const unique = new Map<string, ProdutoAgrupadoMember>();
   for (const member of members) {
-    const key = buildProdutoAgrupadoProductKey(member.produto);
+    const produtoKey = buildProdutoAgrupadoProductKey(member.produto);
+    const key = groupByCor
+      ? `${produtoKey}||${normalizeProdutoAgrupadoCorCode(member.cor)}`
+      : produtoKey;
     const existing = unique.get(key);
     if (!existing) {
       unique.set(key, {
@@ -143,24 +200,30 @@ function buildGroupedMembersWithSales(members: ProdutoAgrupadoMember[]): Produto
 export function aggregateProductDetailsWithGroups(
   rows: ProductDetail[],
   groups: ProdutoAgrupadoGroup[],
-  options?: { groupByColor?: boolean }
+  options?: ProdutoAgrupadoAggregationOptions & { groupByColor?: boolean }
 ): ProductDetail[] {
   if (groups.length === 0) return rows;
 
-  const groupByColor = options?.groupByColor === true;
+  const groupByCor = options?.groupByColor === true || options?.groupByCor === true;
+  const corLookup = options?.corDescricoes ?? null;
   const lookup = buildProdutoAgrupadoLookup(groups);
   const aggregated = new Map<string, ProductDetailAccumulator>();
 
   for (const row of rows) {
     const group = lookup.get(buildProdutoAgrupadoProductKey(row.productId));
     if (!group) {
-      aggregated.set(buildProductDetailKey(row, groupByColor), { ...row });
+      aggregated.set(buildProductDetailKey(row, groupByCor), { ...row });
       continue;
     }
 
-    // Grouped products always consolidate into one entry regardless of color
-    const key = buildGroupAggregationKey(group.id, "");
+    // Por cor: um balde por cor canônica. Sem cor: tudo num balde só.
+    const cor = groupByCor
+      ? resolveProdutoAgrupadoCor(row.productId, row.corProduto, row.descCorProduto, corLookup)
+      : { key: "", label: "" };
+    const key = buildGroupAggregationKey(group.id, cor.key);
     const syntheticId = buildProdutoAgrupadoSyntheticId(group.id);
+    const rowStock = Number(row.stock ?? 0);
+    const rowEstoqueRede = Number(row.estoqueRede ?? 0);
     const incomingMember: ProdutoAgrupadoMember = {
       produto: row.productId,
       cor: String(row.corProduto ?? "").trim(),
@@ -171,8 +234,8 @@ export function aggregateProductDetailsWithGroups(
       averagePrice: Number(row.averagePrice ?? 0),
       cost: Number(row.cost ?? 0),
       markup: Number(row.markup ?? 0),
-      stock: Number(row.stock ?? 0),
-      estoqueRede: Number(row.estoqueRede ?? 0),
+      stock: rowStock,
+      estoqueRede: rowEstoqueRede,
     };
     const current = aggregated.get(key);
 
@@ -181,17 +244,24 @@ export function aggregateProductDetailsWithGroups(
         ...row,
         productId: syntheticId,
         productName: group.nome,
-        corProduto: "",
-        descCorProduto: "",
+        corProduto: cor.key,
+        descCorProduto: cor.label,
         cost: Number(row.cost ?? 0),
         averagePrice: Number(row.averagePrice ?? 0),
         markup: Number(row.markup ?? 0),
         suggestedPrice: row.suggestedPrice ?? null,
+        // Consolidado de verdade no passe final (positivos primeiro, negativo nunca soma).
+        stock: resolveGroupStock(Math.max(0, rowStock), Math.min(0, rowStock)),
+        estoqueRede: resolveGroupStock(Math.max(0, rowEstoqueRede), Math.min(0, rowEstoqueRede)),
         isGroupedProduct: true,
         groupId: group.id,
-        groupedMembers: buildGroupedMembers([incomingMember]),
+        groupedMembers: buildGroupedMembers([incomingMember], groupByCor),
         _groupPreviousRevenue: estimatePreviousValueFromVariance(row.totalRevenue, row.revenueVariance),
         _groupPreviousQuantity: estimatePreviousValueFromVariance(row.totalQuantity, row.quantityVariance),
+        _groupPositiveStock: Math.max(0, rowStock),
+        _groupNegativeStock: Math.min(0, rowStock),
+        _groupPositiveEstoqueRede: Math.max(0, rowEstoqueRede),
+        _groupNegativeEstoqueRede: Math.min(0, rowEstoqueRede),
       });
       continue;
     }
@@ -209,8 +279,12 @@ export function aggregateProductDetailsWithGroups(
     const nextQuantity = currentQuantity + rowQuantity;
     current.totalRevenue = nextRevenue;
     current.totalQuantity = nextQuantity;
-    current.stock = Number(current.stock ?? 0) + Number(row.stock ?? 0);
-    current.estoqueRede = Number(current.estoqueRede ?? 0) + Number(row.estoqueRede ?? 0);
+    current._groupPositiveStock = Number(current._groupPositiveStock ?? 0) + Math.max(0, rowStock);
+    current._groupNegativeStock = Number(current._groupNegativeStock ?? 0) + Math.min(0, rowStock);
+    current._groupPositiveEstoqueRede =
+      Number(current._groupPositiveEstoqueRede ?? 0) + Math.max(0, rowEstoqueRede);
+    current._groupNegativeEstoqueRede =
+      Number(current._groupNegativeEstoqueRede ?? 0) + Math.min(0, rowEstoqueRede);
     current.averagePrice = computeWeightedAverage(nextRevenue, nextQuantity);
     current.cost = computeWeightedAverage(currentCostValue + rowCostValue, nextQuantity);
     current.markup = current.cost > 0 ? current.averagePrice / current.cost : 0;
@@ -224,18 +298,15 @@ export function aggregateProductDetailsWithGroups(
     current._groupPreviousQuantity =
       Number(current._groupPreviousQuantity ?? 0) +
       estimatePreviousValueFromVariance(row.totalQuantity, row.quantityVariance);
-    current.revenueVariance = computeVariance(
-      current.totalRevenue,
-      Number(current._groupPreviousRevenue ?? 0)
-    );
-    current.quantityVariance = computeVariance(
-      current.totalQuantity,
-      Number(current._groupPreviousQuantity ?? 0)
-    );
     current.isNew = Number(current._groupPreviousRevenue ?? 0) <= 0 && current.totalRevenue > 0;
     current.registrationDate = joinDistinct([current.registrationDate, row.registrationDate]) || null;
     current.grade = joinDistinct([current.grade, row.grade]) || null;
-    current.groupedMembers = buildGroupedMembers([...(current.groupedMembers ?? []), incomingMember]);
+    // O balde já é de UMA cor: o rótulo só é completado se o 1o membro veio sem descrição.
+    if (!current.descCorProduto && cor.label) current.descCorProduto = cor.label;
+    current.groupedMembers = buildGroupedMembers(
+      [...(current.groupedMembers ?? []), incomingMember],
+      groupByCor
+    );
   }
 
   for (const row of aggregated.values()) {
@@ -245,23 +316,38 @@ export function aggregateProductDetailsWithGroups(
     row.revenueVariance = computeVariance(row.totalRevenue, previousRevenue);
     row.quantityVariance = computeVariance(row.totalQuantity, previousQuantity);
     row.isNew = previousRevenue <= 0 && row.totalRevenue > 0;
-    delete row._groupPreviousRevenue;
-    delete row._groupPreviousQuantity;
+    row.stock = resolveGroupStock(
+      Number(row._groupPositiveStock ?? 0),
+      Number(row._groupNegativeStock ?? 0)
+    );
+    row.estoqueRede = resolveGroupStock(
+      Number(row._groupPositiveEstoqueRede ?? 0),
+      Number(row._groupNegativeEstoqueRede ?? 0)
+    );
   }
 
   return Array.from(aggregated.values())
-    .map(({ _groupPreviousRevenue: _ignoreRevenue, _groupPreviousQuantity: _ignoreQuantity, ...row }) => row)
+    .map(({
+      _groupPreviousRevenue: _ignoreRevenue,
+      _groupPreviousQuantity: _ignoreQuantity,
+      _groupPositiveStock: _ignorePosStock,
+      _groupNegativeStock: _ignoreNegStock,
+      _groupPositiveEstoqueRede: _ignorePosRede,
+      _groupNegativeEstoqueRede: _ignoreNegRede,
+      ...row
+    }) => row)
     .sort((a, b) => b.totalRevenue - a.totalRevenue);
 }
 
 export function aggregateFilialProdutoSalesWithGroups(
   rows: FilialProdutoSalesRow[],
   groups: ProdutoAgrupadoGroup[],
-  options?: { groupByCor?: boolean }
+  options?: ProdutoAgrupadoAggregationOptions
 ): FilialProdutoSalesRow[] {
   if (groups.length === 0) return rows;
 
   const groupByCor = options?.groupByCor === true;
+  const corLookup = options?.corDescricoes ?? null;
   const lookup = buildProdutoAgrupadoLookup(groups);
   const aggregated = new Map<string, FilialProdutoSalesRow>();
 
@@ -272,8 +358,10 @@ export function aggregateFilialProdutoSalesWithGroups(
       continue;
     }
 
-    // Grouped products always consolidate into one entry regardless of color
-    const key = buildGroupAggregationKey(group.id, "");
+    const cor = groupByCor
+      ? resolveProdutoAgrupadoCor(row.produto, row.cor, row.corDescricao, corLookup)
+      : { key: "", label: "" };
+    const key = buildGroupAggregationKey(group.id, cor.key);
     const syntheticId = buildProdutoAgrupadoSyntheticId(group.id);
     const incomingMember: ProdutoAgrupadoMember = {
       produto: row.produto,
@@ -296,11 +384,11 @@ export function aggregateFilialProdutoSalesWithGroups(
         ...row,
         produto: syntheticId,
         descricao: group.nome,
-        cor: "",
-        corDescricao: "",
+        cor: cor.key,
+        corDescricao: cor.label,
         isGroupedProduct: true,
         groupId: group.id,
-        groupedMembers: buildGroupedMembersWithSales([incomingMember]),
+        groupedMembers: buildGroupedMembersWithSales([incomingMember], groupByCor),
       });
       continue;
     }
@@ -321,8 +409,14 @@ export function aggregateFilialProdutoSalesWithGroups(
     current.tipoProduto = joinDistinct([current.tipoProduto, row.tipoProduto]);
     current.colecao = joinDistinct([current.colecao, row.colecao]);
     current.descColecao = joinDistinct([current.descColecao, row.descColecao]);
-    current.corDescricao = joinDistinct([current.corDescricao, row.corDescricao]);
-    current.groupedMembers = buildGroupedMembersWithSales([...(current.groupedMembers ?? []), incomingMember]);
+    // Por cor o balde já É de uma cor só: o rótulo do balde manda (não vira "AZUL / AZUL").
+    current.corDescricao = groupByCor
+      ? (current.corDescricao || cor.label)
+      : joinDistinct([current.corDescricao, row.corDescricao]);
+    current.groupedMembers = buildGroupedMembersWithSales(
+      [...(current.groupedMembers ?? []), incomingMember],
+      groupByCor
+    );
   }
 
   return Array.from(aggregated.values()).sort((a, b) => b.vendas - a.vendas);
@@ -331,11 +425,12 @@ export function aggregateFilialProdutoSalesWithGroups(
 export function aggregateProdutoQtdePorFilialWithGroups(
   rows: ProdutoQtdePorFilialRow[],
   groups: ProdutoAgrupadoGroup[],
-  options?: { groupByCor?: boolean }
+  options?: ProdutoAgrupadoAggregationOptions
 ): ProdutoQtdePorFilialRow[] {
   if (groups.length === 0) return rows;
 
   const groupByCor = options?.groupByCor === true;
+  const corLookup = options?.corDescricoes ?? null;
   const lookup = buildProdutoAgrupadoLookup(groups);
   const aggregated = new Map<string, ProdutoQtdePorFilialRow>();
 
@@ -345,13 +440,19 @@ export function aggregateProdutoQtdePorFilialWithGroups(
       ? {
           ...row,
           produto: buildProdutoAgrupadoSyntheticId(group.id),
-          cor: "", // Groups always consolidate regardless of color
+          // Mesma chave de cor emitida pelas outras agregações — é por ela que a
+          // Curva ABC casa vendas x qtde por filial x estoque por filial.
+          cor: groupByCor
+            // Estas linhas não trazem descrição de cor: quem resolve é o cadastro (corLookup).
+            ? resolveProdutoAgrupadoCor(row.produto, row.cor, null, corLookup).key
+            : "",
         }
       : { ...row };
     const key = buildQtdeRowKey(nextRow, groupByCor);
     const current = aggregated.get(key);
     if (current) {
       current.qtde += Number(nextRow.qtde ?? 0);
+      current.vendas = Number(current.vendas ?? 0) + Number(nextRow.vendas ?? 0);
     } else {
       aggregated.set(key, nextRow);
     }
@@ -363,13 +464,17 @@ export function aggregateProdutoQtdePorFilialWithGroups(
 export function aggregateProdutoEstoquePorFilialWithGroups(
   rows: ProdutoEstoquePorFilialRow[],
   groups: ProdutoAgrupadoGroup[],
-  options?: { groupByCor?: boolean }
+  options?: ProdutoAgrupadoAggregationOptions
 ): ProdutoEstoquePorFilialRow[] {
   if (groups.length === 0) return rows;
 
   const groupByCor = options?.groupByCor === true;
+  const corLookup = options?.corDescricoes ?? null;
   const lookup = buildProdutoAgrupadoLookup(groups);
   const aggregated = new Map<string, ProdutoEstoquePorFilialRow>();
+  // Positivos e negativos separados por (grupo, cor, filial): o negativo de um
+  // membro NUNCA come o positivo de outro dentro da mesma loja.
+  const saldos = new Map<string, { positivo: number; negativo: number }>();
 
   for (const row of rows) {
     const group = lookup.get(buildProdutoAgrupadoProductKey(row.produto));
@@ -377,16 +482,28 @@ export function aggregateProdutoEstoquePorFilialWithGroups(
       ? {
           ...row,
           produto: buildProdutoAgrupadoSyntheticId(group.id),
-          cor: "", // Groups always consolidate regardless of color
+          cor: groupByCor
+            // Estas linhas não trazem descrição de cor: quem resolve é o cadastro (corLookup).
+            ? resolveProdutoAgrupadoCor(row.produto, row.cor, null, corLookup).key
+            : "",
         }
       : { ...row };
     const key = buildEstoqueRowKey(nextRow, groupByCor);
-    const current = aggregated.get(key);
-    if (current) {
-      current.estoque += Number(nextRow.estoque ?? 0);
-    } else {
+    const estoque = Number(nextRow.estoque ?? 0);
+    const saldo = saldos.get(key) ?? { positivo: 0, negativo: 0 };
+    saldo.positivo += Math.max(0, estoque);
+    saldo.negativo += Math.min(0, estoque);
+    saldos.set(key, saldo);
+
+    if (!aggregated.has(key)) {
       aggregated.set(key, nextRow);
     }
+  }
+
+  for (const [key, row] of aggregated) {
+    const saldo = saldos.get(key);
+    if (!saldo) continue;
+    row.estoque = resolveGroupStock(saldo.positivo, saldo.negativo);
   }
 
   return Array.from(aggregated.values());

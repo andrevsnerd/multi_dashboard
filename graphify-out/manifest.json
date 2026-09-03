@@ -655,9 +655,9 @@
     "semantic_hash": "b902bf3e0fd3ad63c77c2ccd57038ec9"
   },
   "app/api/curva-abc/route.ts": {
-    "mtime": 1782150384.8241723,
-    "ast_hash": "ef36dcb2a746aefc867cb360a6692334",
-    "semantic_hash": "ef36dcb2a746aefc867cb360a6692334"
+    "mtime": 1788463009.4001358,
+    "ast_hash": "9f1e6d6deb0a0c8539c271eb1da580a4",
+    "semantic_hash": ""
   },
   "app/api/curva-por-produto/route.ts": {
     "mtime": 1780581789.1275427,
@@ -835,9 +835,9 @@
     "semantic_hash": "7bd6310573f88283593111b6385ad273"
   },
   "app/api/products/route.ts": {
-    "mtime": 1781209284.6322196,
-    "ast_hash": "affc5c97048cb7c2c4635175ec1b1ece",
-    "semantic_hash": "affc5c97048cb7c2c4635175ec1b1ece"
+    "mtime": 1788463027.4119928,
+    "ast_hash": "573ef46bdc8a0296a7f6c2b4775cef49",
+    "semantic_hash": ""
   },
   "app/api/products/search/route.ts": {
     "mtime": 1783520661.0364802,
@@ -1490,7 +1490,7 @@
     "semantic_hash": "3a1ac7d9dac7349b3338e8b433eb5031"
   },
   "components/performance/CurvaAbcPage.tsx": {
-    "mtime": 1786988601.6496992,
+    "mtime": 1788463322.6449215,
     "ast_hash": "abe739cf4d9b8cf9b7881bc8f3d87d0d",
     "semantic_hash": ""
   },
@@ -2255,9 +2255,9 @@
     "semantic_hash": "3963782248308d4ad8a6ec1590f64f88"
   },
   "lib/mcp/tools/produtos-vendidos.ts": {
-    "mtime": 1780928684.8045661,
-    "ast_hash": "25b749caf2430a2d9751e3c86748029a",
-    "semantic_hash": "25b749caf2430a2d9751e3c86748029a"
+    "mtime": 1788463043.634539,
+    "ast_hash": "d62c2a746be9086e26580e514b02f738",
+    "semantic_hash": ""
   },
   "lib/mcp/tools/relatorios.ts": {
     "mtime": 1782933810.2914283,
@@ -2505,8 +2505,8 @@
     "semantic_hash": "e7b25fbf2e0069ee8a6c5a9fdf73a34d"
   },
   "lib/repositories/performance.ts": {
-    "mtime": 1788444332.331631,
-    "ast_hash": "8e31d343d50fe68ec0eaa81eea944849",
+    "mtime": 1788462794.9321158,
+    "ast_hash": "8623ef0b992850e3f07d65fe7b78ecd8",
     "semantic_hash": ""
   },
   "lib/repositories/productDetail.ts": {
@@ -2720,9 +2720,9 @@
     "semantic_hash": ""
   },
   "lib/utils/controle-estoque-metricas.ts": {
-    "mtime": 1782387996.1625257,
-    "ast_hash": "d5e06c9a7ffae9ee12c41fa5eadf7ede",
-    "semantic_hash": "d5e06c9a7ffae9ee12c41fa5eadf7ede"
+    "mtime": 1788463054.115673,
+    "ast_hash": "2e54caf2cf2f95ec1df4bbbea75d9e90",
+    "semantic_hash": ""
   },
   "lib/utils/curva-abc-observacoes-store.ts": {
     "mtime": 1781206954.6359856,
@@ -2885,9 +2885,9 @@
     "semantic_hash": "89ec7c4db779a711e7bec60f604bbfe6"
   },
   "lib/utils/produto-agrupado-aggregation.ts": {
-    "mtime": 1780073682.8765333,
-    "ast_hash": "df2667e24c08475f818f2471216b4f4b",
-    "semantic_hash": "df2667e24c08475f818f2471216b4f4b"
+    "mtime": 1788462982.77031,
+    "ast_hash": "0bca1183aa7812e7cb14de184b9e0b72",
+    "semantic_hash": ""
   },
   "lib/utils/produto-agrupado-store.ts": {
     "mtime": 1780073682.8795533,
@@ -2905,9 +2905,9 @@
     "semantic_hash": "541cffda89c0207fe13b48e2b73dbc29"
   },
   "lib/utils/produtos-agrupados.ts": {
-    "mtime": 1780073682.8795533,
-    "ast_hash": "fe051cb7cb7ee980ba949f8fed536d59",
-    "semantic_hash": "fe051cb7cb7ee980ba949f8fed536d59"
+    "mtime": 1788462769.24093,
+    "ast_hash": "14b4cf91924cfb22a7fbfadc2d5f03f0",
+    "semantic_hash": ""
   },
   "lib/utils/produtos-descontinuados.ts": {
     "mtime": 1781209136.9738398,

@@ -279,13 +279,16 @@ export function mergeControleEstoqueMetricasEntries(
   for (const row of rows) {
     for (const estoque of row.estoquePorFilial) {
       const key = normalizeControleEstoqueItemValue(estoque.filial).toUpperCase();
+      // PRODUTO AGRUPADO: o negativo de um membro NUNCA come o positivo de outro na
+      // mesma loja. 5 de CP BASIC 1 AZUL + (-3) de CP BASIC 2 AZUL = 5, não 2.
+      const saldo = Math.max(0, Number(estoque.estoque ?? 0));
       const current = estoquePorFilialMap.get(key);
       if (current) {
-        current.estoque += Number(estoque.estoque ?? 0);
+        current.estoque += saldo;
       } else {
         estoquePorFilialMap.set(key, {
           filial: normalizeControleEstoqueItemValue(estoque.filial),
-          estoque: Number(estoque.estoque ?? 0),
+          estoque: saldo,
         });
       }
     }

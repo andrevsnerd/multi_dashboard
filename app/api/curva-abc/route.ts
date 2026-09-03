@@ -4,6 +4,7 @@ import {
   fetchFilialProdutoSales,
   fetchProdutoQtdePorFilial,
   fetchProdutoEstoquePorFilial,
+  fetchProdutoCorDescricoes,
 } from '@/lib/repositories/performance';
 import {
   aggregateFilialProdutoSalesWithGroups,
@@ -129,6 +130,18 @@ export async function GET(request: Request) {
       listProdutosDescontinuados(companyKey),
     ]);
     const descontinuadoKeys = buildDescontinuadoKeySet(descontinuados);
+
+    // Produto agrupado por COR: o grupo é definido no nível produto, mas por cor ele
+    // precisa fundir "CP BASIC 1 AZUL + CP BASIC 2 AZUL". Como o código de cor é
+    // escopado por produto, a fusão casa pela DESCRIÇÃO — e estoque/qtde por filial
+    // não trazem descrição. Este mapa (só dos membros de grupo) resolve isso e é o
+    // MESMO nas três agregações, garantindo que as chaves batam entre elas.
+    const corDescricoes = porCor && groupedProducts.length > 0
+      ? await fetchProdutoCorDescricoes(
+          groupedProducts.flatMap((group) => group.members.map((member) => member.produto))
+        )
+      : null;
+    const grupoAggOptions = { groupByCor: porCor, corDescricoes };
 
     const month = resolvedRange.start.getUTCMonth();
     const year = resolvedRange.start.getUTCFullYear();
@@ -341,13 +354,17 @@ export async function GET(request: Request) {
           }),
           fetchProdutoEstoquePorFilial(companyKey, [...allPosMembers, ...matrizList], allEcomMembers, { groupByCor: porCor }),
         ]);
-        produtos = aggregateFilialProdutoSalesWithGroups(produtos, groupedProducts, { groupByCor: porCor });
-        qtdePorFilialRows = aggregateProdutoQtdePorFilialWithGroups(qtdePorFilialRows, groupedProducts, {
-          groupByCor: porCor,
-        });
-        estoquePorFilialRows = aggregateProdutoEstoquePorFilialWithGroups(estoquePorFilialRows, groupedProducts, {
-          groupByCor: porCor,
-        });
+        produtos = aggregateFilialProdutoSalesWithGroups(produtos, groupedProducts, grupoAggOptions);
+        qtdePorFilialRows = aggregateProdutoQtdePorFilialWithGroups(
+          qtdePorFilialRows,
+          groupedProducts,
+          grupoAggOptions
+        );
+        estoquePorFilialRows = aggregateProdutoEstoquePorFilialWithGroups(
+          estoquePorFilialRows,
+          groupedProducts,
+          grupoAggOptions
+        );
       } catch (produtosError) {
         console.error('Erro ao carregar produtos (não-fatal):', produtosError);
       }
@@ -492,14 +509,16 @@ export async function GET(request: Request) {
         fetchProdutoEstoquePorFilial(companyKey, posMembers, ecomMembers, { groupByCor: porCor }),
         fetchProdutoEstoquePorFilial(companyKey, [...allPosMembers, ...matrizList], allEcomMembers, { groupByCor: porCor }),
       ]);
-      produtos = aggregateFilialProdutoSalesWithGroups(produtos, groupedProducts, { groupByCor: porCor });
-      estoquePorFilialRows = aggregateProdutoEstoquePorFilialWithGroups(estoquePorFilialRows, groupedProducts, {
-        groupByCor: porCor,
-      });
+      produtos = aggregateFilialProdutoSalesWithGroups(produtos, groupedProducts, grupoAggOptions);
+      estoquePorFilialRows = aggregateProdutoEstoquePorFilialWithGroups(
+        estoquePorFilialRows,
+        groupedProducts,
+        grupoAggOptions
+      );
       estoqueRedePorFilialRows = aggregateProdutoEstoquePorFilialWithGroups(
         estoqueRedePorFilialRows,
         groupedProducts,
-        { groupByCor: porCor }
+        grupoAggOptions
       );
     } catch (produtosError) {
       console.error('Erro ao carregar produtos da filial (não-fatal):', produtosError);

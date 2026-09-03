@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+import { fetchProdutoCorDescricoes } from '@/lib/repositories/performance';
 import { fetchProductsWithDetails, type ProductDetail } from '@/lib/repositories/products';
 import { aggregateProductDetailsWithGroups } from '@/lib/utils/produto-agrupado-aggregation';
 import { listProdutoAgrupadoGroups } from '@/lib/utils/produto-agrupado-store';
@@ -68,8 +69,18 @@ export async function GET(request: Request) {
       isKnownCompany ? listProdutosDescontinuados(company as CompanyKey) : Promise.resolve([]),
     ]);
 
+    // Por cor o grupo quebra por cor (CAPA BASIC AZUL = CP BASIC 1 AZUL + CP BASIC 2 AZUL).
+    // A fusão casa pela DESCRIÇÃO da cor — o código é escopado por produto. As linhas já
+    // trazem descCorProduto; o cadastro entra como rede de segurança pra quem vier sem.
+    const corDescricoes = groupByColor && groupedProducts.length > 0
+      ? await fetchProdutoCorDescricoes(
+          groupedProducts.flatMap((group) => group.members.map((member) => member.produto))
+        )
+      : null;
+
     const aggregated: ProductDetail[] = aggregateProductDetailsWithGroups(rawData, groupedProducts, {
       groupByColor,
+      corDescricoes,
     });
 
     const descontinuadoKeys = buildDescontinuadoKeySet(descontinuados);

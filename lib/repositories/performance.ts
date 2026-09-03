@@ -3,7 +3,11 @@ import { withRequest } from '@/lib/db/connection';
 import { type CompanyKey } from '@/lib/config/company';
 import { resolveCompanyLive } from '@/lib/server/company-live';
 import { shiftRangeByMonths, type NormalizedRange } from '@/lib/utils/date';
-import type { ProdutoAgrupadoMember } from '@/lib/utils/produtos-agrupados';
+import {
+  buildProdutoAgrupadoCorLookupKey,
+  type ProdutoAgrupadoCorLookup,
+  type ProdutoAgrupadoMember,
+} from '@/lib/utils/produtos-agrupados';
 
 export interface PerformanceCategoryRow {
   filial: string;
@@ -1431,4 +1435,60 @@ export async function fetchStockByProduto(
     }
     return map;
   });
+}
+
+/**
+ * Descrição de cor (DESC_COR_PRODUTO) de todas as cores dos produtos pedidos.
+ *
+ * Existe para os PRODUTOS AGRUPADOS: o grupo é definido no nível produto, mas a
+ * visão por cor precisa fundir "CP BASIC 1 AZUL + CP BASIC 2 AZUL". O código de
+ * cor é escopado por produto, então a fusão só pode casar pela DESCRIÇÃO — e
+ * estoque/qtde por filial não trazem descrição. Como só os membros de grupo
+ * precisam disso (um punhado de produtos), sai numa consulta própria e barata
+ * em vez de um JOIN extra nas consultas quentes.
+ *
+ * Retorna Map<buildProdutoAgrupadoCorLookupKey(produto, cor), DESC_COR_PRODUTO>.
+ */
+export async function fetchProdutoCorDescricoes(
+  produtos: string[]
+): Promise<ProdutoAgrupadoCorLookup> {
+  const unique = Array.from(
+    new Set(produtos.map((p) => String(p ?? '').trim()).filter(Boolean))
+  );
+  const lookup: ProdutoAgrupadoCorLookup = new Map();
+  if (unique.length === 0) return lookup;
+
+  // Lotes bem abaixo do teto de 2100 parâmetros do SQL Server.
+  const BATCH_SIZE = 500;
+  for (let i = 0; i < unique.length; i += BATCH_SIZE) {
+    const batch = unique.slice(i, i + BATCH_SIZE);
+    const rows = await withRequest(async (request) => {
+      batch.forEach((produto, index) => {
+        request.input(`corProd${index}`, sql.VarChar, produto);
+      });
+      const placeholders = batch.map((_, index) => `@corProd${index}`).join(', ');
+      const result = await request.query<{
+        PRODUTO: string;
+        COR_PRODUTO: string | null;
+        DESC_COR: string | null;
+      }>(`
+        SELECT
+          LTRIM(RTRIM(PRODUTO)) AS PRODUTO,
+          LTRIM(RTRIM(CAST(COR_PRODUTO AS VARCHAR(20)))) AS COR_PRODUTO,
+          MAX(DESC_COR_PRODUTO) AS DESC_COR
+        FROM PRODUTO_CORES WITH (NOLOCK)
+        WHERE LTRIM(RTRIM(PRODUTO)) IN (${placeholders})
+        GROUP BY LTRIM(RTRIM(PRODUTO)), LTRIM(RTRIM(CAST(COR_PRODUTO AS VARCHAR(20))))
+      `);
+      return result.recordset;
+    });
+
+    for (const row of rows) {
+      const desc = String(row.DESC_COR ?? '').trim();
+      if (!desc) continue;
+      lookup.set(buildProdutoAgrupadoCorLookupKey(row.PRODUTO, row.COR_PRODUTO), desc);
+    }
+  }
+
+  return lookup;
 }

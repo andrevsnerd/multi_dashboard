@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import { fetchProductsWithDetails, type ProductDetail } from '@/lib/repositories/products';
+import { fetchProdutoCorDescricoes } from '@/lib/repositories/performance';
 import { fetchProdutosComDesconto, fetchDescontoTotal } from '@/lib/repositories/vendedores-v2';
 import { aggregateProductDetailsWithGroups } from '@/lib/utils/produto-agrupado-aggregation';
 import { listProdutoAgrupadoGroups } from '@/lib/utils/produto-agrupado-store';
@@ -95,8 +96,17 @@ export function registerProdutosVendidosTools(server: McpServer) {
         listProdutoAgrupadoGroups(empresa as CompanyKey),
       ]);
 
+      // Por cor o produto agrupado quebra por cor; a fusão casa pela DESCRIÇÃO
+      // (o código de cor é escopado por produto).
+      const corDescricoes = groupByColor && gruposAgrupados.length > 0
+        ? await fetchProdutoCorDescricoes(
+            gruposAgrupados.flatMap((grupo) => grupo.members.map((membro) => membro.produto))
+          )
+        : null;
+
       const data: ProductDetail[] = aggregateProductDetailsWithGroups(rawData, gruposAgrupados, {
         groupByColor,
+        corDescricoes,
       });
 
       const criterio = ordenarPor ?? 'faturamento';
