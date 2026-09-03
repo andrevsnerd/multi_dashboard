@@ -41,11 +41,41 @@ interface ProjecaoItem {
   janelas: Record<string, number>;
 }
 
+interface MensalItem {
+  /** 'yyyy-MM' */
+  mes: string;
+  qtde: number;
+  qtdeAnoAnterior: number;
+  /** Mês em curso (fechado só até a data base) — não serve de base de crescimento. */
+  parcial: boolean;
+  futuro: boolean;
+}
+
 interface ProjecaoResponse {
   dataBase: string;
   windows: number[];
   itens: ProjecaoItem[];
+  mensal: MensalItem[];
 }
+
+/**
+ * Regra que projeta os meses que ainda não aconteceram.
+ *
+ * `yoy` (padrão) = regra comparativa: mede quanto cada mês FECHADO cresceu contra o mesmo mês
+ * do ano anterior, tira a média desses percentuais e aplica essa média sobre o valor do ano
+ * anterior de cada mês futuro. As outras regras extrapolam o ritmo de uma janela de dias.
+ */
+type RegraProjecao = "yoy" | "30" | "60" | "90" | "120" | "365";
+/** Chave da linha comparativa no mapa de "Qtd Compra" editada (nenhuma janela tem 0 dias). */
+const YOY_KEY = 0;
+const REGRA_LABEL: Record<RegraProjecao, string> = {
+  yoy: "Crescimento YoY (média dos meses)",
+  "30": "Ritmo dos últimos 30 dias",
+  "60": "Ritmo dos últimos 60 dias",
+  "90": "Ritmo dos últimos 90 dias",
+  "120": "Ritmo dos últimos 120 dias",
+  "365": "Ritmo dos últimos 12 meses",
+};
 
 // Janelas exibidas (ordem da imagem: 60 dias como base, depois 12m, 120, 90, 30).
 const WINDOW_ROWS: { dias: number; label: string; base?: boolean }[] = [
@@ -159,6 +189,24 @@ function ymdToBr(ymd: string): string {
   const [y, m, d] = ymd.split("-");
   return `${d}/${m}/${y}`;
 }
+/** Quantos dias tem o mês (1-12) daquele ano. */
+function diasNoMes(ano: number, mes: number): number {
+  return new Date(Date.UTC(ano, mes, 0)).getUTCDate();
+}
+const MES_NOME = [
+  "jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez",
+];
+/** 'yyyy-MM' → 'jan/26'. */
+function mesLabel(mesYm: string): string {
+  const [ano, mes] = mesYm.split("-").map(Number);
+  return `${MES_NOME[mes - 1]}/${String(ano).slice(2)}`;
+}
+function fmtPct(v: number | null, dec = 1): string {
+  if (v == null || !Number.isFinite(v)) return "—";
+  const sinal = v > 0 ? "+" : "";
+  return `${sinal}${(v * 100).toLocaleString("pt-BR", { minimumFractionDigits: dec, maximumFractionDigits: dec })}%`;
+}
+
 /** Janela de 12 meses até hoje — o universo desta tela (opções e picker). */
 function janela12Meses(): { start: string; end: string } {
   const today = new Date();
@@ -196,8 +244,10 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
 
   // Projeção (unidades vendidas por janela) — vem do endpoint dedicado.
   const [projItens, setProjItens] = useState<Record<string, ProjecaoItem>>({});
+  const [mensal, setMensal] = useState<MensalItem[]>([]);
   const [projLoading, setProjLoading] = useState(false);
   const [projErro, setProjErro] = useState<string | null>(null);
+  const [regra, setRegra] = useState<RegraProjecao>("yoy");
 
   // Overrides editáveis (amarelos da planilha).
   const [estoqueOverride, setEstoqueOverride] = useState<number | null>(null);
@@ -324,14 +374,14 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   useEffect(() => {
     const params = new URLSearchParams({ company: companyKey, base: dataBase });
     if (temSelecao) {
-      // Seleção manual manda: projeta exatamente os itens escolhidos.
-      const produtos = Array.from(new Set(Array.from(selectedKeys).map((k) => k.split("||")[0])));
-      produtos.forEach((p) => params.append("produto", p));
+      // Seleção manual manda: projeta exatamente os itens escolhidos (produto × cor).
+      selectedKeys.forEach((key) => params.append("item", key));
     } else if (temDimensao) {
       // Sem seleção, o recorte de cadastro vai para o SQL (nada de listar milhares de códigos).
       DIM_KEYS.forEach((dim) => dims[dim].forEach((v) => params.append(dim, v)));
     } else {
       setProjItens({});
+      setMensal([]);
       setProjErro(null);
       return;
     }
@@ -352,10 +402,12 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
           next[rowKey(it.produto, it.cor)] = it;
         });
         setProjItens(next);
+        setMensal(Array.isArray(json.mensal) ? json.mensal : []);
       })
       .catch((error: Error) => {
         if (cancelled) return;
         setProjItens({});
+        setMensal([]);
         setProjErro(error.message || "Erro ao calcular a projeção");
       })
       .finally(() => {
@@ -402,18 +454,21 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
     if (temSelecao) {
       const estoqueSomado = selectedItems.reduce((s, it) => s + it.estoque, 0);
       WINDOW_ROWS.forEach(({ dias }) => {
-        unidades[dias] = selectedItems.reduce(
-          (s, it) => s + (Number(it.janelas[String(dias)] ?? 0) || 0),
-          0
+        // Piso 0 no TOTAL (não por item): a quantidade líquida de um item pode ser negativa
+        // quando houve mais troca que venda, e descartar essas linhas antes de somar infla o
+        // total — ver [[vendas-nunca-filtrar-linhas-da-regra-global]].
+        unidades[dias] = Math.max(
+          0,
+          selectedItems.reduce((s, it) => s + (Number(it.janelas[String(dias)] ?? 0) || 0), 0)
         );
       });
       return { estoqueSomado, unidades, itens: selectedItems.length };
     }
     const projList = Object.values(projItens);
     WINDOW_ROWS.forEach(({ dias }) => {
-      unidades[dias] = projList.reduce(
-        (s, it) => s + (Number(it.janelas[String(dias)] ?? 0) || 0),
-        0
+      unidades[dias] = Math.max(
+        0,
+        projList.reduce((s, it) => s + (Number(it.janelas[String(dias)] ?? 0) || 0), 0)
       );
     });
     const estoqueSomado = dimScopeRows.reduce((s, row) => s + Math.max(0, row.estoque ?? 0), 0);
@@ -423,6 +478,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   const estoqueAtual = estoqueOverride ?? agregado.estoqueSomado;
   const diasHorizonte = Math.max(0, diffDays(dataBase, venderAte));
   const hasScope = temSelecao || temDimensao;
+  const anoBase = Number(dataBase.slice(0, 4));
 
   // ── Linhas calculadas (tudo reativo, no cliente).
   const linhas = useMemo(() => {
@@ -438,6 +494,149 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
       return { dias, label, base, unVendidas, ritmoDia, ritmoMes, sugestao, qtd, cobertura, duraAte };
     });
   }, [agregado, diasHorizonte, estoqueAtual, qtdOverride, dataBase]);
+
+  // ── Regra comparativa (crescimento YoY) ───────────────────────────────────
+  // Quanto cada mês FECHADO deste ano cresceu contra o mesmo mês do ano anterior; a média
+  // desses percentuais é o crescimento provável aplicado aos meses que faltam.
+  // Ficam fora: mês em curso (parcial, comparação injusta) e mês sem base no ano anterior.
+  const crescimento = useMemo(() => {
+    const comparaveis = mensal.filter((m) => !m.futuro && !m.parcial && m.qtdeAnoAnterior > 0);
+    if (comparaveis.length === 0) return { media: null as number | null, meses: [] as string[] };
+    const taxas = comparaveis.map((m) => m.qtde / m.qtdeAnoAnterior - 1);
+    return {
+      media: taxas.reduce((a, b) => a + b, 0) / taxas.length,
+      meses: comparaveis.map((m) => m.mes),
+    };
+  }, [mensal]);
+
+  /** Ritmo diário de uma janela de dias (para as regras que não são YoY). */
+  const ritmoDiaJanela = useCallback(
+    (dias: number) => (dias > 0 ? (agregado.unidades[dias] ?? 0) / dias : 0),
+    [agregado.unidades]
+  );
+
+  // Valor de cada mês do ano da data base: realizado (mês fechado) e projetado pela regra.
+  const serieMes = useMemo(() => {
+    const g = crescimento.media;
+    const map = new Map<string, { realizado: number | null; projetado: number | null }>();
+    mensal.forEach((m) => {
+      const mesNum = Number(m.mes.slice(5, 7));
+      const projetado =
+        regra === "yoy"
+          ? g == null
+            ? null
+            : m.qtdeAnoAnterior * (1 + g)
+          : ritmoDiaJanela(Number(regra)) * diasNoMes(anoBase, mesNum);
+      map.set(m.mes, { realizado: m.futuro ? null : m.qtde, projetado });
+    });
+    return map;
+  }, [mensal, crescimento.media, regra, ritmoDiaJanela, anoBase]);
+
+  /**
+   * Valor CHEIO de um mês pela regra YoY, para acumular o horizonte. Um mês do ano seguinte
+   * usa o mês correspondente do ano da base (realizado ou projetado) e aplica o crescimento
+   * outra vez — é a mesma regra, só encadeada.
+   */
+  const valorMesYoY = useCallback(
+    (ano: number, mes: number): number => {
+      const g = crescimento.media;
+      if (g == null) return 0;
+      let ciclos = ano - anoBase;
+      if (ciclos < 0) return 0;
+      const info = mensal.find((m) => m.mes === `${anoBase}-${String(mes).padStart(2, "0")}`);
+      if (!info) return 0;
+      const projetadoAnoBase = info.qtdeAnoAnterior * (1 + g);
+      // Mês fechado vale o realizado; mês em curso vale o maior entre o já vendido e a
+      // projeção do mês cheio; mês futuro vale a projeção.
+      let valor = info.futuro
+        ? projetadoAnoBase
+        : info.parcial
+        ? Math.max(info.qtde, projetadoAnoBase)
+        : info.qtde;
+      while (ciclos > 0) {
+        valor *= 1 + g;
+        ciclos -= 1;
+      }
+      return valor;
+    },
+    [crescimento.media, mensal, anoBase]
+  );
+
+  /** Unidades projetadas pela regra YoY entre a data base e "Vender até" (pro-rata no mês). */
+  const projecaoHorizonte = useMemo(() => {
+    if (diasHorizonte <= 0 || crescimento.media == null) return 0;
+    let total = 0;
+    let ano = anoBase;
+    let mes = Number(dataBase.slice(5, 7));
+    let dia = Number(dataBase.slice(8, 10));
+    let restantes = diasHorizonte;
+    for (let guard = 0; restantes > 0 && guard < 48; guard += 1) {
+      const dm = diasNoMes(ano, mes);
+      const usados = Math.min(restantes, dm - dia + 1);
+      total += valorMesYoY(ano, mes) * (usados / dm);
+      restantes -= usados;
+      dia = 1;
+      if (mes === 12) {
+        ano += 1;
+        mes = 1;
+      } else {
+        mes += 1;
+      }
+    }
+    return total;
+  }, [diasHorizonte, crescimento.media, anoBase, dataBase, valorMesYoY]);
+
+  // Linha comparativa da tabela de janelas (fica acima do "60 dias").
+  const linhaYoY = useMemo(() => {
+    const disponivel = crescimento.media != null && diasHorizonte > 0;
+    const unProjetadas = disponivel ? projecaoHorizonte : 0;
+    const ritmoDia = disponivel ? unProjetadas / diasHorizonte : 0;
+    const sugestao = disponivel ? Math.max(0, Math.ceil(unProjetadas - estoqueAtual)) : 0;
+    const qtd = qtdOverride[YOY_KEY] ?? sugestao;
+    const cobertura = ritmoDia > 0 ? (estoqueAtual + qtd) / ritmoDia : null;
+    const duraAte = cobertura !== null ? addDaysFormatted(dataBase, Math.round(cobertura)) : null;
+    return {
+      disponivel,
+      media: crescimento.media,
+      mesesNaMedia: crescimento.meses.length,
+      unProjetadas: Math.round(unProjetadas),
+      ritmoDia,
+      ritmoMes: ritmoDia * 30,
+      sugestao,
+      qtd,
+      cobertura,
+      duraAte,
+    };
+  }, [crescimento, diasHorizonte, projecaoHorizonte, estoqueAtual, qtdOverride, dataBase]);
+
+  // ── Tabela de vendas por mês (ano todo: realizado + projeção) ─────────────
+  const mensalRows = useMemo(
+    () =>
+      mensal.map((m) => {
+        const projetado = serieMes.get(m.mes)?.projetado ?? null;
+        const variacao = !m.futuro && m.qtdeAnoAnterior > 0 ? m.qtde / m.qtdeAnoAnterior - 1 : null;
+        const valorAno = m.futuro
+          ? projetado ?? 0
+          : m.parcial
+          ? Math.max(m.qtde, projetado ?? 0)
+          : m.qtde;
+        return {
+          ...m,
+          projetado,
+          variacao,
+          valorAno,
+          usadoNaMedia: !m.futuro && !m.parcial && m.qtdeAnoAnterior > 0,
+        };
+      }),
+    [mensal, serieMes]
+  );
+
+  const mensalTotais = useMemo(() => {
+    const anoAnterior = mensalRows.reduce((s, r) => s + r.qtdeAnoAnterior, 0);
+    const realizado = mensalRows.reduce((s, r) => s + (r.futuro ? 0 : r.qtde), 0);
+    const ano = mensalRows.reduce((s, r) => s + r.valorAno, 0);
+    return { anoAnterior, realizado, ano, variacao: anoAnterior > 0 ? ano / anoAnterior - 1 : null };
+  }, [mensalRows]);
 
   // ── Picker: universo já recortado pelos filtros de dimensão + busca textual.
   const pickerFiltered = useMemo(() => {
@@ -740,6 +939,74 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
                 </tr>
               </thead>
               <tbody>
+                {/* Regra comparativa: crescimento médio mês x mesmo mês do ano anterior */}
+                <tr className={styles.rowYoY}>
+                  <td className={styles.tdLeft}>
+                    Crescimento YoY
+                    {linhaYoY.disponivel ? (
+                      <span className={styles.rowHint}>
+                        média {fmtPct(linhaYoY.media)} em {fmt(linhaYoY.mesesNaMedia)}{" "}
+                        {linhaYoY.mesesNaMedia === 1 ? "mês" : "meses"} fechados
+                      </span>
+                    ) : (
+                      <span className={styles.rowHint}>sem mês comparável no ano anterior</span>
+                    )}
+                  </td>
+                  <td className={styles.num}>{fmt(diasHorizonte)}</td>
+                  <td className={styles.num} title="Unidades PROJETADAS no horizonte pela regra de crescimento">
+                    {linhaYoY.disponivel ? (
+                      <>
+                        {fmt(linhaYoY.unProjetadas)}
+                        <span className={styles.projTag}>proj.</span>
+                      </>
+                    ) : (
+                      <span className={styles.muted}>—</span>
+                    )}
+                  </td>
+                  <td className={styles.num}>
+                    {linhaYoY.disponivel ? fmtDec(linhaYoY.ritmoDia) : <span className={styles.muted}>—</span>}
+                  </td>
+                  <td className={styles.num}>
+                    {linhaYoY.disponivel ? (
+                      fmtDec(linhaYoY.ritmoMes, 1)
+                    ) : (
+                      <span className={styles.muted}>—</span>
+                    )}
+                  </td>
+                  <td className={`${styles.num} ${styles.sugestao}`}>
+                    {linhaYoY.disponivel ? fmt(linhaYoY.sugestao) : <span className={styles.muted}>—</span>}
+                  </td>
+                  <td className={styles.num}>
+                    <input
+                      type="number"
+                      className={`${styles.qtdInput} ${
+                        qtdOverride[YOY_KEY] != null && qtdOverride[YOY_KEY] !== linhaYoY.sugestao
+                          ? styles.qtdInputEdited
+                          : ""
+                      }`}
+                      value={linhaYoY.qtd}
+                      min={0}
+                      disabled={!linhaYoY.disponivel}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        setQtdOverride((prev) => ({
+                          ...prev,
+                          [YOY_KEY]: raw === "" ? 0 : Math.max(0, Math.round(Number(raw))),
+                        }));
+                      }}
+                    />
+                  </td>
+                  <td className={styles.num}>
+                    {linhaYoY.cobertura !== null ? (
+                      fmt(linhaYoY.cobertura)
+                    ) : (
+                      <span className={styles.muted}>—</span>
+                    )}
+                  </td>
+                  <td className={styles.num}>
+                    {linhaYoY.duraAte ?? <span className={styles.muted}>—</span>}
+                  </td>
+                </tr>
                 {linhas.map((l) => {
                   const overridden = qtdOverride[l.dias] != null && qtdOverride[l.dias] !== l.sugestao;
                   return (
@@ -783,7 +1050,132 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
             <strong>Vender até</strong>. Ritmo = unidades vendidas na janela ÷ dias (loja +
             e-commerce), pela venda líquida validada global (com trocas). O{" "}
             <strong>estoque</strong> do escopo soma os itens com venda nos últimos 12 meses (saldos
-            positivos da rede) — ajuste o campo à mão quando quiser outro cenário.
+            positivos da rede) — ajuste o campo à mão quando quiser outro cenário. A linha{" "}
+            <strong>Crescimento YoY</strong> não usa janela de dias: ela mede o crescimento de cada
+            mês fechado contra o mesmo mês do ano anterior, tira a média e aplica sobre o ano
+            anterior mês a mês até <strong>Vender até</strong>.
+          </div>
+        </div>
+      )}
+
+      {/* Tabela de vendas por mês: ano todo, realizado + projeção */}
+      {hasScope && (
+        <div className={styles.projCard}>
+          <div className={styles.mensalHead}>
+            <div>
+              <div className={styles.projTitle}>Vendas por mês — {anoBase}</div>
+              <div className={styles.mensalSubtitle}>
+                Meses fechados são realizados; o mês em curso vai até a data base; os que faltam
+                saem da regra escolhida.
+              </div>
+            </div>
+            <label className={styles.regraField}>
+              <span className={styles.fieldLabel}>Regra da projeção</span>
+              <select
+                className={styles.select}
+                value={regra}
+                onChange={(e) => setRegra(e.target.value as RegraProjecao)}
+              >
+                {(Object.keys(REGRA_LABEL) as RegraProjecao[]).map((key) => (
+                  <option key={key} value={key}>
+                    {REGRA_LABEL[key]}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className={styles.tableScroll}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th className={styles.thLeft}>Mês</th>
+                  <th>{anoBase - 1} (un)</th>
+                  <th>{anoBase} (un)</th>
+                  <th>Variação</th>
+                  <th>Projeção (un)</th>
+                  <th className={styles.thLeft}>Situação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {mensalRows.length === 0 ? (
+                  <tr>
+                    <td className={styles.tdLeft} colSpan={6}>
+                      <span className={styles.muted}>
+                        {projLoading ? "Carregando a série mensal…" : "Sem série mensal para o escopo."}
+                      </span>
+                    </td>
+                  </tr>
+                ) : (
+                  mensalRows.map((m) => (
+                    <tr key={m.mes} className={m.futuro ? styles.rowFuturo : m.parcial ? styles.rowParcial : ""}>
+                      <td className={styles.tdLeft}>{mesLabel(m.mes)}</td>
+                      <td className={styles.num}>{fmt(m.qtdeAnoAnterior)}</td>
+                      <td className={styles.num}>
+                        {m.futuro ? <span className={styles.muted}>—</span> : fmt(m.qtde)}
+                      </td>
+                      <td
+                        className={`${styles.num} ${
+                          m.variacao == null ? "" : m.variacao >= 0 ? styles.varUp : styles.varDown
+                        }`}
+                      >
+                        {m.variacao == null ? <span className={styles.muted}>—</span> : fmtPct(m.variacao)}
+                      </td>
+                      <td className={`${styles.num} ${styles.sugestao}`}>
+                        {m.projetado == null ? (
+                          <span className={styles.muted}>—</span>
+                        ) : (
+                          fmt(Math.round(m.projetado))
+                        )}
+                      </td>
+                      <td className={styles.tdLeft}>
+                        {m.futuro ? (
+                          <span className={styles.tagProj}>Projeção</span>
+                        ) : m.parcial ? (
+                          <span className={styles.tagParcial}>Parcial (até {ymdToBr(dataBase)})</span>
+                        ) : (
+                          <span className={styles.tagReal}>
+                            Realizado{m.usadoNaMedia ? " · na média" : ""}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+              {mensalRows.length > 0 && (
+                <tfoot>
+                  <tr className={styles.rowTotal}>
+                    <td className={styles.tdLeft}>Total do ano</td>
+                    <td className={styles.num}>{fmt(mensalTotais.anoAnterior)}</td>
+                    <td className={styles.num}>{fmt(mensalTotais.realizado)}</td>
+                    <td
+                      className={`${styles.num} ${
+                        mensalTotais.variacao == null
+                          ? ""
+                          : mensalTotais.variacao >= 0
+                          ? styles.varUp
+                          : styles.varDown
+                      }`}
+                    >
+                      {fmtPct(mensalTotais.variacao)}
+                    </td>
+                    <td className={`${styles.num} ${styles.sugestao}`}>{fmt(Math.round(mensalTotais.ano))}</td>
+                    <td className={styles.tdLeft}>
+                      <span className={styles.muted}>realizado + projeção</span>
+                    </td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+
+          <div className={styles.footNote}>
+            A coluna <strong>{anoBase - 1}</strong> é o mês inteiro do ano anterior; a de{" "}
+            <strong>{anoBase}</strong> é o que já vendeu. A <strong>média de crescimento</strong>{" "}
+            sai só dos meses marcados “na média” (fechados e com base no ano anterior) — o mês em
+            curso fica fora porque a comparação seria injusta. O <strong>Total do ano</strong> soma
+            o realizado dos meses fechados com a projeção dos que faltam.
           </div>
         </div>
       )}

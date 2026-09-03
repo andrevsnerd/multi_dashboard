@@ -28,6 +28,32 @@ function addDaysYmd(ymd: string, delta: number): string {
   return `${yy}-${mm}-${dd}`;
 }
 
+function pad2(n: number): string {
+  return String(n).padStart(2, '0');
+}
+
+/** Último dia do mês (1-12) como 'yyyy-MM-dd'. */
+function lastDayOfMonth(ano: number, mes: number): string {
+  const dia = new Date(Date.UTC(ano, mes, 0)).getUTCDate();
+  return `${ano}-${pad2(mes)}-${pad2(dia)}`;
+}
+
+/** Roda `fn` sobre a lista com no máximo `limite` chamadas simultâneas. */
+async function mapLimit<T, R>(items: T[], limite: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out = new Array<R>(items.length);
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(limite, items.length) }, async () => {
+    for (;;) {
+      const idx = cursor;
+      cursor += 1;
+      if (idx >= items.length) return;
+      out[idx] = await fn(items[idx]);
+    }
+  });
+  await Promise.all(workers);
+  return out;
+}
+
 function isValidYmd(value: string | null): value is string {
   if (!value) return false;
   const m = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -41,12 +67,25 @@ export async function GET(request: Request) {
   const companyKey = searchParams.get('company') as CompanyKey;
   const baseParam = searchParams.get('base');
   // Aceita repetido (?produto=a&produto=b) ou CSV (?produtos=a,b).
-  const produtoIds = [
-    ...searchParams.getAll('produto'),
-    ...(searchParams.get('produtos') ?? '').split(','),
-  ]
-    .map((p) => p.trim())
-    .filter(Boolean);
+  // `item=produto||cor` (repetido) recorta a seleção EXATA de produto x cor — usado quando o
+  // usuário escolhe itens a dedo. Sem ele, um produto entraria com todas as suas cores.
+  const itemKeys = new Set(
+    searchParams
+      .getAll('item')
+      .map((v) => v.trim())
+      .filter((v) => v.includes('||'))
+  );
+  const produtoIds = Array.from(
+    new Set(
+      [
+        ...searchParams.getAll('produto'),
+        ...(searchParams.get('produtos') ?? '').split(','),
+        ...Array.from(itemKeys).map((k) => k.split('||')[0]),
+      ]
+        .map((p) => p.trim())
+        .filter(Boolean)
+    )
+  );
 
   // Recortes por dimensão do cadastro (um select por dimensão na tela, cada um repetível).
   const readDim = (name: string) =>
@@ -95,6 +134,20 @@ export async function GET(request: Request) {
   const posMembers = filiais.filter((f) => !ecommerceFilials.has(f));
   const ecomMembers = filiais.filter((f) => ecommerceFilials.has(f));
 
+  // Escopo comum a todas as consultas: mesma lógica VALIDADA de vendas, só recortada.
+  const escopo = {
+    produtoIds: produtoIds.length > 0 ? produtoIds : null,
+    dimensoes,
+    includePrevious: false as const,
+    limit: 0,
+  };
+  /** Fora da seleção exata de produto x cor a linha não entra na conta. */
+  const noEscopo = (produto: string, cor: string | undefined) =>
+    itemKeys.size === 0 || itemKeys.has(`${produto}||${(cor ?? '').trim()}`);
+
+  const anoBase = Number(baseParam.slice(0, 4));
+  const mesBase = Number(baseParam.slice(5, 7));
+
   try {
     // Uma consulta por janela (a maior é 365d), escopada aos produtos selecionados → leve.
     // Reusa a lógica VALIDADA de vendas (fetchFilialProdutoSales: POS com trocas + e-commerce).
@@ -106,10 +159,7 @@ export async function GET(request: Request) {
         });
         const rows = await fetchFilialProdutoSales(companyKey, posMembers, ecomMembers, range, 'month', {
           groupByCor: true,
-          produtoIds: produtoIds.length > 0 ? produtoIds : null,
-          dimensoes,
-          includePrevious: false,
-          limit: 0,
+          ...escopo,
         });
         return { dias, rows };
       })
@@ -131,6 +181,7 @@ export async function GET(request: Request) {
 
     perWindow.forEach(({ dias, rows }) => {
       rows.forEach((r) => {
+        if (!noEscopo(r.produto, r.cor)) return;
         const cor = (r.cor ?? '').trim();
         const key = `${r.produto}||${cor}`;
         let item = acc.get(key);
@@ -152,8 +203,11 @@ export async function GET(request: Request) {
         if (!item.corDescricao && r.corDescricao) item.corDescricao = r.corDescricao;
         if (!item.descricao && r.descricao) item.descricao = r.descricao;
         if (!item.codigoBarra && r.codigoBarra) item.codigoBarra = r.codigoBarra;
-        // A quantidade líquida da janela pode ser negativa (mais trocas que vendas) — piso 0.
-        item.qtde[dias] = Math.max(0, Math.round(Number(r.qtde ?? 0)));
+        // Quantidade LÍQUIDA da janela, como veio da regra global (pode ser negativa quando
+        // houve mais troca que venda). Não se aplica piso por item: descartar linha negativa
+        // antes de somar infla o total — ver [[vendas-nunca-filtrar-linhas-da-regra-global]].
+        // O piso 0 é aplicado no total do escopo, na tela.
+        item.qtde[dias] = Math.round(Number(r.qtde ?? 0));
       });
     });
 
@@ -169,8 +223,51 @@ export async function GET(request: Request) {
       janelas: Object.fromEntries(WINDOWS.map((d) => [d, item.qtde[d] ?? 0])),
     }));
 
+    // ── Série MENSAL: ano da data base + o mesmo mês do ano anterior, para a regra
+    //    comparativa de crescimento (jan/26 x jan/25, fev x fev …). Meses ainda no futuro
+    //    não são consultados (venda futura é sempre 0); do ano anterior vêm todos os 12.
+    //    O mês da data base fecha em base−1, igual às janelas, então é PARCIAL.
+    const mesesConsulta: Array<{ ano: number; mes: number }> = [];
+    for (let mes = 1; mes <= 12; mes += 1) mesesConsulta.push({ ano: anoBase - 1, mes });
+    for (let mes = 1; mes <= mesBase; mes += 1) mesesConsulta.push({ ano: anoBase, mes });
+
+    // Sem seleção exata nem filtro de cor não precisa quebrar por cor — o total do mês é o
+    // mesmo e a consulta fica bem mais leve (some o join de PRODUTO_CORES).
+    const mensalPorCor = itemKeys.size > 0 || dimensoes.cores.length > 0;
+
+    const totaisMes = await mapLimit(mesesConsulta, 4, async ({ ano, mes }) => {
+      const primeiro = `${ano}-${pad2(mes)}-01`;
+      // No mês da data base a janela para no dia anterior à base (mês em curso, parcial).
+      const ultimo =
+        ano === anoBase && mes === mesBase ? addDaysYmd(baseParam, -1) : lastDayOfMonth(ano, mes);
+      if (ultimo < primeiro) return { chave: `${ano}-${pad2(mes)}`, qtde: 0 };
+      const range = normalizeRangeForQuery({ start: primeiro, end: ultimo });
+      const rows = await fetchFilialProdutoSales(companyKey, posMembers, ecomMembers, range, 'month', {
+        groupByCor: mensalPorCor,
+        ...escopo,
+      });
+      const qtde = rows.reduce(
+        (soma, r) => (noEscopo(r.produto, r.cor) ? soma + Number(r.qtde ?? 0) : soma),
+        0
+      );
+      return { chave: `${ano}-${pad2(mes)}`, qtde: Math.round(qtde) };
+    });
+
+    const qtdePorMes = new Map(totaisMes.map(({ chave, qtde }) => [chave, qtde]));
+    const mensal = Array.from({ length: 12 }, (_, i) => {
+      const mes = i + 1;
+      return {
+        mes: `${anoBase}-${pad2(mes)}`,
+        qtde: qtdePorMes.get(`${anoBase}-${pad2(mes)}`) ?? 0,
+        qtdeAnoAnterior: qtdePorMes.get(`${anoBase - 1}-${pad2(mes)}`) ?? 0,
+        /** Mês em curso: fechado só até a data base, não serve de base de crescimento. */
+        parcial: mes === mesBase,
+        futuro: mes > mesBase,
+      };
+    });
+
     return NextResponse.json(
-      { dataBase: baseParam, windows: WINDOWS, itens },
+      { dataBase: baseParam, windows: WINDOWS, itens, mensal },
       { headers: { 'Cache-Control': 'no-store' } }
     );
   } catch (error) {
