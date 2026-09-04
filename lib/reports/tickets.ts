@@ -27,9 +27,11 @@ export const TICKETS_COLUMNS: ReportColumnDef[] = [
   { key: "COR", defaultLabel: "Cor (cód.)", type: "text" },
   { key: "TAMANHO", defaultLabel: "Tamanho", type: "text" },
   { key: "QTDE_ITEM", defaultLabel: "Qtde", type: "int" },
-  { key: "PRECO_UNITARIO", defaultLabel: "Preço unit.", type: "currency" },
+  { key: "VALOR_ITEM", defaultLabel: "Valor", type: "currency" },
   { key: "DESCONTO_ITEM", defaultLabel: "Desconto", type: "currency" },
-  { key: "VALOR_ITEM", defaultLabel: "Valor do item", type: "currency" },
+  // Preço de tabela do cadastro (PRECO_LIQUIDO da linha de venda), ANTES do desconto —
+  // fica por último de propósito: o que se lê primeiro é o Valor que a peça fez.
+  { key: "PRECO_UNITARIO", defaultLabel: "Preço Linx", type: "currency" },
   // ── Atributos de cadastro do item ──
   { key: "GRUPO", defaultLabel: "Grupo", type: "text" },
   { key: "SUBGRUPO", defaultLabel: "Subgrupo", type: "text" },
@@ -78,9 +80,9 @@ const TICKETS_PRESETS: ReportPresetDef[] = [
       col("COR_DESCRICAO"),
       col("TAMANHO"),
       col("QTDE_ITEM"),
-      col("PRECO_UNITARIO"),
-      col("DESCONTO_ITEM"),
       col("VALOR_ITEM"),
+      col("DESCONTO_ITEM"),
+      col("PRECO_UNITARIO"),
     ],
   },
   {
@@ -105,14 +107,14 @@ const TICKETS_PRESETS: ReportPresetDef[] = [
       col("COR"),
       col("TAMANHO"),
       col("QTDE_ITEM"),
-      col("PRECO_UNITARIO"),
-      col("DESCONTO_ITEM"),
       col("VALOR_ITEM"),
+      col("DESCONTO_ITEM"),
       col("GRUPO"),
       col("SUBGRUPO"),
       col("LINHA"),
       col("COLECAO"),
       col("GRADE"),
+      col("PRECO_UNITARIO"),
     ],
   },
 ];
