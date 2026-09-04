@@ -2460,8 +2460,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/ecommerce.ts": {
-    "mtime": 1788542908.6588395,
-    "ast_hash": "d7c91feb05230229c9b7257f23f07ac5",
+    "mtime": 1788544318.365391,
+    "ast_hash": "bdb97da7ad1914af4dcb32233b8a67e0",
     "semantic_hash": ""
   },
   "lib/repositories/entries.ts": {
@@ -2635,8 +2635,8 @@
     "semantic_hash": "29ce1c73943d226f43e1886d06bd8173"
   },
   "lib/services/salesTotals.ts": {
-    "mtime": 1788542495.6746964,
-    "ast_hash": "48a12c010caafaa91c220abf990ad4d7",
+    "mtime": 1788544318.365391,
+    "ast_hash": "1f0f287d774c4ab30e80714c00e9b3e7",
     "semantic_hash": ""
   },
   "lib/transfer-executor.js": {
@@ -4390,8 +4390,8 @@
     "semantic_hash": ""
   },
   "app/api/projecao-compra/route.ts": {
-    "mtime": 1788542495.6746964,
-    "ast_hash": "dd996a819bf859c5bf8490ae4f1d16a9",
+    "mtime": 1788544318.3710077,
+    "ast_hash": "d029b983f9693c7a2c023b7e3aebb5f0",
     "semantic_hash": ""
   },
   "components/stock/ProjecaoCompraPage.tsx": {

@@ -7777,7 +7777,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_mapa_clientes_route",
-      "community": 20,
+      "community": 462,
       "norm_label": "route.ts"
     },
     {
@@ -7797,7 +7797,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "app_api_mapa_clientes_route_get",
-      "community": 20,
+      "community": 462,
       "norm_label": "get()"
     },
     {
@@ -18279,7 +18279,7 @@
       "source_location": "L1503",
       "_origin": "ast",
       "id": "components_lista_loja_listalojapage_calcqtdsugeridaparafilial",
-      "community": 10,
+      "community": 1,
       "norm_label": "calcqtdsugeridaparafilial()"
     },
     {
@@ -18299,7 +18299,7 @@
       "source_location": "L1577",
       "_origin": "ast",
       "id": "components_lista_loja_listalojapage_itemtemcompraagora",
-      "community": 10,
+      "community": 1,
       "norm_label": "itemtemcompraagora()"
     },
     {
@@ -35429,7 +35429,7 @@
       "source_location": "L170",
       "_origin": "ast",
       "id": "lib_config_compra_ciclo_resolvegapantigodias",
-      "community": 10,
+      "community": 1,
       "norm_label": "resolvegapantigodias()"
     },
     {
@@ -35439,7 +35439,7 @@
       "source_location": "L182",
       "_origin": "ast",
       "id": "lib_config_compra_ciclo_resolverecentehorizontedias",
-      "community": 10,
+      "community": 1,
       "norm_label": "resolverecentehorizontedias()"
     },
     {
@@ -36449,7 +36449,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_db_connection",
-      "community": 20,
+      "community": 459,
       "norm_label": "connection.ts"
     },
     {
@@ -36459,7 +36459,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "lib_db_connection_builddbserverlist",
-      "community": 20,
+      "community": 459,
       "norm_label": "builddbserverlist()"
     },
     {
@@ -36469,7 +36469,7 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "lib_db_connection_db_servers",
-      "community": 20,
+      "community": 459,
       "norm_label": "db_servers"
     },
     {
@@ -36479,7 +36479,7 @@
       "source_location": "L42",
       "_origin": "ast",
       "id": "lib_db_connection_baseconfig",
-      "community": 20,
+      "community": 459,
       "norm_label": "baseconfig"
     },
     {
@@ -45106,7 +45106,7 @@
       "label": "SalesSummaryResult",
       "file_type": "code",
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L137",
+      "source_location": "L125",
       "_origin": "ast",
       "id": "lib_repositories_ecommerce_salessummaryresult",
       "community": 236,
@@ -45116,7 +45116,7 @@
       "label": "fetchTopProductsEcommerce()",
       "file_type": "code",
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L146",
+      "source_location": "L134",
       "_origin": "ast",
       "id": "lib_repositories_ecommerce_fetchtopproductsecommerce",
       "community": 55,
@@ -45126,7 +45126,7 @@
       "label": "fetchEcommerceSummary()",
       "file_type": "code",
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L215",
+      "source_location": "L203",
       "_origin": "ast",
       "id": "lib_repositories_ecommerce_fetchecommercesummary",
       "community": 55,
@@ -45136,7 +45136,7 @@
       "label": "fetchTopCategoriesEcommerce()",
       "file_type": "code",
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L1166",
+      "source_location": "L1155",
       "_origin": "ast",
       "id": "lib_repositories_ecommerce_fetchtopcategoriesecommerce",
       "community": 55,
@@ -45146,7 +45146,7 @@
       "label": "DailyRevenue",
       "file_type": "code",
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L1209",
+      "source_location": "L1198",
       "_origin": "ast",
       "id": "lib_repositories_ecommerce_dailyrevenue",
       "community": 55,
@@ -45156,7 +45156,7 @@
       "label": "fetchDailyEcommerceRevenue()",
       "file_type": "code",
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L1214",
+      "source_location": "L1203",
       "_origin": "ast",
       "id": "lib_repositories_ecommerce_fetchdailyecommercerevenue",
       "community": 55,
@@ -45166,7 +45166,7 @@
       "label": "fetchEcommerceFilialPerformance()",
       "file_type": "code",
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L1258",
+      "source_location": "L1247",
       "_origin": "ast",
       "id": "lib_repositories_ecommerce_fetchecommercefilialperformance",
       "community": 55,
@@ -49799,7 +49799,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_reporttickets",
-      "community": 101,
+      "community": 459,
       "norm_label": "reporttickets.ts"
     },
     {
@@ -49809,7 +49809,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "lib_repositories_reporttickets_round2",
-      "community": 101,
+      "community": 459,
       "norm_label": "round2()"
     },
     {
@@ -49819,7 +49819,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "lib_repositories_reporttickets_roundint",
-      "community": 101,
+      "community": 459,
       "norm_label": "roundint()"
     },
     {
@@ -49829,7 +49829,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "lib_repositories_reporttickets_inlistclause",
-      "community": 101,
+      "community": 459,
       "norm_label": "inlistclause()"
     },
     {
@@ -49839,7 +49839,7 @@
       "source_location": "L56",
       "_origin": "ast",
       "id": "lib_repositories_reporttickets_descnormalizada",
-      "community": 101,
+      "community": 459,
       "norm_label": "descnormalizada()"
     },
     {
@@ -49849,7 +49849,7 @@
       "source_location": "L63",
       "_origin": "ast",
       "id": "lib_repositories_reporttickets_nomeclause",
-      "community": 101,
+      "community": 459,
       "norm_label": "nomeclause()"
     },
     {
@@ -49859,7 +49859,7 @@
       "source_location": "L87",
       "_origin": "ast",
       "id": "lib_repositories_reporttickets_coresjoin",
-      "community": 101,
+      "community": 459,
       "norm_label": "coresjoin()"
     },
     {
@@ -49869,7 +49869,7 @@
       "source_location": "L105",
       "_origin": "ast",
       "id": "lib_repositories_reporttickets_tamanholabelexpr",
-      "community": 101,
+      "community": 459,
       "norm_label": "tamanholabelexpr()"
     },
     {
@@ -49879,7 +49879,7 @@
       "source_location": "L114",
       "_origin": "ast",
       "id": "lib_repositories_reporttickets_ticketitemraw",
-      "community": 101,
+      "community": 459,
       "norm_label": "ticketitemraw"
     },
     {
@@ -49889,7 +49889,7 @@
       "source_location": "L142",
       "_origin": "ast",
       "id": "lib_repositories_reporttickets_ticketagg",
-      "community": 101,
+      "community": 459,
       "norm_label": "ticketagg"
     },
     {
@@ -49899,7 +49899,7 @@
       "source_location": "L181",
       "_origin": "ast",
       "id": "lib_repositories_reporttickets_fetchtickets",
-      "community": 101,
+      "community": 459,
       "norm_label": "fetchtickets()"
     },
     {
@@ -52276,7 +52276,7 @@
       "label": "buildInListClause()",
       "file_type": "code",
       "source_file": "lib/services/salesTotals.ts",
-      "source_location": "L64",
+      "source_location": "L50",
       "_origin": "ast",
       "id": "lib_services_salestotals_buildinlistclause",
       "community": 55,
@@ -52286,7 +52286,7 @@
       "label": "SalesTotals",
       "file_type": "code",
       "source_file": "lib/services/salesTotals.ts",
-      "source_location": "L77",
+      "source_location": "L63",
       "_origin": "ast",
       "id": "lib_services_salestotals_salestotals",
       "community": 100,
@@ -52296,7 +52296,7 @@
       "label": "EMPTY",
       "file_type": "code",
       "source_file": "lib/services/salesTotals.ts",
-      "source_location": "L87",
+      "source_location": "L73",
       "_origin": "ast",
       "id": "lib_services_salestotals_empty",
       "community": 55,
@@ -52306,7 +52306,7 @@
       "label": "buildFilialClause()",
       "file_type": "code",
       "source_file": "lib/services/salesTotals.ts",
-      "source_location": "L97",
+      "source_location": "L83",
       "_origin": "ast",
       "id": "lib_services_salestotals_buildfilialclause",
       "community": 55,
@@ -52316,7 +52316,7 @@
       "label": "buildLinhaClause()",
       "file_type": "code",
       "source_file": "lib/services/salesTotals.ts",
-      "source_location": "L140",
+      "source_location": "L126",
       "_origin": "ast",
       "id": "lib_services_salestotals_buildlinhaclause",
       "community": 55,
@@ -52326,7 +52326,7 @@
       "label": "fetchSalesTotals()",
       "file_type": "code",
       "source_file": "lib/services/salesTotals.ts",
-      "source_location": "L179",
+      "source_location": "L165",
       "_origin": "ast",
       "id": "lib_services_salestotals_fetchsalestotals",
       "community": 55,
@@ -55839,7 +55839,7 @@
       "source_location": "L84",
       "_origin": "ast",
       "id": "lib_utils_date_toutcstartofday",
-      "community": 100,
+      "community": 101,
       "norm_label": "toutcstartofday()"
     },
     {
@@ -55849,7 +55849,7 @@
       "source_location": "L92",
       "_origin": "ast",
       "id": "lib_utils_date_toutcexclusiveend",
-      "community": 100,
+      "community": 101,
       "norm_label": "toutcexclusiveend()"
     },
     {
@@ -104898,7 +104898,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "app/api/projecao-compra/route.ts",
-      "source_location": "L183",
+      "source_location": "L181",
       "weight": 1.0,
       "source": "app_api_projecao_compra_route_get",
       "target": "app_api_projecao_compra_route_adddaysymd",
@@ -104909,7 +104909,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "app/api/projecao-compra/route.ts",
-      "source_location": "L194",
+      "source_location": "L192",
       "weight": 1.0,
       "source": "app_api_projecao_compra_route_get",
       "target": "app_api_projecao_compra_route_pad2",
@@ -104931,7 +104931,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "app/api/projecao-compra/route.ts",
-      "source_location": "L201",
+      "source_location": "L199",
       "weight": 1.0,
       "source": "app_api_projecao_compra_route_get",
       "target": "app_api_projecao_compra_route_lastdayofmonth",
@@ -104942,7 +104942,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "app/api/projecao-compra/route.ts",
-      "source_location": "L190",
+      "source_location": "L188",
       "weight": 1.0,
       "source": "app_api_projecao_compra_route_get",
       "target": "app_api_projecao_compra_route_maplimit",
@@ -104965,7 +104965,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "app/api/projecao-compra/route.ts",
-      "source_location": "L211",
+      "source_location": "L209",
       "weight": 1.0,
       "source": "app_api_projecao_compra_route_get",
       "target": "components_ajuste_estoque_ajustaritempanel_chave"
@@ -104987,7 +104987,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/api/projecao-compra/route.ts",
-      "source_location": "L274",
+      "source_location": "L272",
       "weight": 1.0,
       "source": "app_api_projecao_compra_route_get",
       "target": "lib_repositories_performance_fetchfilialprodutosales"
@@ -104998,7 +104998,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/api/projecao-compra/route.ts",
-      "source_location": "L186",
+      "source_location": "L184",
       "weight": 1.0,
       "source": "app_api_projecao_compra_route_get",
       "target": "lib_services_salestotals_fetchsalestotals"
@@ -105009,7 +105009,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/api/projecao-compra/route.ts",
-      "source_location": "L182",
+      "source_location": "L180",
       "weight": 1.0,
       "source": "app_api_projecao_compra_route_get",
       "target": "lib_utils_date_normalizerangeforquery"
@@ -105020,7 +105020,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "app/api/projecao-compra/route.ts",
-      "source_location": "L300",
+      "source_location": "L298",
       "weight": 1.0,
       "source": "app_api_projecao_compra_route_get",
       "target": "lib_utils_destino_romaneio_store_key"
@@ -182279,7 +182279,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/services/salesTotals.ts",
-      "source_location": "L248",
+      "source_location": "L232",
       "weight": 1.0,
       "source": "lib_services_salestotals_fetchsalestotals",
       "target": "lib_config_company_resolvecompany"
@@ -182928,7 +182928,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/services/salesTotals.ts",
-      "source_location": "L222",
+      "source_location": "L207",
       "weight": 1.0,
       "source": "lib_services_salestotals_fetchsalestotals",
       "target": "lib_config_company_isecommercefilial"
@@ -188850,7 +188850,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L1219",
+      "source_location": "L1208",
       "weight": 1.0,
       "source": "lib_repositories_ecommerce_fetchdailyecommercerevenue",
       "target": "lib_db_connection_withrequest"
@@ -188861,7 +188861,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L1262",
+      "source_location": "L1251",
       "weight": 1.0,
       "source": "lib_repositories_ecommerce_fetchecommercefilialperformance",
       "target": "lib_db_connection_withrequest"
@@ -188872,7 +188872,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L236",
+      "source_location": "L223",
       "weight": 1.0,
       "source": "lib_repositories_ecommerce_fetchecommercesummary",
       "target": "lib_db_connection_withrequest"
@@ -188883,7 +188883,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L1172",
+      "source_location": "L1161",
       "weight": 1.0,
       "source": "lib_repositories_ecommerce_fetchtopcategoriesecommerce",
       "target": "lib_db_connection_withrequest"
@@ -188894,7 +188894,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L152",
+      "source_location": "L140",
       "weight": 1.0,
       "source": "lib_repositories_ecommerce_fetchtopproductsecommerce",
       "target": "lib_db_connection_withrequest"
@@ -190302,7 +190302,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/services/salesTotals.ts",
-      "source_location": "L285",
+      "source_location": "L268",
       "weight": 1.0,
       "source": "lib_services_salestotals_fetchsalestotals",
       "target": "lib_db_connection_withrequest"
@@ -195574,7 +195574,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L1224",
+      "source_location": "L1213",
       "weight": 1.0,
       "source": "lib_repositories_ecommerce_fetchdailyecommercerevenue",
       "target": "lib_db_proxy_proxypool_request"
@@ -195585,7 +195585,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L247",
+      "source_location": "L234",
       "weight": 1.0,
       "source": "lib_repositories_ecommerce_fetchecommercesummary",
       "target": "lib_db_proxy_proxypool_request"
@@ -195596,7 +195596,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L1178",
+      "source_location": "L1167",
       "weight": 1.0,
       "source": "lib_repositories_ecommerce_fetchtopcategoriesecommerce",
       "target": "lib_db_proxy_proxypool_request"
@@ -195607,7 +195607,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L158",
+      "source_location": "L146",
       "weight": 1.0,
       "source": "lib_repositories_ecommerce_fetchtopproductsecommerce",
       "target": "lib_db_proxy_proxypool_request"
@@ -196234,7 +196234,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "lib/services/salesTotals.ts",
-      "source_location": "L291",
+      "source_location": "L274",
       "weight": 1.0,
       "source": "lib_services_salestotals_fetchsalestotals",
       "target": "lib_db_proxy_proxypool_request"
@@ -219968,7 +219968,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L1092",
+      "source_location": "L1081",
       "weight": 1.0,
       "source": "lib_repositories_ecommerce_fetchecommercesummary",
       "target": "lib_repositories_controleestoque_fetchestoquekpis"
@@ -223148,7 +223148,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L1209",
+      "source_location": "L1198",
       "weight": 1.0,
       "source": "lib_repositories_ecommerce",
       "target": "lib_repositories_ecommerce_dailyrevenue",
@@ -223158,7 +223158,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L1214",
+      "source_location": "L1203",
       "weight": 1.0,
       "source": "lib_repositories_ecommerce",
       "target": "lib_repositories_ecommerce_fetchdailyecommercerevenue",
@@ -223168,7 +223168,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L1258",
+      "source_location": "L1247",
       "weight": 1.0,
       "source": "lib_repositories_ecommerce",
       "target": "lib_repositories_ecommerce_fetchecommercefilialperformance",
@@ -223178,7 +223178,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L215",
+      "source_location": "L203",
       "weight": 1.0,
       "source": "lib_repositories_ecommerce",
       "target": "lib_repositories_ecommerce_fetchecommercesummary",
@@ -223188,7 +223188,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L1166",
+      "source_location": "L1155",
       "weight": 1.0,
       "source": "lib_repositories_ecommerce",
       "target": "lib_repositories_ecommerce_fetchtopcategoriesecommerce",
@@ -223198,7 +223198,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L146",
+      "source_location": "L134",
       "weight": 1.0,
       "source": "lib_repositories_ecommerce",
       "target": "lib_repositories_ecommerce_fetchtopproductsecommerce",
@@ -223218,7 +223218,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L137",
+      "source_location": "L125",
       "weight": 1.0,
       "source": "lib_repositories_ecommerce",
       "target": "lib_repositories_ecommerce_salessummaryresult",
@@ -223447,7 +223447,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L1220",
+      "source_location": "L1209",
       "weight": 1.0,
       "source": "lib_repositories_ecommerce_fetchdailyecommercerevenue",
       "target": "lib_repositories_ecommerce_resolverange",
@@ -223458,7 +223458,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L1263",
+      "source_location": "L1252",
       "weight": 1.0,
       "source": "lib_repositories_ecommerce_fetchecommercefilialperformance",
       "target": "lib_repositories_ecommerce_resolverange",
@@ -223469,7 +223469,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L237",
+      "source_location": "L224",
       "weight": 1.0,
       "source": "lib_repositories_ecommerce_fetchecommercesummary",
       "target": "lib_repositories_ecommerce_resolverange",
@@ -223480,7 +223480,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L1174",
+      "source_location": "L1163",
       "weight": 1.0,
       "source": "lib_repositories_ecommerce_fetchtopcategoriesecommerce",
       "target": "lib_repositories_ecommerce_resolverange",
@@ -223491,7 +223491,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L154",
+      "source_location": "L142",
       "weight": 1.0,
       "source": "lib_repositories_ecommerce_fetchtopproductsecommerce",
       "target": "lib_repositories_ecommerce_resolverange",
@@ -223535,7 +223535,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L1224",
+      "source_location": "L1213",
       "weight": 1.0,
       "source": "lib_repositories_ecommerce_fetchdailyecommercerevenue",
       "target": "lib_repositories_ecommerce_buildecommercefilialfilter",
@@ -223546,7 +223546,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L247",
+      "source_location": "L234",
       "weight": 1.0,
       "source": "lib_repositories_ecommerce_fetchecommercesummary",
       "target": "lib_repositories_ecommerce_buildecommercefilialfilter",
@@ -223557,7 +223557,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L1178",
+      "source_location": "L1167",
       "weight": 1.0,
       "source": "lib_repositories_ecommerce_fetchtopcategoriesecommerce",
       "target": "lib_repositories_ecommerce_buildecommercefilialfilter",
@@ -223568,7 +223568,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L158",
+      "source_location": "L146",
       "weight": 1.0,
       "source": "lib_repositories_ecommerce_fetchtopproductsecommerce",
       "target": "lib_repositories_ecommerce_buildecommercefilialfilter",
@@ -223601,7 +223601,7 @@
       "context": "field",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L138",
+      "source_location": "L126",
       "weight": 1.0,
       "source": "lib_repositories_ecommerce_salessummaryresult",
       "target": "types_dashboard_salessummary",
@@ -223613,7 +223613,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L200",
+      "source_location": "L188",
       "weight": 1.0,
       "source": "lib_repositories_ecommerce_fetchtopproductsecommerce",
       "target": "lib_repositories_inventory_fetchmultipleproductsstock"
@@ -223657,7 +223657,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L239",
+      "source_location": "L226",
       "weight": 1.0,
       "source": "lib_repositories_ecommerce_fetchecommercesummary",
       "target": "lib_utils_date_shiftrangebymonths"
@@ -223668,7 +223668,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L315",
+      "source_location": "L302",
       "weight": 1.0,
       "source": "lib_repositories_ecommerce_fetchecommercesummary",
       "target": "tmp_test_projecao_s"
@@ -223712,7 +223712,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/services/salesTotals.ts",
-      "source_location": "L223",
+      "source_location": "L208",
       "weight": 1.0,
       "source": "lib_services_salestotals_fetchsalestotals",
       "target": "lib_repositories_ecommerce_fetchecommercesummary"
@@ -223767,7 +223767,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L1273",
+      "source_location": "L1262",
       "weight": 1.0,
       "source": "lib_repositories_ecommerce_fetchecommercefilialperformance",
       "target": "lib_server_company_live_resolvecompanylive"
@@ -223778,7 +223778,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/ecommerce.ts",
-      "source_location": "L1265",
+      "source_location": "L1254",
       "weight": 1.0,
       "source": "lib_repositories_ecommerce_fetchecommercefilialperformance",
       "target": "lib_utils_date_shiftrangebymonths"
@@ -240096,7 +240096,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/services/salesTotals.ts",
-      "source_location": "L104",
+      "source_location": "L90",
       "weight": 1.0,
       "source": "lib_services_salestotals_buildfilialclause",
       "target": "lib_server_company_live_resolvecompanylive",
@@ -240162,7 +240162,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/services/salesTotals.ts",
-      "source_location": "L108",
+      "source_location": "L94",
       "weight": 1.0,
       "source": "lib_services_salestotals_buildfilialclause",
       "target": "lib_server_company_live_livenameforincoming",
@@ -243035,7 +243035,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/services/salesTotals.ts",
-      "source_location": "L97",
+      "source_location": "L83",
       "weight": 1.0,
       "source": "lib_services_salestotals",
       "target": "lib_services_salestotals_buildfilialclause",
@@ -243045,7 +243045,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/services/salesTotals.ts",
-      "source_location": "L64",
+      "source_location": "L50",
       "weight": 1.0,
       "source": "lib_services_salestotals",
       "target": "lib_services_salestotals_buildinlistclause",
@@ -243055,7 +243055,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/services/salesTotals.ts",
-      "source_location": "L140",
+      "source_location": "L126",
       "weight": 1.0,
       "source": "lib_services_salestotals",
       "target": "lib_services_salestotals_buildlinhaclause",
@@ -243065,7 +243065,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/services/salesTotals.ts",
-      "source_location": "L87",
+      "source_location": "L73",
       "weight": 1.0,
       "source": "lib_services_salestotals",
       "target": "lib_services_salestotals_empty",
@@ -243075,7 +243075,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/services/salesTotals.ts",
-      "source_location": "L179",
+      "source_location": "L165",
       "weight": 1.0,
       "source": "lib_services_salestotals",
       "target": "lib_services_salestotals_fetchsalestotals",
@@ -243085,7 +243085,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/services/salesTotals.ts",
-      "source_location": "L77",
+      "source_location": "L63",
       "weight": 1.0,
       "source": "lib_services_salestotals",
       "target": "lib_services_salestotals_salestotals",
@@ -243150,7 +243150,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/services/salesTotals.ts",
-      "source_location": "L295",
+      "source_location": "L278",
       "weight": 1.0,
       "source": "lib_services_salestotals_fetchsalestotals",
       "target": "lib_services_salestotals_buildinlistclause",
@@ -243161,7 +243161,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/services/salesTotals.ts",
-      "source_location": "L291",
+      "source_location": "L274",
       "weight": 1.0,
       "source": "lib_services_salestotals_fetchsalestotals",
       "target": "lib_services_salestotals_buildfilialclause",
@@ -243172,7 +243172,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/services/salesTotals.ts",
-      "source_location": "L292",
+      "source_location": "L275",
       "weight": 1.0,
       "source": "lib_services_salestotals_fetchsalestotals",
       "target": "lib_services_salestotals_buildlinhaclause",
@@ -243184,7 +243184,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/services/salesTotals.ts",
-      "source_location": "L283",
+      "source_location": "L266",
       "weight": 1.0,
       "source": "lib_services_salestotals_fetchsalestotals",
       "target": "lib_utils_date_shiftrangebymonths"
@@ -275758,5 +275758,5 @@
       "source_file": "tmp_scarfme_poliester_pages.txt"
     }
   ],
-  "built_at_commit": "1493d81b1b1c31df6455eca48f60e2af935645b3"
+  "built_at_commit": "cab447ae2676c0ac7c4296c09ae484ac33c98933"
 }

@@ -41,20 +41,6 @@ export interface SalesTotalsParams {
   /** Lista de produtos (IN) — filtra os totais por vários itens selecionados. */
   produtoIds?: string[] | null;
   produtoSearchTerm?: string | null;
-  /**
-   * Conta o ticket pela sua IDENTIDADE REAL (filial + número) em vez do número solto.
-   *
-   * O número do ticket é sequencial POR LOJA e se repete entre lojas, então o
-   * `COUNT(DISTINCT TICKET)` histórico funde tickets de lojas diferentes e SUBESTIMA a
-   * contagem sempre que há mais de uma filial no escopo — quanto maior a janela, pior
-   * (NERD 365d: 18.288 × 29.729 reais).
-   *
-   * É OPT-IN de propósito: ligado, muda o número de tickets (e o ticket médio) de quem
-   * chamar. O Dashboard, a Curva ABC, o Loja Raio X e os comparativos ficam no
-   * comportamento antigo para não moverem números já publicados; a Projeção de Compra
-   * liga porque lá a contagem é a própria métrica.
-   */
-  ticketsPorFilial?: boolean;
 }
 
 /**
@@ -193,7 +179,6 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
     produtoId,
     produtoIds,
     produtoSearchTerm,
-    ticketsPorFilial = false,
   } = params;
 
   if (!company) return { ...EMPTY };
@@ -230,7 +215,6 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
       grades: grades ?? null,
       colecoes: colecoes ?? null,
       produtoIds: produtoIds ?? null,
-      ticketsPorFilial,
     });
     const s = summary.summary;
     return {
@@ -262,7 +246,6 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
         grades: grades ?? null,
         colecoes: colecoes ?? null,
         produtoIds: produtoIds ?? null,
-        ticketsPorFilial,
       }),
     ]);
     const e = ecom.summary;
@@ -354,15 +337,17 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
           ${corClause}`;
 
     /**
-     * Chave do ticket no COUNT(DISTINCT). Ligado o `ticketsPorFilial`, a chave é
-     * filial+número (a identidade real); desligado, fica o número solto — o
-     * comportamento histórico, preservado para não mover números já publicados.
-     * A data NÃO entra: conferido que (CODIGO_FILIAL, TICKET) nunca aparece em duas
-     * datas em 24 meses, e incluí-la arriscaria partir um ticket ao meio.
+     * Chave do ticket no COUNT(DISTINCT): filial + número, a IDENTIDADE REAL.
+     *
+     * O número do ticket é sequencial POR LOJA e se repete entre lojas, então contar
+     * `DISTINCT TICKET` solto funde tickets de lojas diferentes e subestima o total —
+     * quanto maior a janela, pior (NERD/ELETRONICOS 365d: 18.288 contados × 29.729 reais;
+     * agosto/26 na rede: 2.498 × 2.801). Isso inflava o ticket médio em ~11% na NERD.
+     *
+     * A data NÃO entra na chave: conferido que (CODIGO_FILIAL, TICKET) nunca aparece em
+     * duas datas em 24 meses, e incluí-la arriscaria partir um ticket ao meio.
      */
-    const ticketKeyExpr = ticketsPorFilial
-      ? `LTRIM(RTRIM(CAST(CODIGO_FILIAL AS VARCHAR(20)))) + '|' + LTRIM(RTRIM(CAST(TICKET AS VARCHAR(30))))`
-      : 'TICKET';
+    const ticketKeyExpr = `LTRIM(RTRIM(CAST(CODIGO_FILIAL AS VARCHAR(20)))) + '|' + LTRIM(RTRIM(CAST(TICKET AS VARCHAR(30))))`;
 
     const query = `
       WITH vendas_base AS (

@@ -149,16 +149,14 @@ export async function GET(request: Request) {
   // Mesmos recortes, na fonte canônica de totais/tickets. `linhasCadastro` (e não `linhas`)
   // porque o `linhas` de lá é o escopo legado da NERD e seria ignorado na Scarf Me.
   //
-  // `ticketsPorFilial` é obrigatório AQUI: o número do ticket é sequencial por loja, e a
-  // contagem padrão (`COUNT(DISTINCT TICKET)`, sem a filial) funde tickets de lojas
-  // diferentes. Nesta tela a contagem É a métrica, e a distorção crescia com a janela
-  // (NERD/ELETRONICOS: −9,9% em 30d, −33,3% em 120d, −38,5% em 365d) até inverter o sinal
-  // do crescimento YoY (mostrava −3,1% quando o real era +14,3%). O Dashboard e a Curva
-  // ABC seguem sem a flag, no comportamento antigo.
+  // A contagem de ticket de `fetchSalesTotals` usa a identidade REAL (filial + número):
+  // o número é sequencial por loja e, contado solto, fundia tickets de lojas diferentes.
+  // Nesta tela a contagem É a métrica, e a distorção crescia com a janela (−9,9% em 30d a
+  // −38,5% em 365d na NERD/ELETRONICOS), chegando a inverter o sinal do crescimento YoY
+  // (mostrava −3,1% quando o real era +14,3%).
   const escopoTickets = {
     company: companyKey,
     filial: null,
-    ticketsPorFilial: true,
     grupos: dimensoes.grupos,
     linhasCadastro: dimensoes.linhas,
     subgrupos: dimensoes.subgrupos,

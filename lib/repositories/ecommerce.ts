@@ -120,18 +120,6 @@ export interface SummaryQueryParams {
   produtoSearchTerm?: string;
   acimaDoTicket?: boolean;
   filterByRegistrationDate?: boolean; // Se true, filtra produtos pela data de cadastramento ao invés da data de venda
-  /**
-   * Conta a nota pela sua identidade REAL (filial + NF + série) em vez de NF+série solta.
-   *
-   * A numeração de NF é por CNPJ, e o e-commerce da ScarfMe tem CINCO — os três antigos
-   * mais o rodízio MSC↔AKS ([[ecommerce-scarfme-rodizio-msc-aks]]). Sem a filial na chave,
-   * notas de CNPJs diferentes com o mesmo número viram uma só, e isso ACONTECE: grupo
-   * LENÇO em 365 dias dá 5.525 notas com a filial × 5.033 sem (−8,9%).
-   *
-   * É OPT-IN: ligado, muda a contagem de tickets de quem chamar. O Dashboard fica no
-   * comportamento antigo para não mover números já publicados; a Projeção de Compra liga.
-   */
-  ticketsPorFilial?: boolean;
 }
 
 export interface SalesSummaryResult {
@@ -231,7 +219,6 @@ export async function fetchEcommerceSummary({
   produtoSearchTerm,
   acimaDoTicket = false,
   filterByRegistrationDate = false,
-  ticketsPorFilial = false,
 }: SummaryQueryParams = {}): Promise<SalesSummaryResult> {
   return withRequest(async (request) => {
     const currentRange = resolveRange(range);
@@ -412,12 +399,14 @@ export async function fetchEcommerceSummary({
     });
 
     /**
-     * Chave da nota no COUNT(DISTINCT): com `ticketsPorFilial`, inclui a FILIAL (a
-     * numeração de NF é por CNPJ); sem ele, fica NF+série solta — comportamento histórico.
+     * Chave da nota no COUNT(DISTINCT): FILIAL + NF + série, a identidade real.
+     *
+     * A numeração de NF é por CNPJ, e o e-commerce da ScarfMe tem CINCO — os três antigos
+     * mais o rodízio MSC↔AKS ([[ecommerce-scarfme-rodizio-msc-aks]]). Sem a filial na
+     * chave, notas de CNPJs diferentes com o mesmo número viram uma só, e isso ACONTECE:
+     * grupo LENÇO em 365 dias dá 5.525 notas com a filial × 5.033 sem (−8,9%).
      */
-    const notaKeyExpr = ticketsPorFilial
-      ? "CONCAT(LTRIM(RTRIM(f.FILIAL)), '|', f.NF_SAIDA, '-', f.SERIE_NF)"
-      : "CONCAT(f.NF_SAIDA, '-', f.SERIE_NF)";
+    const notaKeyExpr = "CONCAT(LTRIM(RTRIM(f.FILIAL)), '|', f.NF_SAIDA, '-', f.SERIE_NF)";
 
     const query = `
       WITH summary AS (
