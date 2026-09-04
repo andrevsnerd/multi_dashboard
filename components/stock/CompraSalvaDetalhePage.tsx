@@ -766,7 +766,6 @@ export default function CompraSalvaDetalhePage({
   const [manualSearchLoading, setManualSearchLoading] = useState(false);
   const [manualSearchError, setManualSearchError] = useState<string | null>(null);
   const [addingItemKey, setAddingItemKey] = useState<string | null>(null);
-  const compraSalvaExportRef = useRef<HTMLDivElement>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const [manualState, setManualState] = useState<Record<string, "editing" | "confirmed">>({});
   const [manualDistribuicao, setManualDistribuicao] = useState<Record<string, Record<string, number>>>({});
@@ -1556,15 +1555,40 @@ export default function CompraSalvaDetalhePage({
     companyKey,
   ]);
 
-  const handleExportXlsx = () => {
+  /**
+   * Linhas da compra no mesmo recorte da tela: uma por item e, em peça fashion, mais uma
+   * por tamanho. XLSX e PDF partem daqui — fonte única, então os dois arquivos nunca
+   * divergem entre si nem da tabela.
+   */
+  type CompraSalvaExportRow = {
+    tipo: "item" | "tamanho";
+    produto: string;
+    codigoBarra: string;
+    descProduto: string;
+    corProduto: string;
+    descCor: string;
+    grade: string;
+    colecao: string;
+    tamanho: string;
+    qtd: number;
+    destino: string;
+    estoque: number | null;
+    custoUnit: number | null;
+    custoTotal: number | null;
+  };
+
+  const buildExportRows = (): CompraSalvaExportRow[] => {
     const fmt2 = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
-    const rowExcel = rowsComputed.flatMap(({ it, match, estoque, custoUnit, custoTotal, effectiveQtdManual }) => {
+
+    return rowsComputed.flatMap(({ it, match, estoque, custoUnit, custoTotal, effectiveQtdManual }) => {
       const produtoK = it.produto.trim();
       const corK = expandirPorCor ? ((it.corProduto ?? "").trim() || undefined) : undefined;
       const vendasKey = `${produtoK}||${corK ?? ""}`;
       const vendasRows = vendasPorFilialCache[vendasKey];
       const itemState = manualState[it.itemKey] ?? "auto";
       const distTamanho = distTamanhoByItemKey[it.itemKey] ?? null;
+      const tamanhoInfo = tamanhosCache[vendasKey];
+
       let destino: string;
       if (distTamanho) {
         // Peça fashion: o destino real está nas linhas de tamanho logo abaixo — vale tanto
@@ -1585,40 +1609,78 @@ export default function CompraSalvaDetalhePage({
       }
 
       const base = {
-        PRODUTO: it.produto,
-        CODIGO_BARRA: match?.codigoBarra ?? "",
-        DESC_PRODUTO: it.descricao,
-        COR_PRODUTO: it.corProduto ?? "",
-        DESC_COR_PRODUTO: it.corDescricao ?? "",
-        GRADE: it.grade ?? "",
-        COLECAO: it.colecao ?? "",
+        produto: it.produto,
+        codigoBarra: match?.codigoBarra ?? "",
+        descProduto: it.descricao,
+        corProduto: it.corProduto ?? "",
+        descCor: it.corDescricao ?? "",
+        grade: it.grade ?? "",
+        colecao: it.colecao ?? "",
       };
 
-      const linhaItem = {
+      const linhaItem: CompraSalvaExportRow = {
         ...base,
-        TAMANHO: "",
-        QTD_MANUAL: effectiveQtdManual,
-        DESTINO: destino,
-        ESTOQUE_ATUAL: estoque ?? 0,
-        ...(podeVerCusto ? { CUSTO_UNIT: custoUnit ?? 0, CUSTO_TOTAL: custoTotal ?? 0 } : {}),
+        tipo: "item",
+        tamanho: "",
+        qtd: effectiveQtdManual,
+        destino,
+        estoque: estoque ?? 0,
+        custoUnit: custoUnit ?? 0,
+        custoTotal: custoTotal ?? 0,
       };
 
       if (!distTamanho) return [linhaItem];
 
       // Uma linha por tamanho, igual à tela. A coluna TAMANHO separa as quebras da linha
-      // do item — somar QTD_MANUAL sem filtrar por ela conta a mesma peça duas vezes.
+      // do item — somar a quantidade sem filtrar por ela conta a mesma peça duas vezes.
       return [
         linhaItem,
-        ...distTamanho.linhas.map((linha) => ({
-          ...base,
-          TAMANHO: linha.label,
-          QTD_MANUAL: linha.qtd,
-          DESTINO: linha.partes.map((p) => `${p.label}: ${fmt2(p.qtd)}`).join(" · "),
-          ESTOQUE_ATUAL: "",
-          ...(podeVerCusto ? { CUSTO_UNIT: "", CUSTO_TOTAL: "" } : {}),
-        })),
+        ...distTamanho.linhas.map((linha): CompraSalvaExportRow => {
+          // Estoque do tamanho somando as lojas que recebem fashion — mesmo número da tela.
+          const idx = (tamanhoInfo?.tamanhos ?? []).findIndex((t) => t.ordinal === linha.ordinal);
+          const estoqueFashion = (tamanhoInfo?.porFilial ?? []).reduce((soma, f) => {
+            const label = getFilialLabelForDisplay(resolveCompany(companyKey), f.filial);
+            if (!(LOJAS_FASHION as readonly string[]).includes(label)) return soma;
+            return soma + Math.max(0, Number(f.porTamanho[idx] ?? 0));
+          }, 0);
+
+          return {
+            ...base,
+            tipo: "tamanho",
+            tamanho: linha.label,
+            qtd: linha.qtd,
+            destino: linha.partes.map((p) => `${p.label}: ${fmt2(p.qtd)}`).join(" · "),
+            estoque: estoqueFashion,
+            custoUnit: null,
+            custoTotal: null,
+          };
+        }),
       ];
     });
+  };
+
+  const exportFileName = () => (doc?.title ?? "compra-salva").replace(/[^\w\-]+/g, "_").slice(0, 80);
+
+  const handleExportXlsx = () => {
+    const rowExcel = buildExportRows().map((r) => ({
+      PRODUTO: r.produto,
+      CODIGO_BARRA: r.codigoBarra,
+      DESC_PRODUTO: r.descProduto,
+      COR_PRODUTO: r.corProduto,
+      DESC_COR_PRODUTO: r.descCor,
+      GRADE: r.grade,
+      COLECAO: r.colecao,
+      TAMANHO: r.tamanho,
+      QTD_MANUAL: r.qtd,
+      DESTINO: r.destino,
+      ESTOQUE_ATUAL: r.tipo === "tamanho" ? "" : (r.estoque ?? 0),
+      ...(podeVerCusto
+        ? {
+            CUSTO_UNIT: r.tipo === "tamanho" ? "" : (r.custoUnit ?? 0),
+            CUSTO_TOTAL: r.tipo === "tamanho" ? "" : (r.custoTotal ?? 0),
+          }
+        : {}),
+    }));
 
     const kpis = [
       { METRICA: "Título", VALOR: doc?.title ?? "" },
@@ -1632,167 +1694,190 @@ export default function CompraSalvaDetalhePage({
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(kpis), "KPIs");
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rowExcel), "Compra salva");
 
-    const safeName = (doc?.title ?? "compra-salva").replace(/[^\w\-]+/g, "_").slice(0, 80);
-    XLSX.writeFile(wb, `${safeName}.xlsx`);
+    XLSX.writeFile(wb, `${exportFileName()}.xlsx`);
   };
 
+  /**
+   * PDF da compra inteira, em texto de verdade (jsPDF + autoTable), A4 paisagem.
+   *
+   * Antes isto era um print da tela com html2canvas, fatiado à mão em pedaços de bitmap.
+   * Compra grande estourava o limite de dimensão de canvas do navegador (~16k-32k px, que
+   * ele devolve cortado/em branco sem erro) e a largura saía do elemento na tela — em
+   * janela estreita a tabela vinha sem as colunas da direita. Daí o "vez ou outra corta".
+   * Aqui o PDF é vetorial: a paginação é do autoTable (cabeçalho repetido em toda página,
+   * linha nunca partida no meio), a largura é a da página e não a do navegador, e não
+   * existe imagem nenhuma para cortar.
+   */
   const handleExportPdf = async () => {
-    if (!compraSalvaExportRef.current || items.length === 0) return;
+    if (!doc || items.length === 0) return;
 
     setExportingPdf(true);
     try {
-      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
-        import("html2canvas"),
+      const [{ jsPDF }, autoTableMod] = await Promise.all([
         import("jspdf"),
+        import("jspdf-autotable"),
       ]);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const autoTable = (autoTableMod as any).default ?? autoTableMod;
 
-      const target = compraSalvaExportRef.current;
+      const rows = buildExportRows();
+      const titulo = (doc.title ?? "").trim() || "Compra salva";
+      const subtitulo = [
+        resolveCompany(companyKey)?.name ?? companyKey,
+        `Salva em ${new Date(doc.savedAt).toLocaleString("pt-BR")}`,
+        expandirPorCor ? "Por cor" : "Por produto",
+        `${totals.totalItens} item(ns)`,
+        `${fmt(totals.totalQtdManual)} peça(s)`,
+        ...(podeVerCusto ? [`Custo total ${fmtBRL(totals.totalCusto)}`] : []),
+      ].join("  ·  ");
 
-      // Coleta valores dos inputs ANTES do clone (cloneNode não copia .value de inputs React)
-      const originalInputs = Array.from(target.querySelectorAll("input")) as HTMLInputElement[];
-      const inputValues = originalInputs.map((inp) => inp.value);
+      const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 8;
+      const headerBottom = 21;
 
-      // Aplicado em CADA clone (medição + cada fatia capturada): esconde UI que não deve
-      // aparecer no PDF, troca inputs por spans com o valor certo, e corrige overflow:clip
-      // e position:sticky que o html2canvas não trata bem fora do container real.
-      const applyExportTransform = (cloneDoc: Document, cloneEl: HTMLElement) => {
-        cloneEl.querySelectorAll("[data-pdf-hide]").forEach((el) => {
-          (el as HTMLElement).style.display = "none";
-        });
+      const head = [[
+        "Produto",
+        "Cor",
+        "Grade",
+        "Tam.",
+        "Qtd",
+        "Destino (loja: qtd)",
+        "Estoque",
+        ...(podeVerCusto ? ["Custo un.", "Custo total"] : []),
+      ]];
 
-        const cloneInputs = Array.from(cloneEl.querySelectorAll("input")) as HTMLInputElement[];
-        cloneInputs.forEach((cloneInp, i) => {
-          const span = cloneDoc.createElement("span");
-          span.style.cssText = "display:block;text-align:right;font-weight:700;font-size:14px;font-variant-numeric:tabular-nums;padding:6px 8px;";
-          span.textContent = inputValues[i] ?? "";
-          cloneInp.replaceWith(span);
-        });
+      const body = rows.map((r) => {
+        const isTamanho = r.tipo === "tamanho";
+        // Linha de tamanho leva o código do produto para o leitor amarrá-la ao item mesmo
+        // quando a quebra de página separa os dois.
+        const produtoCell = isTamanho
+          ? `↳ ${r.produto}`
+          : [
+              r.descProduto || r.produto,
+              [r.produto, r.codigoBarra ? `CB ${r.codigoBarra}` : "", r.colecao]
+                .filter(Boolean)
+                .join(" · "),
+            ]
+              .filter(Boolean)
+              .join("\n");
 
-        const cloneWin = cloneDoc.defaultView;
-        if (cloneWin) {
-          cloneEl.querySelectorAll("*").forEach((el) => {
-            const htmlEl = el as HTMLElement;
-            const cs = cloneWin.getComputedStyle(htmlEl);
-            if (cs.overflow === "clip") htmlEl.style.overflow = "visible";
-            if (cs.position === "sticky") htmlEl.style.position = "relative";
-          });
-        }
+        return [
+          produtoCell,
+          isTamanho ? "" : (r.descCor || r.corProduto),
+          isTamanho ? "" : r.grade,
+          r.tamanho,
+          fmt(r.qtd),
+          r.destino || "—",
+          r.estoque != null ? fmt(r.estoque) : "—",
+          ...(podeVerCusto
+            ? [
+                isTamanho ? "" : (r.custoUnit && r.custoUnit > 0 ? fmtBRL2(r.custoUnit) : "—"),
+                isTamanho ? "" : (r.custoTotal && r.custoTotal > 0 ? fmtBRL(r.custoTotal) : "—"),
+              ]
+            : []),
+        ];
+      });
+
+      const foot = [[
+        "TOTAL",
+        "",
+        "",
+        "",
+        fmt(totals.totalQtdManual),
+        `${totals.totalItens} item(ns)`,
+        "",
+        ...(podeVerCusto ? ["", fmtBRL(totals.totalCusto)] : []),
+      ]];
+
+      const columnStyles: Record<number, Record<string, unknown>> = {
+        0: { cellWidth: 62, halign: "left" },
+        1: { cellWidth: 24, halign: "left" },
+        2: { cellWidth: 13, halign: "left" },
+        3: { cellWidth: 11, halign: "center", fontStyle: "bold" },
+        4: { cellWidth: 12, halign: "right", fontStyle: "bold" },
+        5: { halign: "left" }, // Destino: leva toda a largura que sobra da página
+        6: { cellWidth: 15, halign: "right" },
       };
+      if (podeVerCusto) {
+        columnStyles[7] = { cellWidth: 17, halign: "right" };
+        columnStyles[8] = { cellWidth: 20, halign: "right" };
+      }
 
-      // Pontos de quebra (em px de CSS, relativos ao topo da área exportada) onde
-      // é seguro cortar a página — entre linhas da tabela, nunca no meio de uma.
-      let rowBreaksCss: number[] = [];
-      let contentWidthCss = 0;
-      let contentHeightCss = 0;
-
-      // Passagem de MEDIÇÃO: canvas final é minúsculo (scale ínfimo) de propósito —
-      // aqui só nos importa o layout do clone (onclone roda antes do desenho, no
-      // tamanho real em CSS px), não a imagem em si.
-      await html2canvas(target, {
-        backgroundColor: "#ffffff",
-        scale: 0.05,
-        useCORS: true,
-        logging: false,
-        windowWidth: target.scrollWidth,
-        windowHeight: target.scrollHeight,
-        onclone: (cloneDoc, cloneEl) => {
-          applyExportTransform(cloneDoc, cloneEl);
-          const baseRect = cloneEl.getBoundingClientRect();
-          contentWidthCss = baseRect.width;
-          contentHeightCss = baseRect.height;
-          const breaks = new Set<number>();
-          cloneEl.querySelectorAll("tbody tr").forEach((tr) => {
-            breaks.add((tr as HTMLElement).getBoundingClientRect().bottom - baseRect.top);
-          });
-          rowBreaksCss = Array.from(breaks).sort((a, b) => a - b);
+      autoTable(pdf, {
+        head,
+        body,
+        foot,
+        startY: headerBottom,
+        margin: { top: headerBottom, left: margin, right: margin, bottom: 10 },
+        tableWidth: pageWidth - margin * 2,
+        rowPageBreak: "avoid",
+        showHead: "everyPage",
+        showFoot: "lastPage",
+        styles: {
+          font: "helvetica",
+          fontSize: 7,
+          cellPadding: 1.6,
+          overflow: "linebreak",
+          valign: "middle",
+          textColor: [31, 41, 55],
+          lineColor: [226, 232, 240],
+          lineWidth: 0.1,
+        },
+        headStyles: {
+          fillColor: [30, 41, 59],
+          textColor: [226, 232, 240],
+          fontStyle: "bold",
+          fontSize: 6.5,
+        },
+        footStyles: {
+          fillColor: [226, 232, 240],
+          textColor: [15, 23, 42],
+          fontStyle: "bold",
+          fontSize: 7.5,
+        },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        columnStyles,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        didParseCell: (data: any) => {
+          if (data.section !== "body") return;
+          const r = rows[data.row.index];
+          if (!r) return;
+          if (r.tipo === "tamanho") {
+            // Sub-linha de tamanho: mesmo peso visual da tela (recuada, em cinza).
+            data.cell.styles.fillColor = [241, 245, 249];
+            data.cell.styles.textColor = [71, 85, 105];
+            data.cell.styles.fontSize = 6.5;
+          } else if (data.column.index === 0) {
+            data.cell.styles.fontStyle = "bold";
+          }
+        },
+        didDrawPage: () => {
+          pdf.setFont("helvetica", "bold");
+          pdf.setFontSize(13);
+          pdf.setTextColor(15, 23, 42);
+          pdf.text(titulo, margin, 11, { maxWidth: pageWidth - margin * 2 });
+          pdf.setFont("helvetica", "normal");
+          pdf.setFontSize(8);
+          pdf.setTextColor(100, 116, 139);
+          pdf.text(subtitulo, margin, 16.5, { maxWidth: pageWidth - margin * 2 });
         },
       });
 
-      if (contentWidthCss <= 0 || contentHeightCss <= 0) {
-        throw new Error("Não foi possível medir o conteúdo para exportação.");
+      // Numeração só no fim: o total de páginas só existe depois da tabela inteira.
+      const totalPaginas = pdf.getNumberOfPages();
+      const geradoEm = `Gerado em ${new Date().toLocaleString("pt-BR")}`;
+      for (let p = 1; p <= totalPaginas; p += 1) {
+        pdf.setPage(p);
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(7.5);
+        pdf.setTextColor(148, 163, 184);
+        pdf.text(geradoEm, margin, pageHeight - 4);
+        pdf.text(`Página ${p} de ${totalPaginas}`, pageWidth - margin, pageHeight - 4, { align: "right" });
       }
 
-      const SCALE = 2;
-      const pageWidthMm = 210;
-      const cssToMm = pageWidthMm / contentWidthCss;
-      // Altura máxima (em px de CSS) de uma única captura. Compras com muitos itens
-      // geram uma tabela muito alta; capturar tudo de uma vez num canvas só (como antes)
-      // ultrapassa o limite de dimensão de canvas do navegador (~16k-32k px) e o navegador
-      // devolve a imagem cortada/em branco a partir dali, sem erro — daí compras grandes
-      // saírem com o fim da lista faltando. Por isso cada página é capturada separadamente,
-      // já recortada (html2canvas x/y/width/height) no tamanho abaixo, nunca um canvas gigante.
-      const MAX_SLICE_CSS_HEIGHT = 6000;
-
-      const captureSlice = (startCss: number, endCss: number) =>
-        html2canvas(target, {
-          backgroundColor: "#ffffff",
-          scale: SCALE,
-          useCORS: true,
-          logging: false,
-          windowWidth: target.scrollWidth,
-          windowHeight: target.scrollHeight,
-          x: 0,
-          y: startCss,
-          width: contentWidthCss,
-          height: endCss - startCss,
-          onclone: (cloneDoc, cloneEl) => applyExportTransform(cloneDoc, cloneEl),
-        });
-
-      const safeName = (doc?.title ?? "compra-salva").replace(/[^\w\-]+/g, "_").slice(0, 80);
-
-      if (contentHeightCss <= MAX_SLICE_CSS_HEIGHT) {
-        // Compra pequena: cabe inteira numa única fatia segura — 1 página só, como antes.
-        const canvas = await captureSlice(0, contentHeightCss);
-        const pageHeightMm = contentHeightCss * cssToMm;
-        const pdf = new jsPDF({
-          orientation: "portrait",
-          unit: "mm",
-          format: [pageWidthMm, pageHeightMm],
-        });
-        pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, pageWidthMm, pageHeightMm, undefined, "FAST");
-        pdf.save(`${safeName}.pdf`);
-        return;
-      }
-
-      // Compra grande: pagina em A4, cada página com sua própria captura independente.
-      const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4",
-      });
-      const a4HeightMm = pdf.internal.pageSize.getHeight();
-      const sliceCssHeight = Math.min(a4HeightMm / cssToMm, MAX_SLICE_CSS_HEIGHT);
-
-      let cursorCss = 0;
-      let pageIndex = 0;
-
-      while (cursorCss < contentHeightCss) {
-        const maxEndCss = cursorCss + sliceCssHeight;
-        let sliceEndCss: number;
-        if (maxEndCss >= contentHeightCss) {
-          // Última página: leva tudo o que resta.
-          sliceEndCss = contentHeightCss;
-        } else {
-          // Maior quebra de linha que cabe nesta página; se nenhuma couber
-          // (linha mais alta que a página) faz corte rígido para não travar.
-          let candidate = cursorCss;
-          for (const bp of rowBreaksCss) {
-            if (bp > cursorCss && bp <= maxEndCss) candidate = bp;
-            else if (bp > maxEndCss) break;
-          }
-          sliceEndCss = candidate > cursorCss ? candidate : maxEndCss;
-        }
-
-        const canvas = await captureSlice(cursorCss, sliceEndCss);
-        const imgHeightMm = (sliceEndCss - cursorCss) * cssToMm;
-        if (pageIndex > 0) pdf.addPage();
-        pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, pageWidthMm, imgHeightMm, undefined, "FAST");
-
-        cursorCss = sliceEndCss;
-        pageIndex += 1;
-      }
-
-      pdf.save(`${safeName}.pdf`);
+      pdf.save(`${exportFileName()}.pdf`);
     } catch (error) {
       window.alert(error instanceof Error ? error.message : "Erro ao exportar PDF");
     } finally {
@@ -2049,7 +2134,7 @@ export default function CompraSalvaDetalhePage({
       {error && <div className={styles.error}>{error}</div>}
 
       {!loading && !error && doc && (
-        <div ref={compraSalvaExportRef}>
+        <div>
           <div className={styles.summaryCard} style={{ justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 32, flexWrap: "wrap" }}>
               <div className={styles.summaryItem}>
@@ -2071,7 +2156,7 @@ export default function CompraSalvaDetalhePage({
                 </>
               )}
             </div>
-            <div className={styles.exportActions} data-pdf-hide="" ref={exportMenuRef}>
+            <div className={styles.exportActions} ref={exportMenuRef}>
               <button
                 type="button"
                 className={styles.exportBtn}
@@ -2091,7 +2176,8 @@ export default function CompraSalvaDetalhePage({
               >
                 <span className={styles.exportMenuLabel}>Exportar</span>
                 <span className={`${styles.exportCaret}${exportMenuOpen ? ` ${styles.exportCaretOpen}` : ""}`}>v</span>
-                {exportingPdf ? "Exportando PDF…" : "Exportar PDF"}
+                {/* Só o aviso de progresso — o rótulo do botão é o "Exportar" acima. */}
+                {exportingPdf ? <span className={styles.exportMenuLabel}>Exportando PDF…</span> : null}
               </button>
               {exportMenuOpen && (
                 <div className={styles.exportDropdown} role="menu">
@@ -2121,7 +2207,7 @@ export default function CompraSalvaDetalhePage({
             </div>
           </div>
 
-          <div className={styles.manualProductPanel} data-pdf-hide="">
+          <div className={styles.manualProductPanel}>
             <div className={styles.manualProductPanelHeader}>
               <div>
                 <div className={styles.manualProductPanelTitle}>Adicionar produto manualmente</div>
@@ -2195,7 +2281,7 @@ export default function CompraSalvaDetalhePage({
                     <th className={styles.right}>Estoque</th>
                     {podeVerCusto && <th className={styles.right}>Custo Unit.</th>}
                     {podeVerCusto && <th className={styles.right}>Custo Total</th>}
-                    <th style={{ width: 60 }} data-pdf-hide="" />
+                    <th style={{ width: 60 }} />
                   </tr>
                 </thead>
                 <tbody>
@@ -2279,7 +2365,7 @@ export default function CompraSalvaDetalhePage({
                                   <button
                                     type="button"
                                     className={styles.manualToggleBtn}
-                                    data-pdf-hide=""
+                                   
                                     onClick={() => handleManualTamanhoReset(it.itemKey)}
                                     title="Soltar todas as travas e voltar à grade fechada automática"
                                   >
@@ -2317,7 +2403,7 @@ export default function CompraSalvaDetalhePage({
                                   onAddFilial={(filial) => handleManualAddFilial(it.itemKey, filial)}
                                 />
                               )}
-                              <div className={styles.manualEditActions} data-pdf-hide="">
+                              <div className={styles.manualEditActions}>
                                 <button
                                   type="button"
                                   className={styles.manualConfirmBtn}
@@ -2356,7 +2442,7 @@ export default function CompraSalvaDetalhePage({
                                     : <span style={{ color: "#94a3b8", fontSize: 12 }}>Sem distribuição</span>;
                                 })()}
                               </div>
-                              <div className={styles.manualConfirmedActions} data-pdf-hide="">
+                              <div className={styles.manualConfirmedActions}>
                                 <button
                                   type="button"
                                   className={styles.manualToggleBtn}
@@ -2453,7 +2539,7 @@ export default function CompraSalvaDetalhePage({
                                   );
                                 })()}
                               </div>
-                              <div className={styles.manualConfirmedActions} data-pdf-hide="">
+                              <div className={styles.manualConfirmedActions}>
                                 <button
                                   type="button"
                                   className={styles.manualToggleBtn}
@@ -2518,7 +2604,7 @@ export default function CompraSalvaDetalhePage({
                             {custoTotal > 0 ? fmtBRL(custoTotal) : "—"}
                           </td>
                         )}
-                        <td className={styles.right} data-pdf-hide="">
+                        <td className={styles.right}>
                           <button
                             type="button"
                             className={styles.removeBtn}
@@ -2592,7 +2678,7 @@ export default function CompraSalvaDetalhePage({
                                     <button
                                       type="button"
                                       className={styles.tamanhoTravaBtn}
-                                      data-pdf-hide=""
+                                     
                                       onClick={() => handleManualTamanhoLimpar(it.itemKey, linha.ordinal)}
                                       title={`Soltar a trava do ${linha.label} e voltar à grade fechada`}
                                       aria-label={`Soltar a trava do tamanho ${linha.label}`}
@@ -2633,7 +2719,7 @@ export default function CompraSalvaDetalhePage({
                             </td>
                             {podeVerCusto && <td className={styles.right} />}
                             {podeVerCusto && <td className={styles.right} />}
-                            <td data-pdf-hide="" />
+                            <td />
                           </tr>
                         );
                       })}

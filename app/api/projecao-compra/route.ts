@@ -66,22 +66,11 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const companyKey = searchParams.get('company') as CompanyKey;
   const baseParam = searchParams.get('base');
-  // Aceita repetido (?produto=a&produto=b) ou CSV (?produtos=a,b).
-  // `item=produto||cor` (repetido) recorta a seleção EXATA de produto x cor — usado quando o
-  // usuário escolhe itens a dedo. Sem ele, um produto entraria com todas as suas cores.
-  const itemKeys = new Set(
-    searchParams
-      .getAll('item')
-      .map((v) => v.trim())
-      .filter((v) => v.includes('||'))
-  );
+  // Aceita repetido (?produto=a&produto=b) ou CSV (?produtos=a,b). Escopo por PRODUTO: todas
+  // as cores do produto entram, e quem recorta cor é o filtro `cor` (dimensão).
   const produtoIds = Array.from(
     new Set(
-      [
-        ...searchParams.getAll('produto'),
-        ...(searchParams.get('produtos') ?? '').split(','),
-        ...Array.from(itemKeys).map((k) => k.split('||')[0]),
-      ]
+      [...searchParams.getAll('produto'), ...(searchParams.get('produtos') ?? '').split(',')]
         .map((p) => p.trim())
         .filter(Boolean)
     )
@@ -120,6 +109,19 @@ export async function GET(request: Request) {
   if (produtoIds.length === 0 && !temDimensao) {
     return NextResponse.json({ dataBase: baseParam, windows: WINDOWS, itens: [] });
   }
+  // Cada produto/valor de filtro vira um PARÂMETRO na consulta, e o SQL Server aceita no
+  // máximo ~2100 por request. Com "Selecionar tudo" ficou fácil passar disso, então o erro
+  // é explícito (a tela mostra a mensagem) em vez de estourar no driver.
+  const totalRecortes =
+    produtoIds.length + Object.values(dimensoes).reduce((soma, values) => soma + values.length, 0);
+  if (totalRecortes > 1500) {
+    return NextResponse.json(
+      {
+        error: `Escopo muito amplo: ${totalRecortes} itens selecionados (limite 1500). Use um filtro mais largo — selecionar tudo de uma dimensão equivale a não filtrar por ela.`,
+      },
+      { status: 400 }
+    );
+  }
 
   const company = await resolveCompanyDynamic(companyKey);
   if (!company) {
@@ -141,10 +143,6 @@ export async function GET(request: Request) {
     includePrevious: false as const,
     limit: 0,
   };
-  /** Fora da seleção exata de produto x cor a linha não entra na conta. */
-  const noEscopo = (produto: string, cor: string | undefined) =>
-    itemKeys.size === 0 || itemKeys.has(`${produto}||${(cor ?? '').trim()}`);
-
   const anoBase = Number(baseParam.slice(0, 4));
   const mesBase = Number(baseParam.slice(5, 7));
 
@@ -181,7 +179,6 @@ export async function GET(request: Request) {
 
     perWindow.forEach(({ dias, rows }) => {
       rows.forEach((r) => {
-        if (!noEscopo(r.produto, r.cor)) return;
         const cor = (r.cor ?? '').trim();
         const key = `${r.produto}||${cor}`;
         let item = acc.get(key);
@@ -231,9 +228,9 @@ export async function GET(request: Request) {
     for (let mes = 1; mes <= 12; mes += 1) mesesConsulta.push({ ano: anoBase - 1, mes });
     for (let mes = 1; mes <= mesBase; mes += 1) mesesConsulta.push({ ano: anoBase, mes });
 
-    // Sem seleção exata nem filtro de cor não precisa quebrar por cor — o total do mês é o
-    // mesmo e a consulta fica bem mais leve (some o join de PRODUTO_CORES).
-    const mensalPorCor = itemKeys.size > 0 || dimensoes.cores.length > 0;
+    // Sem filtro de cor não precisa quebrar por cor — o total do mês é o mesmo e a consulta
+    // fica bem mais leve (some o join de PRODUTO_CORES).
+    const mensalPorCor = dimensoes.cores.length > 0;
 
     const totaisMes = await mapLimit(mesesConsulta, 4, async ({ ano, mes }) => {
       const primeiro = `${ano}-${pad2(mes)}-01`;
@@ -246,10 +243,7 @@ export async function GET(request: Request) {
         groupByCor: mensalPorCor,
         ...escopo,
       });
-      const qtde = rows.reduce(
-        (soma, r) => (noEscopo(r.produto, r.cor) ? soma + Number(r.qtde ?? 0) : soma),
-        0
-      );
+      const qtde = rows.reduce((soma, r) => soma + Number(r.qtde ?? 0), 0);
       return { chave: `${ano}-${pad2(mes)}`, qtde: Math.round(qtde) };
     });
 

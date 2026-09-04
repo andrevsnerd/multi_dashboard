@@ -2,13 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import MultiSelectFilter, { type MultiSelectOption } from "@/components/filters/MultiSelectFilter";
 import { formatDateForQuery } from "@/lib/utils/date";
 import type { CompanyKey } from "@/lib/config/company";
 
 import styles from "./ProjecaoCompraPage.module.css";
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
+
+/** Opção de um select de dimensão. */
+interface Opcao {
+  value: string;
+  label: string;
+}
 
 interface PickerRow {
   produto: string;
@@ -77,6 +82,23 @@ const REGRA_LABEL: Record<RegraProjecao, string> = {
   "30": "Ritmo 30 dias",
 };
 
+/**
+ * Escopo JÁ APLICADO (o que gerou os números na tela). A projeção não roda a cada clique de
+ * filtro: o usuário monta o recorte e manda gerar. Isso evita disparar consulta pesada a cada
+ * item marcado — e "Selecionar tudo" marca centenas de uma vez.
+ */
+interface PedidoProjecao {
+  dataBase: string;
+  dims: DimState;
+  produtos: string[];
+}
+
+/**
+ * Teto de itens no recorte. Cada produto/valor de filtro viaja na URL e vira um parâmetro no
+ * SQL Server; passando disso a requisição nem chega ao servidor (HTTP 431).
+ */
+const MAX_RECORTES = 600;
+
 /** Janelas de ritmo que a API mede (as mesmas que o select oferece). */
 const WINDOWS_DIAS = [30, 60, 90, 120, 365] as const;
 
@@ -113,7 +135,7 @@ const EMPTY_DIMS: DimState = {
   cor: [],
   tipo: [],
 };
-const EMPTY_DIM_OPTIONS: Record<DimKey, MultiSelectOption[]> = {
+const EMPTY_DIM_OPTIONS: Record<DimKey, Opcao[]> = {
   grupo: [],
   linha: [],
   subgrupo: [],
@@ -190,11 +212,6 @@ function diasNoMes(ano: number, mes: number): number {
 const MES_NOME = [
   "jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez",
 ];
-/** 'yyyy-MM' → 'jan/26'. */
-function mesLabel(mesYm: string): string {
-  const [ano, mes] = mesYm.split("-").map(Number);
-  return `${MES_NOME[mes - 1]}/${String(ano).slice(2)}`;
-}
 function fmtPct(v: number | null, dec = 1): string {
   if (v == null || !Number.isFinite(v)) return "—";
   const sinal = v > 0 ? "+" : "";
@@ -223,20 +240,17 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   // estoque atual + as dimensões de cadastro de cada item (produto × cor).
   const [pickerRows, setPickerRows] = useState<PickerRow[]>([]);
   const [pickerLoading, setPickerLoading] = useState(false);
-  const [search, setSearch] = useState("");
-  const [searchDebounced, setSearchDebounced] = useState("");
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const pickerRef = useRef<HTMLDivElement>(null);
-
   const [dims, setDims] = useState<DimState>(EMPTY_DIMS);
-  const [dimOptions, setDimOptions] = useState<Record<DimKey, MultiSelectOption[]>>(EMPTY_DIM_OPTIONS);
+  const [dimOptions, setDimOptions] = useState<Record<DimKey, Opcao[]>>(EMPTY_DIM_OPTIONS);
   // Já nasce carregando: o efeito abaixo dispara na montagem e só desliga por dimensão.
   const [dimLoading, setDimLoading] = useState<Partial<Record<DimKey, boolean>>>(() =>
     Object.fromEntries(DIM_KEYS.map((dim) => [dim, true]))
   );
-  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  /** Seleção manual = códigos de PRODUTO (todas as cores; quem recorta cor é o filtro Cor). */
+  const [selectedProdutos, setSelectedProdutos] = useState<Set<string>>(new Set());
 
   // Projeção (unidades vendidas por janela) — vem do endpoint dedicado.
+  const [pedido, setPedido] = useState<PedidoProjecao | null>(null);
   const [projItens, setProjItens] = useState<Record<string, ProjecaoItem>>({});
   const [mensal, setMensal] = useState<MensalItem[]>([]);
   const [projLoading, setProjLoading] = useState(false);
@@ -246,24 +260,6 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   // Overrides editáveis (amarelos da planilha).
   const [estoqueOverride, setEstoqueOverride] = useState<number | null>(null);
   const [qtdOverride, setQtdOverride] = useState<Record<string, number | null>>({});
-
-  // Debounce da busca do picker.
-  useEffect(() => {
-    const t = setTimeout(() => setSearchDebounced(search.trim().toLowerCase()), 250);
-    return () => clearTimeout(t);
-  }, [search]);
-
-  // Fecha o dropdown de produtos ao clicar fora.
-  useEffect(() => {
-    if (!pickerOpen) return;
-    const onDown = (event: MouseEvent) => {
-      if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) {
-        setPickerOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [pickerOpen]);
 
   // ── Opções dos selects: um por dimensão, carregadas de uma vez (mesmos endpoints do
   //    Gerador de Relatórios), na janela de 12 meses que é o universo desta tela. Ficam
@@ -284,7 +280,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
 
       fetch(`/api/products/${DIM_ENDPOINT[dim]}?${params.toString()}`, { cache: "no-store" })
         .then((r) => r.json())
-        .then((json: { data?: Array<string | MultiSelectOption> }) => {
+        .then((json: { data?: Array<string | Opcao> }) => {
           if (cancelled) return;
           const options = (json.data ?? [])
             .map((item) =>
@@ -329,12 +325,6 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
     };
   }, [companyKey]);
 
-  const pickerByKey = useMemo(() => {
-    const map = new Map<string, PickerRow>();
-    pickerRows.forEach((p) => map.set(rowKey(p.produto, p.cor), p));
-    return map;
-  }, [pickerRows]);
-
   /** Rótulo bonito da coleção ("DESCRIÇÃO (CÓDIGO)") para os chips. */
   const colecaoLabels = useMemo(() => {
     const map = new Map<string, string>();
@@ -355,30 +345,76 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
 
   const dimFiltradas = useMemo(() => DIM_KEYS.filter((dim) => dims[dim].length > 0), [dims]);
   const temDimensao = dimFiltradas.length > 0;
-  const temSelecao = selectedKeys.size > 0;
+  const temSelecao = selectedProdutos.size > 0;
+  /** Há recorte montado na barra de filtros (ainda não necessariamente gerado). */
+  const temEscopo = temSelecao || temDimensao;
+  /** Já existe projeção na tela. */
+  const gerado = pedido !== null;
 
-  /** Itens do escopo quando ele vem dos filtros (sem seleção manual de produto). */
-  const dimScopeRows = useMemo(
-    () => (temDimensao ? pickerRows.filter((row) => matchesDims(row)) : []),
-    [temDimensao, pickerRows, matchesDims]
+  const produtosSelecionados = useMemo(
+    () => Array.from(selectedProdutos).sort(),
+    [selectedProdutos]
   );
+  const totalRecortes =
+    produtosSelecionados.length + DIM_KEYS.reduce((soma, dim) => soma + dims[dim].length, 0);
 
-  // ── Busca a projeção sempre que muda o escopo ou a data base.
-  //    venderAte e Qtd Compra são puro cálculo no cliente (não vão ao servidor).
+  /** Assinatura do recorte, para saber se mudou algo desde a última geração. */
+  const assinaturaAtual = useMemo(
+    () => JSON.stringify({ dataBase, dims, produtos: produtosSelecionados }),
+    [dataBase, dims, produtosSelecionados]
+  );
+  const assinaturaGerada = useMemo(
+    () =>
+      pedido
+        ? JSON.stringify({ dataBase: pedido.dataBase, dims: pedido.dims, produtos: pedido.produtos })
+        : null,
+    [pedido]
+  );
+  const pendente = assinaturaAtual !== assinaturaGerada;
+
+  /**
+   * Itens (produto × cor) do escopo APLICADO — é o que o estoque e a contagem devem espelhar,
+   * senão a tela mostraria estoque de um recorte e venda de outro. Os filtros de cadastro
+   * sempre valem; a seleção de produto só restringe os códigos, então sem filtro de Cor todas
+   * as cores do produto somam.
+   */
+  const scopeRows = useMemo(() => {
+    if (!pedido) return [];
+    const selecionados = new Set(pedido.produtos);
+    return pickerRows.filter(
+      (row) =>
+        DIM_KEYS.every(
+          (dim) => pedido.dims[dim].length === 0 || pedido.dims[dim].includes(dimValue(row, dim))
+        ) && (selecionados.size === 0 || selecionados.has(row.produto))
+    );
+  }, [pedido, pickerRows]);
+
+  const gerarProjecao = () => {
+    if (!temEscopo) return;
+    setPedido({ dataBase, dims, produtos: produtosSelecionados });
+  };
+
+  // ── Busca a projeção do escopo APLICADO (só roda quando o usuário manda gerar).
+  //    venderAte, Qtd Compra e a regra são puro cálculo no cliente (não vão ao servidor).
   useEffect(() => {
-    const params = new URLSearchParams({ company: companyKey, base: dataBase });
-    if (temSelecao) {
-      // Seleção manual manda: projeta exatamente os itens escolhidos (produto × cor).
-      selectedKeys.forEach((key) => params.append("item", key));
-    } else if (temDimensao) {
-      // Sem seleção, o recorte de cadastro vai para o SQL (nada de listar milhares de códigos).
-      DIM_KEYS.forEach((dim) => dims[dim].forEach((v) => params.append(dim, v)));
-    } else {
+    if (!pedido) return;
+    const recortes =
+      pedido.produtos.length + DIM_KEYS.reduce((soma, dim) => soma + pedido.dims[dim].length, 0);
+    if (recortes > MAX_RECORTES) {
       setProjItens({});
       setMensal([]);
-      setProjErro(null);
+      setProjErro(
+        `Escopo muito amplo: ${fmt(recortes)} itens no recorte (limite ${fmt(MAX_RECORTES)}). ` +
+          `Selecionar tudo de uma dimensão equivale a não filtrar por ela — deixe o filtro em "Todos".`
+      );
       return;
     }
+    // Filtros de cadastro e seleção de produto se SOMAM no SQL: o produto restringe os
+    // códigos, o filtro Cor (quando marcado) restringe as cores. Sem filtro de Cor, o
+    // servidor devolve todas as cores do produto e a tela soma.
+    const params = new URLSearchParams({ company: companyKey, base: pedido.dataBase });
+    DIM_KEYS.forEach((dim) => pedido.dims[dim].forEach((v) => params.append(dim, v)));
+    pedido.produtos.forEach((produto) => params.append("produto", produto));
 
     let cancelled = false;
     setProjLoading(true);
@@ -410,68 +446,62 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [companyKey, dataBase, selectedKeys, dims, temSelecao, temDimensao]);
+  }, [companyKey, pedido]);
 
-  // Trocar a data base ou o escopo zera os overrides (a base de cálculo mudou).
+  // Gerar de novo zera os ajustes manuais (a base de cálculo mudou).
   useEffect(() => {
     setEstoqueOverride(null);
     setQtdOverride({});
-  }, [dataBase, selectedKeys, dims]);
+  }, [pedido]);
 
-  // ── Itens selecionados resolvidos (metadados do picker + janelas da projeção).
+  // ── Produtos do escopo APLICADO: descrição, código e estoque somando as cores do recorte.
   const selectedItems = useMemo(() => {
-    return Array.from(selectedKeys)
-      .map((key) => {
-        const picker = pickerByKey.get(key);
-        const proj = projItens[key];
-        const produto = key.split("||")[0];
-        const cor = key.split("||")[1] ?? "";
-        return {
-          key,
-          produto,
-          cor,
-          descricao: picker?.descricao || proj?.descricao || produto,
-          corDescricao: picker?.corDescricao || proj?.corDescricao || cor,
-          codigoBarra: picker?.codigoBarra || proj?.codigoBarra || "",
-          grade: picker?.grade || proj?.grade || "",
-          estoque: Math.max(0, picker?.estoque ?? 0),
-          janelas: proj?.janelas ?? {},
-        };
-      })
-      .sort((a, b) => a.descricao.localeCompare(b.descricao, "pt-BR"));
-  }, [selectedKeys, pickerByKey, projItens]);
+    const porProduto = new Map<
+      string,
+      { produto: string; descricao: string; codigoBarra: string; grade: string; estoque: number; cores: number }
+    >();
+    scopeRows.forEach((row) => {
+      const atual = porProduto.get(row.produto);
+      if (atual) {
+        atual.estoque += Math.max(0, row.estoque ?? 0);
+        atual.cores += 1;
+        if (!atual.codigoBarra && row.codigoBarra) atual.codigoBarra = row.codigoBarra;
+        return;
+      }
+      porProduto.set(row.produto, {
+        produto: row.produto,
+        descricao: row.descricao || row.produto,
+        codigoBarra: row.codigoBarra ?? "",
+        grade: row.grade ?? "",
+        estoque: Math.max(0, row.estoque ?? 0),
+        cores: 1,
+      });
+    });
+    return Array.from(porProduto.values()).sort((a, b) =>
+      a.descricao.localeCompare(b.descricao, "pt-BR")
+    );
+  }, [scopeRows]);
 
   // ── Agregado do escopo: estoque somado + unidades vendidas somadas por janela.
-  //    Seleção manual → só os itens escolhidos. Filtros → tudo o que o SQL devolveu.
+  //    O servidor já devolve exatamente o escopo (produtos × filtros), então soma-se TUDO.
   const agregado = useMemo(() => {
     const unidades: Record<number, number> = {};
-    if (temSelecao) {
-      const estoqueSomado = selectedItems.reduce((s, it) => s + it.estoque, 0);
-      WINDOWS_DIAS.forEach((dias) => {
-        // Piso 0 no TOTAL (não por item): a quantidade líquida de um item pode ser negativa
-        // quando houve mais troca que venda, e descartar essas linhas antes de somar infla o
-        // total — ver [[vendas-nunca-filtrar-linhas-da-regra-global]].
-        unidades[dias] = Math.max(
-          0,
-          selectedItems.reduce((s, it) => s + (Number(it.janelas[String(dias)] ?? 0) || 0), 0)
-        );
-      });
-      return { estoqueSomado, unidades, itens: selectedItems.length };
-    }
     const projList = Object.values(projItens);
     WINDOWS_DIAS.forEach((dias) => {
+      // Piso 0 no TOTAL (não por item): a quantidade líquida de um item pode ser negativa
+      // quando houve mais troca que venda, e descartar essas linhas antes de somar infla o
+      // total — ver [[vendas-nunca-filtrar-linhas-da-regra-global]].
       unidades[dias] = Math.max(
         0,
         projList.reduce((s, it) => s + (Number(it.janelas[String(dias)] ?? 0) || 0), 0)
       );
     });
-    const estoqueSomado = dimScopeRows.reduce((s, row) => s + Math.max(0, row.estoque ?? 0), 0);
-    return { estoqueSomado, unidades, itens: Math.max(dimScopeRows.length, projList.length) };
-  }, [temSelecao, selectedItems, projItens, dimScopeRows]);
+    const estoqueSomado = scopeRows.reduce((s, row) => s + Math.max(0, row.estoque ?? 0), 0);
+    return { estoqueSomado, unidades, itens: Math.max(scopeRows.length, projList.length) };
+  }, [projItens, scopeRows]);
 
   const estoqueAtual = estoqueOverride ?? agregado.estoqueSomado;
   const diasHorizonte = Math.max(0, diffDays(dataBase, venderAte));
-  const hasScope = temSelecao || temDimensao;
   const anoBase = Number(dataBase.slice(0, 4));
 
   // ── Regra comparativa (crescimento YoY) ───────────────────────────────────
@@ -631,308 +661,319 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
     const anoAnterior = mensalRows.reduce((s, r) => s + r.qtdeAnoAnterior, 0);
     const realizado = mensalRows.reduce((s, r) => s + (r.futuro ? 0 : r.qtde), 0);
     const ano = mensalRows.reduce((s, r) => s + r.valorAno, 0);
-    // O que ainda falta vender no ano: meses futuros inteiros + o resto do mês em curso.
-    const projetadoRestante = mensalRows.reduce(
-      (s, r) => s + (r.futuro ? r.projetado ?? 0 : Math.max(0, r.valorAno - r.qtde)),
-      0
-    );
     return {
       anoAnterior,
       realizado,
       ano,
-      projetadoRestante,
       variacao: anoAnterior > 0 ? ano / anoAnterior - 1 : null,
     };
   }, [mensalRows]);
 
-  // ── Picker: universo já recortado pelos filtros de dimensão + busca textual.
-  const pickerFiltered = useMemo(() => {
-    let rows = pickerRows.filter((row) => matchesDims(row));
-    if (searchDebounced) {
-      rows = rows.filter((p) => {
-        const hay = `${p.descricao ?? ""} ${p.produto ?? ""} ${p.codigoBarra ?? ""} ${p.corDescricao ?? ""} ${p.subgrupo ?? ""} ${p.colecao ?? ""}`.toLowerCase();
-        return hay.includes(searchDebounced);
+  /**
+   * Opções do select de produto: uma por PRODUTO (não produto × cor), já recortadas pelos
+   * filtros de cadastro. A busca textual fica dentro do dropdown.
+   */
+  const produtoOptions = useMemo(() => {
+    const porProduto = new Map<string, { value: string; label: string; busca: string; meta: string[] }>();
+    const cores = new Map<string, number>();
+    const estoques = new Map<string, number>();
+    pickerRows
+      .filter((row) => matchesDims(row))
+      .forEach((row) => {
+        cores.set(row.produto, (cores.get(row.produto) ?? 0) + 1);
+        estoques.set(row.produto, (estoques.get(row.produto) ?? 0) + Math.max(0, row.estoque ?? 0));
+        if (porProduto.has(row.produto)) return;
+        porProduto.set(row.produto, {
+          value: row.produto,
+          label: row.descricao || row.produto,
+          busca: `${row.descricao ?? ""} ${row.produto} ${row.codigoBarra ?? ""} ${row.subgrupo ?? ""} ${row.colecao ?? ""}`,
+          meta: [(row.codigoBarra || row.produto).trim()],
+        });
       });
-    }
-    return rows;
-  }, [pickerRows, matchesDims, searchDebounced]);
-  const pickerVisible = useMemo(() => pickerFiltered.slice(0, 120), [pickerFiltered]);
+    return Array.from(porProduto.values())
+      .map((opt) => {
+        const qtdCores = cores.get(opt.value) ?? 0;
+        return {
+          ...opt,
+          meta: [
+            ...opt.meta,
+            `${qtdCores} ${qtdCores === 1 ? "cor" : "cores"}`,
+            `${fmt(estoques.get(opt.value) ?? 0)} un`,
+          ],
+        };
+      })
+      .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
+  }, [pickerRows, matchesDims]);
 
-  const toggleKey = (key: string) =>
-    setSelectedKeys((prev) => {
+  /** Chips da barra de filtros: refletem a seleção ao vivo, não o que já foi gerado. */
+  const chipsProdutos = useMemo(() => {
+    const labels = new Map(produtoOptions.map((o) => [o.value, o.label] as const));
+    return produtosSelecionados
+      .map((produto) => ({ produto, label: labels.get(produto) ?? produto }))
+      .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
+  }, [produtosSelecionados, produtoOptions]);
+
+  const toggleProduto = (produto: string) =>
+    setSelectedProdutos((prev) => {
       const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
+      if (next.has(produto)) next.delete(produto);
+      else next.add(produto);
       return next;
     });
 
   const limparTudo = () => {
-    setSelectedKeys(new Set());
+    setSelectedProdutos(new Set());
     setDims(EMPTY_DIMS);
-    setSearch("");
   };
 
-  const soUm = temSelecao && selectedItems.length === 1 ? selectedItems[0] : null;
+  const soUm = selectedItems.length === 1 ? selectedItems[0] : null;
 
   return (
     <div className={styles.wrapper}>
-      {/* Header */}
+      {/* ── Parâmetros + filtros (uma só superfície) ─────────────────────── */}
       <div className={styles.headerCard}>
-        <div className={styles.titleRow}>
-          <h1 className={styles.title}>Projeção Compra</h1>
-          <span
-            className={`${styles.loadingCue} ${projLoading || pickerLoading ? styles.loadingCueActive : ""}`}
-            role="status"
-          >
-            <span className={styles.spinner} aria-hidden="true" />
-            Calculando…
-          </span>
-        </div>
-        <p className={styles.subtitle}>
-          Escolha o escopo — pelos filtros de cadastro (grupo, linha, subgrupo, grade, coleção, cor,
-          tipo) ou por produtos específicos (um ou vários) — e veja quanto comprar para o estoque
-          durar até a data alvo. O ritmo é medido em várias janelas (loja + e-commerce) com a venda
-          validada global. Mude a data ou a quantidade e tudo recalcula na hora.
-        </p>
-      </div>
-
-      {/* Menus (acima da tabela) */}
-      <div className={styles.toolbar}>
-        <div className={styles.toolbarRow}>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>Data base</span>
-            <input
-              type="date"
-              className={styles.input}
-              value={dataBase}
-              onChange={(e) => e.target.value && setDataBase(e.target.value)}
-            />
-          </label>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>Vender até</span>
-            <input
-              type="date"
-              className={styles.input}
-              value={venderAte}
-              min={dataBase}
-              onChange={(e) => e.target.value && setVenderAte(e.target.value)}
-            />
-          </label>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>Estoque atual (un)</span>
-            <input
-              type="number"
-              className={styles.input}
-              value={estoqueAtual}
-              min={0}
-              disabled={!hasScope}
-              onChange={(e) => {
-                const v = e.target.value === "" ? null : Math.max(0, Math.round(Number(e.target.value)));
-                setEstoqueOverride(Number.isNaN(v as number) ? null : v);
-              }}
-            />
-          </label>
-          <div className={styles.field}>
-            <span className={styles.fieldLabel}>Dias no horizonte</span>
-            <span className={styles.computed}>{fmt(diasHorizonte)}</span>
-          </div>
-          {estoqueOverride !== null && hasScope && (
-            <button type="button" className={styles.resetLink} onClick={() => setEstoqueOverride(null)}>
-              ↺ voltar ao estoque real ({fmt(agregado.estoqueSomado)} un)
-            </button>
-          )}
-        </div>
-
-        {/* Um select por dimensão (só some quando a empresa não tem opção nenhuma) */}
-        <div className={styles.toolbarRow}>
-          {DIM_KEYS.map((dim) =>
-            dimOptions[dim].length > 0 || dims[dim].length > 0 ? (
-              <MultiSelectFilter
-                key={dim}
-                label={DIM_LABEL[dim]}
-                value={dims[dim]}
-                options={dimOptions[dim]}
-                loading={!!dimLoading[dim]}
-                onChange={(values) => setDims((prev) => ({ ...prev, [dim]: values }))}
+        <div className={styles.topBar}>
+          <div className={styles.topFields}>
+            <label className={styles.field}>
+              <span className={styles.fieldLabel}>Data base</span>
+              <input
+                type="date"
+                className={styles.input}
+                value={dataBase}
+                onChange={(e) => e.target.value && setDataBase(e.target.value)}
               />
-            ) : null
-          )}
-
-          {/* Picker de produtos (produto × cor), multi-seleção */}
-          <div className={styles.produtoPicker} ref={pickerRef}>
-            <span className={styles.fieldLabel}>Produtos</span>
-            <button
-              type="button"
-              className={`${styles.pickerButton} ${pickerOpen ? styles.pickerButtonActive : ""}`}
-              onClick={() => setPickerOpen((prev) => !prev)}
-            >
-              <span>
-                {selectedItems.length === 0
-                  ? "Todos do filtro"
-                  : selectedItems.length === 1
-                  ? selectedItems[0].descricao
-                  : `${selectedItems.length} itens`}
+            </label>
+            <label className={styles.field}>
+              <span className={styles.fieldLabel}>Vender até</span>
+              <input
+                type="date"
+                className={styles.input}
+                value={venderAte}
+                min={dataBase}
+                onChange={(e) => e.target.value && setVenderAte(e.target.value)}
+              />
+            </label>
+            <label className={styles.field}>
+              <span className={styles.fieldLabel}>
+                Estoque atual
+                {estoqueOverride !== null && gerado && (
+                  <button
+                    type="button"
+                    className={styles.resetLink}
+                    title={`Voltar ao estoque real (${fmt(agregado.estoqueSomado)} un)`}
+                    onClick={() => setEstoqueOverride(null)}
+                  >
+                    ↺
+                  </button>
+                )}
               </span>
-              <span>▼</span>
-            </button>
-            {pickerOpen && (
-              <div className={styles.pickerDropdown}>
-                <div className={styles.searchBox}>
-                  <input
-                    className={styles.searchInput}
-                    type="text"
-                    placeholder="Buscar produto, código, cor…"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                  {search && (
-                    <button
-                      type="button"
-                      className={styles.searchClear}
-                      onClick={() => setSearch("")}
-                      aria-label="Limpar"
-                    >
-                      ×
-                    </button>
-                  )}
-                </div>
-                <div className={styles.pickerList}>
-                  {pickerLoading ? (
-                    <div className={styles.pickerEmpty}>Carregando produtos…</div>
-                  ) : pickerVisible.length === 0 ? (
-                    <div className={styles.pickerEmpty}>Nenhum produto encontrado.</div>
-                  ) : (
-                    pickerVisible.map((p) => {
-                      const key = rowKey(p.produto, p.cor);
-                      const checked = selectedKeys.has(key);
-                      return (
-                        <label
-                          key={key}
-                          className={`${styles.pickerRow} ${checked ? styles.pickerRowActive : ""}`}
-                        >
-                          <input type="checkbox" checked={checked} onChange={() => toggleKey(key)} />
-                          <span className={styles.pickerInfo}>
-                            <span className={styles.pickerName}>{p.descricao || p.produto}</span>
-                            <span className={styles.pickerMeta}>
-                              {(p.corDescricao || p.cor) && <span>{p.corDescricao || p.cor}</span>}
-                              <span>{(p.codigoBarra || p.produto).trim()}</span>
-                              <span>{fmt(Math.max(0, p.estoque ?? 0))} un</span>
-                            </span>
-                          </span>
-                        </label>
-                      );
-                    })
-                  )}
-                </div>
-                <div className={styles.pickerFoot}>
-                  <span>
-                    {fmt(pickerFiltered.length)} itens no filtro
-                    {pickerFiltered.length > pickerVisible.length
-                      ? ` · mostrando ${fmt(pickerVisible.length)}, busque para refinar`
-                      : ""}
-                  </span>
-                  {temSelecao && (
-                    <button
-                      type="button"
-                      className={styles.pickerFootAction}
-                      onClick={() => setSelectedKeys(new Set())}
-                    >
-                      limpar seleção
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
+              <input
+                type="number"
+                className={`${styles.input} ${styles.inputNum}`}
+                value={estoqueAtual}
+                min={0}
+                disabled={!gerado}
+                onChange={(e) => {
+                  const v = e.target.value === "" ? null : Math.max(0, Math.round(Number(e.target.value)));
+                  setEstoqueOverride(Number.isNaN(v as number) ? null : v);
+                }}
+              />
+            </label>
+            <div className={styles.field}>
+              <span className={styles.fieldLabel}>Horizonte</span>
+              <span className={styles.pill}>{fmt(diasHorizonte)} dias</span>
+            </div>
           </div>
 
-          {hasScope && (
-            <button type="button" className={styles.clearAll} onClick={limparTudo}>
-              Limpar filtros
-            </button>
-          )}
+          {/* Produto: seleção por código (todas as cores entram) */}
+          <MultiSelect
+            variant="field"
+            label="Produto"
+            options={produtoOptions}
+            value={produtosSelecionados}
+            onChange={(values) => setSelectedProdutos(new Set(values))}
+            loading={pickerLoading}
+            searchPlaceholder="Buscar produto, código…"
+            vazioLabel="Todos"
+            unidade="produto"
+            unidadePlural="produtos"
+            largura="lg"
+          />
         </div>
 
-        {/* Chips do escopo ativo */}
-        {hasScope && (
-          <div className={styles.chips}>
-            {dimFiltradas.flatMap((dim) =>
-              dims[dim].map((value) => (
-                <button
-                  key={`${dim}:${value}`}
-                  type="button"
-                  className={styles.chip}
-                  title={`Remover filtro de ${DIM_LABEL[dim]}`}
-                  onClick={() =>
-                    setDims((prev) => ({ ...prev, [dim]: prev[dim].filter((v) => v !== value) }))
-                  }
-                >
-                  <span className={styles.chipDim}>{DIM_LABEL[dim]}</span>
-                  {dimChipLabel(dim, value)} ×
-                </button>
-              ))
-            )}
-            {temSelecao && temDimensao && (
-              <span className={styles.chipNote}>
-                com produtos selecionados, os filtros só recortam a busca — a projeção usa os itens
-                escolhidos
-              </span>
-            )}
-            {selectedItems.map((it) => (
+        {/* ── Filtros de cadastro (pílulas) ──────────────────────────────── */}
+        <div className={styles.filterBar}>
+          {DIM_KEYS.map((dim) => (
+            <MultiSelect
+              key={dim}
+              variant="pill"
+              label={DIM_LABEL[dim]}
+              options={dimOptions[dim]}
+              value={dims[dim]}
+              loading={!!dimLoading[dim]}
+              onChange={(values) => setDims((prev) => ({ ...prev, [dim]: values }))}
+              searchPlaceholder={`Buscar ${DIM_LABEL[dim].toLowerCase()}…`}
+              vazioLabel="Todos"
+            />
+          ))}
+
+          {dimFiltradas.flatMap((dim) =>
+            dims[dim].map((value) => (
               <button
-                key={it.key}
+                key={`${dim}:${value}`}
                 type="button"
-                className={`${styles.chip} ${styles.chipProduto}`}
-                title="Remover da seleção"
-                onClick={() => toggleKey(it.key)}
+                className={styles.chip}
+                title={`Remover ${DIM_LABEL[dim]}`}
+                onClick={() => setDims((prev) => ({ ...prev, [dim]: prev[dim].filter((v) => v !== value) }))}
               >
-                {it.descricao}
-                {it.corDescricao || it.cor ? ` · ${it.corDescricao || it.cor}` : ""} ×
+                {dimChipLabel(dim, value)}
+                <span className={styles.chipX}>×</span>
               </button>
-            ))}
-          </div>
-        )}
+            ))
+          )}
+          {chipsProdutos.map((it) => (
+            <button
+              key={it.produto}
+              type="button"
+              className={styles.chip}
+              title="Remover da seleção"
+              onClick={() => toggleProduto(it.produto)}
+            >
+              {it.label}
+              <span className={styles.chipX}>×</span>
+            </button>
+          ))}
+          {temEscopo && (
+            <button type="button" className={styles.linkAction} onClick={limparTudo}>
+              Limpar
+            </button>
+          )}
+
+          <button
+            type="button"
+            className={styles.btnGerar}
+            onClick={gerarProjecao}
+            disabled={!temEscopo || projLoading || (gerado && !pendente)}
+            title={
+              !temEscopo
+                ? "Monte um recorte primeiro"
+                : gerado && !pendente
+                ? "Nada mudou desde a última projeção"
+                : `Gerar projeção (${fmt(totalRecortes)} ${totalRecortes === 1 ? "item" : "itens"} no recorte)`
+            }
+          >
+            {projLoading ? "Gerando…" : "Gerar projeção"}
+          </button>
+        </div>
       </div>
 
-      {/* Projeção (tabela em tela cheia) */}
-      {!hasScope ? (
+      {/* ── Título + escopo ──────────────────────────────────────────────── */}
+      <div className={styles.titleBar}>
+        <h1 className={styles.title}>Projeção Compra</h1>
+        {gerado && (
+          <span className={styles.scopeText}>
+            {soUm ? (
+              <>
+                {soUm.descricao}
+                {soUm.codigoBarra && <> · cód. {soUm.codigoBarra}</>}
+                {soUm.grade && <> · {soUm.grade}</>}
+                {soUm.cores > 0 && (
+                  <>
+                    {" · "}
+                    {soUm.cores} {soUm.cores === 1 ? "cor" : "cores"}
+                  </>
+                )}
+                {" · "}estoque {fmt(estoqueAtual)} un
+              </>
+            ) : (
+              <>
+                {fmt(agregado.itens)} itens · estoque {fmt(estoqueAtual)} un
+              </>
+            )}
+          </span>
+        )}
+        <span
+          className={`${styles.loadingCue} ${projLoading || pickerLoading ? styles.loadingCueActive : ""}`}
+          role="status"
+        >
+          <span className={styles.spinner} aria-hidden="true" />
+          calculando
+        </span>
+      </div>
+
+      {!gerado ? (
         <div className={styles.emptyPanel}>
-          <div className={styles.emptyIcon}>🎯</div>
-          <div className={styles.emptyTitle}>Escolha um escopo para projetar</div>
+          <div className={styles.emptyTitle}>Monte o recorte e gere a projeção</div>
           <div className={styles.emptyText}>
-            Use os filtros de cadastro acima — grupo, linha, subgrupo, grade, coleção, cor, tipo — ou
-            selecione produtos específicos. Tudo o que estiver no escopo é somado num único bloco de
-            compra.
+            Filtre por cadastro ou selecione produtos e clique em <strong>Gerar projeção</strong>.
           </div>
         </div>
       ) : (
-        <div className={styles.projCard}>
-          {/* Cabeçalho do escopo */}
-          <div className={styles.projHead}>
-            <div className={styles.projTitle}>Análise de giro e sugestão de compra</div>
-            {soUm ? (
-              <div className={styles.projSubtitle}>
-                <strong>{soUm.descricao}</strong>
-                {(soUm.corDescricao || soUm.cor) && <> · {soUm.corDescricao || soUm.cor}</>}
-                {soUm.codigoBarra && <> · cód. {soUm.codigoBarra}</>}
-                {soUm.grade && <> · {soUm.grade}</>}
-                {" · "}estoque <strong>{fmt(estoqueAtual)}</strong> un · vender até{" "}
-                <strong>{ymdToBr(venderAte)}</strong> ({fmt(diasHorizonte)} dias)
-              </div>
-            ) : (
-              <div className={styles.projSubtitle}>
-                <strong>{fmt(agregado.itens)}</strong> itens (produto × cor) somados · estoque{" "}
-                <strong>{fmt(estoqueAtual)}</strong> un · vender até{" "}
-                <strong>{ymdToBr(venderAte)}</strong> ({fmt(diasHorizonte)} dias)
-              </div>
-            )}
-          </div>
-
+        <>
           {projErro && <div className={styles.erro}>{projErro}</div>}
 
-          {/* Regra do ritmo (select) + a linha calculada */}
-          <div className={styles.regraBar}>
-            <label className={styles.regraField}>
-              <span className={styles.fieldLabel}>Regra do ritmo</span>
+          {/* ── KPIs ──────────────────────────────────────────────────────── */}
+          <div className={styles.kpiStrip}>
+            <div className={styles.kpi}>
+              <span className={styles.kpiLabel}>Sugestão de compra</span>
+              <span className={styles.kpiValue}>
+                {linhaAtiva.disponivel ? fmt(linhaAtiva.sugestao) : "—"}
+              </span>
+              <span className={styles.kpiHint}>un para durar o horizonte</span>
+            </div>
+            <div className={styles.kpi}>
+              <span className={styles.kpiLabel}>
+                {linhaAtiva.yoy ? "Projeção que falta" : "Unidades da janela"}
+              </span>
+              <span className={styles.kpiValue}>{linhaAtiva.disponivel ? fmt(linhaAtiva.un) : "—"}</span>
+              <span className={styles.kpiHint}>
+                {linhaAtiva.yoy ? "un no horizonte" : `un em ${fmt(linhaAtiva.dias)} dias`}
+              </span>
+            </div>
+            <div className={styles.kpi}>
+              <span className={styles.kpiLabel}>Ritmo</span>
+              <span className={styles.kpiValue}>
+                {linhaAtiva.disponivel ? fmtDec(linhaAtiva.ritmoDia) : "—"}
+                <span className={styles.kpiUnit}>un/dia</span>
+              </span>
+              <span className={styles.kpiHint}>
+                {linhaAtiva.disponivel ? `${fmtDec(linhaAtiva.ritmoMes, 1)} un/mês` : "—"}
+              </span>
+            </div>
+            <div className={styles.kpi}>
+              <span className={styles.kpiLabel}>Cobertura</span>
+              <span className={styles.kpiValue}>
+                {linhaAtiva.cobertura !== null ? fmt(linhaAtiva.cobertura) : "—"}
+                {linhaAtiva.cobertura !== null && <span className={styles.kpiUnit}>dias</span>}
+              </span>
+            </div>
+            <div className={styles.kpi}>
+              <span className={styles.kpiLabel}>Dura até</span>
+              <span className={styles.kpiValue}>{linhaAtiva.duraAte ?? "—"}</span>
+            </div>
+            <div className={styles.kpi}>
+              <span className={styles.kpiLabel}>Crescimento médio</span>
+              <span
+                className={`${styles.kpiValue} ${
+                  crescimento.media == null ? "" : crescimento.media >= 0 ? styles.varUp : styles.varDown
+                }`}
+              >
+                {fmtPct(crescimento.media)}
+              </span>
+              <span className={styles.kpiHint}>
+                {crescimento.meses.length > 0
+                  ? `${fmt(crescimento.meses.length)} ${
+                      crescimento.meses.length === 1 ? "mês fechado" : "meses fechados"
+                    }`
+                  : "sem base comparável"}
+              </span>
+            </div>
+          </div>
+
+          {/* ── Regra de cálculo ─────────────────────────────────────────── */}
+          <div className={styles.card}>
+            <div className={styles.cardHead}>
+              <span className={styles.cardTitle}>Regra de cálculo</span>
               <select
                 className={styles.select}
                 value={regra}
@@ -944,189 +985,119 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
                   </option>
                 ))}
               </select>
-            </label>
-            <div className={styles.regraNota}>
-              {regra === "yoy" ? (
-                crescimento.media != null ? (
-                  <>
-                    Crescimento médio <strong>{fmtPct(crescimento.media)}</strong> em{" "}
-                    <strong>{fmt(crescimento.meses.length)}</strong>{" "}
-                    {crescimento.meses.length === 1 ? "mês fechado" : "meses fechados"} contra o
-                    mesmo mês do ano anterior, aplicado mês a mês até {ymdToBr(venderAte)}.
-                  </>
-                ) : (
-                  <>Sem mês comparável no ano anterior para medir crescimento neste escopo.</>
-                )
-              ) : (
-                <>
-                  Ritmo medido nos últimos {fmt(Number(regra))} dias antes da data base, mantido
-                  constante até {ymdToBr(venderAte)}.
-                </>
-              )}
             </div>
-          </div>
-
-          <div className={styles.tableScroll}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th className={styles.thLeft}>Regra</th>
-                  <th>Dias</th>
-                  <th>Unidades</th>
-                  <th>Ritmo (un/dia)</th>
-                  <th>Ritmo (un/mês)</th>
-                  <th>Sugestão compra</th>
-                  <th>Qtd Compra</th>
-                  <th>Cobertura (dias)</th>
-                  <th>Dura até</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className={styles.rowBase}>
-                  <td className={styles.tdLeft}>{REGRA_LABEL[regra]}</td>
-                  <td className={styles.num}>{fmt(linhaAtiva.dias)}</td>
-                  <td
-                    className={styles.num}
-                    title={
-                      linhaAtiva.yoy
-                        ? "Unidades PROJETADAS no horizonte pela regra de crescimento"
-                        : "Unidades vendidas na janela (venda líquida validada, com trocas)"
-                    }
-                  >
-                    {linhaAtiva.disponivel ? (
-                      <>
-                        {fmt(linhaAtiva.un)}
-                        {linhaAtiva.yoy && <span className={styles.projTag}>proj.</span>}
-                      </>
-                    ) : (
-                      <span className={styles.muted}>—</span>
-                    )}
-                  </td>
-                  <td className={styles.num}>
-                    {linhaAtiva.disponivel ? fmtDec(linhaAtiva.ritmoDia) : <span className={styles.muted}>—</span>}
-                  </td>
-                  <td className={styles.num}>
-                    {linhaAtiva.disponivel ? fmtDec(linhaAtiva.ritmoMes, 1) : <span className={styles.muted}>—</span>}
-                  </td>
-                  <td className={`${styles.num} ${styles.sugestao}`}>
-                    {linhaAtiva.disponivel ? fmt(linhaAtiva.sugestao) : <span className={styles.muted}>—</span>}
-                  </td>
-                  <td className={styles.num}>
-                    <input
-                      type="number"
-                      className={`${styles.qtdInput} ${linhaAtiva.editado ? styles.qtdInputEdited : ""}`}
-                      value={linhaAtiva.qtd}
-                      min={0}
-                      disabled={!linhaAtiva.disponivel}
-                      onChange={(e) => {
-                        const raw = e.target.value;
-                        setQtdOverride((prev) => ({
-                          ...prev,
-                          [regra]: raw === "" ? 0 : Math.max(0, Math.round(Number(raw))),
-                        }));
-                      }}
-                    />
-                  </td>
-                  <td className={styles.num}>
-                    {linhaAtiva.cobertura !== null ? fmt(linhaAtiva.cobertura) : <span className={styles.muted}>—</span>}
-                  </td>
-                  <td className={styles.num}>{linhaAtiva.duraAte ?? <span className={styles.muted}>—</span>}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div className={styles.footNote}>
-            Como usar: altere <strong>Qtd Compra</strong> (ou o estoque / as datas) e as colunas{" "}
-            <strong>Cobertura</strong> e <strong>Dura até</strong> se ajustam sozinhas. A{" "}
-            <strong>Sugestão de compra</strong> é a quantidade para o estoque durar exatamente até{" "}
-            <strong>Vender até</strong>. Ritmo = unidades vendidas na janela ÷ dias (loja +
-            e-commerce), pela venda líquida validada global (com trocas). O{" "}
-            <strong>estoque</strong> do escopo soma os itens com venda nos últimos 12 meses (saldos
-            positivos da rede) — ajuste o campo à mão quando quiser outro cenário. Na regra{" "}
-            <strong>Crescimento YoY</strong> não existe janela de dias: os <em>Dias</em> são o
-            próprio horizonte e as <em>Unidades</em> já são a projeção mês a mês até{" "}
-            <strong>Vender até</strong>.
-          </div>
-        </div>
-      )}
-
-      {/* Vendas por mês: meses em COLUNAS, quantidade + % de crescimento na mesma célula */}
-      {hasScope && (
-        <div className={styles.projCard}>
-          <div className={styles.mensalHead}>
-            <div>
-              <div className={styles.projTitle}>Vendas por mês — {anoBase}</div>
-              <div className={styles.mensalSubtitle}>
-                Cada célula traz a quantidade e o crescimento sobre o mesmo mês do ano anterior.
-                Mês fechado é realizado; o mês em curso vai até {ymdToBr(dataBase)}; os que faltam
-                são projeção por <strong>{REGRA_LABEL[regra]}</strong>.
-              </div>
-            </div>
-            <div className={styles.mensalKpis}>
-              <div className={styles.kpi}>
-                <span className={styles.kpiLabel}>Crescimento médio</span>
-                <span className={styles.kpiValue}>{fmtPct(crescimento.media)}</span>
-                <span className={styles.kpiHint}>
-                  {crescimento.meses.length > 0
-                    ? `${fmt(crescimento.meses.length)} ${
-                        crescimento.meses.length === 1 ? "mês fechado" : "meses fechados"
-                      }`
-                    : "sem base comparável"}
-                </span>
-              </div>
-              <div className={styles.kpi}>
-                <span className={styles.kpiLabel}>Projeção que falta</span>
-                <span className={styles.kpiValue}>
-                  {fmt(Math.round(mensalTotais.projetadoRestante))}
-                </span>
-                <span className={styles.kpiHint}>un até dez/{String(anoBase).slice(2)}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className={styles.tableScroll}>
-            <table className={`${styles.table} ${styles.mensalTable}`}>
-              <thead>
-                <tr>
-                  <th className={`${styles.thLeft} ${styles.stickyCol}`}>Série</th>
-                  {mensalRows.map((m) => (
-                    <th key={m.mes} className={m.futuro ? styles.thFuturo : undefined}>
-                      {mesLabel(m.mes)}
-                    </th>
-                  ))}
-                  <th className={styles.thTotal}>Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {mensalRows.length === 0 ? (
+            <div className={styles.tableScroll}>
+              <table className={`${styles.table} ${styles.regraTable}`}>
+                <thead>
                   <tr>
-                    <td className={`${styles.tdLeft} ${styles.stickyCol}`} colSpan={14}>
-                      <span className={styles.muted}>
-                        {projLoading
-                          ? "Carregando a série mensal…"
-                          : "Sem série mensal para o escopo."}
-                      </span>
-                    </td>
+                    <th>Dias</th>
+                    <th>Unidades</th>
+                    <th>Ritmo un/dia</th>
+                    <th>Ritmo un/mês</th>
+                    <th>Sugestão</th>
+                    <th>Qtd compra</th>
+                    <th>Cobertura</th>
+                    <th>Dura até</th>
                   </tr>
-                ) : (
-                  <>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className={styles.num}>{fmt(linhaAtiva.dias)}</td>
+                    <td className={styles.num}>
+                      {linhaAtiva.disponivel ? (
+                        <>
+                          {fmt(linhaAtiva.un)}
+                          {linhaAtiva.yoy && <span className={styles.tag}>proj.</span>}
+                        </>
+                      ) : (
+                        <span className={styles.muted}>—</span>
+                      )}
+                    </td>
+                    <td className={styles.num}>
+                      {linhaAtiva.disponivel ? fmtDec(linhaAtiva.ritmoDia) : <span className={styles.muted}>—</span>}
+                    </td>
+                    <td className={styles.num}>
+                      {linhaAtiva.disponivel ? (
+                        fmtDec(linhaAtiva.ritmoMes, 1)
+                      ) : (
+                        <span className={styles.muted}>—</span>
+                      )}
+                    </td>
+                    <td className={styles.num}>
+                      {linhaAtiva.disponivel ? fmt(linhaAtiva.sugestao) : <span className={styles.muted}>—</span>}
+                    </td>
+                    <td className={styles.num}>
+                      <input
+                        type="number"
+                        className={`${styles.qtdInput} ${linhaAtiva.editado ? styles.qtdInputEdited : ""}`}
+                        value={linhaAtiva.qtd}
+                        min={0}
+                        disabled={!linhaAtiva.disponivel}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          setQtdOverride((prev) => ({
+                            ...prev,
+                            [regra]: raw === "" ? 0 : Math.max(0, Math.round(Number(raw))),
+                          }));
+                        }}
+                      />
+                    </td>
+                    <td className={styles.num}>
+                      {linhaAtiva.cobertura !== null ? (
+                        `${fmt(linhaAtiva.cobertura)}d`
+                      ) : (
+                        <span className={styles.muted}>—</span>
+                      )}
+                    </td>
+                    <td className={styles.num}>{linhaAtiva.duraAte ?? <span className={styles.muted}>—</span>}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* ── Vendas por mês (meses em colunas) ───────────────────────── */}
+          <div className={styles.card}>
+            <div className={styles.cardHead}>
+              <span className={styles.cardTitle}>Vendas por mês</span>
+              <div className={styles.legend}>
+                <span className={styles.legendItem}>
+                  <span className={`${styles.dot} ${styles.dotReal}`} />
+                  realizado
+                </span>
+                <span className={styles.legendItem}>
+                  <span className={`${styles.dot} ${styles.dotParcial}`} />
+                  parcial
+                </span>
+                <span className={styles.legendItem}>
+                  <span className={`${styles.dot} ${styles.dotProj}`} />
+                  projetado
+                </span>
+              </div>
+            </div>
+            <div className={styles.tableScroll}>
+              <table className={`${styles.table} ${styles.mensalTable}`}>
+                <thead>
+                  <tr>
+                    <th className={`${styles.thLeft} ${styles.stickyCol}`}>Série</th>
+                    {mensalRows.map((m) => (
+                      <th key={m.mes}>{MES_NOME[Number(m.mes.slice(5, 7)) - 1]}</th>
+                    ))}
+                    <th className={styles.colTotal}>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {mensalRows.length === 0 ? (
                     <tr>
-                      <td className={`${styles.tdLeft} ${styles.stickyCol}`}>{anoBase - 1}</td>
-                      {mensalRows.map((m) => (
-                        <td key={m.mes} className={styles.num}>
-                          {fmt(m.qtdeAnoAnterior)}
-                        </td>
-                      ))}
-                      <td className={`${styles.num} ${styles.tdTotal}`}>
-                        {fmt(mensalTotais.anoAnterior)}
+                      <td className={`${styles.tdLeft} ${styles.stickyCol}`} colSpan={14}>
+                        <span className={styles.muted}>
+                          {projLoading ? "Carregando…" : "Sem série mensal para o escopo."}
+                        </span>
                       </td>
                     </tr>
+                  ) : (
                     <tr>
-                      <td className={`${styles.tdLeft} ${styles.stickyCol}`}>
-                        {anoBase}
-                        <span className={styles.rowHint}>realizado / projeção</span>
-                      </td>
+                      <td className={`${styles.tdLeft} ${styles.stickyCol}`}>{anoBase}</td>
                       {mensalRows.map((m) => {
                         const valor = m.futuro ? m.projetado : m.qtde;
                         const pct = m.pctSobreAnoAnterior;
@@ -1140,7 +1111,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
                               m.futuro
                                 ? `Projeção por ${REGRA_LABEL[regra]}`
                                 : m.parcial
-                                ? `Parcial: até ${ymdToBr(dataBase)} (fora da média de crescimento)`
+                                ? `Parcial: até ${ymdToBr(dataBase)} (fora da média)`
                                 : "Realizado"
                             }
                           >
@@ -1149,11 +1120,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
                             </span>
                             <span
                               className={`${styles.cellPct} ${
-                                pct == null
-                                  ? styles.muted
-                                  : pct >= 0
-                                  ? styles.varUp
-                                  : styles.varDown
+                                pct == null ? styles.muted : pct >= 0 ? styles.varUp : styles.varDown
                               }`}
                             >
                               {fmtPct(pct)}
@@ -1163,7 +1130,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
                           </td>
                         );
                       })}
-                      <td className={`${styles.num} ${styles.tdTotal}`}>
+                      <td className={`${styles.num} ${styles.colTotal}`}>
                         <span className={styles.cellQtd}>{fmt(Math.round(mensalTotais.ano))}</span>
                         <span
                           className={`${styles.cellPct} ${
@@ -1178,22 +1145,258 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
                         </span>
                       </td>
                     </tr>
-                  </>
-                )}
-              </tbody>
-            </table>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-
-          <div className={styles.footNote}>
-            A linha <strong>{anoBase - 1}</strong> é o mês inteiro do ano anterior. Na linha{" "}
-            <strong>{anoBase}</strong>, a <strong>%</strong> ao lado da quantidade é sempre o
-            crescimento sobre o mesmo mês do ano anterior. A <strong>média de crescimento</strong>{" "}
-            usa só os meses fechados com base no ano anterior — o mês em curso (<em>parcial</em>)
-            fica fora porque a comparação seria injusta. O <strong>Total</strong> é o realizado dos
-            meses fechados somado à projeção dos que faltam.
-          </div>
-        </div>
+        </>
       )}
+    </div>
+  );
+}
+
+// ─── Multi-select (mesma lógica do MultiSelectFilter do Gerador de Relatórios) ──
+//
+// O que vem de lá, de propósito: "(Selecionar tudo)" age sobre o que está FILTRADO — então
+// digitar um termo e clicar seleciona todos os itens daquela busca de uma vez; "Limpar tudo"
+// zera; e o que já está selecionado sobe para o topo da lista, separado do resto.
+
+interface MultiSelectOpcao {
+  value: string;
+  label: string;
+  /** Texto extra considerado na busca (código de barra, subgrupo, coleção…). */
+  busca?: string;
+  /** Linha de metadados abaixo do nome. */
+  meta?: string[];
+}
+
+interface MultiSelectProps {
+  label: string;
+  options: MultiSelectOpcao[];
+  value: string[];
+  onChange: (values: string[]) => void;
+  loading?: boolean;
+  searchPlaceholder: string;
+  vazioLabel: string;
+  /** "pill" = filtro compacto; "field" = campo com rótulo em cima. */
+  variant: "pill" | "field";
+  unidade?: string;
+  unidadePlural?: string;
+  largura?: "sm" | "lg";
+}
+
+/** Quantas linhas o painel desenha (a seleção em massa continua valendo para tudo). */
+const MULTI_SELECT_RENDER_MAX = 200;
+
+function MultiSelect({
+  label,
+  options,
+  value,
+  onChange,
+  loading = false,
+  searchPlaceholder,
+  vazioLabel,
+  variant,
+  unidade = "item",
+  unidadePlural = "itens",
+  largura = "sm",
+}: MultiSelectProps) {
+  const [open, setOpen] = useState(false);
+  const [busca, setBusca] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (open) inputRef.current?.focus();
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (event: MouseEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) {
+        setOpen(false);
+        setBusca("");
+      }
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  const filtradas = useMemo(() => {
+    const termo = busca.trim().toLowerCase();
+    if (!termo) return options;
+    return options.filter(
+      (o) =>
+        o.label.toLowerCase().includes(termo) ||
+        o.value.toLowerCase().includes(termo) ||
+        (o.busca ?? "").toLowerCase().includes(termo)
+    );
+  }, [options, busca]);
+
+  const { selecionadas, naoSelecionadas } = useMemo(() => {
+    const sel: MultiSelectOpcao[] = [];
+    const nao: MultiSelectOpcao[] = [];
+    filtradas.forEach((o) => (value.includes(o.value) ? sel.push(o) : nao.push(o)));
+    return { selecionadas: sel, naoSelecionadas: nao };
+  }, [filtradas, value]);
+
+  const todasFiltradasSelecionadas = filtradas.length > 0 && naoSelecionadas.length === 0;
+  const algumaFiltradaSelecionada = selecionadas.length > 0;
+
+  // Age sobre o FILTRADO: é o que faz "digitar e selecionar todos" funcionar.
+  const alternarTodas = () => {
+    if (todasFiltradasSelecionadas) {
+      const doFiltro = new Set(filtradas.map((o) => o.value));
+      onChange(value.filter((v) => !doFiltro.has(v)));
+      return;
+    }
+    onChange(Array.from(new Set([...value, ...filtradas.map((o) => o.value)])));
+  };
+
+  const alternar = (v: string) =>
+    onChange(value.includes(v) ? value.filter((x) => x !== v) : [...value, v]);
+
+  const texto =
+    value.length === 0
+      ? vazioLabel
+      : value.length === 1
+      ? options.find((o) => o.value === value[0])?.label ?? value[0]
+      : `${value.length} ${unidadePlural}`;
+
+  const visiveis = [...selecionadas, ...naoSelecionadas].slice(0, MULTI_SELECT_RENDER_MAX);
+  const cortadas = filtradas.length - visiveis.length;
+
+  const renderOpcao = (o: MultiSelectOpcao) => {
+    const checked = value.includes(o.value);
+    return (
+      <button
+        key={o.value}
+        type="button"
+        className={`${styles.optionRow} ${checked ? styles.optionRowActive : ""}`}
+        onClick={() => alternar(o.value)}
+      >
+        <span className={styles.checkbox}>{checked ? "✓" : ""}</span>
+        <span className={styles.optionInfo}>
+          <span className={styles.optionName}>{o.label}</span>
+          {o.meta && o.meta.length > 0 && (
+            <span className={styles.optionMeta}>
+              {o.meta.map((m) => (
+                <span key={m}>{m}</span>
+              ))}
+            </span>
+          )}
+        </span>
+      </button>
+    );
+  };
+
+  return (
+    <div className={variant === "pill" ? styles.dimWrap : styles.field} ref={ref}>
+      {variant === "field" && <span className={styles.fieldLabel}>{label}</span>}
+      <div className={variant === "field" ? styles.produtoWrap : undefined}>
+        <button
+          type="button"
+          className={
+            variant === "pill"
+              ? `${styles.dimPill} ${value.length > 0 ? styles.dimPillActive : ""}`
+              : `${styles.produtoButton} ${open ? styles.produtoButtonActive : ""}`
+          }
+          onClick={() => setOpen((prev) => !prev)}
+        >
+          {variant === "pill" ? (
+            <>
+              <span className={styles.dimLabel}>{label}:</span>
+              <span className={styles.dimValue}>{texto}</span>
+            </>
+          ) : (
+            <span>{texto}</span>
+          )}
+          <span className={styles.caret}>⌄</span>
+        </button>
+
+        {open && (
+          <div className={`${styles.dropdown} ${largura === "lg" ? styles.dropdownLg : ""}`}>
+            <div className={styles.searchBox}>
+              <input
+                ref={inputRef}
+                className={styles.searchInput}
+                type="text"
+                placeholder={searchPlaceholder}
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+              />
+              {busca && (
+                <button
+                  type="button"
+                  className={styles.searchClear}
+                  onClick={() => {
+                    setBusca("");
+                    inputRef.current?.focus();
+                  }}
+                  aria-label="Limpar busca"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+
+            <div className={styles.listHeader}>
+              <button
+                type="button"
+                className={`${styles.optionRow} ${styles.selectAllRow} ${
+                  todasFiltradasSelecionadas ? styles.optionRowActive : ""
+                }`}
+                onClick={alternarTodas}
+                disabled={filtradas.length === 0}
+              >
+                <span className={styles.checkbox}>
+                  {todasFiltradasSelecionadas ? "✓" : algumaFiltradaSelecionada ? "⊞" : ""}
+                </span>
+                <span>
+                  (Selecionar tudo{busca.trim() ? ` — ${fmt(filtradas.length)} do filtro` : ""})
+                </span>
+              </button>
+              {value.length > 0 && (
+                <button
+                  type="button"
+                  className={styles.linkAction}
+                  onClick={() => onChange([])}
+                  title="Limpar todas as seleções"
+                >
+                  Limpar tudo
+                </button>
+              )}
+            </div>
+
+            <div className={styles.optionList}>
+              {loading ? (
+                <div className={styles.optionEmpty}>Carregando…</div>
+              ) : filtradas.length === 0 ? (
+                <div className={styles.optionEmpty}>Nenhum resultado encontrado</div>
+              ) : (
+                <>
+                  {selecionadas.slice(0, MULTI_SELECT_RENDER_MAX).map(renderOpcao)}
+                  {selecionadas.length > 0 && naoSelecionadas.length > 0 && (
+                    <div className={styles.separator} />
+                  )}
+                  {naoSelecionadas
+                    .slice(0, Math.max(0, MULTI_SELECT_RENDER_MAX - selecionadas.length))
+                    .map(renderOpcao)}
+                </>
+              )}
+            </div>
+
+            <div className={styles.dropdownFoot}>
+              <span>
+                {fmt(filtradas.length)} {filtradas.length === 1 ? unidade : unidadePlural}
+                {cortadas > 0 ? ` · mostrando ${fmt(visiveis.length)}` : ""}
+                {value.length > 0 ? ` · ${fmt(value.length)} selecionado${value.length === 1 ? "" : "s"}` : ""}
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
