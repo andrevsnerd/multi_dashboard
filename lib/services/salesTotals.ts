@@ -19,11 +19,18 @@ export interface SalesTotalsParams {
   company: CompanyKey | string | undefined;
   range: NormalizedRange;
   filial?: string | null;
+  /**
+   * Escopo de LINHA da NERD (legado): por decisão antiga só se aplica quando company === 'nerd',
+   * porque nasceu do toggle "Eletrônicos". Para filtrar por linha em QUALQUER empresa use
+   * `linhasCadastro` — a Scarf Me trata LINHA como categoria e precisa dela.
+   */
   linhas?: string[] | null;
   comparisonMode?: 'month' | 'year';
   // Filtros opcionais adicionais (usados pelo Gerador de Relatórios). Todos
   // opcionais e aditivos: callers existentes (dashboard, curva-abc) não os passam.
   grupos?: string[] | null;
+  /** Filtro de LINHA que vale para qualquer empresa (ver a nota em `linhas`). */
+  linhasCadastro?: string[] | null;
   subgrupos?: string[] | null;
   grades?: string[] | null;
   colecoes?: string[] | null;
@@ -163,6 +170,7 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
     linhas,
     comparisonMode = 'month',
     grupos,
+    linhasCadastro,
     subgrupos,
     grades,
     colecoes,
@@ -174,6 +182,15 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
   } = params;
 
   if (!company) return { ...EMPTY };
+
+  // O e-commerce (`fetchEcommerceSummary`) filtra LINHA sem recorte por empresa, então lá as
+  // duas listas viram uma só: o escopo legado da NERD e o filtro de linha do cadastro.
+  const linhasEcommerce = (() => {
+    const juntas = [...(linhas ?? []), ...(linhasCadastro ?? [])]
+      .map((l) => (l ?? '').trim())
+      .filter(Boolean);
+    return juntas.length > 0 ? Array.from(new Set(juntas)) : null;
+  })();
 
   // `fetchSalesTotals` recebe um range JÁ NORMALIZADO (end EXCLUSIVO — início do dia
   // seguinte ao último dia). `fetchEcommerceSummary`, porém, espera um range CRU
@@ -192,7 +209,7 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
       company: company as string,
       range: ecommerceRange,
       filial: filial ?? null,
-      linhas: linhas ?? null,
+      linhas: linhasEcommerce,
       grupos: grupos ?? null,
       subgrupos: subgrupos ?? null,
       grades: grades ?? null,
@@ -223,7 +240,7 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
         company: company as string,
         range: ecommerceRange,
         filial: null,
-        linhas: linhas ?? null,
+        linhas: linhasEcommerce,
         grupos: grupos ?? null,
         subgrupos: subgrupos ?? null,
         grades: grades ?? null,
@@ -259,6 +276,7 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
 
     // Filtros adicionais do Gerador de Relatórios (todos opcionais; '' quando vazios).
     const grupoClause = buildInListClause(request, grupos, 'stGrupo', 'p.GRUPO_PRODUTO');
+    const linhaCadastroClause = buildInListClause(request, linhasCadastro, 'stLinhaCad', 'p.LINHA');
     const subgrupoClause = buildInListClause(request, subgrupos, 'stSubgrupo', 'p.SUBGRUPO_PRODUTO');
     const gradeClause = buildInListClause(request, grades, 'stGrade', 'CONVERT(VARCHAR, p.GRADE)');
     const colecaoClause = buildInListClause(request, colecoes, 'stColecao', 'p.COLECAO');
@@ -267,7 +285,8 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
 
     const needsProdutoJoin =
       linhaTokens.active ||
-      !!grupoClause || !!subgrupoClause || !!gradeClause || !!colecaoClause || !!tipoClause;
+      !!grupoClause || !!linhaCadastroClause || !!subgrupoClause || !!gradeClause ||
+      !!colecaoClause || !!tipoClause;
     const needsCoresJoin = !!corClause;
 
     // Filtro por lista de produtos (IN), produto específico (id) ou busca textual.
@@ -310,6 +329,7 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
 
     // Cláusulas de atributo (produto/cor) — idênticas em vendas_base e TrocasPuras.
     const prodAttrClause = `${grupoClause}
+          ${linhaCadastroClause}
           ${subgrupoClause}
           ${gradeClause}
           ${colecaoClause}

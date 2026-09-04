@@ -59,9 +59,23 @@ interface MensalItem {
 interface ProjecaoResponse {
   dataBase: string;
   windows: number[];
+  metrica: Metrica;
   itens: ProjecaoItem[];
+  /** Total do escopo por janela de dias, já com piso 0 (vale para as duas métricas). */
+  totaisJanela: Record<string, number>;
   mensal: MensalItem[];
 }
+
+/**
+ * O que a análise mede. `produtos` = unidades vendidas (visão de compra, com estoque,
+ * sugestão e cobertura). `tickets` = contagem de vendas (visão de fluxo): as contas de
+ * estoque não se aplicam, só ritmo e crescimento.
+ */
+type Metrica = "produtos" | "tickets";
+const METRICAS: { key: Metrica; label: string }[] = [
+  { key: "produtos", label: "Produtos" },
+  { key: "tickets", label: "Tickets" },
+];
 
 /**
  * Regra que projeta os meses que ainda não aconteceram.
@@ -89,6 +103,7 @@ const REGRA_LABEL: Record<RegraProjecao, string> = {
  */
 interface PedidoProjecao {
   dataBase: string;
+  metrica: Metrica;
   dims: DimState;
   produtos: string[];
 }
@@ -250,8 +265,10 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   const [selectedProdutos, setSelectedProdutos] = useState<Set<string>>(new Set());
 
   // Projeção (unidades vendidas por janela) — vem do endpoint dedicado.
+  const [metrica, setMetrica] = useState<Metrica>("produtos");
   const [pedido, setPedido] = useState<PedidoProjecao | null>(null);
   const [projItens, setProjItens] = useState<Record<string, ProjecaoItem>>({});
+  const [totaisJanela, setTotaisJanela] = useState<Record<string, number>>({});
   const [mensal, setMensal] = useState<MensalItem[]>([]);
   const [projLoading, setProjLoading] = useState(false);
   const [projErro, setProjErro] = useState<string | null>(null);
@@ -360,13 +377,18 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
 
   /** Assinatura do recorte, para saber se mudou algo desde a última geração. */
   const assinaturaAtual = useMemo(
-    () => JSON.stringify({ dataBase, dims, produtos: produtosSelecionados }),
-    [dataBase, dims, produtosSelecionados]
+    () => JSON.stringify({ dataBase, metrica, dims, produtos: produtosSelecionados }),
+    [dataBase, metrica, dims, produtosSelecionados]
   );
   const assinaturaGerada = useMemo(
     () =>
       pedido
-        ? JSON.stringify({ dataBase: pedido.dataBase, dims: pedido.dims, produtos: pedido.produtos })
+        ? JSON.stringify({
+            dataBase: pedido.dataBase,
+            metrica: pedido.metrica,
+            dims: pedido.dims,
+            produtos: pedido.produtos,
+          })
         : null,
     [pedido]
   );
@@ -391,7 +413,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
 
   const gerarProjecao = () => {
     if (!temEscopo) return;
-    setPedido({ dataBase, dims, produtos: produtosSelecionados });
+    setPedido({ dataBase, metrica, dims, produtos: produtosSelecionados });
   };
 
   // ── Busca a projeção do escopo APLICADO (só roda quando o usuário manda gerar).
@@ -402,6 +424,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
       pedido.produtos.length + DIM_KEYS.reduce((soma, dim) => soma + pedido.dims[dim].length, 0);
     if (recortes > MAX_RECORTES) {
       setProjItens({});
+      setTotaisJanela({});
       setMensal([]);
       setProjErro(
         `Escopo muito amplo: ${fmt(recortes)} itens no recorte (limite ${fmt(MAX_RECORTES)}). ` +
@@ -412,7 +435,11 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
     // Filtros de cadastro e seleção de produto se SOMAM no SQL: o produto restringe os
     // códigos, o filtro Cor (quando marcado) restringe as cores. Sem filtro de Cor, o
     // servidor devolve todas as cores do produto e a tela soma.
-    const params = new URLSearchParams({ company: companyKey, base: pedido.dataBase });
+    const params = new URLSearchParams({
+      company: companyKey,
+      base: pedido.dataBase,
+      metrica: pedido.metrica,
+    });
     DIM_KEYS.forEach((dim) => pedido.dims[dim].forEach((v) => params.append(dim, v)));
     pedido.produtos.forEach((produto) => params.append("produto", produto));
 
@@ -432,11 +459,13 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
           next[rowKey(it.produto, it.cor)] = it;
         });
         setProjItens(next);
+        setTotaisJanela(json.totaisJanela ?? {});
         setMensal(Array.isArray(json.mensal) ? json.mensal : []);
       })
       .catch((error: Error) => {
         if (cancelled) return;
         setProjItens({});
+        setTotaisJanela({});
         setMensal([]);
         setProjErro(error.message || "Erro ao calcular a projeção");
       })
@@ -485,20 +514,16 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   // ── Agregado do escopo: estoque somado + unidades vendidas somadas por janela.
   //    O servidor já devolve exatamente o escopo (produtos × filtros), então soma-se TUDO.
   const agregado = useMemo(() => {
+    // O total por janela vem pronto do servidor (já com piso 0 no TOTAL, não por item — ver
+    // [[vendas-nunca-filtrar-linhas-da-regra-global]]) e serve às duas métricas.
     const unidades: Record<number, number> = {};
-    const projList = Object.values(projItens);
     WINDOWS_DIAS.forEach((dias) => {
-      // Piso 0 no TOTAL (não por item): a quantidade líquida de um item pode ser negativa
-      // quando houve mais troca que venda, e descartar essas linhas antes de somar infla o
-      // total — ver [[vendas-nunca-filtrar-linhas-da-regra-global]].
-      unidades[dias] = Math.max(
-        0,
-        projList.reduce((s, it) => s + (Number(it.janelas[String(dias)] ?? 0) || 0), 0)
-      );
+      unidades[dias] = Number(totaisJanela[String(dias)] ?? 0) || 0;
     });
     const estoqueSomado = scopeRows.reduce((s, row) => s + Math.max(0, row.estoque ?? 0), 0);
-    return { estoqueSomado, unidades, itens: Math.max(scopeRows.length, projList.length) };
-  }, [projItens, scopeRows]);
+    const itens = Math.max(scopeRows.length, Object.keys(projItens).length);
+    return { estoqueSomado, unidades, itens };
+  }, [totaisJanela, projItens, scopeRows]);
 
   const estoqueAtual = estoqueOverride ?? agregado.estoqueSomado;
   const diasHorizonte = Math.max(0, diffDays(dataBase, venderAte));
@@ -641,9 +666,11 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
           : m.parcial
           ? Math.max(m.qtde, projetado ?? 0)
           : m.qtde;
-        // % sempre contra o MESMO mês do ano anterior: mês realizado usa o que vendeu, mês
-        // futuro usa a projeção da regra escolhida (assim a coluna nunca fica vazia).
-        const valorCelula = m.futuro ? projetado : m.qtde;
+        // Célula: mês fechado mostra o realizado; mês futuro e o mês EM CURSO mostram a
+        // projeção do mês cheio (comparar 2 dias corridos com um mês inteiro do ano anterior
+        // não diz nada). No mês em curso o valor é `valorAno`, o mesmo que entra no total, para
+        // a linha fechar com a coluna Total.
+        const valorCelula = m.futuro ? projetado : m.parcial ? valorAno : m.qtde;
         const pctSobreAnoAnterior =
           m.qtdeAnoAnterior > 0 && valorCelula != null ? valorCelula / m.qtdeAnoAnterior - 1 : null;
         return {
@@ -726,6 +753,10 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
     setDims(EMPTY_DIMS);
   };
 
+  /** Métrica dos números NA TELA (o toggle ao vivo só vale depois de gerar). */
+  const metricaAplicada: Metrica = pedido?.metrica ?? metrica;
+  const ehTickets = metricaAplicada === "tickets";
+  const unidadeLabel = ehTickets ? "tickets" : "un";
   const soUm = selectedItems.length === 1 ? selectedItems[0] : null;
 
   return (
@@ -734,6 +765,21 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
       <div className={styles.headerCard}>
         <div className={styles.topBar}>
           <div className={styles.topFields}>
+            <div className={styles.field}>
+              <span className={styles.fieldLabel}>Análise por</span>
+              <div className={styles.segmented}>
+                {METRICAS.map((m) => (
+                  <button
+                    key={m.key}
+                    type="button"
+                    className={`${styles.segment} ${metrica === m.key ? styles.segmentActive : ""}`}
+                    onClick={() => setMetrica(m.key)}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <label className={styles.field}>
               <span className={styles.fieldLabel}>Data base</span>
               <input
@@ -753,6 +799,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
                 onChange={(e) => e.target.value && setVenderAte(e.target.value)}
               />
             </label>
+            {metrica === "produtos" && (
             <label className={styles.field}>
               <span className={styles.fieldLabel}>
                 Estoque atual
@@ -779,10 +826,46 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
                 }}
               />
             </label>
+            )}
+            {metrica === "produtos" && (
+            <label className={styles.field}>
+              <span className={styles.fieldLabel}>Qtd compra</span>
+              <input
+                type="number"
+                className={`${styles.input} ${styles.inputNum} ${
+                  linhaAtiva.editado ? styles.inputEdited : ""
+                }`}
+                value={linhaAtiva.qtd}
+                min={0}
+                disabled={!gerado || !linhaAtiva.disponivel}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  setQtdOverride((prev) => ({
+                    ...prev,
+                    [regra]: raw === "" ? 0 : Math.max(0, Math.round(Number(raw))),
+                  }));
+                }}
+              />
+            </label>
+            )}
             <div className={styles.field}>
               <span className={styles.fieldLabel}>Horizonte</span>
               <span className={styles.pill}>{fmt(diasHorizonte)} dias</span>
             </div>
+            <label className={styles.field}>
+              <span className={styles.fieldLabel}>Regra de cálculo</span>
+              <select
+                className={styles.select}
+                value={regra}
+                onChange={(e) => setRegra(e.target.value as RegraProjecao)}
+              >
+                {REGRAS.map((key) => (
+                  <option key={key} value={key}>
+                    {REGRA_LABEL[key]}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
 
           {/* Produto: seleção por código (todas as cores entram) */}
@@ -883,11 +966,12 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
                     {soUm.cores} {soUm.cores === 1 ? "cor" : "cores"}
                   </>
                 )}
-                {" · "}estoque {fmt(estoqueAtual)} un
+                {!ehTickets && <> · estoque {fmt(estoqueAtual)} un</>}
               </>
             ) : (
               <>
-                {fmt(agregado.itens)} itens · estoque {fmt(estoqueAtual)} un
+                {fmt(agregado.itens)} itens
+                {!ehTickets && <> · estoque {fmt(estoqueAtual)} un</>}
               </>
             )}
           </span>
@@ -913,44 +997,58 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
           {projErro && <div className={styles.erro}>{projErro}</div>}
 
           {/* ── KPIs ──────────────────────────────────────────────────────── */}
-          <div className={styles.kpiStrip}>
-            <div className={styles.kpi}>
-              <span className={styles.kpiLabel}>Sugestão de compra</span>
-              <span className={styles.kpiValue}>
-                {linhaAtiva.disponivel ? fmt(linhaAtiva.sugestao) : "—"}
-              </span>
-              <span className={styles.kpiHint}>un para durar o horizonte</span>
-            </div>
+          <div className={`${styles.kpiStrip} ${ehTickets ? styles.kpiStripTickets : ""}`}>
+            {!ehTickets && (
+              <div className={styles.kpi}>
+                <span className={styles.kpiLabel}>Sugestão de compra</span>
+                <span className={styles.kpiValue}>
+                  {linhaAtiva.disponivel ? fmt(linhaAtiva.sugestao) : "—"}
+                </span>
+                <span className={styles.kpiHint}>un para durar o horizonte</span>
+              </div>
+            )}
             <div className={styles.kpi}>
               <span className={styles.kpiLabel}>
-                {linhaAtiva.yoy ? "Projeção que falta" : "Unidades da janela"}
+                {linhaAtiva.yoy
+                  ? "Projeção que falta"
+                  : ehTickets
+                  ? "Tickets da janela"
+                  : "Unidades da janela"}
               </span>
               <span className={styles.kpiValue}>{linhaAtiva.disponivel ? fmt(linhaAtiva.un) : "—"}</span>
               <span className={styles.kpiHint}>
-                {linhaAtiva.yoy ? "un no horizonte" : `un em ${fmt(linhaAtiva.dias)} dias`}
+                {linhaAtiva.yoy
+                  ? `${unidadeLabel} no horizonte`
+                  : `${unidadeLabel} em ${fmt(linhaAtiva.dias)} dias`}
               </span>
             </div>
             <div className={styles.kpi}>
               <span className={styles.kpiLabel}>Ritmo</span>
               <span className={styles.kpiValue}>
                 {linhaAtiva.disponivel ? fmtDec(linhaAtiva.ritmoDia) : "—"}
-                <span className={styles.kpiUnit}>un/dia</span>
+                <span className={styles.kpiUnit}>{unidadeLabel}/dia</span>
               </span>
               <span className={styles.kpiHint}>
-                {linhaAtiva.disponivel ? `${fmtDec(linhaAtiva.ritmoMes, 1)} un/mês` : "—"}
+                {linhaAtiva.disponivel
+                  ? `${fmtDec(linhaAtiva.ritmoMes, 1)} ${unidadeLabel}/mês`
+                  : "—"}
               </span>
             </div>
-            <div className={styles.kpi}>
-              <span className={styles.kpiLabel}>Cobertura</span>
-              <span className={styles.kpiValue}>
-                {linhaAtiva.cobertura !== null ? fmt(linhaAtiva.cobertura) : "—"}
-                {linhaAtiva.cobertura !== null && <span className={styles.kpiUnit}>dias</span>}
-              </span>
-            </div>
-            <div className={styles.kpi}>
-              <span className={styles.kpiLabel}>Dura até</span>
-              <span className={styles.kpiValue}>{linhaAtiva.duraAte ?? "—"}</span>
-            </div>
+            {!ehTickets && (
+              <>
+                <div className={styles.kpi}>
+                  <span className={styles.kpiLabel}>Cobertura</span>
+                  <span className={styles.kpiValue}>
+                    {linhaAtiva.cobertura !== null ? fmt(linhaAtiva.cobertura) : "—"}
+                    {linhaAtiva.cobertura !== null && <span className={styles.kpiUnit}>dias</span>}
+                  </span>
+                </div>
+                <div className={styles.kpi}>
+                  <span className={styles.kpiLabel}>Dura até</span>
+                  <span className={styles.kpiValue}>{linhaAtiva.duraAte ?? "—"}</span>
+                </div>
+              </>
+            )}
             <div className={styles.kpi}>
               <span className={styles.kpiLabel}>Crescimento médio</span>
               <span
@@ -970,96 +1068,12 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
             </div>
           </div>
 
-          {/* ── Regra de cálculo ─────────────────────────────────────────── */}
-          <div className={styles.card}>
-            <div className={styles.cardHead}>
-              <span className={styles.cardTitle}>Regra de cálculo</span>
-              <select
-                className={styles.select}
-                value={regra}
-                onChange={(e) => setRegra(e.target.value as RegraProjecao)}
-              >
-                {REGRAS.map((key) => (
-                  <option key={key} value={key}>
-                    {REGRA_LABEL[key]}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className={styles.tableScroll}>
-              <table className={`${styles.table} ${styles.regraTable}`}>
-                <thead>
-                  <tr>
-                    <th>Dias</th>
-                    <th>Unidades</th>
-                    <th>Ritmo un/dia</th>
-                    <th>Ritmo un/mês</th>
-                    <th>Sugestão</th>
-                    <th>Qtd compra</th>
-                    <th>Cobertura</th>
-                    <th>Dura até</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td className={styles.num}>{fmt(linhaAtiva.dias)}</td>
-                    <td className={styles.num}>
-                      {linhaAtiva.disponivel ? (
-                        <>
-                          {fmt(linhaAtiva.un)}
-                          {linhaAtiva.yoy && <span className={styles.tag}>proj.</span>}
-                        </>
-                      ) : (
-                        <span className={styles.muted}>—</span>
-                      )}
-                    </td>
-                    <td className={styles.num}>
-                      {linhaAtiva.disponivel ? fmtDec(linhaAtiva.ritmoDia) : <span className={styles.muted}>—</span>}
-                    </td>
-                    <td className={styles.num}>
-                      {linhaAtiva.disponivel ? (
-                        fmtDec(linhaAtiva.ritmoMes, 1)
-                      ) : (
-                        <span className={styles.muted}>—</span>
-                      )}
-                    </td>
-                    <td className={styles.num}>
-                      {linhaAtiva.disponivel ? fmt(linhaAtiva.sugestao) : <span className={styles.muted}>—</span>}
-                    </td>
-                    <td className={styles.num}>
-                      <input
-                        type="number"
-                        className={`${styles.qtdInput} ${linhaAtiva.editado ? styles.qtdInputEdited : ""}`}
-                        value={linhaAtiva.qtd}
-                        min={0}
-                        disabled={!linhaAtiva.disponivel}
-                        onChange={(e) => {
-                          const raw = e.target.value;
-                          setQtdOverride((prev) => ({
-                            ...prev,
-                            [regra]: raw === "" ? 0 : Math.max(0, Math.round(Number(raw))),
-                          }));
-                        }}
-                      />
-                    </td>
-                    <td className={styles.num}>
-                      {linhaAtiva.cobertura !== null ? (
-                        `${fmt(linhaAtiva.cobertura)}d`
-                      ) : (
-                        <span className={styles.muted}>—</span>
-                      )}
-                    </td>
-                    <td className={styles.num}>{linhaAtiva.duraAte ?? <span className={styles.muted}>—</span>}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
           {/* ── Vendas por mês (meses em colunas) ───────────────────────── */}
           <div className={styles.card}>
             <div className={styles.cardHead}>
-              <span className={styles.cardTitle}>Vendas por mês</span>
+              <span className={styles.cardTitle}>
+                {ehTickets ? "Tickets por mês" : "Vendas por mês"}
+              </span>
               <div className={styles.legend}>
                 <span className={styles.legendItem}>
                   <span className={`${styles.dot} ${styles.dotReal}`} />
@@ -1067,7 +1081,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
                 </span>
                 <span className={styles.legendItem}>
                   <span className={`${styles.dot} ${styles.dotParcial}`} />
-                  parcial
+                  mês em curso
                 </span>
                 <span className={styles.legendItem}>
                   <span className={`${styles.dot} ${styles.dotProj}`} />
@@ -1099,7 +1113,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
                     <tr>
                       <td className={`${styles.tdLeft} ${styles.stickyCol}`}>{anoBase}</td>
                       {mensalRows.map((m) => {
-                        const valor = m.futuro ? m.projetado : m.qtde;
+                        const valor = m.futuro ? m.projetado : m.parcial ? m.valorAno : m.qtde;
                         const pct = m.pctSobreAnoAnterior;
                         return (
                           <td
@@ -1111,7 +1125,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
                               m.futuro
                                 ? `Projeção por ${REGRA_LABEL[regra]}`
                                 : m.parcial
-                                ? `Parcial: até ${ymdToBr(dataBase)} (fora da média)`
+                                ? `Mês em curso: projeção do mês cheio por ${REGRA_LABEL[regra]} · já vendeu ${fmt(m.qtde)} un até ${ymdToBr(dataBase)} · fora da média de crescimento`
                                 : "Realizado"
                             }
                           >
@@ -1125,8 +1139,9 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
                             >
                               {fmtPct(pct)}
                             </span>
-                            {m.parcial && <span className={styles.cellFlag}>parcial</span>}
-                            {m.futuro && <span className={styles.cellFlag}>proj.</span>}
+                            {(m.parcial || m.futuro) && (
+                              <span className={styles.cellFlag}>proj.</span>
+                            )}
                           </td>
                         );
                       })}

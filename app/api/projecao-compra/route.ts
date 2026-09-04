@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { fetchFilialProdutoSales } from '@/lib/repositories/performance';
+import { fetchSalesTotals } from '@/lib/services/salesTotals';
 import { type CompanyKey } from '@/lib/config/company';
 import { resolveCompanyDynamic } from '@/lib/config/company-server';
 import { normalizeRangeForQuery } from '@/lib/utils/date';
@@ -97,6 +98,8 @@ export async function GET(request: Request) {
     tipos: readDim('tipo'),
   };
   const temDimensao = Object.values(dimensoes).some((values) => values.length > 0);
+  // `produtos` (padrão) mede unidades vendidas; `tickets` mede a contagem de vendas.
+  const metrica = searchParams.get('metrica') === 'tickets' ? 'tickets' : 'produtos';
 
   if (!companyKey) {
     return NextResponse.json({ error: 'Parâmetro "company" obrigatório' }, { status: 400 });
@@ -107,7 +110,7 @@ export async function GET(request: Request) {
   // Sem escopo algum a projeção seria "a rede inteira somada", que não é um cenário de
   // compra útil (e custaria 5 varreduras completas). A tela cobra ao menos um recorte.
   if (produtoIds.length === 0 && !temDimensao) {
-    return NextResponse.json({ dataBase: baseParam, windows: WINDOWS, itens: [] });
+    return NextResponse.json({ dataBase: baseParam, windows: WINDOWS, metrica, itens: [] });
   }
   // Cada produto/valor de filtro vira um PARÂMETRO na consulta, e o SQL Server aceita no
   // máximo ~2100 por request. Com "Selecionar tudo" ficou fácil passar disso, então o erro
@@ -143,10 +146,115 @@ export async function GET(request: Request) {
     includePrevious: false as const,
     limit: 0,
   };
+  // Mesmos recortes, na fonte canônica de totais/tickets. `linhasCadastro` (e não `linhas`)
+  // porque o `linhas` de lá é o escopo legado da NERD e seria ignorado na Scarf Me.
+  const escopoTickets = {
+    company: companyKey,
+    filial: null,
+    grupos: dimensoes.grupos,
+    linhasCadastro: dimensoes.linhas,
+    subgrupos: dimensoes.subgrupos,
+    grades: dimensoes.grades,
+    colecoes: dimensoes.colecoes,
+    cores: dimensoes.cores,
+    tipos: dimensoes.tipos,
+    produtoIds: produtoIds.length > 0 ? produtoIds : null,
+  };
+
   const anoBase = Number(baseParam.slice(0, 4));
   const mesBase = Number(baseParam.slice(5, 7));
 
   try {
+    if (metrica === 'tickets') {
+      // Uma consulta por janela + uma por mês. `comparisonMode: 'year'` já devolve o MESMO mês
+      // do ano anterior na mesma chamada, então a série mensal sai em 12 consultas.
+      const [janelas, meses] = await Promise.all([
+        Promise.all(
+          WINDOWS.map(async (dias) => {
+            const range = normalizeRangeForQuery({
+              start: addDaysYmd(baseParam, -dias),
+              end: addDaysYmd(baseParam, -1),
+            });
+            const totais = await fetchSalesTotals({ ...escopoTickets, range });
+            return [dias, Math.max(0, Math.round(totais.tickets))] as const;
+          })
+        ),
+        mapLimit(
+          Array.from({ length: 12 }, (_, i) => i + 1),
+          4,
+          async (mes) => {
+            const chave = `${anoBase}-${pad2(mes)}`;
+            const futuro = mes > mesBase;
+            const parcial = mes === mesBase;
+            const piso = (n: number) => Math.max(0, Math.round(n));
+            // A base do crescimento é sempre o mês CHEIO do ano anterior.
+            const rangeAnterior = normalizeRangeForQuery({
+              start: `${anoBase - 1}-${pad2(mes)}-01`,
+              end: lastDayOfMonth(anoBase - 1, mes),
+            });
+
+            const primeiro = `${anoBase}-${pad2(mes)}-01`;
+            const ultimo = parcial ? addDaysYmd(baseParam, -1) : lastDayOfMonth(anoBase, mes);
+            // Mês futuro (ou mês em curso com a data base no dia 1) não tem nada realizado:
+            // basta a base do ano anterior.
+            if (futuro || ultimo < primeiro) {
+              const anterior = await fetchSalesTotals({ ...escopoTickets, range: rangeAnterior });
+              return {
+                mes: chave,
+                qtde: 0,
+                qtdeAnoAnterior: piso(anterior.tickets),
+                parcial,
+                futuro,
+              };
+            }
+
+            const rangeAtual = normalizeRangeForQuery({ start: primeiro, end: ultimo });
+            if (parcial) {
+              // Duas consultas de propósito: o realizado é a janela parcial, mas a base tem de
+              // ser o mês inteiro do ano anterior (senão compararia 3 dias com 3 dias).
+              const [atual, anterior] = await Promise.all([
+                fetchSalesTotals({ ...escopoTickets, range: rangeAtual }),
+                fetchSalesTotals({ ...escopoTickets, range: rangeAnterior }),
+              ]);
+              return {
+                mes: chave,
+                qtde: piso(atual.tickets),
+                qtdeAnoAnterior: piso(anterior.tickets),
+                parcial: true,
+                futuro: false,
+              };
+            }
+
+            // Mês fechado: `comparisonMode: 'year'` já traz o mesmo mês do ano anterior.
+            const totais = await fetchSalesTotals({
+              ...escopoTickets,
+              range: rangeAtual,
+              comparisonMode: 'year',
+            });
+            return {
+              mes: chave,
+              qtde: piso(totais.tickets),
+              qtdeAnoAnterior: piso(totais.ticketsPrevious),
+              parcial: false,
+              futuro: false,
+            };
+          }
+        ),
+      ]);
+
+      return NextResponse.json(
+        {
+          dataBase: baseParam,
+          windows: WINDOWS,
+          metrica,
+          itens: [],
+          totaisJanela: Object.fromEntries(janelas),
+          mensal: meses,
+        },
+        { headers: { 'Cache-Control': 'no-store' } }
+      );
+    }
+
     // Uma consulta por janela (a maior é 365d), escopada aos produtos selecionados → leve.
     // Reusa a lógica VALIDADA de vendas (fetchFilialProdutoSales: POS com trocas + e-commerce).
     const perWindow = await Promise.all(
@@ -260,8 +368,17 @@ export async function GET(request: Request) {
       };
     });
 
+    // Piso 0 no TOTAL, não por item: linha negativa (mais troca que venda) entra na soma —
+    // ver [[vendas-nunca-filtrar-linhas-da-regra-global]].
+    const totaisJanela = Object.fromEntries(
+      WINDOWS.map((dias) => [
+        dias,
+        Math.max(0, itens.reduce((soma, it) => soma + (Number(it.janelas[dias] ?? 0) || 0), 0)),
+      ])
+    );
+
     return NextResponse.json(
-      { dataBase: baseParam, windows: WINDOWS, itens, mensal },
+      { dataBase: baseParam, windows: WINDOWS, metrica, itens, totaisJanela, mensal },
       { headers: { 'Cache-Control': 'no-store' } }
     );
   } catch (error) {

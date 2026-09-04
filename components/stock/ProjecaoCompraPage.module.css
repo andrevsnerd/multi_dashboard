@@ -60,6 +60,10 @@
   background: var(--s-50, #f8fafc);
   color: var(--t-500);
 }
+.inputEdited {
+  border-color: var(--brand-scarfme, #2563eb);
+  color: var(--brand-scarfme, #2563eb);
+}
 .input:focus {
   outline: none;
   border-color: var(--brand-scarfme, #2563eb);
@@ -532,7 +536,7 @@
   color: var(--t-900);
 }
 .select {
-  height: 38px;
+  height: 40px;
   min-width: 215px;
   padding: 0 12px;
   border: 1px solid var(--b-300);
@@ -614,37 +618,6 @@
 .muted {
   color: var(--t-400, var(--t-500));
 }
-.tag {
-  margin-left: 5px;
-  font-size: 10.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--t-500);
-  vertical-align: 1px;
-}
-.qtdInput {
-  width: 100px;
-  height: 38px;
-  padding: 0 11px;
-  border: 1px solid var(--b-300);
-  border-radius: 7px;
-  background: var(--s-white);
-  color: var(--t-900);
-  font-size: 15px;
-  font-weight: 600;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-.qtdInput:focus {
-  outline: none;
-  border-color: var(--brand-scarfme, #2563eb);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
-}
-.qtdInputEdited {
-  border-color: var(--brand-scarfme, #2563eb);
-  color: var(--brand-scarfme, #2563eb);
-}
 
 /* ── Tabela mensal (meses em colunas) ───────────────────────────────────── */
 .mensalTable {
@@ -706,12 +679,6 @@
   color: #dc2626;
 }
 
-/* A tabela da regra tem uma linha só — os valores funcionam como resumo. */
-.regraTable tbody td {
-  font-size: 17px;
-  font-weight: 600;
-  padding: 18px 16px;
-}
 .btnGerar {
   margin-left: auto;
   height: 36px;
@@ -732,4 +699,38 @@
   background: var(--b-200);
   color: var(--t-500);
   cursor: default;
+}
+.cellParcial .cellQtd {
+  color: var(--brand-scarfme, #2563eb);
+}
+
+/* ── Seletor de métrica (Produtos x Tickets) ────────────────────────────── */
+.segmented {
+  display: inline-flex;
+  height: 40px;
+  padding: 3px;
+  border: 1px solid var(--b-300);
+  border-radius: 8px;
+  background: var(--s-50, #f1f5f9);
+}
+.segment {
+  border: none;
+  background: none;
+  padding: 0 16px;
+  border-radius: 6px;
+  color: var(--t-500);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.segment:hover {
+  color: var(--t-900);
+}
+.segmentActive {
+  background: var(--s-white);
+  color: var(--t-900);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
+}
+.kpiStripTickets {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
