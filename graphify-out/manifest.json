@@ -1590,8 +1590,8 @@
     "semantic_hash": "7100ad93329f4cae6f0cf2636fa8a06f"
   },
   "components/relatorios/GeradorRelatoriosPage.tsx": {
-    "mtime": 1788535485.6450968,
-    "ast_hash": "5be2c74b9018079ea07e031148328fca",
+    "mtime": 1788540582.799924,
+    "ast_hash": "97df6af8928860e80f3c9b2f22f8eca7",
     "semantic_hash": ""
   },
   "components/romaneios/RomaneioDeleteModal.tsx": {
@@ -2305,9 +2305,9 @@
     "semantic_hash": ""
   },
   "lib/reports/clientes-filial.ts": {
-    "mtime": 1783350348.259974,
-    "ast_hash": "edf21680b6a3d0d0a6bec6dc94c89ef7",
-    "semantic_hash": "edf21680b6a3d0d0a6bec6dc94c89ef7"
+    "mtime": 1788540413.9422603,
+    "ast_hash": "2b47bf3e4089a32ec5f5017074cf27a8",
+    "semantic_hash": ""
   },
   "lib/reports/column-sources.ts": {
     "mtime": 1782217532.3486032,
@@ -2320,8 +2320,8 @@
     "semantic_hash": "d907b2b11f2629a2edb97e34f6158c45"
   },
   "lib/reports/compra-sugerida-abc.ts": {
-    "mtime": 1786375621.3013093,
-    "ast_hash": "206e90d9b31d044989c1354b6db60429",
+    "mtime": 1788540413.9422603,
+    "ast_hash": "cbec2e350233ae8f353c0d22022107df",
     "semantic_hash": ""
   },
   "lib/reports/enrich.server.ts": {
@@ -2330,9 +2330,9 @@
     "semantic_hash": "459288f759cd65627de962137ef9cd3f"
   },
   "lib/reports/estoque-rede.ts": {
-    "mtime": 1782411377.9501762,
-    "ast_hash": "b33f5093f87673ff841931663a4c3f2f",
-    "semantic_hash": "b33f5093f87673ff841931663a4c3f2f"
+    "mtime": 1788540413.9396448,
+    "ast_hash": "13dd4a0fa4539b7ec16ed0eb792e5135",
+    "semantic_hash": ""
   },
   "lib/reports/format.ts": {
     "mtime": 1787841910.378267,
@@ -2345,14 +2345,14 @@
     "semantic_hash": ""
   },
   "lib/reports/produtos-cadastro.ts": {
-    "mtime": 1781890529.315976,
-    "ast_hash": "ce361c4e4695202ad231b755a4b94cbb",
-    "semantic_hash": "ce361c4e4695202ad231b755a4b94cbb"
+    "mtime": 1788540413.9422603,
+    "ast_hash": "31ef5a9c6b9d25aa16f00b787adcee97",
+    "semantic_hash": ""
   },
   "lib/reports/produtos-parados.ts": {
-    "mtime": 1782139920.077256,
-    "ast_hash": "fe8b4f01343d375ab3137eb62dc558f2",
-    "semantic_hash": "fe8b4f01343d375ab3137eb62dc558f2"
+    "mtime": 1788540413.9396448,
+    "ast_hash": "80ebbb91327b9f2a38d635195a224784",
+    "semantic_hash": ""
   },
   "lib/reports/registry.server.ts": {
     "mtime": 1788535376.5774956,
@@ -2365,19 +2365,19 @@
     "semantic_hash": ""
   },
   "lib/reports/types.ts": {
-    "mtime": 1787844328.0923216,
-    "ast_hash": "0bc788ad75f5c940fbdfac0feb4fda18",
+    "mtime": 1788540413.9374597,
+    "ast_hash": "dc9e67d1cb3c9f9d08dedc43459038fe",
     "semantic_hash": ""
   },
   "lib/reports/vendas-faturamento.ts": {
-    "mtime": 1787760417.6215158,
-    "ast_hash": "7a1ef723d9d6131b637bbee2112db18b",
+    "mtime": 1788540413.939131,
+    "ast_hash": "b3dd346435fa043c51958df665229344",
     "semantic_hash": ""
   },
   "lib/reports/vendas-historico.ts": {
-    "mtime": 1782472725.3382902,
-    "ast_hash": "bf5aa919fbf46517893235fef776bad6",
-    "semantic_hash": "bf5aa919fbf46517893235fef776bad6"
+    "mtime": 1788540413.9396448,
+    "ast_hash": "ba08e468d1720ec3e76ed22c41452a54",
+    "semantic_hash": ""
   },
   "lib/repositories/ajuste-historico.ts": {
     "mtime": 1785418328.554834,
@@ -2460,8 +2460,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/ecommerce.ts": {
-    "mtime": 1785788872.4167156,
-    "ast_hash": "7c081e7e3d4c6f210440fc40e89e5b06",
+    "mtime": 1788542908.6588395,
+    "ast_hash": "d7c91feb05230229c9b7257f23f07ac5",
     "semantic_hash": ""
   },
   "lib/repositories/entries.ts": {
@@ -2635,8 +2635,8 @@
     "semantic_hash": "29ce1c73943d226f43e1886d06bd8173"
   },
   "lib/services/salesTotals.ts": {
-    "mtime": 1788530796.3134966,
-    "ast_hash": "81d2a8779c89fdd7489b23bce293e0d7",
+    "mtime": 1788542495.6746964,
+    "ast_hash": "48a12c010caafaa91c220abf990ad4d7",
     "semantic_hash": ""
   },
   "lib/transfer-executor.js": {
@@ -2750,9 +2750,9 @@
     "semantic_hash": ""
   },
   "lib/utils/exportClientesFilialXlsx.ts": {
-    "mtime": 1783355346.9212315,
-    "ast_hash": "509d81e36fde086b1d3ec891d19d893c",
-    "semantic_hash": "509d81e36fde086b1d3ec891d19d893c"
+    "mtime": 1788540513.9743214,
+    "ast_hash": "3c70027595ecab0d2b8782979f909e84",
+    "semantic_hash": ""
   },
   "lib/utils/exportColecoesPanelXlsx.ts": {
     "mtime": 1783087287.0941746,
@@ -2760,8 +2760,8 @@
     "semantic_hash": "b49b5b9ead7d54146b24809bb4c99a58"
   },
   "lib/utils/exportCompraSugeridaAbcXlsx.ts": {
-    "mtime": 1786378305.7337751,
-    "ast_hash": "a87074132df51cb7325fb27c7b57b63b",
+    "mtime": 1788540514.0881634,
+    "ast_hash": "99fb3f9b79e5b7d77d4e8f9f05ce57db",
     "semantic_hash": ""
   },
   "lib/utils/exportControlePerformanceXlsx.ts": {
@@ -2820,8 +2820,8 @@
     "semantic_hash": "8701380f942e9ca88c5421d89e76ee7a"
   },
   "lib/utils/exportRelatorioXlsx.ts": {
-    "mtime": 1787842673.2442925,
-    "ast_hash": "0d85746f196bbcbd09742cc305423730",
+    "mtime": 1788540565.562315,
+    "ast_hash": "3bb7db990992178b04c18d7987451797",
     "semantic_hash": ""
   },
   "lib/utils/exportRelatorios.ts": {
@@ -3620,8 +3620,8 @@
     "semantic_hash": ""
   },
   "lib/utils/exportEstoqueRedeXlsx.ts": {
-    "mtime": 1784632863.7526011,
-    "ast_hash": "767c61cd94cbc4f925523495fb45b1e5",
+    "mtime": 1788540514.029621,
+    "ast_hash": "640438566ff42e3341368fb242979c35",
     "semantic_hash": ""
   },
   "app/(companies)/[company]/produto-giro/page.tsx": {
@@ -4265,8 +4265,8 @@
     "semantic_hash": ""
   },
   "lib/utils/exportRelatorioAbasXlsx.ts": {
-    "mtime": 1787760393.1313055,
-    "ast_hash": "dd966bae42c9a8f5af42c72309895832",
+    "mtime": 1788540565.5866637,
+    "ast_hash": "12f0517d978569ddb2c1a0792f5ceda2",
     "semantic_hash": ""
   },
   "lib/utils/romaneio-tipos.ts": {
@@ -4290,8 +4290,8 @@
     "semantic_hash": ""
   },
   "lib/reports/projecao-vendas.ts": {
-    "mtime": 1787844615.2288687,
-    "ast_hash": "e166f25ab0e6a560da5ee172524aaefb",
+    "mtime": 1788540413.9447618,
+    "ast_hash": "907172856a0096074e7069020398f1d2",
     "semantic_hash": ""
   },
   "lib/repositories/reportProjecaoVendas.ts": {
@@ -4300,8 +4300,8 @@
     "semantic_hash": ""
   },
   "lib/utils/exportProjecaoVendasXlsx.ts": {
-    "mtime": 1787844536.40259,
-    "ast_hash": "03c8aff9dcb6df3c97a7efc4f5a078fa",
+    "mtime": 1788540536.2520492,
+    "ast_hash": "00e85b2bb174e86ece4ea168a39d8186",
     "semantic_hash": ""
   },
   "lib/utils/projecao-vendas.ts": {
@@ -4330,8 +4330,8 @@
     "semantic_hash": ""
   },
   "lib/reports/custos-defeitos.ts": {
-    "mtime": 1788185563.0453906,
-    "ast_hash": "2746de6038559c83ba1211773b117a3b",
+    "mtime": 1788540413.9447618,
+    "ast_hash": "33733b47cfc5081d9cadac1218f98d0f",
     "semantic_hash": ""
   },
   "lib/repositories/reportCustosDefeitos.ts": {
@@ -4350,8 +4350,8 @@
     "semantic_hash": ""
   },
   "lib/utils/exportCustosDefeitosXlsx.ts": {
-    "mtime": 1788185563.048862,
-    "ast_hash": "c1e378cf08ccf650c396d8659c82c3b0",
+    "mtime": 1788540582.799924,
+    "ast_hash": "0e6af7d65ebca53a4bc58f546ba0e1d5",
     "semantic_hash": ""
   },
   "docs/INVESTIGACAO_B1.10.0023_FONE_TWS_VOLT.md": {
@@ -4390,8 +4390,8 @@
     "semantic_hash": ""
   },
   "app/api/projecao-compra/route.ts": {
-    "mtime": 1788530930.5392833,
-    "ast_hash": "b40d490189226b064755b4bafc1e129f",
+    "mtime": 1788542495.6746964,
+    "ast_hash": "dd996a819bf859c5bf8490ae4f1d16a9",
     "semantic_hash": ""
   },
   "components/stock/ProjecaoCompraPage.tsx": {
@@ -4415,8 +4415,8 @@
     "semantic_hash": ""
   },
   "lib/reports/tickets.ts": {
-    "mtime": 1788535223.5190878,
-    "ast_hash": "a130e0e591594d9ac5078103776960ce",
+    "mtime": 1788540413.9447618,
+    "ast_hash": "da758240f73a1c4a54433ed3aa4685e1",
     "semantic_hash": ""
   },
   "lib/repositories/reportTickets.ts": {
@@ -4425,8 +4425,13 @@
     "semantic_hash": ""
   },
   "lib/utils/exportTicketsXlsx.ts": {
-    "mtime": 1788535974.2071922,
-    "ast_hash": "8a8103579cf080ed4850990037599c1e",
+    "mtime": 1788540443.9946163,
+    "ast_hash": "b5bdd6901db06c435b7ab09e30154b38",
+    "semantic_hash": ""
+  },
+  "lib/utils/reportFilename.ts": {
+    "mtime": 1788540825.5694613,
+    "ast_hash": "ea92e9cd5b23abfadc080b9291ae7b31",
     "semantic_hash": ""
   }
 }

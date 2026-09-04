@@ -41,6 +41,20 @@ export interface SalesTotalsParams {
   /** Lista de produtos (IN) — filtra os totais por vários itens selecionados. */
   produtoIds?: string[] | null;
   produtoSearchTerm?: string | null;
+  /**
+   * Conta o ticket pela sua IDENTIDADE REAL (filial + número) em vez do número solto.
+   *
+   * O número do ticket é sequencial POR LOJA e se repete entre lojas, então o
+   * `COUNT(DISTINCT TICKET)` histórico funde tickets de lojas diferentes e SUBESTIMA a
+   * contagem sempre que há mais de uma filial no escopo — quanto maior a janela, pior
+   * (NERD 365d: 18.288 × 29.729 reais).
+   *
+   * É OPT-IN de propósito: ligado, muda o número de tickets (e o ticket médio) de quem
+   * chamar. O Dashboard, a Curva ABC, o Loja Raio X e os comparativos ficam no
+   * comportamento antigo para não moverem números já publicados; a Projeção de Compra
+   * liga porque lá a contagem é a própria métrica.
+   */
+  ticketsPorFilial?: boolean;
 }
 
 /**
@@ -179,6 +193,7 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
     produtoId,
     produtoIds,
     produtoSearchTerm,
+    ticketsPorFilial = false,
   } = params;
 
   if (!company) return { ...EMPTY };
@@ -215,6 +230,7 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
       grades: grades ?? null,
       colecoes: colecoes ?? null,
       produtoIds: produtoIds ?? null,
+      ticketsPorFilial,
     });
     const s = summary.summary;
     return {
@@ -246,6 +262,7 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
         grades: grades ?? null,
         colecoes: colecoes ?? null,
         produtoIds: produtoIds ?? null,
+        ticketsPorFilial,
       }),
     ]);
     const e = ecom.summary;
@@ -336,6 +353,17 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
           ${tipoClause}
           ${corClause}`;
 
+    /**
+     * Chave do ticket no COUNT(DISTINCT). Ligado o `ticketsPorFilial`, a chave é
+     * filial+número (a identidade real); desligado, fica o número solto — o
+     * comportamento histórico, preservado para não mover números já publicados.
+     * A data NÃO entra: conferido que (CODIGO_FILIAL, TICKET) nunca aparece em duas
+     * datas em 24 meses, e incluí-la arriscaria partir um ticket ao meio.
+     */
+    const ticketKeyExpr = ticketsPorFilial
+      ? `LTRIM(RTRIM(CAST(CODIGO_FILIAL AS VARCHAR(20)))) + '|' + LTRIM(RTRIM(CAST(TICKET AS VARCHAR(30))))`
+      : 'TICKET';
+
     const query = `
       WITH vendas_base AS (
         SELECT
@@ -388,6 +416,7 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
         SELECT
           v.DATA_VENDA,
           vt.TICKET,
+          vt.CODIGO_FILIAL,
           CAST((0 - vt.PRECO_LIQUIDO * vt.QTDE) AS DECIMAL(38,6)) AS VALOR_LIQUIDO_CALC,
           (0 - vt.QTDE) AS QTDE_LIQUIDA_CALC
         FROM LOJA_VENDA_TROCA vt WITH (NOLOCK)
@@ -438,6 +467,7 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
         SELECT
           vcn.DATA_VENDA,
           vcn.TICKET,
+          vcn.CODIGO_FILIAL,
           CAST((
             CAST(vcn.PRECO_LIQUIDO * vcn.QTDE AS DECIMAL(38,6))
             - CAST(vcn.DESCONTO_VENDA AS DECIMAL(38,6))
@@ -455,6 +485,7 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
         SELECT
           tp.DATA_VENDA,
           tp.TICKET,
+          tp.CODIGO_FILIAL,
           tp.VALOR_LIQUIDO_CALC,
           tp.QTDE_LIQUIDA_CALC
         FROM TrocasPuras tp
@@ -466,11 +497,11 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
         SUM(CASE WHEN DATA_VENDA >= @stPrevStart AND DATA_VENDA < @stPrevEnd THEN QTDE_LIQUIDA_CALC ELSE 0 END) AS previousQuantity,
         COUNT(DISTINCT CASE
           WHEN DATA_VENDA >= @stStart AND DATA_VENDA < @stEnd AND QTDE_LIQUIDA_CALC > 0
-          THEN TICKET ELSE NULL
+          THEN ${ticketKeyExpr} ELSE NULL
         END) AS currentTickets,
         COUNT(DISTINCT CASE
           WHEN DATA_VENDA >= @stPrevStart AND DATA_VENDA < @stPrevEnd AND QTDE_LIQUIDA_CALC > 0
-          THEN TICKET ELSE NULL
+          THEN ${ticketKeyExpr} ELSE NULL
         END) AS previousTickets,
         MAX(CASE WHEN DATA_VENDA >= @stStart AND DATA_VENDA < @stEnd THEN DATA_VENDA ELSE NULL END) AS lastSaleDate
       FROM MovimentoUnificado
