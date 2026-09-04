@@ -41,6 +41,7 @@ import {
   custosDefeitosMeta,
   CUSTOS_DEFEITOS_ID,
 } from "./custos-defeitos";
+import { buildTicketsPresets, ticketsMeta, TICKETS_ID } from "./tickets";
 
 /**
  * Registry PURO de tipos de análise (apenas metadados/colunas/presets).
@@ -59,6 +60,7 @@ export const REPORT_TYPES: ReportTypeMeta[] = [
   produtosCadastroMeta,
   compraSugeridaAbcMeta,
   clientesFilialMeta,
+  ticketsMeta,
   projecaoVendasMeta,
   custosDefeitosMeta,
 ];
@@ -98,6 +100,9 @@ export function getDefaultPresets(id: string, companyKey: CompanyKey): ReportPre
   }
   if (id === CUSTOS_DEFEITOS_ID) {
     return buildCustosDefeitosPresets();
+  }
+  if (id === TICKETS_ID) {
+    return buildTicketsPresets();
   }
   return getReportMeta(id)?.defaultPresets ?? [];
 }

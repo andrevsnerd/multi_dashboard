@@ -1590,8 +1590,8 @@
     "semantic_hash": "7100ad93329f4cae6f0cf2636fa8a06f"
   },
   "components/relatorios/GeradorRelatoriosPage.tsx": {
-    "mtime": 1788535485.6450968,
-    "ast_hash": "5be2c74b9018079ea07e031148328fca",
+    "mtime": 1788372521.9043384,
+    "ast_hash": "ee8d2c9499dc5d424b16445727198e50",
     "semantic_hash": ""
   },
   "components/romaneios/RomaneioDeleteModal.tsx": {
@@ -1645,8 +1645,8 @@
     "semantic_hash": "f9f455e79710f72c6b9952301879ebc6"
   },
   "components/stock/CompraSalvaDetalhePage.tsx": {
-    "mtime": 1788528421.632208,
-    "ast_hash": "01e7483cc3fcdcc3bb1050b865859f4f",
+    "mtime": 1787837454.5612767,
+    "ast_hash": "16ad15bf2a3acd73391e7a1394200309",
     "semantic_hash": ""
   },
   "components/stock/ComprasSalvasListPanel.tsx": {
@@ -2355,13 +2355,13 @@
     "semantic_hash": "fe8b4f01343d375ab3137eb62dc558f2"
   },
   "lib/reports/registry.server.ts": {
-    "mtime": 1788535376.5774956,
-    "ast_hash": "a6d4f532fb5abd3b083bb9db76caea10",
+    "mtime": 1787842233.3476315,
+    "ast_hash": "fb1893c281f5cfcecab4f53be8f44fae",
     "semantic_hash": ""
   },
   "lib/reports/registry.ts": {
-    "mtime": 1788535376.5774956,
-    "ast_hash": "85b6e489acf4bcc719953fc2d177acaa",
+    "mtime": 1788185563.0453906,
+    "ast_hash": "ecc9fee9d0755619dca5297ab2acfa4d",
     "semantic_hash": ""
   },
   "lib/reports/types.ts": {
@@ -2635,8 +2635,8 @@
     "semantic_hash": "29ce1c73943d226f43e1886d06bd8173"
   },
   "lib/services/salesTotals.ts": {
-    "mtime": 1788530796.3134966,
-    "ast_hash": "81d2a8779c89fdd7489b23bce293e0d7",
+    "mtime": 1785788884.4105797,
+    "ast_hash": "5658d101a4c4f57093d979c1f5d26a81",
     "semantic_hash": ""
   },
   "lib/transfer-executor.js": {
@@ -4390,13 +4390,13 @@
     "semantic_hash": ""
   },
   "app/api/projecao-compra/route.ts": {
-    "mtime": 1788530930.5392833,
-    "ast_hash": "b40d490189226b064755b4bafc1e129f",
+    "mtime": 1788445614.756677,
+    "ast_hash": "7e6476da4a44d36f44a3e5dfb268af44",
     "semantic_hash": ""
   },
   "components/stock/ProjecaoCompraPage.tsx": {
-    "mtime": 1788531104.2739482,
-    "ast_hash": "8fc0ebdaf4ab175dfd7a097c0a53a974",
+    "mtime": 1788453357.7845545,
+    "ast_hash": "d4bb0f1cb6665d327df873cc1aeb9937",
     "semantic_hash": ""
   },
   "lib/config/saida-estoque-negativo.ts": {
@@ -4412,21 +4412,6 @@
   "app/api/saidas-entradas-produtos/saida-editar/route.ts": {
     "mtime": 1788448647.6849658,
     "ast_hash": "0c5aab9460ce44c10299cc6b611eef75",
-    "semantic_hash": ""
-  },
-  "lib/reports/tickets.ts": {
-    "mtime": 1788535223.5190878,
-    "ast_hash": "a130e0e591594d9ac5078103776960ce",
-    "semantic_hash": ""
-  },
-  "lib/repositories/reportTickets.ts": {
-    "mtime": 1788536087.52643,
-    "ast_hash": "8a2c4ccfa45efc2e874c6648d92be9fe",
-    "semantic_hash": ""
-  },
-  "lib/utils/exportTicketsXlsx.ts": {
-    "mtime": 1788535974.2071922,
-    "ast_hash": "8a8103579cf080ed4850990037599c1e",
     "semantic_hash": ""
   }
 }

@@ -491,5 +491,6 @@
   "489": "RealizadasPanel.tsx",
   "490": "saida-estoque-negativo.ts",
   "491": "fix-tipos-romaneio-acento.mjs",
+  "492": "executeQueryWithParams",
   "499": "MultiSelectFilter.tsx"
 }

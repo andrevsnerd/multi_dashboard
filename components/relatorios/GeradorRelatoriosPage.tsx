@@ -31,6 +31,8 @@ import {
 import { CUSTOS_DEFEITOS_ID } from "@/lib/reports/custos-defeitos";
 import { exportProjecaoVendasXlsx } from "@/lib/utils/exportProjecaoVendasXlsx";
 import { exportCustosDefeitosXlsx } from "@/lib/utils/exportCustosDefeitosXlsx";
+import { exportTicketsXlsx } from "@/lib/utils/exportTicketsXlsx";
+import { TICKETS_ID } from "@/lib/reports/tickets";
 import { formatData, formatDataVenda, formatDiasAcabar, formatDiasParado } from "@/lib/reports/format";
 import { getDefaultPresets, getReportMeta, REPORT_TYPES, VENDAS_FATURAMENTO_ID } from "@/lib/reports/registry";
 import { computeExtraSources, getEditorExtraColumns } from "@/lib/reports/column-sources";
@@ -1180,6 +1182,21 @@ export default function GeradorRelatoriosPage({
         sortedRows,
         enabledColumns.map((c) => ({ key: c.key, label: c.label })),
         { companyKey, companyName, columnTypes, sheetName: meta?.label }
+      );
+      return;
+    }
+    // Tickets detalhados: export dedicado em 3 abas (faixa por ticket com os itens
+    // recolhíveis, tabela plana com autofiltro e resumo por ticket).
+    if (reportTypeId === TICKETS_ID) {
+      void exportTicketsXlsx(
+        sortedRows,
+        enabledColumns.map((c) => ({ key: c.key, label: c.label })),
+        {
+          companyKey,
+          range: { startDate: range.startDate, endDate: range.endDate },
+          filialLabel,
+          columnTypes,
+        }
       );
       return;
     }
