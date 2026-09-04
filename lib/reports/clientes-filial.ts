@@ -59,6 +59,7 @@ export function buildClientesFilialPresets(): ReportPresetDef[] {
 export const clientesFilialMeta: ReportTypeMeta = {
   id: CLIENTES_FILIAL_ID,
   label: "Clientes por filial",
+  fileSlug: "clientes",
   description:
     "Relação de clientes que compraram no período: total gasto, peças, tickets, 1ª e última compra, cidade, endereço e telefone — com uma coluna por filial mostrando quantos tickets o cliente fez em cada uma. Agrupa por cliente (nome); CPF/cidade/endereço/telefone vêm do cadastro.",
   supportedFilters: ["periodo", "filial"],

@@ -1,6 +1,7 @@
 import type { ColumnType, ReportCellValue, ReportPresetColumn, ReportRow } from "@/lib/reports/types";
 import { formatData, formatDataVenda, formatDiasAcabar, formatDiasParado } from "@/lib/reports/format";
 import { ROW_COLECAO_COD_FIELD, ROW_COLECAO_DESC_FIELD } from "@/lib/reports/keys";
+import { buildReportFilename } from "@/lib/utils/reportFilename";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ExcelJSCell = any;
@@ -14,12 +15,6 @@ export interface OutCol {
 
 export function safeFilenamePart(s: string): string {
   return s.replace(/[^a-zA-Z0-9_-]+/g, "_").slice(0, 48);
-}
-
-export function formatDateRange(start: Date, end: Date): string {
-  const fmt = (d: Date) =>
-    d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" }).replace(/\//g, "-");
-  return `${fmt(start)}_${fmt(end)}`;
 }
 
 /**
@@ -166,8 +161,15 @@ export async function exportRelatorioXlsx(
   columns: ReportPresetColumn[],
   options: {
     reportLabel: string;
+    /** Base CURTA do nome do arquivo (default: o próprio `reportLabel`). */
+    fileBase?: string;
     companyKey: string;
     range: { startDate: Date; endDate: Date };
+    /**
+     * true quando a análise NÃO tem filtro de período (estoque, cadastro, parados): o nome
+     * do arquivo carimba a data de geração em vez de um intervalo que não existe.
+     */
+    semPeriodo?: boolean;
     filialLabel?: string | null;
     sheetName?: string;
     /** Tipos por coluna; só diasParado/dataVenda/date são formatados como texto. */
@@ -318,13 +320,15 @@ export async function exportRelatorioXlsx(
     });
   }
 
-  const filialPart = options.filialLabel ? `-${safeFilenamePart(options.filialLabel)}` : "";
   await downloadXlsxWorkbook(
     workbook,
-    `${safeFilenamePart(options.reportLabel)}-${options.companyKey}${filialPart}-${formatDateRange(
-      options.range.startDate,
-      options.range.endDate
-    )}.xlsx`
+    buildReportFilename({
+      base: options.fileBase ?? options.reportLabel,
+      companyKey: options.companyKey,
+      filialLabel: options.filialLabel,
+      range: options.semPeriodo ? null : options.range,
+      data: options.semPeriodo ? new Date() : null,
+    })
   );
 }
 

@@ -263,6 +263,7 @@ export function buildVendasFaturamentoPresets(companyKey: CompanyKey): ReportPre
 export const vendasFaturamentoMeta: ReportTypeMeta = {
   id: VENDAS_FATURAMENTO_ID,
   label: "Vendas por faturamento",
+  fileSlug: "vendas",
   description:
     "Itens vendidos no período (por produto × cor), ordenados por faturamento líquido. Usa a mesma lógica validada da tela de Produtos (trocas, cancelamentos e descontos já tratados).",
   supportedFilters: [

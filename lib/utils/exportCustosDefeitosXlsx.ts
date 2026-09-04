@@ -41,7 +41,7 @@ export async function exportCustosDefeitosXlsx(
   const hoje = new Date().toLocaleDateString("pt-BR");
 
   await exportCompraPorLojaXlsx(rows as Array<Record<string, CellValue>>, mapped, {
-    fileLabel: "custos-defeitos",
+    fileLabel: "defeitos",
     companyKey: options.companyKey,
     sheetName: options.sheetName ?? "Custos de defeitos",
     titleLines: [

@@ -56,6 +56,7 @@ export function buildCustosDefeitosPresets(): ReportPresetDef[] {
 export const custosDefeitosMeta: ReportTypeMeta = {
   id: CUSTOS_DEFEITOS_ID,
   label: "Custos de defeitos",
+  fileSlug: "defeitos",
   description:
     "Cole a lista de produtos defeituosos (um código por linha, de barra ou do produto — igual à Lista Loja). Cada repetição conta +1 na quantidade. Devolve o detalhe do item, o custo unitário do cadastro, o custo total de cada linha e a soma geral. Não consulta estoque nem venda.",
   // Sem filtros: a entrada é a lista colada (a tela mostra o campo próprio desta análise).

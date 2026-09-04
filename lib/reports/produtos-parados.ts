@@ -61,6 +61,7 @@ export function buildProdutosParadosPresets(companyKey: CompanyKey): ReportPrese
 export const produtosParadosMeta: ReportTypeMeta = {
   id: PRODUTOS_PARADOS_ID,
   label: "Produtos parados",
+  fileSlug: "parados",
   description:
     "Produtos (por produto × cor) com estoque, mostrando há quantos dias estão sem vender (ou \"Nunca vendeu\") e a data da última venda. Mesma lógica da página Produtos Parados; ordene por Dias parado para ver os mais parados primeiro.",
   // Sem período (a defasagem é calculada até hoje).

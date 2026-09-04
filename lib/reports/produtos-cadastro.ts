@@ -60,6 +60,7 @@ export function buildProdutosCadastroPresets(companyKey: CompanyKey): ReportPres
 export const produtosCadastroMeta: ReportTypeMeta = {
   id: PRODUTOS_CADASTRO_ID,
   label: "Produtos por cadastro",
+  fileSlug: "cadastro",
   description:
     "Produtos (por produto × cor, com estoque) com a data de cadastro e há quantos dias foram cadastrados. Útil para achar itens novos ou antigos. Mesmo escopo da Estoque por filial.",
   supportedFilters: ["filial", "nome", "cor", "linha", "subgrupo", "grupo", "grade"],

@@ -3,14 +3,13 @@ import {
   buildOutCols,
   colLetter,
   downloadXlsxWorkbook,
-  formatDateRange,
   isNumericType,
   isSummableColumn,
   numFmtFor,
-  safeFilenamePart,
   widthFor,
   type OutCol,
 } from "./exportRelatorioXlsx";
+import { buildReportFilename } from "@/lib/utils/reportFilename";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ExcelJSCell = any;
@@ -313,6 +312,8 @@ export async function exportRelatorioAbasXlsx(
   columns: ReportPresetColumn[],
   options: {
     reportLabel: string;
+    /** Base CURTA do nome do arquivo (default: o próprio `reportLabel`). */
+    fileBase?: string;
     companyKey: string;
     range: { startDate: Date; endDate: Date };
     filialLabel?: string | null;
@@ -543,11 +544,15 @@ export async function exportRelatorioAbasXlsx(
     }
   }
 
-  const filialPart = options.filialLabel ? `-${safeFilenamePart(options.filialLabel)}` : "";
+  // "abas-<dimensão>" entra como hint: `vendas-abas-subgrupo-nerd-set.xlsx`.
   await downloadXlsxWorkbook(
     workbook,
-    `${safeFilenamePart(options.reportLabel)}-abas-${safeFilenamePart(dimensao.label)}-${
-      options.companyKey
-    }${filialPart}-${formatDateRange(options.range.startDate, options.range.endDate)}.xlsx`
+    buildReportFilename({
+      base: options.fileBase ?? options.reportLabel,
+      hint: `abas-${dimensao.label}`,
+      companyKey: options.companyKey,
+      filialLabel: options.filialLabel,
+      range: options.range,
+    })
   );
 }

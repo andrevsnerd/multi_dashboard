@@ -75,6 +75,7 @@ export function buildVendasHistoricoPresets(): ReportPresetDef[] {
 export const vendasHistoricoMeta: ReportTypeMeta = {
   id: VENDAS_HISTORICO_ID,
   label: "Histórico de vendas",
+  fileSlug: "historico-vendas",
   description:
     "Cada venda registrada de um item, sem agrupar: data, filial e vendedor de cada saída — loja (POS) e e-commerce (faturamento, sem vendedor). Use o filtro de produto para ver o histórico de um item específico.",
   supportedFilters: [

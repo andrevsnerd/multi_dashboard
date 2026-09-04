@@ -1,19 +1,10 @@
 import type { ColumnType, ReportPresetColumn, ReportRow } from "@/lib/reports/types";
 import { formatData } from "@/lib/reports/format";
 import { FILIAL_COMPRAS_COL_PREFIX } from "@/lib/reports/clientes-filial";
+import { buildReportFilename } from "@/lib/utils/reportFilename";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ExcelJSCell = any;
-
-function safeFilenamePart(s: string): string {
-  return s.replace(/[^a-zA-Z0-9_-]+/g, "_").slice(0, 48);
-}
-
-function formatDateRange(start: Date, end: Date): string {
-  const fmt = (d: Date) =>
-    d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" }).replace(/\//g, "-");
-  return `${fmt(start)}_${fmt(end)}`;
-}
 
 /** Letra(s) da coluna do Excel a partir do número (1 → A, 27 → AA). */
 function colLetter(n: number): string {
@@ -219,11 +210,12 @@ export async function exportClientesFilialXlsx(
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  const filialPart = options.filialLabel ? `-${safeFilenamePart(options.filialLabel)}` : "";
-  a.download = `clientes-por-filial-${options.companyKey}${filialPart}-${formatDateRange(
-    options.range.startDate,
-    options.range.endDate
-  )}.xlsx`;
+  a.download = buildReportFilename({
+    base: "clientes",
+    companyKey: options.companyKey,
+    filialLabel: options.filialLabel,
+    range: options.range,
+  });
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

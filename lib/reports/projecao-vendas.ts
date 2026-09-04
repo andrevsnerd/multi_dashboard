@@ -153,6 +153,7 @@ export function buildProjecaoVendasPresets(companyKey: CompanyKey): ReportPreset
 export const projecaoVendasMeta: ReportTypeMeta = {
   id: PROJECAO_VENDAS_ID,
   label: "Projeção de vendas",
+  fileSlug: "projecao",
   description:
     "Quanto cada item (produto × cor) deve vender no mês atual e nos próximos — uma coluna por mês, mais os dias até o estoque zerar. Cole a lista de códigos (código de barra interno ou código do produto) e cada item é projetado a partir da PRÓPRIA história. O ritmo vem da série MENSAL de vendas dos últimos 24 meses, medido na janela que termina no último mês com venda: item ativo usa os meses recentes, item que parou usa os meses em que vendia (e o relatório mostra há quanto tempo parou e a confiança da estimativa). Com \"Considerar estoque\" ligado a projeção para quando o estoque acaba; desligado, mostra a demanda pura do histórico — o modo de analisar antes de comprar, em que item já zerado continua mostrando quanto venderia. Nenhuma reconstrução de estoque retroativo entra na conta.",
   // Sem "periodo": o ritmo é sempre medido nos últimos 24 meses e a projeção começa no mês

@@ -1,22 +1,13 @@
 import type { ColumnType, ReportCellValue, ReportPresetColumn, ReportRow } from "@/lib/reports/types";
 import { formatData, formatDataVenda, formatDiasParado } from "@/lib/reports/format";
 import { ROW_COLECAO_COD_FIELD, ROW_COLECAO_DESC_FIELD } from "@/lib/reports/keys";
+import { buildReportFilename } from "@/lib/utils/reportFilename";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ExcelJSCell = any;
 
 /** Prefixo das colunas dinâmicas de estoque por filial (espelha o front / reportEstoque.ts). */
 const FILIAL_COL_PREFIX = "ESTOQUE_FILIAL::";
-
-function safeFilenamePart(s: string): string {
-  return s.replace(/[^a-zA-Z0-9_-]+/g, "_").slice(0, 48);
-}
-
-function formatDateRange(start: Date, end: Date): string {
-  const fmt = (d: Date) =>
-    d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" }).replace(/\//g, "-");
-  return `${fmt(start)}_${fmt(end)}`;
-}
 
 /** Letra(s) da coluna do Excel a partir do número (1 → A, 27 → AA). */
 function colLetter(n: number): string {
@@ -274,11 +265,13 @@ export async function exportEstoqueRedeXlsx(
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  const filialPart = options.filialLabel ? `-${safeFilenamePart(options.filialLabel)}` : "";
-  a.download = `estoque-por-filial-${options.companyKey}${filialPart}-${formatDateRange(
-    options.range.startDate,
-    options.range.endDate
-  )}.xlsx`;
+  // Saldo atual: o nome leva a data de geração, não um intervalo (a análise não tem período).
+  a.download = buildReportFilename({
+    base: "estoque",
+    companyKey: options.companyKey,
+    filialLabel: options.filialLabel,
+    data: options.range.endDate,
+  });
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

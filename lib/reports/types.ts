@@ -101,6 +101,12 @@ export interface ReportTypeMeta {
   id: string;
   label: string;
   description: string;
+  /**
+   * Apelido curto usado no NOME DO ARQUIVO exportado (ex.: "vendas", "parados").
+   * Sem isso o nome herdaria o `label` inteiro ("Vendas por faturamento") e ficaria
+   * gigante — ver [lib/utils/reportFilename.ts].
+   */
+  fileSlug?: string;
   supportedFilters: ReportFilterKey[];
   columns: ReportColumnDef[];
   defaultPresets: ReportPresetDef[];

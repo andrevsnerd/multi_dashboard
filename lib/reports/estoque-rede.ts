@@ -85,6 +85,7 @@ export function buildEstoqueRedePresets(companyKey: CompanyKey): ReportPresetDef
 export const estoqueRedeMeta: ReportTypeMeta = {
   id: ESTOQUE_REDE_ID,
   label: "Estoque por filial",
+  fileSlug: "estoque",
   description:
     "Estoque de todos os produtos (por produto × cor) da rede, com uma coluna por filial e o estoque total. Mesmo escopo da Estoque Consulta (saldos negativos só aparecem quando a filial está totalmente negativa).",
   // Sem período (estoque é o saldo atual) e sem filtro de filial (mostra todas).

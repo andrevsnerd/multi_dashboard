@@ -121,6 +121,7 @@ export function buildCompraSugeridaAbcPresets(companyKey: CompanyKey): ReportPre
 export const compraSugeridaAbcMeta: ReportTypeMeta = {
   id: COMPRA_SUGERIDA_ABC_ID,
   label: "Compra sugerida por Curva ABC",
+  fileSlug: "compra-sugerida",
   description:
     "Lista de compras consolidada da rede: para cada item da Curva ABC, traz a compra sugerida de CADA loja (só o que precisa comprar agora ou comprar essa semana). Uma coluna por loja; a Compra total e o Custo total são fórmulas dinâmicas no Excel — altere as quantidades das lojas e os totais se recalculam.",
   // Sem filtro de filial: o relatório é sempre da rede inteira (uma coluna por loja).

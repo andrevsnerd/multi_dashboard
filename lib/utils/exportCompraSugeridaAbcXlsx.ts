@@ -1,6 +1,7 @@
 import type { ColumnType, ReportPresetColumn, ReportRow } from "@/lib/reports/types";
 import { COMPRA_FILIAL_COL_PREFIX } from "@/lib/reports/compra-sugerida-abc";
 import { ROW_RUPTURA_FIELD } from "@/lib/reports/keys";
+import { buildReportFilename } from "@/lib/utils/reportFilename";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ExcelJSCell = any;
@@ -30,12 +31,6 @@ export function buildCompraSugeridaFileHint(singleValueFilters: Array<string | n
     .map((v) => (v ? slugifyFilenamePart(v) : ""))
     .filter(Boolean)
     .join("-");
-}
-
-function formatDateRange(start: Date, end: Date): string {
-  const fmt = (d: Date) =>
-    d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" }).replace(/\//g, "-");
-  return `${fmt(start)}_a_${fmt(end)}`;
 }
 
 /** Letra(s) da coluna do Excel a partir do número (1 → A, 27 → AA). */
@@ -416,10 +411,13 @@ export async function exportCompraPorLojaXlsx(
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  const rangePart = options.dateRange
-    ? `-${formatDateRange(options.dateRange.startDate, options.dateRange.endDate)}`
-    : "";
-  a.download = `${slugifyFilenamePart(options.fileLabel)}-${options.companyKey}${rangePart}.xlsx`;
+  // Sem período (ex.: Custos de defeitos) o nome carimba a data de geração.
+  a.download = buildReportFilename({
+    base: options.fileLabel,
+    companyKey: options.companyKey,
+    range: options.dateRange ?? null,
+    data: options.dateRange ? null : new Date(),
+  });
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

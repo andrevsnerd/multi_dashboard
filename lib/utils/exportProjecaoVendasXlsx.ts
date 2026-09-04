@@ -6,13 +6,10 @@ import {
   DIAS_ACABAR_SEM_GIRO,
   PROJECAO_MES_COL_PREFIX,
 } from "@/lib/reports/projecao-vendas";
+import { buildReportFilename } from "@/lib/utils/reportFilename";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ExcelJSCell = any;
-
-function safeFilenamePart(s: string): string {
-  return s.replace(/[^a-zA-Z0-9_-]+/g, "_").slice(0, 48);
-}
 
 /** Letra(s) da coluna do Excel a partir do número (1 → A, 27 → AA). */
 function colLetter(n: number): string {
@@ -394,12 +391,13 @@ export async function exportProjecaoVendasXlsx(
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  const hintPart = options.fileHint ? `-${safeFilenamePart(options.fileHint)}` : "";
-  const filialPart = options.filialLabel ? `-${safeFilenamePart(options.filialLabel)}` : "";
-  const dataPart = options.dataBase
-    .toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })
-    .replace(/\//g, "-");
-  a.download = `projecao-vendas-${options.companyKey}${filialPart}${hintPart}-${dataPart}.xlsx`;
+  a.download = buildReportFilename({
+    base: "projecao",
+    hint: options.fileHint,
+    companyKey: options.companyKey,
+    filialLabel: options.filialLabel,
+    data: options.dataBase,
+  });
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

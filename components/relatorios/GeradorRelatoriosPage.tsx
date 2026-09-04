@@ -1102,6 +1102,9 @@ export default function GeradorRelatoriosPage({
   }, [filial, companyKey]);
 
   const handleExport = () => {
+    // Nome do arquivo: base CURTA da análise (`fileSlug` do registry, ex.: "vendas",
+    // "parados") — o `label` inteiro deixava nomes gigantes. Ver [lib/utils/reportFilename.ts].
+    const fileBase = meta?.fileSlug ?? meta?.label ?? "relatorio";
     const columnTypes: Record<string, ColumnType> = {};
     for (const c of enabledColumns) columnTypes[c.key] = colTypeOf(effectiveCatalog, c.key);
     // Compra sugerida por Curva ABC: export dedicado com fórmulas (Compra total / Custo
@@ -1129,7 +1132,7 @@ export default function GeradorRelatoriosPage({
         cores.length === 1 ? cores[0] : null,
         tipos.length === 1 ? tipos[0] : null,
       ]);
-      const baseLabel = wantsRupturas ? "compra-sugerida-rupturas" : "compra-sugerida";
+      const baseLabel = wantsRupturas ? `${fileBase}-rupturas` : fileBase;
       void exportCompraSugeridaAbcXlsx(
         sortedRows,
         enabledColumns.map((c) => ({ key: c.key, label: c.label })),
@@ -1246,6 +1249,7 @@ export default function GeradorRelatoriosPage({
         enabledColumns.map((c) => ({ key: c.key, label: c.label })),
         {
           reportLabel: meta?.label ?? "relatorio",
+          fileBase,
           companyKey,
           range: { startDate: range.startDate, endDate: range.endDate },
           filialLabel,
@@ -1272,11 +1276,14 @@ export default function GeradorRelatoriosPage({
       enabledColumns.map((c) => ({ key: c.key, label: c.label })),
       {
         reportLabel: meta?.label ?? "relatorio",
+        fileBase,
         companyKey,
         range: { startDate: range.startDate, endDate: range.endDate },
         filialLabel,
         sheetName: meta?.label,
         columnTypes,
+        // Estoque/cadastro/parados não têm período: o nome carimba a data de geração.
+        semPeriodo: optionsFromStock,
       }
     );
   };

@@ -126,6 +126,7 @@ export function buildTicketsPresets(): ReportPresetDef[] {
 export const ticketsMeta: ReportTypeMeta = {
   id: TICKETS_ID,
   label: "Tickets detalhados",
+  fileSlug: "tickets",
   description:
     "Os tickets (vendas) do período, abertos item por item: uma linha por produto × cor × tamanho, com o vendedor, o valor do ticket e o valor de cada item. Os filtros de produto (nome, grupo, linha, subgrupo, coleção, cor…) escolhem quais TICKETS entram — e o ticket vem inteiro, com todos os seus itens, mesmo os que não casam com o filtro. Sem filtro nenhum, vêm todos os tickets do período com os totais. Só venda de loja física (POS): ticket e vendedor não existem no e-commerce.",
   supportedFilters: [
