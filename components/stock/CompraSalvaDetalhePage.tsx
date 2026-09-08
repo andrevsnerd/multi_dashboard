@@ -14,8 +14,11 @@ import {
 } from "@/lib/config/company";
 import type { CompraSalva, CompraSalvaItemRow } from "@/lib/types/compra-salva";
 import {
+  comParteAtacado,
+  DESTINO_ATACADO_LABEL,
   partesDestinoCompraFinal,
-  textoDestinoCompraFinal,
+  reservaAtacado,
+  textoPartesDestino,
   type DestinoCompraFinalParte,
 } from "@/lib/utils/compra-final-destino";
 import {
@@ -430,7 +433,11 @@ const DESTINO_FILIAL_BADGE_THEMES = [
   { bg: "#d6e4c4", fg: "#354418", border: "#8baa5e" },
 ] as const;
 
+/** ATACADO nao entra no sorteio de cores: quadradinho manual tem cor propria (ambar). */
+const DESTINO_ATACADO_BADGE_THEME = { bg: "#fde68a", fg: "#78350f", border: "#d97706" } as const;
+
 function destinoBadgeThemeForFilial(label: string) {
+  if (normalizeKey(label) === DESTINO_ATACADO_LABEL) return DESTINO_ATACADO_BADGE_THEME;
   let h = 2166136261;
   for (let i = 0; i < label.length; i++) {
     h ^= label.charCodeAt(i);
@@ -456,7 +463,12 @@ function getFilialOptions(companyKey: CompanyKey): string[] {
   (cfg.filialFilters.inventory ?? []).forEach(addLabel);
   (cfg.filialFilters.sales ?? []).forEach(addLabel);
 
-  return [...labels.values()].sort((a, b) => compareFilialDisplayOrder(a, b, cfg));
+  // ATACADO fecha a lista: nao e filial do registry, mas o editor manual precisa poder
+  // recolocar o quadradinho quando o comprador assume a distribuicao a mao.
+  return [
+    ...[...labels.values()].sort((a, b) => compareFilialDisplayOrder(a, b, cfg)),
+    DESTINO_ATACADO_LABEL,
+  ];
 }
 
 function ManualDestinoEditor({
@@ -546,6 +558,52 @@ function ManualDestinoEditor({
         </button>
       </div>
     </div>
+  );
+}
+
+/**
+ * Quadradinho do ATACADO na coluna Destino. E o unico destino digitado a mao dentro do modo
+ * automatico: o que entra aqui sai do total antes da regra por filial, entao as lojas
+ * continuam dividindo pela mesma logica de sempre — so sobre o que sobrou.
+ */
+function AtacadoQtdControl({ qtd, onSet }: { qtd: number; onSet: (valor: number) => void }) {
+  const t = DESTINO_ATACADO_BADGE_THEME;
+
+  if (qtd <= 0) {
+    return (
+      <button
+        type="button"
+        className={styles.atacadoAddBtn}
+        onClick={() => onSet(1)}
+        title="Separar pecas para o ATACADO. A quantidade reservada sai da distribuicao por filial e as lojas dividem o que sobra."
+      >
+        + ATACADO
+      </button>
+    );
+  }
+
+  return (
+    <span
+      className={styles.atacadoControl}
+      style={{ background: t.bg, color: t.fg, borderColor: t.border }}
+      title="Pecas separadas para o ATACADO. Sai da distribuicao por filial; as lojas dividem o que sobra."
+    >
+      <span className={styles.destinoFilialBadgeName}>{DESTINO_ATACADO_LABEL}</span>
+      <button type="button" className={styles.manualQtyBtn} onClick={() => onSet(qtd - 1)}>−</button>
+      <input
+        type="number"
+        min={0}
+        inputMode="numeric"
+        className={`${styles.manualQtyVal} ${styles.atacadoQtyVal}`}
+        value={qtd}
+        onChange={(e) => {
+          const v = parseInt(e.target.value, 10);
+          onSet(Number.isNaN(v) ? 0 : v);
+        }}
+        onFocus={(e) => e.currentTarget.select()}
+      />
+      <button type="button" className={styles.manualQtyBtn} onClick={() => onSet(qtd + 1)}>+</button>
+    </span>
   );
 }
 
@@ -790,10 +848,19 @@ export default function CompraSalvaDetalhePage({
   >({});
   const manualDistTamanhoRef = useRef(manualDistTamanho);
   manualDistTamanhoRef.current = manualDistTamanho;
+  /**
+   * Reserva de ATACADO por item: `itemKey` → quantidade separada à mão. É o único destino
+   * digitado dentro do modo automático — sai do total antes da regra e as lojas dividem o
+   * que sobra (10 com 1 no atacado = a mesma distribuição de sempre, sobre 9).
+   */
+  const [atacadoQtd, setAtacadoQtd] = useState<Record<string, number>>({});
+  const atacadoQtdRef = useRef(atacadoQtd);
+  atacadoQtdRef.current = atacadoQtd;
   const filialOptions = useMemo(() => getFilialOptions(companyKey), [companyKey]);
   const manualStorageKey = `compra-manual:${compraId}`;
   const manualTamanhoStorageKey = `compra-manual-tamanho:${compraId}`;
   const manualDistTamanhoStorageKey = `compra-manual-destino-tamanho:${compraId}`;
+  const atacadoStorageKey = `compra-atacado:${compraId}`;
 
   useEffect(() => {
     let cancelled = false;
@@ -930,6 +997,36 @@ export default function CompraSalvaDetalhePage({
       }
     } catch { /* ignora erros de storage */ }
   }, [manualState, manualDistTamanho, manualDistTamanhoStorageKey]);
+
+  // Restaura a reserva de ATACADO de cada item
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(atacadoStorageKey);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as Record<string, number>;
+      if (typeof saved !== "object" || saved === null) return;
+      const limpo: Record<string, number> = {};
+      for (const [itemKey, qtd] of Object.entries(saved)) {
+        const valor = Math.max(0, Math.round(Number(qtd)));
+        if (Number.isFinite(valor) && valor > 0) limpo[itemKey] = valor;
+      }
+      if (Object.keys(limpo).length === 0) return;
+      atacadoQtdRef.current = limpo;
+      setAtacadoQtd(limpo);
+    } catch { /* ignora dados corrompidos */ }
+  }, [atacadoStorageKey]);
+
+  // Persiste a reserva de ATACADO
+  useEffect(() => {
+    try {
+      const comReserva = Object.fromEntries(Object.entries(atacadoQtd).filter(([, qtd]) => qtd > 0));
+      if (Object.keys(comReserva).length > 0) {
+        localStorage.setItem(atacadoStorageKey, JSON.stringify(comReserva));
+      } else {
+        localStorage.removeItem(atacadoStorageKey);
+      }
+    } catch { /* ignora erros de storage */ }
+  }, [atacadoQtd, atacadoStorageKey]);
 
   const expandirPorCor = doc?.expandirPorCor ?? true;
 
@@ -1198,11 +1295,17 @@ export default function CompraSalvaDetalhePage({
       const emManual = itemManualState === "editing" || itemManualState === "confirmed";
       const hasManualTamanho = emManual && manualDistTamanho[it.itemKey] !== undefined;
       const hasManualOverride = emManual && manualDistribuicao[it.itemKey] !== undefined;
+      // No manual por filial o ATACADO vira uma linha do editor (o quadradinho entra na
+      // semente), entao a reserva fica inerte para nao contar a mesma peca duas vezes.
+      const atacadoBruto = hasManualOverride ? 0 : Math.max(0, Math.round(Number(atacadoQtd[it.itemKey] ?? 0)));
       const effectiveQtdManual = hasManualTamanho
-        ? (manualDistTamanhoTotalByItemKey[it.itemKey] ?? 0)
+        // Manual por tamanho: as lojas ja estao fixas na mao do comprador, entao a reserva
+        // soma por cima e a Qtd do item continua sendo tudo que foi comprado.
+        ? (manualDistTamanhoTotalByItemKey[it.itemKey] ?? 0) + atacadoBruto
         : hasManualOverride
           ? (manualTotalByItemKey[it.itemKey] ?? 0)
           : Math.max(0, Number(it.qtdManual ?? 0));
+      const { atacado, qtdParaLojas } = reservaAtacado(effectiveQtdManual, atacadoBruto);
       const match = listaRows.find((p) => {
         const pProd = (p.produto ?? "").trim();
         const pCor = (p.cor ?? "").trim();
@@ -1226,9 +1329,9 @@ export default function CompraSalvaDetalhePage({
           }
         : sugestaoBase;
       const qtdSugerida = sugestaoAtual.qty;
-      return { it, match, live, estoque, custoUnit, custoTotal, qtdSugerida, sugestaoAtual, effectiveQtdManual };
+      return { it, match, live, estoque, custoUnit, custoTotal, qtdSugerida, sugestaoAtual, effectiveQtdManual, atacado, qtdParaLojas };
     });
-  }, [items, listaRows, expandirPorCor, liveMetrics, manualDistribuicao, manualDistTamanho, manualState, manualTotalByItemKey, manualDistTamanhoTotalByItemKey, comprasTransitoIndex, companyKey, catraca.reconcile]);
+  }, [items, listaRows, expandirPorCor, liveMetrics, manualDistribuicao, manualDistTamanho, manualState, manualTotalByItemKey, manualDistTamanhoTotalByItemKey, atacadoQtd, comprasTransitoIndex, companyKey, catraca.reconcile]);
 
   // Catraca: junta gravações pendentes e persiste.
   const catracaFreezes = useMemo<CatracaFreeze[]>(() => {
@@ -1508,7 +1611,7 @@ export default function CompraSalvaDetalhePage({
    */
   const distTamanhoByItemKey = useMemo(() => {
     const mapa: Record<string, DistribuicaoPorTamanho | null> = {};
-    for (const { it, effectiveQtdManual } of rowsComputed) {
+    for (const { it, qtdParaLojas } of rowsComputed) {
       const produtoK = it.produto.trim();
       const corK = expandirPorCor ? ((it.corProduto ?? "").trim() || undefined) : undefined;
       const vendasKey = `${produtoK}||${corK ?? ""}`;
@@ -1531,7 +1634,8 @@ export default function CompraSalvaDetalhePage({
         });
       } else if (!isManualFilial && temGradeFashion && vendasRows !== undefined) {
         mapa[it.itemKey] = distribuirPorTamanho({
-          qtdTotal: effectiveQtdManual,
+          // O que foi para o ATACADO nao entra na grade: os tamanhos dividem o resto.
+          qtdTotal: qtdParaLojas,
           tamanhos: tamanhoInfo.tamanhos,
           estoquePorFilial: tamanhoInfo.porFilial,
           vendasPorFilial: vendasRows,
@@ -1580,7 +1684,7 @@ export default function CompraSalvaDetalhePage({
   const buildExportRows = (): CompraSalvaExportRow[] => {
     const fmt2 = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
 
-    return rowsComputed.flatMap(({ it, match, estoque, custoUnit, custoTotal, effectiveQtdManual }) => {
+    return rowsComputed.flatMap(({ it, match, estoque, custoUnit, custoTotal, effectiveQtdManual, atacado, qtdParaLojas }) => {
       const produtoK = it.produto.trim();
       const corK = expandirPorCor ? ((it.corProduto ?? "").trim() || undefined) : undefined;
       const vendasKey = `${produtoK}||${corK ?? ""}`;
@@ -1589,13 +1693,17 @@ export default function CompraSalvaDetalhePage({
       const distTamanho = distTamanhoByItemKey[it.itemKey] ?? null;
       const tamanhoInfo = tamanhosCache[vendasKey];
 
+      // O quadradinho do ATACADO abre o destino: a reserva vem antes da regra, então o
+      // arquivo mostra a mesma conta da tela (as linhas de tamanho somam o que sobrou).
+      const prefixoAtacado = atacado > 0 ? `${DESTINO_ATACADO_LABEL}: ${fmt2(atacado)} · ` : "";
+
       let destino: string;
       if (distTamanho) {
         // Peça fashion: o destino real está nas linhas de tamanho logo abaixo — vale tanto
         // para a distribuição da regra quanto para a que o comprador fez à mão.
-        destino = distTamanho.modo === "manual"
+        destino = prefixoAtacado + (distTamanho.modo === "manual"
           ? "por tamanho, à mão (ver linhas TAMANHO)"
-          : "por tamanho (ver linhas TAMANHO)";
+          : "por tamanho (ver linhas TAMANHO)");
       } else if (itemState === "confirmed") {
         const dist = manualDistribuicao[it.itemKey] ?? {};
         const cfg = resolveCompany(companyKey);
@@ -1605,7 +1713,14 @@ export default function CompraSalvaDetalhePage({
           .map(([label, qty]) => `${label}: ${fmt2(qty)}`)
           .join(" · ");
       } else {
-        destino = vendasRows !== undefined ? textoDestinoCompraFinal(effectiveQtdManual, vendasRows, companyKey, estoquePorFilialCache[vendasKey], getSharedLimiteDiasReposicao({ linha: match?.linha, subgrupo: match?.subgrupo })) : "";
+        destino = vendasRows !== undefined
+          ? textoPartesDestino(
+              comParteAtacado(
+                partesDestinoCompraFinal(qtdParaLojas, vendasRows, companyKey, estoquePorFilialCache[vendasKey], getSharedLimiteDiasReposicao({ linha: match?.linha, subgrupo: match?.subgrupo })),
+                atacado
+              )
+            )
+          : "";
       }
 
       const base = {
@@ -1965,7 +2080,8 @@ export default function CompraSalvaDetalhePage({
 
   /**
    * Grava a distribuição manual de UM tamanho e mantém a Qtd do item igual à soma de tudo —
-   * a mesma conta do manual por filial, só uma dimensão mais fundo.
+   * a mesma conta do manual por filial, só uma dimensão mais fundo. A reserva de ATACADO
+   * entra por cima: ela não está em nenhum tamanho, mas foi comprada.
    */
   const aplicarManualDistTamanho = (
     itemKey: string,
@@ -1976,7 +2092,8 @@ export default function CompraSalvaDetalhePage({
     const next = { ...manualDistTamanhoRef.current, [itemKey]: doItem };
     manualDistTamanhoRef.current = next;
     setManualDistTamanho(next);
-    const total = Object.values(doItem).reduce((soma, loja) => soma + sumDistribuicaoManual(loja), 0);
+    const somaTamanhos = Object.values(doItem).reduce((soma, loja) => soma + sumDistribuicaoManual(loja), 0);
+    const total = somaTamanhos + Math.max(0, Math.round(Number(atacadoQtdRef.current[itemKey] ?? 0)));
     setItems((prev) => prev.map((i) => (i.itemKey === itemKey ? { ...i, qtdManual: total } : i)));
     void handleUpdateQtd(itemKey, total);
   };
@@ -2024,6 +2141,7 @@ export default function CompraSalvaDetalhePage({
     itemKey: string,
     ordinal: number,
     value: number,
+    /** Qtd que está na grade — já sem o que foi separado para o ATACADO. */
     qtdAtualItem: number,
     tamanhosNaGrade: number
   ) => {
@@ -2039,8 +2157,10 @@ export default function CompraSalvaDetalhePage({
     const somaTravada = Object.values(doItem).reduce((soma, v) => soma + v, 0);
     const gradeTodaTravada = tamanhosNaGrade > 0 && Object.keys(doItem).length >= tamanhosNaGrade;
     if (somaTravada > qtdAtualItem || (gradeTodaTravada && somaTravada !== qtdAtualItem)) {
-      setItems((prev) => prev.map((i) => (i.itemKey === itemKey ? { ...i, qtdManual: somaTravada } : i)));
-      void handleUpdateQtd(itemKey, somaTravada);
+      // A reserva de ATACADO continua fora da grade: a Qtd do item é a grade mais ela.
+      const total = somaTravada + Math.max(0, Math.round(Number(atacadoQtdRef.current[itemKey] ?? 0)));
+      setItems((prev) => prev.map((i) => (i.itemKey === itemKey ? { ...i, qtdManual: total } : i)));
+      void handleUpdateQtd(itemKey, total);
     }
   };
 
@@ -2061,6 +2181,52 @@ export default function CompraSalvaDetalhePage({
     delete next[itemKey];
     manualTamanhoQtdRef.current = next;
     setManualTamanhoQtd(next);
+  };
+
+  /**
+   * Grava a reserva de ATACADO do item.
+   *
+   * No automático a peça só troca de destino: `teto` é a Qtd do item, a reserva sai do total
+   * antes da regra e a Qtd não muda — 10 peças com 1 no atacado viram a mesma distribuição
+   * de sempre sobre 9. No manual por tamanho as lojas já estão fixas na mão do comprador,
+   * então a reserva entra por cima (`somaTamanhos`) e a Qtd do item sobe junto.
+   */
+  const handleAtacadoSet = (
+    itemKey: string,
+    valor: number,
+    { teto, somaTamanhos }: { teto: number | null; somaTamanhos: number | null }
+  ) => {
+    const bruto = Number(valor);
+    let qtd = Math.max(0, Math.round(Number.isFinite(bruto) ? bruto : 0));
+    if (teto !== null) qtd = Math.min(qtd, Math.max(0, Math.round(teto)));
+
+    const next = { ...atacadoQtdRef.current };
+    if (qtd > 0) next[itemKey] = qtd;
+    else delete next[itemKey];
+    atacadoQtdRef.current = next;
+    setAtacadoQtd(next);
+
+    if (somaTamanhos !== null) {
+      const total = Math.max(0, Math.round(somaTamanhos)) + qtd;
+      setItems((prev) => prev.map((i) => (i.itemKey === itemKey ? { ...i, qtdManual: total } : i)));
+      void handleUpdateQtd(itemKey, total);
+      return;
+    }
+
+    // Grade com tamanho travado à mão: se a reserva não cabe junto com as travas, quem sobe
+    // é a Qtd — mesma regra de sempre (quem digitou 4 no P quer 4 no P).
+    if (teto !== null) {
+      const travas = manualTamanhoQtdRef.current[itemKey];
+      const somaTravada = Object.values(travas ?? {}).reduce(
+        (soma, v) => soma + Math.max(0, Math.round(Number(v) || 0)),
+        0
+      );
+      if (somaTravada > 0 && somaTravada + qtd > Math.max(0, Math.round(teto))) {
+        const total = somaTravada + qtd;
+        setItems((prev) => prev.map((i) => (i.itemKey === itemKey ? { ...i, qtdManual: total } : i)));
+        void handleUpdateQtd(itemKey, total);
+      }
+    }
   };
 
   const handleManualAddFilial = (itemKey: string, filial: string) => {
@@ -2285,7 +2451,7 @@ export default function CompraSalvaDetalhePage({
                   </tr>
                 </thead>
                 <tbody>
-                  {rowsComputed.map(({ it, match, live, estoque, custoUnit, custoTotal, qtdSugerida, sugestaoAtual, effectiveQtdManual }) => {
+                  {rowsComputed.map(({ it, match, live, estoque, custoUnit, custoTotal, qtdSugerida, sugestaoAtual, effectiveQtdManual, atacado, qtdParaLojas }) => {
                     const itemManualState = manualState[it.itemKey] ?? "auto";
                     const isEditing = itemManualState === "editing";
                     const isConfirmed = itemManualState === "confirmed";
@@ -2295,14 +2461,21 @@ export default function CompraSalvaDetalhePage({
                     const vendasKey = `${produtoK}||${corK ?? ""}`;
                     const vendasRowsK = vendasPorFilialCache[vendasKey];
                     const estoqueRowsK = estoquePorFilialCache[vendasKey];
-                    const partesDestino =
+                    // A regra roda sobre o que sobrou depois da reserva de ATACADO; o
+                    // quadradinho do atacado entra nas partes so na hora de comparar,
+                    // exportar e semear o modo manual (na tela ele tem seu proprio controle).
+                    const partesLojas =
                       vendasRowsK === undefined
                         ? undefined
-                        : partesDestinoCompraFinal(effectiveQtdManual, vendasRowsK, companyKey, estoqueRowsK, getSharedLimiteDiasReposicao({ linha: match?.linha, subgrupo: match?.subgrupo }));
+                        : partesDestinoCompraFinal(qtdParaLojas, vendasRowsK, companyKey, estoqueRowsK, getSharedLimiteDiasReposicao({ linha: match?.linha, subgrupo: match?.subgrupo }));
+                    const partesDestino = partesLojas === undefined ? undefined : comParteAtacado(partesLojas, atacado);
                     const partesDestinoSugerido =
                       vendasRowsK === undefined || qtdSugerida === null
                         ? undefined
-                        : partesDestinoCompraFinal(qtdSugerida, vendasRowsK, companyKey, estoqueRowsK, getSharedLimiteDiasReposicao({ linha: match?.linha, subgrupo: match?.subgrupo }));
+                        : comParteAtacado(
+                            partesDestinoCompraFinal(Math.max(0, qtdSugerida - atacado), vendasRowsK, companyKey, estoqueRowsK, getSharedLimiteDiasReposicao({ linha: match?.linha, subgrupo: match?.subgrupo })),
+                            atacado
+                          );
 
                     // ── Peça fashion (grade com P, M ou G): quebra em uma linha por tamanho ──
                     // A quantidade salva continua mandando; a regra só reparte entre as 4 lojas
@@ -2313,6 +2486,23 @@ export default function CompraSalvaDetalhePage({
                     // Manual de peça fashion: a mão do comprador desce até o tamanho, então as
                     // linhas de P/M/G continuam na tela — cada uma com seu editor de lojas.
                     const manualPorTamanho = isManual && distTamanho?.modo === "manual";
+                    // Quadradinho do ATACADO: no automatico ele carrega peca da regra para a
+                    // reserva (a Qtd nao muda); no manual por tamanho a mao ja fixou as lojas,
+                    // entao a reserva soma por cima e a Qtd do item sobe junto.
+                    const atacadoControl = (
+                      <AtacadoQtdControl
+                        qtd={atacado}
+                        onSet={(valor) =>
+                          handleAtacadoSet(
+                            it.itemKey,
+                            valor,
+                            manualPorTamanho
+                              ? { teto: null, somaTamanhos: manualDistTamanhoTotalByItemKey[it.itemKey] ?? 0 }
+                              : { teto: effectiveQtdManual, somaTamanhos: null }
+                          )
+                        }
+                      />
+                    );
 
                     return (
                     <React.Fragment key={it.itemKey}>
@@ -2393,6 +2583,7 @@ export default function CompraSalvaDetalhePage({
                                   <span className={styles.destinoPorTamanhoNota}>
                                     editando por tamanho ↓
                                   </span>
+                                  {atacadoControl}
                                 </div>
                               ) : (
                                 <ManualDestinoEditor
@@ -2425,12 +2616,15 @@ export default function CompraSalvaDetalhePage({
                             <div>
                               <div className={styles.destinoCellInner}>
                                 {manualPorTamanho ? (
-                                  <span className={styles.destinoPorTamanhoNota}>
-                                    por tamanho ↓
-                                    <span className={styles.gradeTravaBadge} title="Distribuição feita à mão, tamanho por tamanho.">
-                                      à mão
+                                  <>
+                                    <span className={styles.destinoPorTamanhoNota}>
+                                      por tamanho ↓
+                                      <span className={styles.gradeTravaBadge} title="Distribuição feita à mão, tamanho por tamanho.">
+                                        à mão
+                                      </span>
                                     </span>
-                                  </span>
+                                    {atacadoControl}
+                                  </>
                                 ) : (() => {
                                   const cfg = resolveCompany(companyKey);
                                   const manualPartes: DestinoCompraFinalParte[] = Object.entries(manualDistribuicao[it.itemKey] ?? {})
@@ -2476,11 +2670,12 @@ export default function CompraSalvaDetalhePage({
                                       </span>
                                     )}
                                   </span>
-                                ) : partesDestino === undefined
+                                ) : partesLojas === undefined
                                   ? "…"
-                                  : partesDestino === null
-                                    ? "—"
-                                    : <DestinoCompraFinalBadges partes={partesDestino} />}
+                                  : partesLojas === null
+                                    ? (atacado > 0 ? null : "—")
+                                    : <DestinoCompraFinalBadges partes={partesLojas} />}
+                                {atacadoControl}
                                 {(live === undefined || sugestaoAtual.ideal) ? (
                                   <span style={{ marginLeft: 6 }}>
                                     <CompraIdealCell
@@ -2668,7 +2863,7 @@ export default function CompraSalvaDetalhePage({
                                         it.itemKey,
                                         linha.ordinal,
                                         Number(e.target.value ?? 0),
-                                        effectiveQtdManual,
+                                        qtdParaLojas,
                                         distTamanho.tamanhosNaGrade
                                       )
                                     }

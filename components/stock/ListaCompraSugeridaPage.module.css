@@ -1364,6 +1364,47 @@
   margin: 0;
 }
 
+/* ── Reserva de ATACADO: quadradinho manual dentro da coluna Destino ── */
+.atacadoControl {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 7px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.atacadoQtyVal {
+  width: 40px;
+  min-width: 40px;
+  height: 18px;
+}
+
+.atacadoAddBtn {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px dashed #d97706;
+  background: transparent;
+  color: #b45309;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  line-height: 1.6;
+  transition: background 0.15s, color 0.15s;
+}
+
+.atacadoAddBtn:hover {
+  background: #fde68a;
+  color: #78350f;
+}
+
 .manualAddFilialRow {
   display: flex;
   align-items: center;

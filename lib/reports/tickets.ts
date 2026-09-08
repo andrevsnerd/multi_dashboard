@@ -29,8 +29,9 @@ export const TICKETS_COLUMNS: ReportColumnDef[] = [
   { key: "QTDE_ITEM", defaultLabel: "Qtde", type: "int" },
   { key: "VALOR_ITEM", defaultLabel: "Valor", type: "currency" },
   { key: "DESCONTO_ITEM", defaultLabel: "Desconto", type: "currency" },
-  // Preço de tabela do cadastro (PRECO_LIQUIDO da linha de venda), ANTES do desconto —
-  // fica por último de propósito: o que se lê primeiro é o Valor que a peça fez.
+  // Preço CADASTRADO no Linx (PRODUTOS.PRECO_REPOSICAO_1), não o que o caixa bateu — os
+  // dois divergem quando se dá desconto no balão do preço. Fica por último de propósito: o
+  // que se lê primeiro é o Valor que a peça fez. O preço cobrado sai de Valor + Desconto.
   { key: "PRECO_UNITARIO", defaultLabel: "Preço Linx", type: "currency" },
   // ── Atributos de cadastro do item ──
   { key: "GRUPO", defaultLabel: "Grupo", type: "text" },

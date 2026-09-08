@@ -127,7 +127,40 @@ export function textoDestinoCompraFinal(
   limiteDias = 60
 ): string {
   const partesH = partesDestinoCompraFinal(qtdManual, vendasPorFilial, companyKey, estoquePorFilial, limiteDias);
-  if (partesH === null) return "—";
+  return textoPartesDestino(partesH);
+}
+
+/** Mesmo texto "LOJA: qtd · LOJA: qtd" a partir de partes já montadas. */
+export function textoPartesDestino(partes: DestinoCompraFinalParte[] | null | undefined): string {
+  if (!partes || partes.length === 0) return "—";
   const fmt = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
-  return partesH.map((p) => `${p.label}: ${fmt(p.qtd)}`).join(" · ");
+  return partes.map((p) => `${p.label}: ${fmt(p.qtd)}`).join(" · ");
+}
+
+/**
+ * Destino virtual do ATACADO — peças separadas à mão, fora da regra por filial. Não é uma
+ * filial do registry: é um quadradinho a mais na coluna Destino.
+ */
+export const DESTINO_ATACADO_LABEL = "ATACADO";
+
+/**
+ * Reserva do ATACADO: a quantidade reservada sai do total ANTES da regra e o que sobra segue
+ * a distribuição normal. 10 peças com 1 no atacado = a mesma regra de sempre, sobre 9.
+ */
+export function reservaAtacado(
+  qtdTotal: number,
+  atacadoBruto: number
+): { atacado: number; qtdParaLojas: number } {
+  const total = Math.max(0, Math.round(Number(qtdTotal) || 0));
+  const atacado = Math.max(0, Math.min(Math.round(Number(atacadoBruto) || 0), total));
+  return { atacado, qtdParaLojas: total - atacado };
+}
+
+/** Coloca o quadradinho do ATACADO na frente das partes vindas da regra. */
+export function comParteAtacado(
+  partes: DestinoCompraFinalParte[] | null | undefined,
+  atacado: number
+): DestinoCompraFinalParte[] | null {
+  if (atacado <= 0) return partes ?? null;
+  return [{ label: DESTINO_ATACADO_LABEL, qtd: atacado }, ...(partes ?? [])];
 }

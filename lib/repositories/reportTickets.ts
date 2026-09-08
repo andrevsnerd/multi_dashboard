@@ -133,7 +133,8 @@ interface TicketItemRaw {
   colecao: string;
   grade: string;
   qtde: number;
-  precoUnitario: number;
+  /** Preço do CADASTRO (PRODUTOS.PRECO_REPOSICAO_1). `null` = sem preço cadastrado. */
+  precoUnitario: number | null;
   desconto: number;
   valorItem: number;
 }
@@ -173,6 +174,21 @@ interface TicketAgg {
  * cor, tipo) escolhem quais TICKETS entram — e o ticket vem INTEIRO, com todos os seus
  * itens. É o que se quer ao perguntar "o que mais sai junto com a capa de couro?".
  * Período e filial, por serem do próprio ticket, recortam normalmente.
+ *
+ * ── Preço ───────────────────────────────────────────────────────────────────────
+ * "Preço Linx" (`PRECO_UNITARIO`) é o preço CADASTRADO, NÃO o `PRECO_LIQUIDO` da linha de
+ * venda: o caixa pode bater um valor diferente do cadastro, e foi o que gerou o relato
+ * (ticket 00014022, item N4.8M.0004 → saiu a 358 com o cadastro em 398). O preço
+ * efetivamente cobrado não se perde: `Valor + Desconto` devolve `PRECO_LIQUIDO × QTDE`.
+ *
+ * Fonte primária: `PRODUTOS.PRECO_REPOSICAO_1` — a mesma tabela mestre que o resto do
+ * Gerador usa para custo/preço ([[gerador-custo-preco-da-tabela-mestre]]). Reserva:
+ * `PRODUTOS_PRECOS.PRECO1` da tabela de preço DO PRÓPRIO TICKET (`LOJA_VENDA
+ * .CODIGO_TAB_PRECO`, hoje '01' em 100% dos 32.331 tickets NERD de 12 meses). A reserva
+ * existe porque 84 produtos ativos têm o preço sugerido zerado e só têm preço na tabela —
+ * sem ela a coluna sairia em branco justamente neles. As duas fontes concordam em 15.834
+ * de 15.918 produtos ativos e acertam o preço batido o MESMO número de vezes, então a
+ * escolha da primária é por consistência com o resto do Gerador, não por precisão.
  *
  * ── Escopo ──────────────────────────────────────────────────────────────────────
  * Só venda de loja física (POS): ticket e vendedor não existem no e-commerce
@@ -424,7 +440,10 @@ export async function fetchTickets(filters: ReportFilters): Promise<ReportResult
         MAX(LTRIM(RTRIM(ISNULL(CAST(p.COLECAO AS VARCHAR(60)), '')))) AS colecao,
         MAX(LTRIM(RTRIM(ISNULL(CAST(p.GRADE AS VARCHAR(60)), '')))) AS grade,
         SUM(m.QTDE_LIQUIDA_CALC) AS qtde,
-        MAX(m.PRECO_LIQUIDO) AS precoUnitario,
+        MAX(COALESCE(
+          NULLIF(CAST(p.PRECO_REPOSICAO_1 AS DECIMAL(18, 2)), 0),
+          NULLIF(CAST(pp.PRECO1 AS DECIMAL(18, 2)), 0)
+        )) AS precoUnitario,
         SUM(m.DESCONTO_VENDA) AS desconto,
         SUM(m.VALOR_LIQUIDO_CALC) AS valorItem
       FROM movimento m
@@ -437,6 +456,9 @@ export async function fetchTickets(filters: ReportFilters): Promise<ReportResult
         ON p.PRODUTO = m.PRODUTO
       LEFT JOIN PRODUTOS_TAMANHOS pt WITH (NOLOCK)
         ON LTRIM(RTRIM(CONVERT(VARCHAR(60), pt.GRADE))) = LTRIM(RTRIM(CONVERT(VARCHAR(60), p.GRADE)))
+      LEFT JOIN PRODUTOS_PRECOS pp WITH (NOLOCK)
+        ON LTRIM(RTRIM(pp.PRODUTO)) = LTRIM(RTRIM(m.PRODUTO))
+        AND LTRIM(RTRIM(pp.CODIGO_TAB_PRECO)) = COALESCE(NULLIF(LTRIM(RTRIM(v.CODIGO_TAB_PRECO)), ''), '01')
       LEFT JOIN LOJA_VENDEDORES lv WITH (NOLOCK)
         ON LTRIM(RTRIM(CAST(lv.VENDEDOR AS VARCHAR(20)))) = LTRIM(RTRIM(CAST(v.VENDEDOR AS VARCHAR(20))))
       LEFT JOIN (
@@ -484,7 +506,8 @@ export async function fetchTickets(filters: ReportFilters): Promise<ReportResult
         colecao: (r.colecao ?? "").trim(),
         grade: (r.grade ?? "").trim(),
         qtde: Number(r.qtde ?? 0),
-        precoUnitario: Number(r.precoUnitario ?? 0),
+        precoUnitario:
+          r.precoUnitario != null && Number(r.precoUnitario) > 0 ? Number(r.precoUnitario) : null,
         desconto: Number(r.desconto ?? 0),
         valorItem: Number(r.valorItem ?? 0),
       })),
@@ -600,7 +623,9 @@ export async function fetchTickets(filters: ReportFilters): Promise<ReportResult
             ? item.tamanhoLabel || (item.tamanho > 0 ? String(item.tamanho) : "")
             : "",
         QTDE_ITEM: roundInt(item.qtde),
-        PRECO_UNITARIO: round2(item.precoUnitario),
+        // Preço de tabela do cadastro; em branco quando o produto não tem preço cadastrado
+        // (melhor que R$ 0,00, que se confundiria com brinde).
+        PRECO_UNITARIO: item.precoUnitario != null ? round2(item.precoUnitario) : null,
         DESCONTO_ITEM: round2(item.desconto),
         VALOR_ITEM: round2(item.valorItem),
         GRUPO: item.grupo,
