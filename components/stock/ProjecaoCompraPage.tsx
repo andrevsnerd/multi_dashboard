@@ -976,8 +976,11 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
             )}
           </span>
         )}
+        {/* Só a projeção acende o "calculando". A base de produtos (curva-abc, 12 meses) também
+            carrega na montagem, mas isso não é cálculo — o próprio select de Produto mostra
+            "Carregando…" quando aberto. */}
         <span
-          className={`${styles.loadingCue} ${projLoading || pickerLoading ? styles.loadingCueActive : ""}`}
+          className={`${styles.loadingCue} ${projLoading ? styles.loadingCueActive : ""}`}
           role="status"
         >
           <span className={styles.spinner} aria-hidden="true" />
