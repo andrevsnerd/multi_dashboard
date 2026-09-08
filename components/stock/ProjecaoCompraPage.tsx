@@ -363,7 +363,10 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   const dimFiltradas = useMemo(() => DIM_KEYS.filter((dim) => dims[dim].length > 0), [dims]);
   const temDimensao = dimFiltradas.length > 0;
   const temSelecao = selectedProdutos.size > 0;
-  /** Há recorte montado na barra de filtros (ainda não necessariamente gerado). */
+  /**
+   * Há recorte montado na barra de filtros (ainda não necessariamente gerado). Sem recorte a
+   * projeção continua valendo: é o TOTAL DA REDE, o número contra o qual se compara o recorte.
+   */
   const temEscopo = temSelecao || temDimensao;
   /** Já existe projeção na tela. */
   const gerado = pedido !== null;
@@ -412,7 +415,6 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   }, [pedido, pickerRows]);
 
   const gerarProjecao = () => {
-    if (!temEscopo) return;
     setPedido({ dataBase, metrica, dims, produtos: produtosSelecionados });
   };
 
@@ -753,6 +755,12 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
     setDims(EMPTY_DIMS);
   };
 
+  /** O que está na tela é a rede inteira (geraram sem nenhum recorte). */
+  const escopoRede =
+    pedido !== null &&
+    pedido.produtos.length === 0 &&
+    DIM_KEYS.every((dim) => pedido.dims[dim].length === 0);
+
   /** Métrica dos números NA TELA (o toggle ao vivo só vale depois de gerar). */
   const metricaAplicada: Metrica = pedido?.metrica ?? metrica;
   const ehTickets = metricaAplicada === "tickets";
@@ -936,16 +944,16 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
             type="button"
             className={styles.btnGerar}
             onClick={gerarProjecao}
-            disabled={!temEscopo || projLoading || (gerado && !pendente)}
+            disabled={projLoading || (gerado && !pendente)}
             title={
-              !temEscopo
-                ? "Monte um recorte primeiro"
-                : gerado && !pendente
+              gerado && !pendente
                 ? "Nada mudou desde a última projeção"
+                : !temEscopo
+                ? "Gerar projeção da rede inteira (sem filtro)"
                 : `Gerar projeção (${fmt(totalRecortes)} ${totalRecortes === 1 ? "item" : "itens"} no recorte)`
             }
           >
-            {projLoading ? "Gerando…" : "Gerar projeção"}
+            {projLoading ? "Gerando…" : temEscopo ? "Gerar projeção" : "Gerar total da rede"}
           </button>
         </div>
       </div>
@@ -970,6 +978,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
               </>
             ) : (
               <>
+                {escopoRede && <>Rede inteira · </>}
                 {fmt(agregado.itens)} itens
                 {!ehTickets && <> · estoque {fmt(estoqueAtual)} un</>}
               </>
@@ -990,9 +999,10 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
 
       {!gerado ? (
         <div className={styles.emptyPanel}>
-          <div className={styles.emptyTitle}>Monte o recorte e gere a projeção</div>
+          <div className={styles.emptyTitle}>Gere a projeção</div>
           <div className={styles.emptyText}>
-            Filtre por cadastro ou selecione produtos e clique em <strong>Gerar projeção</strong>.
+            Filtre por cadastro ou selecione produtos — ou deixe tudo em <strong>Todos</strong> para
+            o total da rede.
           </div>
         </div>
       ) : (

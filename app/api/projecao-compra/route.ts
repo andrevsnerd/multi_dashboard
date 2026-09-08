@@ -107,11 +107,10 @@ export async function GET(request: Request) {
   if (!isValidYmd(baseParam)) {
     return NextResponse.json({ error: 'Parâmetro "base" (yyyy-MM-dd) inválido' }, { status: 400 });
   }
-  // Sem escopo algum a projeção seria "a rede inteira somada", que não é um cenário de
-  // compra útil (e custaria 5 varreduras completas). A tela cobra ao menos um recorte.
-  if (produtoIds.length === 0 && !temDimensao) {
-    return NextResponse.json({ dataBase: baseParam, windows: WINDOWS, metrica, itens: [] });
-  }
+  // Sem recorte algum a consulta é o TOTAL DA REDE — cenário válido (é o número que a
+  // Projeção Compra compara com o recorte). Na métrica `produtos` isso muda a forma de
+  // medir: ver `detalharItens` abaixo.
+  const temEscopo = produtoIds.length > 0 || temDimensao;
   // Cada produto/valor de filtro vira um PARÂMETRO na consulta, e o SQL Server aceita no
   // máximo ~2100 por request. Com "Selecionar tudo" ficou fácil passar disso, então o erro
   // é explícito (a tela mostra a mensagem) em vez de estourar no driver.
@@ -263,19 +262,24 @@ export async function GET(request: Request) {
 
     // Uma consulta por janela (a maior é 365d), escopada aos produtos selecionados → leve.
     // Reusa a lógica VALIDADA de vendas (fetchFilialProdutoSales: POS com trocas + e-commerce).
-    const perWindow = await Promise.all(
-      WINDOWS.map(async (dias) => {
-        const range = normalizeRangeForQuery({
-          start: addDaysYmd(baseParam, -dias),
-          end: addDaysYmd(baseParam, -1),
-        });
-        const rows = await fetchFilialProdutoSales(companyKey, posMembers, ecomMembers, range, 'month', {
-          groupByCor: true,
-          ...escopo,
-        });
-        return { dias, rows };
-      })
-    );
+    //
+    // No total da rede (sem recorte) a lista item a item seria a rede inteira produto × cor —
+    // dezenas de milhares de linhas numa resposta que a tela só usa para somar. Então ali o
+    // total sai da soma direta das linhas e a quebra por cor sai da query.
+    const detalharItens = temEscopo;
+    // Recortada, cada janela é leve e as 5 vão juntas. Sem recorte cada uma varre a rede
+    // inteira, então elas andam de duas em duas para não afogar o banco.
+    const perWindow = await mapLimit(Array.from(WINDOWS), temEscopo ? WINDOWS.length : 2, async (dias) => {
+      const range = normalizeRangeForQuery({
+        start: addDaysYmd(baseParam, -dias),
+        end: addDaysYmd(baseParam, -1),
+      });
+      const rows = await fetchFilialProdutoSales(companyKey, posMembers, ecomMembers, range, 'month', {
+        groupByCor: detalharItens,
+        ...escopo,
+      });
+      return { dias, rows };
+    });
 
     // Monta produto||cor → { metadata, d30, d60, ... }
     type ItemAcc = {
@@ -290,8 +294,15 @@ export async function GET(request: Request) {
       qtde: Record<number, number>;
     };
     const acc = new Map<string, ItemAcc>();
+    /** Soma EXATA da janela (o arredondamento fica no fim, nunca por linha). */
+    const somaJanela = new Map<number, number>();
 
     perWindow.forEach(({ dias, rows }) => {
+      somaJanela.set(
+        dias,
+        rows.reduce((soma, r) => soma + (Number(r.qtde ?? 0) || 0), 0)
+      );
+      if (!detalharItens) return;
       rows.forEach((r) => {
         const cor = (r.cor ?? '').trim();
         const key = `${r.produto}||${cor}`;
@@ -377,10 +388,7 @@ export async function GET(request: Request) {
     // Piso 0 no TOTAL, não por item: linha negativa (mais troca que venda) entra na soma —
     // ver [[vendas-nunca-filtrar-linhas-da-regra-global]].
     const totaisJanela = Object.fromEntries(
-      WINDOWS.map((dias) => [
-        dias,
-        Math.max(0, itens.reduce((soma, it) => soma + (Number(it.janelas[dias] ?? 0) || 0), 0)),
-      ])
+      WINDOWS.map((dias) => [dias, Math.max(0, Math.round(somaJanela.get(dias) ?? 0))])
     );
 
     return NextResponse.json(

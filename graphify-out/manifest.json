@@ -4390,13 +4390,13 @@
     "semantic_hash": ""
   },
   "app/api/projecao-compra/route.ts": {
-    "mtime": 1788544318.3710077,
-    "ast_hash": "d029b983f9693c7a2c023b7e3aebb5f0",
+    "mtime": 1788884510.1717906,
+    "ast_hash": "2d53aefe5614d6c88b06399affc54416",
     "semantic_hash": ""
   },
   "components/stock/ProjecaoCompraPage.tsx": {
-    "mtime": 1788531104.2739482,
-    "ast_hash": "8fc0ebdaf4ab175dfd7a097c0a53a974",
+    "mtime": 1788884490.4493773,
+    "ast_hash": "2b10afee9a77fda1b87b0a07999dbaa9",
     "semantic_hash": ""
   },
   "lib/config/saida-estoque-negativo.ts": {
