@@ -65,6 +65,10 @@ const TIPO_CORES_DARK: Record<string, string> = {
   "SAÍDA POR TRANSFERÊNCIA": "#f97316",
   "AJUSTE": "#a78bfa",
   "LOJA VENDAS": "#ef4444",
+  // Troca/devolução volta ao estoque (entra positivo) — família das entradas.
+  "TROCA/DEVOLUÇÃO": "#38bdf8",
+  // NF de saída baixa estoque (entra negativo) — família das saídas.
+  "NF DE SAÍDA": "#fbbf24",
   // VM (peça em exposição) — mesma família da etiqueta VM nas telas de estoque.
   "VM": "#f87171",
 };
@@ -76,6 +80,10 @@ const TIPO_CORES_LIGHT: Record<string, string> = {
   "SAÍDA POR TRANSFERÊNCIA": "#c2410c",
   "AJUSTE": "#7c3aed",
   "LOJA VENDAS": "#dc2626",
+  // Troca/devolução volta ao estoque (entra positivo) — família das entradas.
+  "TROCA/DEVOLUÇÃO": "#0284c7",
+  // NF de saída baixa estoque (entra negativo) — família das saídas.
+  "NF DE SAÍDA": "#b45309",
   // VM (peça em exposição) — mesma família da etiqueta VM nas telas de estoque.
   "VM": "#dc2626",
 };
@@ -944,11 +952,19 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
               highlight
               t={t}
             />
-            <InfoCard label="Saldo QTDE" value={`${saldoMovimentos} un`} t={t} />
+            <InfoCard label="Saldo pelos movimentos" value={`${saldoMovimentos} un`} t={t} />
             {/* Em grade múltipla "Saldo grade" seria só a 1ª posição (o P), o que engana —
                 o detalhe por tamanho está nas colunas da tabela. */}
             {!multiTamanho && <InfoCard label="Saldo grade" value={`${saldoGrade} un`} t={t} />}
-            <InfoCard label="Diferença" value={`${diferencaEstoque} un`} highlight={diferencaEstoque !== 0} t={t} />
+            {/* Com todas as fontes de movimento lidas, sobrar diferença é sinal real de
+                problema — então o cartão vira veredito em vez de só mostrar o número. */}
+            <InfoCard
+              label="Conferência"
+              value={diferencaEstoque === 0 ? "confere" : `divergência de ${diferencaEstoque} un`}
+              valueColor={diferencaEstoque === 0 ? t.posNum : t.negNum}
+              highlight={diferencaEstoque !== 0}
+              t={t}
+            />
             <InfoCard label="Movimentos" value={`${dados.linhas.length}`} t={t} />
           </div>
 
@@ -1091,6 +1107,13 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
                       <td style={td}>{badge(l.tipo, t)}</td>
                       <td style={{ ...td, fontFamily: "monospace", color: t.mono }}>
                         {l.doc}
+                        {/* Linha de venda cancelada: fica visível para auditoria, mas
+                            com movimento 0 — a venda não aconteceu, o estoque nunca desceu. */}
+                        {l.cancelada && (
+                          <span style={{ marginLeft: 6, fontFamily: "inherit", fontSize: 10, color: t.warnText }}>
+                            cancelada
+                          </span>
+                        )}
                       </td>
                       <td style={{ ...td, color: t.romaneio, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
                           title={l.romaneio ?? undefined}>
@@ -1228,7 +1251,7 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
 
 // ── Sub-componentes ─────────────────────────────────────────────────────────
 
-function InfoCard({ label, value, sub, highlight, t }: { label: string; value: string; sub?: string; highlight?: boolean; t: Palette }) {
+function InfoCard({ label, value, sub, highlight, valueColor, t }: { label: string; value: string; sub?: string; highlight?: boolean; valueColor?: string; t: Palette }) {
   return (
     <div style={{
       background: t.cardBg,
@@ -1238,7 +1261,7 @@ function InfoCard({ label, value, sub, highlight, t }: { label: string; value: s
       minWidth: 100,
     }}>
       <div style={{ fontSize: 10, color: t.muted, marginBottom: 2 }}>{label}</div>
-      <div style={{ fontSize: 14, fontWeight: 600, color: highlight ? t.highlight : t.heading }}>{value}</div>
+      <div style={{ fontSize: 14, fontWeight: 600, color: valueColor ?? (highlight ? t.highlight : t.heading) }}>{value}</div>
       {sub && <div style={{ fontSize: 11, color: t.subMuted, marginTop: 2 }}>{sub}</div>}
     </div>
   );

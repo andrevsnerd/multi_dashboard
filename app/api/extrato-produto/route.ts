@@ -40,6 +40,11 @@ export interface ExtratoLinha {
   atualizouEstoque: boolean | null;
   statusTransito: number | null;
   /**
+   * Linha de venda cancelada no Linx (`QTDE_CANCELADA > 0`). Aparece na lista para
+   * auditoria, mas com movimento 0: a venda não aconteceu, o estoque nunca desceu.
+   */
+  cancelada?: boolean;
+  /**
    * Quem fez o movimento. Romaneios e contagem trazem o RESPONSAVEL do Linx (login,
    * ex.: "ALECIO"); venda traz o apelido do vendedor (LOJA_VENDEDORES, mesmo join do
    * relatório de vendedores); ajuste manual traz o usuário do dashboard.
@@ -654,6 +659,16 @@ export async function GET(request: NextRequest) {
           : ""
       })`
     : "";
+  // LOJA_VENDA_TROCA segue a mesma régua da venda: só tem CODIGO_FILIAL.
+  const filialFilterT = filialNome
+    ? `AND (${filialEqualsSql("f.FILIAL", filialNome)}${
+        filialResolvida?.codFilial
+          ? ` OR ${filialEqualsSql("t.CODIGO_FILIAL", filialResolvida.codFilial)}`
+          : ""
+      })`
+    : "";
+  // FATURAMENTO guarda o NOME da filial (mesma coluna de ESTOQUE_PRODUTOS).
+  const filialFilterNf = filialNome ? `AND ${filialEqualsSql("f.FILIAL", filialNome)}` : "";
 
   // ── Info do produto ──
   let descProduto: string | null = null;
@@ -846,6 +861,10 @@ export async function GET(request: NextRequest) {
       FROM ESTOQUE_PROD_ENT e WITH (NOLOCK)
       JOIN ESTOQUE_PROD1_ENT p WITH (NOLOCK)
         ON e.ROMANEIO_PRODUTO = p.ROMANEIO_PRODUTO
+        -- O romaneio quase sempre é único, mas há casos (831397, 831448, 831449) em
+        -- que o mesmo número existe em 2 filiais e o join solto duplicava a linha.
+        -- Casar a filial só quando o item a tem: quando é nula, o cabeçalho manda.
+        AND (p.FILIAL IS NULL OR LTRIM(RTRIM(p.FILIAL)) = '' OR p.FILIAL = e.FILIAL)
       WHERE p.PRODUTO = '${produtoSql}'
         AND p.COR_PRODUTO = '${corSql}'
         ${filialFilterEnt}
@@ -911,6 +930,8 @@ export async function GET(request: NextRequest) {
       FROM ESTOQUE_PROD_SAI s WITH (NOLOCK)
       JOIN ESTOQUE_PROD1_SAI p WITH (NOLOCK)
         ON s.ROMANEIO_PRODUTO = p.ROMANEIO_PRODUTO
+        -- Mesma proteção de fan-out da entrada (romaneio repetido em 2 filiais).
+        AND (p.FILIAL IS NULL OR LTRIM(RTRIM(p.FILIAL)) = '' OR p.FILIAL = s.FILIAL)
       WHERE p.PRODUTO = '${produtoSql}'
         AND p.COR_PRODUTO = '${corSql}'
         ${filialFilterSai}
@@ -982,13 +1003,21 @@ export async function GET(request: NextRequest) {
       ORDER BY v.DATA_VENDA
     `);
     for (const r of rows) {
-      const qtdeLiquida = (r.QTDE ?? 0) - (r.QTDE_CANCELADA ?? 0);
-      if (qtdeLiquida === 0) continue; // ignora linhas com movimento líquido zero
+      // O movimento de estoque da venda é QTDE, e só. NUNCA subtraia QTDE_CANCELADA:
+      // linha cancelada no Linx grava QTDE=0 e QTDE_CANCELADA>0 — a venda não
+      // aconteceu, o estoque nunca desceu, então subtrair inventaria uma devolução
+      // (era o que criava a divergência de estoque × saldo). Além disso o campo tem
+      // lixo no banco (há linha com QTDE_CANCELADA = 319.135.272), o que estouraria o
+      // extrato inteiro. Mesma regra das funções canônicas de venda do projeto, que
+      // filtram a linha cancelada em vez de compensá-la.
+      const qtdeVenda = Math.max(0, r.QTDE ?? 0);
+      const cancelada = (r.QTDE_CANCELADA ?? 0) > 0;
+      if (qtdeVenda === 0 && !cancelada) continue; // sem movimento e sem nada a auditar
       // A venda não tem colunas posicionais: guarda o tamanho como ordinal da grade
       // (LOJA_VENDA_PRODUTO.TAMANHO, o mesmo índice de PRODUTOS_BARRA).
       const qtdePorTamanhoVenda =
         tamanhos.length > 0
-          ? tamanhos.map((tam) => (tam.ordinal === Number(r.TAMANHO ?? 0) ? -qtdeLiquida : 0))
+          ? tamanhos.map((tam) => (tam.ordinal === Number(r.TAMANHO ?? 0) ? -qtdeVenda : 0))
           : null;
       linhas.push({
         emissao: r.DATA_VENDA ? new Date(r.DATA_VENDA).toISOString() : "",
@@ -998,10 +1027,83 @@ export async function GET(request: NextRequest) {
         filialOrigem: r.FILIAL_VENDA?.trim() || r.CODIGO_FILIAL?.trim() || null,
         filialDestino: null,
         romaneio: null,
-        qtde: -qtdeLiquida,
-        qtdeGrade: -qtdeLiquida, // vendas não têm campo de grade separado
+        qtde: -qtdeVenda,
+        qtdeGrade: -qtdeVenda, // vendas não têm campo de grade separado
         qtdePorTamanho: qtdePorTamanhoVenda,
-        valor: -(r.PRECO_LIQUIDO ?? 0) * qtdeLiquida,
+        valor: -(r.PRECO_LIQUIDO ?? 0) * qtdeVenda,
+        preco: r.PRECO_LIQUIDO ?? 0,
+        obs: null,
+        atualizouEstoque: true,
+        statusTransito: null,
+        responsavel: r.VENDEDOR_NOME?.trim() ?? null,
+        cancelada,
+      });
+    }
+  } catch (e) {
+    erros.push(`LOJA VENDAS: ${(e as Error).message}`);
+  }
+
+  // ── 4b. TROCA / DEVOLUÇÃO (LOJA_VENDA_TROCA) ──
+  // A peça devolvida pelo cliente VOLTA ao estoque: LOJA_VENDA_TROCA tem 3 triggers
+  // que escrevem em ESTOQUE_PRODUTOS. Sem esta fonte o extrato ficava com estoque
+  // maior que o saldo em toda loja que aceita devolução (442 un na rede NERD em 2026).
+  try {
+    const rows = await query<{
+      DATA_VENDA: Date;
+      CODIGO_FILIAL: string;
+      FILIAL_TROCA: string | null;
+      TICKET: string;
+      ITEM: string | null;
+      QTDE: number;
+      PRECO_LIQUIDO: number;
+      TAMANHO: number | null;
+      VENDEDOR_NOME: string | null;
+    }>(`
+      SELECT
+        t.DATA_VENDA,
+        t.CODIGO_FILIAL,
+        f.FILIAL AS FILIAL_TROCA,
+        t.TICKET,
+        t.ITEM,
+        t.QTDE,
+        t.PRECO_LIQUIDO,
+        t.TAMANHO,
+        NULLIF(ISNULL(
+          LTRIM(RTRIM(CAST(lv.VENDEDOR_APELIDO AS VARCHAR(60)))),
+          LTRIM(RTRIM(CAST(v.VENDEDOR AS VARCHAR(20))))
+        ), '') AS VENDEDOR_NOME
+      FROM LOJA_VENDA_TROCA t WITH (NOLOCK)
+      LEFT JOIN FILIAIS f WITH (NOLOCK) ON f.COD_FILIAL = t.CODIGO_FILIAL
+      LEFT JOIN LOJA_VENDA v WITH (NOLOCK)
+        ON v.CODIGO_FILIAL = t.CODIGO_FILIAL AND v.TICKET = t.TICKET
+      LEFT JOIN LOJA_VENDEDORES lv WITH (NOLOCK)
+        ON LTRIM(RTRIM(CAST(v.VENDEDOR AS VARCHAR))) = LTRIM(RTRIM(CAST(lv.VENDEDOR AS VARCHAR)))
+      WHERE t.PRODUTO = '${produtoSql}'
+        AND t.COR_PRODUTO = '${corSql}'
+        AND t.QTDE > 0
+        AND ISNULL(t.NAO_MOVIMENTA_ESTOQUE, 0) = 0
+        ${filialFilterT}
+      ORDER BY t.DATA_VENDA
+    `);
+    for (const r of rows) {
+      const qtdeTroca = Math.max(0, r.QTDE ?? 0);
+      if (qtdeTroca === 0) continue;
+      const qtdePorTamanhoTroca =
+        tamanhos.length > 0
+          ? tamanhos.map((tam) => (tam.ordinal === Number(r.TAMANHO ?? 0) ? qtdeTroca : 0))
+          : null;
+      linhas.push({
+        emissao: r.DATA_VENDA ? new Date(r.DATA_VENDA).toISOString() : "",
+        tipo: "TROCA/DEVOLUÇÃO",
+        tipoRomaneio: null,
+        doc: r.TICKET?.trim() ?? "",
+        filialOrigem: null,
+        filialDestino: r.FILIAL_TROCA?.trim() || r.CODIGO_FILIAL?.trim() || null,
+        romaneio: r.ITEM?.trim() ? `ITEM ${r.ITEM.trim()}` : null,
+        qtde: qtdeTroca,
+        qtdeGrade: qtdeTroca, // troca não tem campo de grade separado
+        qtdePorTamanho: qtdePorTamanhoTroca,
+        valor: (r.PRECO_LIQUIDO ?? 0) * qtdeTroca,
         preco: r.PRECO_LIQUIDO ?? 0,
         obs: null,
         atualizouEstoque: true,
@@ -1010,7 +1112,76 @@ export async function GET(request: NextRequest) {
       });
     }
   } catch (e) {
-    erros.push(`LOJA VENDAS: ${(e as Error).message}`);
+    erros.push(`TROCA/DEVOLUÇÃO: ${(e as Error).message}`);
+  }
+
+  // ── 4c. NF DE SAÍDA (FATURAMENTO + FATURAMENTO_PROD) ──
+  // Nota fiscal de saída baixa estoque (FATURAMENTO/FATURAMENTO_PROD têm triggers em
+  // ESTOQUE_PRODUTOS). É a fonte que faltava na matriz: sozinha, ela explicava 1.230
+  // SKUs que não fechavam em NERD. Sem filtro de NATUREZA_SAIDA de propósito —
+  // qualquer NF de saída mexe no estoque, ao contrário da regra de FATURAMENTO
+  // LÍQUIDO (essa sim restringe natureza, mas é conta de dinheiro, não de estoque).
+  //
+  // A NF de ENTRADA (ENTRADAS/ENTRADAS_PRODUTO) NÃO entra aqui: ela já vem refletida
+  // no romaneio de entrada. Somá-la faz o extrato contar a mesma peça duas vezes
+  // (testado: derruba o fechamento da matriz de 11.374 para 11.009 SKUs).
+  try {
+    const rows = await query<{
+      EMISSAO: Date;
+      FILIAL: string;
+      NF_SAIDA: string;
+      SERIE_NF: string | null;
+      NOME_CLIFOR: string | null;
+      NATUREZA_SAIDA: string | null;
+      QTDE: number;
+      PRECO: number;
+    }>(`
+      SELECT
+        f.EMISSAO,
+        f.FILIAL,
+        f.NF_SAIDA,
+        NULLIF(LTRIM(RTRIM(CAST(f.SERIE_NF AS VARCHAR(10)))), '') AS SERIE_NF,
+        NULLIF(LTRIM(RTRIM(CAST(f.NOME_CLIFOR AS VARCHAR(60)))), '') AS NOME_CLIFOR,
+        NULLIF(LTRIM(RTRIM(CAST(f.NATUREZA_SAIDA AS VARCHAR(20)))), '') AS NATUREZA_SAIDA,
+        fp.QTDE,
+        fp.PRECO
+      FROM FATURAMENTO f WITH (NOLOCK)
+      JOIN FATURAMENTO_PROD fp WITH (NOLOCK)
+        ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+      WHERE fp.PRODUTO = '${produtoSql}'
+        AND fp.COR_PRODUTO = '${corSql}'
+        AND ISNULL(f.NOTA_CANCELADA, 0) = 0
+        AND fp.QTDE > 0
+        ${filialFilterNf}
+      ORDER BY f.EMISSAO
+    `);
+    for (const r of rows) {
+      const qtdeNf = Math.max(0, r.QTDE ?? 0);
+      if (qtdeNf === 0) continue;
+      linhas.push({
+        emissao: r.EMISSAO ? new Date(r.EMISSAO).toISOString() : "",
+        tipo: "NF DE SAÍDA",
+        tipoRomaneio: r.NATUREZA_SAIDA ?? null,
+        doc: [r.NF_SAIDA?.trim(), r.SERIE_NF?.trim()].filter(Boolean).join("/"),
+        filialOrigem: r.FILIAL?.trim() ?? null,
+        filialDestino: null,
+        romaneio: r.NOME_CLIFOR?.trim() ?? null,
+        qtde: -qtdeNf,
+        // FATURAMENTO_PROD só tem F1..F9, que não cobrem a grade inteira do Linx
+        // (até 48 posições) — então o detalhe por tamanho fica "—" em vez de fingir
+        // que caiu tudo no primeiro, mesma decisão do ajuste manual.
+        qtdeGrade: -qtdeNf,
+        qtdePorTamanho: null,
+        valor: -(r.PRECO ?? 0) * qtdeNf,
+        preco: r.PRECO ?? 0,
+        obs: null,
+        atualizouEstoque: true,
+        statusTransito: null,
+        responsavel: null,
+      });
+    }
+  } catch (e) {
+    erros.push(`NF DE SAÍDA: ${(e as Error).message}`);
   }
 
   // ── 5. LOJA SAIDAS (romaneios de saída via loja) ──
