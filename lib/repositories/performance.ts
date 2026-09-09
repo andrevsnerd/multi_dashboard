@@ -372,6 +372,12 @@ export async function fetchFilialProdutoSales(
     linhas?: string[] | null;
     /** Restringe a consulta a uma lista de produtos (scoping da mesma query validada, não nova lógica). */
     produtoIds?: string[] | null;
+    /**
+     * Busca livre por NOME do produto (`DESC_PRODUTO LIKE '%termo%'`, mínimo 2 caracteres) —
+     * a mesma régua do Gerador de Relatórios, para quem digita "bandana" e quer todos os
+     * itens com esse nome sem escolher um a um. ADITIVO a `produtoIds` e às dimensões.
+     */
+    produtoSearchTerm?: string | null;
     /** Quando false, não busca o período anterior (vendasPrevious = 0) — economiza metade das queries. */
     includePrevious?: boolean;
     /**
@@ -399,6 +405,10 @@ export async function fetchFilialProdutoSales(
   const produtoIdList = (options?.produtoIds ?? [])
     .map((p) => (p ?? '').trim())
     .filter(Boolean);
+  // Busca por nome: vira um IN sobre PRODUTOS em vez de enumerar códigos, então um termo
+  // que casa milhares de itens não estoura o teto de parâmetros do SQL Server.
+  const produtoSearchTerm = (options?.produtoSearchTerm ?? '').trim();
+  const usaBuscaProduto = produtoSearchTerm.length >= 2;
   const linhaList = (companyKey === 'nerd' && options?.linhas)
     ? options.linhas.map(l => l.trim().toUpperCase()).filter(Boolean)
     : [];
@@ -549,6 +559,12 @@ export async function fetchFilialProdutoSales(
         const prodPlaceholders = produtoIdList.map((_, i) => `@${prefix}Prod${i}`).join(', ');
         produtoVpClause = `AND vp.PRODUTO IN (${prodPlaceholders})`;
         produtoVtClause = `AND vt.PRODUTO IN (${prodPlaceholders})`;
+      }
+      if (usaBuscaProduto) {
+        request.input(`${prefix}Busca`, sql.VarChar, `%${produtoSearchTerm}%`);
+        const emProdutos = `IN (SELECT ps.PRODUTO FROM PRODUTOS ps WITH (NOLOCK) WHERE ps.DESC_PRODUTO LIKE @${prefix}Busca)`;
+        produtoVpClause += `\n            AND vp.PRODUTO ${emProdutos}`;
+        produtoVtClause += `\n            AND vt.PRODUTO ${emProdutos}`;
       }
       const dimFinalClauses = buildDimClauses(request, prefix);
       const query = `
@@ -742,6 +758,10 @@ export async function fetchFilialProdutoSales(
         produtoIdList.forEach((prod, i) => request.input(`${prefix}EcomProd${i}`, sql.VarChar, prod));
         const prodPlaceholders = produtoIdList.map((_, i) => `@${prefix}EcomProd${i}`).join(', ');
         produtoFpClause = `AND fp.PRODUTO IN (${prodPlaceholders})`;
+      }
+      if (usaBuscaProduto) {
+        request.input(`${prefix}EcomBusca`, sql.VarChar, `%${produtoSearchTerm}%`);
+        produtoFpClause += `\n          AND fp.PRODUTO IN (SELECT ps.PRODUTO FROM PRODUTOS ps WITH (NOLOCK) WHERE ps.DESC_PRODUTO LIKE @${prefix}EcomBusca)`;
       }
       const dimEcomClauses = buildDimClauses(request, `${prefix}Ecom`);
 

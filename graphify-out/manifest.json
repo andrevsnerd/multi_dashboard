@@ -2505,8 +2505,8 @@
     "semantic_hash": "e7b25fbf2e0069ee8a6c5a9fdf73a34d"
   },
   "lib/repositories/performance.ts": {
-    "mtime": 1788462794.9321158,
-    "ast_hash": "8623ef0b992850e3f07d65fe7b78ecd8",
+    "mtime": 1788955654.115361,
+    "ast_hash": "24e0307e1c23872856d1dbdb7b93047a",
     "semantic_hash": ""
   },
   "lib/repositories/productDetail.ts": {
@@ -4390,13 +4390,13 @@
     "semantic_hash": ""
   },
   "app/api/projecao-compra/route.ts": {
-    "mtime": 1788954786.0328953,
-    "ast_hash": "52ab9fcf8f5aaf4bd2943b58ffcd9e61",
+    "mtime": 1788955675.506112,
+    "ast_hash": "5f8bc5f32b119acc631bb5462ed436db",
     "semantic_hash": ""
   },
   "components/stock/ProjecaoCompraPage.tsx": {
-    "mtime": 1788954886.507943,
-    "ast_hash": "9345819dd6bc2765bf52b7579d9fb591",
+    "mtime": 1788955737.3813999,
+    "ast_hash": "ca8b013e7d9df04b64bf28538a93e8bb",
     "semantic_hash": ""
   },
   "lib/config/saida-estoque-negativo.ts": {

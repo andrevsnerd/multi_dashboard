@@ -83,6 +83,11 @@ export async function GET(request: Request) {
     )
   );
 
+  // Busca livre por nome, igual ao Gerador de Relatórios: digitar "bandana" sem escolher
+  // ninguém na lista recorta a projeção em TODOS os itens com esse nome (DESC_PRODUTO LIKE).
+  const buscaProduto = (searchParams.get('busca') ?? '').trim();
+  const temBusca = buscaProduto.length >= 2;
+
   // Recortes por dimensão do cadastro (um select por dimensão na tela, cada um repetível).
   const readDim = (name: string) =>
     Array.from(
@@ -116,7 +121,7 @@ export async function GET(request: Request) {
   // Sem recorte algum a consulta é o TOTAL DA REDE — cenário válido (é o número que a
   // Projeção Compra compara com o recorte). Na métrica `produtos` isso muda a forma de
   // medir: ver `detalharItens` abaixo.
-  const temEscopo = produtoIds.length > 0 || temDimensao;
+  const temEscopo = produtoIds.length > 0 || temDimensao || temBusca;
   // Cada produto/valor de filtro vira um PARÂMETRO na consulta, e o SQL Server aceita no
   // máximo ~2100 por request. Com "Selecionar tudo" ficou fácil passar disso, então o erro
   // é explícito (a tela mostra a mensagem) em vez de estourar no driver.
@@ -147,6 +152,7 @@ export async function GET(request: Request) {
   // Escopo comum a todas as consultas: mesma lógica VALIDADA de vendas, só recortada.
   const escopo = {
     produtoIds: produtoIds.length > 0 ? produtoIds : null,
+    produtoSearchTerm: temBusca ? buscaProduto : null,
     dimensoes,
     includePrevious: false as const,
     limit: 0,
@@ -170,6 +176,7 @@ export async function GET(request: Request) {
     cores: dimensoes.cores,
     tipos: dimensoes.tipos,
     produtoIds: produtoIds.length > 0 ? produtoIds : null,
+    produtoSearchTerm: temBusca ? buscaProduto : null,
   };
 
   const anoBase = Number(baseParam.slice(0, 4));
@@ -307,6 +314,7 @@ export async function GET(request: Request) {
         cores: orNull(dimensoes.cores),
         tipos: orNull(dimensoes.tipos),
         produtoIds: produtoIds.length > 0 ? produtoIds : null,
+        produtoSearchTerm: temBusca ? buscaProduto : null,
       }),
     ]);
 

@@ -100,7 +100,12 @@ interface PedidoProjecao {
   metrica: Metrica;
   dims: DimState;
   produtos: string[];
+  /** Busca livre por nome, quando o usuário digitou sem escolher ninguém da lista. */
+  busca: string;
 }
+
+/** Mínimo de caracteres para a busca livre valer como recorte (igual ao Gerador). */
+const MIN_BUSCA = 2;
 
 /**
  * Teto de itens no recorte. Cada produto/valor de filtro viaja na URL e vira um parâmetro no
@@ -470,10 +475,16 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   const temDimensao = dimFiltradas.length > 0;
   const temSelecao = produtoChips.length > 0;
   /**
+   * Texto digitado sem escolher ninguém da lista JÁ É um recorte — mesma regra do Gerador
+   * de Relatórios: "bandana" projeta todos os itens cujo nome tem "bandana".
+   */
+  const buscaLivre = produtoQuery.trim().length >= MIN_BUSCA ? produtoQuery.trim() : "";
+  const temBusca = buscaLivre !== "";
+  /**
    * Há recorte montado na barra de filtros (ainda não necessariamente gerado). Sem recorte a
    * projeção continua valendo: é o TOTAL DA REDE, o número contra o qual se compara o recorte.
    */
-  const temEscopo = temSelecao || temDimensao;
+  const temEscopo = temSelecao || temDimensao || temBusca;
   /** Já existe projeção na tela. */
   const gerado = pedido !== null;
 
@@ -486,8 +497,8 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
 
   /** Assinatura do recorte, para saber se mudou algo desde a última geração. */
   const assinaturaAtual = useMemo(
-    () => JSON.stringify({ dataBase, metrica, dims, produtos: produtosSelecionados }),
-    [dataBase, metrica, dims, produtosSelecionados]
+    () => JSON.stringify({ dataBase, metrica, dims, produtos: produtosSelecionados, busca: buscaLivre }),
+    [dataBase, metrica, dims, produtosSelecionados, buscaLivre]
   );
   const assinaturaGerada = useMemo(
     () =>
@@ -497,6 +508,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
             metrica: pedido.metrica,
             dims: pedido.dims,
             produtos: pedido.produtos,
+            busca: pedido.busca,
           })
         : null,
     [pedido]
@@ -504,7 +516,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   const pendente = assinaturaAtual !== assinaturaGerada;
 
   const gerarProjecao = () => {
-    setPedido({ dataBase, metrica, dims, produtos: produtosSelecionados });
+    setPedido({ dataBase, metrica, dims, produtos: produtosSelecionados, busca: buscaLivre });
   };
 
   // ── Busca a projeção do escopo APLICADO (só roda quando o usuário manda gerar).
@@ -534,6 +546,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
     });
     DIM_KEYS.forEach((dim) => pedido.dims[dim].forEach((v) => params.append(dim, v)));
     pedido.produtos.forEach((produto) => params.append("produto", produto));
+    if (pedido.busca) params.set("busca", pedido.busca);
 
     let cancelled = false;
     setProjLoading(true);
@@ -810,6 +823,8 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   const limparTudo = () => {
     setProdutoChips([]);
     setDims(EMPTY_DIMS);
+    setProdutoQuery("");
+    setProdutoResults([]);
     setAvisoCodigos(null);
   };
 
@@ -817,6 +832,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   const escopoRede =
     pedido !== null &&
     pedido.produtos.length === 0 &&
+    pedido.busca === "" &&
     DIM_KEYS.every((dim) => pedido.dims[dim].length === 0);
 
   /** Métrica dos números NA TELA (o toggle ao vivo só vale depois de gerar). */
@@ -1033,6 +1049,8 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
                     <span>
                       {produtoChips.length > 0
                         ? `${fmt(produtoChips.length)} produto${produtoChips.length === 1 ? "" : "s"} no escopo`
+                        : temBusca
+                        ? `Sem escolher ninguém: projeta todos os itens com "${buscaLivre}" no nome`
                         : "Sem seleção = todos os produtos do filtro"}
                     </span>
                     {produtoChips.length > 0 && (
@@ -1080,6 +1098,20 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
                 <span className={styles.chipX}>×</span>
               </button>
             ))
+          )}
+          {temBusca && (
+            <button
+              type="button"
+              className={styles.chip}
+              title="Recorte por nome — remover a busca"
+              onClick={() => {
+                setProdutoQuery("");
+                setProdutoResults([]);
+              }}
+            >
+              nome: {buscaLivre}
+              <span className={styles.chipX}>×</span>
+            </button>
           )}
           {chipsProdutos.map((it) => (
             <button
