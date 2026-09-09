@@ -10,6 +10,8 @@ import {
   VAREJO_VALUE,
 } from "@/lib/config/company";
 
+import { getDefeitoFilial } from "@/lib/config/filiais-especiais";
+
 import styles from "./FilialFilter.module.css";
 
 interface FilialFilterProps {
@@ -22,6 +24,14 @@ interface FilialFilterProps {
   allowedFiliais?: string[] | null;
   /** Esconde a opção VAREJO (ex.: controle de transferências em scarfme). */
   hideVarejo?: boolean;
+  /**
+   * Mostra a filial de DEFEITO da empresa (NERD DEFEITOS / BAZAR SCARF ME) como opção
+   * extra, fora da lista de lojas. Ela vive fora do registry de propósito (não é loja,
+   * não entra em vendas nem em "Todas as filiais"), mas CARREGA estoque de verdade —
+   * então telas de consulta de estoque precisam poder selecioná-la. Opt-in: só as telas
+   * que passam esta prop ganham a opção. Ver lib/config/filiais-especiais.ts.
+   */
+  includeFilialDefeito?: boolean;
   showActiveGroupHint?: boolean;
   companyConfigOverride?: Pick<
     CompanyConfig,
@@ -37,6 +47,7 @@ export default function FilialFilter({
   module = "sales",
   allowedFiliais,
   hideVarejo = false,
+  includeFilialDefeito = false,
   showActiveGroupHint = false,
   companyConfigOverride = null,
 }: FilialFilterProps) {
@@ -91,6 +102,19 @@ export default function FilialFilter({
     }
   }
   const ecommerceDisplayName = ecommerceFilial ? (displayNames[ecommerceFilial] ?? ecommerceFilial) : null;
+
+  // Filial de defeito: opção extra, fora da lista de lojas. Respeita allowedFiliais —
+  // quem não tem essa filial atribuída não a vê (mesma régua das lojas).
+  const filialDefeito = ((): string | null => {
+    if (!includeFilialDefeito) return null;
+    const nome = getDefeitoFilial(companyKey) ?? null;
+    if (!nome) return null;
+    if (allowedFiliais && allowedFiliais.length > 0) {
+      const allowedSet = new Set(allowedFiliais.map((a) => (a || "").trim().toUpperCase()));
+      if (!allowedSet.has(nome.trim().toUpperCase())) return null;
+    }
+    return nome;
+  })();
 
   const getGroupActiveHint = (filial: string | null): string | null => {
     if (!showActiveGroupHint || !company || !filial || filial === VAREJO_VALUE) return null;
@@ -190,6 +214,21 @@ export default function FilialFilter({
                 </button>
               );
             })}
+            {filialDefeito ? (
+              <>
+                <span className={styles.groupHeading}>Defeito</span>
+                <button
+                  type="button"
+                  className={`${styles.option} ${value === filialDefeito ? styles.optionActive : ""}`}
+                  onClick={() => {
+                    onChange(filialDefeito);
+                    setIsOpen(false);
+                  }}
+                >
+                  {filialDefeito}
+                </button>
+              </>
+            ) : null}
           </div>
         </>
       ) : null}

@@ -1383,6 +1383,9 @@ export default function GeradorRelatoriosPage({
               value={filial}
               onChange={setFilial}
               module="sales"
+              // Mesma opção da Estoque Consulta: permite rodar as análises de estoque
+              // (Produtos parados, Produtos cadastro) escopadas na filial de defeito.
+              includeFilialDefeito
             />
           )}
           {companyKey === "nerd" && fornecedoresOpts.length > 0 && (

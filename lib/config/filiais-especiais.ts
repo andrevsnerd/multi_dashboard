@@ -4,8 +4,14 @@
  * ════════════════════════════════════════════════════════════════════════════
  *
  * Não entram em `lib/config/filial-registry.ts` de propósito: não são lojas,
- * então não aparecem em vendas, estoque, colunas por filial nem nos filtros
+ * então não aparecem em vendas, colunas por filial, "Todas as filiais" nem nos filtros
  * operacionais (`filialFilters`).
+ *
+ * Exceção OPT-IN: elas carregam estoque de verdade (NERD DEFEITOS tem ~3,7 mil peças;
+ * BAZAR SCARF ME, ~5,1 mil), e antes não havia como consultar esse saldo em lugar nenhum.
+ * Telas de consulta de estoque podem pedir a opção passando `includeFilialDefeito` ao
+ * `FilialFilter` (hoje: Estoque Consulta e Gerador de Relatórios). É só uma opção a mais
+ * no dropdown — nenhum agregado passa a somar defeito por conta disso.
  *
  * Hoje só existe uma categoria: a filial de DEFEITO de cada empresa, usada como
  * DESTINO dos romaneios de saída do tipo "DEFEITO" (a loja manda o defeito pra lá).

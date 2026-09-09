@@ -1016,6 +1016,10 @@ export default function EstoqueItemPage({
               onChange={setSelectedFilial}
               label="Filial"
               module="inventory"
+              // A filial de defeito carrega estoque de verdade (NERD DEFEITOS tem ~3,7 mil
+              // peças) e não aparece em "Todas as filiais" — sem esta opção não havia
+              // nenhuma forma de consultar esse saldo. Ver lib/config/filiais-especiais.ts.
+              includeFilialDefeito
             />
           </div>
         </div>
