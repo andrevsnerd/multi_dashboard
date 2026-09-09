@@ -695,8 +695,8 @@
     "semantic_hash": "46a07d2e6577a3e46cb6adcc5fda6699"
   },
   "app/api/extrato-produto/route.ts": {
-    "mtime": 1786551698.5870378,
-    "ast_hash": "b97814abb1b1e68daccec6f72f2f07cb",
+    "mtime": 1788968357.8558617,
+    "ast_hash": "bded699f51a3fb3cda93effe0fc24e30",
     "semantic_hash": ""
   },
   "app/api/faturamento/detalhe/route.ts": {
@@ -1340,8 +1340,8 @@
     "semantic_hash": "1f13894059c7c73365fb5303040f3f5a"
   },
   "components/extrato-produto/ExtratoProdutoPage.tsx": {
-    "mtime": 1786552564.034089,
-    "ast_hash": "2cb7a4196deeeddea315a59d2d783b0e",
+    "mtime": 1788968420.8261929,
+    "ast_hash": "8cf53a369e78d48e252001d1256da501",
     "semantic_hash": ""
   },
   "components/faturamento/FaturamentoPage.tsx": {
@@ -3275,8 +3275,8 @@
     "semantic_hash": "13b10626efb1b650fd9a9d669d662dac"
   },
   "CLAUDE.md": {
-    "mtime": 1783942537.1633878,
-    "ast_hash": "c6e37734fa15c4f3b7d6a73504cf2ec2",
+    "mtime": 1788969787.2195406,
+    "ast_hash": "70b74d3c8f7cd3ca7175a457d2373632",
     "semantic_hash": ""
   },
   "QUICK_START_CLOUDFLARE.md": {
@@ -4472,6 +4472,11 @@
   "lib/config/compra-ciclo-tipos.ts": {
     "mtime": 1788966318.0050182,
     "ast_hash": "d0d7821927d73fbd1e4ee74fa0af67e2",
+    "semantic_hash": ""
+  },
+  "scripts/conferir-movimento-estoque.mjs": {
+    "mtime": 1788969866.276787,
+    "ast_hash": "3db9ba78649f40adbe5466beeb60a44f",
     "semantic_hash": ""
   }
 }
