@@ -24,6 +24,17 @@ interface ProdutoChip {
   name: string;
 }
 
+/** Resposta de /api/products/dimensoes-escopo: as dimensões dos produtos do recorte. */
+interface DimensoesEscopo {
+  grupos?: string[];
+  linhas?: string[];
+  subgrupos?: string[];
+  grades?: string[];
+  colecoes?: Opcao[];
+  tipos?: string[];
+  cores?: string[];
+}
+
 interface ProjecaoItem {
   produto: string;
   cor: string;
@@ -275,46 +286,11 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   const [estoqueOverride, setEstoqueOverride] = useState<number | null>(null);
   const [qtdOverride, setQtdOverride] = useState<Record<string, number | null>>({});
 
-  // ── Opções dos selects: um por dimensão, carregadas de uma vez (mesmos endpoints do
-  //    Gerador de Relatórios), na janela de 12 meses que é o universo desta tela. Ficam
-  //    prontas na hora, sem depender do dataset pesado do picker.
-  useEffect(() => {
-    let cancelled = false;
-    const { start, end } = janela12Meses();
-
-    DIM_KEYS.forEach((dim) => {
-      const params = new URLSearchParams({ company: companyKey });
-      // Cor sai do estoque/cadastro e não aceita período (ver /api/products/cores).
-      if (dim !== "cor") {
-        params.set("start", start);
-        params.set("end", end);
-      }
-      // Coleção: rótulo "DESCRIÇÃO (CÓDIGO)" com o value sendo o código.
-      if (dim === "colecao") params.set("includeDescriptions", "1");
-
-      fetch(`/api/products/${DIM_ENDPOINT[dim]}?${params.toString()}`, { cache: "no-store" })
-        .then((r) => r.json())
-        .then((json: { data?: Array<string | Opcao> }) => {
-          if (cancelled) return;
-          const options = (json.data ?? [])
-            .map((item) =>
-              typeof item === "string" ? { value: item, label: item } : { value: item.value, label: item.label }
-            )
-            .filter((opt) => opt.value);
-          setDimOptions((prev) => ({ ...prev, [dim]: options }));
-        })
-        .catch(() => {
-          if (!cancelled) setDimOptions((prev) => ({ ...prev, [dim]: [] }));
-        })
-        .finally(() => {
-          if (!cancelled) setDimLoading((prev) => ({ ...prev, [dim]: false }));
-        });
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [companyKey]);
+  /**
+   * Opções globais (sem recorte de produto) guardadas depois do primeiro carregamento: limpar
+   * a seleção volta para elas na hora, sem repetir as 7 consultas.
+   */
+  const dimOptionsGlobais = useRef<Record<DimKey, Opcao[]> | null>(null);
 
   // ── Busca de produto (mesma do Gerador de Relatórios): consulta o cadastro por nome,
   //    código do produto ou código de barra, com debounce. Sem catálogo pré-carregado.
@@ -494,6 +470,129 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   );
   const totalRecortes =
     produtosSelecionados.length + DIM_KEYS.reduce((soma, dim) => soma + dims[dim].length, 0);
+
+  // ── Opções dos filtros: reagem ao item escolhido ──────────────────────────
+  // Sem recorte, cada dimensão vem do seu endpoint de sempre (o que teve VENDA nos 12 meses,
+  // mesma régua do Gerador de Relatórios). Com item(ns) escolhido(s) — ou busca por nome —
+  // os selects passam a listar só o que existe NAQUELES itens: oferecer o cadastro inteiro ao
+  // lado de uma seleção só confunde, e em Cor é pior ainda, porque no Linx o mesmo código de
+  // cor é outra cor em outro produto (ver [[cor-escopada-por-produto-vs-mapa-global]]).
+  const escopoDeProduto = temSelecao || temBusca;
+
+  useEffect(() => {
+    let cancelled = false;
+    const escopado = produtosSelecionados.length > 0 || buscaLivre !== "";
+
+    // Voltar ao estado sem recorte é instantâneo: as opções globais ficam guardadas.
+    if (!escopado && dimOptionsGlobais.current) {
+      setDimOptions(dimOptionsGlobais.current);
+      setDimLoading({});
+      return;
+    }
+
+    setDimLoading(Object.fromEntries(DIM_KEYS.map((dim) => [dim, true])));
+
+    const carregar = () => {
+      if (escopado) {
+        // Um request só para as 7 dimensões (o servidor varre PRODUTOS uma vez).
+        const params = new URLSearchParams({ company: companyKey });
+        produtosSelecionados.forEach((p) => params.append("produto", p));
+        if (buscaLivre) params.set("busca", buscaLivre);
+
+        fetch(`/api/products/dimensoes-escopo?${params.toString()}`, { cache: "no-store" })
+          .then((r) => r.json())
+          .then((json: DimensoesEscopo) => {
+            if (cancelled) return;
+            const simples = (values?: string[]): Opcao[] =>
+              (values ?? []).filter(Boolean).map((v) => ({ value: v, label: v }));
+            setDimOptions({
+              grupo: simples(json.grupos),
+              linha: simples(json.linhas),
+              subgrupo: simples(json.subgrupos),
+              grade: simples(json.grades),
+              colecao: (json.colecoes ?? []).filter((o) => o?.value),
+              cor: simples(json.cores),
+              tipo: simples(json.tipos),
+            });
+          })
+          .catch(() => {
+            if (!cancelled) setDimOptions(EMPTY_DIM_OPTIONS);
+          })
+          .finally(() => {
+            if (!cancelled) setDimLoading({});
+          });
+        return;
+      }
+
+      // Sem recorte: os endpoints de sempre, um por dimensão, na janela de 12 meses.
+      const { start, end } = janela12Meses();
+      const carregadas: Partial<Record<DimKey, Opcao[]>> = {};
+      DIM_KEYS.forEach((dim) => {
+        const params = new URLSearchParams({ company: companyKey });
+        // Cor sai do estoque/cadastro e não aceita período (ver /api/products/cores).
+        if (dim !== "cor") {
+          params.set("start", start);
+          params.set("end", end);
+        }
+        // Coleção: rótulo "DESCRIÇÃO (CÓDIGO)" com o value sendo o código.
+        if (dim === "colecao") params.set("includeDescriptions", "1");
+
+        fetch(`/api/products/${DIM_ENDPOINT[dim]}?${params.toString()}`, { cache: "no-store" })
+          .then((r) => r.json())
+          .then((json: { data?: Array<string | Opcao> }) => {
+            if (cancelled) return;
+            const options = (json.data ?? [])
+              .map((item) =>
+                typeof item === "string" ? { value: item, label: item } : { value: item.value, label: item.label }
+              )
+              .filter((opt) => opt.value);
+            carregadas[dim] = options;
+            setDimOptions((prev) => ({ ...prev, [dim]: options }));
+          })
+          .catch(() => {
+            if (cancelled) return;
+            carregadas[dim] = [];
+            setDimOptions((prev) => ({ ...prev, [dim]: [] }));
+          })
+          .finally(() => {
+            if (cancelled) return;
+            setDimLoading((prev) => ({ ...prev, [dim]: false }));
+            // Guarda o conjunto global assim que as 7 chegarem.
+            if (DIM_KEYS.every((k) => carregadas[k])) {
+              dimOptionsGlobais.current = { ...EMPTY_DIM_OPTIONS, ...carregadas } as Record<DimKey, Opcao[]>;
+            }
+          });
+      });
+    };
+
+    // A busca muda a cada tecla; espera o usuário parar antes de ir ao banco.
+    const timer = setTimeout(carregar, buscaLivre ? 350 : 0);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [companyKey, produtosSelecionados, buscaLivre]);
+
+  // Valor que saiu do recorte não pode continuar marcado — filtraria por algo que não existe
+  // nos itens escolhidos e a projeção voltaria vazia sem explicação. Só poda com a lista já
+  // carregada: lista vazia pode ser falha da consulta (ou dimensão que a empresa não usa),
+  // e aí a seleção fica de pé.
+  useEffect(() => {
+    setDims((prev) => {
+      let mudou = false;
+      const next = { ...prev };
+      DIM_KEYS.forEach((dim) => {
+        if (prev[dim].length === 0 || dimOptions[dim].length === 0) return;
+        const disponiveis = new Set(dimOptions[dim].map((o) => o.value));
+        const mantidas = prev[dim].filter((v) => disponiveis.has(v));
+        if (mantidas.length !== prev[dim].length) {
+          next[dim] = mantidas;
+          mudou = true;
+        }
+      });
+      return mudou ? next : prev;
+    });
+  }, [dimOptions]);
 
   /** Assinatura do recorte, para saber se mudou algo desde a última geração. */
   const assinaturaAtual = useMemo(
@@ -1071,6 +1170,14 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
 
         {/* ── Filtros de cadastro (pílulas) ──────────────────────────────── */}
         <div className={styles.filterBar}>
+          {escopoDeProduto && (
+            <span
+              className={styles.filterHint}
+              title="Grupo, Linha, Subgrupo, Grade, Coleção, Cor e Tipo mostram só o que existe nos itens do recorte."
+            >
+              filtros do item
+            </span>
+          )}
           {DIM_KEYS.map((dim) => (
             <MultiSelect
               key={dim}

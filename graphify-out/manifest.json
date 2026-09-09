@@ -815,9 +815,9 @@
     "semantic_hash": ""
   },
   "app/api/products/cores/route.ts": {
-    "mtime": 1781091472.735209,
-    "ast_hash": "6f9f884351c5c061ae61dfad27324754",
-    "semantic_hash": "6f9f884351c5c061ae61dfad27324754"
+    "mtime": 1788956347.8968575,
+    "ast_hash": "3950a10d199fa4d835d1d348a012c3b5",
+    "semantic_hash": ""
   },
   "app/api/products/grades/route.ts": {
     "mtime": 1768227711.9904811,
@@ -2435,8 +2435,8 @@
     "semantic_hash": "8c1d93a8e7b6ea254bb47828f9553e06"
   },
   "lib/repositories/controleEstoque.ts": {
-    "mtime": 1788372467.024648,
-    "ast_hash": "956d0e5b1fc34eabd2f6282ad71b656e",
+    "mtime": 1788956754.2646456,
+    "ast_hash": "8a8ff0832c4815a9cecbd7f437e9f548",
     "semantic_hash": ""
   },
   "lib/repositories/controleMovimento.ts": {
@@ -4395,8 +4395,8 @@
     "semantic_hash": ""
   },
   "components/stock/ProjecaoCompraPage.tsx": {
-    "mtime": 1788955737.3813999,
-    "ast_hash": "ca8b013e7d9df04b64bf28538a93e8bb",
+    "mtime": 1788956832.211306,
+    "ast_hash": "640a951cd342235dc94ae383a2ecac57",
     "semantic_hash": ""
   },
   "lib/config/saida-estoque-negativo.ts": {
@@ -4432,6 +4432,11 @@
   "lib/utils/reportFilename.ts": {
     "mtime": 1788540825.5694613,
     "ast_hash": "ea92e9cd5b23abfadc080b9291ae7b31",
+    "semantic_hash": ""
+  },
+  "app/api/products/dimensoes-escopo/route.ts": {
+    "mtime": 1788956763.6937802,
+    "ast_hash": "57d4684cec4769dd00f36c0a2a4f52c5",
     "semantic_hash": ""
   }
 }

@@ -809,3 +809,17 @@
   color: var(--t-500);
   line-height: 1.3;
 }
+.filterHint {
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px dashed var(--b-300);
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--t-500);
+  cursor: default;
+}

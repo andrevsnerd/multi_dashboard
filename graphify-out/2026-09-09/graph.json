@@ -6127,7 +6127,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_corporativo_pedidos_id_efetivar_route",
-      "community": 134,
+      "community": 9,
       "norm_label": "route.ts"
     },
     {
@@ -6137,7 +6137,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "app_api_corporativo_pedidos_id_efetivar_route_post",
-      "community": 134,
+      "community": 9,
       "norm_label": "post()"
     },
     {
@@ -8497,7 +8497,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_products_search_route",
-      "community": 20,
+      "community": 101,
       "norm_label": "route.ts"
     },
     {
@@ -8507,7 +8507,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "app_api_products_search_route_get",
-      "community": 20,
+      "community": 101,
       "norm_label": "get()"
     },
     {
@@ -8887,7 +8887,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_produtos_parados_entradas_por_filial_route",
-      "community": 496,
+      "community": 2,
       "norm_label": "route.ts"
     },
     {
@@ -8897,7 +8897,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "app_api_produtos_parados_entradas_por_filial_route_get",
-      "community": 496,
+      "community": 2,
       "norm_label": "get()"
     },
     {
@@ -10397,7 +10397,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_log_debug_route",
-      "community": 20,
+      "community": 101,
       "norm_label": "route.ts"
     },
     {
@@ -10407,7 +10407,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_log_debug_route_get",
-      "community": 20,
+      "community": 101,
       "norm_label": "get()"
     },
     {
@@ -10417,7 +10417,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_log_detalhes_route",
-      "community": 20,
+      "community": 101,
       "norm_label": "route.ts"
     },
     {
@@ -10427,7 +10427,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_log_detalhes_route_logdetalheitem",
-      "community": 20,
+      "community": 101,
       "norm_label": "logdetalheitem"
     },
     {
@@ -10437,7 +10437,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_log_detalhes_route_get",
-      "community": 20,
+      "community": 101,
       "norm_label": "get()"
     },
     {
@@ -10507,7 +10507,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_produto_por_codigo_barras_route",
-      "community": 20,
+      "community": 101,
       "norm_label": "route.ts"
     },
     {
@@ -10517,7 +10517,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_produto_por_codigo_barras_route_get",
-      "community": 20,
+      "community": 101,
       "norm_label": "get()"
     },
     {
@@ -10577,7 +10577,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_responsaveis_route",
-      "community": 20,
+      "community": 101,
       "norm_label": "route.ts"
     },
     {
@@ -10587,7 +10587,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_responsaveis_route_get",
-      "community": 20,
+      "community": 101,
       "norm_label": "get()"
     },
     {
@@ -10597,7 +10597,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_tipos_romaneio_route",
-      "community": 20,
+      "community": 101,
       "norm_label": "route.ts"
     },
     {
@@ -10607,7 +10607,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_tipos_romaneio_route_get",
-      "community": 20,
+      "community": 101,
       "norm_label": "get()"
     },
     {
@@ -13199,7 +13199,7 @@
       "source_location": "L34",
       "_origin": "ast",
       "id": "components_compras_gastoscompradrawer_props",
-      "community": 21,
+      "community": 33,
       "norm_label": "props"
     },
     {
@@ -13349,7 +13349,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "components_compras_novacompramodal_props",
-      "community": 21,
+      "community": 33,
       "norm_label": "props"
     },
     {
@@ -15929,7 +15929,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_filters_selectfilter",
-      "community": 101,
+      "community": 160,
       "norm_label": "selectfilter.tsx"
     },
     {
@@ -15939,7 +15939,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "components_filters_selectfilter_selectfilterprops",
-      "community": 101,
+      "community": 160,
       "norm_label": "selectfilterprops"
     },
     {
@@ -15949,7 +15949,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "components_filters_selectfilter_selectfilter",
-      "community": 101,
+      "community": 160,
       "norm_label": "selectfilter()"
     },
     {
@@ -26616,7 +26616,7 @@
       "label": "WINDOWS_DIAS",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L112",
+      "source_location": "L117",
       "_origin": "ast",
       "id": "components_stock_projecaocomprapage_windows_dias",
       "community": 25,
@@ -26626,7 +26626,7 @@
       "label": "DimKey",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L116",
+      "source_location": "L121",
       "_origin": "ast",
       "id": "components_stock_projecaocomprapage_dimkey",
       "community": 25,
@@ -26636,7 +26636,7 @@
       "label": "DIM_KEYS",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L117",
+      "source_location": "L122",
       "_origin": "ast",
       "id": "components_stock_projecaocomprapage_dim_keys",
       "community": 25,
@@ -26646,7 +26646,7 @@
       "label": "DIM_LABEL",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L118",
+      "source_location": "L123",
       "_origin": "ast",
       "id": "components_stock_projecaocomprapage_dim_label",
       "community": 25,
@@ -26656,7 +26656,7 @@
       "label": "DIM_ENDPOINT",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L128",
+      "source_location": "L133",
       "_origin": "ast",
       "id": "components_stock_projecaocomprapage_dim_endpoint",
       "community": 25,
@@ -26666,7 +26666,7 @@
       "label": "DimState",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L137",
+      "source_location": "L142",
       "_origin": "ast",
       "id": "components_stock_projecaocomprapage_dimstate",
       "community": 25,
@@ -26676,7 +26676,7 @@
       "label": "EMPTY_DIMS",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L138",
+      "source_location": "L143",
       "_origin": "ast",
       "id": "components_stock_projecaocomprapage_empty_dims",
       "community": 25,
@@ -26686,7 +26686,7 @@
       "label": "EMPTY_DIM_OPTIONS",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L147",
+      "source_location": "L152",
       "_origin": "ast",
       "id": "components_stock_projecaocomprapage_empty_dim_options",
       "community": 25,
@@ -26696,7 +26696,7 @@
       "label": "fmt()",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L159",
+      "source_location": "L164",
       "_origin": "ast",
       "id": "components_stock_projecaocomprapage_fmt",
       "community": 25,
@@ -26706,7 +26706,7 @@
       "label": "fmtDec()",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L162",
+      "source_location": "L167",
       "_origin": "ast",
       "id": "components_stock_projecaocomprapage_fmtdec",
       "community": 25,
@@ -26716,7 +26716,7 @@
       "label": "rowKey()",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L165",
+      "source_location": "L170",
       "_origin": "ast",
       "id": "components_stock_projecaocomprapage_rowkey",
       "community": 25,
@@ -26726,7 +26726,7 @@
       "label": "todayYmd()",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L169",
+      "source_location": "L174",
       "_origin": "ast",
       "id": "components_stock_projecaocomprapage_todayymd",
       "community": 25,
@@ -26736,7 +26736,7 @@
       "label": "endOfYearYmd()",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L173",
+      "source_location": "L178",
       "_origin": "ast",
       "id": "components_stock_projecaocomprapage_endofyearymd",
       "community": 25,
@@ -26746,7 +26746,7 @@
       "label": "diffDays()",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L178",
+      "source_location": "L183",
       "_origin": "ast",
       "id": "components_stock_projecaocomprapage_diffdays",
       "community": 25,
@@ -26756,7 +26756,7 @@
       "label": "addDaysFormatted()",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L186",
+      "source_location": "L191",
       "_origin": "ast",
       "id": "components_stock_projecaocomprapage_adddaysformatted",
       "community": 25,
@@ -26766,7 +26766,7 @@
       "label": "ymdToBr()",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L194",
+      "source_location": "L199",
       "_origin": "ast",
       "id": "components_stock_projecaocomprapage_ymdtobr",
       "community": 25,
@@ -26776,7 +26776,7 @@
       "label": "diasNoMes()",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L199",
+      "source_location": "L204",
       "_origin": "ast",
       "id": "components_stock_projecaocomprapage_diasnomes",
       "community": 25,
@@ -26786,7 +26786,7 @@
       "label": "MES_NOME",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L202",
+      "source_location": "L207",
       "_origin": "ast",
       "id": "components_stock_projecaocomprapage_mes_nome",
       "community": 25,
@@ -26796,7 +26796,7 @@
       "label": "fmtPct()",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L205",
+      "source_location": "L210",
       "_origin": "ast",
       "id": "components_stock_projecaocomprapage_fmtpct",
       "community": 25,
@@ -26806,7 +26806,7 @@
       "label": "janela12Meses()",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L212",
+      "source_location": "L217",
       "_origin": "ast",
       "id": "components_stock_projecaocomprapage_janela12meses",
       "community": 25,
@@ -26816,7 +26816,7 @@
       "label": "Props",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L221",
+      "source_location": "L226",
       "_origin": "ast",
       "id": "components_stock_projecaocomprapage_props",
       "community": 25,
@@ -26826,7 +26826,7 @@
       "label": "ProjecaoCompraPage()",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L225",
+      "source_location": "L230",
       "_origin": "ast",
       "id": "components_stock_projecaocomprapage_projecaocomprapage",
       "community": 25,
@@ -26836,7 +26836,7 @@
       "label": "MultiSelectOpcao",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L1351",
+      "source_location": "L1435",
       "_origin": "ast",
       "id": "components_stock_projecaocomprapage_multiselectopcao",
       "community": 25,
@@ -26846,7 +26846,7 @@
       "label": "MultiSelectProps",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L1360",
+      "source_location": "L1444",
       "_origin": "ast",
       "id": "components_stock_projecaocomprapage_multiselectprops",
       "community": 25,
@@ -26856,7 +26856,7 @@
       "label": "MultiSelect()",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L1378",
+      "source_location": "L1462",
       "_origin": "ast",
       "id": "components_stock_projecaocomprapage_multiselect",
       "community": 25,
@@ -27149,7 +27149,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_stock_stockbyfilialpage",
-      "community": 101,
+      "community": 160,
       "norm_label": "stockbyfilialpage.tsx"
     },
     {
@@ -27159,7 +27159,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "components_stock_stockbyfilialpage_stockbyfilialpageprops",
-      "community": 101,
+      "community": 160,
       "norm_label": "stockbyfilialpageprops"
     },
     {
@@ -27169,7 +27169,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "components_stock_stockbyfilialpage_fetchstockbyfilial",
-      "community": 101,
+      "community": 160,
       "norm_label": "fetchstockbyfilial()"
     },
     {
@@ -27179,7 +27179,7 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "components_stock_stockbyfilialpage_stockbyfilialpage",
-      "community": 101,
+      "community": 160,
       "norm_label": "stockbyfilialpage()"
     },
     {
@@ -34219,7 +34219,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_auth_route_guards",
-      "community": 9,
+      "community": 134,
       "norm_label": "route-guards.ts"
     },
     {
@@ -35199,7 +35199,7 @@
       "source_location": "L85",
       "_origin": "ast",
       "id": "lib_config_company_getfilialgroupmembers",
-      "community": 2,
+      "community": 49,
       "norm_label": "getfilialgroupmembers()"
     },
     {
@@ -36539,7 +36539,7 @@
       "source_location": "L159",
       "_origin": "ast",
       "id": "lib_db_connection_withrequest",
-      "community": 20,
+      "community": 101,
       "norm_label": "withrequest()"
     },
     {
@@ -36809,7 +36809,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "lib_etiquetas_barcode_simbologia",
-      "community": 159,
+      "community": 454,
       "norm_label": "simbologia"
     },
     {
@@ -36999,7 +36999,7 @@
       "source_location": "L252",
       "_origin": "ast",
       "id": "lib_etiquetas_barcode_encodebarcode",
-      "community": 65,
+      "community": 184,
       "norm_label": "encodebarcode()"
     },
     {
@@ -37119,7 +37119,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_etiquetas_tipos",
-      "community": 159,
+      "community": 454,
       "norm_label": "tipos.ts"
     },
     {
@@ -37139,7 +37139,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "lib_etiquetas_tipos_campoetiqueta",
-      "community": 159,
+      "community": 454,
       "norm_label": "campoetiqueta"
     },
     {
@@ -37149,7 +37149,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "lib_etiquetas_tipos_campos_disponiveis",
-      "community": 184,
+      "community": 159,
       "norm_label": "campos_disponiveis"
     },
     {
@@ -37169,7 +37169,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "lib_etiquetas_tipos_fontezpl",
-      "community": 159,
+      "community": 184,
       "norm_label": "fontezpl"
     },
     {
@@ -37179,7 +37179,7 @@
       "source_location": "L60",
       "_origin": "ast",
       "id": "lib_etiquetas_tipos_fontes_bitmap",
-      "community": 159,
+      "community": 454,
       "norm_label": "fontes_bitmap"
     },
     {
@@ -37189,7 +37189,7 @@
       "source_location": "L70",
       "_origin": "ast",
       "id": "lib_etiquetas_tipos_fonte_a_base",
-      "community": 159,
+      "community": 184,
       "norm_label": "fonte_a_base"
     },
     {
@@ -37199,7 +37199,7 @@
       "source_location": "L72",
       "_origin": "ast",
       "id": "lib_etiquetas_tipos_metricafonte",
-      "community": 159,
+      "community": 454,
       "norm_label": "metricafonte"
     },
     {
@@ -37209,7 +37209,7 @@
       "source_location": "L84",
       "_origin": "ast",
       "id": "lib_etiquetas_tipos_melhorfontebitmap",
-      "community": 159,
+      "community": 454,
       "norm_label": "melhorfontebitmap()"
     },
     {
@@ -37219,7 +37219,7 @@
       "source_location": "L110",
       "_origin": "ast",
       "id": "lib_etiquetas_tipos_metricadalinha",
-      "community": 184,
+      "community": 454,
       "norm_label": "metricadalinha()"
     },
     {
@@ -37229,7 +37229,7 @@
       "source_location": "L129",
       "_origin": "ast",
       "id": "lib_etiquetas_tipos_alturaefetivamm",
-      "community": 184,
+      "community": 454,
       "norm_label": "alturaefetivamm()"
     },
     {
@@ -37249,7 +37249,7 @@
       "source_location": "L180",
       "_origin": "ast",
       "id": "lib_etiquetas_tipos_configbarcode",
-      "community": 159,
+      "community": 454,
       "norm_label": "configbarcode"
     },
     {
@@ -37259,7 +37259,7 @@
       "source_location": "L199",
       "_origin": "ast",
       "id": "lib_etiquetas_tipos_configimpressora",
-      "community": 159,
+      "community": 454,
       "norm_label": "configimpressora"
     },
     {
@@ -37269,7 +37269,7 @@
       "source_location": "L223",
       "_origin": "ast",
       "id": "lib_etiquetas_tipos_configcalibracao",
-      "community": 159,
+      "community": 454,
       "norm_label": "configcalibracao"
     },
     {
@@ -37299,7 +37299,7 @@
       "source_location": "L258",
       "_origin": "ast",
       "id": "lib_etiquetas_tipos_config_padrao",
-      "community": 159,
+      "community": 454,
       "norm_label": "config_padrao"
     },
     {
@@ -37349,7 +37349,7 @@
       "source_location": "L444",
       "_origin": "ast",
       "id": "lib_etiquetas_tipos_larguracaracteremm",
-      "community": 184,
+      "community": 454,
       "norm_label": "larguracaracteremm()"
     },
     {
@@ -37359,7 +37359,7 @@
       "source_location": "L452",
       "_origin": "ast",
       "id": "lib_etiquetas_tipos_larguratextomm",
-      "community": 184,
+      "community": 454,
       "norm_label": "larguratextomm()"
     },
     {
@@ -37369,7 +37369,7 @@
       "source_location": "L461",
       "_origin": "ast",
       "id": "lib_etiquetas_tipos_dotspormm",
-      "community": 184,
+      "community": 454,
       "norm_label": "dotspormm()"
     },
     {
@@ -37399,7 +37399,7 @@
       "source_location": "L574",
       "_origin": "ast",
       "id": "lib_etiquetas_tipos_alturaconteudobrutamm",
-      "community": 184,
+      "community": 104,
       "norm_label": "alturaconteudobrutamm()"
     },
     {
@@ -37539,7 +37539,7 @@
       "source_location": "L271",
       "_origin": "ast",
       "id": "lib_etiquetas_zpl_analisartextos",
-      "community": 184,
+      "community": 104,
       "norm_label": "analisartextos()"
     },
     {
@@ -37549,7 +37549,7 @@
       "source_location": "L312",
       "_origin": "ast",
       "id": "lib_etiquetas_zpl_caracteresdalinha",
-      "community": 184,
+      "community": 295,
       "norm_label": "caracteresdalinha()"
     },
     {
@@ -37559,7 +37559,7 @@
       "source_location": "L329",
       "_origin": "ast",
       "id": "lib_etiquetas_zpl_ajustartamanhoparacaber",
-      "community": 184,
+      "community": 104,
       "norm_label": "ajustartamanhoparacaber()"
     },
     {
@@ -37579,7 +37579,7 @@
       "source_location": "L386",
       "_origin": "ast",
       "id": "lib_etiquetas_zpl_gerarzpl",
-      "community": 104,
+      "community": 184,
       "norm_label": "gerarzpl()"
     },
     {
@@ -41859,7 +41859,7 @@
       "source_location": "L608",
       "_origin": "ast",
       "id": "lib_repositories_claudereport_querysalesrows",
-      "community": 20,
+      "community": 101,
       "norm_label": "querysalesrows()"
     },
     {
@@ -43599,7 +43599,7 @@
       "source_location": "L1194",
       "_origin": "ast",
       "id": "lib_repositories_controleestoque_fetchultimasentradasporfilial",
-      "community": 496,
+      "community": 2,
       "norm_label": "fetchultimasentradasporfilial()"
     },
     {
@@ -44156,7 +44156,7 @@
       "label": "EstoqueRedeItemRow",
       "file_type": "code",
       "source_file": "lib/repositories/controleEstoque.ts",
-      "source_location": "L9211",
+      "source_location": "L9258",
       "_origin": "ast",
       "id": "lib_repositories_controleestoque_estoqueredeitemrow",
       "community": 231,
@@ -44166,7 +44166,7 @@
       "label": "EstoqueRedeParams",
       "file_type": "code",
       "source_file": "lib/repositories/controleEstoque.ts",
-      "source_location": "L9227",
+      "source_location": "L9274",
       "_origin": "ast",
       "id": "lib_repositories_controleestoque_estoqueredeparams",
       "community": 2,
@@ -44176,7 +44176,7 @@
       "label": "fetchEstoqueRedePorProduto()",
       "file_type": "code",
       "source_file": "lib/repositories/controleEstoque.ts",
-      "source_location": "L9255",
+      "source_location": "L9302",
       "_origin": "ast",
       "id": "lib_repositories_controleestoque_fetchestoqueredeporproduto",
       "community": 2,
@@ -44909,7 +44909,7 @@
       "source_location": "L392",
       "_origin": "ast",
       "id": "lib_repositories_corporativostore_pedido",
-      "community": 160,
+      "community": 9,
       "norm_label": "pedido"
     },
     {
@@ -44979,7 +44979,7 @@
       "source_location": "L572",
       "_origin": "ast",
       "id": "lib_repositories_corporativostore_marcarpedidoefetivado",
-      "community": 134,
+      "community": 9,
       "norm_label": "marcarpedidoefetivado()"
     },
     {
@@ -45859,7 +45859,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_inventory",
-      "community": 126,
+      "community": 37,
       "norm_label": "inventory.ts"
     },
     {
@@ -45869,7 +45869,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "lib_repositories_inventory_buildfilialfilter",
-      "community": 126,
+      "community": 37,
       "norm_label": "buildfilialfilter()"
     },
     {
@@ -45879,7 +45879,7 @@
       "source_location": "L109",
       "_origin": "ast",
       "id": "lib_repositories_inventory_productstockparams",
-      "community": 126,
+      "community": 37,
       "norm_label": "productstockparams"
     },
     {
@@ -45889,7 +45889,7 @@
       "source_location": "L116",
       "_origin": "ast",
       "id": "lib_repositories_inventory_productstock",
-      "community": 126,
+      "community": 37,
       "norm_label": "productstock"
     },
     {
@@ -45899,7 +45899,7 @@
       "source_location": "L126",
       "_origin": "ast",
       "id": "lib_repositories_inventory_fetchproductstock",
-      "community": 126,
+      "community": 37,
       "norm_label": "fetchproductstock()"
     },
     {
@@ -45909,7 +45909,7 @@
       "source_location": "L189",
       "_origin": "ast",
       "id": "lib_repositories_inventory_fetchmultipleproductsstock",
-      "community": 126,
+      "community": 37,
       "norm_label": "fetchmultipleproductsstock()"
     },
     {
@@ -45919,7 +45919,7 @@
       "source_location": "L286",
       "_origin": "ast",
       "id": "lib_repositories_inventory_fetchmultipleproductsstockbycolor",
-      "community": 126,
+      "community": 37,
       "norm_label": "fetchmultipleproductsstockbycolor()"
     },
     {
@@ -45939,7 +45939,7 @@
       "source_location": "L450",
       "_origin": "ast",
       "id": "lib_repositories_inventory_fetchmultipleproductsstockbycolorporfilial",
-      "community": 126,
+      "community": 37,
       "norm_label": "fetchmultipleproductsstockbycolorporfilial()"
     },
     {
@@ -45949,7 +45949,7 @@
       "source_location": "L560",
       "_origin": "ast",
       "id": "lib_repositories_inventory_stocksummaryparams",
-      "community": 126,
+      "community": 37,
       "norm_label": "stocksummaryparams"
     },
     {
@@ -45959,7 +45959,7 @@
       "source_location": "L580",
       "_origin": "ast",
       "id": "lib_repositories_inventory_stocksummary",
-      "community": 126,
+      "community": 37,
       "norm_label": "stocksummary"
     },
     {
@@ -45969,7 +45969,7 @@
       "source_location": "L590",
       "_origin": "ast",
       "id": "lib_repositories_inventory_fetchstocksummary",
-      "community": 126,
+      "community": 80,
       "norm_label": "fetchstocksummary()"
     },
     {
@@ -46319,7 +46319,7 @@
       "source_location": "L214",
       "_origin": "ast",
       "id": "lib_repositories_lojaraiox_resolvefilialnames",
-      "community": 126,
+      "community": 49,
       "norm_label": "resolvefilialnames()"
     },
     {
@@ -46329,7 +46329,7 @@
       "source_location": "L232",
       "_origin": "ast",
       "id": "lib_repositories_lojaraiox_filiaisescopo",
-      "community": 126,
+      "community": 49,
       "norm_label": "filiaisescopo()"
     },
     {
@@ -46529,7 +46529,7 @@
       "source_location": "L754",
       "_origin": "ast",
       "id": "lib_repositories_lojaraiox_fetchdisponibilidademes",
-      "community": 126,
+      "community": 49,
       "norm_label": "fetchdisponibilidademes()"
     },
     {
@@ -46679,7 +46679,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_pedidovendalinx",
-      "community": 160,
+      "community": 9,
       "norm_label": "pedidovendalinx.ts"
     },
     {
@@ -46689,7 +46689,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "lib_repositories_pedidovendalinx_trim",
-      "community": 160,
+      "community": 9,
       "norm_label": "trim()"
     },
     {
@@ -46699,7 +46699,7 @@
       "source_location": "L34",
       "_origin": "ast",
       "id": "lib_repositories_pedidovendalinx_round2",
-      "community": 160,
+      "community": 9,
       "norm_label": "round2()"
     },
     {
@@ -46709,7 +46709,7 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "lib_repositories_pedidovendalinx_pedidovendalinxresult",
-      "community": 160,
+      "community": 9,
       "norm_label": "pedidovendalinxresult"
     },
     {
@@ -46719,7 +46719,7 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "lib_repositories_pedidovendalinx_cadastroresolvido",
-      "community": 160,
+      "community": 9,
       "norm_label": "cadastroresolvido"
     },
     {
@@ -46729,7 +46729,7 @@
       "source_location": "L46",
       "_origin": "ast",
       "id": "lib_repositories_pedidovendalinx_linhavenda",
-      "community": 160,
+      "community": 9,
       "norm_label": "linhavenda"
     },
     {
@@ -46739,7 +46739,7 @@
       "source_location": "L57",
       "_origin": "ast",
       "id": "lib_repositories_pedidovendalinx_resolvecadastro",
-      "community": 160,
+      "community": 9,
       "norm_label": "resolvecadastro()"
     },
     {
@@ -46749,7 +46749,7 @@
       "source_location": "L83",
       "_origin": "ast",
       "id": "lib_repositories_pedidovendalinx_resolvebarras",
-      "community": 160,
+      "community": 9,
       "norm_label": "resolvebarras()"
     },
     {
@@ -46759,7 +46759,7 @@
       "source_location": "L113",
       "_origin": "ast",
       "id": "lib_repositories_pedidovendalinx_montarlinhas",
-      "community": 160,
+      "community": 9,
       "norm_label": "montarlinhas()"
     },
     {
@@ -46769,7 +46769,7 @@
       "source_location": "L145",
       "_origin": "ast",
       "id": "lib_repositories_pedidovendalinx_criarpedidovendalinx",
-      "community": 160,
+      "community": 9,
       "norm_label": "criarpedidovendalinx()"
     },
     {
@@ -46886,7 +46886,7 @@
       "label": "ProdutoQtdePorFilialRow",
       "file_type": "code",
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L827",
+      "source_location": "L847",
       "_origin": "ast",
       "id": "lib_repositories_performance_produtoqtdeporfilialrow",
       "community": 7,
@@ -46896,7 +46896,7 @@
       "label": "fetchProdutoQtdePorFilial()",
       "file_type": "code",
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L841",
+      "source_location": "L861",
       "_origin": "ast",
       "id": "lib_repositories_performance_fetchprodutoqtdeporfilial",
       "community": 459,
@@ -46906,7 +46906,7 @@
       "label": "ProdutoEstoquePorFilialRow",
       "file_type": "code",
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L1052",
+      "source_location": "L1072",
       "_origin": "ast",
       "id": "lib_repositories_performance_produtoestoqueporfilialrow",
       "community": 7,
@@ -46916,7 +46916,7 @@
       "label": "fetchProdutoEstoquePorFilial()",
       "file_type": "code",
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L1063",
+      "source_location": "L1083",
       "_origin": "ast",
       "id": "lib_repositories_performance_fetchprodutoestoqueporfilial",
       "community": 459,
@@ -46926,7 +46926,7 @@
       "label": "ProdutoEstoqueDetalhadoPorFilialRow",
       "file_type": "code",
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L1119",
+      "source_location": "L1139",
       "_origin": "ast",
       "id": "lib_repositories_performance_produtoestoquedetalhadoporfilialrow",
       "community": 7,
@@ -46936,7 +46936,7 @@
       "label": "fetchProdutoEstoqueDetalhadoPorFilial()",
       "file_type": "code",
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L1131",
+      "source_location": "L1151",
       "_origin": "ast",
       "id": "lib_repositories_performance_fetchprodutoestoquedetalhadoporfilial",
       "community": 459,
@@ -46946,7 +46946,7 @@
       "label": "fetchFilialProdutoVendedorSales()",
       "file_type": "code",
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L1231",
+      "source_location": "L1251",
       "_origin": "ast",
       "id": "lib_repositories_performance_fetchfilialprodutovendedorsales",
       "community": 126,
@@ -46956,7 +46956,7 @@
       "label": "fetchStockByProduto()",
       "file_type": "code",
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L1410",
+      "source_location": "L1430",
       "_origin": "ast",
       "id": "lib_repositories_performance_fetchstockbyproduto",
       "community": 34,
@@ -46966,7 +46966,7 @@
       "label": "fetchProdutoCorDescricoes()",
       "file_type": "code",
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L1452",
+      "source_location": "L1472",
       "_origin": "ast",
       "id": "lib_repositories_performance_fetchprodutocordescricoes",
       "community": 459,
@@ -47719,7 +47719,7 @@
       "source_location": "L430",
       "_origin": "ast",
       "id": "lib_repositories_productdetail_resolvebarcode",
-      "community": 20,
+      "community": 49,
       "norm_label": "resolvebarcode()"
     },
     {
@@ -48189,7 +48189,7 @@
       "source_location": "L1302",
       "_origin": "ast",
       "id": "lib_repositories_products_fetchproductswithdetailsecommerce",
-      "community": 126,
+      "community": 37,
       "norm_label": "fetchproductswithdetailsecommerce()"
     },
     {
@@ -49839,7 +49839,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_reporttickets",
-      "community": 101,
+      "community": 450,
       "norm_label": "reporttickets.ts"
     },
     {
@@ -49849,7 +49849,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "lib_repositories_reporttickets_round2",
-      "community": 101,
+      "community": 450,
       "norm_label": "round2()"
     },
     {
@@ -49859,7 +49859,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "lib_repositories_reporttickets_roundint",
-      "community": 101,
+      "community": 450,
       "norm_label": "roundint()"
     },
     {
@@ -49869,7 +49869,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "lib_repositories_reporttickets_inlistclause",
-      "community": 101,
+      "community": 450,
       "norm_label": "inlistclause()"
     },
     {
@@ -49879,7 +49879,7 @@
       "source_location": "L56",
       "_origin": "ast",
       "id": "lib_repositories_reporttickets_descnormalizada",
-      "community": 101,
+      "community": 450,
       "norm_label": "descnormalizada()"
     },
     {
@@ -49889,7 +49889,7 @@
       "source_location": "L63",
       "_origin": "ast",
       "id": "lib_repositories_reporttickets_nomeclause",
-      "community": 101,
+      "community": 450,
       "norm_label": "nomeclause()"
     },
     {
@@ -49899,7 +49899,7 @@
       "source_location": "L87",
       "_origin": "ast",
       "id": "lib_repositories_reporttickets_coresjoin",
-      "community": 101,
+      "community": 450,
       "norm_label": "coresjoin()"
     },
     {
@@ -49909,7 +49909,7 @@
       "source_location": "L105",
       "_origin": "ast",
       "id": "lib_repositories_reporttickets_tamanholabelexpr",
-      "community": 101,
+      "community": 450,
       "norm_label": "tamanholabelexpr()"
     },
     {
@@ -49919,7 +49919,7 @@
       "source_location": "L114",
       "_origin": "ast",
       "id": "lib_repositories_reporttickets_ticketitemraw",
-      "community": 101,
+      "community": 450,
       "norm_label": "ticketitemraw"
     },
     {
@@ -49929,7 +49929,7 @@
       "source_location": "L143",
       "_origin": "ast",
       "id": "lib_repositories_reporttickets_ticketagg",
-      "community": 101,
+      "community": 450,
       "norm_label": "ticketagg"
     },
     {
@@ -49939,7 +49939,7 @@
       "source_location": "L197",
       "_origin": "ast",
       "id": "lib_repositories_reporttickets_fetchtickets",
-      "community": 101,
+      "community": 450,
       "norm_label": "fetchtickets()"
     },
     {
@@ -51289,7 +51289,7 @@
       "source_location": "L1714",
       "_origin": "ast",
       "id": "lib_saida_entrada_executor_executeentradaappend",
-      "community": 463,
+      "community": 116,
       "norm_label": "executeentradaappend()"
     },
     {
@@ -51319,7 +51319,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "lib_server_company_live_resolvecompanylive",
-      "community": 126,
+      "community": 20,
       "norm_label": "resolvecompanylive()"
     },
     {
@@ -52529,7 +52529,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_types_compra_gasto",
-      "community": 454,
+      "community": 33,
       "norm_label": "compra-gasto.ts"
     },
     {
@@ -52559,7 +52559,7 @@
       "source_location": "L64",
       "_origin": "ast",
       "id": "lib_types_compra_gasto_compragastopremieritem",
-      "community": 454,
+      "community": 33,
       "norm_label": "compragastopremieritem"
     },
     {
@@ -52569,7 +52569,7 @@
       "source_location": "L69",
       "_origin": "ast",
       "id": "lib_types_compra_gasto_compra_gasto_premier_catalogo",
-      "community": 454,
+      "community": 33,
       "norm_label": "compra_gasto_premier_catalogo"
     },
     {
@@ -52579,7 +52579,7 @@
       "source_location": "L83",
       "_origin": "ast",
       "id": "lib_types_compra_gasto_compra_gasto_premier_itens",
-      "community": 454,
+      "community": 33,
       "norm_label": "compra_gasto_premier_itens"
     },
     {
@@ -52589,7 +52589,7 @@
       "source_location": "L88",
       "_origin": "ast",
       "id": "lib_types_compra_gasto_custopadraopremier",
-      "community": 454,
+      "community": 33,
       "norm_label": "custopadraopremier()"
     },
     {
@@ -52619,7 +52619,7 @@
       "source_location": "L115",
       "_origin": "ast",
       "id": "lib_types_compra_gasto_compra_gasto_canal_curto",
-      "community": 454,
+      "community": 33,
       "norm_label": "compra_gasto_canal_curto"
     },
     {
@@ -52689,7 +52689,7 @@
       "source_location": "L196",
       "_origin": "ast",
       "id": "lib_types_compra_gasto_compragastoparcela",
-      "community": 21,
+      "community": 33,
       "norm_label": "compragastoparcela"
     },
     {
@@ -52699,7 +52699,7 @@
       "source_location": "L210",
       "_origin": "ast",
       "id": "lib_types_compra_gasto_compragastolote",
-      "community": 21,
+      "community": 33,
       "norm_label": "compragastolote"
     },
     {
@@ -52719,7 +52719,7 @@
       "source_location": "L251",
       "_origin": "ast",
       "id": "lib_types_compra_gasto_compragastolotenomes",
-      "community": 454,
+      "community": 33,
       "norm_label": "compragastolotenomes"
     },
     {
@@ -52739,7 +52739,7 @@
       "source_location": "L279",
       "_origin": "ast",
       "id": "lib_types_compra_gasto_compragastototais",
-      "community": 454,
+      "community": 33,
       "norm_label": "compragastototais"
     },
     {
@@ -52749,7 +52749,7 @@
       "source_location": "L290",
       "_origin": "ast",
       "id": "lib_types_compra_gasto_compragastopainel",
-      "community": 454,
+      "community": 33,
       "norm_label": "compragastopainel"
     },
     {
@@ -52759,7 +52759,7 @@
       "source_location": "L295",
       "_origin": "ast",
       "id": "lib_types_compra_gasto_compragastostatuskey",
-      "community": 454,
+      "community": 33,
       "norm_label": "compragastostatuskey"
     },
     {
@@ -52769,7 +52769,7 @@
       "source_location": "L302",
       "_origin": "ast",
       "id": "lib_types_compra_gasto_compragastostatus",
-      "community": 454,
+      "community": 33,
       "norm_label": "compragastostatus"
     },
     {
@@ -52779,7 +52779,7 @@
       "source_location": "L314",
       "_origin": "ast",
       "id": "lib_types_compra_gasto_compragastocandidata",
-      "community": 454,
+      "community": 33,
       "norm_label": "compragastocandidata"
     },
     {
@@ -52869,7 +52869,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "lib_types_compra_transito_compratransitostatus",
-      "community": 454,
+      "community": 33,
       "norm_label": "compratransitostatus"
     },
     {
@@ -54049,7 +54049,7 @@
       "source_location": "L726",
       "_origin": "ast",
       "id": "lib_utils_compra_gastos_agregacao_compragastoagendalinha",
-      "community": 21,
+      "community": 33,
       "norm_label": "compragastoagendalinha"
     },
     {
@@ -55889,7 +55889,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_utils_date",
-      "community": 101,
+      "community": 55,
       "norm_label": "date.ts"
     },
     {
@@ -55909,7 +55909,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "lib_utils_date_startofcurrentmonth",
-      "community": 101,
+      "community": 55,
       "norm_label": "startofcurrentmonth()"
     },
     {
@@ -55919,7 +55919,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "lib_utils_date_endofcurrentmonth",
-      "community": 101,
+      "community": 55,
       "norm_label": "endofcurrentmonth()"
     },
     {
@@ -55969,7 +55969,7 @@
       "source_location": "L84",
       "_origin": "ast",
       "id": "lib_utils_date_toutcstartofday",
-      "community": 101,
+      "community": 55,
       "norm_label": "toutcstartofday()"
     },
     {
@@ -55979,7 +55979,7 @@
       "source_location": "L92",
       "_origin": "ast",
       "id": "lib_utils_date_toutcexclusiveend",
-      "community": 101,
+      "community": 55,
       "norm_label": "toutcexclusiveend()"
     },
     {
@@ -55999,7 +55999,7 @@
       "source_location": "L108",
       "_origin": "ast",
       "id": "lib_utils_date_addmonthsutc",
-      "community": 101,
+      "community": 55,
       "norm_label": "addmonthsutc()"
     },
     {
@@ -56009,7 +56009,7 @@
       "source_location": "L144",
       "_origin": "ast",
       "id": "lib_utils_date_lastdayofmonthutc",
-      "community": 101,
+      "community": 55,
       "norm_label": "lastdayofmonthutc()"
     },
     {
@@ -56089,7 +56089,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "lib_utils_destino_romaneio_store_key",
-      "community": 126,
+      "community": 37,
       "norm_label": "key()"
     },
     {
@@ -63909,7 +63909,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "proxy_server_proxy_helpers",
-      "community": 126,
+      "community": 37,
       "norm_label": "proxy-helpers.js"
     },
     {
@@ -63919,7 +63919,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "proxy_server_proxy_helpers_executequerywithparams",
-      "community": 126,
+      "community": 37,
       "norm_label": "executequerywithparams()"
     },
     {
@@ -63929,7 +63929,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "proxy_server_proxy_helpers_getsqltype",
-      "community": 126,
+      "community": 37,
       "norm_label": "getsqltype()"
     },
     {
@@ -103158,7 +103158,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/api/products/cores/route.ts",
-      "source_location": "L11",
+      "source_location": "L22",
       "weight": 1.0,
       "source": "app_api_products_cores_route_get",
       "target": "lib_repositories_controleestoque_fetchavailablecores"
@@ -105060,7 +105060,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "app/api/projecao-compra/route.ts",
-      "source_location": "L186",
+      "source_location": "L193",
       "weight": 1.0,
       "source": "app_api_projecao_compra_route_get",
       "target": "app_api_projecao_compra_route_adddaysymd",
@@ -105071,7 +105071,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "app/api/projecao-compra/route.ts",
-      "source_location": "L197",
+      "source_location": "L204",
       "weight": 1.0,
       "source": "app_api_projecao_compra_route_get",
       "target": "app_api_projecao_compra_route_pad2",
@@ -105093,7 +105093,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "app/api/projecao-compra/route.ts",
-      "source_location": "L204",
+      "source_location": "L211",
       "weight": 1.0,
       "source": "app_api_projecao_compra_route_get",
       "target": "app_api_projecao_compra_route_lastdayofmonth",
@@ -105104,7 +105104,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "app/api/projecao-compra/route.ts",
-      "source_location": "L193",
+      "source_location": "L200",
       "weight": 1.0,
       "source": "app_api_projecao_compra_route_get",
       "target": "app_api_projecao_compra_route_maplimit",
@@ -105115,7 +105115,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "app/api/projecao-compra/route.ts",
-      "source_location": "L302",
+      "source_location": "L309",
       "weight": 1.0,
       "source": "app_api_projecao_compra_route_get",
       "target": "app_api_projecao_compra_route_ornull",
@@ -105126,7 +105126,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "app/api/projecao-compra/route.ts",
-      "source_location": "L113",
+      "source_location": "L118",
       "weight": 1.0,
       "source": "app_api_projecao_compra_route_get",
       "target": "app_api_projecao_compra_route_isvalidymd",
@@ -105138,7 +105138,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "app/api/projecao-compra/route.ts",
-      "source_location": "L214",
+      "source_location": "L221",
       "weight": 1.0,
       "source": "app_api_projecao_compra_route_get",
       "target": "components_ajuste_estoque_ajustaritempanel_chave"
@@ -105149,7 +105149,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/api/projecao-compra/route.ts",
-      "source_location": "L134",
+      "source_location": "L139",
       "weight": 1.0,
       "source": "app_api_projecao_compra_route_get",
       "target": "lib_config_company_server_resolvecompanydynamic"
@@ -105160,7 +105160,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/api/projecao-compra/route.ts",
-      "source_location": "L298",
+      "source_location": "L305",
       "weight": 1.0,
       "source": "app_api_projecao_compra_route_get",
       "target": "lib_repositories_controleestoque_fetchestoqueredeporproduto"
@@ -105171,7 +105171,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/api/projecao-compra/route.ts",
-      "source_location": "L292",
+      "source_location": "L299",
       "weight": 1.0,
       "source": "app_api_projecao_compra_route_get",
       "target": "lib_repositories_performance_fetchfilialprodutosales"
@@ -105182,7 +105182,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/api/projecao-compra/route.ts",
-      "source_location": "L189",
+      "source_location": "L196",
       "weight": 1.0,
       "source": "app_api_projecao_compra_route_get",
       "target": "lib_services_salestotals_fetchsalestotals"
@@ -105193,7 +105193,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/api/projecao-compra/route.ts",
-      "source_location": "L185",
+      "source_location": "L192",
       "weight": 1.0,
       "source": "app_api_projecao_compra_route_get",
       "target": "lib_utils_date_normalizerangeforquery"
@@ -105204,7 +105204,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "app/api/projecao-compra/route.ts",
-      "source_location": "L318",
+      "source_location": "L326",
       "weight": 1.0,
       "source": "app_api_projecao_compra_route_get",
       "target": "lib_utils_destino_romaneio_store_key"
@@ -162132,7 +162132,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L186",
+      "source_location": "L191",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_adddaysformatted",
@@ -162142,7 +162142,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L199",
+      "source_location": "L204",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_diasnomes",
@@ -162152,7 +162152,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L178",
+      "source_location": "L183",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_diffdays",
@@ -162162,7 +162162,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L128",
+      "source_location": "L133",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_dim_endpoint",
@@ -162172,7 +162172,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L117",
+      "source_location": "L122",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_dim_keys",
@@ -162182,7 +162182,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L118",
+      "source_location": "L123",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_dim_label",
@@ -162192,7 +162192,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L116",
+      "source_location": "L121",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_dimkey",
@@ -162202,7 +162202,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L137",
+      "source_location": "L142",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_dimstate",
@@ -162212,7 +162212,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L147",
+      "source_location": "L152",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_empty_dim_options",
@@ -162222,7 +162222,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L138",
+      "source_location": "L143",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_empty_dims",
@@ -162232,7 +162232,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L173",
+      "source_location": "L178",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_endofyearymd",
@@ -162242,7 +162242,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L159",
+      "source_location": "L164",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_fmt",
@@ -162252,7 +162252,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L162",
+      "source_location": "L167",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_fmtdec",
@@ -162262,7 +162262,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L205",
+      "source_location": "L210",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_fmtpct",
@@ -162272,7 +162272,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L212",
+      "source_location": "L217",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_janela12meses",
@@ -162292,7 +162292,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L202",
+      "source_location": "L207",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_mes_nome",
@@ -162322,7 +162322,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L1378",
+      "source_location": "L1462",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_multiselect",
@@ -162332,7 +162332,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L1351",
+      "source_location": "L1435",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_multiselectopcao",
@@ -162342,7 +162342,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L1360",
+      "source_location": "L1444",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_multiselectprops",
@@ -162382,7 +162382,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L225",
+      "source_location": "L230",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_projecaocomprapage",
@@ -162412,7 +162412,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L221",
+      "source_location": "L226",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_props",
@@ -162452,7 +162452,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L165",
+      "source_location": "L170",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_rowkey",
@@ -162462,7 +162462,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L169",
+      "source_location": "L174",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_todayymd",
@@ -162472,7 +162472,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L112",
+      "source_location": "L117",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_windows_dias",
@@ -162482,7 +162482,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L194",
+      "source_location": "L199",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_ymdtobr",
@@ -162538,7 +162538,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L617",
+      "source_location": "L680",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_windows_dias"
@@ -162549,7 +162549,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L280",
+      "source_location": "L492",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_dim_keys"
@@ -162559,7 +162559,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L1543",
+      "source_location": "L1627",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_multiselect",
       "target": "components_stock_projecaocomprapage_fmt",
@@ -162570,7 +162570,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L522",
+      "source_location": "L584",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_fmt",
@@ -162581,7 +162581,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L1199",
+      "source_location": "L1283",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_fmtdec",
@@ -162592,7 +162592,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L551",
+      "source_location": "L614",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_rowkey",
@@ -162603,7 +162603,7 @@
       "context": "argument",
       "confidence": "INFERRED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L226",
+      "source_location": "L231",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_todayymd",
@@ -162614,7 +162614,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L170",
+      "source_location": "L175",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_todayymd",
       "target": "lib_utils_date_formatdateforquery",
@@ -162625,7 +162625,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L227",
+      "source_location": "L232",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_endofyearymd",
@@ -162636,7 +162636,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L628",
+      "source_location": "L691",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_diffdays",
@@ -162647,7 +162647,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L733",
+      "source_location": "L796",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_adddaysformatted",
@@ -162658,7 +162658,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L1299",
+      "source_location": "L1383",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_ymdtobr",
@@ -162669,7 +162669,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L662",
+      "source_location": "L725",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_diasnomes",
@@ -162680,7 +162680,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L1230",
+      "source_location": "L1314",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_fmtpct",
@@ -162691,7 +162691,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L216",
+      "source_location": "L221",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_janela12meses",
       "target": "lib_utils_date_formatdateforquery",
@@ -162702,7 +162702,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L278",
+      "source_location": "L284",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_janela12meses",
@@ -162713,7 +162713,7 @@
       "context": "field",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L222",
+      "source_location": "L227",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_props",
       "target": "lib_config_company_companykey",
@@ -162725,7 +162725,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L1311",
+      "source_location": "L1395",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "lib_repositories_topprodutospresentation_pct"
@@ -188803,7 +188803,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/controleEstoque.ts",
-      "source_location": "L9183",
+      "source_location": "L9201",
       "weight": 1.0,
       "source": "lib_repositories_controleestoque_fetchavailablecores",
       "target": "lib_db_connection_withrequest"
@@ -188946,7 +188946,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/controleEstoque.ts",
-      "source_location": "L9270",
+      "source_location": "L9317",
       "weight": 1.0,
       "source": "lib_repositories_controleestoque_fetchestoqueredeporproduto",
       "target": "lib_db_connection_withrequest"
@@ -189650,7 +189650,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L514",
+      "source_location": "L524",
       "weight": 1.0,
       "source": "lib_repositories_performance_fetchfilialprodutosales",
       "target": "lib_db_connection_withrequest"
@@ -189661,7 +189661,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L1265",
+      "source_location": "L1285",
       "weight": 1.0,
       "source": "lib_repositories_performance_fetchfilialprodutovendedorsales",
       "target": "lib_db_connection_withrequest"
@@ -189683,7 +189683,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L1465",
+      "source_location": "L1485",
       "weight": 1.0,
       "source": "lib_repositories_performance_fetchprodutocordescricoes",
       "target": "lib_db_connection_withrequest"
@@ -189694,7 +189694,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L1149",
+      "source_location": "L1169",
       "weight": 1.0,
       "source": "lib_repositories_performance_fetchprodutoestoquedetalhadoporfilial",
       "target": "lib_db_connection_withrequest"
@@ -189705,7 +189705,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L1073",
+      "source_location": "L1093",
       "weight": 1.0,
       "source": "lib_repositories_performance_fetchprodutoestoqueporfilial",
       "target": "lib_db_connection_withrequest"
@@ -189716,7 +189716,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L856",
+      "source_location": "L876",
       "weight": 1.0,
       "source": "lib_repositories_performance_fetchprodutoqtdeporfilial",
       "target": "lib_db_connection_withrequest"
@@ -189727,7 +189727,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L1419",
+      "source_location": "L1439",
       "weight": 1.0,
       "source": "lib_repositories_performance_fetchstockbyproduto",
       "target": "lib_db_connection_withrequest"
@@ -190959,7 +190959,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L702",
+      "source_location": "L718",
       "weight": 1.0,
       "source": "lib_repositories_performance_fetchfilialprodutosales",
       "target": "lib_db_connection_query"
@@ -190970,7 +190970,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L1315",
+      "source_location": "L1335",
       "weight": 1.0,
       "source": "lib_repositories_performance_fetchfilialprodutovendedorsales",
       "target": "lib_db_connection_query"
@@ -190992,7 +190992,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L1207",
+      "source_location": "L1227",
       "weight": 1.0,
       "source": "lib_repositories_performance_fetchprodutoestoquedetalhadoporfilial",
       "target": "lib_db_connection_query"
@@ -191003,7 +191003,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L1100",
+      "source_location": "L1120",
       "weight": 1.0,
       "source": "lib_repositories_performance_fetchprodutoestoqueporfilial",
       "target": "lib_db_connection_query"
@@ -191014,7 +191014,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L985",
+      "source_location": "L1005",
       "weight": 1.0,
       "source": "lib_repositories_performance_fetchprodutoqtdeporfilial",
       "target": "lib_db_connection_query"
@@ -191025,7 +191025,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L1430",
+      "source_location": "L1450",
       "weight": 1.0,
       "source": "lib_repositories_performance_fetchstockbyproduto",
       "target": "lib_db_connection_query"
@@ -195700,7 +195700,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "lib/repositories/controleEstoque.ts",
-      "source_location": "L9184",
+      "source_location": "L9231",
       "weight": 1.0,
       "source": "lib_repositories_controleestoque_fetchavailablecores",
       "target": "lib_db_proxy_proxypool_request"
@@ -195832,7 +195832,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "lib/repositories/controleEstoque.ts",
-      "source_location": "L9271",
+      "source_location": "L9318",
       "weight": 1.0,
       "source": "lib_repositories_controleestoque_fetchestoqueredeporproduto",
       "target": "lib_db_proxy_proxypool_request"
@@ -196184,7 +196184,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L553",
+      "source_location": "L569",
       "weight": 1.0,
       "source": "lib_repositories_performance_fetchfilialprodutosales",
       "target": "lib_db_proxy_proxypool_request"
@@ -217265,7 +217265,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/controleEstoque.ts",
-      "source_location": "L9211",
+      "source_location": "L9258",
       "weight": 1.0,
       "source": "lib_repositories_controleestoque",
       "target": "lib_repositories_controleestoque_estoqueredeitemrow",
@@ -217275,7 +217275,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/controleEstoque.ts",
-      "source_location": "L9227",
+      "source_location": "L9274",
       "weight": 1.0,
       "source": "lib_repositories_controleestoque",
       "target": "lib_repositories_controleestoque_estoqueredeparams",
@@ -217435,7 +217435,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/controleEstoque.ts",
-      "source_location": "L9255",
+      "source_location": "L9302",
       "weight": 1.0,
       "source": "lib_repositories_controleestoque",
       "target": "lib_repositories_controleestoque_fetchestoqueredeporproduto",
@@ -218332,7 +218332,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/controleEstoque.ts",
-      "source_location": "L9184",
+      "source_location": "L9231",
       "weight": 1.0,
       "source": "lib_repositories_controleestoque_fetchavailablecores",
       "target": "lib_repositories_controleestoque_buildfilialfilter",
@@ -218442,7 +218442,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/controleEstoque.ts",
-      "source_location": "L9271",
+      "source_location": "L9318",
       "weight": 1.0,
       "source": "lib_repositories_controleestoque_fetchestoqueredeporproduto",
       "target": "lib_repositories_controleestoque_buildfilialfilter",
@@ -218981,7 +218981,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/controleEstoque.ts",
-      "source_location": "L9272",
+      "source_location": "L9319",
       "weight": 1.0,
       "source": "lib_repositories_controleestoque_fetchestoqueredeporproduto",
       "target": "lib_repositories_controleestoque_buildgrupofilter",
@@ -219157,7 +219157,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/controleEstoque.ts",
-      "source_location": "L9273",
+      "source_location": "L9320",
       "weight": 1.0,
       "source": "lib_repositories_controleestoque_fetchestoqueredeporproduto",
       "target": "lib_repositories_controleestoque_buildlinhafilter",
@@ -219333,7 +219333,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/controleEstoque.ts",
-      "source_location": "L9274",
+      "source_location": "L9321",
       "weight": 1.0,
       "source": "lib_repositories_controleestoque_fetchestoqueredeporproduto",
       "target": "lib_repositories_controleestoque_buildcolecaofilter",
@@ -219520,7 +219520,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/controleEstoque.ts",
-      "source_location": "L9275",
+      "source_location": "L9322",
       "weight": 1.0,
       "source": "lib_repositories_controleestoque_fetchestoqueredeporproduto",
       "target": "lib_repositories_controleestoque_buildsubgrupofilter",
@@ -219696,7 +219696,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/controleEstoque.ts",
-      "source_location": "L9276",
+      "source_location": "L9323",
       "weight": 1.0,
       "source": "lib_repositories_controleestoque_fetchestoqueredeporproduto",
       "target": "lib_repositories_controleestoque_buildgradefilter",
@@ -219883,7 +219883,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/controleEstoque.ts",
-      "source_location": "L9277",
+      "source_location": "L9324",
       "weight": 1.0,
       "source": "lib_repositories_controleestoque_fetchestoqueredeporproduto",
       "target": "lib_repositories_controleestoque_buildexclusionfilter",
@@ -219971,7 +219971,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/controleEstoque.ts",
-      "source_location": "L9185",
+      "source_location": "L9202",
       "weight": 1.0,
       "source": "lib_repositories_controleestoque_fetchavailablecores",
       "target": "lib_repositories_controleestoque_buildnerdonlylinhaeletronicosfilter",
@@ -220059,7 +220059,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/controleEstoque.ts",
-      "source_location": "L9278",
+      "source_location": "L9325",
       "weight": 1.0,
       "source": "lib_repositories_controleestoque_fetchestoqueredeporproduto",
       "target": "lib_repositories_controleestoque_buildnerdonlylinhaeletronicosfilter",
@@ -228089,7 +228089,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L1231",
+      "source_location": "L1251",
       "weight": 1.0,
       "source": "lib_repositories_performance",
       "target": "lib_repositories_performance_fetchfilialprodutovendedorsales",
@@ -228109,7 +228109,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L1452",
+      "source_location": "L1472",
       "weight": 1.0,
       "source": "lib_repositories_performance",
       "target": "lib_repositories_performance_fetchprodutocordescricoes",
@@ -228119,7 +228119,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L1131",
+      "source_location": "L1151",
       "weight": 1.0,
       "source": "lib_repositories_performance",
       "target": "lib_repositories_performance_fetchprodutoestoquedetalhadoporfilial",
@@ -228129,7 +228129,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L1063",
+      "source_location": "L1083",
       "weight": 1.0,
       "source": "lib_repositories_performance",
       "target": "lib_repositories_performance_fetchprodutoestoqueporfilial",
@@ -228139,7 +228139,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L841",
+      "source_location": "L861",
       "weight": 1.0,
       "source": "lib_repositories_performance",
       "target": "lib_repositories_performance_fetchprodutoqtdeporfilial",
@@ -228149,7 +228149,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L1410",
+      "source_location": "L1430",
       "weight": 1.0,
       "source": "lib_repositories_performance",
       "target": "lib_repositories_performance_fetchstockbyproduto",
@@ -228229,7 +228229,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L1119",
+      "source_location": "L1139",
       "weight": 1.0,
       "source": "lib_repositories_performance",
       "target": "lib_repositories_performance_produtoestoquedetalhadoporfilialrow",
@@ -228239,7 +228239,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L1052",
+      "source_location": "L1072",
       "weight": 1.0,
       "source": "lib_repositories_performance",
       "target": "lib_repositories_performance_produtoestoqueporfilialrow",
@@ -228249,7 +228249,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L827",
+      "source_location": "L847",
       "weight": 1.0,
       "source": "lib_repositories_performance",
       "target": "lib_repositories_performance_produtoqtdeporfilialrow",
@@ -228403,7 +228403,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L1150",
+      "source_location": "L1170",
       "weight": 1.0,
       "source": "lib_repositories_performance_fetchprodutoestoquedetalhadoporfilial",
       "target": "lib_repositories_performance_normalizefilialfiltervalue",
@@ -228414,7 +228414,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L1074",
+      "source_location": "L1094",
       "weight": 1.0,
       "source": "lib_repositories_performance_fetchprodutoestoqueporfilial",
       "target": "lib_repositories_performance_normalizefilialfiltervalue",
@@ -228425,7 +228425,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L1165",
+      "source_location": "L1185",
       "weight": 1.0,
       "source": "lib_repositories_performance_fetchprodutoestoquedetalhadoporfilial",
       "target": "lib_repositories_performance_buildnormalizedfilialsqlexpr",
@@ -228436,7 +228436,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L1078",
+      "source_location": "L1098",
       "weight": 1.0,
       "source": "lib_repositories_performance_fetchprodutoestoqueporfilial",
       "target": "lib_repositories_performance_buildnormalizedfilialsqlexpr",
@@ -228502,7 +228502,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L803",
+      "source_location": "L823",
       "weight": 1.0,
       "source": "lib_repositories_performance_fetchfilialprodutosales",
       "target": "lib_repositories_performance_filialprodutomergekey",
@@ -228514,7 +228514,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L407",
+      "source_location": "L417",
       "weight": 1.0,
       "source": "lib_repositories_performance_fetchfilialprodutosales",
       "target": "lib_utils_date_shiftrangebymonths"
@@ -228525,7 +228525,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L804",
+      "source_location": "L824",
       "weight": 1.0,
       "source": "lib_repositories_performance_fetchfilialprodutosales",
       "target": "lib_utils_destino_romaneio_store_key"
@@ -228536,7 +228536,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L515",
+      "source_location": "L525",
       "weight": 1.0,
       "source": "lib_repositories_performance_fetchfilialprodutosales",
       "target": "tmp_test_projecao_s"
@@ -228646,7 +228646,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L1240",
+      "source_location": "L1260",
       "weight": 1.0,
       "source": "lib_repositories_performance_fetchfilialprodutovendedorsales",
       "target": "lib_utils_date_shiftrangebymonths"
@@ -228657,7 +228657,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L1383",
+      "source_location": "L1403",
       "weight": 1.0,
       "source": "lib_repositories_performance_fetchfilialprodutovendedorsales",
       "target": "lib_utils_destino_romaneio_store_key"
@@ -228668,7 +228668,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L1266",
+      "source_location": "L1286",
       "weight": 1.0,
       "source": "lib_repositories_performance_fetchfilialprodutovendedorsales",
       "target": "tmp_test_projecao_s"
@@ -228679,7 +228679,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L1434",
+      "source_location": "L1454",
       "weight": 1.0,
       "source": "lib_repositories_performance_fetchstockbyproduto",
       "target": "lib_utils_destino_romaneio_store_key"
@@ -228690,7 +228690,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/performance.ts",
-      "source_location": "L1489",
+      "source_location": "L1509",
       "weight": 1.0,
       "source": "lib_repositories_performance_fetchprodutocordescricoes",
       "target": "lib_utils_produtos_agrupados_buildprodutoagrupadocorlookupkey"
@@ -276395,5 +276395,5 @@
       "source_file": "tmp_scarfme_poliester_pages.txt"
     }
   ],
-  "built_at_commit": "ec81658ea075cd6f2ed5ec29a52e86111c54d7a0"
+  "built_at_commit": "cd2161c1cf39859dfeabe0a42c9c91067892d962"
 }

@@ -453,7 +453,7 @@
   "451": "fetchUltimasEntradasPorFilial",
   "452": "ClienteCorporativoForm.tsx",
   "453": "registroDefaults.ts",
-  "454": "compra-gasto.ts",
+  "454": "tipos.ts",
   "455": "company-live.ts",
   "456": "route.ts",
   "457": "page.tsx",
@@ -495,6 +495,5 @@
   "493": "RealizadasPanel.tsx",
   "494": "page.tsx",
   "495": "page.tsx",
-  "496": "fetchUltimasEntradasPorFilial",
   "497": "page.tsx"
 }

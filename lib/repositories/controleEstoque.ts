@@ -9174,11 +9174,58 @@ export async function fetchEstoqueDimensaoOpcoes({
 export async function fetchAvailableCores({
   company,
   filial,
+  produtoIds,
+  produtoSearchTerm,
 }: {
   company?: string;
   filial?: string | null;
+  /** Restringe as cores às de uma lista de produtos (cor é escopada por produto no Linx). */
+  produtoIds?: string[] | null;
+  /** Restringe às cores dos produtos cujo nome casa com o termo (`DESC_PRODUTO LIKE`). */
+  produtoSearchTerm?: string | null;
 }): Promise<string[]> {
   if (!company) return [];
+
+  const produtoIdList = Array.from(
+    new Set((produtoIds ?? []).map((v) => String(v ?? '').trim()).filter(Boolean))
+  );
+  const termo = (produtoSearchTerm ?? '').trim();
+  const temEscopoProduto = produtoIdList.length > 0 || termo.length >= 2;
+
+  // ── Cores DE UM RECORTE de produtos ───────────────────────────────────────────────
+  // O mesmo código de cor é outra cor em outro produto, então listar o mapa global ao lado
+  // de um produto escolhido só confunde. Aqui a fonte é o CADASTRO (PRODUTO_CORES), não o
+  // estoque: cor que já vendeu e hoje está zerada continua sendo um recorte válido — e o
+  // rótulo sai do mesmo `DESC_COR_PRODUTO` contra o qual as consultas de venda comparam.
+  if (temEscopoProduto) {
+    return withRequest(async (request) => {
+      const nerdLinhaFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
+
+      let produtoFilter = '';
+      if (produtoIdList.length > 0) {
+        produtoIdList.forEach((v, i) => request.input(`corProd${i}`, sql.VarChar, v));
+        const ph = produtoIdList.map((_, i) => `@corProd${i}`).join(', ');
+        produtoFilter += ` AND pc.PRODUTO IN (${ph})`;
+      }
+      if (termo.length >= 2) {
+        request.input('corBusca', sql.VarChar, `%${termo}%`);
+        produtoFilter += ` AND p.DESC_PRODUTO LIKE @corBusca`;
+      }
+
+      const result = await request.query<{ cor: string }>(`
+        SELECT DISTINCT
+          UPPER(LTRIM(RTRIM(ISNULL(pc.DESC_COR_PRODUTO, '')))) AS cor
+        FROM PRODUTO_CORES pc WITH (NOLOCK)
+        LEFT JOIN PRODUTOS p WITH (NOLOCK) ON RTRIM(LTRIM(p.PRODUTO)) = RTRIM(LTRIM(pc.PRODUTO))
+        WHERE ISNULL(pc.DESC_COR_PRODUTO, '') <> ''
+          ${produtoFilter}
+          ${nerdLinhaFilter}
+        ORDER BY cor
+      `);
+
+      return result.recordset.map((row) => row.cor?.trim() ?? '').filter(Boolean);
+    });
+  }
 
   return withRequest(async (request) => {
     const filialFilter = await buildFilialFilter(request, company, filial, 'e', null);
@@ -9205,6 +9252,131 @@ export async function fetchAvailableCores({
       .map((row) => row.cor?.trim() ?? '')
       .filter(Boolean);
   });
+}
+
+/** As dimensões de cadastro de um recorte de produtos, prontas para os selects da tela. */
+export interface DimensoesDoEscopo {
+  grupos: string[];
+  linhas: string[];
+  subgrupos: string[];
+  grades: string[];
+  /** Coleção é `{ value: código, label: "DESCRIÇÃO (CÓDIGO)" }`, igual a /api/products/colecoes. */
+  colecoes: Array<{ value: string; label: string }>;
+  tipos: string[];
+  cores: string[];
+}
+
+/**
+ * Dimensões de cadastro DOS PRODUTOS de um recorte — o que alimenta os selects quando o
+ * usuário já escolheu item(ns) ou digitou um nome: mostrar o cadastro inteiro ao lado de uma
+ * seleção só confunde ("subgrupo mostra todos por padrão, porém se selecionar um item, ele só
+ * mostra os que estão nesses itens").
+ *
+ * Tudo sai de UMA varredura em PRODUTOS (grupo/linha/subgrupo/grade/coleção/tipo são colunas
+ * do próprio produto), mais `fetchAvailableCores` para a cor — assim o recorte inteiro custa
+ * duas consultas em vez de sete. Sem recorte esta função não é usada: aí valem os endpoints de
+ * sempre, que listam o que teve VENDA no período.
+ *
+ * As dimensões que os endpoints originais não servem para a empresa (subgrupo, grade e coleção
+ * só existem para a Scarf Me) continuam vazias aqui — o recorte não pode fazer aparecer um
+ * filtro que a tela nunca teve.
+ */
+export async function fetchDimensoesDosProdutos({
+  company,
+  produtoIds,
+  produtoSearchTerm,
+}: {
+  company?: string;
+  produtoIds?: string[] | null;
+  produtoSearchTerm?: string | null;
+}): Promise<DimensoesDoEscopo> {
+  const vazio: DimensoesDoEscopo = {
+    grupos: [],
+    linhas: [],
+    subgrupos: [],
+    grades: [],
+    colecoes: [],
+    tipos: [],
+    cores: [],
+  };
+  if (!company) return vazio;
+
+  const produtoIdList = Array.from(
+    new Set((produtoIds ?? []).map((v) => String(v ?? '').trim()).filter(Boolean))
+  );
+  const termo = (produtoSearchTerm ?? '').trim();
+  if (produtoIdList.length === 0 && termo.length < 2) return vazio;
+
+  const [cadastro, cores] = await Promise.all([
+    withRequest(async (request) => {
+      const nerdLinhaFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
+
+      let produtoFilter = '';
+      if (produtoIdList.length > 0) {
+        produtoIdList.forEach((v, i) => request.input(`dimProd${i}`, sql.VarChar, v));
+        const ph = produtoIdList.map((_, i) => `@dimProd${i}`).join(', ');
+        produtoFilter += ` AND p.PRODUTO IN (${ph})`;
+      }
+      if (termo.length >= 2) {
+        request.input('dimBusca', sql.VarChar, `%${termo}%`);
+        produtoFilter += ` AND p.DESC_PRODUTO LIKE @dimBusca`;
+      }
+
+      return request.query<{
+        grupo: string;
+        linha: string;
+        subgrupo: string;
+        grade: string;
+        colecao: string;
+        tipo: string;
+      }>(`
+        SELECT DISTINCT
+          UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, '')))) AS grupo,
+          UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) AS linha,
+          UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) AS subgrupo,
+          UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), '')))) AS grade,
+          UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) AS colecao,
+          UPPER(LTRIM(RTRIM(ISNULL(p.TIPO_PRODUTO, '')))) AS tipo
+        FROM PRODUTOS p WITH (NOLOCK)
+        WHERE 1 = 1
+          ${produtoFilter}
+          ${nerdLinhaFilter}
+      `);
+    }),
+    fetchAvailableCores({ company, produtoIds: produtoIdList, produtoSearchTerm: termo }),
+  ]);
+
+  const distintos = (pegar: (row: Record<string, string>) => string): string[] =>
+    Array.from(
+      new Set(
+        cadastro.recordset
+          .map((row) => (pegar(row as unknown as Record<string, string>) ?? '').trim())
+          .filter(Boolean)
+      )
+    ).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
+  // Descrição da coleção SEMPRE da tabela mestre COLECOES — mesmo rótulo do select de sempre.
+  const descByCode = await getColecaoDescMap().catch(() => new Map<string, string>());
+  const colecoes = distintos((r) => r.colecao)
+    .map((value) => {
+      const descricao = (descByCode.get(value) || '').trim();
+      return {
+        value,
+        label: descricao && descricao.toUpperCase() !== value ? `${descricao} (${value})` : value,
+      };
+    })
+    .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
+
+  const soScarfme = company === 'scarfme';
+  return {
+    grupos: distintos((r) => r.grupo),
+    linhas: distintos((r) => r.linha),
+    subgrupos: soScarfme ? distintos((r) => r.subgrupo) : [],
+    grades: soScarfme ? distintos((r) => r.grade) : [],
+    colecoes: soScarfme ? colecoes : [],
+    tipos: distintos((r) => r.tipo),
+    cores,
+  };
 }
 
 /** Linha de estoque por (produto, cor, filial) para o relatório de Estoque por filial. */
