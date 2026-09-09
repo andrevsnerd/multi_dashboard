@@ -5,12 +5,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/AuthContext";
 import { getCompraCicloRuntime, setCompraCicloRuntime } from "@/lib/config/compra-ciclo";
 import {
-  DIAS_SEMANA,
   LIMITES,
   clonarConfigCiclo,
-  normalizeCicloValor,
   novoRegraId,
-  regraCasa,
   type CicloRegra,
   type CompraCicloConfig,
   type CompraCicloPreset,
@@ -29,23 +26,6 @@ interface RespostaGet {
   presets: CompraCicloPreset[];
   podeEditar: boolean;
   error?: string;
-}
-
-/** Resolve o ciclo de um item usando a config QUE ESTÁ NA TELA (não a salva). */
-function resolverNaTela(
-  config: CompraCicloConfig,
-  linha: string,
-  subgrupo: string
-): { indice: number; grupo: string; coberturaDias: number; producaoDias: number } {
-  const l = normalizeCicloValor(linha);
-  const sg = normalizeCicloValor(subgrupo);
-  for (let i = 0; i < config.regras.length; i += 1) {
-    const r = config.regras[i];
-    if (regraCasa(r, l, sg)) {
-      return { indice: i, grupo: r.grupo, coberturaDias: r.coberturaDias, producaoDias: r.producaoDias };
-    }
-  }
-  return { indice: -1, ...config.padrao };
 }
 
 function mesmoConteudo(a: CompraCicloConfig | null, b: CompraCicloConfig | null): boolean {
@@ -68,12 +48,9 @@ export default function CompraCicloPage({ companyKey, companyName }: Props) {
   const [erro, setErro] = useState("");
   const [aviso, setAviso] = useState("");
 
+  const [presetId, setPresetId] = useState("");
   const [presetNome, setPresetNome] = useState("");
-  const [presetDescricao, setPresetDescricao] = useState("");
   const [criandoPreset, setCriandoPreset] = useState(false);
-
-  const [testeLinha, setTesteLinha] = useState("");
-  const [testeSubgrupo, setTesteSubgrupo] = useState("");
 
   const dirty = !!config && !mesmoConteudo(config, salva);
 
@@ -231,11 +208,19 @@ export default function CompraCicloPage({ companyKey, companyName }: Props) {
     }
   }, [companyKey, companyName, publicarNoRuntime, username]);
 
-  const aplicarPreset = useCallback((preset: CompraCicloPreset) => {
+  /* ─────────────────────────── presets ───────────────────────────── */
+
+  const presetSelecionado = useMemo(
+    () => presets.find((p) => p.id === presetId) ?? null,
+    [presetId, presets]
+  );
+
+  const aplicarPreset = useCallback(() => {
+    if (!presetSelecionado) return;
     setErro("");
-    setConfig(clonarConfigCiclo(preset.config));
-    setAviso(`Preset "${preset.nome}" carregado no formulário. Confira e clique em Salvar.`);
-  }, []);
+    setConfig(clonarConfigCiclo(presetSelecionado.config));
+    setAviso(`Preset "${presetSelecionado.nome}" carregado. Confira e clique em Salvar.`);
+  }, [presetSelecionado]);
 
   const criarPreset = useCallback(async () => {
     if (!config) return;
@@ -250,13 +235,17 @@ export default function CompraCicloPage({ companyKey, companyName }: Props) {
       const res = await fetch("/api/compra-ciclo/presets", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-auth-username": username },
-        body: JSON.stringify({ nome, descricao: presetDescricao.trim(), config }),
+        body: JSON.stringify({ company: companyKey, nome, config }),
       });
-      const json = (await res.json()) as { presets?: CompraCicloPreset[]; error?: string };
+      const json = (await res.json()) as {
+        preset?: CompraCicloPreset;
+        presets?: CompraCicloPreset[];
+        error?: string;
+      };
       if (!res.ok || !json.presets) throw new Error(json.error ?? "Erro ao salvar o preset.");
       setPresets(json.presets);
+      setPresetId(json.preset?.id ?? "");
       setPresetNome("");
-      setPresetDescricao("");
       setCriandoPreset(false);
       setAviso(`Preset "${nome}" criado.`);
     } catch (e) {
@@ -264,36 +253,31 @@ export default function CompraCicloPage({ companyKey, companyName }: Props) {
     } finally {
       setSalvando(false);
     }
-  }, [config, presetDescricao, presetNome, username]);
+  }, [companyKey, config, presetNome, username]);
 
-  const excluirPreset = useCallback(
-    async (preset: CompraCicloPreset) => {
-      if (!window.confirm(`Excluir o preset "${preset.nome}"?`)) return;
-      setSalvando(true);
-      setErro("");
-      try {
-        const res = await fetch(`/api/compra-ciclo/presets?id=${encodeURIComponent(preset.id)}`, {
-          method: "DELETE",
-          headers: { "x-auth-username": username },
-        });
-        const json = (await res.json()) as { presets?: CompraCicloPreset[]; error?: string };
-        if (!res.ok || !json.presets) throw new Error(json.error ?? "Erro ao excluir o preset.");
-        setPresets(json.presets);
-      } catch (e) {
-        setErro(e instanceof Error ? e.message : "Erro ao excluir o preset.");
-      } finally {
-        setSalvando(false);
-      }
-    },
-    [username]
-  );
+  const excluirPreset = useCallback(async () => {
+    if (!presetSelecionado || presetSelecionado.builtin) return;
+    if (!window.confirm(`Excluir o preset "${presetSelecionado.nome}"?`)) return;
+    setSalvando(true);
+    setErro("");
+    try {
+      const params = new URLSearchParams({ company: companyKey, id: presetSelecionado.id });
+      const res = await fetch(`/api/compra-ciclo/presets?${params.toString()}`, {
+        method: "DELETE",
+        headers: { "x-auth-username": username },
+      });
+      const json = (await res.json()) as { presets?: CompraCicloPreset[]; error?: string };
+      if (!res.ok || !json.presets) throw new Error(json.error ?? "Erro ao excluir o preset.");
+      setPresets(json.presets);
+      setPresetId("");
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Erro ao excluir o preset.");
+    } finally {
+      setSalvando(false);
+    }
+  }, [companyKey, presetSelecionado, username]);
 
-  /* ─────────────────────────── derivados ─────────────────────────── */
-
-  const teste = useMemo(() => {
-    if (!config || (!testeLinha.trim() && !testeSubgrupo.trim())) return null;
-    return resolverNaTela(config, testeLinha, testeSubgrupo);
-  }, [config, testeLinha, testeSubgrupo]);
+  /* ─────────────────────────── render ────────────────────────────── */
 
   const igualAoFabrica = mesmoConteudo(config, fabrica);
 
@@ -381,14 +365,44 @@ export default function CompraCicloPage({ companyKey, companyName }: Props) {
 
       {/* ── presets ───────────────────────────────────────────────── */}
       <section className={styles.card}>
-        <div className={styles.cardHead}>
-          <div>
-            <h2 className={styles.cardTitulo}>Presets</h2>
-            <p className={styles.cardSub}>
-              Conjuntos prontos de prazos. Aplicar só preenche o formulário — os números novos só
-              valem depois de <strong>Salvar</strong>.
-            </p>
-          </div>
+        <h2 className={styles.cardTitulo}>Presets</h2>
+        <p className={styles.cardSub}>
+          Conjuntos prontos de prazos de {companyName}. Aplicar só preenche a tabela abaixo — os
+          números novos só valem depois de <strong>Salvar</strong>.
+        </p>
+
+        <div className={styles.presetBarra}>
+          <select
+            className={styles.select}
+            value={presetId}
+            onChange={(e) => setPresetId(e.target.value)}
+            disabled={travado}
+          >
+            <option value="">Escolha um preset…</option>
+            {presets.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.nome}
+                {p.builtin ? " (fábrica)" : ""}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className={styles.btnGhost}
+            onClick={aplicarPreset}
+            disabled={travado || !presetSelecionado}
+          >
+            Aplicar
+          </button>
+          <button
+            type="button"
+            className={styles.btnGhost}
+            onClick={excluirPreset}
+            disabled={travado || !presetSelecionado || presetSelecionado.builtin}
+            title="Só presets criados aqui podem ser excluídos"
+          >
+            Excluir
+          </button>
           <button
             type="button"
             className={styles.btnGhost}
@@ -399,6 +413,10 @@ export default function CompraCicloPage({ companyKey, companyName }: Props) {
           </button>
         </div>
 
+        {presetSelecionado?.descricao && (
+          <p className={styles.presetDesc}>{presetSelecionado.descricao}</p>
+        )}
+
         {criandoPreset && (
           <div className={styles.presetForm}>
             <input
@@ -408,50 +426,11 @@ export default function CompraCicloPage({ companyKey, companyName }: Props) {
               onChange={(e) => setPresetNome(e.target.value)}
               maxLength={60}
             />
-            <input
-              className={`${styles.input} ${styles.inputLargo}`}
-              placeholder="Descrição curta (opcional)"
-              value={presetDescricao}
-              onChange={(e) => setPresetDescricao(e.target.value)}
-              maxLength={160}
-            />
             <button type="button" className={styles.btnPrimary} onClick={criarPreset} disabled={travado}>
               Criar preset
             </button>
           </div>
         )}
-
-        <div className={styles.presets}>
-          {presets.map((p) => (
-            <div key={p.id} className={styles.preset}>
-              <div className={styles.presetTopo}>
-                <span className={styles.presetNome}>{p.nome}</span>
-                {p.builtin ? (
-                  <span className={styles.tagFabrica}>fábrica</span>
-                ) : (
-                  <button
-                    type="button"
-                    className={styles.presetExcluir}
-                    onClick={() => excluirPreset(p)}
-                    disabled={travado}
-                    title="Excluir preset"
-                  >
-                    ×
-                  </button>
-                )}
-              </div>
-              {p.descricao && <p className={styles.presetDesc}>{p.descricao}</p>}
-              <button
-                type="button"
-                className={styles.presetAplicar}
-                onClick={() => aplicarPreset(p)}
-                disabled={travado}
-              >
-                Aplicar
-              </button>
-            </div>
-          ))}
-        </div>
       </section>
 
       {/* ── tabela de faixas ──────────────────────────────────────── */}
@@ -485,7 +464,7 @@ export default function CompraCicloPage({ companyKey, companyName }: Props) {
             </thead>
             <tbody>
               {config.regras.map((r, i) => (
-                <tr key={r.id} className={teste?.indice === i ? styles.linhaCasou : undefined}>
+                <tr key={r.id}>
                   <td className={styles.colOrdem}>{i + 1}</td>
                   <td>
                     <input
@@ -583,7 +562,7 @@ export default function CompraCicloPage({ companyKey, companyName }: Props) {
               ))}
 
               {/* Padrão: quem não casou com nenhuma faixa. Não some e não sai do lugar. */}
-              <tr className={`${styles.linhaPadrao} ${teste?.indice === -1 ? styles.linhaCasou : ""}`}>
+              <tr className={styles.linhaPadrao}>
                 <td className={styles.colOrdem}>—</td>
                 <td>
                   <input
@@ -632,136 +611,8 @@ export default function CompraCicloPage({ companyKey, companyName }: Props) {
         </div>
 
         {config.regras.length === 0 && (
-          <p className={styles.vazio}>
-            Sem faixa por categoria: todo item usa o padrão acima.
-          </p>
+          <p className={styles.vazio}>Sem faixa por categoria: todo item usa o padrão acima.</p>
         )}
-      </section>
-
-      {/* ── testar ────────────────────────────────────────────────── */}
-      <section className={styles.card}>
-        <h2 className={styles.cardTitulo}>Testar um item</h2>
-        <p className={styles.cardSub}>
-          Digite a linha e o subgrupo de um produto para ver qual faixa vence (fica destacada na
-          tabela) e com que prazos ele sai.
-        </p>
-        <div className={styles.testeLinhaCampos}>
-          <label className={styles.campo}>
-            <span className={styles.campoLabel}>Linha</span>
-            <input
-              className={styles.input}
-              value={testeLinha}
-              onChange={(e) => setTesteLinha(e.target.value)}
-              placeholder="LENCOS"
-            />
-          </label>
-          <label className={styles.campo}>
-            <span className={styles.campoLabel}>Subgrupo</span>
-            <input
-              className={styles.input}
-              value={testeSubgrupo}
-              onChange={(e) => setTesteSubgrupo(e.target.value)}
-              placeholder="CETIM DE SEDA"
-            />
-          </label>
-          {teste && (
-            <div className={styles.testeResultado}>
-              <span className={styles.testeGrupo}>{teste.grupo}</span>
-              <span className={styles.testeNumeros}>
-                {teste.coberturaDias} d de cobertura · {teste.producaoDias} d de produção · alvo{" "}
-                {teste.coberturaDias + teste.producaoDias} d
-              </span>
-              <span className={styles.testeOrigem}>
-                {teste.indice === -1 ? "caiu no padrão" : `faixa #${teste.indice + 1}`}
-              </span>
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* ── parâmetros gerais ─────────────────────────────────────── */}
-      <section className={styles.card}>
-        <h2 className={styles.cardTitulo}>Parâmetros gerais da empresa</h2>
-        <div className={styles.params}>
-          <label className={styles.paramLinha}>
-            <input
-              type="checkbox"
-              checked={config.enabled}
-              onChange={(e) => patch({ enabled: e.target.checked })}
-              disabled={travado}
-            />
-            <span>
-              <strong>Modo ciclo ligado</strong>
-              <em>
-                Lead time separado da cobertura, quantidade de 1 ciclo e data de compra com catraca.
-                Desligado, volta à lógica legada: lead = cobertura e alvo de 2× cobertura, sem data.
-              </em>
-            </span>
-          </label>
-
-          <label className={styles.paramLinha}>
-            <input
-              type="number"
-              className={styles.inputNum}
-              value={config.gapAntigoDias}
-              min={LIMITES.gapMin}
-              max={LIMITES.gapMax}
-              onChange={(e) => patch({ gapAntigoDias: Number(e.target.value) })}
-              disabled={travado}
-            />
-            <span>
-              <strong>Janela antiga (dias)</strong>
-              <em>
-                Se o maior trecho com estoque terminou há mais que isto, ele está velho e o ritmo passa
-                a ser medido pelo trecho recente. Hoje: SCARF ME 60, NERD 30.
-              </em>
-            </span>
-          </label>
-
-          <label className={styles.paramLinha}>
-            <input
-              type="number"
-              className={styles.inputNum}
-              value={config.recenteHorizonteDias}
-              min={LIMITES.horizonteMin}
-              max={LIMITES.horizonteMax}
-              onChange={(e) => patch({ recenteHorizonteDias: Number(e.target.value) })}
-              disabled={travado}
-            />
-            <span>
-              <strong>Resgate por venda recente (dias)</strong>
-              <em>
-                Item cujo trecho longo não vendeu, mas que vendeu dentro deste horizonte, volta a ter
-                ritmo (venda ÷ mínimo de 30 dias) em vez de cair em Suficiente com estoque zero.
-              </em>
-            </span>
-          </label>
-
-          <label className={styles.paramLinha}>
-            <select
-              className={styles.select}
-              value={config.compraDiaSemana ?? ""}
-              onChange={(e) =>
-                patch({ compraDiaSemana: e.target.value === "" ? null : Number(e.target.value) })
-              }
-              disabled={travado}
-            >
-              <option value="">sem dia fixo</option>
-              {DIAS_SEMANA.map((d) => (
-                <option key={d.valor} value={d.valor}>
-                  {d.label}
-                </option>
-              ))}
-            </select>
-            <span>
-              <strong>Dia de compra da semana</strong>
-              <em>
-                Empresa que só compra num dia fixo: item cuja data cai até a próxima ocorrência desse
-                dia é marcado &quot;comprar essa semana&quot;. Hoje só NERD (segundas).
-              </em>
-            </span>
-          </label>
-        </div>
       </section>
     </div>
   );

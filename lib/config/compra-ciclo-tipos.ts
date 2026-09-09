@@ -57,11 +57,16 @@ export interface CompraCicloConfig {
 
 export type CompraCicloConfigMap = Record<string, CompraCicloConfig>;
 
-/** Snapshot nomeado de uma config inteira, aplicável em qualquer empresa. */
+/**
+ * Snapshot nomeado de uma config inteira. Preset é SEMPRE de uma empresa: os prazos da SCARF
+ * ME não dizem nada sobre a NERD, então a lista de uma nunca aparece na outra.
+ */
 export interface CompraCicloPreset {
   id: string;
   nome: string;
   descricao: string;
+  /** Empresa dona do preset ("nerd" | "scarfme"). */
+  company: string;
   /** true = preset de fábrica (não pode ser apagado nem sobrescrito). */
   builtin: boolean;
   config: CompraCicloConfig;
@@ -234,30 +239,25 @@ export function configCicloFabrica(company: string): CompraCicloConfig {
 }
 
 /**
- * Presets de fábrica — pontos de partida prontos. Cada um é uma config inteira; aplicar um
- * preset só PREENCHE o formulário (ainda precisa salvar). Presets novos são criados na tela
- * a partir da config atual.
+ * Presets de fábrica — o ponto de partida de cada empresa. Aplicar um preset só PREENCHE o
+ * formulário (ainda precisa salvar). Presets novos são criados na tela a partir da config
+ * atual e ficam na empresa em que foram criados.
  */
 export const PRESETS_FABRICA: CompraCicloPreset[] = [
   {
     id: "fabrica-scarfme",
     nome: "Padrão SCARF ME",
     descricao: "Seda 90/80 · Cashmere e Kafta 90/70 · Pashmina e Lenços BR 60/37 · default 60/37.",
+    company: "scarfme",
     builtin: true,
     config: SCARFME_FABRICA,
   },
   {
     id: "fabrica-nerd",
     nome: "Padrão NERD",
-    descricao: "Sem regra por categoria: tudo 30 de cobertura / 14 de lead. Compra às segundas.",
+    descricao: "Sem regra por categoria: tudo 30 de cobertura / 14 de lead.",
+    company: "nerd",
     builtin: true,
     config: NERD_FABRICA,
-  },
-  {
-    id: "fabrica-desligado",
-    nome: "Modo ciclo desligado",
-    descricao: "Volta à lógica legada (lead = cobertura, alvo 2× cobertura, sem data de compra).",
-    builtin: true,
-    config: CORPORATIVO_FABRICA,
   },
 ];

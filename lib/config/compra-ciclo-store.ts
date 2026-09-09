@@ -115,11 +115,16 @@ async function runMigrations(): Promise<void> {
       id TEXT PRIMARY KEY,
       nome TEXT NOT NULL,
       descricao TEXT NOT NULL DEFAULT '',
+      company TEXT NOT NULL DEFAULT '',
       config JSONB NOT NULL,
       criado_por TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
+  // `company` entrou depois da primeira versao da tabela.
+  await ddl(
+    () => sql`ALTER TABLE compra_ciclo_presets ADD COLUMN IF NOT EXISTS company TEXT NOT NULL DEFAULT ''`
+  );
 }
 
 /* ──────────────────────────────── configs ────────────────────────────────── */
@@ -248,6 +253,7 @@ function normalizarPreset(bruto: unknown): CompraCicloPreset | null {
     id,
     nome,
     descricao: String(p.descricao ?? "").trim(),
+    company: String(p.company ?? "").trim(),
     builtin: false,
     config: normalizarConfigCiclo(p.config),
     criadoPor: p.criadoPor ? String(p.criadoPor) : undefined,
@@ -255,20 +261,25 @@ function normalizarPreset(bruto: unknown): CompraCicloPreset | null {
   };
 }
 
-/** Presets de fábrica primeiro, depois os criados na tela (mais novos por último). */
-export async function listarPresetsCiclo(): Promise<CompraCicloPreset[]> {
+/**
+ * Presets de UMA empresa: o de fábrica dela primeiro, depois os criados na tela (mais novos
+ * por último). Preset é sempre de uma empresa — os prazos da SCARF ME não dizem nada sobre a
+ * NERD, então a lista de uma nunca aparece na outra.
+ */
+export async function listarPresetsCiclo(company: string): Promise<CompraCicloPreset[]> {
   let salvos: CompraCicloPreset[] = [];
   try {
     if (!hasPostgres()) {
       salvos = (lerArquivo().presets ?? [])
         .map(normalizarPreset)
-        .filter((p): p is CompraCicloPreset => p !== null);
+        .filter((p): p is CompraCicloPreset => p !== null && p.company === company);
     } else {
       await ensureTable();
       const sql = getNeonSql();
       const rows = (await sql`
-        SELECT id, nome, descricao, config, criado_por, created_at
+        SELECT id, nome, descricao, company, config, criado_por, created_at
         FROM compra_ciclo_presets
+        WHERE company = ${company}
         ORDER BY created_at ASC
       `) as Array<Record<string, unknown>>;
       salvos = rows
@@ -277,6 +288,7 @@ export async function listarPresetsCiclo(): Promise<CompraCicloPreset[]> {
             id: r.id,
             nome: r.nome,
             descricao: r.descricao,
+            company: r.company,
             config: r.config,
             criadoPor: r.criado_por,
             createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : r.created_at,
@@ -288,10 +300,15 @@ export async function listarPresetsCiclo(): Promise<CompraCicloPreset[]> {
     console.error("[compra-ciclo] falha ao listar presets", erro);
   }
 
-  return [...PRESETS_FABRICA.map((p) => ({ ...p, config: clonarConfigCiclo(p.config) })), ...salvos];
+  const fabrica = PRESETS_FABRICA.filter((p) => p.company === company).map((p) => ({
+    ...p,
+    config: clonarConfigCiclo(p.config),
+  }));
+  return [...fabrica, ...salvos];
 }
 
 export async function salvarPresetCiclo(input: {
+  company: string;
   nome: string;
   descricao?: string;
   config: unknown;
@@ -299,7 +316,11 @@ export async function salvarPresetCiclo(input: {
 }): Promise<CompraCicloPreset> {
   const nome = input.nome.trim();
   if (!nome) throw new Error("Dê um nome ao preset.");
-  if (PRESETS_FABRICA.some((p) => p.nome.toLowerCase() === nome.toLowerCase())) {
+  if (
+    PRESETS_FABRICA.some(
+      (p) => p.company === input.company && p.nome.toLowerCase() === nome.toLowerCase()
+    )
+  ) {
     throw new Error("Já existe um preset de fábrica com esse nome.");
   }
 
@@ -307,6 +328,7 @@ export async function salvarPresetCiclo(input: {
     id: `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
     nome,
     descricao: (input.descricao ?? "").trim(),
+    company: input.company,
     builtin: false,
     config: normalizarConfigCiclo(input.config),
     criadoPor: input.usuario,
@@ -321,8 +343,8 @@ export async function salvarPresetCiclo(input: {
     await ensureTable();
     const sql = getNeonSql();
     await sql`
-      INSERT INTO compra_ciclo_presets (id, nome, descricao, config, criado_por)
-      VALUES (${preset.id}, ${preset.nome}, ${preset.descricao},
+      INSERT INTO compra_ciclo_presets (id, nome, descricao, company, config, criado_por)
+      VALUES (${preset.id}, ${preset.nome}, ${preset.descricao}, ${preset.company},
               ${JSON.stringify(preset.config)}::jsonb, ${preset.criadoPor ?? null})
     `;
   }

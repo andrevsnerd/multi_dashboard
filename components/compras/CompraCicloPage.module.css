@@ -160,87 +160,32 @@
 }
 
 /* ── presets ─────────────────────────────────────────────────────── */
+.presetBarra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+.presetBarra .select {
+  width: 280px;
+  flex: 0 1 280px;
+}
+.presetDesc {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--t-500);
+}
 .presetForm {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 14px;
+  margin-top: 12px;
 }
-.presets {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 10px;
-}
-.preset {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  border: 1px solid var(--b-200);
-  border-radius: 8px;
-  padding: 10px 12px;
-  background: var(--s-50);
-}
-.presetTopo {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-.presetNome {
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--t-900);
-}
-.tagFabrica {
-  font-size: 10.5px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--t-500);
-  border: 1px solid var(--b-300);
-  border-radius: 999px;
-  padding: 1px 7px;
-}
-.presetDesc {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.45;
-  color: var(--t-500);
-  flex: 1;
-}
-.presetAplicar {
-  align-self: flex-start;
-  border: 1px solid var(--b-300);
-  background: var(--s-white);
-  color: var(--t-700);
-  border-radius: 6px;
-  padding: 4px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.presetAplicar:hover:not(:disabled) {
-  background: var(--s-100);
-}
-.presetAplicar:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-.presetExcluir {
-  border: none;
-  background: transparent;
-  color: var(--t-400);
-  font-size: 18px;
-  line-height: 1;
-  cursor: pointer;
-  padding: 0 2px;
-}
-.presetExcluir:hover:not(:disabled) {
-  color: #dc2626;
-}
-.presetExcluir:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
+.presetForm .input {
+  width: 280px;
+  flex: 0 1 280px;
 }
 
 /* ── tabela ──────────────────────────────────────────────────────── */
@@ -289,9 +234,6 @@
   font-weight: 600;
   color: var(--t-700);
 }
-.linhaCasou td {
-  background: var(--s-blue50);
-}
 .linhaPadrao td {
   background: var(--s-50);
 }
@@ -318,10 +260,6 @@
   background: var(--s-white);
   color: var(--t-900);
   font-size: 13.5px;
-}
-.inputLargo {
-  min-width: 280px;
-  flex: 1;
 }
 .inputNum {
   height: 34px;
@@ -372,98 +310,4 @@
 .btnIconeRemover:hover:not(:disabled) {
   border-color: rgba(220, 38, 38, 0.5);
   color: #dc2626;
-}
-
-/* ── testar ──────────────────────────────────────────────────────── */
-.testeLinhaCampos {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 12px;
-  margin-top: 12px;
-}
-.campo {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-.campoLabel {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--t-500);
-}
-.campo .input {
-  width: 200px;
-}
-.testeResultado {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  flex-wrap: wrap;
-  padding: 8px 14px;
-  border: 1px solid rgba(37, 99, 235, 0.28);
-  background: var(--s-blue50);
-  border-radius: 8px;
-}
-.testeGrupo {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--t-900);
-}
-.testeNumeros {
-  font-size: 12.5px;
-  color: var(--t-700);
-}
-.testeOrigem {
-  font-size: 11.5px;
-  color: var(--t-500);
-}
-
-/* ── parâmetros ──────────────────────────────────────────────────── */
-.params {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 12px;
-}
-.paramLinha {
-  display: grid;
-  grid-template-columns: 120px 1fr;
-  align-items: start;
-  gap: 12px;
-  cursor: pointer;
-}
-.paramLinha input[type="checkbox"] {
-  width: 17px;
-  height: 17px;
-  margin-top: 2px;
-  justify-self: start;
-  cursor: pointer;
-}
-.paramLinha .select {
-  width: 100%;
-  min-width: 0;
-}
-.paramLinha strong {
-  display: block;
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--t-900);
-}
-.paramLinha em {
-  display: block;
-  margin-top: 2px;
-  font-size: 12.5px;
-  font-style: normal;
-  line-height: 1.5;
-  color: var(--t-500);
-  max-width: 720px;
-}
-
-@media (max-width: 640px) {
-  .paramLinha {
-    grid-template-columns: 1fr;
-  }
 }

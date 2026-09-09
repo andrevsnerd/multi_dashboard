@@ -23,7 +23,7 @@ export async function GET(request: Request) {
   try {
     const [config, presets] = await Promise.all([
       carregarConfigCiclo(company),
-      listarPresetsCiclo(),
+      listarPresetsCiclo(company),
     ]);
     return NextResponse.json({
       config,
