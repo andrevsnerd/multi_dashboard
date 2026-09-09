@@ -1,6 +1,7 @@
 import sql from "mssql";
 
 import { resolveCicloCompra } from "@/lib/config/compra-ciclo";
+import { ensureCompraCicloRuntime } from "@/lib/config/compra-ciclo-store";
 import { withRequest } from "@/lib/db/connection";
 
 /**
@@ -88,6 +89,9 @@ export async function applyAutoRecebimento<T extends RecebimentoItemLike>(
 ): Promise<T[]> {
   const auto = items.filter((it) => it.dataRecebimentoManual !== true && String(it.produto ?? "").trim());
   if (auto.length === 0) return items;
+
+  // A data prevista de recebimento sai do lead time da tela "Ciclo de Compra".
+  await ensureCompraCicloRuntime();
 
   const map = await resolveProducaoDiasByProduto(company, auto.map((it) => String(it.produto)));
   const producaoDefault = resolveCicloCompra(company, {}).producaoDias;

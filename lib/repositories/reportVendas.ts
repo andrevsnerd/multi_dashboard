@@ -18,6 +18,7 @@ import { canonicalKey, ROW_COR_FIELD } from "@/lib/reports/keys";
 import { getControleEstoqueMetricasItens } from "@/lib/server/controle-estoque-metricas";
 import { buildControleEstoqueItemKey } from "@/lib/utils/controle-estoque-metricas";
 import { calcCompraIdealFromResumo } from "@/lib/utils/compra-ideal";
+import { ensureCompraCicloRuntime } from "@/lib/config/compra-ciclo-store";
 import { listComprasTransitoFull } from "@/lib/utils/compra-transito-store";
 import { isCompraTransitoDateActive } from "@/lib/utils/compra-transito-status";
 import type { CompraTransitoIndexEntry } from "@/lib/client/compras-transito";
@@ -103,6 +104,9 @@ function roundInt(value: number | null | undefined): number {
 export async function fetchVendasFaturamento(
   filters: ReportFilters
 ): Promise<ReportResult> {
+  // Prazos de ciclo editáveis na tela "Ciclo de Compra" — carrega antes do loop por item.
+  await ensureCompraCicloRuntime();
+
   const salesFilters = {
     company: filters.company,
     range: { start: filters.start, end: filters.end },

@@ -20,6 +20,7 @@ import {
   calcCompraIdealFromResumo,
   precisaComprarEssaSemana,
 } from "@/lib/utils/compra-ideal";
+import { ensureCompraCicloRuntime } from "@/lib/config/compra-ciclo-store";
 import { listComprasTransitoFull } from "@/lib/utils/compra-transito-store";
 import { isCompraTransitoDateActive } from "@/lib/utils/compra-transito-status";
 import type { CompraTransitoIndexEntry } from "@/lib/client/compras-transito";
@@ -177,6 +178,9 @@ export async function fetchCompraSugeridaAbc(
   filters: ReportFilters,
   ctx?: ReportRunContext
 ): Promise<ReportResult> {
+  // Prazos de ciclo editáveis na tela "Ciclo de Compra" — carrega antes do loop por item.
+  await ensureCompraCicloRuntime();
+
   const [details, descontinuados] = await Promise.all([
     fetchProductsWithDetails({
       company: filters.company,

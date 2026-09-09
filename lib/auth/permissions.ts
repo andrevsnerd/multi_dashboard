@@ -166,6 +166,10 @@ export const ROLE_RESTRICTED_PERMISSIONS: Partial<Record<PermissionKey, RoleKey[
   // veem custo). Restringir a admin+diretor tornava a permissao inutil: as duas
   // ja tem acesso total, e o checkbox sumia para a unica funcao que precisa dele.
   "gastos-compra": ["admin", "diretor", "logistica"],
+  // Ciclo de Compra define cobertura e lead time da rede: mexer ali muda a quantidade
+  // sugerida e a data de compra de TODA loja. Politica de reposicao, nao operacao de loja —
+  // mesmo conjunto restrito, com diretor entrando somente-leitura.
+  "compra-ciclo": ["admin", "diretor", "logistica"],
   // Área corporativo é exclusiva do admin, diretor e do cliente_corporativo. Supervisor/gerente/logística
   // nunca acessam, pois roleAllowsPermission barra.
   "clientes-corporativos": ["admin", "diretor", "cliente_corporativo"],

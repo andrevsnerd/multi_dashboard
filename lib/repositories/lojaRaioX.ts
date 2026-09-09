@@ -46,6 +46,7 @@ import {
   type CompraIdealStatus,
 } from "@/lib/utils/compra-ideal";
 import { getMappedColorDescription } from "@/lib/utils/colorMapping";
+import { ensureCompraCicloRuntime } from "@/lib/config/compra-ciclo-store";
 import type { CompraTransitoIndexEntry } from "@/lib/client/compras-transito";
 
 /** Intervalo [start, end) — end exclusivo, padrão do app. */
@@ -1292,6 +1293,10 @@ export async function fetchRupturasLoja(params: {
     company, filial, range, linhas, withCompraIdeal,
     grupos, subgrupos, grades, colecoes, cores, tipos, produtoId, produtoSearchTerm,
   } = params;
+
+  // Prazos de ciclo (cobertura/produção) vêm da tela "Ciclo de Compra": carrega uma vez antes
+  // do loop por item, já que `resolveCicloCompra` dentro dele é síncrono.
+  if (withCompraIdeal) await ensureCompraCicloRuntime();
 
   const [produtosRaw, cfg, descSet, transito] = await Promise.all([
     fetchProductsWithDetails({

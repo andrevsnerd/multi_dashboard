@@ -169,6 +169,8 @@ export default function Sidebar({ companyName }: SidebarProps) {
     basePath && basePath !== "/" ? `${basePath}/compras-salvas` : "/compras-salvas";
   const gastosCompraHref =
     basePath && basePath !== "/" ? `${basePath}/gastos-compra` : "/gastos-compra";
+  const compraCicloHref =
+    basePath && basePath !== "/" ? `${basePath}/compra-ciclo` : "/compra-ciclo";
   const mapaClientesHref =
     basePath && basePath !== "/" ? `${basePath}/mapa-clientes` : "/mapa-clientes";
   const sincronizacaoHref =
@@ -267,6 +269,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     "/compras-transito",
     "/compras-salvas",
     "/gastos-compra",
+    "/compra-ciclo",
     "/produtos",
     "/produtos-recentes",
     "/produto-agrupado",
@@ -551,6 +554,14 @@ export default function Sidebar({ companyName }: SidebarProps) {
           permission: "gastos-compra",
           isActive: (currentPathname) =>
             matchesSegment(currentPathname, "/gastos-compra", gastosCompraHref),
+        },
+        {
+          key: "compra-ciclo",
+          label: "Ciclo de Compra",
+          href: compraCicloHref,
+          permission: "compra-ciclo",
+          isActive: (currentPathname) =>
+            matchesSegment(currentPathname, "/compra-ciclo", compraCicloHref),
         },
       ],
     },

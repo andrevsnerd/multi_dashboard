@@ -325,8 +325,8 @@
     "semantic_hash": "cf2bef2b79543108e9513318bfc96dd6"
   },
   "app/admin/page.tsx": {
-    "mtime": 1787749351.3707507,
-    "ast_hash": "aeee2cd9a5fb1a6e508f44e47e3d5f0f",
+    "mtime": 1788965099.196081,
+    "ast_hash": "954306feeec9a9fa8fcf39cc2136a4b3",
     "semantic_hash": ""
   },
   "app/admin/transferencia-permissoes/page.tsx": {
@@ -1200,9 +1200,9 @@
     "semantic_hash": "04a03e1ff0cb73f657e6958e47cd5545"
   },
   "app/layout.tsx": {
-    "mtime": 1782497773.5276608,
-    "ast_hash": "0af2bfa957561f9cbc7a39b7c172ddfd",
-    "semantic_hash": "0af2bfa957561f9cbc7a39b7c172ddfd"
+    "mtime": 1788964842.669846,
+    "ast_hash": "f01440884368ff5e1c505bb9e29baec9",
+    "semantic_hash": ""
   },
   "app/login/page.tsx": {
     "mtime": 1771588589.3136365,
@@ -1430,8 +1430,8 @@
     "semantic_hash": "7a672d31b6ac254cb25f6a420501049d"
   },
   "components/layout/Sidebar.tsx": {
-    "mtime": 1788442653.457553,
-    "ast_hash": "71cc9137e71f2e54d6a5f6c611ac597a",
+    "mtime": 1788965099.282777,
+    "ast_hash": "b737617854b97a0fe2dfd60d6c49d9a8",
     "semantic_hash": ""
   },
   "components/layout/SidebarContext.tsx": {
@@ -2075,8 +2075,8 @@
     "semantic_hash": ""
   },
   "lib/auth/permissions.ts": {
-    "mtime": 1788448540.9444518,
-    "ast_hash": "2d09ebc72dcea0a700d146bb5c80472e",
+    "mtime": 1788965099.1909637,
+    "ast_hash": "bd4dfa4de029a5e2776b15d0c5eb9f45",
     "semantic_hash": ""
   },
   "lib/auth/users-store-neon.ts": {
@@ -2135,8 +2135,8 @@
     "semantic_hash": ""
   },
   "lib/config/compra-ciclo.ts": {
-    "mtime": 1784659087.3553984,
-    "ast_hash": "6e90ce50ac3f3e7fc97035ff17232570",
+    "mtime": 1788964727.867492,
+    "ast_hash": "67b36b9e88c18dc92e8fa4ca88f6adf3",
     "semantic_hash": ""
   },
   "lib/config/filial-config-builder.ts": {
@@ -2155,8 +2155,8 @@
     "semantic_hash": "29590f1b0f773ebbcd60e9dc314eec58"
   },
   "lib/config/page-permissions.ts": {
-    "mtime": 1788442640.381323,
-    "ast_hash": "99f727dfcebb660ecd931da3e4c0b55a",
+    "mtime": 1788965099.1868172,
+    "ast_hash": "2d150924374e9c7bcceb586a5aae87d7",
     "semantic_hash": ""
   },
   "lib/constants/columns.ts": {
@@ -2545,8 +2545,8 @@
     "semantic_hash": "36ad099560d5d50a879355f562c7807a"
   },
   "lib/repositories/reportCompraSugeridaAbc.ts": {
-    "mtime": 1786993635.0435781,
-    "ast_hash": "26d36fa500ae27c4ed054f8ed818c125",
+    "mtime": 1788964892.472407,
+    "ast_hash": "ca4d085efb4b86dc5ec224256b8eba96",
     "semantic_hash": ""
   },
   "lib/repositories/reportEstoque.ts": {
@@ -2565,9 +2565,9 @@
     "semantic_hash": "234df7ca790fa285814435a673e30214"
   },
   "lib/repositories/reportVendas.ts": {
-    "mtime": 1782472796.1019335,
-    "ast_hash": "b76130a288276dfca8b2a7c09372d89b",
-    "semantic_hash": "b76130a288276dfca8b2a7c09372d89b"
+    "mtime": 1788964892.4744272,
+    "ast_hash": "1dbb6194f03bc6445bc6390bbb5c77b5",
+    "semantic_hash": ""
   },
   "lib/repositories/reportVendasHistorico.ts": {
     "mtime": 1783520661.0612419,
@@ -2610,9 +2610,9 @@
     "semantic_hash": "3a04c2346d182ca8b26aa88fe31cbe41"
   },
   "lib/server/compra-transito-recebimento.ts": {
-    "mtime": 1782496198.9635177,
-    "ast_hash": "150ef33da40c1f565e29ded1f15efcb4",
-    "semantic_hash": "150ef33da40c1f565e29ded1f15efcb4"
+    "mtime": 1788964892.4744272,
+    "ast_hash": "726d0d6d84769b7e3903d59e7ef1c25e",
+    "semantic_hash": ""
   },
   "lib/server/compra-transito-reconciliacao.ts": {
     "mtime": 1781719292.553023,
@@ -3445,8 +3445,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/lojaRaioX.ts": {
-    "mtime": 1786988601.6664424,
-    "ast_hash": "ea38c28aef36716e5225b145a8583843",
+    "mtime": 1788964892.4688096,
+    "ast_hash": "c23590be7ae09591daf97781f9ed18d3",
     "semantic_hash": ""
   },
   "lib/utils/exportLojaRaioXXlsx.ts": {
@@ -4437,6 +4437,41 @@
   "app/api/products/dimensoes-escopo/route.ts": {
     "mtime": 1788956763.6937802,
     "ast_hash": "57d4684cec4769dd00f36c0a2a4f52c5",
+    "semantic_hash": ""
+  },
+  "app/(companies)/[company]/compra-ciclo/page.tsx": {
+    "mtime": 1788965074.3659663,
+    "ast_hash": "bbe16c9fa9ecc961a4f5f1bd5bd2bee9",
+    "semantic_hash": ""
+  },
+  "app/api/compra-ciclo/presets/route.ts": {
+    "mtime": 1788964825.4147756,
+    "ast_hash": "5ece709d45ce6052450a2296f93020ce",
+    "semantic_hash": ""
+  },
+  "app/api/compra-ciclo/route.ts": {
+    "mtime": 1788964813.455957,
+    "ast_hash": "6e7368d930034a385d3d529edeedaf77",
+    "semantic_hash": ""
+  },
+  "components/compras/CompraCicloPage.tsx": {
+    "mtime": 1788965023.3668432,
+    "ast_hash": "dfebf11a1a601366f4865dd4eaa7c421",
+    "semantic_hash": ""
+  },
+  "lib/auth/compra-ciclo-guard.ts": {
+    "mtime": 1788964801.4866848,
+    "ast_hash": "dac0ac05568a36c73e5aaa46c9277045",
+    "semantic_hash": ""
+  },
+  "lib/config/compra-ciclo-store.ts": {
+    "mtime": 1788964787.5495274,
+    "ast_hash": "e28d5b69e48864b0b652514a169b336e",
+    "semantic_hash": ""
+  },
+  "lib/config/compra-ciclo-tipos.ts": {
+    "mtime": 1788964689.4940557,
+    "ast_hash": "9eb4f1067a3170aff9dcadd378b5812a",
     "semantic_hash": ""
   }
 }
