@@ -8,7 +8,12 @@ import { readOnlyBlock } from '@/lib/auth/route-guards';
 import { canEditarRomaneioEntrada } from '@/lib/auth/permissions';
 import { resolveResponsavelLinx } from '@/lib/server/responsavel-linx';
 import { inserirAjuste } from '@/lib/repositories/ajuste-historico';
-import { executeEntradaAppend } from '@/lib/saida-entrada-executor';
+import {
+  executeEntradaAppend,
+  verificarTravaMovimento,
+  motivoTravaMovimento,
+  avisoTravaMovimento,
+} from '@/lib/saida-entrada-executor';
 
 /**
  * REABRIR ROMANEIO DE ENTRADA — o Linx deixa abrir uma entrada já gravada e
@@ -198,12 +203,50 @@ export async function GET(request: NextRequest) {
 
     const filialNome = await resolverNomeFilial(filial);
     const { editavel, motivo } = await verificarEditavel(romaneio, filialNome);
-    const itens = editavel ? await lerItensDoRomaneio(romaneio, filialNome) : [];
+    if (!editavel) {
+      return NextResponse.json({ romaneio, filial: filialNome, editavel, motivo, aviso: null, itens: [] });
+    }
 
-    return NextResponse.json({ romaneio, filial: filialNome, editavel, motivo, itens });
+    // Trava do Linx (estoque fechado / ajustado depois da emissão). O
+    // fechamento fecha a porta para o romaneio inteiro; o ajuste é por produto
+    // × cor, então vira aviso — quem decide item por item é o POST.
+    const pool = shouldUseProxy() ? new ProxyPool() : await getConnectionPool();
+    const trava = await verificarTravaMovimento(pool, {
+      tipo: 'entrada',
+      romaneio,
+      filial: filialNome,
+      itens: null,
+    });
+    if (trava.fechamento) {
+      return NextResponse.json({
+        romaneio,
+        filial: filialNome,
+        editavel: false,
+        motivo: motivoTravaMovimento({ ...trava, travados: [] }, romaneio),
+        aviso: null,
+        itens: [],
+      });
+    }
+
+    const itens = await lerItensDoRomaneio(romaneio, filialNome);
+
+    return NextResponse.json({
+      romaneio,
+      filial: filialNome,
+      editavel,
+      motivo,
+      aviso: avisoTravaMovimento(trava),
+      itens,
+    });
   } catch (error) {
     console.error('Erro ao carregar romaneio de entrada para edição', error);
-    return NextResponse.json({ error: 'Erro ao carregar o romaneio de entrada' }, { status: 500 });
+    // O motivo vai junto: engolir a mensagem do banco foi o que fez um erro de
+    // query virar "erro ao carregar" e mandar procurar defeito no lugar errado.
+    const detalhe = error instanceof Error ? error.message : '';
+    return NextResponse.json(
+      { error: `Erro ao carregar o romaneio de entrada${detalhe ? `: ${detalhe}` : ''}` },
+      { status: 500 }
+    );
   }
 }
 

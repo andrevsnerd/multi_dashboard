@@ -74,9 +74,40 @@ function isNgrokUrl(url: string): boolean {
 }
 
 /**
+ * Erro que o PRÓPRIO proxy respondeu (HTTP 500 com JSON), em oposição a falha
+ * de rede/conexão com ele.
+ *
+ * A diferença importa: o proxy respondendo "Timeout: Request failed to complete
+ * in 300000ms" (timeout do SQL Server, espera por lock, pool cheio) era
+ * reescrito abaixo como "o servidor proxy não respondeu" — mandava investigar o
+ * proxy, que estava perfeito, em vez do banco. Erro do banco tem que chegar
+ * como erro do banco.
+ */
+class ProxyResponseError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'ProxyResponseError';
+    this.status = status;
+  }
+}
+
+/** Statement que NÃO pode ser repetido às cegas (soma/insere/apaga). */
+function isEscrita(queryText: string): boolean {
+  return /\b(insert|update|delete|merge|exec|execute|truncate|drop|alter|create)\b/i.test(queryText);
+}
+
+/**
  * Detecta o tipo de erro e retorna mensagem apropriada
  */
-function getErrorMessage(error: unknown, proxyUrl: string): string {
+function getErrorMessage(error: unknown, proxyUrl: string, escrita = false): string {
+  // O proxy respondeu: o erro é do banco. Repassa como está (com prefixo) para
+  // a tela mostrar o motivo real (trigger do Linx, lock, timeout de query).
+  if (error instanceof ProxyResponseError) {
+    return `Erro do banco (via proxy): ${error.message}`;
+  }
+
   if (error instanceof Error) {
     const errorMessage = error.message.toLowerCase();
     const cause = (error as any).cause;
@@ -92,8 +123,15 @@ function getErrorMessage(error: unknown, proxyUrl: string): string {
       return `Erro de conexão com o proxy: O servidor proxy não está acessível. Verifique se o proxy está rodando e se PROXY_URL (${proxyUrl}) está correta no Vercel.`;
     }
 
-    // Erro de timeout
-    if (errorMessage.includes('timeout') || errorMessage.includes('aborted')) {
+    // Timeout/abort do lado do cliente: a requisição foi cortada aqui, sem
+    // resposta do proxy. (Timeout vindo DO proxy cai no ProxyResponseError.)
+    if (error.name === 'AbortError' || errorMessage.includes('aborted') || errorMessage.includes('timeout')) {
+      if (escrita) {
+        // Gravação sem resposta é ambígua: pode ter sido aplicada no banco. Não
+        // repetimos por conta própria (ver retry abaixo) e a pessoa precisa
+        // conferir antes de refazer.
+        return `A gravação não respondeu em ${REQUEST_TIMEOUT}ms. ATENÇÃO: ela pode ter sido aplicada no banco — confira o romaneio/estoque antes de tentar de novo.`;
+      }
       return `Timeout ao conectar com o proxy: O servidor proxy não respondeu em ${REQUEST_TIMEOUT}ms. Verifique se o proxy está rodando e acessível.`;
     }
 
@@ -217,12 +255,17 @@ async function queryViaProxyWithRetry<T>(
       }));
       
       // Se for erro 502/503/504, pode ser problema de conexão - tentar retry
-      if ((response.status === 502 || response.status === 503 || response.status === 504) && retryCount < MAX_RETRIES) {
+      // (só leitura: repetir escrita pode gravar duas vezes)
+      if (
+        (response.status === 502 || response.status === 503 || response.status === 504) &&
+        retryCount < MAX_RETRIES &&
+        !isEscrita(queryText)
+      ) {
         await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * (retryCount + 1)));
         return queryViaProxyWithRetry(queryText, params, retryCount + 1);
       }
-      
-      throw new Error(errorData.error || `Erro HTTP ${response.status}`);
+
+      throw new ProxyResponseError(errorData.error || `Erro HTTP ${response.status}`, response.status);
     }
 
     // Resposta OK e não é HTML, ler como JSON
@@ -239,14 +282,21 @@ async function queryViaProxyWithRetry<T>(
     // Limpar timeout em caso de erro também
     cleanup();
     
-    // Se for erro de abort (timeout) ou conexão, tentar retry
+    // Se for erro de abort (timeout) ou conexão, tentar retry.
+    //
+    // NUNCA repetir escrita: quando a resposta se perde (timeout, ECONNRESET) a
+    // query pode ter rodado no banco, e um `SET QTDE = QTDE + @qtde` repetido
+    // soma de novo — foi assim que já apareceram romaneios/transferências em
+    // dobro ("achou que falhou e refez"). Escrita que perde a resposta tem que
+    // subir como erro para a pessoa conferir e decidir.
     if (
-      (error instanceof Error && 
-       (error.name === 'AbortError' || 
+      (error instanceof Error &&
+       (error.name === 'AbortError' ||
         error.message.includes('ECONNRESET') ||
         error.message.includes('ECONNREFUSED') ||
         error.message.includes('fetch failed'))) &&
-      retryCount < MAX_RETRIES
+      retryCount < MAX_RETRIES &&
+      !isEscrita(queryText)
     ) {
       console.warn(`Tentativa ${retryCount + 1} falhou, tentando novamente...`);
       await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * (retryCount + 1)));
@@ -254,7 +304,7 @@ async function queryViaProxyWithRetry<T>(
     }
 
     // Erro final - formatar mensagem
-    const errorMessage = getErrorMessage(error, PROXY_URL);
+    const errorMessage = getErrorMessage(error, PROXY_URL, isEscrita(queryText));
     console.error('Erro ao executar query via proxy:', {
       error: errorMessage,
       proxyUrl: PROXY_URL,

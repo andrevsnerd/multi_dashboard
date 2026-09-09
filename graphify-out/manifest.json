@@ -2180,9 +2180,9 @@
     "semantic_hash": "3c4ad348578816913d51c6492f969206"
   },
   "lib/db/proxy.ts": {
-    "mtime": 1781813481.4913518,
-    "ast_hash": "54c10346548468eb4fd178f941a3df0e",
-    "semantic_hash": "54c10346548468eb4fd178f941a3df0e"
+    "mtime": 1788898076.6978295,
+    "ast_hash": "f52a0468fd26a5c13b8e9e096905ac3d",
+    "semantic_hash": ""
   },
   "lib/mcp/auth.ts": {
     "mtime": 1780584828.0837848,
@@ -2595,8 +2595,8 @@
     "semantic_hash": ""
   },
   "lib/saida-entrada-executor.js": {
-    "mtime": 1788455091.959301,
-    "ast_hash": "40b64733585816cff3f17eace4c305d7",
+    "mtime": 1788898475.6858,
+    "ast_hash": "70c69d215f0f56a695a2ec0c8f19f2b9",
     "semantic_hash": ""
   },
   "lib/server/company-live.ts": {
@@ -2995,9 +2995,9 @@
     "semantic_hash": "65d786a1615ad3042938ed3cce229160"
   },
   "proxy-server/server.js": {
-    "mtime": 1783433135.0217896,
-    "ast_hash": "c93533011fb284b3803c2b190ed9f164",
-    "semantic_hash": "c93533011fb284b3803c2b190ed9f164"
+    "mtime": 1788897728.8764188,
+    "ast_hash": "794cf9267afe7b9eede3f7d10c41d5cb",
+    "semantic_hash": ""
   },
   "relatorio_entradas_vendas_estoque.py": {
     "mtime": 1780073682.8890896,
@@ -4365,8 +4365,8 @@
     "semantic_hash": ""
   },
   "app/api/saidas-entradas-produtos/entrada-editar/route.ts": {
-    "mtime": 1788352827.7080126,
-    "ast_hash": "3bd4100cf4d7c280dc1ca67f232a66e7",
+    "mtime": 1788897963.85367,
+    "ast_hash": "7cee4e0fe494964c04658c882524cc9b",
     "semantic_hash": ""
   },
   "app/api/controle-estoque/filtro-opcoes/route.ts": {
@@ -4390,13 +4390,13 @@
     "semantic_hash": ""
   },
   "app/api/projecao-compra/route.ts": {
-    "mtime": 1788884510.1717906,
-    "ast_hash": "2d53aefe5614d6c88b06399affc54416",
+    "mtime": 1788954786.0328953,
+    "ast_hash": "52ab9fcf8f5aaf4bd2943b58ffcd9e61",
     "semantic_hash": ""
   },
   "components/stock/ProjecaoCompraPage.tsx": {
-    "mtime": 1788884490.4493773,
-    "ast_hash": "2b10afee9a77fda1b87b0a07999dbaa9",
+    "mtime": 1788954886.507943,
+    "ast_hash": "9345819dd6bc2765bf52b7579d9fb591",
     "semantic_hash": ""
   },
   "lib/config/saida-estoque-negativo.ts": {
@@ -4410,8 +4410,8 @@
     "semantic_hash": ""
   },
   "app/api/saidas-entradas-produtos/saida-editar/route.ts": {
-    "mtime": 1788448647.6849658,
-    "ast_hash": "0c5aab9460ce44c10299cc6b611eef75",
+    "mtime": 1788897970.1168025,
+    "ast_hash": "c9c9a79fdd919feab9fdd5492f92c202",
     "semantic_hash": ""
   },
   "lib/reports/tickets.ts": {

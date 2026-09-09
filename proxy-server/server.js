@@ -176,10 +176,20 @@ app.post('/query', authenticate, async (req, res) => {
     });
   } catch (error) {
     console.error('Erro ao executar query:', error);
+    // Os triggers do Linx respondem com `raiserror` + `rollback`: o driver
+    // devolve só o efeito ("The transaction ended in the trigger. The batch has
+    // been aborted.") e o MOTIVO ("Não é possível Alterar Movimentacao de
+    // Estoque anterior ao Ajuste !") vem em `precedingErrors`. Mandar só
+    // error.message deixava o dashboard sem como explicar a recusa.
+    const precedingErrors = Array.isArray(error.precedingErrors)
+      ? error.precedingErrors.map((e) => (e && e.message ? String(e.message) : '')).filter(Boolean)
+      : [];
     res.status(500).json({
       success: false,
-      error: error.message,
+      error: [error.message, ...precedingErrors].filter(Boolean).join(' | '),
+      precedingErrors,
       code: error.code,
+      number: error.number,
     });
   }
 });

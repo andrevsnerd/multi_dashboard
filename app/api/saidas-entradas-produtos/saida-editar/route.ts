@@ -9,7 +9,12 @@ import { canEditarRomaneioSaida } from '@/lib/auth/permissions';
 import { resolveResponsavelLinx } from '@/lib/server/responsavel-linx';
 import { inserirAjuste } from '@/lib/repositories/ajuste-historico';
 import { getConfirmados } from '@/lib/utils/romaneio-confirmacao-store';
-import { executeSaidaAppend } from '@/lib/saida-entrada-executor';
+import {
+  executeSaidaAppend,
+  verificarTravaMovimento,
+  motivoTravaMovimento,
+  avisoTravaMovimento,
+} from '@/lib/saida-entrada-executor';
 
 /**
  * REABRIR ROMANEIO DE SAÍDA — espelho de `entrada-editar`: o operador esqueceu
@@ -235,13 +240,55 @@ export async function GET(request: NextRequest) {
 
     const filialNome = await resolverNomeFilial(filial);
     const { editavel, motivo, filialDestino } = await verificarEditavel(romaneio, filialNome);
-    const itens = editavel ? await lerItensDoRomaneio(romaneio, filialNome) : [];
-    const aviso = editavel ? await avisoConferenciaDestino(companyKey, romaneio, filialDestino) : null;
+    if (!editavel) {
+      return NextResponse.json({
+        romaneio,
+        filial: filialNome,
+        filialDestino,
+        editavel,
+        motivo,
+        aviso: null,
+        itens: [],
+      });
+    }
+
+    // Trava do Linx (estoque fechado / ajustado depois da emissão): fechamento
+    // bloqueia o romaneio todo, ajuste é por produto × cor e vira aviso.
+    const pool = shouldUseProxy() ? new ProxyPool() : await getConnectionPool();
+    const trava = await verificarTravaMovimento(pool, {
+      tipo: 'saida',
+      romaneio,
+      filial: filialNome,
+      itens: null,
+    });
+    if (trava.fechamento) {
+      return NextResponse.json({
+        romaneio,
+        filial: filialNome,
+        filialDestino,
+        editavel: false,
+        motivo: motivoTravaMovimento({ ...trava, travados: [] }, romaneio),
+        aviso: null,
+        itens: [],
+      });
+    }
+
+    const itens = await lerItensDoRomaneio(romaneio, filialNome);
+    // Dois avisos possíveis (conferência do destino e trava por ajuste): a tela
+    // mostra um só campo, então vão juntos.
+    const aviso = [await avisoConferenciaDestino(companyKey, romaneio, filialDestino), avisoTravaMovimento(trava)]
+      .filter(Boolean)
+      .join(' ') || null;
 
     return NextResponse.json({ romaneio, filial: filialNome, filialDestino, editavel, motivo, aviso, itens });
   } catch (error) {
     console.error('Erro ao carregar romaneio de saída para edição', error);
-    return NextResponse.json({ error: 'Erro ao carregar o romaneio de saída' }, { status: 500 });
+    // Mesma razão do lado da entrada: a mensagem do banco vai junto.
+    const detalhe = error instanceof Error ? error.message : '';
+    return NextResponse.json(
+      { error: `Erro ao carregar o romaneio de saída${detalhe ? `: ${detalhe}` : ''}` },
+      { status: 500 }
+    );
   }
 }
 

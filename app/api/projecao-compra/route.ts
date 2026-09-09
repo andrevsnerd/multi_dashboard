@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { fetchFilialProdutoSales } from '@/lib/repositories/performance';
+import { fetchEstoqueRedePorProduto } from '@/lib/repositories/controleEstoque';
 import { fetchSalesTotals } from '@/lib/services/salesTotals';
 import { type CompanyKey } from '@/lib/config/company';
 import { resolveCompanyDynamic } from '@/lib/config/company-server';
@@ -53,6 +54,11 @@ async function mapLimit<T, R>(items: T[], limite: number, fn: (item: T) => Promi
   });
   await Promise.all(workers);
   return out;
+}
+
+/** Lista vazia = dimensão não filtrada (os builders de filtro esperam null, não `[]`). */
+function orNull(values: string[]): string[] | null {
+  return values.length > 0 ? values : null;
 }
 
 function isValidYmd(value: string | null): value is string {
@@ -255,6 +261,9 @@ export async function GET(request: Request) {
           itens: [],
           totaisJanela: Object.fromEntries(janelas),
           mensal: meses,
+          // Tickets é visão de fluxo: as contas de estoque não se aplicam.
+          estoqueTotal: 0,
+          estoqueItens: 0,
         },
         { headers: { 'Cache-Control': 'no-store' } }
       );
@@ -269,17 +278,55 @@ export async function GET(request: Request) {
     const detalharItens = temEscopo;
     // Recortada, cada janela é leve e as 5 vão juntas. Sem recorte cada uma varre a rede
     // inteira, então elas andam de duas em duas para não afogar o banco.
-    const perWindow = await mapLimit(Array.from(WINDOWS), temEscopo ? WINDOWS.length : 2, async (dias) => {
-      const range = normalizeRangeForQuery({
-        start: addDaysYmd(baseParam, -dias),
-        end: addDaysYmd(baseParam, -1),
-      });
-      const rows = await fetchFilialProdutoSales(companyKey, posMembers, ecomMembers, range, 'month', {
-        groupByCor: detalharItens,
-        ...escopo,
-      });
-      return { dias, rows };
+    //
+    // O ESTOQUE do mesmo recorte vem junto, da fonte canônica da Estoque Consulta
+    // (`fetchEstoqueRedePorProduto`: só saldos positivos, exclusões e escopo da empresa
+    // aplicados) — a tela precisa dele para cobertura e compra sugerida, e medi-lo aqui
+    // evita ter de baixar o catálogo inteiro no cliente só para somar estoque.
+    const [perWindow, estoqueRows] = await Promise.all([
+      mapLimit(Array.from(WINDOWS), temEscopo ? WINDOWS.length : 2, async (dias) => {
+        const range = normalizeRangeForQuery({
+          start: addDaysYmd(baseParam, -dias),
+          end: addDaysYmd(baseParam, -1),
+        });
+        const rows = await fetchFilialProdutoSales(companyKey, posMembers, ecomMembers, range, 'month', {
+          groupByCor: detalharItens,
+          ...escopo,
+        });
+        return { dias, rows };
+      }),
+      fetchEstoqueRedePorProduto({
+        company: companyKey,
+        // Rede inteira: a projeção é de compra da rede, como as vendas acima.
+        filial: null,
+        grupos: orNull(dimensoes.grupos),
+        linhas: orNull(dimensoes.linhas),
+        subgrupos: orNull(dimensoes.subgrupos),
+        grades: orNull(dimensoes.grades),
+        colecoes: orNull(dimensoes.colecoes),
+        cores: orNull(dimensoes.cores),
+        tipos: orNull(dimensoes.tipos),
+        produtoIds: produtoIds.length > 0 ? produtoIds : null,
+      }),
+    ]);
+
+    // Soma por item (produto × cor) somando as filiais; negativo nunca conta.
+    const estoquePorItem = new Map<string, number>();
+    estoqueRows.forEach((r) => {
+      const key = `${r.produto}||${(r.corCodigo ?? '').trim()}`;
+      estoquePorItem.set(
+        key,
+        (estoquePorItem.get(key) ?? 0) + Math.max(0, Number(r.positiveStock) || 0)
+      );
     });
+    let estoqueTotal = 0;
+    let estoqueItens = 0;
+    estoquePorItem.forEach((qtde) => {
+      if (qtde <= 0) return;
+      estoqueTotal += qtde;
+      estoqueItens += 1;
+    });
+    estoqueTotal = Math.round(estoqueTotal);
 
     // Monta produto||cor → { metadata, d30, d60, ... }
     type ItemAcc = {
@@ -392,7 +439,16 @@ export async function GET(request: Request) {
     );
 
     return NextResponse.json(
-      { dataBase: baseParam, windows: WINDOWS, metrica, itens, totaisJanela, mensal },
+      {
+        dataBase: baseParam,
+        windows: WINDOWS,
+        metrica,
+        itens,
+        totaisJanela,
+        mensal,
+        estoqueTotal,
+        estoqueItens,
+      },
       { headers: { 'Cache-Control': 'no-store' } }
     );
   } catch (error) {

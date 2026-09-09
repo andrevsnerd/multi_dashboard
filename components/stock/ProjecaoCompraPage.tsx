@@ -15,23 +15,13 @@ interface Opcao {
   label: string;
 }
 
-interface PickerRow {
-  produto: string;
-  descricao: string;
-  cor?: string;
-  corDescricao?: string;
-  codigoBarra?: string;
-  grade?: string;
-  grupo?: string;
-  linha?: string;
-  subgrupo?: string;
-  colecao?: string;
-  tipoProduto?: string;
-  estoque?: number;
-}
-
-interface CurvaAbcResponse {
-  produtos: PickerRow[];
+/**
+ * Produto escolhido na busca (chip). O escopo desta tela é por PRODUTO — todas as cores
+ * entram e quem recorta cor é o filtro Cor —, então o chip guarda só código + descrição.
+ */
+interface ProdutoChip {
+  id: string;
+  name: string;
 }
 
 interface ProjecaoItem {
@@ -64,6 +54,10 @@ interface ProjecaoResponse {
   /** Total do escopo por janela de dias, já com piso 0 (vale para as duas métricas). */
   totaisJanela: Record<string, number>;
   mensal: MensalItem[];
+  /** Estoque atual do MESMO recorte (só saldos positivos) — vem do servidor, não das vendas. */
+  estoqueTotal?: number;
+  /** Itens (produto × cor) com estoque no recorte — usado como contagem do escopo. */
+  estoqueItens?: number;
 }
 
 /**
@@ -171,25 +165,6 @@ function fmtDec(n: number, dec = 2): string {
 function rowKey(produto: string, cor: string | null | undefined): string {
   return `${produto}||${(cor ?? "").trim()}`;
 }
-/** Valor da dimensão numa linha do universo (mesma normalização das opções: UPPER/trim). */
-function dimValue(row: PickerRow, dim: DimKey): string {
-  const raw =
-    dim === "grupo"
-      ? row.grupo
-      : dim === "linha"
-      ? row.linha
-      : dim === "subgrupo"
-      ? row.subgrupo
-      : dim === "grade"
-      ? row.grade
-      : dim === "colecao"
-      ? row.colecao
-      : dim === "cor"
-      ? row.corDescricao || row.cor
-      : row.tipoProduto;
-  return (raw ?? "").trim().toUpperCase();
-}
-
 /** Hoje no calendário local, como 'yyyy-MM-dd'. */
 function todayYmd(): string {
   return formatDateForQuery(new Date());
@@ -251,24 +226,41 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   const [dataBase, setDataBase] = useState<string>(todayYmd);
   const [venderAte, setVenderAte] = useState<string>(() => endOfYearYmd(todayYmd()));
 
-  // Universo pesquisável — reusa o dataset da Curva ABC (12m, rede, por cor): traz
-  // estoque atual + as dimensões de cadastro de cada item (produto × cor).
-  const [pickerRows, setPickerRows] = useState<PickerRow[]>([]);
-  const [pickerLoading, setPickerLoading] = useState(false);
   const [dims, setDims] = useState<DimState>(EMPTY_DIMS);
   const [dimOptions, setDimOptions] = useState<Record<DimKey, Opcao[]>>(EMPTY_DIM_OPTIONS);
   // Já nasce carregando: o efeito abaixo dispara na montagem e só desliga por dimensão.
   const [dimLoading, setDimLoading] = useState<Partial<Record<DimKey, boolean>>>(() =>
     Object.fromEntries(DIM_KEYS.map((dim) => [dim, true]))
   );
-  /** Seleção manual = códigos de PRODUTO (todas as cores; quem recorta cor é o filtro Cor). */
-  const [selectedProdutos, setSelectedProdutos] = useState<Set<string>>(new Set());
+  /**
+   * Seleção manual = códigos de PRODUTO (todas as cores; quem recorta cor é o filtro Cor).
+   * Busca sob demanda, igual ao Gerador de Relatórios: nada de baixar o catálogo inteiro
+   * para filtrar no cliente — o usuário digita, o servidor devolve, o item vira chip.
+   */
+  const [produtoChips, setProdutoChips] = useState<ProdutoChip[]>([]);
+  const [produtoQuery, setProdutoQuery] = useState("");
+  const [produtoResults, setProdutoResults] = useState<ProdutoChip[]>([]);
+  const [produtoBuscando, setProdutoBuscando] = useState(false);
+  const [produtoOpen, setProdutoOpen] = useState(false);
+  const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchWrapRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  // Colar lista de códigos (código de barra interno ou código do produto) — mesmo campo do
+  // Gerador de Relatórios, resolvido em lote numa requisição só.
+  const [codigosColados, setCodigosColados] = useState("");
+  const [resolvendoCodigos, setResolvendoCodigos] = useState(false);
+  const [avisoCodigos, setAvisoCodigos] = useState<string | null>(null);
 
   // Projeção (unidades vendidas por janela) — vem do endpoint dedicado.
   const [metrica, setMetrica] = useState<Metrica>("produtos");
   const [pedido, setPedido] = useState<PedidoProjecao | null>(null);
   const [projItens, setProjItens] = useState<Record<string, ProjecaoItem>>({});
   const [totaisJanela, setTotaisJanela] = useState<Record<string, number>>({});
+  /** Estoque do escopo APLICADO, como o servidor mediu (total + nº de itens produto × cor). */
+  const [estoqueEscopo, setEstoqueEscopo] = useState<{ total: number; itens: number }>({
+    total: 0,
+    itens: 0,
+  });
   const [mensal, setMensal] = useState<MensalItem[]>([]);
   const [projLoading, setProjLoading] = useState(false);
   const [projErro, setProjErro] = useState<string | null>(null);
@@ -319,28 +311,149 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
     };
   }, [companyKey]);
 
-  // ── Carrega a base de produtos (uma vez por empresa): últimos 12 meses, rede inteira,
-  //    por cor — dá o universo pesquisável com estoque atual e metadados de cadastro.
-  useEffect(() => {
-    let cancelled = false;
-    setPickerLoading(true);
-    const { start, end } = janela12Meses();
-    const params = new URLSearchParams({ company: companyKey, start, end, porCor: "1" });
-    fetch(`/api/curva-abc?${params.toString()}`, { cache: "no-store" })
-      .then((r) => r.json())
-      .then((json: CurvaAbcResponse) => {
-        if (!cancelled) setPickerRows(Array.isArray(json.produtos) ? json.produtos : []);
-      })
-      .catch(() => {
-        if (!cancelled) setPickerRows([]);
-      })
-      .finally(() => {
-        if (!cancelled) setPickerLoading(false);
+  // ── Busca de produto (mesma do Gerador de Relatórios): consulta o cadastro por nome,
+  //    código do produto ou código de barra, com debounce. Sem catálogo pré-carregado.
+  const runSearch = useCallback(async (term: string) => {
+    if (term.trim().length < 2) {
+      setProdutoResults([]);
+      setProdutoBuscando(false);
+      return;
+    }
+    setProdutoBuscando(true);
+    try {
+      const res = await fetch(`/api/products/search?q=${encodeURIComponent(term.trim())}`, {
+        cache: "no-store",
       });
-    return () => {
-      cancelled = true;
+      if (!res.ok) {
+        setProdutoResults([]);
+        return;
+      }
+      const json = (await res.json()) as {
+        data?: Array<{ productId: string; productName: string }>;
+      };
+      // PRODUTO/DESC_PRODUTO são CHAR no Linx: chegam com espaço à direita.
+      setProdutoResults(
+        (json.data ?? [])
+          .map((p) => ({ id: (p.productId ?? "").trim(), name: (p.productName ?? "").trim() }))
+          .filter((p) => p.id)
+      );
+    } catch {
+      setProdutoResults([]);
+    } finally {
+      setProdutoBuscando(false);
+    }
+  }, []);
+
+  const onProdutoQueryChange = (value: string) => {
+    setProdutoQuery(value);
+    setProdutoOpen(true);
+    if (searchDebounce.current) clearTimeout(searchDebounce.current);
+    if (value.trim().length < 2) {
+      setProdutoResults([]);
+      setProdutoBuscando(false);
+      return;
+    }
+    setProdutoBuscando(true);
+    searchDebounce.current = setTimeout(() => void runSearch(value), 300);
+  };
+
+  useEffect(() => () => {
+    if (searchDebounce.current) clearTimeout(searchDebounce.current);
+  }, []);
+
+  /** Escolher um resultado ACUMULA como chip e deixa a busca livre para o próximo item. */
+  const addProdutoChip = (p: ProdutoChip) => {
+    setProdutoChips((prev) => (prev.some((x) => x.id === p.id) ? prev : [...prev, p]));
+    setProdutoQuery("");
+    setProdutoResults([]);
+  };
+
+  const removeProdutoChip = (id: string) =>
+    setProdutoChips((prev) => prev.filter((x) => x.id !== id));
+
+  /**
+   * Resolve em LOTE os códigos colados (código de barra interno OU código do produto) e
+   * adiciona como chips. Código que não casou é mostrado na tela — colar 11 códigos e
+   * receber 9 itens sem aviso seria pior que o erro.
+   */
+  const adicionarCodigosColados = useCallback(async () => {
+    const codigos = codigosColados
+      .split(/[\s,;]+/g)
+      .map((c) => c.trim())
+      .filter(Boolean);
+    if (codigos.length === 0) {
+      setAvisoCodigos("Cole pelo menos um código.");
+      return;
+    }
+    setResolvendoCodigos(true);
+    setAvisoCodigos(null);
+    try {
+      const res = await fetch("/api/relatorios/resolver-produtos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ codigos }),
+      });
+      const json = (await res.json()) as {
+        itens?: Array<{ produto: string; descricao: string }>;
+        naoEncontrados?: string[];
+        error?: string;
+      };
+      if (!res.ok) throw new Error(json?.error || "Erro ao resolver os códigos");
+
+      const itens = json.itens ?? [];
+      // O escopo é por PRODUTO: dois códigos de barra do mesmo produto viram um chip só.
+      let adicionados = 0;
+      setProdutoChips((prev) => {
+        const existentes = new Set(prev.map((c) => c.id));
+        const novos: ProdutoChip[] = [];
+        for (const it of itens) {
+          const id = String(it.produto ?? "").trim();
+          if (!id || existentes.has(id)) continue;
+          existentes.add(id);
+          novos.push({ id, name: String(it.descricao ?? "").trim() || id });
+        }
+        adicionados = novos.length;
+        return novos.length > 0 ? [...prev, ...novos] : prev;
+      });
+
+      const naoEncontrados = json.naoEncontrados ?? [];
+      const partes: string[] = [];
+      if (adicionados > 0) partes.push(`${adicionados} produto(s) adicionado(s)`);
+      if (naoEncontrados.length > 0) {
+        const lista = naoEncontrados.slice(0, 10).join(", ");
+        partes.push(
+          `${naoEncontrados.length} não reconhecido(s): ${lista}${naoEncontrados.length > 10 ? "…" : ""}`
+        );
+      }
+      setAvisoCodigos(partes.join(" · ") || "Nenhum código novo.");
+      if (naoEncontrados.length === 0) setCodigosColados("");
+    } catch (e) {
+      setAvisoCodigos(e instanceof Error ? e.message : "Erro ao resolver os códigos");
+    } finally {
+      setResolvendoCodigos(false);
+    }
+  }, [codigosColados]);
+
+  // Fecha o dropdown de busca ao clicar fora ou apertar Esc.
+  useEffect(() => {
+    if (!produtoOpen) return;
+    const onPointerDown = (e: MouseEvent | TouchEvent) => {
+      if (searchWrapRef.current && !searchWrapRef.current.contains(e.target as Node)) {
+        setProdutoOpen(false);
+      }
     };
-  }, [companyKey]);
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setProdutoOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("touchstart", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("touchstart", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [produtoOpen]);
 
   /** Rótulo bonito da coleção ("DESCRIÇÃO (CÓDIGO)") para os chips. */
   const colecaoLabels = useMemo(() => {
@@ -353,16 +466,9 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
     dim === "colecao" ? colecaoLabels.get(value) ?? value : value;
 
   // ── Escopo ────────────────────────────────────────────────────────────────
-  /** Uma linha do universo casa com todos os filtros marcados. */
-  const matchesDims = useCallback(
-    (row: PickerRow) =>
-      DIM_KEYS.every((dim) => dims[dim].length === 0 || dims[dim].includes(dimValue(row, dim))),
-    [dims]
-  );
-
   const dimFiltradas = useMemo(() => DIM_KEYS.filter((dim) => dims[dim].length > 0), [dims]);
   const temDimensao = dimFiltradas.length > 0;
-  const temSelecao = selectedProdutos.size > 0;
+  const temSelecao = produtoChips.length > 0;
   /**
    * Há recorte montado na barra de filtros (ainda não necessariamente gerado). Sem recorte a
    * projeção continua valendo: é o TOTAL DA REDE, o número contra o qual se compara o recorte.
@@ -372,8 +478,8 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   const gerado = pedido !== null;
 
   const produtosSelecionados = useMemo(
-    () => Array.from(selectedProdutos).sort(),
-    [selectedProdutos]
+    () => produtoChips.map((c) => c.id).sort(),
+    [produtoChips]
   );
   const totalRecortes =
     produtosSelecionados.length + DIM_KEYS.reduce((soma, dim) => soma + dims[dim].length, 0);
@@ -397,23 +503,6 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   );
   const pendente = assinaturaAtual !== assinaturaGerada;
 
-  /**
-   * Itens (produto × cor) do escopo APLICADO — é o que o estoque e a contagem devem espelhar,
-   * senão a tela mostraria estoque de um recorte e venda de outro. Os filtros de cadastro
-   * sempre valem; a seleção de produto só restringe os códigos, então sem filtro de Cor todas
-   * as cores do produto somam.
-   */
-  const scopeRows = useMemo(() => {
-    if (!pedido) return [];
-    const selecionados = new Set(pedido.produtos);
-    return pickerRows.filter(
-      (row) =>
-        DIM_KEYS.every(
-          (dim) => pedido.dims[dim].length === 0 || pedido.dims[dim].includes(dimValue(row, dim))
-        ) && (selecionados.size === 0 || selecionados.has(row.produto))
-    );
-  }, [pedido, pickerRows]);
-
   const gerarProjecao = () => {
     setPedido({ dataBase, metrica, dims, produtos: produtosSelecionados });
   };
@@ -428,6 +517,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
       setProjItens({});
       setTotaisJanela({});
       setMensal([]);
+      setEstoqueEscopo({ total: 0, itens: 0 });
       setProjErro(
         `Escopo muito amplo: ${fmt(recortes)} itens no recorte (limite ${fmt(MAX_RECORTES)}). ` +
           `Selecionar tudo de uma dimensão equivale a não filtrar por ela — deixe o filtro em "Todos".`
@@ -463,12 +553,17 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
         setProjItens(next);
         setTotaisJanela(json.totaisJanela ?? {});
         setMensal(Array.isArray(json.mensal) ? json.mensal : []);
+        setEstoqueEscopo({
+          total: Math.max(0, Number(json.estoqueTotal ?? 0) || 0),
+          itens: Math.max(0, Number(json.estoqueItens ?? 0) || 0),
+        });
       })
       .catch((error: Error) => {
         if (cancelled) return;
         setProjItens({});
         setTotaisJanela({});
         setMensal([]);
+        setEstoqueEscopo({ total: 0, itens: 0 });
         setProjErro(error.message || "Erro ao calcular a projeção");
       })
       .finally(() => {
@@ -485,33 +580,33 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
     setQtdOverride({});
   }, [pedido]);
 
-  // ── Produtos do escopo APLICADO: descrição, código e estoque somando as cores do recorte.
+  // ── Produtos do escopo APLICADO: descrição, código e nº de cores. Sai das linhas que o
+  //    servidor devolveu (produto × cor), que já são exatamente o recorte gerado.
   const selectedItems = useMemo(() => {
     const porProduto = new Map<
       string,
-      { produto: string; descricao: string; codigoBarra: string; grade: string; estoque: number; cores: number }
+      { produto: string; descricao: string; codigoBarra: string; grade: string; cores: number }
     >();
-    scopeRows.forEach((row) => {
-      const atual = porProduto.get(row.produto);
+    Object.values(projItens).forEach((it) => {
+      const atual = porProduto.get(it.produto);
       if (atual) {
-        atual.estoque += Math.max(0, row.estoque ?? 0);
         atual.cores += 1;
-        if (!atual.codigoBarra && row.codigoBarra) atual.codigoBarra = row.codigoBarra;
+        if (!atual.codigoBarra && it.codigoBarra) atual.codigoBarra = it.codigoBarra;
+        if (!atual.grade && it.grade) atual.grade = it.grade;
         return;
       }
-      porProduto.set(row.produto, {
-        produto: row.produto,
-        descricao: row.descricao || row.produto,
-        codigoBarra: row.codigoBarra ?? "",
-        grade: row.grade ?? "",
-        estoque: Math.max(0, row.estoque ?? 0),
+      porProduto.set(it.produto, {
+        produto: it.produto,
+        descricao: it.descricao || it.produto,
+        codigoBarra: it.codigoBarra ?? "",
+        grade: it.grade ?? "",
         cores: 1,
       });
     });
     return Array.from(porProduto.values()).sort((a, b) =>
       a.descricao.localeCompare(b.descricao, "pt-BR")
     );
-  }, [scopeRows]);
+  }, [projItens]);
 
   // ── Agregado do escopo: estoque somado + unidades vendidas somadas por janela.
   //    O servidor já devolve exatamente o escopo (produtos × filtros), então soma-se TUDO.
@@ -522,10 +617,12 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
     WINDOWS_DIAS.forEach((dias) => {
       unidades[dias] = Number(totaisJanela[String(dias)] ?? 0) || 0;
     });
-    const estoqueSomado = scopeRows.reduce((s, row) => s + Math.max(0, row.estoque ?? 0), 0);
-    const itens = Math.max(scopeRows.length, Object.keys(projItens).length);
+    // Estoque do MESMO recorte, medido no servidor (só saldos positivos — negativo nunca
+    // conta). A contagem de itens usa o maior entre quem tem estoque e quem teve venda.
+    const estoqueSomado = estoqueEscopo.total;
+    const itens = Math.max(estoqueEscopo.itens, Object.keys(projItens).length);
     return { estoqueSomado, unidades, itens };
-  }, [totaisJanela, projItens, scopeRows]);
+  }, [totaisJanela, projItens, estoqueEscopo]);
 
   const estoqueAtual = estoqueOverride ?? agregado.estoqueSomado;
   const diasHorizonte = Math.max(0, diffDays(dataBase, venderAte));
@@ -698,61 +795,22 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
     };
   }, [mensalRows]);
 
-  /**
-   * Opções do select de produto: uma por PRODUTO (não produto × cor), já recortadas pelos
-   * filtros de cadastro. A busca textual fica dentro do dropdown.
-   */
-  const produtoOptions = useMemo(() => {
-    const porProduto = new Map<string, { value: string; label: string; busca: string; meta: string[] }>();
-    const cores = new Map<string, number>();
-    const estoques = new Map<string, number>();
-    pickerRows
-      .filter((row) => matchesDims(row))
-      .forEach((row) => {
-        cores.set(row.produto, (cores.get(row.produto) ?? 0) + 1);
-        estoques.set(row.produto, (estoques.get(row.produto) ?? 0) + Math.max(0, row.estoque ?? 0));
-        if (porProduto.has(row.produto)) return;
-        porProduto.set(row.produto, {
-          value: row.produto,
-          label: row.descricao || row.produto,
-          busca: `${row.descricao ?? ""} ${row.produto} ${row.codigoBarra ?? ""} ${row.subgrupo ?? ""} ${row.colecao ?? ""}`,
-          meta: [(row.codigoBarra || row.produto).trim()],
-        });
-      });
-    return Array.from(porProduto.values())
-      .map((opt) => {
-        const qtdCores = cores.get(opt.value) ?? 0;
-        return {
-          ...opt,
-          meta: [
-            ...opt.meta,
-            `${qtdCores} ${qtdCores === 1 ? "cor" : "cores"}`,
-            `${fmt(estoques.get(opt.value) ?? 0)} un`,
-          ],
-        };
-      })
-      .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
-  }, [pickerRows, matchesDims]);
-
   /** Chips da barra de filtros: refletem a seleção ao vivo, não o que já foi gerado. */
-  const chipsProdutos = useMemo(() => {
-    const labels = new Map(produtoOptions.map((o) => [o.value, o.label] as const));
-    return produtosSelecionados
-      .map((produto) => ({ produto, label: labels.get(produto) ?? produto }))
-      .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
-  }, [produtosSelecionados, produtoOptions]);
+  const chipsProdutos = useMemo(
+    () => [...produtoChips].sort((a, b) => a.name.localeCompare(b.name, "pt-BR")),
+    [produtoChips]
+  );
 
-  const toggleProduto = (produto: string) =>
-    setSelectedProdutos((prev) => {
-      const next = new Set(prev);
-      if (next.has(produto)) next.delete(produto);
-      else next.add(produto);
-      return next;
-    });
+  /** Resultados da busca sem os que já viraram chip. */
+  const resultadosDisponiveis = useMemo(() => {
+    const escolhidos = new Set(produtoChips.map((c) => c.id));
+    return produtoResults.filter((p) => !escolhidos.has(p.id));
+  }, [produtoResults, produtoChips]);
 
   const limparTudo = () => {
-    setSelectedProdutos(new Set());
+    setProdutoChips([]);
     setDims(EMPTY_DIMS);
+    setAvisoCodigos(null);
   };
 
   /** O que está na tela é a rede inteira (geraram sem nenhum recorte). */
@@ -876,20 +934,121 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
             </label>
           </div>
 
-          {/* Produto: seleção por código (todas as cores entram) */}
-          <MultiSelect
-            variant="field"
-            label="Produto"
-            options={produtoOptions}
-            value={produtosSelecionados}
-            onChange={(values) => setSelectedProdutos(new Set(values))}
-            loading={pickerLoading}
-            searchPlaceholder="Buscar produto, código…"
-            vazioLabel="Todos"
-            unidade="produto"
-            unidadePlural="produtos"
-            largura="lg"
-          />
+          {/* Produto: busca no cadastro (mesma do Gerador de Relatórios). Cada escolha vira
+              chip e o escopo é por PRODUTO — todas as cores entram. */}
+          <div className={styles.field} ref={searchWrapRef}>
+            <span className={styles.fieldLabel}>
+              Produto
+              {produtoChips.length > 0 && (
+                <span className={styles.fieldCount}>
+                  {fmt(produtoChips.length)} selecionado{produtoChips.length === 1 ? "" : "s"}
+                </span>
+              )}
+            </span>
+            <div className={styles.produtoWrap}>
+              <div className={styles.searchBox}>
+                <input
+                  ref={searchInputRef}
+                  className={styles.produtoInput}
+                  type="text"
+                  value={produtoQuery}
+                  placeholder={
+                    produtoChips.length > 0 ? "Adicionar outro produto…" : "Buscar produto, código…"
+                  }
+                  onChange={(e) => onProdutoQueryChange(e.target.value)}
+                  onFocus={() => setProdutoOpen(true)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") e.preventDefault();
+                  }}
+                />
+                {produtoQuery && (
+                  <button
+                    type="button"
+                    className={styles.searchClear}
+                    onClick={() => {
+                      setProdutoQuery("");
+                      setProdutoResults([]);
+                      searchInputRef.current?.focus();
+                    }}
+                    aria-label="Limpar busca"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+
+              {produtoOpen && (
+                <div className={styles.dropdown}>
+                  <div className={styles.optionList}>
+                    {produtoQuery.trim().length < 2 ? (
+                      <div className={styles.optionEmpty}>
+                        Digite ao menos 2 letras — nome, código do produto ou código de barra.
+                      </div>
+                    ) : produtoBuscando ? (
+                      <div className={styles.optionEmpty}>Buscando…</div>
+                    ) : resultadosDisponiveis.length === 0 ? (
+                      <div className={styles.optionEmpty}>Nenhum resultado encontrado</div>
+                    ) : (
+                      resultadosDisponiveis.map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          className={styles.optionRow}
+                          onClick={() => addProdutoChip(p)}
+                        >
+                          <span className={styles.optionInfo}>
+                            <span className={styles.optionName}>{p.name}</span>
+                            <span className={styles.optionMeta}>
+                              <span>{p.id}</span>
+                            </span>
+                          </span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Colar lista de códigos: resolve em lote e vira chips (um por produto). */}
+                  <div className={styles.pasteBox}>
+                    <textarea
+                      className={styles.pasteArea}
+                      value={codigosColados}
+                      placeholder={"Colar lista de códigos (um por linha)\n050341\n050340"}
+                      onChange={(e) => setCodigosColados(e.target.value)}
+                      rows={2}
+                    />
+                    <div className={styles.pasteActions}>
+                      <button
+                        type="button"
+                        className={styles.pasteBtn}
+                        onClick={() => void adicionarCodigosColados()}
+                        disabled={resolvendoCodigos || codigosColados.trim() === ""}
+                      >
+                        {resolvendoCodigos ? "Buscando…" : "Adicionar códigos"}
+                      </button>
+                      {avisoCodigos && <span className={styles.pasteAviso}>{avisoCodigos}</span>}
+                    </div>
+                  </div>
+
+                  <div className={styles.dropdownFoot}>
+                    <span>
+                      {produtoChips.length > 0
+                        ? `${fmt(produtoChips.length)} produto${produtoChips.length === 1 ? "" : "s"} no escopo`
+                        : "Sem seleção = todos os produtos do filtro"}
+                    </span>
+                    {produtoChips.length > 0 && (
+                      <button
+                        type="button"
+                        className={styles.linkAction}
+                        onClick={() => setProdutoChips([])}
+                      >
+                        Limpar tudo
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* ── Filtros de cadastro (pílulas) ──────────────────────────────── */}
@@ -924,13 +1083,13 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
           )}
           {chipsProdutos.map((it) => (
             <button
-              key={it.produto}
+              key={it.id}
               type="button"
               className={styles.chip}
-              title="Remover da seleção"
-              onClick={() => toggleProduto(it.produto)}
+              title={`${it.name} (${it.id}) — remover da seleção`}
+              onClick={() => removeProdutoChip(it.id)}
             >
-              {it.label}
+              {it.name}
               <span className={styles.chipX}>×</span>
             </button>
           ))}
@@ -985,9 +1144,8 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
             )}
           </span>
         )}
-        {/* Só a projeção acende o "calculando". A base de produtos (curva-abc, 12 meses) também
-            carrega na montagem, mas isso não é cálculo — o próprio select de Produto mostra
-            "Carregando…" quando aberto. */}
+        {/* Só a projeção acende o "calculando". A busca de produto é sob demanda e mostra o
+            próprio "Buscando…" dentro do dropdown. */}
         <span
           className={`${styles.loadingCue} ${projLoading ? styles.loadingCueActive : ""}`}
           role="status"
