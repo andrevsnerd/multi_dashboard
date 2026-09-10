@@ -115,9 +115,15 @@
   cursor: pointer;
 }
 .produtoButton > span:first-child {
+  /* `min-width: 0` é o que faz o `text-overflow` valer: num contêiner flex o item não
+     encurta abaixo do tamanho do conteúdo sem isso, e o texto vaza por cima da borda
+     levando o caret com ele. */
+  min-width: 0;
+  flex: 1 1 auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-align: left;
 }
 .produtoButtonActive,
 .produtoButton:hover {
@@ -1251,4 +1257,72 @@
 
 .dicaNota strong {
   color: var(--t-700);
+}
+
+/* ── Select de compras salvas: títulos longos precisam de espaço ────────── */
+
+/* Os títulos vêm da Lista Loja ("[Lista Loja] Sugestão IA — Seda Curva A/B até 31/12 ·
+   bruna"), então o campo é o mais largo da barra e ganha a linha inteira quando sobra. */
+.campoCompra {
+  flex: 1 1 340px;
+  min-width: 280px;
+  max-width: 520px;
+}
+
+.campoCompra .produtoButton {
+  width: 100%;
+}
+
+/* Ancorado à ESQUERDA: a barra de filtros quebra em várias linhas e o campo pode acabar
+   perto da borda esquerda — ancorado à direita, um menu largo sairia da tela. */
+.dropdownXl {
+  left: 0;
+  right: auto;
+  width: 560px;
+  max-width: min(560px, calc(100vw - 40px));
+}
+
+.produtoWrap .dropdownXl {
+  left: 0;
+  right: auto;
+}
+
+/* O nome da compra é a identidade dela e o que importa costuma estar NO FIM (a data, quem
+   salvou). Cortar com "…" perderia justamente isso, então aqui ele quebra em duas linhas. */
+.opcaoMultilinha .optionName {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.opcaoMultilinha .optionRow {
+  align-items: flex-start;
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+
+.opcaoMultilinha .checkbox {
+  margin-top: 2px;
+}
+
+/* A conta de "Precisa comprar": tres linhas alinhadas, com o resultado destacado. */
+.dicaConta {
+  margin: 9px 0 4px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--s-50);
+}
+
+.dicaConta .dicaLinha {
+  padding: 3px 0;
+}
+
+.dicaConta .dicaTotal {
+  margin-top: 4px;
+  padding-top: 6px;
+  font-size: 13px;
 }

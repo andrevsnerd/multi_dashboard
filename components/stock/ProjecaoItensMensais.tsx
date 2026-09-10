@@ -363,8 +363,11 @@ export default function ProjecaoItensMensais({
       {/* A conta inteira em uma linha: sem isto "Precisa comprar" parece número mágico. */}
       <div className={styles.tabelaNota}>
         Os meses mostram <strong>quanto vende</strong> — mês fechado é o realizado, à frente é
-        projeção. Depois vem a decisão: <strong>Vai vender até {ateLabel}</strong> −{" "}
-        <strong>Tem em estoque</strong> = <strong>Precisa comprar</strong>.
+        projeção. A <strong>%</strong> compara sempre com o <strong>mesmo mês de {anoBase - 1}</strong>;
+        onde ela não aparece é porque o item não vendeu nada naquele mês do ano passado, então
+        não há com o que comparar. Depois vem a decisão:{" "}
+        <strong>Vai vender até {ateLabel}</strong> − <strong>Tem em estoque</strong> ={" "}
+        <strong>Precisa comprar</strong>.
         {compra ? (
           <>
             {" "}
@@ -458,14 +461,21 @@ export default function ProjecaoItensMensais({
                         <span className={`${styles.cellQtd} ${!valor ? styles.zero : ""}`}>
                           {valor == null ? "—" : valor === 0 ? "·" : fmt(valor)}
                         </span>
-                        <span
-                          className={`${styles.cellPct} ${
-                            m.pct == null ? styles.muted : m.pct >= 0 ? styles.varUp : styles.varDown
-                          }`}
-                          title={`${anoBase - 1}: ${fmt(m.qtdeAnoAnterior)} un`}
-                        >
-                          {fmtPct(m.pct)}
-                        </span>
+                        {/* Sem venda no mesmo mês de {anoBase-1} não existe comparação —
+                            então a célula fica VAZIA em vez de mostrar um "—", que só
+                            chamava atenção para um valor que não tem o que dizer. */}
+                        {m.pct == null ? (
+                          <span className={styles.cellPct} aria-hidden="true" />
+                        ) : (
+                          <span
+                            className={`${styles.cellPct} ${
+                              m.pct >= 0 ? styles.varUp : styles.varDown
+                            }`}
+                            title={`${fmt(m.qtdeAnoAnterior)} un no mesmo mês de ${anoBase - 1}`}
+                          >
+                            {fmtPct(m.pct)}
+                          </span>
+                        )}
                       </td>
                     );
                   })}
@@ -563,10 +573,13 @@ export default function ProjecaoItensMensais({
 }
 
 /**
- * A memória de cálculo de "Precisa comprar", aberta linha por linha.
+ * O que entrou na conta de "Precisa comprar", desta linha.
  *
- * O número sozinho não se defende — é a soma dos meses que faltam menos o estoque — e sem
- * ver as parcelas ninguém confere nada. Mesma ideia do tooltip de Compra Ideal da Curva ABC.
+ * Foi encurtado de propósito (a primeira versão virou um painel de vinte linhas que ninguém
+ * lia): a pergunta é "o que está sendo considerado nesta compra", e a resposta são TRÊS
+ * números — o que vai vender, o que já tem, e a diferença. Os meses que formam a projeção
+ * vêm numa linha só, e a regra em uma frase. O detalhamento completo da régua fica no bloco
+ * "Como a projeção é calculada", no topo da tela.
  */
 function DicaCompra({
   dica,
@@ -585,8 +598,8 @@ function DicaCompra({
   const curva = REGRAS_CURVA[regra] != null;
 
   // Posiciona junto ao ponteiro, sem sair da janela.
-  const largura = 380;
-  const altura = Math.min(470, 200 + l.partes.length * 26);
+  const largura = 340;
+  const altura = 250;
   const margem = 12;
   const janelaW = typeof window !== "undefined" ? window.innerWidth : 1280;
   const janelaH = typeof window !== "undefined" ? window.innerHeight : 800;
@@ -597,138 +610,83 @@ function DicaCompra({
       ? topAcima
       : Math.min(dica.y + 16, Math.max(margem, janelaH - altura - margem));
 
-  const criteriosFora = Array.from(
-    new Set(
-      l.meses
-        .filter((m) => (m.futuro || m.parcial) && m.criterio && m.criterio !== "yoy")
-        .map((m) => m.criterio as CriterioMes)
-    )
-  );
+  /** Os meses do horizonte numa linha só: "set 31 (21d) + out 38 + nov 22 + dez 18". */
+  const somaMeses = l.partes
+    .map((parte) => {
+      const rotulo = MES_NOME[parte.mes - 1];
+      const valor = fmt(Math.round(parte.parcela));
+      const parcial = parte.diasUsados < parte.diasDoMes;
+      return parcial ? `${rotulo} ${valor} (${parte.diasUsados}d)` : `${rotulo} ${valor}`;
+    })
+    .join(" + ");
+
+  /** Um mês do horizonte não veio da curva do ano anterior — vale dizer qual foi o desvio. */
+  const criterioFora = l.meses.find(
+    (m) => (m.futuro || m.parcial) && m.criterio && m.criterio !== "yoy"
+  )?.criterio;
+
+  const noLimite =
+    l.indice != null && (l.indice >= INDICE_MAX || l.indice <= INDICE_MIN)
+      ? l.indice >= INDICE_MAX
+        ? "travado no teto de 2,00×"
+        : "travado no piso de 0,30×"
+      : null;
 
   return (
     <div className={styles.dicaPainel} style={{ left, top, width: largura }}>
-      <div className={styles.dicaTitulo}>
-        Precisa comprar: <strong>{fmt(l.sugestao)} un</strong>
-      </div>
       <div className={styles.dicaItem}>{l.rotulo}</div>
 
-      <div className={styles.dicaDivisor} />
+      <div className={styles.dicaConta}>
+        <div className={styles.dicaLinha}>
+          <span>Vai vender até {ateLabel}</span>
+          <span>{fmt(Math.round(l.necessidade))}</span>
+        </div>
+        <div className={styles.dicaLinha}>
+          <span>Já tem em estoque</span>
+          <span>− {fmt(l.estoque)}</span>
+        </div>
+        <div className={`${styles.dicaLinha} ${styles.dicaTotal}`}>
+          <span>Precisa comprar</span>
+          <span>
+            <strong>{fmt(l.sugestao)} un</strong>
+          </span>
+        </div>
+      </div>
 
       {l.semSerie ? (
         <div className={styles.dicaNota}>
-          Este item não teve venda no período, então não há série para projetar. A sugestão fica
-          em 0 — o número da compra é decisão de quem comprou, não da conta.
+          Este item <strong>não vendeu nada</strong> no período, então não há o que projetar — a
+          sugestão fica em 0 e a quantidade da compra é decisão sua.
         </div>
       ) : curva ? (
-        <>
-          <div className={styles.dicaSecao}>
-            Quanto ainda vai vender, até {ateLabel} ({fmt(diasHorizonte)} dias)
-          </div>
-          {l.partes.map((parte) => {
-            const parcial = parte.diasUsados < parte.diasDoMes;
-            return (
-              <div key={`${parte.ano}-${parte.mes}`} className={styles.dicaLinha}>
-                <span>
-                  {MES_NOME[parte.mes - 1]}/{String(parte.ano).slice(2)}
-                  {parcial ? (
-                    <span className={styles.dicaFraco}>
-                      {" "}
-                      {parte.diasUsados} de {parte.diasDoMes} dias
-                    </span>
-                  ) : null}
-                </span>
-                <span>
-                  {parcial ? (
-                    <>
-                      <span className={styles.dicaFraco}>
-                        {fmt(Math.round(parte.mesCheio))} ×{" "}
-                        {fmtDec(parte.diasUsados / parte.diasDoMes)} ={" "}
-                      </span>
-                      <strong>{fmt(Math.round(parte.parcela))}</strong>
-                    </>
-                  ) : (
-                    <strong>{fmt(Math.round(parte.parcela))}</strong>
-                  )}
-                </span>
-              </div>
-            );
-          })}
-          <div className={`${styles.dicaLinha} ${styles.dicaTotal}`}>
-            <span>Vai vender</span>
-            <span>
-              <strong>{fmt(Math.round(l.necessidade))} un</strong>
-            </span>
-          </div>
-
-          <div className={styles.dicaDivisor} />
-
-          <div className={styles.dicaSecao}>De onde saiu a projeção de cada mês</div>
-          <div className={styles.dicaNota}>
-            Cada mês futuro vale <strong>o que vendeu no mesmo mês de {anoBase - 1}</strong>{" "}
-            multiplicado pelo índice deste item.
-          </div>
-          <div className={styles.dicaLinha}>
-            <span>Índice deste item</span>
-            <span>
-              {l.indice == null ? (
-                <span className={styles.dicaFraco}>sem base no ano anterior</span>
-              ) : (
-                <strong>{fmtDec(l.indice)}×</strong>
-              )}
-              {l.indice != null && l.indice >= INDICE_MAX ? (
-                <span className={styles.dicaFraco}> no teto</span>
+        <div className={styles.dicaNota}>
+          {somaMeses ? (
+            <>
+              Os {fmt(Math.round(l.necessidade))} vêm de <strong>{somaMeses}</strong>. Cada mês é o
+              que este item vendeu no mesmo mês de {anoBase - 1}
+              {l.indice != null ? (
+                <>
+                  , × <strong>{fmtDec(l.indice)}</strong>
+                </>
               ) : null}
-              {l.indice != null && l.indice <= INDICE_MIN ? (
-                <span className={styles.dicaFraco}> no piso</span>
-              ) : null}
-            </span>
-          </div>
-          <div className={styles.dicaLinha}>
-            <span>Meses fechados na conta</span>
-            <span>{fmt(l.mesesFechados)}</span>
-          </div>
-          {criteriosFora.map((c) => (
-            <div key={c} className={styles.dicaNota}>
-              {CRITERIO_TEXTO[c]}
-            </div>
-          ))}
-        </>
+              .{noLimite ? ` Índice ${noLimite}.` : ""}
+            </>
+          ) : (
+            "Sem meses fechados no ano, a curva não tem de onde sair."
+          )}
+          {criterioFora ? ` ${CRITERIO_TEXTO[criterioFora]}.` : ""}
+        </div>
       ) : (
-        <>
-          <div className={styles.dicaSecao}>Ritmo esticado — {REGRA_LABEL[regra]}</div>
-          <div className={styles.dicaNota}>
-            Esta regra não usa sazonalidade: pega o que saiu nos últimos {regra} dias, divide
-            pelos dias da janela e multiplica pelos {fmt(diasHorizonte)} dias do horizonte.
-          </div>
-          <div className={`${styles.dicaLinha} ${styles.dicaTotal}`}>
-            <span>Vai vender</span>
-            <span>
-              <strong>{fmt(Math.round(l.necessidade))} un</strong>
-            </span>
-          </div>
-        </>
+        <div className={styles.dicaNota}>
+          {REGRA_LABEL[regra]}: o que saiu nos últimos {regra} dias, esticado para os{" "}
+          {fmt(diasHorizonte)} dias do horizonte. <strong>Sem sazonalidade.</strong>
+        </div>
       )}
 
-      <div className={styles.dicaDivisor} />
-
-      <div className={styles.dicaLinha}>
-        <span>Vai vender até {ateLabel}</span>
-        <span>{fmt(Math.round(l.necessidade))} un</span>
-      </div>
-      <div className={styles.dicaLinha}>
-        <span>− Tem em estoque</span>
-        <span>{fmt(l.estoque)} un</span>
-      </div>
-      <div className={`${styles.dicaLinha} ${styles.dicaTotal}`}>
-        <span>= Precisa comprar</span>
-        <span>
-          <strong>{fmt(l.sugestao)} un</strong>
-        </span>
-      </div>
-      {l.necessidade - l.estoque < 0 ? (
+      {l.estoque > l.necessidade ? (
         <div className={styles.dicaNota}>
-          O estoque já cobre o horizonte, com {fmt(Math.round(l.estoque - l.necessidade))} un de
-          folga — por isso a sugestão é 0 e não um número negativo.
+          O estoque já cobre o período, com {fmt(Math.round(l.estoque - l.necessidade))} un de
+          folga.
         </div>
       ) : null}
 
@@ -745,16 +703,9 @@ function DicaCompra({
           {(l.origens ?? []).map((o, i) => (
             <div key={`${o.titulo}-${i}`} className={styles.dicaLinha}>
               <span className={styles.dicaFraco}>{o.titulo}</span>
-              <span className={styles.dicaFraco}>{fmt(o.qtd)} un</span>
+              <span className={styles.dicaFraco}>{fmt(o.qtd)}</span>
             </div>
           ))}
-          <div className={styles.dicaNota}>
-            {(l.diferenca ?? 0) < 0
-              ? `A compra está ${fmt(-(l.diferenca ?? 0))} un abaixo do sugerido.`
-              : (l.diferenca ?? 0) > 0
-              ? `A compra está ${fmt(l.diferenca ?? 0)} un acima do sugerido.`
-              : "A compra bate exatamente com o sugerido."}
-          </div>
         </>
       ) : null}
     </div>

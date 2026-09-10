@@ -991,7 +991,15 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   }, [totaisJanela, projItens, estoqueEscopo]);
 
   const estoqueAtual = estoqueOverride ?? agregado.estoqueSomado;
-  const diasHorizonte = Math.max(0, diffDays(dataBase, venderAte));
+  /**
+   * Dias do horizonte, com as DUAS pontas dentro: "vender até 31/12" inclui o dia 31.
+   *
+   * `diffDays` devolve a distância entre as datas (112 de 10/09 a 31/12), e o laço que
+   * consome o horizonte começa contando o próprio dia da data base — então sem o `+1` ele
+   * parava em 30/12 e o último dia do período ficava de fora. Subestimava a projeção em um
+   * dia (≈0,9% num trimestre), o que é pouco mas errado.
+   */
+  const diasHorizonte = Math.max(0, diffDays(dataBase, venderAte) + 1);
   const anoBase = Number(dataBase.slice(0, 4));
 
   // ── Motor de projeção (curva do ano anterior × índice) ────────────────────
@@ -1357,9 +1365,13 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
               <MultiSelect
                 label={carregandoCompra ? "Compras salvas · carregando…" : "Compras salvas"}
                 variant="field"
-                largura="lg"
+                /* Títulos de compra são longos: campo elástico e menu largo, ancorado à
+                   esquerda, com o nome quebrando em duas linhas em vez de cortar. */
+                largura="xl"
+                classeCampo={styles.campoCompra}
+                multilinha
                 loading={carregandoCompra}
-                searchPlaceholder="Buscar compra por título…"
+                searchPlaceholder="Buscar compra por título ou data…"
                 vazioLabel="Não importar"
                 unidade="compra"
                 unidadePlural="compras importadas"
@@ -1844,13 +1856,19 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
                             <span className={styles.cellQtd}>
                               {valor == null ? "—" : fmt(Math.round(valor))}
                             </span>
-                            <span
-                              className={`${styles.cellPct} ${
-                                pct == null ? styles.muted : pct >= 0 ? styles.varUp : styles.varDown
-                              }`}
-                            >
-                              {fmtPct(pct)}
-                            </span>
+                            {/* Sem venda no mesmo mês do ano anterior não há comparação:
+                                célula vazia, e não um "—" que chama atenção sem dizer nada. */}
+                            {pct == null ? (
+                              <span className={styles.cellPct} aria-hidden="true" />
+                            ) : (
+                              <span
+                                className={`${styles.cellPct} ${
+                                  pct >= 0 ? styles.varUp : styles.varDown
+                                }`}
+                              >
+                                {fmtPct(pct)}
+                              </span>
+                            )}
                             {(m.parcial || m.futuro) && (
                               <span className={styles.cellFlag}>proj.</span>
                             )}
@@ -1925,7 +1943,11 @@ interface MultiSelectProps {
   variant: "pill" | "field";
   unidade?: string;
   unidadePlural?: string;
-  largura?: "sm" | "lg";
+  largura?: "sm" | "lg" | "xl";
+  /** Classe extra no contêiner do campo — usada para o campo de compras salvas, mais largo. */
+  classeCampo?: string;
+  /** Deixa o nome da opção quebrar em duas linhas em vez de cortar com "…". */
+  multilinha?: boolean;
 }
 
 /** Quantas linhas o painel desenha (a seleção em massa continua valendo para tudo). */
@@ -1943,6 +1965,8 @@ function MultiSelect({
   unidade = "item",
   unidadePlural = "itens",
   largura = "sm",
+  classeCampo,
+  multilinha = false,
 }: MultiSelectProps) {
   const [open, setOpen] = useState(false);
   const [busca, setBusca] = useState("");
@@ -2034,7 +2058,10 @@ function MultiSelect({
   };
 
   return (
-    <div className={variant === "pill" ? styles.dimWrap : styles.field} ref={ref}>
+    <div
+      className={`${variant === "pill" ? styles.dimWrap : styles.field} ${classeCampo ?? ""}`}
+      ref={ref}
+    >
       {variant === "field" && <span className={styles.fieldLabel}>{label}</span>}
       <div className={variant === "field" ? styles.produtoWrap : undefined}>
         <button
@@ -2045,6 +2072,7 @@ function MultiSelect({
               : `${styles.produtoButton} ${open ? styles.produtoButtonActive : ""}`
           }
           onClick={() => setOpen((prev) => !prev)}
+          title={value.length > 0 ? texto : undefined}
         >
           {variant === "pill" ? (
             <>
@@ -2058,7 +2086,11 @@ function MultiSelect({
         </button>
 
         {open && (
-          <div className={`${styles.dropdown} ${largura === "lg" ? styles.dropdownLg : ""}`}>
+          <div
+            className={`${styles.dropdown} ${
+              largura === "xl" ? styles.dropdownXl : largura === "lg" ? styles.dropdownLg : ""
+            }`}
+          >
             <div className={styles.searchBox}>
               <input
                 ref={inputRef}
@@ -2111,7 +2143,7 @@ function MultiSelect({
               )}
             </div>
 
-            <div className={styles.optionList}>
+            <div className={`${styles.optionList} ${multilinha ? styles.opcaoMultilinha : ""}`}>
               {loading ? (
                 <div className={styles.optionEmpty}>Carregando…</div>
               ) : filtradas.length === 0 ? (

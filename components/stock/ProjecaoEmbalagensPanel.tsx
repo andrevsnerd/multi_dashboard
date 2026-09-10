@@ -552,13 +552,17 @@ function ComparativoAno({ linha, anoBase }: { linha: LinhaEmbalagem; anoBase: nu
                     <span className={styles.cellQtd}>
                       {m.valor == null ? "—" : fmt(Math.round(m.valor))}
                     </span>
-                    <span
-                      className={`${styles.cellPct} ${
-                        pct == null ? styles.muted : pct >= 0 ? styles.varUp : styles.varDown
-                      }`}
-                    >
-                      {fmtPct(pct)}
-                    </span>
+                    {/* Sem venda no mesmo mês do ano anterior não há comparação: célula
+                        vazia, em vez de um "—" que chama atenção sem dizer nada. */}
+                    {pct == null ? (
+                      <span className={styles.cellPct} aria-hidden="true" />
+                    ) : (
+                      <span
+                        className={`${styles.cellPct} ${pct >= 0 ? styles.varUp : styles.varDown}`}
+                      >
+                        {fmtPct(pct)}
+                      </span>
+                    )}
                     {(m.parcial || m.futuro) && <span className={styles.cellFlag}>proj.</span>}
                   </td>
                 );
