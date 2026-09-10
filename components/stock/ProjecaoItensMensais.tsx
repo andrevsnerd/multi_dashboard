@@ -18,14 +18,18 @@ import styles from "./ProjecaoCompraPage.module.css";
  * Projeção ITEM A ITEM, com os meses em colunas — o mesmo desenho da tabela mensal do
  * escopo, só que uma linha por produto × cor em vez de uma linha para o agregado.
  *
- * Serve a dois usos:
- *   - conferir um recorte item a item, quando o total do escopo esconde quem está puxando;
- *   - avaliar uma COMPRA SALVA: ali a lista de linhas vem da compra (não das vendas), e as
- *     colunas "Qtd salva" e "Diferença" dizem se o que foi pedido cobre a projeção.
+ * A tabela é lida em dois blocos, e é isso que o cabeçalho de dois andares marca:
  *
- * Por que as linhas vêm da compra e não da consulta, nesse segundo caso: um item que a
- * compra pediu e que NÃO vendeu nada no período não volta da consulta de vendas — e ele é
- * justamente o que se quer enxergar. Some da tabela seria esconder o pior caso.
+ *   VENDAS POR MÊS  →  quanto sai (mês fechado = realizado, à frente = projeção)
+ *   DECISÃO         →  Vai vender até X − Tem em estoque = Precisa comprar
+ *
+ * Quando a lista veio de uma COMPRA SALVA entram mais duas: "Na compra" (o que foi pedido)
+ * e "Situação", que diz em PALAVRA se falta, sobra ou está no ponto — "+12" obrigaria quem
+ * lê a lembrar de que lado é bom.
+ *
+ * Por que, no caso da compra, as linhas vêm dela e não da consulta de vendas: um item que a
+ * compra pediu e que NÃO vendeu nada no período não volta da consulta — e ele é justamente
+ * o que se quer enxergar. Sumir da tabela seria esconder o pior caso.
  */
 
 const MES_NOME = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
@@ -58,6 +62,8 @@ interface Props {
   /** Quando veio de uma compra salva, é ela que manda nas linhas. */
   compra?: { title: string; items: ItemCompra[] } | null;
   dataBase: string;
+  /** Data alvo ('yyyy-MM-dd') — aparece no cabeçalho da coluna "Vai vender". */
+  venderAte: string;
   diasHorizonte: number;
   regra: RegraProjecao;
   carregando?: boolean;
@@ -68,6 +74,10 @@ interface Props {
 
 function fmt(n: number): string {
   return n.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
+}
+function ymdToBr(ymd: string): string {
+  const [y, m, d] = (ymd ?? "").split("-");
+  return y && m && d ? `${d}/${m}/${y}` : "";
 }
 function chave(produto: string, cor: string | null | undefined): string {
   return `${(produto ?? "").trim()}||${(cor ?? "").trim()}`;
@@ -95,12 +105,13 @@ interface LinhaItem {
   /** Valor por mês: realizado no mês fechado, projeção no resto. */
   meses: Array<{ mes: string; valor: number | null; valorAno: number; parcial: boolean; futuro: boolean }>;
   totalAno: number;
-  /** Consumo projetado entre a data base e "Vender até". */
+  /** Quanto o item deve vender entre a data base e "Vender até". */
   necessidade: number;
+  /** Necessidade − estoque, com piso 0. */
   sugestao: number;
   /** Só quando veio de compra salva. */
   qtdSalva: number | null;
-  /** Quanto a compra salva passa (ou falta) do sugerido. */
+  /** Na compra − Precisa comprar. */
   diferenca: number | null;
   /** Sem série: item da compra que não teve venda no período. */
   semSerie: boolean;
@@ -110,6 +121,7 @@ export default function ProjecaoItensMensais({
   itens,
   compra,
   dataBase,
+  venderAte,
   diasHorizonte,
   regra,
   carregando,
@@ -229,15 +241,20 @@ export default function ProjecaoItensMensais({
   }, [itens, compra, modoCurva, regra, dataBase, diasHorizonte, anoBase]);
 
   const totais = useMemo(() => {
+    const comFalta = linhas.filter((l) => (l.diferenca ?? 0) < 0);
     return {
       porMes: Array.from({ length: 12 }, (_, i) =>
         linhas.reduce((s, l) => s + (l.meses[i]?.valorAno ?? 0), 0)
       ),
       totalAno: linhas.reduce((s, l) => s + l.totalAno, 0),
       estoque: linhas.reduce((s, l) => s + l.estoque, 0),
+      necessidade: linhas.reduce((s, l) => s + l.necessidade, 0),
       sugestao: linhas.reduce((s, l) => s + l.sugestao, 0),
       qtdSalva: compra ? linhas.reduce((s, l) => s + (l.qtdSalva ?? 0), 0) : null,
-      diferenca: compra ? linhas.reduce((s, l) => s + (l.diferenca ?? 0), 0) : null,
+      /** Quantos itens da compra ficaram ABAIXO do sugerido. */
+      itensComFalta: comFalta.length,
+      /** Peças faltando somando só quem está curto — sobra de um não cobre falta de outro. */
+      pecasFaltando: comFalta.reduce((s, l) => s - (l.diferenca ?? 0), 0),
       semSerie: linhas.filter((l) => l.semSerie).length,
     };
   }, [linhas, compra]);
@@ -248,7 +265,7 @@ export default function ProjecaoItensMensais({
         <div className={styles.cardHead}>
           <span className={styles.cardTitle}>Itens por mês</span>
         </div>
-        <div className={styles.emptyText} style={{ padding: "12px 16px 18px" }}>
+        <div className={styles.tabelaNota}>
           O recorte tem mais de {fmt(maxItens ?? 400)} itens — a projeção item a item não foi
           calculada. Reduza o escopo (ou importe uma compra salva) para ver a tabela.
         </div>
@@ -256,7 +273,8 @@ export default function ProjecaoItensMensais({
     );
   }
 
-  const colunas = 15 + (compra ? 2 : 0);
+  const colunas = 16 + (compra ? 2 : 0);
+  const ateLabel = ymdToBr(venderAte);
 
   return (
     <div className={styles.card}>
@@ -271,34 +289,78 @@ export default function ProjecaoItensMensais({
             realizado
           </span>
           <span className={styles.legendItem}>
-            <span className={`${styles.dot} ${styles.dotParcial}`} />
-            mês em curso
-          </span>
-          <span className={styles.legendItem}>
             <span className={`${styles.dot} ${styles.dotProj}`} />
             projetado
           </span>
         </div>
-        {totais.semSerie > 0 && (
-          <span className={styles.embAviso}>
-            {fmt(totais.semSerie)} {totais.semSerie === 1 ? "item sem venda" : "itens sem venda"} no
-            período
-          </span>
-        )}
       </div>
+
+      {/* A conta inteira em uma linha: sem isto "Precisa comprar" parece número mágico. */}
+      <div className={styles.tabelaNota}>
+        Os meses mostram <strong>quanto vende</strong> — mês fechado é o realizado, à frente é
+        projeção. Depois vem a decisão: <strong>Vai vender até {ateLabel}</strong> −{" "}
+        <strong>Tem em estoque</strong> = <strong>Precisa comprar</strong>.
+        {compra ? (
+          <>
+            {" "}
+            <strong>Na compra</strong> é o que você salvou; <strong>Situação</strong> compara os
+            dois.
+          </>
+        ) : null}
+        {totais.semSerie > 0 ? (
+          <>
+            {" · "}
+            {fmt(totais.semSerie)}{" "}
+            {totais.semSerie === 1 ? "item sem venda" : "itens sem venda"} no período
+          </>
+        ) : null}
+      </div>
+
       <div className={styles.tableScroll}>
         <table className={`${styles.table} ${styles.mensalTable} ${styles.itensTable}`}>
           <thead>
             <tr>
-              <th className={`${styles.thLeft} ${styles.stickyCol}`}>Item</th>
-              <th>Estoque</th>
+              <th className={`${styles.thLeft} ${styles.stickyCol}`} rowSpan={2}>
+                Item
+              </th>
+              <th colSpan={13} className={styles.grupoHead}>
+                Vendas por mês — {anoBase}
+              </th>
+              <th colSpan={compra ? 5 : 3} className={`${styles.grupoHead} ${styles.grupoDecisao}`}>
+                Decisão de compra
+              </th>
+            </tr>
+            <tr>
               {MES_NOME.map((nome) => (
                 <th key={nome}>{nome}</th>
               ))}
-              <th className={styles.colTotal}>Total {anoBase}</th>
-              {compra && <th>Qtd salva</th>}
-              <th>Sugerido</th>
-              {compra && <th>Diferença</th>}
+              <th className={styles.colTotal}>Total</th>
+              <th
+                className={styles.colDecisao}
+                title={`Projeção de venda da data base até ${ateLabel}`}
+              >
+                Vai vender
+                <span className={styles.thSub}>até {ateLabel}</span>
+              </th>
+              <th className={styles.colDecisao} title="Estoque atual da rede (só saldos positivos)">
+                Tem
+                <span className={styles.thSub}>em estoque</span>
+              </th>
+              <th className={styles.colDecisao} title="Vai vender − Tem em estoque (nunca negativo)">
+                Precisa
+                <span className={styles.thSub}>comprar</span>
+              </th>
+              {compra ? (
+                <th className={styles.colDecisao} title="Quantidade que está na compra salva">
+                  Na compra
+                  <span className={styles.thSub}>salva</span>
+                </th>
+              ) : null}
+              {compra ? (
+                <th className={styles.colDecisao} title="Na compra − Precisa comprar">
+                  Situação
+                </th>
+              ) : null}
             </tr>
           </thead>
           <tbody>
@@ -317,50 +379,45 @@ export default function ProjecaoItensMensais({
                     <span className={styles.itemNome}>{l.rotulo}</span>
                     <span className={styles.itemMeta}>{l.detalhe}</span>
                   </td>
-                  <td className={styles.num}>{fmt(l.estoque)}</td>
-                  {l.meses.map((m) => (
-                    <td
-                      key={m.mes}
-                      className={`${styles.num} ${styles.cellMes} ${
-                        m.futuro ? styles.cellProj : m.parcial ? styles.cellParcial : ""
-                      }`}
-                    >
-                      <span className={styles.cellQtd}>
-                        {m.valor == null ? "—" : fmt(Math.round(m.valor))}
-                      </span>
-                    </td>
-                  ))}
+                  {l.meses.map((m) => {
+                    const valor = m.valor == null ? null : Math.round(m.valor);
+                    return (
+                      <td
+                        key={m.mes}
+                        className={`${styles.num} ${styles.cellMes} ${
+                          m.futuro ? styles.cellProj : m.parcial ? styles.cellParcial : ""
+                        }`}
+                      >
+                        {/* Zero vira um ponto apagado: numa tabela esparsa, a parede de
+                            "0" esconde os números que importam. */}
+                        <span className={`${styles.cellQtd} ${!valor ? styles.zero : ""}`}>
+                          {valor == null ? "—" : valor === 0 ? "·" : fmt(valor)}
+                        </span>
+                      </td>
+                    );
+                  })}
                   <td className={`${styles.num} ${styles.colTotal}`}>
                     <span className={styles.cellQtd}>{fmt(Math.round(l.totalAno))}</span>
                   </td>
-                  {compra && <td className={styles.num}>{fmt(l.qtdSalva ?? 0)}</td>}
-                  <td className={`${styles.num} ${l.sugestao > 0 ? styles.embComprar : ""}`}>
+                  <td className={`${styles.num} ${styles.colDecisao}`}>
+                    {fmt(Math.round(l.necessidade))}
+                  </td>
+                  <td className={`${styles.num} ${styles.colDecisao}`}>{fmt(l.estoque)}</td>
+                  <td className={`${styles.num} ${styles.colDecisao} ${styles.colPrecisa}`}>
                     {fmt(l.sugestao)}
                   </td>
-                  {compra && (
-                    <td
-                      className={`${styles.num} ${
-                        l.diferenca == null
-                          ? ""
-                          : l.diferenca < 0
-                          ? styles.varDown
-                          : l.diferenca > 0
-                          ? styles.varUp
-                          : styles.muted
-                      }`}
-                      title={
-                        l.diferenca == null
-                          ? ""
-                          : l.diferenca < 0
-                          ? "A compra salva está abaixo do sugerido"
-                          : l.diferenca > 0
-                          ? "A compra salva passa do sugerido"
-                          : "A compra salva bate com o sugerido"
-                      }
-                    >
-                      {l.diferenca == null ? "—" : `${l.diferenca > 0 ? "+" : ""}${fmt(l.diferenca)}`}
+                  {compra ? (
+                    <td className={`${styles.num} ${styles.colDecisao}`}>{fmt(l.qtdSalva ?? 0)}</td>
+                  ) : null}
+                  {compra ? (
+                    <td className={`${styles.num} ${styles.colDecisao}`}>
+                      <Situacao
+                        diferenca={l.diferenca}
+                        qtdSalva={l.qtdSalva}
+                        sugestao={l.sugestao}
+                      />
                     </td>
-                  )}
+                  ) : null}
                 </tr>
               ))
             )}
@@ -371,7 +428,6 @@ export default function ProjecaoItensMensais({
                 <td className={`${styles.tdLeft} ${styles.stickyCol}`}>
                   Total · {fmt(linhas.length)} {linhas.length === 1 ? "item" : "itens"}
                 </td>
-                <td className={styles.num}>{fmt(totais.estoque)}</td>
                 {totais.porMes.map((valor, i) => (
                   <td key={MES_NOME[i]} className={`${styles.num} ${styles.cellMes}`}>
                     <span className={styles.cellQtd}>{fmt(Math.round(valor))}</span>
@@ -380,23 +436,79 @@ export default function ProjecaoItensMensais({
                 <td className={`${styles.num} ${styles.colTotal}`}>
                   <span className={styles.cellQtd}>{fmt(Math.round(totais.totalAno))}</span>
                 </td>
-                {compra && <td className={styles.num}>{fmt(totais.qtdSalva ?? 0)}</td>}
-                <td className={styles.num}>{fmt(totais.sugestao)}</td>
-                {compra && (
-                  <td
-                    className={`${styles.num} ${
-                      (totais.diferenca ?? 0) < 0 ? styles.varDown : styles.varUp
-                    }`}
-                  >
-                    {(totais.diferenca ?? 0) > 0 ? "+" : ""}
-                    {fmt(totais.diferenca ?? 0)}
+                <td className={`${styles.num} ${styles.colDecisao}`}>
+                  {fmt(Math.round(totais.necessidade))}
+                </td>
+                <td className={`${styles.num} ${styles.colDecisao}`}>{fmt(totais.estoque)}</td>
+                <td className={`${styles.num} ${styles.colDecisao} ${styles.colPrecisa}`}>
+                  {fmt(totais.sugestao)}
+                </td>
+                {compra ? (
+                  <td className={`${styles.num} ${styles.colDecisao}`}>
+                    {fmt(totais.qtdSalva ?? 0)}
                   </td>
-                )}
+                ) : null}
+                {compra ? (
+                  <td className={`${styles.num} ${styles.colDecisao}`}>
+                    {/* Somar as diferenças com sinal mentiria: sobra de um item não cobre a
+                        falta de outro. O agregado honesto é quantos itens estão curtos. */}
+                    {totais.itensComFalta === 0 ? (
+                      <span className={`${styles.situacao} ${styles.sitOk}`}>tudo coberto</span>
+                    ) : (
+                      <span
+                        className={`${styles.situacao} ${styles.sitFalta}`}
+                        title={`${fmt(totais.pecasFaltando)} peças a menos que o sugerido, somando só os itens curtos`}
+                      >
+                        {fmt(totais.itensComFalta)}{" "}
+                        {totais.itensComFalta === 1 ? "item curto" : "itens curtos"}
+                      </span>
+                    )}
+                  </td>
+                ) : null}
               </tr>
             </tfoot>
           )}
         </table>
       </div>
     </div>
+  );
+}
+
+/**
+ * O veredito da linha em PALAVRA, não em número com sinal: "+12" obriga quem lê a lembrar
+ * de que lado é bom. Falta é o único que exige ação, então é o único em vermelho.
+ */
+function Situacao({
+  diferenca,
+  qtdSalva,
+  sugestao,
+}: {
+  diferenca: number | null;
+  qtdSalva: number | null;
+  sugestao: number;
+}) {
+  if (diferenca == null) return <span className={styles.muted}>—</span>;
+  const detalhe = `Precisa comprar ${fmt(sugestao)} · na compra ${fmt(qtdSalva ?? 0)}`;
+
+  if (diferenca < 0) {
+    return (
+      <span className={`${styles.situacao} ${styles.sitFalta}`} title={detalhe}>
+        faltam {fmt(-diferenca)}
+      </span>
+    );
+  }
+  if (diferenca > 0) {
+    // Sem sugestão nenhuma, comprar não é "sobra" — é uma aposta de quem comprou.
+    const rotulo = sugestao === 0 ? `extra ${fmt(diferenca)}` : `sobram ${fmt(diferenca)}`;
+    return (
+      <span className={`${styles.situacao} ${styles.sitSobra}`} title={detalhe}>
+        {rotulo}
+      </span>
+    );
+  }
+  return (
+    <span className={`${styles.situacao} ${styles.sitOk}`} title={detalhe}>
+      no ponto
+    </span>
   );
 }

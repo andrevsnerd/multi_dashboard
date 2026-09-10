@@ -965,3 +965,90 @@
   accent-color: var(--brand-scarfme, #2d1b4e);
   cursor: pointer;
 }
+
+/* ── Cabeçalho de dois andares e bloco de decisão da tabela item a item ── */
+
+.grupoHead {
+  text-align: center !important;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--t-500);
+  border-bottom: 1px solid var(--b-200);
+}
+
+.grupoDecisao {
+  background: var(--s-blue50);
+  color: var(--t-700);
+  border-left: 2px solid var(--b-300);
+}
+
+/* Subtítulo da coluna (a data alvo, "em estoque"…) numa segunda linha menor. */
+.thSub {
+  display: block;
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--t-500);
+}
+
+.colDecisao {
+  background: var(--s-blue50);
+}
+
+.itensTable thead th.colDecisao:first-of-type,
+.itensTable tbody td.colDecisao:first-of-type,
+.itensTable tfoot td.colDecisao:first-of-type {
+  border-left: 2px solid var(--b-300);
+}
+
+/* O número em que se age. */
+.colPrecisa {
+  font-weight: 700;
+  color: var(--t-900);
+}
+
+/* Mês sem venda: um ponto apagado em vez de uma parede de zeros. */
+.zero {
+  color: var(--t-400, var(--t-500));
+  opacity: 0.5;
+}
+
+/* Veredito em palavra, não em número com sinal. */
+.situacao {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sitFalta {
+  background: rgba(220, 38, 38, 0.12);
+  color: #b91c1c;
+}
+
+.sitSobra {
+  background: rgba(180, 83, 9, 0.12);
+  color: #b45309;
+}
+
+.sitOk {
+  background: rgba(22, 163, 74, 0.12);
+  color: #15803d;
+}
+
+/* Linha de explicação entre o título do card e a tabela. */
+.tabelaNota {
+  padding: 0 16px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--t-500);
+}
+
+.tabelaNota strong {
+  color: var(--t-700);
+  font-weight: 600;
+}

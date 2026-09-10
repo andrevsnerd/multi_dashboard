@@ -1794,6 +1794,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
               itens={Object.values(projItens)}
               compra={pedido.compra}
               dataBase={dataBase}
+              venderAte={venderAte}
               diasHorizonte={diasHorizonte}
               regra={regra}
               carregando={projLoading}
