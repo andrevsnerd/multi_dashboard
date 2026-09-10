@@ -31,6 +31,7 @@ import {
   REGRAS,
   REGRAS_CURVA,
   REGRA_LABEL,
+  ehRegraCompraIdeal,
   type RegraProjecao,
 } from "@/lib/utils/projecao-regras";
 
@@ -78,6 +79,8 @@ interface ProjecaoItem {
   estoque?: number;
   /** Série do ano por item — só vem no modo "item a item". */
   mensal?: MensalItem[];
+  /** Consumo/dia pela régua da Compra Ideal (Curva ABC). Só no modo "item a item". */
+  consumoIdeal?: number;
 }
 
 /** Uma compra salva na lista do select. */
@@ -849,6 +852,37 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   );
   const pendente = assinaturaAtual !== assinaturaGerada;
 
+  /**
+   * Regras que a aba atual oferece. A régua da Compra Ideal mede o consumo/dia de um ITEM
+   * pelo trecho com estoque positivo — coisa que só existe para produto do Linx. Embalagem
+   * não tem cadastro nem saldo, e ticket não é item; nas duas abas ela sai do select em vez
+   * de aparecer e devolver zero.
+   */
+  const regrasDisponiveis = useMemo(
+    () => (metrica === "produtos" ? REGRAS : REGRAS.filter((r) => !ehRegraCompraIdeal(r))),
+    [metrica]
+  );
+
+  // Trocar de aba com a regra da Compra Ideal escolhida cairia numa regra que aquela aba
+  // não sabe calcular — volta para o padrão.
+  useEffect(() => {
+    if (metrica !== "produtos" && ehRegraCompraIdeal(regra)) setRegra("realista");
+  }, [metrica, regra]);
+
+  /**
+   * Troca a regra de cálculo. A régua da Compra Ideal mede o ritmo POR ITEM, então ela
+   * exige o detalhe item a item — escolher a regra liga o modo e refaz a projeção na hora,
+   * em vez de mostrar "—" e esperar que o usuário adivinhe que falta marcar uma caixa.
+   */
+  const escolherRegra = (nova: RegraProjecao) => {
+    setRegra(nova);
+    if (!ehRegraCompraIdeal(nova) || porItem) return;
+    setPorItem(true);
+    if (pedido) {
+      setPedido({ ...pedido, porItem: true });
+    }
+  };
+
   const gerarProjecao = () => {
     setPedido({
       dataBase,
@@ -990,6 +1024,25 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
     return { estoqueSomado, unidades, itens };
   }, [totaisJanela, projItens, estoqueEscopo]);
 
+  /**
+   * Ritmo do escopo pela régua da Compra Ideal: a SOMA do consumo/dia dos itens. É o mesmo
+   * princípio de [[compra-ideal-rede-soma-por-filial]] — o ritmo da rede é a soma dos
+   * ritmos, não um número medido no agregado (que diluiria quem ficou zerado).
+   */
+  const consumoIdealEscopo = useMemo(
+    () =>
+      Object.values(projItens).reduce(
+        (soma, it) => soma + (Number(it.consumoIdeal) || 0),
+        0
+      ),
+    [projItens]
+  );
+  /** Quantos itens do escopo têm ritmo medido — o resto não tem trecho com estoque. */
+  const itensComRitmoIdeal = useMemo(
+    () => Object.values(projItens).filter((it) => Number.isFinite(Number(it.consumoIdeal))).length,
+    [projItens]
+  );
+
   const estoqueAtual = estoqueOverride ?? agregado.estoqueSomado;
   /**
    * Dias do horizonte, com as DUAS pontas dentro: "vender até 31/12" inclui o dia 31.
@@ -1107,18 +1160,31 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   //    As regras de curva medem o horizonte inteiro mês a mês; as de dias extrapolam a janela.
   const linhaAtiva = useMemo(() => {
     const curva = modoCurva !== null;
+    const ehIdeal = ehRegraCompraIdeal(regra);
     // Sem nenhum mês fechado (data base em janeiro) não há índice nem janela recente: a
     // projeção não existe e a tela mostra "—" em vez de um 0 que pareceria venda zero.
-    const disponivel = curva ? perfil.ultimoMesReal >= 1 && diasHorizonte > 0 : true;
-    const dias = curva ? diasHorizonte : Number(regra);
-    const un = curva ? (disponivel ? projecaoHorizonte : 0) : agregado.unidades[dias] ?? 0;
-    const ritmoDia = dias > 0 ? un / dias : 0;
+    // A régua da Compra Ideal só existe no modo item a item (o ritmo é medido por item).
+    const disponivel = ehIdeal
+      ? itensComRitmoIdeal > 0 && diasHorizonte > 0
+      : curva
+      ? perfil.ultimoMesReal >= 1 && diasHorizonte > 0
+      : true;
+    const dias = curva || ehIdeal ? diasHorizonte : Number(regra);
+    const un = ehIdeal
+      ? consumoIdealEscopo * diasHorizonte
+      : curva
+      ? disponivel
+        ? projecaoHorizonte
+        : 0
+      : agregado.unidades[dias] ?? 0;
+    const ritmoDia = ehIdeal ? consumoIdealEscopo : dias > 0 ? un / dias : 0;
     const sugestao = disponivel ? Math.max(0, Math.ceil(ritmoDia * diasHorizonte - estoqueAtual)) : 0;
     const qtd = qtdOverride[regra] ?? sugestao;
     const cobertura = ritmoDia > 0 ? (estoqueAtual + qtd) / ritmoDia : null;
     const duraAte = cobertura !== null ? addDaysFormatted(dataBase, Math.round(cobertura)) : null;
     return {
       curva,
+      ehIdeal,
       disponivel,
       dias,
       un: Math.round(un),
@@ -1133,6 +1199,8 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   }, [
     regra,
     modoCurva,
+    consumoIdealEscopo,
+    itensComRitmoIdeal,
     perfil.ultimoMesReal,
     diasHorizonte,
     projecaoHorizonte,
@@ -1349,9 +1417,9 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
               <select
                 className={styles.select}
                 value={regra}
-                onChange={(e) => setRegra(e.target.value as RegraProjecao)}
+                onChange={(e) => escolherRegra(e.target.value as RegraProjecao)}
               >
-                {REGRAS.map((key) => (
+                {regrasDisponiveis.map((key) => (
                   <option key={key} value={key}>
                     {REGRA_LABEL[key]}
                   </option>

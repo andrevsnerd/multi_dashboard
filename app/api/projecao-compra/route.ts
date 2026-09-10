@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server';
 
 import { fetchFilialProdutoSales } from '@/lib/repositories/performance';
 import { fetchEstoqueRedePorProduto } from '@/lib/repositories/controleEstoque';
+import { getControleEstoqueMetricasItensBatched } from '@/lib/server/controle-estoque-metricas';
+import { buildControleEstoqueItemKey } from '@/lib/utils/controle-estoque-metricas';
+import { ensureCompraCicloRuntime } from '@/lib/config/compra-ciclo-store';
+import { calcCompraIdealFromResumo } from '@/lib/utils/compra-ideal';
 import { fetchSalesTotals } from '@/lib/services/salesTotals';
 import { VAREJO_VALUE, getFilialGroupMembers, type CompanyKey } from '@/lib/config/company';
 import { resolveCompanyDynamic } from '@/lib/config/company-server';
@@ -375,6 +379,8 @@ export async function GET(request: Request) {
       codigoBarra: string;
       grade: string;
       subgrupo: string;
+      /** Necessária para o ciclo de compra da regra "Ritmo Compra Ideal" (linha + subgrupo). */
+      linha: string;
       colecao: string;
       qtde: Record<number, number>;
     };
@@ -401,6 +407,7 @@ export async function GET(request: Request) {
             codigoBarra: r.codigoBarra ?? '',
             grade: r.grade ?? '',
             subgrupo: r.subgrupo ?? '',
+            linha: r.linha ?? '',
             colecao: r.colecao ?? '',
             qtde: {},
           };
@@ -487,6 +494,51 @@ export async function GET(request: Request) {
     const porItemOmitido = porItem && acc.size > MAX_ITENS_MENSAL;
     const detalharMensalItem = porItem && !porItemOmitido;
 
+    // ── Ritmo pela régua da COMPRA IDEAL (a mesma da Curva ABC) ─────────────────────
+    // A regra "Ritmo Compra Ideal" da tela não mede venda por mês: mede o consumo/dia do
+    // MAIOR trecho contínuo com estoque positivo, com os resgates de janela antiga e de
+    // venda recente. Essa conta é a de `calcCompraIdeal`, e as métricas que ela consome
+    // vêm do lote de `metricas-itens` — DUAS consultas agregadas para a lista inteira, não
+    // uma por item (ver [[compra-sugerida-abc-conexao-perdida-n1-proxy]]).
+    //
+    // Só roda no modo item a item: o ritmo é POR ITEM e não existe versão agregada dele.
+    const consumoIdealPorItem = new Map<string, number>();
+    if (detalharMensalItem && acc.size > 0) {
+      try {
+        // Prazos de ciclo editáveis na tela "Ciclo de Compra" — carrega antes do loop.
+        await ensureCompraCicloRuntime();
+        const metricas = await getControleEstoqueMetricasItensBatched({
+          company: companyKey,
+          // Mesmo recorte de filial da tela. `null` = rede inteira.
+          filial: filialParam,
+          itens: Array.from(acc.values()).map((item) => ({
+            produto: item.produto,
+            corProduto: item.cor || null,
+          })),
+        });
+        Array.from(acc.values()).forEach((item) => {
+          const metricaKey = buildControleEstoqueItemKey(item.produto, item.cor || null);
+          const resumo = metricas[metricaKey]?.resumo;
+          if (!resumo) return;
+          // `transitEntries` vazio de propósito: aqui se quer o RITMO DE VENDA, não a
+          // sugestão de compra da Curva ABC. O trânsito abate a compra, não o consumo.
+          const ideal = calcCompraIdealFromResumo(resumo, [], {
+            linha: item.linha,
+            subgrupo: item.subgrupo,
+            company: companyKey,
+          });
+          consumoIdealPorItem.set(
+            `${item.produto}||${item.cor}`,
+            Math.max(0, Number(ideal.consumoDiario) || 0)
+          );
+        });
+      } catch (erro) {
+        // Falhar aqui não pode derrubar a projeção inteira: as outras regras seguem
+        // funcionando e a tela avisa que esta ficou sem base.
+        console.error('Projeção Compra: falha ao medir o ritmo da Compra Ideal', erro);
+      }
+    }
+
     const itens = Array.from(acc.values()).map((item) => {
       const key = `${item.produto}||${item.cor}`;
       const serie = mensalPorItem.get(key);
@@ -502,6 +554,11 @@ export async function GET(request: Request) {
         janelas: Object.fromEntries(WINDOWS.map((d) => [d, item.qtde[d] ?? 0])),
         /** Estoque atual do item (só saldos positivos), da mesma fonte do total. */
         estoque: Math.round(estoquePorItem.get(key) ?? 0),
+        /**
+         * Consumo/dia pela régua da Compra Ideal (Curva ABC). `undefined` = não medido
+         * (fora do modo item a item, ou o item não tem métrica de disponibilidade).
+         */
+        consumoIdeal: consumoIdealPorItem.has(key) ? consumoIdealPorItem.get(key) : undefined,
         mensal: detalharMensalItem
           ? Array.from({ length: 12 }, (_, i) => {
               const mes = i + 1;

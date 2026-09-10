@@ -18,6 +18,7 @@ import {
   CRITERIO_TEXTO,
   REGRAS_CURVA,
   REGRA_LABEL,
+  ehRegraCompraIdeal,
   type RegraProjecao,
 } from "@/lib/utils/projecao-regras";
 
@@ -54,6 +55,8 @@ export interface ItemProjecao {
   mensal?: MesSerie[];
   /** Consumo nas janelas de N dias — usado pelas regras "Ritmo N dias". */
   janelas?: Record<string, number>;
+  /** Consumo/dia pela régua da Compra Ideal — usado pela regra "Ritmo Compra Ideal". */
+  consumoIdeal?: number;
 }
 
 /** Um item da compra salva importada. */
@@ -102,6 +105,9 @@ function ymdToBr(ymd: string): string {
   const [y, m, d] = (ymd ?? "").split("-");
   return y && m && d ? `${d}/${m}/${y}` : "";
 }
+function diasNoMes(ano: number, mes: number): number {
+  return new Date(Date.UTC(ano, mes, 0)).getUTCDate();
+}
 function chave(produto: string, cor: string | null | undefined): string {
   return `${(produto ?? "").trim()}||${(cor ?? "").trim()}`;
 }
@@ -143,6 +149,10 @@ interface LinhaItem {
   necessidade: number;
   /** Necessidade − estoque, com piso 0. */
   sugestao: number;
+  /** Consumo/dia que a regra escolhida usou. */
+  ritmoDia: number;
+  /** Regra "Ritmo Compra Ideal" escolhida mas o item não tem métrica de disponibilidade. */
+  semRitmoIdeal: boolean;
   /** Só quando veio de compra salva. */
   qtdSalva: number | null;
   /** Na compra − Precisa comprar. */
@@ -202,6 +212,21 @@ export default function ProjecaoItensMensais({
       const indice = modoCurva ? indiceDoModo(perfil, modoCurva) : perfil.indice;
       const curva = modoCurva !== null;
 
+      // ── Ritmo/dia das regras que NÃO usam a curva do ano anterior ──
+      const ehIdeal = ehRegraCompraIdeal(regra);
+      const consumoIdeal = Number(item?.consumoIdeal);
+      const temIdeal = Number.isFinite(consumoIdeal) && consumoIdeal >= 0;
+      /** Janela em dias da regra "Ritmo N dias" (0 nas outras). */
+      const diasJanela = curva || ehIdeal ? 0 : Number(regra);
+      const consumoJanela = Number(item?.janelas?.[String(diasJanela)] ?? 0) || 0;
+      const ritmoDia = ehIdeal
+        ? temIdeal
+          ? consumoIdeal
+          : 0
+        : diasJanela > 0
+        ? consumoJanela / diasJanela
+        : 0;
+
       const meses = (
         semSerie
           ? Array.from({ length: 12 }, (_, i) => ({
@@ -220,6 +245,9 @@ export default function ProjecaoItensMensais({
           const r = projetarMesCheio(perfil, mesNum, modoCurva);
           projetado = perfil.ultimoMesReal >= 1 ? r.valor : null;
           criterio = r.criterio;
+        } else if (!semSerie || ehIdeal) {
+          // Sem sazonalidade: o mês vale o ritmo/dia × os dias daquele mês.
+          projetado = ritmoDia * diasNoMes(anoBase, mesNum);
         }
         const valorAno = m.futuro
           ? projetado ?? 0
@@ -240,21 +268,16 @@ export default function ProjecaoItensMensais({
         };
       });
 
-      // Regra de curva: soma mês a mês. Regra de janela: o ritmo medido no item, esticado
-      // pelo horizonte — a mesma conta que o KPI do escopo faz, só que por linha.
-      const diasJanela = curva ? 0 : Number(regra);
-      const consumoJanela = Number(item?.janelas?.[String(diasJanela)] ?? 0) || 0;
       // O horizonte fica ABERTO (mês a mês) para o tooltip poder mostrar de onde veio o
       // número; a soma das parcelas é exatamente o que `projetarHorizonte` devolveria.
       const partes =
         curva && modoCurva && !semSerie
           ? detalharHorizonte(serie, perfil, modoCurva, indice, dataBase, diasHorizonte)
           : [];
+      // Regra de curva: soma mês a mês. As outras: ritmo/dia × dias do horizonte.
       const necessidade = curva
         ? partes.reduce((soma, parte) => soma + parte.parcela, 0)
-        : diasJanela > 0
-        ? (consumoJanela / diasJanela) * diasHorizonte
-        : 0;
+        : ritmoDia * diasHorizonte;
       const sugestao = Math.max(0, Math.ceil(necessidade - estoque));
 
       return {
@@ -268,6 +291,8 @@ export default function ProjecaoItensMensais({
         totalAno: meses.reduce((s, m) => s + m.valorAno, 0),
         necessidade,
         sugestao,
+        ritmoDia,
+        semRitmoIdeal: ehIdeal && !temIdeal,
         qtdSalva,
         diferenca: qtdSalva == null ? null : qtdSalva - sugestao,
         semSerie,
@@ -363,7 +388,15 @@ export default function ProjecaoItensMensais({
       {/* A conta inteira em uma linha: sem isto "Precisa comprar" parece número mágico. */}
       <div className={styles.tabelaNota}>
         Os meses mostram <strong>quanto vende</strong> — mês fechado é o realizado, à frente é
-        projeção. A <strong>%</strong> compara sempre com o <strong>mesmo mês de {anoBase - 1}</strong>;
+        projeção
+        {ehRegraCompraIdeal(regra) ? (
+          <>
+            {" "}
+            pelo <strong>ritmo da Compra Ideal</strong> (consumo/dia × dias do mês, sem
+            sazonalidade e sem comparar com o ano passado)
+          </>
+        ) : null}
+        . A <strong>%</strong> compara sempre com o <strong>mesmo mês de {anoBase - 1}</strong>;
         onde ela não aparece é porque o item não vendeu nada naquele mês do ano passado, então
         não há com o que comparar. Depois vem a decisão:{" "}
         <strong>Vai vender até {ateLabel}</strong> − <strong>Tem em estoque</strong> ={" "}
@@ -676,10 +709,27 @@ function DicaCompra({
           )}
           {criterioFora ? ` ${CRITERIO_TEXTO[criterioFora]}.` : ""}
         </div>
+      ) : ehRegraCompraIdeal(regra) ? (
+        <div className={styles.dicaNota}>
+          {l.semRitmoIdeal ? (
+            <>
+              Este item <strong>não tem ritmo medido</strong> pela régua da Compra Ideal (sem
+              trecho com estoque positivo no histórico), então a projeção fica em 0.
+            </>
+          ) : (
+            <>
+              Ritmo da <strong>Compra Ideal</strong>: <strong>{fmtDec(l.ritmoDia)}/dia</strong> ×{" "}
+              {fmt(diasHorizonte)} dias = {fmt(Math.round(l.necessidade))}. O consumo/dia é o
+              mesmo que a Curva ABC usa — vendas do maior trecho contínuo com estoque, não dias
+              corridos. <strong>Sem comparação com o ano passado.</strong>
+            </>
+          )}
+        </div>
       ) : (
         <div className={styles.dicaNota}>
-          {REGRA_LABEL[regra]}: o que saiu nos últimos {regra} dias, esticado para os{" "}
-          {fmt(diasHorizonte)} dias do horizonte. <strong>Sem sazonalidade.</strong>
+          {REGRA_LABEL[regra]}: o que saiu nos últimos {regra} dias ({fmtDec(l.ritmoDia)}/dia),
+          esticado para os {fmt(diasHorizonte)} dias do horizonte.{" "}
+          <strong>Sem sazonalidade.</strong>
         </div>
       )}
 

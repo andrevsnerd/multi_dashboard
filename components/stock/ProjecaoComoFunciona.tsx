@@ -185,6 +185,18 @@ export default function ProjecaoComoFunciona({ perfil, anoBase }: Props) {
               comparação.
             </li>
             <li>
+              <strong>Ritmo Compra Ideal (igual à Curva ABC)</strong>: <em>não olha o ano
+              passado</em>. Usa o mesmo consumo/dia que decide a compra no dia a dia — as vendas
+              do <strong>maior trecho contínuo com estoque positivo</strong> nos últimos 12 meses
+              (teto de 60 dias), e não dias corridos, para que um item que ficou meses zerado não
+              tenha o ritmo diluído. Vêm de carona os mesmos resgates da Compra Ideal: quando o
+              maior trecho ficou velho, vale o trecho recente; quando ele teve zero venda mas o
+              item vendeu há pouco, o consumo é reativado em vez de zerar. A projeção é{" "}
+              <strong>consumo/dia × dias do horizonte</strong>, sem sazonalidade. Serve para a
+              Projeção Compra falar a mesma língua da Curva ABC — e por medir item a item, ela
+              liga o detalhe por item sozinha.
+            </li>
+            <li>
               <strong>Ritmo 30 / 60 / 90 / 120 dias / 12 meses</strong>: aí sim é ritmo esticado —
               o que saiu na janela dividido pelos dias dela, multiplicado pelo horizonte.{" "}
               <strong>Não tem sazonalidade</strong> e existe para conferência, não para decidir
