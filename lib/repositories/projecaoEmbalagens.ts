@@ -5,6 +5,7 @@ import {
   CATEGORIAS,
   CATEGORIA_KEYS,
   EMBALAGENS,
+  EMBALAGENS_VISIVEIS,
   contagemVazia,
   type CategoriaEmbalagem,
   type ContextoTicket,
@@ -477,8 +478,10 @@ export async function fetchProjecaoEmbalagens(
     });
   });
 
-  // ── Monta a série de cada embalagem ──
-  return EMBALAGENS.map((emb) => {
+  // ── Monta a série de cada embalagem VISÍVEL ──
+  //    As ocultas seguem sendo calculadas acima (custa nada, o laço é por assinatura)
+  //    mas não entram na resposta: a tela não tem o que fazer com elas ainda.
+  return EMBALAGENS_VISIVEIS.map((emb) => {
     const mapaMes = porMes.get(emb.id) ?? new Map<string, number>();
     const mapaFaixa = porFaixa.get(emb.id) ?? new Map<number, number>();
 

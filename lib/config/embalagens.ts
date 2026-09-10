@@ -229,6 +229,11 @@ export interface EmbalagemDef {
   regra: ((ctx: ContextoTicket) => number) | null;
   /** Observação que a tela mostra no tooltip da linha. */
   nota?: string;
+  /**
+   * Fora da tela por ora. A definição fica aqui (com o motivo) em vez de sumir do arquivo:
+   * o dia em que a regra existir, é só tirar a flag.
+   */
+  oculta?: boolean;
 }
 
 export const EMBALAGENS: EmbalagemDef[] = [
@@ -321,6 +326,9 @@ export const EMBALAGENS: EmbalagemDef[] = [
     estoqueInicial: 1260,
     regra: (ctx) => ctx.qtd.pashminaTarsila,
     nota: "1 por pashmina da coleção Tarsila do Amaral.",
+    // Não existe produto da coleção Tarsila no grupo PASHMINA do cadastro, então a linha
+    // daria zero em todo mês. Fora da tela até se saber a que produto ela corresponde.
+    oculta: true,
   },
   {
     id: "fundo-caixa-acrilico",
@@ -436,13 +444,22 @@ export const EMBALAGENS: EmbalagemDef[] = [
     nota: "1 por pedido do site.",
   },
 
-  // ── Ainda sem regra: aparecem na tela para não sumirem da contagem ──
-  { id: "caixa-gaveta-cg08", nome: "Caixa gaveta - CG08", estoqueInicial: 1520, regra: null },
-  { id: "caixa-gaveta-cg32", nome: "Caixa gaveta - CG32", estoqueInicial: 1470, regra: null },
-  { id: "caixa-gaveta-tarsila", nome: "Caixa gaveta - Tarsila", estoqueInicial: 936, regra: null },
+  // ── Caixas gaveta: falta saber que ticket puxa cada uma, então ficam fora da tela ──
+  { id: "caixa-gaveta-cg08", nome: "Caixa gaveta - CG08", estoqueInicial: 1520, regra: null, oculta: true },
+  { id: "caixa-gaveta-cg32", nome: "Caixa gaveta - CG32", estoqueInicial: 1470, regra: null, oculta: true },
+  {
+    id: "caixa-gaveta-tarsila",
+    nome: "Caixa gaveta - Tarsila",
+    estoqueInicial: 936,
+    regra: null,
+    oculta: true,
+  },
 ];
 
 export const EMBALAGEM_IDS = EMBALAGENS.map((e) => e.id);
+
+/** As que a tela mostra. O estoque das ocultas continua guardado, só não aparece. */
+export const EMBALAGENS_VISIVEIS = EMBALAGENS.filter((e) => !e.oculta);
 
 /** Estoque de fábrica (a contagem da planilha), usado enquanto ninguém salvou o seu. */
 export function estoqueInicialMap(): Record<string, number> {

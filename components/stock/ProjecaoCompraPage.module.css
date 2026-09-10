@@ -866,3 +866,33 @@
   font-weight: 700;
   color: #b45309;
 }
+
+/* A tabela de embalagem é larga: nome + estoque + 12 meses + total + comprar. */
+.embTable {
+  min-width: 1460px;
+}
+
+.embTable thead th:first-child,
+.embTable tbody td:first-child,
+.embTable tfoot td:first-child {
+  min-width: 250px;
+}
+
+/* Estoque é digitado direto na célula — o campo cabe na coluna. */
+.embTable .inputNum {
+  height: 32px;
+  width: 84px;
+  font-size: 13px;
+  padding: 0 8px;
+}
+
+.embTable tfoot td {
+  border-top: 2px solid var(--b-200);
+  font-weight: 700;
+  background: var(--s-50);
+}
+
+.embTable tfoot .stickyCol {
+  background: var(--s-50);
+}
+
