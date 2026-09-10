@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import FilialFilter from "@/components/filters/FilialFilter";
+import { useAuth } from "@/components/auth/AuthContext";
+import ProjecaoEmbalagensPanel, {
+  type PedidoEmbalagens,
+} from "@/components/stock/ProjecaoEmbalagensPanel";
 import { formatDateForQuery } from "@/lib/utils/date";
 import { VAREJO_VALUE, resolveCompany, type CompanyKey } from "@/lib/config/company";
 import {
@@ -10,10 +14,19 @@ import {
   PESO_JANELA_RECENTE,
   indiceDoModo,
   montarPerfil,
+  projetarHorizonte,
   projetarMesCheio,
   type CriterioMes,
   type ModoProjecao,
 } from "@/lib/utils/projecao-realista";
+
+import {
+  CRITERIO_TEXTO,
+  REGRAS,
+  REGRAS_CURVA,
+  REGRA_LABEL,
+  type RegraProjecao,
+} from "@/lib/utils/projecao-regras";
 
 import styles from "./ProjecaoCompraPage.module.css";
 
@@ -86,46 +99,12 @@ interface ProjecaoResponse {
  * sugestão e cobertura). `tickets` = contagem de vendas (visão de fluxo): as contas de
  * estoque não se aplicam, só ritmo e crescimento.
  */
-type Metrica = "produtos" | "tickets";
+type Metrica = "produtos" | "tickets" | "embalagens";
 const METRICAS: { key: Metrica; label: string }[] = [
   { key: "produtos", label: "Produtos" },
   { key: "tickets", label: "Tickets" },
+  { key: "embalagens", label: "Embalagens" },
 ];
-
-/**
- * Regra que projeta os meses que ainda não aconteceram.
- *
- * `realista` (padrão) e `mais10` são o motor de [projecao-realista.ts](@/lib/utils/projecao-realista):
- * mantêm a CURVA do ano anterior (sazonalidade) e corrigem o patamar por um índice — YoY
- * combinado (ano corrido + últimos 3 meses) no realista, +10% fixo no conservador. É a mesma
- * lógica do `AUTOMACOES/projecao_scarfme.py`.
- *
- * As regras de dias extrapolam linearmente o ritmo de uma janela — não têm sazonalidade e
- * seguem existindo para conferência.
- */
-type RegraProjecao = "realista" | "mais10" | "30" | "60" | "90" | "120" | "365";
-/** As regras que usam o motor de curva + índice (as outras são ritmo de janela). */
-const REGRAS_CURVA: Record<string, ModoProjecao> = { realista: "realista", mais10: "mais10" };
-/** Ordem do select — as duas de curva primeiro (realista é o padrão), depois as janelas. */
-const REGRAS: RegraProjecao[] = ["realista", "mais10", "60", "365", "120", "90", "30"];
-const REGRA_LABEL: Record<RegraProjecao, string> = {
-  realista: "Projeção realista (índice YoY)",
-  mais10: "Projeção conservadora (+10%)",
-  "60": "Ritmo 60 dias",
-  "365": "Ritmo 12 meses",
-  "120": "Ritmo 120 dias",
-  "90": "Ritmo 90 dias",
-  "30": "Ritmo 30 dias",
-};
-
-/** Texto do tooltip de cada mês projetado, conforme o critério que o motor usou. */
-const CRITERIO_TEXTO: Record<CriterioMes, string> = {
-  real: "Realizado",
-  parado: "Escopo sem venda nos últimos meses fechados: projeta 0",
-  yoy: "Mesmo mês do ano anterior × índice YoY do escopo",
-  ano_passado: "Mesmo mês do ano anterior + 10%",
-  sem_base: "Sem base no ano anterior naquele mês: média dos últimos meses fechados",
-};
 
 /**
  * Escopo JÁ APLICADO (o que gerou os números na tela). A projeção não roda a cada clique de
@@ -267,6 +246,7 @@ interface Props {
 }
 
 export default function ProjecaoCompraPage({ companyKey }: Props) {
+  const { user } = useAuth();
   const [dataBase, setDataBase] = useState<string>(todayYmd);
   const [venderAte, setVenderAte] = useState<string>(() => endOfYearYmd(todayYmd()));
 
@@ -673,6 +653,9 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   //    venderAte, Qtd Compra e a regra são puro cálculo no cliente (não vão ao servidor).
   useEffect(() => {
     if (!pedido) return;
+    // Embalagem tem consulta própria (a lista é fixa e cada linha tem a sua série):
+    // quem busca é o painel da aba.
+    if (pedido.metrica === "embalagens") return;
     const recortes =
       pedido.produtos.length + DIM_KEYS.reduce((soma, dim) => soma + pedido.dims[dim].length, 0);
     if (recortes > MAX_RECORTES) {
@@ -869,58 +852,14 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   }, [mensal, perfil, modoCurva, regra, ritmoDiaJanela, anoBase]);
 
   /**
-   * Valor CHEIO de um mês pela regra de curva, para acumular o horizonte. Um mês do ano
-   * seguinte usa o mês correspondente do ano da base e aplica o índice outra vez — é a mesma
-   * regra, só encadeada (o script não passa de dezembro; o horizonte da tela pode).
+   * Unidades projetadas pela regra de curva entre a data base e "Vender até" (pro-rata nas
+   * pontas). A conta vive no motor — [projecao-realista.ts](@/lib/utils/projecao-realista) —
+   * porque a aba Embalagens projeta cada embalagem exatamente do mesmo jeito.
    */
-  const valorMesCurva = useCallback(
-    (ano: number, mes: number): number => {
-      if (!modoCurva || perfil.ultimoMesReal < 1) return 0;
-      let ciclos = ano - anoBase;
-      if (ciclos < 0) return 0;
-      const info = mensal.find((m) => m.mes === `${anoBase}-${String(mes).padStart(2, "0")}`);
-      if (!info) return 0;
-      const { valor: projetadoAnoBase } = projetarMesCheio(perfil, mes, modoCurva);
-      // Mês fechado vale o realizado; mês em curso vale o maior entre o já vendido e a
-      // projeção do mês cheio; mês futuro vale a projeção.
-      let valor = info.futuro
-        ? projetadoAnoBase
-        : info.parcial
-        ? Math.max(info.qtde, projetadoAnoBase)
-        : info.qtde;
-      const fator = indiceRegra ?? 1;
-      while (ciclos > 0) {
-        valor *= fator;
-        ciclos -= 1;
-      }
-      return valor;
-    },
-    [modoCurva, perfil, mensal, anoBase, indiceRegra]
-  );
-
-  /** Unidades projetadas pela regra de curva entre a data base e "Vender até" (pro-rata). */
   const projecaoHorizonte = useMemo(() => {
-    if (diasHorizonte <= 0 || !modoCurva || perfil.ultimoMesReal < 1) return 0;
-    let total = 0;
-    let ano = anoBase;
-    let mes = Number(dataBase.slice(5, 7));
-    let dia = Number(dataBase.slice(8, 10));
-    let restantes = diasHorizonte;
-    for (let guard = 0; restantes > 0 && guard < 48; guard += 1) {
-      const dm = diasNoMes(ano, mes);
-      const usados = Math.min(restantes, dm - dia + 1);
-      total += valorMesCurva(ano, mes) * (usados / dm);
-      restantes -= usados;
-      dia = 1;
-      if (mes === 12) {
-        ano += 1;
-        mes = 1;
-      } else {
-        mes += 1;
-      }
-    }
-    return total;
-  }, [diasHorizonte, modoCurva, perfil.ultimoMesReal, anoBase, dataBase, valorMesCurva]);
+    if (!modoCurva) return 0;
+    return projetarHorizonte(mensal, perfil, modoCurva, indiceRegra, dataBase, diasHorizonte);
+  }, [mensal, perfil, modoCurva, indiceRegra, dataBase, diasHorizonte]);
 
   // ── A ÚNICA linha da tabela de giro: a regra escolhida no select.
   //    As regras de curva medem o horizonte inteiro mês a mês; as de dias extrapolam a janela.
@@ -1046,6 +985,15 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   /** Métrica dos números NA TELA (o toggle ao vivo só vale depois de gerar). */
   const metricaAplicada: Metrica = pedido?.metrica ?? metrica;
   const ehTickets = metricaAplicada === "tickets";
+  /** Aba Embalagens AO VIVO — é ela que decide quais campos o cabeçalho mostra. */
+  const ehEmbalagens = metrica === "embalagens";
+  /** Aba Embalagens APLICADA — é ela que decide o que aparece abaixo do título. */
+  const ehEmbalagensAplicada = metricaAplicada === "embalagens";
+  /** O pedido, quando ele é de embalagem: é o que dispara a consulta do painel. */
+  const pedidoEmbalagens: PedidoEmbalagens | null =
+    pedido && pedido.metrica === "embalagens"
+      ? { dataBase: pedido.dataBase, filial: pedido.filial }
+      : null;
   const unidadeLabel = ehTickets ? "tickets" : "un";
   const soUm = selectedItems.length === 1 ? selectedItems[0] : null;
 
@@ -1167,7 +1115,9 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
           </div>
 
           {/* Produto: busca no cadastro (mesma do Gerador de Relatórios). Cada escolha vira
-              chip e o escopo é por PRODUTO — todas as cores entram. */}
+              chip e o escopo é por PRODUTO — todas as cores entram. Embalagem não tem
+              recorte de cadastro: a lista dela é fixa. */}
+          {!ehEmbalagens && (
           <div className={styles.field} ref={searchWrapRef}>
             <span className={styles.fieldLabel}>
               Produto
@@ -1283,10 +1233,13 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
               )}
             </div>
           </div>
+          )}
         </div>
 
         {/* ── Filtros de cadastro (pílulas) ──────────────────────────────── */}
         <div className={styles.filterBar}>
+          {!ehEmbalagens && (
+          <>
           {escopoDeProduto && (
             <span
               className={styles.filterHint}
@@ -1354,6 +1307,8 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
               Limpar
             </button>
           )}
+          </>
+          )}
 
           <button
             type="button"
@@ -1376,7 +1331,13 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
       {/* ── Título + escopo ──────────────────────────────────────────────── */}
       <div className={styles.titleBar}>
         <h1 className={styles.title}>Projeção Compra</h1>
-        {gerado && (
+        {gerado && ehEmbalagensAplicada && (
+          <span className={styles.scopeText}>
+            {filialAplicadaLabel ? `${filialAplicadaLabel} · ` : "Rede inteira · "}
+            embalagens ScarfMe
+          </span>
+        )}
+        {gerado && !ehEmbalagensAplicada && (
           <span className={styles.scopeText}>
             {soUm ? (
               <>
@@ -1413,7 +1374,17 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
         </span>
       </div>
 
-      {!gerado ? (
+      {ehEmbalagensAplicada ? (
+        <ProjecaoEmbalagensPanel
+          companyKey={companyKey}
+          username={user?.username ?? ""}
+          pedido={pedidoEmbalagens}
+          dataBase={dataBase}
+          diasHorizonte={diasHorizonte}
+          regra={regra}
+          onLoadingChange={setProjLoading}
+        />
+      ) : !gerado ? (
         <div className={styles.emptyPanel}>
           <div className={styles.emptyTitle}>Gere a projeção</div>
           <div className={styles.emptyText}>

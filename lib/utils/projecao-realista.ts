@@ -191,3 +191,82 @@ export function projetarAno(
     return { mes, ...projetarMes(perfil, mes, modo) };
   });
 }
+
+/** Quantos dias tem o mês (1-12) daquele ano. */
+function diasNoMes(ano: number, mes: number): number {
+  return new Date(Date.UTC(ano, mes, 0)).getUTCDate();
+}
+
+/**
+ * Valor CHEIO de um mês do calendário, já misturando realizado e projeção — a peça que a
+ * soma do horizonte precisa.
+ *
+ * Mês fechado vale o realizado; mês em curso vale o MAIOR entre o já vendido e a projeção
+ * do mês cheio (senão um mês que já estourou a projeção entraria abaixo do que ele é); mês
+ * futuro vale a projeção. Um mês do ano SEGUINTE reaplica o índice sobre o mês
+ * correspondente do ano base — é a mesma regra, só encadeada (o script original para em
+ * dezembro; o horizonte da tela pode passar).
+ */
+export function valorMesHorizonte(
+  serie: MesSerie[],
+  perfil: PerfilProjecao,
+  modo: ModoProjecao,
+  indice: number | null,
+  anoBase: number,
+  ano: number,
+  mes: number
+): number {
+  if (perfil.ultimoMesReal < 1) return 0;
+  let ciclos = ano - anoBase;
+  if (ciclos < 0) return 0;
+  const info = serie.find((m) => m.mes === `${anoBase}-${String(mes).padStart(2, "0")}`);
+  if (!info) return 0;
+  const { valor: projetado } = projetarMesCheio(perfil, mes, modo);
+  let valor = info.futuro ? projetado : info.parcial ? Math.max(info.qtde, projetado) : info.qtde;
+  const fator = indice ?? 1;
+  while (ciclos > 0) {
+    valor *= fator;
+    ciclos -= 1;
+  }
+  return valor;
+}
+
+/**
+ * Quanto a série entrega entre a data base e o fim do horizonte, mês a mês e com pro-rata
+ * nas pontas (o mês da data base entra só pelos dias que faltam dele).
+ *
+ * `dataBase` é 'yyyy-MM-dd' e `diasHorizonte` é a distância até a data "Vender até".
+ * Sem arredondar: quem soma linhas precisa dos centavos ([[produto-giro-arredondamento-somar-exato]]).
+ */
+export function projetarHorizonte(
+  serie: MesSerie[],
+  perfil: PerfilProjecao,
+  modo: ModoProjecao,
+  indice: number | null,
+  dataBase: string,
+  diasHorizonte: number
+): number {
+  if (diasHorizonte <= 0 || perfil.ultimoMesReal < 1) return 0;
+  const anoBase = Number(dataBase.slice(0, 4));
+  let total = 0;
+  let ano = anoBase;
+  let mes = Number(dataBase.slice(5, 7));
+  let dia = Number(dataBase.slice(8, 10));
+  let restantes = diasHorizonte;
+  // Teto de 48 meses: o horizonte é escolhido na tela e um erro de digitação na data não
+  // pode virar laço infinito.
+  for (let guard = 0; restantes > 0 && guard < 48; guard += 1) {
+    const dm = diasNoMes(ano, mes);
+    const usados = Math.min(restantes, dm - dia + 1);
+    total += valorMesHorizonte(serie, perfil, modo, indice, anoBase, ano, mes) * (usados / dm);
+    restantes -= usados;
+    dia = 1;
+    if (mes === 12) {
+      ano += 1;
+      mes = 1;
+    } else {
+      mes += 1;
+    }
+  }
+  return total;
+}

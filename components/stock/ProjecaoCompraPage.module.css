@@ -823,3 +823,46 @@
   color: var(--t-500);
   cursor: default;
 }
+
+/* ── Aba Embalagens ─────────────────────────────────────────────────────── */
+
+.embActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.embAviso {
+  font-size: 12px;
+  color: var(--t-500);
+}
+
+/* Linha clicável: abre a série mensal daquela embalagem. Escopado em .embTable para
+   não mexer nas tabelas das abas Produtos e Tickets, que não são clicáveis. */
+.embTable tbody tr {
+  cursor: pointer;
+}
+
+.embTable tbody tr:hover td {
+  background: var(--s-50);
+}
+
+.embTable tbody tr.embRowAtiva td {
+  background: var(--s-100);
+}
+
+.embSemRegra {
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--s-100);
+  color: var(--t-500);
+}
+
+.embComprar {
+  font-weight: 700;
+  color: #b45309;
+}

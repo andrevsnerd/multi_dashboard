@@ -2511,7 +2511,9 @@ export default function CompraSalvaDetalhePage({
                           <div className={styles.productName}>{it.descricao || it.produto}</div>
                           <div className={styles.productCode}>{it.produto}</div>
                           {it.corDescricao && <div className={styles.productCode}>{it.corDescricao}</div>}
-                          {it.grade && <div className={styles.productCode}>Grade: {it.grade}</div>}
+                          {(it.grade || match?.grade) && (
+                            <div className={styles.productCode}>Grade: {it.grade || match?.grade}</div>
+                          )}
                           {it.colecao && <div className={styles.productCode}>Coleção: {it.colecao}</div>}
                         </td>
                         <td className={styles.right}>
@@ -3149,4 +3151,3 @@ export default function CompraSalvaDetalhePage({
     </div>
   );
 }
-
