@@ -376,6 +376,12 @@ function calcularSugestaoCompletoComTransito(
     ritmoDiasComVenda?: number | null;
     ritmoPrimeiraVendaIso?: string | null;
     ritmoUltimaVendaIso?: string | null;
+    ritmoRecenteDias?: number | null;
+    ritmoRecenteVendas?: number | null;
+    ritmoRecenteInicioIso?: string | null;
+    ritmoRecenteFimIso?: string | null;
+    ritmoRecenteUltimaVendaIso?: string | null;
+    ritmoGapDias?: number | null;
     totalNmQty: number | null;
   } | undefined,
   comprasTransitoIndex: CompraTransitoIndex,
@@ -403,6 +409,14 @@ function calcularSugestaoCompletoComTransito(
       ritmoDiasComVenda: liveData.ritmoDiasComVenda ?? null,
       ritmoPrimeiraVendaIso: liveData.ritmoPrimeiraVendaIso ?? null,
       ritmoUltimaVendaIso: liveData.ritmoUltimaVendaIso ?? null,
+      // Sem os campos do trecho RECENTE o calculo nunca aplica a janela antiga (gap) nem o
+      // resgate de janela zerada, e a sugestao divergia do "comprar agora" da Curva ABC.
+      ritmoRecenteDias: liveData.ritmoRecenteDias ?? null,
+      ritmoRecenteVendas: liveData.ritmoRecenteVendas ?? null,
+      ritmoRecenteInicioIso: liveData.ritmoRecenteInicioIso ?? null,
+      ritmoRecenteFimIso: liveData.ritmoRecenteFimIso ?? null,
+      ritmoRecenteUltimaVendaIso: liveData.ritmoRecenteUltimaVendaIso ?? null,
+      ritmoGapDias: liveData.ritmoGapDias ?? null,
     },
     transitEntries,
     { linha: match.linha, subgrupo: match.subgrupo, company }
@@ -703,6 +717,12 @@ async function fetchVendasItemMetricas(params: URLSearchParams): Promise<{
   ritmoDiasComVenda: number | null;
   ritmoPrimeiraVendaIso: string | null;
   ritmoUltimaVendaIso: string | null;
+  ritmoRecenteDias: number | null;
+  ritmoRecenteVendas: number | null;
+  ritmoRecenteInicioIso: string | null;
+  ritmoRecenteFimIso: string | null;
+  ritmoRecenteUltimaVendaIso: string | null;
+  ritmoGapDias: number | null;
   totalNmQty: number;
 } | null> {
   const metricas = await fetchItemMetricas(params);
@@ -724,6 +744,12 @@ async function fetchVendasItemMetricas(params: URLSearchParams): Promise<{
     ritmoDiasComVenda: metricas.resumo.ritmoDiasComVenda,
     ritmoPrimeiraVendaIso: metricas.resumo.ritmoPrimeiraVendaIso,
     ritmoUltimaVendaIso: metricas.resumo.ritmoUltimaVendaIso,
+    ritmoRecenteDias: metricas.resumo.ritmoRecenteDias,
+    ritmoRecenteVendas: metricas.resumo.ritmoRecenteVendas,
+    ritmoRecenteInicioIso: metricas.resumo.ritmoRecenteInicioIso,
+    ritmoRecenteFimIso: metricas.resumo.ritmoRecenteFimIso,
+    ritmoRecenteUltimaVendaIso: metricas.resumo.ritmoRecenteUltimaVendaIso,
+    ritmoGapDias: metricas.resumo.ritmoGapDias,
     totalNmQty: calcTotalPerFilialQty({
       company: resolveCompany(params.get("company") ?? undefined),
       vendasPorFilial: metricas.vendasPorFilial,
@@ -792,6 +818,12 @@ export default function CompraSalvaDetalhePage({
     ritmoDiasComVenda: number | null;
     ritmoPrimeiraVendaIso: string | null;
     ritmoUltimaVendaIso: string | null;
+    ritmoRecenteDias: number | null;
+    ritmoRecenteVendas: number | null;
+    ritmoRecenteInicioIso: string | null;
+    ritmoRecenteFimIso: string | null;
+    ritmoRecenteUltimaVendaIso: string | null;
+    ritmoGapDias: number | null;
     totalNmQty: number | null;
   }>>({});
   const [comprasTransitoIndex, setComprasTransitoIndex] = useState<CompraTransitoIndex>(new Map());
@@ -1218,6 +1250,12 @@ export default function CompraSalvaDetalhePage({
             ritmoDiasComVenda: vendas?.ritmoDiasComVenda ?? null,
             ritmoPrimeiraVendaIso: vendas?.ritmoPrimeiraVendaIso ?? null,
             ritmoUltimaVendaIso: vendas?.ritmoUltimaVendaIso ?? null,
+            ritmoRecenteDias: vendas?.ritmoRecenteDias ?? null,
+            ritmoRecenteVendas: vendas?.ritmoRecenteVendas ?? null,
+            ritmoRecenteInicioIso: vendas?.ritmoRecenteInicioIso ?? null,
+            ritmoRecenteFimIso: vendas?.ritmoRecenteFimIso ?? null,
+            ritmoRecenteUltimaVendaIso: vendas?.ritmoRecenteUltimaVendaIso ?? null,
+            ritmoGapDias: vendas?.ritmoGapDias ?? null,
             totalNmQty: vendas?.totalNmQty ?? null,
           },
         };
