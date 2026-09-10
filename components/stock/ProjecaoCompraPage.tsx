@@ -7,12 +7,15 @@ import { useAuth } from "@/components/auth/AuthContext";
 import ProjecaoEmbalagensPanel, {
   type PedidoEmbalagens,
 } from "@/components/stock/ProjecaoEmbalagensPanel";
+import ProjecaoComoFunciona from "@/components/stock/ProjecaoComoFunciona";
 import ProjecaoItensMensais, {
   type ItemCompra,
 } from "@/components/stock/ProjecaoItensMensais";
 import { formatDateForQuery } from "@/lib/utils/date";
 import { VAREJO_VALUE, resolveCompany, type CompanyKey } from "@/lib/config/company";
 import {
+  INDICE_MAX,
+  INDICE_MIN,
   MESES_JANELA_ATIVIDADE,
   PESO_JANELA_RECENTE,
   indiceDoModo,
@@ -83,12 +86,16 @@ interface CompraSalvaOpcao {
   title: string;
   itemCount: number;
   totalQtdManual: number;
+  comprada?: boolean;
   savedAt: string;
 }
 
-/** A compra salva JÁ IMPORTADA: é ela que manda nas linhas da tabela item a item. */
+/**
+ * As compras salvas JÁ IMPORTADAS: são elas que mandam nas linhas da tabela item a item.
+ * Pode ser mais de uma — os itens repetidos somam.
+ */
 interface CompraImportada {
-  id: string;
+  ids: string[];
   title: string;
   items: ItemCompra[];
 }
@@ -312,6 +319,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   const [pedido, setPedido] = useState<PedidoProjecao | null>(null);
   // ── Compra salva: lista do select, a que está importada e o modo item a item ──
   const [comprasSalvas, setComprasSalvas] = useState<CompraSalvaOpcao[]>([]);
+  const [comprasSelecionadas, setComprasSelecionadas] = useState<string[]>([]);
   const [compraImportada, setCompraImportada] = useState<CompraImportada | null>(null);
   const [carregandoCompra, setCarregandoCompra] = useState(false);
   const [erroCompra, setErroCompra] = useState<string | null>(null);
@@ -522,14 +530,19 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   }, [companyKey, metrica]);
 
   /**
-   * Importa uma compra salva: os itens dela viram o recorte (um chip por PRODUTO) e a
-   * projeção passa a sair item a item, com a Qtd salva ao lado do sugerido.
+   * Importa UMA OU MAIS compras salvas: os itens delas viram o recorte (um chip por PRODUTO)
+   * e a projeção passa a sair item a item, com a Qtd salva ao lado do sugerido.
    *
-   * Gera na hora. Escolher a compra no select já é a decisão — pedir um segundo clique em
-   * "Gerar projeção" seria burocracia.
+   * Com várias compras, o mesmo produto × cor pedido em duas delas SOMA — é o pedido total
+   * que se compara com a projeção, não cada lista isolada. A origem de cada quantidade fica
+   * no tooltip da linha, para a soma não virar um número sem procedência.
+   *
+   * Gera na hora. Escolher no select já é a decisão — pedir um segundo clique em "Gerar
+   * projeção" seria burocracia.
    */
-  const importarCompraSalva = async (id: string) => {
-    if (!id) {
+  const importarComprasSalvas = async (ids: string[]) => {
+    setComprasSelecionadas(ids);
+    if (ids.length === 0) {
       setCompraImportada(null);
       setPorItem(false);
       setErroCompra(null);
@@ -538,32 +551,64 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
     setCarregandoCompra(true);
     setErroCompra(null);
     try {
-      const res = await fetch(
-        `/api/controle-estoque/compras-salvas/${id}?company=${companyKey}`,
-        { cache: "no-store" }
+      const respostas = await Promise.all(
+        ids.map(async (id) => {
+          const res = await fetch(
+            `/api/controle-estoque/compras-salvas/${id}?company=${companyKey}`,
+            { cache: "no-store" }
+          );
+          const json = (await res.json()) as {
+            data?: { id: string; title: string; items?: Array<Record<string, unknown>> };
+            error?: string;
+          };
+          if (!res.ok || !json.data) {
+            throw new Error(json?.error || "Erro ao carregar a compra salva");
+          }
+          return json.data;
+        })
       );
-      const json = (await res.json()) as {
-        data?: { id: string; title: string; items?: Array<Record<string, unknown>> };
-        error?: string;
-      };
-      if (!res.ok || !json.data) throw new Error(json?.error || "Erro ao carregar a compra salva");
 
-      const items: ItemCompra[] = (json.data.items ?? []).map((raw) => ({
-        produto: String(raw.produto ?? "").trim(),
-        cor: String(raw.corProduto ?? "").trim(),
-        corDescricao: String(raw.corDescricao ?? "").trim(),
-        descricao: String(raw.descricao ?? "").trim(),
-        qtdManual: Math.max(0, Math.round(Number(raw.qtdManual ?? 0) || 0)),
-        custoUnitario: Number(raw.custoUnitario ?? 0) || undefined,
-      }));
-      const compra: CompraImportada = { id: json.data.id, title: json.data.title, items };
+      // Junta os itens de todas as compras, somando o que se repete em produto × cor.
+      const porItemChave = new Map<string, ItemCompra>();
+      respostas.forEach((compra) => {
+        const titulo = compra.title ?? "";
+        (compra.items ?? []).forEach((raw) => {
+          const produto = String(raw.produto ?? "").trim();
+          if (!produto) return;
+          const cor = String(raw.corProduto ?? "").trim();
+          const qtd = Math.max(0, Math.round(Number(raw.qtdManual ?? 0) || 0));
+          const chaveItem = `${produto}||${cor}`;
+          const existente = porItemChave.get(chaveItem);
+          if (existente) {
+            existente.qtdManual += qtd;
+            existente.origens = [...(existente.origens ?? []), { titulo, qtd }];
+            return;
+          }
+          porItemChave.set(chaveItem, {
+            produto,
+            cor,
+            corDescricao: String(raw.corDescricao ?? "").trim(),
+            descricao: String(raw.descricao ?? "").trim(),
+            qtdManual: qtd,
+            custoUnitario: Number(raw.custoUnitario ?? 0) || undefined,
+            origens: respostas.length > 1 ? [{ titulo, qtd }] : undefined,
+          });
+        });
+      });
+      const items = Array.from(porItemChave.values());
+
+      const title =
+        respostas.length === 1
+          ? respostas[0].title
+          : `${respostas.length} compras · ${respostas.map((c) => c.title).join(" + ")}`;
+      const compra: CompraImportada = { ids: respostas.map((c) => c.id), title, items };
 
       // O recorte da consulta é por PRODUTO (todas as cores vêm); quem recorta a cor de
       // volta é a própria tabela, que monta as linhas a partir dos itens da compra.
       const chips: ProdutoChip[] = [];
       const vistos = new Set<string>();
       items.forEach((it) => {
-        if (!it.produto || vistos.has(it.produto)) return;
+        if (vistos.has(it.produto)) return;
         vistos.add(it.produto);
         chips.push({ id: it.produto, name: it.descricao || it.produto });
       });
@@ -782,7 +827,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
         produtos: produtosSelecionados,
         busca: buscaLivre,
         porItem,
-        compra: compraImportada?.id ?? null,
+        compra: compraImportada?.ids.join(",") ?? null,
       }),
     [dataBase, metrica, filial, dims, produtosSelecionados, buscaLivre, porItem, compraImportada]
   );
@@ -797,7 +842,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
             produtos: pedido.produtos,
             busca: pedido.busca,
             porItem: pedido.porItem,
-            compra: pedido.compra?.id ?? null,
+            compra: pedido.compra?.ids.join(",") ?? null,
           })
         : null,
     [pedido]
@@ -966,12 +1011,27 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   const mesesNoIndice = perfil.ultimoMesReal;
   /** Nas regras de janela o índice não é aplicado, mas segue exibido como referência. */
   const indiceExibido = modoCurva ? indiceRegra : perfil.indice;
+  /**
+   * Legenda do KPI do índice, em português. A versão antiga mostrava "+100,0%" com o hint
+   * "índice 2,00" — o mesmo número duas vezes, em duas unidades, sem dizer o que ele faz.
+   * Agora o valor é o MULTIPLICADOR (é assim que ele entra na conta) e a legenda diz sobre
+   * o que ele multiplica.
+   */
   const indiceHint = useMemo(() => {
-    if (indiceExibido == null) return "sem base no ano anterior";
-    if (regra === "mais10") return "fixo: ano anterior + 10%";
+    if (indiceExibido == null) return "sem base no ano anterior — usa a média recente";
+    if (regra === "mais10") return `projeta o resto do ano a +10% sobre ${anoBase - 1}`;
     const meses = `${fmt(mesesNoIndice)} ${mesesNoIndice === 1 ? "mês fechado" : "meses fechados"}`;
-    return modoCurva ? `índice ${fmtDec(indiceExibido, 2)} · ${meses}` : `referência · ${meses}`;
-  }, [indiceExibido, regra, modoCurva, mesesNoIndice]);
+    const teto =
+      indiceExibido >= INDICE_MAX
+        ? " · no teto"
+        : indiceExibido <= INDICE_MIN
+        ? " · no piso"
+        : "";
+    const comparado = `comparando ${meses}`;
+    return modoCurva
+      ? `projeta cada mês a ${fmtDec(indiceExibido, 2)}× o mesmo mês de ${anoBase - 1} · ${comparado}${teto}`
+      : `só referência — esta regra não usa índice · ${comparado}`;
+  }, [indiceExibido, regra, modoCurva, mesesNoIndice, anoBase]);
   /** Tooltip: a conta inteira, para o número nunca parecer mágico. */
   const indiceExplicacao = useMemo(() => {
     if (regra === "mais10") return "Projeção conservadora: mesmo mês do ano anterior × 1,10.";
@@ -1137,6 +1197,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
     setProdutoQuery("");
     setProdutoResults([]);
     setAvisoCodigos(null);
+    setComprasSelecionadas([]);
     setCompraImportada(null);
     setErroCompra(null);
     setPorItem(false);
@@ -1289,29 +1350,33 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
                 ))}
               </select>
             </label>
-            {/* Compra salva: importa os itens da compra e projeta cada um linha a linha,
-                com a Qtd salva ao lado do sugerido. */}
+            {/* Compras salvas: importa os itens e projeta cada um linha a linha, com a Qtd
+                salva ao lado do sugerido. Aceita VÁRIAS — o mesmo item pedido em duas listas
+                soma, porque o que se compara com a projeção é o pedido total. */}
             {metrica === "produtos" && comprasSalvas.length > 0 && (
-              <label className={styles.field}>
-                <span className={styles.fieldLabel}>
-                  Compra salva
-                  {carregandoCompra && <span className={styles.fieldCount}>carregando…</span>}
-                </span>
-                <select
-                  className={`${styles.select} ${styles.selectCompra}`}
-                  value={compraImportada?.id ?? ""}
-                  disabled={carregandoCompra}
-                  onChange={(e) => void importarCompraSalva(e.target.value)}
-                >
-                  <option value="">Não importar</option>
-                  {comprasSalvas.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.title} · {fmt(c.itemCount)} itens · {fmt(c.totalQtdManual)} un ·{" "}
-                      {ymdToBr(c.savedAt.slice(0, 10))}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <MultiSelect
+                label={carregandoCompra ? "Compras salvas · carregando…" : "Compras salvas"}
+                variant="field"
+                largura="lg"
+                loading={carregandoCompra}
+                searchPlaceholder="Buscar compra por título…"
+                vazioLabel="Não importar"
+                unidade="compra"
+                unidadePlural="compras importadas"
+                value={comprasSelecionadas}
+                onChange={(ids) => void importarComprasSalvas(ids)}
+                options={comprasSalvas.map((c) => ({
+                  value: c.id,
+                  label: c.title,
+                  busca: `${c.title} ${ymdToBr(c.savedAt.slice(0, 10))}`,
+                  meta: [
+                    `${fmt(c.itemCount)} itens`,
+                    `${fmt(c.totalQtdManual)} un`,
+                    ymdToBr(c.savedAt.slice(0, 10)),
+                    ...(c.comprada ? ["comprada"] : []),
+                  ],
+                }))}
+              />
             )}
             {/* Sem compra importada o detalhe item a item continua disponível: é o mesmo
                 cálculo, só que as linhas saem do recorte em vez da compra. */}
@@ -1593,6 +1658,10 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
         </span>
       </div>
 
+      {/* A régua da projeção, recolhida por padrão. Vale para as três abas — todas usam o
+          mesmo motor —, e fica ACIMA dos números porque é onde a dúvida aparece. */}
+      <ProjecaoComoFunciona perfil={gerado ? perfil : null} anoBase={anoBase} />
+
       {ehEmbalagensAplicada ? (
         <ProjecaoEmbalagensPanel
           companyKey={companyKey}
@@ -1627,10 +1696,26 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
                 <span className={styles.kpiHint}>un para durar o horizonte</span>
               </div>
             )}
-            <div className={styles.kpi}>
+            {/* "Projeção que falta" não dizia o que faltava. É o que ainda vai SAIR daqui
+                até a data alvo — a mesma coisa que a coluna "Vai vender" da tabela item a
+                item, para os dois nomes não divergirem. */}
+            <div
+              className={styles.kpi}
+              title={
+                linhaAtiva.curva
+                  ? `Quanto o escopo ainda deve ${
+                      ehTickets ? "receber de tickets" : "vender"
+                    } entre ${ymdToBr(dataBase)} e ${ymdToBr(venderAte)} — soma mês a mês, com o mês da data base entrando só pelos dias que faltam dele.`
+                  : `O que saiu nos últimos ${fmt(linhaAtiva.dias)} dias, esticado para os ${fmt(
+                      diasHorizonte
+                    )} dias do horizonte.`
+              }
+            >
               <span className={styles.kpiLabel}>
                 {linhaAtiva.curva
-                  ? "Projeção que falta"
+                  ? ehTickets
+                    ? `Tickets até ${ymdToBr(venderAte)}`
+                    : `Vai vender até ${ymdToBr(venderAte)}`
                   : ehTickets
                   ? "Tickets da janela"
                   : "Unidades da janela"}
@@ -1638,7 +1723,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
               <span className={styles.kpiValue}>{linhaAtiva.disponivel ? fmt(linhaAtiva.un) : "—"}</span>
               <span className={styles.kpiHint}>
                 {linhaAtiva.curva
-                  ? `${unidadeLabel} no horizonte`
+                  ? `${unidadeLabel} nos ${fmt(diasHorizonte)} dias que faltam`
                   : `${unidadeLabel} em ${fmt(linhaAtiva.dias)} dias`}
               </span>
             </div>
@@ -1669,16 +1754,21 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
                 </div>
               </>
             )}
+            {/* O valor é o MULTIPLICADOR, que é como o índice entra na conta. Mostrar
+                "+100%" ao lado de "índice 2,00" era o mesmo número duas vezes. */}
             <div className={styles.kpi} title={indiceExplicacao}>
               <span className={styles.kpiLabel}>
-                {linhaAtiva.curva ? "Índice usado" : "Crescimento YoY"}
+                {linhaAtiva.curva ? `Ritmo vs ${anoBase - 1}` : `Crescimento vs ${anoBase - 1}`}
               </span>
               <span
                 className={`${styles.kpiValue} ${
                   indiceExibido == null ? "" : indiceExibido >= 1 ? styles.varUp : styles.varDown
                 }`}
               >
-                {indiceExibido == null ? "—" : fmtPct(indiceExibido - 1)}
+                {indiceExibido == null ? "—" : `${fmtDec(indiceExibido, 2)}×`}
+                {indiceExibido != null && (
+                  <span className={styles.kpiUnit}>{fmtPct(indiceExibido - 1)}</span>
+                )}
               </span>
               <span className={styles.kpiHint}>{indiceHint}</span>
             </div>

@@ -246,9 +246,43 @@ export function projetarHorizonte(
   dataBase: string,
   diasHorizonte: number
 ): number {
-  if (diasHorizonte <= 0 || perfil.ultimoMesReal < 1) return 0;
+  return detalharHorizonte(serie, perfil, modo, indice, dataBase, diasHorizonte).reduce(
+    (soma, parte) => soma + parte.parcela,
+    0
+  );
+}
+
+/** Um mês do horizonte, com a conta aberta — é o que o tooltip da tela mostra. */
+export interface ParteHorizonte {
+  ano: number;
+  mes: number;
+  /** Projeção do MÊS CHEIO (o que aquele mês inteiro venderia). */
+  mesCheio: number;
+  /** Quantos dias daquele mês caem dentro do horizonte. */
+  diasUsados: number;
+  diasDoMes: number;
+  /** `mesCheio × diasUsados / diasDoMes` — o que esse mês contribui de fato. */
+  parcela: number;
+}
+
+/**
+ * A mesma conta de `projetarHorizonte`, mas devolvendo os pedaços em vez do total.
+ *
+ * Existe porque um número sozinho ("precisa comprar 87") não se defende: quem lê precisa
+ * ver que ele é a soma de out + nov + dez, e que o mês da data base entra só pelos dias
+ * que faltam dele.
+ */
+export function detalharHorizonte(
+  serie: MesSerie[],
+  perfil: PerfilProjecao,
+  modo: ModoProjecao,
+  indice: number | null,
+  dataBase: string,
+  diasHorizonte: number
+): ParteHorizonte[] {
+  if (diasHorizonte <= 0 || perfil.ultimoMesReal < 1) return [];
   const anoBase = Number(dataBase.slice(0, 4));
-  let total = 0;
+  const partes: ParteHorizonte[] = [];
   let ano = anoBase;
   let mes = Number(dataBase.slice(5, 7));
   let dia = Number(dataBase.slice(8, 10));
@@ -258,7 +292,15 @@ export function projetarHorizonte(
   for (let guard = 0; restantes > 0 && guard < 48; guard += 1) {
     const dm = diasNoMes(ano, mes);
     const usados = Math.min(restantes, dm - dia + 1);
-    total += valorMesHorizonte(serie, perfil, modo, indice, anoBase, ano, mes) * (usados / dm);
+    const mesCheio = valorMesHorizonte(serie, perfil, modo, indice, anoBase, ano, mes);
+    partes.push({
+      ano,
+      mes,
+      mesCheio,
+      diasUsados: usados,
+      diasDoMes: dm,
+      parcela: mesCheio * (usados / dm),
+    });
     restantes -= usados;
     dia = 1;
     if (mes === 12) {
@@ -268,5 +310,5 @@ export function projetarHorizonte(
       mes += 1;
     }
   }
-  return total;
+  return partes;
 }

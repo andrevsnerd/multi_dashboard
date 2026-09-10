@@ -1,16 +1,25 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import {
+  INDICE_MAX,
+  INDICE_MIN,
+  detalharHorizonte,
   indiceDoModo,
   montarPerfil,
-  projetarHorizonte,
   projetarMesCheio,
+  type CriterioMes,
   type MesSerie,
   type ModoProjecao,
+  type ParteHorizonte,
 } from "@/lib/utils/projecao-realista";
-import { REGRAS_CURVA, REGRA_LABEL, type RegraProjecao } from "@/lib/utils/projecao-regras";
+import {
+  CRITERIO_TEXTO,
+  REGRAS_CURVA,
+  REGRA_LABEL,
+  type RegraProjecao,
+} from "@/lib/utils/projecao-regras";
 
 import styles from "./ProjecaoCompraPage.module.css";
 
@@ -55,6 +64,11 @@ export interface ItemCompra {
   descricao: string;
   qtdManual: number;
   custoUnitario?: number;
+  /**
+   * Quando MAIS DE UMA compra foi importada, de onde veio cada pedaço da quantidade. Sem
+   * isso a soma de duas listas viraria um número sem procedência.
+   */
+  origens?: Array<{ titulo: string; qtd: number }>;
 }
 
 interface Props {
@@ -74,6 +88,15 @@ interface Props {
 
 function fmt(n: number): string {
   return n.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
+}
+function fmtPct(v: number | null, dec = 1): string {
+  if (v == null || !Number.isFinite(v)) return "—";
+  const sinal = v > 0 ? "+" : "";
+  return `${sinal}${(v * 100).toLocaleString("pt-BR", { minimumFractionDigits: dec, maximumFractionDigits: dec })}%`;
+}
+function fmtDec(n: number | null | undefined, dec = 2): string {
+  if (n == null || !Number.isFinite(n)) return "—";
+  return n.toLocaleString("pt-BR", { minimumFractionDigits: dec, maximumFractionDigits: dec });
 }
 function ymdToBr(ymd: string): string {
   const [y, m, d] = (ymd ?? "").split("-");
@@ -103,7 +126,18 @@ interface LinhaItem {
   detalhe: string;
   estoque: number;
   /** Valor por mês: realizado no mês fechado, projeção no resto. */
-  meses: Array<{ mes: string; valor: number | null; valorAno: number; parcial: boolean; futuro: boolean }>;
+  meses: Array<{
+    mes: string;
+    valor: number | null;
+    valorAno: number;
+    /** Mesmo mês do ano anterior — a base da % que a célula mostra. */
+    qtdeAnoAnterior: number;
+    /** Variação da célula sobre o mesmo mês do ano anterior. */
+    pct: number | null;
+    parcial: boolean;
+    futuro: boolean;
+    criterio: CriterioMes | null;
+  }>;
   totalAno: number;
   /** Quanto o item deve vender entre a data base e "Vender até". */
   necessidade: number;
@@ -115,6 +149,14 @@ interface LinhaItem {
   diferenca: number | null;
   /** Sem série: item da compra que não teve venda no período. */
   semSerie: boolean;
+  /** O horizonte aberto mês a mês — é o corpo do tooltip de "Precisa comprar". */
+  partes: ParteHorizonte[];
+  /** Índice YoY do próprio item (null nas regras de janela ou sem base). */
+  indice: number | null;
+  /** Quantos meses fechados entraram no índice. */
+  mesesFechados: number;
+  /** De qual compra veio cada pedaço da Qtd salva (só com várias compras importadas). */
+  origens?: Array<{ titulo: string; qtd: number }>;
 }
 
 export default function ProjecaoItensMensais({
@@ -130,6 +172,12 @@ export default function ProjecaoItensMensais({
 }: Props) {
   const anoBase = Number(dataBase.slice(0, 4));
   const modoCurva: ModoProjecao | null = REGRAS_CURVA[regra] ?? null;
+  /**
+   * Tooltip de "Precisa comprar". Vai posicionado em `fixed` pela coordenada do mouse, e
+   * não com um popover dentro da célula: a tabela rola na horizontal e um popover interno
+   * seria cortado pelo `overflow` do contêiner.
+   */
+  const [dica, setDica] = useState<{ x: number; y: number; linha: LinhaItem } | null>(null);
 
   const linhas: LinhaItem[] = useMemo(() => {
     const porChave = new Map(itens.map((i) => [chave(i.produto, i.cor), i]));
@@ -142,7 +190,8 @@ export default function ProjecaoItensMensais({
       cor: string,
       rotulo: string,
       detalhe: string,
-      qtdSalva: number | null
+      qtdSalva: number | null,
+      origens?: Array<{ titulo: string; qtd: number }>
     ): LinhaItem => {
       const item = porChave.get(key) ?? porChaveFrouxa.get(chaveFrouxa(produto, cor));
       const serie = item?.mensal ?? [];
@@ -166,21 +215,28 @@ export default function ProjecaoItensMensais({
       ).map((m) => {
         const mesNum = Number(m.mes.slice(5, 7));
         let projetado: number | null = null;
+        let criterio: CriterioMes | null = null;
         if (curva && modoCurva) {
           const r = projetarMesCheio(perfil, mesNum, modoCurva);
           projetado = perfil.ultimoMesReal >= 1 ? r.valor : null;
+          criterio = r.criterio;
         }
         const valorAno = m.futuro
           ? projetado ?? 0
           : m.parcial
           ? Math.max(m.qtde, projetado ?? 0)
           : m.qtde;
+        const valor = m.futuro ? projetado : m.parcial ? valorAno : m.qtde;
         return {
           mes: m.mes,
-          valor: m.futuro ? projetado : m.parcial ? valorAno : m.qtde,
+          valor,
           valorAno,
+          qtdeAnoAnterior: m.qtdeAnoAnterior,
+          // A % é sempre contra o MESMO mês do ano anterior — a mesma régua das outras telas.
+          pct: m.qtdeAnoAnterior > 0 && valor != null ? valor / m.qtdeAnoAnterior - 1 : null,
           parcial: m.parcial,
           futuro: m.futuro,
+          criterio,
         };
       });
 
@@ -188,10 +244,14 @@ export default function ProjecaoItensMensais({
       // pelo horizonte — a mesma conta que o KPI do escopo faz, só que por linha.
       const diasJanela = curva ? 0 : Number(regra);
       const consumoJanela = Number(item?.janelas?.[String(diasJanela)] ?? 0) || 0;
+      // O horizonte fica ABERTO (mês a mês) para o tooltip poder mostrar de onde veio o
+      // número; a soma das parcelas é exatamente o que `projetarHorizonte` devolveria.
+      const partes =
+        curva && modoCurva && !semSerie
+          ? detalharHorizonte(serie, perfil, modoCurva, indice, dataBase, diasHorizonte)
+          : [];
       const necessidade = curva
-        ? modoCurva && !semSerie
-          ? projetarHorizonte(serie, perfil, modoCurva, indice, dataBase, diasHorizonte)
-          : 0
+        ? partes.reduce((soma, parte) => soma + parte.parcela, 0)
         : diasJanela > 0
         ? (consumoJanela / diasJanela) * diasHorizonte
         : 0;
@@ -211,6 +271,10 @@ export default function ProjecaoItensMensais({
         qtdSalva,
         diferenca: qtdSalva == null ? null : qtdSalva - sugestao,
         semSerie,
+        partes,
+        indice: curva ? indice : null,
+        mesesFechados: perfil.ultimoMesReal,
+        origens,
       };
     };
 
@@ -223,7 +287,8 @@ export default function ProjecaoItensMensais({
           c.cor,
           c.descricao || c.produto,
           [c.produto, c.corDescricao || c.cor].filter(Boolean).join(" · "),
-          Math.max(0, Math.round(c.qtdManual ?? 0))
+          Math.max(0, Math.round(c.qtdManual ?? 0)),
+          c.origens
         )
       );
     }
@@ -393,6 +458,14 @@ export default function ProjecaoItensMensais({
                         <span className={`${styles.cellQtd} ${!valor ? styles.zero : ""}`}>
                           {valor == null ? "—" : valor === 0 ? "·" : fmt(valor)}
                         </span>
+                        <span
+                          className={`${styles.cellPct} ${
+                            m.pct == null ? styles.muted : m.pct >= 0 ? styles.varUp : styles.varDown
+                          }`}
+                          title={`${anoBase - 1}: ${fmt(m.qtdeAnoAnterior)} un`}
+                        >
+                          {fmtPct(m.pct)}
+                        </span>
                       </td>
                     );
                   })}
@@ -403,7 +476,12 @@ export default function ProjecaoItensMensais({
                     {fmt(Math.round(l.necessidade))}
                   </td>
                   <td className={`${styles.num} ${styles.colDecisao}`}>{fmt(l.estoque)}</td>
-                  <td className={`${styles.num} ${styles.colDecisao} ${styles.colPrecisa}`}>
+                  <td
+                    className={`${styles.num} ${styles.colDecisao} ${styles.colPrecisa} ${styles.temDica}`}
+                    onMouseEnter={(e) => setDica({ x: e.clientX, y: e.clientY, linha: l })}
+                    onMouseMove={(e) => setDica({ x: e.clientX, y: e.clientY, linha: l })}
+                    onMouseLeave={() => setDica(null)}
+                  >
                     {fmt(l.sugestao)}
                   </td>
                   {compra ? (
@@ -470,6 +548,215 @@ export default function ProjecaoItensMensais({
           )}
         </table>
       </div>
+
+      {dica && (
+        <DicaCompra
+          dica={dica}
+          regra={regra}
+          anoBase={anoBase}
+          ateLabel={ateLabel}
+          diasHorizonte={diasHorizonte}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * A memória de cálculo de "Precisa comprar", aberta linha por linha.
+ *
+ * O número sozinho não se defende — é a soma dos meses que faltam menos o estoque — e sem
+ * ver as parcelas ninguém confere nada. Mesma ideia do tooltip de Compra Ideal da Curva ABC.
+ */
+function DicaCompra({
+  dica,
+  regra,
+  anoBase,
+  ateLabel,
+  diasHorizonte,
+}: {
+  dica: { x: number; y: number; linha: LinhaItem };
+  regra: RegraProjecao;
+  anoBase: number;
+  ateLabel: string;
+  diasHorizonte: number;
+}) {
+  const l = dica.linha;
+  const curva = REGRAS_CURVA[regra] != null;
+
+  // Posiciona junto ao ponteiro, sem sair da janela.
+  const largura = 380;
+  const altura = Math.min(470, 200 + l.partes.length * 26);
+  const margem = 12;
+  const janelaW = typeof window !== "undefined" ? window.innerWidth : 1280;
+  const janelaH = typeof window !== "undefined" ? window.innerHeight : 800;
+  const left = Math.min(Math.max(margem, dica.x + 16), Math.max(margem, janelaW - largura - margem));
+  const topAcima = dica.y - altura - 16;
+  const top =
+    topAcima > margem
+      ? topAcima
+      : Math.min(dica.y + 16, Math.max(margem, janelaH - altura - margem));
+
+  const criteriosFora = Array.from(
+    new Set(
+      l.meses
+        .filter((m) => (m.futuro || m.parcial) && m.criterio && m.criterio !== "yoy")
+        .map((m) => m.criterio as CriterioMes)
+    )
+  );
+
+  return (
+    <div className={styles.dicaPainel} style={{ left, top, width: largura }}>
+      <div className={styles.dicaTitulo}>
+        Precisa comprar: <strong>{fmt(l.sugestao)} un</strong>
+      </div>
+      <div className={styles.dicaItem}>{l.rotulo}</div>
+
+      <div className={styles.dicaDivisor} />
+
+      {l.semSerie ? (
+        <div className={styles.dicaNota}>
+          Este item não teve venda no período, então não há série para projetar. A sugestão fica
+          em 0 — o número da compra é decisão de quem comprou, não da conta.
+        </div>
+      ) : curva ? (
+        <>
+          <div className={styles.dicaSecao}>
+            Quanto ainda vai vender, até {ateLabel} ({fmt(diasHorizonte)} dias)
+          </div>
+          {l.partes.map((parte) => {
+            const parcial = parte.diasUsados < parte.diasDoMes;
+            return (
+              <div key={`${parte.ano}-${parte.mes}`} className={styles.dicaLinha}>
+                <span>
+                  {MES_NOME[parte.mes - 1]}/{String(parte.ano).slice(2)}
+                  {parcial ? (
+                    <span className={styles.dicaFraco}>
+                      {" "}
+                      {parte.diasUsados} de {parte.diasDoMes} dias
+                    </span>
+                  ) : null}
+                </span>
+                <span>
+                  {parcial ? (
+                    <>
+                      <span className={styles.dicaFraco}>
+                        {fmt(Math.round(parte.mesCheio))} ×{" "}
+                        {fmtDec(parte.diasUsados / parte.diasDoMes)} ={" "}
+                      </span>
+                      <strong>{fmt(Math.round(parte.parcela))}</strong>
+                    </>
+                  ) : (
+                    <strong>{fmt(Math.round(parte.parcela))}</strong>
+                  )}
+                </span>
+              </div>
+            );
+          })}
+          <div className={`${styles.dicaLinha} ${styles.dicaTotal}`}>
+            <span>Vai vender</span>
+            <span>
+              <strong>{fmt(Math.round(l.necessidade))} un</strong>
+            </span>
+          </div>
+
+          <div className={styles.dicaDivisor} />
+
+          <div className={styles.dicaSecao}>De onde saiu a projeção de cada mês</div>
+          <div className={styles.dicaNota}>
+            Cada mês futuro vale <strong>o que vendeu no mesmo mês de {anoBase - 1}</strong>{" "}
+            multiplicado pelo índice deste item.
+          </div>
+          <div className={styles.dicaLinha}>
+            <span>Índice deste item</span>
+            <span>
+              {l.indice == null ? (
+                <span className={styles.dicaFraco}>sem base no ano anterior</span>
+              ) : (
+                <strong>{fmtDec(l.indice)}×</strong>
+              )}
+              {l.indice != null && l.indice >= INDICE_MAX ? (
+                <span className={styles.dicaFraco}> no teto</span>
+              ) : null}
+              {l.indice != null && l.indice <= INDICE_MIN ? (
+                <span className={styles.dicaFraco}> no piso</span>
+              ) : null}
+            </span>
+          </div>
+          <div className={styles.dicaLinha}>
+            <span>Meses fechados na conta</span>
+            <span>{fmt(l.mesesFechados)}</span>
+          </div>
+          {criteriosFora.map((c) => (
+            <div key={c} className={styles.dicaNota}>
+              {CRITERIO_TEXTO[c]}
+            </div>
+          ))}
+        </>
+      ) : (
+        <>
+          <div className={styles.dicaSecao}>Ritmo esticado — {REGRA_LABEL[regra]}</div>
+          <div className={styles.dicaNota}>
+            Esta regra não usa sazonalidade: pega o que saiu nos últimos {regra} dias, divide
+            pelos dias da janela e multiplica pelos {fmt(diasHorizonte)} dias do horizonte.
+          </div>
+          <div className={`${styles.dicaLinha} ${styles.dicaTotal}`}>
+            <span>Vai vender</span>
+            <span>
+              <strong>{fmt(Math.round(l.necessidade))} un</strong>
+            </span>
+          </div>
+        </>
+      )}
+
+      <div className={styles.dicaDivisor} />
+
+      <div className={styles.dicaLinha}>
+        <span>Vai vender até {ateLabel}</span>
+        <span>{fmt(Math.round(l.necessidade))} un</span>
+      </div>
+      <div className={styles.dicaLinha}>
+        <span>− Tem em estoque</span>
+        <span>{fmt(l.estoque)} un</span>
+      </div>
+      <div className={`${styles.dicaLinha} ${styles.dicaTotal}`}>
+        <span>= Precisa comprar</span>
+        <span>
+          <strong>{fmt(l.sugestao)} un</strong>
+        </span>
+      </div>
+      {l.necessidade - l.estoque < 0 ? (
+        <div className={styles.dicaNota}>
+          O estoque já cobre o horizonte, com {fmt(Math.round(l.estoque - l.necessidade))} un de
+          folga — por isso a sugestão é 0 e não um número negativo.
+        </div>
+      ) : null}
+
+      {l.qtdSalva != null ? (
+        <>
+          <div className={styles.dicaDivisor} />
+          <div className={styles.dicaLinha}>
+            <span>Na compra salva</span>
+            <span>
+              <strong>{fmt(l.qtdSalva)} un</strong>
+            </span>
+          </div>
+          {/* Com várias compras importadas, de onde veio cada pedaço da soma. */}
+          {(l.origens ?? []).map((o, i) => (
+            <div key={`${o.titulo}-${i}`} className={styles.dicaLinha}>
+              <span className={styles.dicaFraco}>{o.titulo}</span>
+              <span className={styles.dicaFraco}>{fmt(o.qtd)} un</span>
+            </div>
+          ))}
+          <div className={styles.dicaNota}>
+            {(l.diferenca ?? 0) < 0
+              ? `A compra está ${fmt(-(l.diferenca ?? 0))} un abaixo do sugerido.`
+              : (l.diferenca ?? 0) > 0
+              ? `A compra está ${fmt(l.diferenca ?? 0)} un acima do sugerido.`
+              : "A compra bate exatamente com o sugerido."}
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }
