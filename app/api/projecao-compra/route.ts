@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { fetchFilialProdutoSales } from '@/lib/repositories/performance';
 import { fetchEstoqueRedePorProduto } from '@/lib/repositories/controleEstoque';
 import { fetchSalesTotals } from '@/lib/services/salesTotals';
-import { type CompanyKey } from '@/lib/config/company';
+import { VAREJO_VALUE, getFilialGroupMembers, type CompanyKey } from '@/lib/config/company';
 import { resolveCompanyDynamic } from '@/lib/config/company-server';
 import { normalizeRangeForQuery } from '@/lib/utils/date';
 
@@ -109,6 +109,9 @@ export async function GET(request: Request) {
     tipos: readDim('tipo'),
   };
   const temDimensao = Object.values(dimensoes).some((values) => values.length > 0);
+  // Filial escolhida (nome canônico do grupo, VAREJO ou vazio = rede inteira). NÃO entra em
+  // `dimensoes`: aquilo filtra PRODUTOS, isto restringe o universo de filiais consultado.
+  const filialParam = searchParams.get('filial')?.trim() || null;
   // `produtos` (padrão) mede unidades vendidas; `tickets` mede a contagem de vendas.
   const metrica = searchParams.get('metrica') === 'tickets' ? 'tickets' : 'produtos';
 
@@ -145,7 +148,26 @@ export async function GET(request: Request) {
   // A Matriz não vende (fica de fora do ritmo). Nomes VIVOS via resolveCompanyDynamic.
   const ecommerceFilials = new Set(company.ecommerceFilials ?? []);
   const matrizSet = new Set(MATRIZ_FILIAIS[companyKey] ?? []);
-  const filiais = (company.filialFilters.sales ?? []).filter((f) => !matrizSet.has(f));
+  const todasFiliais = (company.filialFilters.sales ?? []).filter((f) => !matrizSet.has(f));
+
+  // Recorte por filial. Uma loja escolhida traz o GRUPO INTEIRO em vendas: a Paulista trocou
+  // de CNPJ 3x e o e-commerce reveza MSC/AKS — o histórico das pernas antigas é da mesma loja
+  // e descartá-lo mataria a base do ano anterior, que é justamente o que o índice compara.
+  // (No estoque a régua é outra, só a perna ativa, e quem cuida disso é a consulta de estoque.)
+  let filiais = todasFiliais;
+  if (filialParam === VAREJO_VALUE) {
+    filiais = todasFiliais.filter((f) => !ecommerceFilials.has(f));
+  } else if (filialParam) {
+    const membros = new Set(getFilialGroupMembers(company, filialParam));
+    filiais = todasFiliais.filter((f) => membros.has(f));
+  }
+  if (filialParam && filialParam !== VAREJO_VALUE && filiais.length === 0) {
+    return NextResponse.json(
+      { error: `Filial "${filialParam}" não pertence ao escopo de vendas da empresa` },
+      { status: 400 }
+    );
+  }
+
   const posMembers = filiais.filter((f) => !ecommerceFilials.has(f));
   const ecomMembers = filiais.filter((f) => ecommerceFilials.has(f));
 
@@ -165,9 +187,17 @@ export async function GET(request: Request) {
   // Nesta tela a contagem É a métrica, e a distorção crescia com a janela (−9,9% em 30d a
   // −38,5% em 365d na NERD/ELETRONICOS), chegando a inverter o sinal do crescimento YoY
   // (mostrava −3,1% quando o real era +14,3%).
+  //
+  // A filial vai como LISTA quando o recorte é de loja física: `filial` sozinho gera
+  // `f.FILIAL = @stFilial`, um CNPJ só, e a PAULISTA (que trocou de CNPJ em maio/2026)
+  // apareceria "nascendo em maio" — jan-abr ficaram no CNPJ antigo. Grupo de e-commerce
+  // continua indo por `filial`: ali `fetchSalesTotals` delega para o resumo de e-commerce,
+  // que já soma o rodízio MSC↔AKS inteiro.
+  const soEcommerce = posMembers.length === 0 && ecomMembers.length > 0;
   const escopoTickets = {
     company: companyKey,
-    filial: null,
+    filial: soEcommerce ? filialParam : null,
+    filiais: soEcommerce || !filialParam ? null : posMembers,
     grupos: dimensoes.grupos,
     linhasCadastro: dimensoes.linhas,
     subgrupos: dimensoes.subgrupos,
@@ -184,8 +214,16 @@ export async function GET(request: Request) {
 
   try {
     if (metrica === 'tickets') {
-      // Uma consulta por janela + uma por mês. `comparisonMode: 'year'` já devolve o MESMO mês
-      // do ano anterior na mesma chamada, então a série mensal sai em 12 consultas.
+      // Uma consulta por janela + DUAS por mês (o realizado e a base do ano anterior).
+      //
+      // Por que não `comparisonMode: 'year'`, que traria as duas na mesma chamada: naquele
+      // caminho o `ticketsPrevious` do E-COMMERCE está errado. `fetchSalesTotals` delega o
+      // e-commerce a `fetchEcommerceSummary` sem repassar o `comparisonMode`, então o
+      // "anterior" volta como o MÊS ANTERIOR e não o mesmo mês do ano passado — e isso
+      // contamina tanto a filial de e-commerce quanto o total da rede da Scarf Me (que soma
+      // varejo + e-commerce). Medido em 10/09/2026: a série "ano anterior" do e-commerce vinha
+      // deslocada em um mês (jan/26 comparava com dez/25). Pedir o mês do ano anterior
+      // explicitamente custa uma consulta a mais e vale para os três caminhos.
       const [janelas, meses] = await Promise.all([
         Promise.all(
           WINDOWS.map(async (dias) => {
@@ -227,33 +265,18 @@ export async function GET(request: Request) {
             }
 
             const rangeAtual = normalizeRangeForQuery({ start: primeiro, end: ultimo });
-            if (parcial) {
-              // Duas consultas de propósito: o realizado é a janela parcial, mas a base tem de
-              // ser o mês inteiro do ano anterior (senão compararia 3 dias com 3 dias).
-              const [atual, anterior] = await Promise.all([
-                fetchSalesTotals({ ...escopoTickets, range: rangeAtual }),
-                fetchSalesTotals({ ...escopoTickets, range: rangeAnterior }),
-              ]);
-              return {
-                mes: chave,
-                qtde: piso(atual.tickets),
-                qtdeAnoAnterior: piso(anterior.tickets),
-                parcial: true,
-                futuro: false,
-              };
-            }
-
-            // Mês fechado: `comparisonMode: 'year'` já traz o mesmo mês do ano anterior.
-            const totais = await fetchSalesTotals({
-              ...escopoTickets,
-              range: rangeAtual,
-              comparisonMode: 'year',
-            });
+            // Mês fechado ou em curso: o realizado é a janela do ano base e a base de
+            // comparação é sempre o mês CHEIO do ano anterior (no mês em curso, senão
+            // compararia 3 dias com 3 dias).
+            const [atual, anterior] = await Promise.all([
+              fetchSalesTotals({ ...escopoTickets, range: rangeAtual }),
+              fetchSalesTotals({ ...escopoTickets, range: rangeAnterior }),
+            ]);
             return {
               mes: chave,
-              qtde: piso(totais.tickets),
-              qtdeAnoAnterior: piso(totais.ticketsPrevious),
-              parcial: false,
+              qtde: piso(atual.tickets),
+              qtdeAnoAnterior: piso(anterior.tickets),
+              parcial,
               futuro: false,
             };
           }
@@ -304,8 +327,10 @@ export async function GET(request: Request) {
       }),
       fetchEstoqueRedePorProduto({
         company: companyKey,
-        // Rede inteira: a projeção é de compra da rede, como as vendas acima.
-        filial: null,
+        // Mesmo recorte das vendas. Sem filial é a rede inteira. A régua de filial do
+        // ESTOQUE é a da perna ativa e quem aplica é o próprio repositório —
+        // ver [[estoque-perna-ativa-vendas-grupo-inteiro]].
+        filial: filialParam,
         grupos: orNull(dimensoes.grupos),
         linhas: orNull(dimensoes.linhas),
         subgrupos: orNull(dimensoes.subgrupos),

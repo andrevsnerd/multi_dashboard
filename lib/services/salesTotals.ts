@@ -20,6 +20,19 @@ export interface SalesTotalsParams {
   range: NormalizedRange;
   filial?: string | null;
   /**
+   * Lista EXPLÍCITA de filiais (nomes do banco). Aditivo e opcional: quando vem preenchida,
+   * vence `filial` e a cláusula fica `f.FILIAL IN (...)`.
+   *
+   * Existe porque `filial` sozinho gera `f.FILIAL = @stFilial`, UM CNPJ — o que basta para o
+   * dashboard (que sempre olha a perna canônica), mas perde histórico num grupo multi-CNPJ:
+   * a PAULISTA vendeu jan-abr/2026 num CNPJ e mai-ago/2026 em outro, então a canônica sozinha
+   * mostra a loja "nascendo em maio". Vendas somam o GRUPO INTEIRO — ver
+   * [[estoque-perna-ativa-vendas-grupo-inteiro]]. Contar ticket por vários CNPJs é seguro: a
+   * identidade do ticket é filial + número, então filiais distintas nunca colidem no
+   * COUNT(DISTINCT) — ver [[salestotals-count-distinct-ticket-sem-filial]].
+   */
+  filiais?: string[] | null;
+  /**
    * Escopo de LINHA da NERD (legado): por decisão antiga só se aplica quando company === 'nerd',
    * porque nasceu do toggle "Eletrônicos". Para filtrar por linha em QUALQUER empresa use
    * `linhasCadastro` — a Scarf Me trata LINHA como categoria e precisa dela.
@@ -85,10 +98,23 @@ async function buildFilialClause(
   companySlug: string | undefined,
   module: CompanyModule,
   specificFilial: string | null | undefined,
+  filialList?: string[] | null,
 ): Promise<string> {
   if (!companySlug) return '';
   const company = await resolveCompanyLive(companySlug);
   if (!company) return '';
+
+  // Lista explícita vence: o chamador já resolveu quais CNPJs compõem o escopo.
+  const listaExplicita = Array.from(
+    new Set((filialList ?? []).map((f) => (f ?? '').trim()).filter(Boolean))
+  );
+  if (listaExplicita.length > 0) {
+    const vivos = await Promise.all(listaExplicita.map((f) => liveNameForIncoming(f)));
+    const nomes = Array.from(new Set(vivos.map((f) => (f ?? '').trim()).filter(Boolean)));
+    if (nomes.length === 0) return '';
+    nomes.forEach((f, i) => request.input(`stFL${i}`, sql.VarChar, f));
+    return `AND f.FILIAL IN (${nomes.map((_, i) => `@stFL${i}`).join(', ')})`;
+  }
 
   // Normaliza o nome vindo do front para o nome vivo do banco (match por COD_FILIAL).
   specificFilial = await liveNameForIncoming(specificFilial);
@@ -179,9 +205,14 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
     produtoId,
     produtoIds,
     produtoSearchTerm,
+    filiais,
   } = params;
 
   if (!company) return { ...EMPTY };
+
+  // Com lista explícita o chamador já decidiu o escopo: não delega para o e-commerce nem
+  // agrega varejo + e-commerce. É por isso que a lista só deve trazer filiais de POS.
+  const temListaFilial = (filiais ?? []).some((f) => (f ?? '').trim().length > 0);
 
   // O e-commerce (`fetchEcommerceSummary`) filtra LINHA sem recorte por empresa, então lá as
   // duas listas viram uma só: o escopo legado da NERD e o filtro de linha do cadastro.
@@ -204,7 +235,7 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
   };
 
   // Ecommerce: se a filial selecionada é puramente ecommerce, delegar para o repositório de ecommerce
-  if (isEcommerceFilial(company as string, filial ?? null)) {
+  if (!temListaFilial && isEcommerceFilial(company as string, filial ?? null)) {
     const summary = await fetchEcommerceSummary({
       company: company as string,
       range: ecommerceRange,
@@ -231,7 +262,10 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
   // Scarfme com "todas as filiais": agregar varejo + ecommerce
   const companyConfig = resolveCompany(company as string);
   const isScarfmeAll =
-    company === 'scarfme' && filial == null && (companyConfig?.ecommerceFilials?.length ?? 0) > 0;
+    !temListaFilial &&
+    company === 'scarfme' &&
+    filial == null &&
+    (companyConfig?.ecommerceFilials?.length ?? 0) > 0;
 
   if (isScarfmeAll) {
     const [varejo, ecom] = await Promise.all([
@@ -271,7 +305,13 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
     request.input('stPrevStart', sql.DateTime, previousRange.start);
     request.input('stPrevEnd', sql.DateTime, previousRange.end);
 
-    const filialClause = await buildFilialClause(request, company as string, 'sales', filial ?? null);
+    const filialClause = await buildFilialClause(
+      request,
+      company as string,
+      'sales',
+      filial ?? null,
+      filiais ?? null
+    );
     const linhaTokens = buildLinhaClause(request, company as string, linhas);
 
     // Filtros adicionais do Gerador de Relatórios (todos opcionais; '' quando vazios).

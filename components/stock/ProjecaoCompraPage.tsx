@@ -2,8 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import FilialFilter from "@/components/filters/FilialFilter";
 import { formatDateForQuery } from "@/lib/utils/date";
-import type { CompanyKey } from "@/lib/config/company";
+import { VAREJO_VALUE, resolveCompany, type CompanyKey } from "@/lib/config/company";
+import {
+  MESES_JANELA_ATIVIDADE,
+  PESO_JANELA_RECENTE,
+  indiceDoModo,
+  montarPerfil,
+  projetarMesCheio,
+  type CriterioMes,
+  type ModoProjecao,
+} from "@/lib/utils/projecao-realista";
 
 import styles from "./ProjecaoCompraPage.module.css";
 
@@ -85,20 +95,36 @@ const METRICAS: { key: Metrica; label: string }[] = [
 /**
  * Regra que projeta os meses que ainda não aconteceram.
  *
- * `yoy` (padrão) = regra comparativa: mede quanto cada mês FECHADO cresceu contra o mesmo mês
- * do ano anterior, tira a média desses percentuais e aplica essa média sobre o valor do ano
- * anterior de cada mês futuro. As outras regras extrapolam o ritmo de uma janela de dias.
+ * `realista` (padrão) e `mais10` são o motor de [projecao-realista.ts](@/lib/utils/projecao-realista):
+ * mantêm a CURVA do ano anterior (sazonalidade) e corrigem o patamar por um índice — YoY
+ * combinado (ano corrido + últimos 3 meses) no realista, +10% fixo no conservador. É a mesma
+ * lógica do `AUTOMACOES/projecao_scarfme.py`.
+ *
+ * As regras de dias extrapolam linearmente o ritmo de uma janela — não têm sazonalidade e
+ * seguem existindo para conferência.
  */
-type RegraProjecao = "yoy" | "30" | "60" | "90" | "120" | "365";
-/** Ordem do select — YoY primeiro (padrão), depois as janelas de dias. */
-const REGRAS: RegraProjecao[] = ["yoy", "60", "365", "120", "90", "30"];
+type RegraProjecao = "realista" | "mais10" | "30" | "60" | "90" | "120" | "365";
+/** As regras que usam o motor de curva + índice (as outras são ritmo de janela). */
+const REGRAS_CURVA: Record<string, ModoProjecao> = { realista: "realista", mais10: "mais10" };
+/** Ordem do select — as duas de curva primeiro (realista é o padrão), depois as janelas. */
+const REGRAS: RegraProjecao[] = ["realista", "mais10", "60", "365", "120", "90", "30"];
 const REGRA_LABEL: Record<RegraProjecao, string> = {
-  yoy: "Crescimento YoY",
+  realista: "Projeção realista (índice YoY)",
+  mais10: "Projeção conservadora (+10%)",
   "60": "Ritmo 60 dias",
   "365": "Ritmo 12 meses",
   "120": "Ritmo 120 dias",
   "90": "Ritmo 90 dias",
   "30": "Ritmo 30 dias",
+};
+
+/** Texto do tooltip de cada mês projetado, conforme o critério que o motor usou. */
+const CRITERIO_TEXTO: Record<CriterioMes, string> = {
+  real: "Realizado",
+  parado: "Escopo sem venda nos últimos meses fechados: projeta 0",
+  yoy: "Mesmo mês do ano anterior × índice YoY do escopo",
+  ano_passado: "Mesmo mês do ano anterior + 10%",
+  sem_base: "Sem base no ano anterior naquele mês: média dos últimos meses fechados",
 };
 
 /**
@@ -109,6 +135,8 @@ const REGRA_LABEL: Record<RegraProjecao, string> = {
 interface PedidoProjecao {
   dataBase: string;
   metrica: Metrica;
+  /** Nome canônico da filial, VAREJO_VALUE ou null = rede inteira. */
+  filial: string | null;
   dims: DimState;
   produtos: string[];
   /** Busca livre por nome, quando o usuário digitou sem escolher ninguém da lista. */
@@ -280,7 +308,14 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   const [mensal, setMensal] = useState<MensalItem[]>([]);
   const [projLoading, setProjLoading] = useState(false);
   const [projErro, setProjErro] = useState<string | null>(null);
-  const [regra, setRegra] = useState<RegraProjecao>("yoy");
+  const [regra, setRegra] = useState<RegraProjecao>("realista");
+  /**
+   * Filial do recorte (null = rede inteira). Fica FORA de `dims` de propósito: as dimensões
+   * filtram o cadastro de PRODUTOS, a filial restringe o universo de lojas consultado.
+   * Em vendas a loja escolhida traz o grupo inteiro (CNPJ antigo é a mesma loja) — é o
+   * servidor que expande, ver [[canonica-grupo-e-filial-ativa]].
+   */
+  const [filial, setFilial] = useState<string | null>(null);
 
   // Overrides editáveis (amarelos da planilha).
   const [estoqueOverride, setEstoqueOverride] = useState<number | null>(null);
@@ -596,8 +631,16 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
 
   /** Assinatura do recorte, para saber se mudou algo desde a última geração. */
   const assinaturaAtual = useMemo(
-    () => JSON.stringify({ dataBase, metrica, dims, produtos: produtosSelecionados, busca: buscaLivre }),
-    [dataBase, metrica, dims, produtosSelecionados, buscaLivre]
+    () =>
+      JSON.stringify({
+        dataBase,
+        metrica,
+        filial,
+        dims,
+        produtos: produtosSelecionados,
+        busca: buscaLivre,
+      }),
+    [dataBase, metrica, filial, dims, produtosSelecionados, buscaLivre]
   );
   const assinaturaGerada = useMemo(
     () =>
@@ -605,6 +648,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
         ? JSON.stringify({
             dataBase: pedido.dataBase,
             metrica: pedido.metrica,
+            filial: pedido.filial,
             dims: pedido.dims,
             produtos: pedido.produtos,
             busca: pedido.busca,
@@ -615,7 +659,14 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   const pendente = assinaturaAtual !== assinaturaGerada;
 
   const gerarProjecao = () => {
-    setPedido({ dataBase, metrica, dims, produtos: produtosSelecionados, busca: buscaLivre });
+    setPedido({
+      dataBase,
+      metrica,
+      filial,
+      dims,
+      produtos: produtosSelecionados,
+      busca: buscaLivre,
+    });
   };
 
   // ── Busca a projeção do escopo APLICADO (só roda quando o usuário manda gerar).
@@ -643,6 +694,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
       base: pedido.dataBase,
       metrica: pedido.metrica,
     });
+    if (pedido.filial) params.set("filial", pedido.filial);
     DIM_KEYS.forEach((dim) => pedido.dims[dim].forEach((v) => params.append(dim, v)));
     pedido.produtos.forEach((produto) => params.append("produto", produto));
     if (pedido.busca) params.set("busca", pedido.busca);
@@ -740,21 +792,53 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   const diasHorizonte = Math.max(0, diffDays(dataBase, venderAte));
   const anoBase = Number(dataBase.slice(0, 4));
 
-  // ── Regra comparativa (crescimento YoY) ───────────────────────────────────
-  // Quanto cada mês FECHADO deste ano cresceu contra o mesmo mês do ano anterior; a média
-  // desses percentuais é o crescimento provável aplicado aos meses que faltam.
-  // Ficam fora: mês em curso (parcial, comparação injusta) e mês sem base no ano anterior.
-  const crescimento = useMemo(() => {
-    const comparaveis = mensal.filter((m) => !m.futuro && !m.parcial && m.qtdeAnoAnterior > 0);
-    if (comparaveis.length === 0) return { media: null as number | null, meses: [] as string[] };
-    const taxas = comparaveis.map((m) => m.qtde / m.qtdeAnoAnterior - 1);
-    return {
-      media: taxas.reduce((a, b) => a + b, 0) / taxas.length,
-      meses: comparaveis.map((m) => m.mes),
-    };
-  }, [mensal]);
+  // ── Motor de projeção (curva do ano anterior × índice) ────────────────────
+  // Porte do `projecao_scarfme.py`: NÃO se extrapola ritmo. Mantém-se a curva do ano
+  // anterior — é ela que carrega a sazonalidade — e corrige-se o patamar por um índice YoY
+  // que é RAZÃO DE SOMAS (ano corrido 50% + últimos 3 meses fechados 50%, clampado em
+  // [0,30 ; 2,00]). A regra antiga tirava a MÉDIA das taxas mensais, o que dava o mesmo peso
+  // a um mês de base 3 e a um de base 3.000.
+  const perfil = useMemo(() => montarPerfil(mensal), [mensal]);
 
-  /** Ritmo diário de uma janela de dias (para as regras que não são YoY). */
+  /** Modo do motor quando a regra escolhida é de curva; null nas regras de janela. */
+  const modoCurva: ModoProjecao | null = REGRAS_CURVA[regra] ?? null;
+  /** Índice que a regra atual aplica sobre a curva (1,10 no conservador). */
+  const indiceRegra = modoCurva ? indiceDoModo(perfil, modoCurva) : null;
+
+  // ── KPI do índice: o número que move a projeção, com de onde ele saiu ─────
+  const mesesNoIndice = perfil.ultimoMesReal;
+  /** Nas regras de janela o índice não é aplicado, mas segue exibido como referência. */
+  const indiceExibido = modoCurva ? indiceRegra : perfil.indice;
+  const indiceHint = useMemo(() => {
+    if (indiceExibido == null) return "sem base no ano anterior";
+    if (regra === "mais10") return "fixo: ano anterior + 10%";
+    const meses = `${fmt(mesesNoIndice)} ${mesesNoIndice === 1 ? "mês fechado" : "meses fechados"}`;
+    return modoCurva ? `índice ${fmtDec(indiceExibido, 2)} · ${meses}` : `referência · ${meses}`;
+  }, [indiceExibido, regra, modoCurva, mesesNoIndice]);
+  /** Tooltip: a conta inteira, para o número nunca parecer mágico. */
+  const indiceExplicacao = useMemo(() => {
+    if (regra === "mais10") return "Projeção conservadora: mesmo mês do ano anterior × 1,10.";
+    const pAno = Math.round((1 - PESO_JANELA_RECENTE) * 100);
+    const pRec = Math.round(PESO_JANELA_RECENTE * 100);
+    const trecho = (v: number | null) => (v == null ? "sem base" : fmtDec(v, 3));
+    const cru =
+      perfil.yoyAno != null && perfil.yoyRecente != null
+        ? (1 - PESO_JANELA_RECENTE) * perfil.yoyAno + PESO_JANELA_RECENTE * perfil.yoyRecente
+        : perfil.yoyAno ?? perfil.yoyRecente;
+    const travado =
+      cru != null && perfil.indice != null && Math.abs(cru - perfil.indice) > 1e-9
+        ? ` · travado em [0,30 ; 2,00] (bruto ${fmtDec(cru, 3)})`
+        : "";
+    return (
+      `Índice = ${pAno}% do YoY do ano corrido (${trecho(perfil.yoyAno)}) + ` +
+      `${pRec}% do YoY dos últimos ${MESES_JANELA_ATIVIDADE} meses fechados ` +
+      `(${trecho(perfil.yoyRecente)})${travado}. Cada YoY é a soma do ano ÷ soma do ano ` +
+      `anterior nos mesmos meses. A projeção é o mês do ano anterior × esse índice, ` +
+      `preservando a sazonalidade.`
+    );
+  }, [regra, perfil.yoyAno, perfil.yoyRecente, perfil.indice]);
+
+  /** Ritmo diário de uma janela de dias (para as regras que não usam a curva). */
   const ritmoDiaJanela = useCallback(
     (dias: number) => (dias > 0 ? (agregado.unidades[dias] ?? 0) / dias : 0),
     [agregado.unidades]
@@ -762,35 +846,41 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
 
   // Valor de cada mês do ano da data base: realizado (mês fechado) e projetado pela regra.
   const serieMes = useMemo(() => {
-    const g = crescimento.media;
-    const map = new Map<string, { realizado: number | null; projetado: number | null }>();
+    const map = new Map<
+      string,
+      { realizado: number | null; projetado: number | null; criterio: CriterioMes | null }
+    >();
     mensal.forEach((m) => {
       const mesNum = Number(m.mes.slice(5, 7));
-      const projetado =
-        regra === "yoy"
-          ? g == null
-            ? null
-            : m.qtdeAnoAnterior * (1 + g)
-          : ritmoDiaJanela(Number(regra)) * diasNoMes(anoBase, mesNum);
-      map.set(m.mes, { realizado: m.futuro ? null : m.qtde, projetado });
+      let projetado: number | null;
+      let criterio: CriterioMes | null = null;
+      if (modoCurva) {
+        // Projeção do mês CHEIO — inclusive nos fechados, onde ela fica só como aferição
+        // (a célula do mês fechado mostra o realizado).
+        const r = projetarMesCheio(perfil, mesNum, modoCurva);
+        projetado = perfil.ultimoMesReal >= 1 ? r.valor : null;
+        criterio = r.criterio;
+      } else {
+        projetado = ritmoDiaJanela(Number(regra)) * diasNoMes(anoBase, mesNum);
+      }
+      map.set(m.mes, { realizado: m.futuro ? null : m.qtde, projetado, criterio });
     });
     return map;
-  }, [mensal, crescimento.media, regra, ritmoDiaJanela, anoBase]);
+  }, [mensal, perfil, modoCurva, regra, ritmoDiaJanela, anoBase]);
 
   /**
-   * Valor CHEIO de um mês pela regra YoY, para acumular o horizonte. Um mês do ano seguinte
-   * usa o mês correspondente do ano da base (realizado ou projetado) e aplica o crescimento
-   * outra vez — é a mesma regra, só encadeada.
+   * Valor CHEIO de um mês pela regra de curva, para acumular o horizonte. Um mês do ano
+   * seguinte usa o mês correspondente do ano da base e aplica o índice outra vez — é a mesma
+   * regra, só encadeada (o script não passa de dezembro; o horizonte da tela pode).
    */
-  const valorMesYoY = useCallback(
+  const valorMesCurva = useCallback(
     (ano: number, mes: number): number => {
-      const g = crescimento.media;
-      if (g == null) return 0;
+      if (!modoCurva || perfil.ultimoMesReal < 1) return 0;
       let ciclos = ano - anoBase;
       if (ciclos < 0) return 0;
       const info = mensal.find((m) => m.mes === `${anoBase}-${String(mes).padStart(2, "0")}`);
       if (!info) return 0;
-      const projetadoAnoBase = info.qtdeAnoAnterior * (1 + g);
+      const { valor: projetadoAnoBase } = projetarMesCheio(perfil, mes, modoCurva);
       // Mês fechado vale o realizado; mês em curso vale o maior entre o já vendido e a
       // projeção do mês cheio; mês futuro vale a projeção.
       let valor = info.futuro
@@ -798,18 +888,19 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
         : info.parcial
         ? Math.max(info.qtde, projetadoAnoBase)
         : info.qtde;
+      const fator = indiceRegra ?? 1;
       while (ciclos > 0) {
-        valor *= 1 + g;
+        valor *= fator;
         ciclos -= 1;
       }
       return valor;
     },
-    [crescimento.media, mensal, anoBase]
+    [modoCurva, perfil, mensal, anoBase, indiceRegra]
   );
 
-  /** Unidades projetadas pela regra YoY entre a data base e "Vender até" (pro-rata no mês). */
+  /** Unidades projetadas pela regra de curva entre a data base e "Vender até" (pro-rata). */
   const projecaoHorizonte = useMemo(() => {
-    if (diasHorizonte <= 0 || crescimento.media == null) return 0;
+    if (diasHorizonte <= 0 || !modoCurva || perfil.ultimoMesReal < 1) return 0;
     let total = 0;
     let ano = anoBase;
     let mes = Number(dataBase.slice(5, 7));
@@ -818,7 +909,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
     for (let guard = 0; restantes > 0 && guard < 48; guard += 1) {
       const dm = diasNoMes(ano, mes);
       const usados = Math.min(restantes, dm - dia + 1);
-      total += valorMesYoY(ano, mes) * (usados / dm);
+      total += valorMesCurva(ano, mes) * (usados / dm);
       restantes -= usados;
       dia = 1;
       if (mes === 12) {
@@ -829,22 +920,24 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
       }
     }
     return total;
-  }, [diasHorizonte, crescimento.media, anoBase, dataBase, valorMesYoY]);
+  }, [diasHorizonte, modoCurva, perfil.ultimoMesReal, anoBase, dataBase, valorMesCurva]);
 
   // ── A ÚNICA linha da tabela de giro: a regra escolhida no select.
-  //    YoY mede o horizonte inteiro pela regra comparativa; as outras extrapolam a janela.
+  //    As regras de curva medem o horizonte inteiro mês a mês; as de dias extrapolam a janela.
   const linhaAtiva = useMemo(() => {
-    const yoy = regra === "yoy";
-    const disponivel = yoy ? crescimento.media != null && diasHorizonte > 0 : true;
-    const dias = yoy ? diasHorizonte : Number(regra);
-    const un = yoy ? (disponivel ? projecaoHorizonte : 0) : agregado.unidades[dias] ?? 0;
+    const curva = modoCurva !== null;
+    // Sem nenhum mês fechado (data base em janeiro) não há índice nem janela recente: a
+    // projeção não existe e a tela mostra "—" em vez de um 0 que pareceria venda zero.
+    const disponivel = curva ? perfil.ultimoMesReal >= 1 && diasHorizonte > 0 : true;
+    const dias = curva ? diasHorizonte : Number(regra);
+    const un = curva ? (disponivel ? projecaoHorizonte : 0) : agregado.unidades[dias] ?? 0;
     const ritmoDia = dias > 0 ? un / dias : 0;
     const sugestao = disponivel ? Math.max(0, Math.ceil(ritmoDia * diasHorizonte - estoqueAtual)) : 0;
     const qtd = qtdOverride[regra] ?? sugestao;
     const cobertura = ritmoDia > 0 ? (estoqueAtual + qtd) / ritmoDia : null;
     const duraAte = cobertura !== null ? addDaysFormatted(dataBase, Math.round(cobertura)) : null;
     return {
-      yoy,
+      curva,
       disponivel,
       dias,
       un: Math.round(un),
@@ -858,7 +951,8 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
     };
   }, [
     regra,
-    crescimento.media,
+    modoCurva,
+    perfil.ultimoMesReal,
     diasHorizonte,
     projecaoHorizonte,
     agregado.unidades,
@@ -871,7 +965,9 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   const mensalRows = useMemo(
     () =>
       mensal.map((m) => {
-        const projetado = serieMes.get(m.mes)?.projetado ?? null;
+        const info = serieMes.get(m.mes);
+        const projetado = info?.projetado ?? null;
+        const criterio = info?.criterio ?? null;
         const valorAno = m.futuro
           ? projetado ?? 0
           : m.parcial
@@ -887,9 +983,11 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
         return {
           ...m,
           projetado,
+          criterio,
           valorAno,
           pctSobreAnoAnterior,
-          usadoNaMedia: !m.futuro && !m.parcial && m.qtdeAnoAnterior > 0,
+          /** Mês fechado com base no ano anterior: é o que alimenta o índice YoY. */
+          usadoNoIndice: !m.futuro && !m.parcial && m.qtdeAnoAnterior > 0,
         };
       }),
     [mensal, serieMes]
@@ -921,6 +1019,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
 
   const limparTudo = () => {
     setProdutoChips([]);
+    setFilial(null);
     setDims(EMPTY_DIMS);
     setProdutoQuery("");
     setProdutoResults([]);
@@ -930,9 +1029,19 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   /** O que está na tela é a rede inteira (geraram sem nenhum recorte). */
   const escopoRede =
     pedido !== null &&
+    pedido.filial === null &&
     pedido.produtos.length === 0 &&
     pedido.busca === "" &&
     DIM_KEYS.every((dim) => pedido.dims[dim].length === 0);
+
+  /** Rótulo da filial APLICADA (a do pedido, não a do select ao vivo). */
+  const filialAplicadaLabel = useMemo(() => {
+    const escolhida = pedido?.filial ?? null;
+    if (!escolhida) return null;
+    if (escolhida === VAREJO_VALUE) return "VAREJO";
+    const cfg = resolveCompany(companyKey);
+    return cfg?.filialDisplayNames?.[escolhida] ?? escolhida;
+  }, [pedido, companyKey]);
 
   /** Métrica dos números NA TELA (o toggle ao vivo só vale depois de gerar). */
   const metricaAplicada: Metrica = pedido?.metrica ?? metrica;
@@ -961,6 +1070,14 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
                 ))}
               </div>
             </div>
+            {/* Filial: o mesmo controle das outras telas (grupos canônicos, VAREJO,
+                E-commerce). Recorta o universo de lojas, não o cadastro de produtos. */}
+            <FilialFilter
+              companyKey={companyKey}
+              value={filial}
+              onChange={setFilial}
+              module="sales"
+            />
             <label className={styles.field}>
               <span className={styles.fieldLabel}>Data base</span>
               <input
@@ -1263,6 +1380,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
           <span className={styles.scopeText}>
             {soUm ? (
               <>
+                {filialAplicadaLabel && <>{filialAplicadaLabel} · </>}
                 {soUm.descricao}
                 {soUm.codigoBarra && <> · cód. {soUm.codigoBarra}</>}
                 {soUm.grade && <> · {soUm.grade}</>}
@@ -1277,6 +1395,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
             ) : (
               <>
                 {escopoRede && <>Rede inteira · </>}
+                {filialAplicadaLabel && <>{filialAplicadaLabel} · </>}
                 {fmt(agregado.itens)} itens
                 {!ehTickets && <> · estoque {fmt(estoqueAtual)} un</>}
               </>
@@ -1319,7 +1438,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
             )}
             <div className={styles.kpi}>
               <span className={styles.kpiLabel}>
-                {linhaAtiva.yoy
+                {linhaAtiva.curva
                   ? "Projeção que falta"
                   : ehTickets
                   ? "Tickets da janela"
@@ -1327,7 +1446,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
               </span>
               <span className={styles.kpiValue}>{linhaAtiva.disponivel ? fmt(linhaAtiva.un) : "—"}</span>
               <span className={styles.kpiHint}>
-                {linhaAtiva.yoy
+                {linhaAtiva.curva
                   ? `${unidadeLabel} no horizonte`
                   : `${unidadeLabel} em ${fmt(linhaAtiva.dias)} dias`}
               </span>
@@ -1359,22 +1478,18 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
                 </div>
               </>
             )}
-            <div className={styles.kpi}>
-              <span className={styles.kpiLabel}>Crescimento médio</span>
+            <div className={styles.kpi} title={indiceExplicacao}>
+              <span className={styles.kpiLabel}>
+                {linhaAtiva.curva ? "Índice usado" : "Crescimento YoY"}
+              </span>
               <span
                 className={`${styles.kpiValue} ${
-                  crescimento.media == null ? "" : crescimento.media >= 0 ? styles.varUp : styles.varDown
+                  indiceExibido == null ? "" : indiceExibido >= 1 ? styles.varUp : styles.varDown
                 }`}
               >
-                {fmtPct(crescimento.media)}
+                {indiceExibido == null ? "—" : fmtPct(indiceExibido - 1)}
               </span>
-              <span className={styles.kpiHint}>
-                {crescimento.meses.length > 0
-                  ? `${fmt(crescimento.meses.length)} ${
-                      crescimento.meses.length === 1 ? "mês fechado" : "meses fechados"
-                    }`
-                  : "sem base comparável"}
-              </span>
+              <span className={styles.kpiHint}>{indiceHint}</span>
             </div>
           </div>
 
@@ -1433,10 +1548,16 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
                             }`}
                             title={
                               m.futuro
-                                ? `Projeção por ${REGRA_LABEL[regra]}`
+                                ? `${REGRA_LABEL[regra]}${
+                                    m.criterio ? ` · ${CRITERIO_TEXTO[m.criterio]}` : ""
+                                  }`
                                 : m.parcial
-                                ? `Mês em curso: projeção do mês cheio por ${REGRA_LABEL[regra]} · já vendeu ${fmt(m.qtde)} un até ${ymdToBr(dataBase)} · fora da média de crescimento`
-                                : "Realizado"
+                                ? `Mês em curso: projeção do mês cheio por ${REGRA_LABEL[regra]}${
+                                    m.criterio ? ` · ${CRITERIO_TEXTO[m.criterio]}` : ""
+                                  } · já vendeu ${fmt(m.qtde)} ${unidadeLabel} até ${ymdToBr(
+                                    dataBase
+                                  )} · fora do índice`
+                                : `Realizado${m.usadoNoIndice ? " · entra no índice YoY" : ""}`
                             }
                           >
                             <span className={styles.cellQtd}>
