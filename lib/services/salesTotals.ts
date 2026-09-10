@@ -239,6 +239,9 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
     const summary = await fetchEcommerceSummary({
       company: company as string,
       range: ecommerceRange,
+      // Sem isto o "anterior" do e-commerce vinha sempre do MÊS anterior, mesmo com
+      // comparisonMode: 'year' — só o campo de comparação, nunca o total corrente.
+      comparisonMode,
       filial: filial ?? null,
       linhas: linhasEcommerce,
       grupos: grupos ?? null,
@@ -273,6 +276,8 @@ export async function fetchSalesTotals(params: SalesTotalsParams): Promise<Sales
       fetchEcommerceSummary({
         company: company as string,
         range: ecommerceRange,
+        // Idem: o pedaço de e-commerce do "ano anterior" da REDE vinha do mês anterior.
+        comparisonMode,
         filial: null,
         linhas: linhasEcommerce,
         grupos: grupos ?? null,

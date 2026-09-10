@@ -120,6 +120,20 @@ export interface SummaryQueryParams {
   produtoSearchTerm?: string;
   acimaDoTicket?: boolean;
   filterByRegistrationDate?: boolean; // Se true, filtra produtos pela data de cadastramento ao invés da data de venda
+  /**
+   * Como montar o período de COMPARAÇÃO (só afeta os campos `previousValue`/variação %;
+   * o período atual e todos os totais correntes ficam intactos).
+   *
+   * 'month' (padrão) = mesmos dias do mês anterior. 'year' = mesmos dias do ano anterior.
+   *
+   * Existe porque o período anterior era fixo em −1 mês: quem pedia comparação ANUAL recebia
+   * a mensal sem aviso. `fetchSalesTotals` já aceitava `comparisonMode: 'year'` e o repassava
+   * ao caminho POS, mas não até aqui — então na Scarf Me (rede = varejo + e-commerce) a parte
+   * de e-commerce do "ano anterior" vinha do mês anterior. Medido em 10/09/2026: jan/2025 da
+   * rede aparecia 2.520 tickets em vez de 1.945, porque o pedaço de e-commerce trazia dez/2025.
+   * O padrão continua 'month', então nenhum chamador que não pede nada muda de resultado.
+   */
+  comparisonMode?: 'month' | 'year';
 }
 
 export interface SalesSummaryResult {
@@ -219,12 +233,14 @@ export async function fetchEcommerceSummary({
   produtoSearchTerm,
   acimaDoTicket = false,
   filterByRegistrationDate = false,
+  comparisonMode = 'month',
 }: SummaryQueryParams = {}): Promise<SalesSummaryResult> {
   return withRequest(async (request) => {
     const currentRange = resolveRange(range);
     const { start, end } = currentRange;
-    const previousRange = shiftRangeByMonths(currentRange, -1);
-    // Período anterior = mesmos dias (ex.: 1 a 5 → 1 a 5 do mês anterior). End exclusivo.
+    // Período anterior = mesmos dias, um mês atrás (padrão) ou um ANO atrás quando pedido
+    // (ex.: 1 a 5 de jan → 1 a 5 de dez, ou 1 a 5 de jan do ano anterior). End exclusivo.
+    const previousRange = shiftRangeByMonths(currentRange, comparisonMode === 'year' ? -12 : -1);
 
     request.input('startDate', sql.DateTime, start);
     request.input('endDate', sql.DateTime, end);
