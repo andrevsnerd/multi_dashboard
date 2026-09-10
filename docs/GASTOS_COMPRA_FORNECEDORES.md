@@ -31,6 +31,7 @@ soma fecha exata.
 | **Roseli (Pashmina)** | 3x iguais: **90**, **120** e **150** dias. |
 | **Fátima (Fashion)** | 2x iguais: **30** e **60** dias. |
 | **Premier** | 3x iguais: **30**, **60** e **90** dias. |
+| **Gentile Etiquetas** | 2x iguais: **30** e **60** dias, no boleto. |
 | **Índia (Kunal)** | **13x iguais**: entrada à vista (dia 0) + 12 parcelas de 30 em 30 dias (30 a 360). Sem canais. |
 | **China (Nick)** | Dois pagamentos **paralelos** sobre o mesmo total: Transferência bancária 40% + Alibaba 60%. Cada canal se divide em 30% **no ato do pedido**, 50% **no despacho** (+30 dias) e 20% **60 dias após o despacho** (+90 dias). As datas coincidem — o dia soma os dois. |
 | **China (Hannah)** | Mesmos canais do Nick (Transferência 40% + Alibaba 60%), mas fecha no despacho: 30% **no ato do pedido** e os **70% restantes no despacho** (+30 dias). Sem a parcela de 60 dias depois. |
@@ -131,6 +132,55 @@ Na mesma tela, **quantidade** é lida com `parseQtd`: em pt-BR "5.800 unidades"
 é cinco mil e oitocentos, e o ponto só vale como decimal quando não forma grupos
 de três ("1.5" = 1,5).
 
+## Catálogo Gentile Etiquetas — preço por faixa
+
+O tipo de compra **Gentile Etiquetas** é o papel seda e a etiqueta adesiva da
+Scarf Me. Ele se parece com a Premier (linhas prontas, valor = qtd × preço), com
+**uma diferença que manda no desenho da tela**: a Gentile **não tem preço
+unitário único** — ela cota por **faixa de quantidade**, e o preço cai conforme o
+volume. Por isso a tela **escolhe a faixa** em vez de digitar o preço: a faixa
+traz quantidade e preço juntos, e o total sai sozinho.
+
+**Papel seda fundo branco — estampa rosa Scarf Me** (50x70 cm, entrega em 1
+semana a 10 dias), comprado em **Kg**:
+
+| Faixa | R$/Kg | Total |
+| --- | --- | --- |
+| 10 Kg | 84,99 | **849,90** |
+| 20 Kg | 60,10 | **1.202,00** |
+
+**Etiqueta adesiva fundo branco — Scarf Me, 2 cores** (45x25 mm, corte reto nas
+laterais, 2 cores de impressão em tinta), comprada em **milheiro**:
+
+| Faixa | R$/milheiro | Total |
+| --- | --- | --- |
+| 1.000 unid | 326,00 | **326,00** |
+| 3.000 unid | 163,49 | **490,47** |
+| 5.000 unid | 137,00 | **685,00** |
+| 10.000 unid | 103,00 | **1.030,00** |
+| 15.000 unid | 90,00 | **1.350,00** |
+
+A lista vive em `COMPRA_GASTO_GENTILE_CATALOGO`
+([lib/types/compra-gasto.ts](../lib/types/compra-gasto.ts)) — é lá que se muda
+faixa, preço ou item. O **total da faixa nunca é campo**: é sempre
+`qtd × custoUnitario` (`totalFaixaGentile`), para não existirem duas fontes do
+mesmo número.
+
+⚠️ **A quantidade está na unidade de COMPRA, não em unidades avulsas**: Kg no
+papel e **milheiro** na etiqueta — 3 milheiros = 3.000 etiquetas. Não é
+detalhe de exibição, é o que mantém o valor exato: 3.000 etiquetas a R$ 163,49 o
+milheiro dão R$ 0,16349 por unidade, cinco casas, que o item grava com quatro
+(0,1635) e fecham em R$ 490,50 em vez dos R$ 490,47 cotados. Em milheiro a conta
+é exata. A unidade vai junto na descrição gravada da linha ("… (milheiro)"),
+porque é ela que dá sentido ao "3 × R$ 163,49" na gaveta da compra.
+
+Quantidade e preço continuam **editáveis** por cima da faixa (reajuste, ou uma
+quantidade que a tabela não cobre). Digitar por cima **descarta a faixa** e a
+tela avisa *"quantidade fora das faixas cotadas — confirme o preço com a
+Gentile"*: como o preço da Gentile é por volume, interpolar faixa seria inventar
+cotação (15 Kg de papel pelo preço do 10 Kg daria R$ 1.274,85, mais caro que os
+20 Kg).
+
 ## Pontos de atenção
 
 - **Compra em trânsito → Pagamento:** o select é o mesmo, mais uma opção
@@ -145,6 +195,10 @@ de três ("1.5" = 1,5).
   material, já com o preço de tabela preenchido — só a quantidade é digitada) e um
   *fornecedor* (3x, 30/60/90). Escolher o tipo de compra Premier já marca o
   fornecedor Premier — dá para trocar depois, se a compra for de outro.
+- **Gentile Etiquetas também é as duas coisas**: um *tipo de compra* (os dois
+  itens da Scarf Me, cotados por faixa de quantidade) e um *fornecedor* (2x,
+  30/60, no boleto). Escolher o tipo já marca o fornecedor e o gasto vira
+  "Embalagem e material" — os dois dão para trocar depois.
 - **Parcelas iguais** vêm do helper `iguaisEm([dias…])`: para mudar um prazo,
   mexa só na lista de dias. Percentual diferente por etapa (como a China) é
   escrito à mão na própria linha.

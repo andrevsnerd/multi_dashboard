@@ -437,6 +437,11 @@ const REGRAS: Record<CompraGastoFornecedor, RegraModelo> = {
     dica: "3x iguais: 30, 60 e 90 dias depois da data da compra.",
     etapas: iguaisEm([30, 60, 90]),
   },
+  gentile: {
+    label: "Gentile Etiquetas",
+    dica: "2x iguais: 30 e 60 dias depois da data da compra, no boleto.",
+    etapas: iguaisEm([30, 60]),
+  },
   china: {
     label: "China (Nick)",
     dica: DICA_CHINA,
@@ -476,6 +481,7 @@ export const COMPRA_GASTO_FORNECEDORES: {
     "roseli",
     "fatima",
     "premier",
+    "gentile",
     "china",
     "china_hannah",
     "india_kunal",

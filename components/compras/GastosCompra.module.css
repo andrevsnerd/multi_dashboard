@@ -1049,6 +1049,66 @@
   color: var(--t-900);
 }
 
+/* Item Gentile: cotado por faixa de quantidade, então a linha vira um bloco —
+   nome, especificação, a escolha da faixa e a tabela de preços por baixo. */
+.gentileItem {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid var(--b-200);
+  background: var(--s-50);
+}
+
+.gentileName {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--t-900);
+}
+
+.gentileSpec {
+  font-size: 11px;
+  color: var(--t-500);
+}
+
+.gentileRow {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.6fr) 84px 100px 100px;
+  gap: 6px;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.gentileRow input,
+.gentileRow select {
+  font: inherit;
+  font-size: 12.5px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--b-300);
+  background: var(--s-white);
+  color: var(--t-900);
+  width: 100%;
+}
+
+.gentileFaixas {
+  font-family: var(--gc-mono);
+  font-size: 10.5px;
+  color: var(--t-400);
+  margin-top: 2px;
+}
+
+.gentileAviso {
+  font-size: 11px;
+  color: var(--gc-warn);
+}
+
+@media (max-width: 640px) {
+  .gentileRow {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
 .freeLineHead {
   font-size: 9.5px;
   font-weight: 600;

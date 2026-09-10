@@ -166,7 +166,14 @@ async function writeFileAll(data: FileShape) {
 const TIPOS: CompraGastoTipo[] = ["mercadoria", "frete", "adiantamento", "material", "outros"];
 // "salva" é legado: nenhum lote novo nasce dela, mas os já gravados precisam
 // continuar sendo lidos com a própria origem em vez de cair no fallback.
-const ORIGENS: CompraGastoOrigem[] = ["transito", "itens", "premier", "valor", "salva"];
+const ORIGENS: CompraGastoOrigem[] = [
+  "transito",
+  "itens",
+  "premier",
+  "gentile",
+  "valor",
+  "salva",
+];
 
 function num(v: unknown): number {
   const n = typeof v === "string" ? Number(v) : (v as number);

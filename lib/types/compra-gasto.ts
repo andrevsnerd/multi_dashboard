@@ -32,13 +32,23 @@ export type CompraGastoTipo =
  *  - `itens`: linhas digitadas à mão.
  *  - `premier`: compra de embalagem/material da Premier. As linhas já vêm
  *    prontas (sacola, caixa, tag…) e só quantidade e preço são digitados.
+ *  - `gentile`: compra da Gentile Etiquetas (papel seda e etiqueta adesiva).
+ *    Igual à Premier no valor (qtd × preço), mas o preço não é único: cada item
+ *    é cotado por FAIXA de quantidade, e escolher a faixa já traz quantidade e
+ *    preço prontos.
  *  - `valor`: LEGADO. Só descrição e valor total. Saiu da tela de lançamento —
  *    o valor continua aqui para os lotes já gravados serem lidos.
  *  - `salva`: LEGADO. Antes de a fonte passar a ser a Compra em trânsito, o
  *    vínculo era com a Compra Salva. Nenhuma compra nova nasce assim; o valor
  *    só existe para os lotes já gravados continuarem legíveis no painel.
  */
-export type CompraGastoOrigem = "transito" | "itens" | "premier" | "valor" | "salva";
+export type CompraGastoOrigem =
+  | "transito"
+  | "itens"
+  | "premier"
+  | "gentile"
+  | "valor"
+  | "salva";
 
 /**
  * Catálogo Premier — embalagem e material de loja.
@@ -94,6 +104,79 @@ export function custoPadraoPremier(descricao: string): number | null {
 }
 
 /**
+ * Catálogo Gentile Etiquetas — papel seda e etiqueta adesiva da Scarf Me.
+ *
+ * A diferença para a Premier: aqui **não existe preço unitário único**. A
+ * Gentile cota por FAIXA de quantidade e o preço cai conforme o volume — 10 Kg
+ * de papel sai a R$ 84,99/Kg e 20 Kg a R$ 60,10/Kg; o milheiro de etiqueta sai
+ * de R$ 326,00 (1.000) a R$ 90,00 (15.000). Por isso a tela escolhe a faixa em
+ * vez de digitar o preço: a faixa é que traz quantidade e preço juntos.
+ *
+ * ⚠️ `qtd` está na UNIDADE DE COMPRA do item, que é a unidade em que a Gentile
+ * cota — Kg no papel, **milheiro** na etiqueta. Guardar a etiqueta em unidades
+ * avulsas quebraria o valor: 3.000 unidades saem a R$ 163,49 o milheiro, o que
+ * dá R$ 0,16349 a unidade — cinco casas, que o item grava com quatro (0,1635) e
+ * fecha em R$ 490,50 em vez dos R$ 490,47 cotados. Em milheiro a conta é exata
+ * (3 × 163,49), e é a mesma linguagem do orçamento.
+ *
+ * O total da faixa não é campo: é sempre `qtd × custoUnitario`, para não haver
+ * duas fontes do mesmo número. `rotulo` é como a Gentile escreve a faixa, e é o
+ * que aparece na tela.
+ */
+export interface CompraGastoGentileFaixa {
+  /** Como a Gentile cota a faixa: "10 Kg", "3.000 unid". */
+  rotulo: string;
+  /** Quantidade na unidade de compra do item (Kg, milheiro). */
+  qtd: number;
+  /** Preço da unidade de compra (R$/Kg, R$/milheiro). */
+  custoUnitario: number;
+}
+
+export interface CompraGastoGentileItem {
+  /** Descrição que vai para a linha do lote. */
+  descricao: string;
+  /** Unidade de compra — a mesma de `faixa.qtd`. */
+  unidade: string;
+  /** Especificação técnica do orçamento (tamanho, cores, acabamento). */
+  especificacao: string;
+  /** Prazo de entrega prometido pela Gentile, para leitura humana. */
+  prazoEntrega?: string | null;
+  faixas: CompraGastoGentileFaixa[];
+}
+
+export const COMPRA_GASTO_GENTILE_CATALOGO: CompraGastoGentileItem[] = [
+  {
+    descricao: "Papel seda fundo branco — estampa rosa Scarf Me",
+    unidade: "Kg",
+    especificacao: "50x70 cm",
+    prazoEntrega: "1 semana a 10 dias",
+    faixas: [
+      // 10 Kg = R$ 849,90 e 20 Kg = R$ 1.202,00 (os totais do orçamento).
+      { rotulo: "10 Kg", qtd: 10, custoUnitario: 84.99 },
+      { rotulo: "20 Kg", qtd: 20, custoUnitario: 60.1 },
+    ],
+  },
+  {
+    descricao: "Etiqueta adesiva fundo branco — Scarf Me, 2 cores",
+    unidade: "milheiro",
+    especificacao: "45x25 mm, corte reto nas laterais, 2 cores de impressão em tinta",
+    faixas: [
+      // A Gentile cota o milheiro; o total da faixa é milheiros × preço.
+      { rotulo: "1.000 unid", qtd: 1, custoUnitario: 326 },
+      { rotulo: "3.000 unid", qtd: 3, custoUnitario: 163.49 },
+      { rotulo: "5.000 unid", qtd: 5, custoUnitario: 137 },
+      { rotulo: "10.000 unid", qtd: 10, custoUnitario: 103 },
+      { rotulo: "15.000 unid", qtd: 15, custoUnitario: 90 },
+    ],
+  },
+];
+
+/** Total cotado de uma faixa — sempre derivado, nunca um campo à parte. */
+export function totalFaixaGentile(faixa: CompraGastoGentileFaixa): number {
+  return Math.round(faixa.qtd * faixa.custoUnitario * 100) / 100;
+}
+
+/**
  * Canal de pagamento de uma parcela.
  *
  * Existe porque uma compra pode ter DOIS pagamentos correndo em paralelo que
@@ -129,6 +212,7 @@ export const COMPRA_GASTO_CANAIS: CompraGastoCanal[] = ["transferencia", "alibab
  *  - `roseli` (Pashmina): 3x, 90/120/150 dias.
  *  - `fatima` (Fashion): 2x, 30/60 dias.
  *  - `premier` (embalagem e material): 3x, 30/60/90 dias.
+ *  - `gentile` (Gentile Etiquetas): 2x, 30/60 dias, no boleto.
  *  - `india_kunal`: 13x iguais — entrada à vista + 12 parcelas de 30 em 30 dias.
  *  - `china` (Nick), `china_hannah`, `nepal`: transferência 40% + Alibaba 60%,
  *    cada canal com 30% no ato do pedido, 50% no despacho (+30 dias) e 20% 60
@@ -152,6 +236,7 @@ export type CompraGastoFornecedor =
   | "roseli"
   | "fatima"
   | "premier"
+  | "gentile"
   | "china"
   | "china_hannah"
   | "india_kunal"
@@ -175,6 +260,7 @@ export const COMPRA_GASTO_ORIGEM_LABEL: Record<CompraGastoOrigem, string> = {
   transito: "Compra em trânsito",
   itens: "Itens digitados",
   premier: "Premier",
+  gentile: "Gentile Etiquetas",
   valor: "Valor único (legado)",
   salva: "Compra Salva (legado)",
 };

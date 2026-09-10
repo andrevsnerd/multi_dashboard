@@ -4,6 +4,7 @@ import { readOnlyBlock } from "@/lib/auth/route-guards";
 import type {
   CompraGastoItem,
   CompraGastoLoteInput,
+  CompraGastoOrigem,
   CompraGastoParcela,
 } from "@/lib/types/compra-gasto";
 import { cents, gerarParcelas, itensTotal } from "@/lib/utils/compra-gastos-agregacao";
@@ -46,9 +47,9 @@ export async function GET(request: Request) {
  *    CONFIRMADA (qtd × custo, com fallback de custo no ERP). Rascunho é recusado.
  *    Item sem custo NÃO vira zero em silêncio — o lote nasce marcado como
  *    estimativa e a observação registra quantos.
- *  - "itens" / "premier": as linhas vêm do corpo da requisição (com ou sem
- *    vínculo a produto). Premier é a compra de embalagem/material, cujas linhas
- *    a tela já apresenta prontas.
+ *  - "itens" / "premier" / "gentile": as linhas vêm do corpo da requisição (com
+ *    ou sem vínculo a produto). Premier e Gentile são compras de embalagem e
+ *    material, cujas linhas a tela já apresenta prontas.
  *  - "valor": LEGADO — só descrição e valor total. Não é mais lançável na tela.
  *
  * As parcelas podem vir prontas (`parcelas`) ou ser geradas do total resolvido
@@ -74,13 +75,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "A data da compra é obrigatória" }, { status: 400 });
     }
 
-    // "premier" é a compra de embalagem/material: linhas prontas, digitadas com
-    // quantidade e preço — do ponto de vista do valor, é igual a "itens".
-    const origem =
-      body.origem === "transito" || body.origem === "itens" || body.origem === "premier"
+    // "premier" e "gentile" são compras de embalagem/material: linhas prontas,
+    // com quantidade e preço — do ponto de vista do valor, iguais a "itens".
+    const POR_LINHAS: CompraGastoOrigem[] = ["itens", "premier", "gentile"];
+    const origem: CompraGastoOrigem =
+      body.origem === "transito" || POR_LINHAS.includes(body.origem)
         ? body.origem
         : "valor";
-    const porLinhas = origem === "itens" || origem === "premier";
+    const porLinhas = POR_LINHAS.includes(origem);
     let itens: CompraGastoItem[] = Array.isArray(body.itens) ? body.itens : [];
     let estimado = !!body.estimado;
     let observacao = body.observacao ? String(body.observacao).trim() : null;

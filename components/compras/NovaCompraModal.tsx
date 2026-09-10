@@ -5,8 +5,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CompraTransitoListEntry } from "@/lib/types/compra-transito";
 import {
   COMPRA_GASTO_CANAL_LABEL,
+  COMPRA_GASTO_GENTILE_CATALOGO,
   COMPRA_GASTO_PREMIER_CATALOGO,
   COMPRA_GASTO_TIPO_LABEL,
+  totalFaixaGentile,
   type CompraGastoCandidata,
   type CompraGastoFornecedor,
   type CompraGastoItem,
@@ -70,6 +72,20 @@ interface LinhaPremier {
   custoUnitario: string;
 }
 
+/**
+ * Linha Gentile: item e unidade são fixos (vêm do catálogo). A FAIXA escolhida
+ * preenche quantidade e preço de uma vez — é assim que a Gentile cota. Os dois
+ * campos continuam editáveis: quantidade fora de tabela e reajuste de preço se
+ * digitam por cima, e é o valor digitado que a compra grava.
+ */
+interface LinhaGentile {
+  descricao: string;
+  /** Índice da faixa escolhida no catálogo; -1 = nenhuma (item fora da compra). */
+  faixa: number;
+  qtd: string;
+  custoUnitario: string;
+}
+
 const LINHA_VAZIA: LinhaLivre = { descricao: "", produto: "", corProduto: "", qtd: "", custoUnitario: "" };
 
 const TIPOS: CompraGastoTipo[] = ["mercadoria", "frete", "adiantamento", "material", "outros"];
@@ -78,12 +94,13 @@ const TIPOS: CompraGastoTipo[] = ["mercadoria", "frete", "adiantamento", "materi
  * Origens lançáveis na tela. "valor" e "salva" existem no modelo só para os
  * lotes antigos serem lidos — compra nova nasce sempre com itens.
  */
-type OrigemLancavel = Extract<CompraGastoOrigem, "transito" | "itens" | "premier">;
+type OrigemLancavel = Extract<CompraGastoOrigem, "transito" | "itens" | "premier" | "gentile">;
 
 const TIPO_COMPRA_OPCOES: { valor: OrigemLancavel; label: string }[] = [
   { valor: "transito", label: "Compra em trânsito" },
   { valor: "itens", label: "Itens digitados" },
   { valor: "premier", label: "Premier" },
+  { valor: "gentile", label: "Gentile Etiquetas" },
 ];
 
 /**
@@ -97,6 +114,20 @@ function premierPadrao(): LinhaPremier[] {
     descricao: item.descricao,
     qtd: "",
     custoUnitario: item.custoPadrao != null ? moneyUnit(item.custoPadrao) : "",
+  }));
+}
+
+/**
+ * Catálogo Gentile pronto para escolher: nenhum item vem marcado (faixa -1), do
+ * mesmo jeito que a Premier nasce sem quantidade — quem lança diz o que está
+ * comprando.
+ */
+function gentilePadrao(): LinhaGentile[] {
+  return COMPRA_GASTO_GENTILE_CATALOGO.map((item) => ({
+    descricao: item.descricao,
+    faixa: -1,
+    qtd: "",
+    custoUnitario: "",
   }));
 }
 
@@ -121,6 +152,8 @@ export default function NovaCompraModal({
   const [linhas, setLinhas] = useState<LinhaLivre[]>([{ ...LINHA_VAZIA }]);
   /** Catálogo Premier inteiro na tela: o usuário preenche só o que está comprando. */
   const [premier, setPremier] = useState<LinhaPremier[]>(premierPadrao);
+  /** Catálogo Gentile: os dois itens na tela, cada um com as faixas cotadas. */
+  const [gentile, setGentile] = useState<LinhaGentile[]>(gentilePadrao);
 
   const [titulo, setTitulo] = useState("");
   /**
@@ -239,7 +272,29 @@ export default function NovaCompraModal({
     [premier]
   );
 
-  const itensDaCompra = origem === "premier" ? itensPremier : itensDasLinhas;
+  /**
+   * Só os itens Gentile realmente comprados. A descrição gravada carrega a
+   * UNIDADE de compra (Kg, milheiro) porque é ela que dá sentido à quantidade
+   * na gaveta da compra: "3 × R$ 163,49" só se lê certo sabendo que são
+   * milheiros.
+   */
+  const itensGentile = useMemo<CompraGastoItem[]>(
+    () =>
+      gentile
+        .map((l, i) => ({
+          descricao: `${l.descricao} (${COMPRA_GASTO_GENTILE_CATALOGO[i].unidade})`,
+          produto: null,
+          corProduto: null,
+          corDescricao: null,
+          qtd: parseQtd(l.qtd) || 0,
+          custoUnitario: parsePrecoUnitario(l.custoUnitario) || 0,
+        }))
+        .filter((i) => i.qtd > 0),
+    [gentile]
+  );
+
+  const itensDaCompra =
+    origem === "premier" ? itensPremier : origem === "gentile" ? itensGentile : itensDasLinhas;
 
   const total = useMemo(() => {
     if (origem === "transito") return cents(previa?.total ?? transitoSelecionado?.totalValor ?? 0);
@@ -332,7 +387,47 @@ export default function NovaCompraModal({
       // 30/60/90 dele) vem junto, sem precisar escolher de novo lá embaixo.
       setFornecedor("premier");
     }
+    if (proxima === "gentile") {
+      setTipo("material");
+      setTitulo((atual) => atual.trim() || "Compra Gentile Etiquetas");
+      // Mesma ideia da Premier: o fornecedor já vem escolhido e traz o
+      // parcelamento 30/60 no boleto.
+      setFornecedor("gentile");
+    }
   }, []);
+
+  /**
+   * Escolher a faixa é o gesto principal desta tela: a Gentile cota quantidade
+   * e preço juntos, então a faixa preenche os dois. Voltar para "— não comprar —"
+   * limpa a linha e tira o item da compra.
+   */
+  const escolherFaixaGentile = useCallback((i: number, indice: number) => {
+    setGentile((prev) => {
+      const next = [...prev];
+      const faixa = COMPRA_GASTO_GENTILE_CATALOGO[i].faixas[indice];
+      next[i] = faixa
+        ? { ...next[i], faixa: indice, qtd: String(faixa.qtd), custoUnitario: moneyUnit(faixa.custoUnitario) }
+        : { ...next[i], faixa: -1, qtd: "", custoUnitario: "" };
+      return next;
+    });
+  }, []);
+
+  /**
+   * Quantidade ou preço digitados por cima da faixa. A faixa deixa de valer
+   * (vira -1) porque o que está na tela já não é mais a cotação dela — o aviso
+   * de "fora de tabela" é o que sinaliza que o preço precisa ser confirmado com
+   * a Gentile.
+   */
+  const atualizarGentile = useCallback(
+    (i: number, campo: "qtd" | "custoUnitario", valor: string) => {
+      setGentile((prev) => {
+        const next = [...prev];
+        next[i] = { ...next[i], [campo]: valor, faixa: -1 };
+        return next;
+      });
+    },
+    []
+  );
 
   const atualizarPremier = useCallback(
     (i: number, campo: "qtd" | "custoUnitario", valor: string) => {
@@ -381,6 +476,10 @@ export default function NovaCompraModal({
     }
     if (origem === "premier" && itensPremier.length === 0) {
       setErro("Informe a quantidade de pelo menos um item Premier.");
+      return;
+    }
+    if (origem === "gentile" && itensGentile.length === 0) {
+      setErro("Escolha a quantidade de pelo menos um item da Gentile.");
       return;
     }
     if (!parcelas.length || parcelas.some((p) => !p.vencimento)) {
@@ -685,6 +784,90 @@ export default function NovaCompraModal({
                 de tabela já preenchido. Digite a quantidade só do que está comprando: item sem
                 quantidade fica de fora da compra. O preço é editável — se a Premier reajustou,
                 corrija na linha e a compra grava o valor digitado.
+              </p>
+            </div>
+          )}
+
+          {origem === "gentile" && (
+            <div>
+              <div className={styles.blockTitle}>Itens Gentile Etiquetas</div>
+              <div className={styles.freeLines}>
+                {gentile.map((l, i) => {
+                  const item = COMPRA_GASTO_GENTILE_CATALOGO[i];
+                  const qtd = parseQtd(l.qtd) || 0;
+                  const preco = parsePrecoUnitario(l.custoUnitario) || 0;
+                  const totalLinha = qtd * preco;
+                  // Quantidade digitada por cima da tabela: o preço da Gentile
+                  // é por faixa, então fora dela ninguém garante o valor.
+                  const foraDeTabela = l.faixa < 0 && qtd > 0;
+                  return (
+                    <div className={styles.gentileItem} key={item.descricao}>
+                      <div className={styles.gentileName}>{item.descricao}</div>
+                      <div className={styles.gentileSpec}>
+                        {item.especificacao}
+                        {item.prazoEntrega ? ` · entrega em ${item.prazoEntrega}` : ""}
+                      </div>
+                      <div className={styles.gentileRow}>
+                        <select
+                          value={String(l.faixa)}
+                          onChange={(e) => escolherFaixaGentile(i, Number(e.target.value))}
+                          aria-label={`Quantidade de ${item.descricao}`}
+                        >
+                          <option value="-1">— não comprar —</option>
+                          {item.faixas.map((f, idx) => (
+                            <option key={f.rotulo} value={String(idx)}>
+                              {`${f.rotulo} — ${money(totalFaixaGentile(f))}`}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          value={l.qtd}
+                          placeholder={item.unidade}
+                          inputMode="decimal"
+                          aria-label={`Quantidade em ${item.unidade}`}
+                          onChange={(e) => atualizarGentile(i, "qtd", e.target.value)}
+                        />
+                        <input
+                          value={l.custoUnitario}
+                          placeholder={`R$/${item.unidade}`}
+                          inputMode="decimal"
+                          aria-label={`Preço por ${item.unidade}`}
+                          onChange={(e) => atualizarGentile(i, "custoUnitario", e.target.value)}
+                        />
+                        <span className={styles.freeLineTotal}>
+                          {totalLinha > 0 ? money(totalLinha) : "—"}
+                        </span>
+                      </div>
+                      <div className={styles.gentileFaixas}>
+                        {item.faixas
+                          .map((f) => `${f.rotulo}: ${money(totalFaixaGentile(f))}`)
+                          .join("  ·  ")}
+                        {item.unidade === "milheiro" ? "  (preço por milheiro)" : ""}
+                      </div>
+                      {foraDeTabela && (
+                        <div className={styles.gentileAviso}>
+                          Quantidade fora das faixas cotadas — confirme o preço com a Gentile.
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                <div className={styles.premierLine}>
+                  <span className={styles.premierTotalLabel}>Total da compra</span>
+                  <span />
+                  <span />
+                  <span className={`${styles.freeLineTotal} ${styles.premierTotalValor}`}>
+                    {total > 0 ? money(total) : "—"}
+                  </span>
+                </div>
+              </div>
+              <p className={styles.note}>
+                A Gentile cota por faixa de quantidade, e o preço cai conforme o volume — escolher
+                a faixa já traz quantidade e preço. Item sem quantidade fica de fora da compra. O
+                papel é comprado em <strong>Kg</strong> e a etiqueta em <strong>milheiro</strong>
+                {" "}(3 milheiros = 3.000 unidades): é essa a quantidade que a linha grava. Os dois
+                campos são editáveis para reajuste ou quantidade fora de tabela — nesse caso vale o
+                valor digitado. Pagamento em 30/60 dias, no boleto.
               </p>
             </div>
           )}

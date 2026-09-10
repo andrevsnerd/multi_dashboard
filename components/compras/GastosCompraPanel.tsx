@@ -828,9 +828,11 @@ function LinhaMes({
                                   ? "Compra Salva"
                                   : lote.origem === "premier"
                                     ? `Premier · ${lote.itens.length} itens`
-                                    : lote.origem === "itens"
-                                      ? `${lote.itens.length} linhas`
-                                      : "valor único"}
+                                    : lote.origem === "gentile"
+                                      ? `Gentile · ${lote.itens.length} ${lote.itens.length === 1 ? "item" : "itens"}`
+                                      : lote.origem === "itens"
+                                        ? `${lote.itens.length} linhas`
+                                        : "valor único"}
                             </span>
                             {ref.totalParcelas > 1 && (
                               <span className={styles.tag}>

@@ -510,9 +510,11 @@ export default function GastosCompraDrawer({
                       ? `Compra Salva vinculada — ${lote.itens.length} itens (vínculo antigo, de antes de a fonte passar a ser a Compra em trânsito). O valor veio de qtd × custo item por item.`
                       : lote.origem === "premier"
                         ? `Compra Premier (embalagem e material): ${lote.itens.length} ${lote.itens.length === 1 ? "item" : "itens"} do catálogo, com quantidade e preço digitados.`
-                        : lote.origem === "itens"
-                          ? `Linhas digitadas nesta compra: ${lote.itens.filter((i) => i.produto).length} vinculadas a produto e ${lote.itens.filter((i) => !i.produto).length} livres.`
-                          : "Valor único informado à mão. Sem itens, sem impacto em estoque."}
+                        : lote.origem === "gentile"
+                          ? `Compra Gentile Etiquetas: ${lote.itens.length} ${lote.itens.length === 1 ? "item" : "itens"} do catálogo, na faixa de quantidade cotada. A quantidade está na unidade de compra que aparece na descrição — Kg no papel, milheiro na etiqueta.`
+                          : lote.origem === "itens"
+                            ? `Linhas digitadas nesta compra: ${lote.itens.filter((i) => i.produto).length} vinculadas a produto e ${lote.itens.filter((i) => !i.produto).length} livres.`
+                            : "Valor único informado à mão. Sem itens, sem impacto em estoque."}
                 </span>
               </div>
               <div className={styles.fact}>
