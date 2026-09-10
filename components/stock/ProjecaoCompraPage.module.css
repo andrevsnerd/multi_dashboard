@@ -896,3 +896,72 @@
   background: var(--s-50);
 }
 
+
+/* ── Tabela item a item (produto × cor por mês) ─────────────────────────── */
+
+.itensTable {
+  min-width: 1560px;
+}
+
+.itensTable thead th:first-child,
+.itensTable tbody td:first-child,
+.itensTable tfoot td:first-child {
+  min-width: 280px;
+  max-width: 320px;
+}
+
+.itemNome {
+  display: block;
+  font-weight: 600;
+  color: var(--t-900);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.itemMeta {
+  display: block;
+  font-size: 11px;
+  color: var(--t-500);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.itensTable tfoot td {
+  border-top: 2px solid var(--b-200);
+  font-weight: 700;
+  background: var(--s-50);
+}
+
+.itensTable tfoot .stickyCol {
+  background: var(--s-50);
+}
+
+/* Select de compra salva no cabeçalho — mais largo que os outros campos. */
+.selectCompra {
+  min-width: 320px;
+  max-width: 420px;
+}
+
+/* Caixa de marcação inline, no mesmo alinhamento dos outros campos do cabeçalho. */
+.checkField {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--b-300);
+  border-radius: 8px;
+  background: var(--s-white);
+  color: var(--t-700);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.checkField input {
+  accent-color: var(--brand-scarfme, #2d1b4e);
+  cursor: pointer;
+}

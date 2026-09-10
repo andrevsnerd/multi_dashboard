@@ -1,12 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent } from "react";
 
 import FilialFilter from "@/components/filters/FilialFilter";
 import { useAuth } from "@/components/auth/AuthContext";
 import ProjecaoEmbalagensPanel, {
   type PedidoEmbalagens,
 } from "@/components/stock/ProjecaoEmbalagensPanel";
+import ProjecaoItensMensais, {
+  type ItemCompra,
+} from "@/components/stock/ProjecaoItensMensais";
 import { formatDateForQuery } from "@/lib/utils/date";
 import { VAREJO_VALUE, resolveCompany, type CompanyKey } from "@/lib/config/company";
 import {
@@ -68,6 +71,26 @@ interface ProjecaoItem {
   subgrupo: string;
   colecao: string;
   janelas: Record<string, number>;
+  /** Estoque atual do item (só saldos positivos). */
+  estoque?: number;
+  /** Série do ano por item — só vem no modo "item a item". */
+  mensal?: MensalItem[];
+}
+
+/** Uma compra salva na lista do select. */
+interface CompraSalvaOpcao {
+  id: string;
+  title: string;
+  itemCount: number;
+  totalQtdManual: number;
+  savedAt: string;
+}
+
+/** A compra salva JÁ IMPORTADA: é ela que manda nas linhas da tabela item a item. */
+interface CompraImportada {
+  id: string;
+  title: string;
+  items: ItemCompra[];
 }
 
 interface MensalItem {
@@ -92,6 +115,11 @@ interface ProjecaoResponse {
   estoqueTotal?: number;
   /** Itens (produto × cor) com estoque no recorte — usado como contagem do escopo. */
   estoqueItens?: number;
+  /** O servidor mandou a série mensal por item. */
+  porItem?: boolean;
+  /** Escopo grande demais: o detalhe por item não foi calculado. */
+  porItemOmitido?: boolean;
+  maxItensMensal?: number;
 }
 
 /**
@@ -114,6 +142,10 @@ const METRICAS: { key: Metrica; label: string }[] = [
 interface PedidoProjecao {
   dataBase: string;
   metrica: Metrica;
+  /** Projetar item a item (mês a mês por produto × cor). */
+  porItem: boolean;
+  /** A compra salva que originou o recorte, quando foi assim que ele nasceu. */
+  compra: CompraImportada | null;
   /** Nome canônico da filial, VAREJO_VALUE ou null = rede inteira. */
   filial: string | null;
   dims: DimState;
@@ -278,6 +310,15 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   // Projeção (unidades vendidas por janela) — vem do endpoint dedicado.
   const [metrica, setMetrica] = useState<Metrica>("produtos");
   const [pedido, setPedido] = useState<PedidoProjecao | null>(null);
+  // ── Compra salva: lista do select, a que está importada e o modo item a item ──
+  const [comprasSalvas, setComprasSalvas] = useState<CompraSalvaOpcao[]>([]);
+  const [compraImportada, setCompraImportada] = useState<CompraImportada | null>(null);
+  const [carregandoCompra, setCarregandoCompra] = useState(false);
+  const [erroCompra, setErroCompra] = useState<string | null>(null);
+  /** Projetar produto × cor linha a linha. Importar uma compra salva liga isto sozinho. */
+  const [porItem, setPorItem] = useState(false);
+  /** O que o servidor respondeu sobre o detalhe por item na última projeção. */
+  const [detalheItem, setDetalheItem] = useState({ disponivel: false, omitido: false, max: 400 });
   const [projItens, setProjItens] = useState<Record<string, ProjecaoItem>>({});
   const [totaisJanela, setTotaisJanela] = useState<Record<string, number>>({});
   /** Estoque do escopo APLICADO, como o servidor mediu (total + nº de itens produto × cor). */
@@ -367,20 +408,27 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   const removeProdutoChip = (id: string) =>
     setProdutoChips((prev) => prev.filter((x) => x.id !== id));
 
-  /**
-   * Resolve em LOTE os códigos colados (código de barra interno OU código do produto) e
-   * adiciona como chips. Código que não casou é mostrado na tela — colar 11 códigos e
-   * receber 9 itens sem aviso seria pior que o erro.
-   */
-  const adicionarCodigosColados = useCallback(async () => {
-    const codigos = codigosColados
+  /** Quebra um texto colado em códigos (linha, tab, vírgula, ponto-e-vírgula ou espaço). */
+  const quebrarCodigos = (texto: string): string[] =>
+    texto
       .split(/[\s,;]+/g)
       .map((c) => c.trim())
       .filter(Boolean);
+
+  /**
+   * Resolve em LOTE uma lista de códigos (código de barra interno OU código do produto) e
+   * adiciona como chips. Código que não casou é mostrado na tela — colar 11 códigos e
+   * receber 9 itens sem aviso seria pior que o erro.
+   *
+   * `codigosDiretos` é o caminho de quem colou NO CAMPO DE BUSCA; sem ele, vale o que está
+   * na caixa "Colar lista de códigos".
+   */
+  const resolverCodigos = useCallback(async (codigos: string[], limparCaixa: boolean) => {
     if (codigos.length === 0) {
       setAvisoCodigos("Cole pelo menos um código.");
       return;
     }
+    setProdutoOpen(true);
     setResolvendoCodigos(true);
     setAvisoCodigos(null);
     try {
@@ -422,13 +470,127 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
         );
       }
       setAvisoCodigos(partes.join(" · ") || "Nenhum código novo.");
-      if (naoEncontrados.length === 0) setCodigosColados("");
+      if (limparCaixa && naoEncontrados.length === 0) setCodigosColados("");
     } catch (e) {
       setAvisoCodigos(e instanceof Error ? e.message : "Erro ao resolver os códigos");
     } finally {
       setResolvendoCodigos(false);
     }
-  }, [codigosColados]);
+  }, []);
+
+  const adicionarCodigosColados = useCallback(
+    () => resolverCodigos(quebrarCodigos(codigosColados), true),
+    [codigosColados, resolverCodigos]
+  );
+
+  /**
+   * Colar uma LISTA no campo de busca resolve em lote, sem passar pela caixa escondida no
+   * dropdown. Era o passo que faltava: quem cola dez códigos espera dez chips, não uma
+   * busca por nome com o blob inteiro (que nunca casa com nada).
+   *
+   * Um código só continua indo para a busca normal — colar um código para procurá-lo é
+   * legítimo, e o campo já resolve barra e código de produto.
+   */
+  const onProdutoPaste = (event: ClipboardEvent<HTMLInputElement>) => {
+    const texto = event.clipboardData.getData("text");
+    if (!texto) return;
+    const codigos = quebrarCodigos(texto);
+    if (codigos.length < 2) return;
+    event.preventDefault();
+    setProdutoQuery("");
+    setProdutoResults([]);
+    void resolverCodigos(codigos, false);
+  };
+
+  // ── Compras salvas: lista do select ───────────────────────────────────────
+  //    Só na aba Produtos, e uma vez por empresa. A lista é leve (cabeçalho, sem itens).
+  useEffect(() => {
+    if (metrica !== "produtos") return;
+    let cancelado = false;
+    fetch(`/api/controle-estoque/compras-salvas?company=${companyKey}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("falhou"))))
+      .then((json: { data?: CompraSalvaOpcao[] }) => {
+        if (!cancelado) setComprasSalvas(Array.isArray(json.data) ? json.data : []);
+      })
+      .catch(() => {
+        // Sem lista o select simplesmente não aparece — não é erro que mereça alarme.
+        if (!cancelado) setComprasSalvas([]);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [companyKey, metrica]);
+
+  /**
+   * Importa uma compra salva: os itens dela viram o recorte (um chip por PRODUTO) e a
+   * projeção passa a sair item a item, com a Qtd salva ao lado do sugerido.
+   *
+   * Gera na hora. Escolher a compra no select já é a decisão — pedir um segundo clique em
+   * "Gerar projeção" seria burocracia.
+   */
+  const importarCompraSalva = async (id: string) => {
+    if (!id) {
+      setCompraImportada(null);
+      setPorItem(false);
+      setErroCompra(null);
+      return;
+    }
+    setCarregandoCompra(true);
+    setErroCompra(null);
+    try {
+      const res = await fetch(
+        `/api/controle-estoque/compras-salvas/${id}?company=${companyKey}`,
+        { cache: "no-store" }
+      );
+      const json = (await res.json()) as {
+        data?: { id: string; title: string; items?: Array<Record<string, unknown>> };
+        error?: string;
+      };
+      if (!res.ok || !json.data) throw new Error(json?.error || "Erro ao carregar a compra salva");
+
+      const items: ItemCompra[] = (json.data.items ?? []).map((raw) => ({
+        produto: String(raw.produto ?? "").trim(),
+        cor: String(raw.corProduto ?? "").trim(),
+        corDescricao: String(raw.corDescricao ?? "").trim(),
+        descricao: String(raw.descricao ?? "").trim(),
+        qtdManual: Math.max(0, Math.round(Number(raw.qtdManual ?? 0) || 0)),
+        custoUnitario: Number(raw.custoUnitario ?? 0) || undefined,
+      }));
+      const compra: CompraImportada = { id: json.data.id, title: json.data.title, items };
+
+      // O recorte da consulta é por PRODUTO (todas as cores vêm); quem recorta a cor de
+      // volta é a própria tabela, que monta as linhas a partir dos itens da compra.
+      const chips: ProdutoChip[] = [];
+      const vistos = new Set<string>();
+      items.forEach((it) => {
+        if (!it.produto || vistos.has(it.produto)) return;
+        vistos.add(it.produto);
+        chips.push({ id: it.produto, name: it.descricao || it.produto });
+      });
+
+      setProdutoChips(chips);
+      setDims(EMPTY_DIMS);
+      setProdutoQuery("");
+      setProdutoResults([]);
+      setCompraImportada(compra);
+      setPorItem(true);
+      setPedido({
+        dataBase,
+        metrica: "produtos",
+        filial,
+        dims: EMPTY_DIMS,
+        produtos: chips.map((c) => c.id),
+        busca: "",
+        porItem: true,
+        compra,
+      });
+    } catch (e) {
+      setErroCompra(e instanceof Error ? e.message : "Erro ao carregar a compra salva");
+      setCompraImportada(null);
+    } finally {
+      setCarregandoCompra(false);
+    }
+  };
 
   // Fecha o dropdown de busca ao clicar fora ou apertar Esc.
   useEffect(() => {
@@ -619,8 +781,10 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
         dims,
         produtos: produtosSelecionados,
         busca: buscaLivre,
+        porItem,
+        compra: compraImportada?.id ?? null,
       }),
-    [dataBase, metrica, filial, dims, produtosSelecionados, buscaLivre]
+    [dataBase, metrica, filial, dims, produtosSelecionados, buscaLivre, porItem, compraImportada]
   );
   const assinaturaGerada = useMemo(
     () =>
@@ -632,6 +796,8 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
             dims: pedido.dims,
             produtos: pedido.produtos,
             busca: pedido.busca,
+            porItem: pedido.porItem,
+            compra: pedido.compra?.id ?? null,
           })
         : null,
     [pedido]
@@ -646,6 +812,8 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
       dims,
       produtos: produtosSelecionados,
       busca: buscaLivre,
+      porItem,
+      compra: compraImportada,
     });
   };
 
@@ -678,6 +846,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
       metrica: pedido.metrica,
     });
     if (pedido.filial) params.set("filial", pedido.filial);
+    if (pedido.porItem) params.set("porItem", "1");
     DIM_KEYS.forEach((dim) => pedido.dims[dim].forEach((v) => params.append(dim, v)));
     pedido.produtos.forEach((produto) => params.append("produto", produto));
     if (pedido.busca) params.set("busca", pedido.busca);
@@ -703,6 +872,11 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
         setEstoqueEscopo({
           total: Math.max(0, Number(json.estoqueTotal ?? 0) || 0),
           itens: Math.max(0, Number(json.estoqueItens ?? 0) || 0),
+        });
+        setDetalheItem({
+          disponivel: json.porItem === true,
+          omitido: json.porItemOmitido === true,
+          max: Number(json.maxItensMensal ?? 400) || 400,
         });
       })
       .catch((error: Error) => {
@@ -963,6 +1137,9 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
     setProdutoQuery("");
     setProdutoResults([]);
     setAvisoCodigos(null);
+    setCompraImportada(null);
+    setErroCompra(null);
+    setPorItem(false);
   };
 
   /** O que está na tela é a rede inteira (geraram sem nenhum recorte). */
@@ -1112,6 +1289,45 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
                 ))}
               </select>
             </label>
+            {/* Compra salva: importa os itens da compra e projeta cada um linha a linha,
+                com a Qtd salva ao lado do sugerido. */}
+            {metrica === "produtos" && comprasSalvas.length > 0 && (
+              <label className={styles.field}>
+                <span className={styles.fieldLabel}>
+                  Compra salva
+                  {carregandoCompra && <span className={styles.fieldCount}>carregando…</span>}
+                </span>
+                <select
+                  className={`${styles.select} ${styles.selectCompra}`}
+                  value={compraImportada?.id ?? ""}
+                  disabled={carregandoCompra}
+                  onChange={(e) => void importarCompraSalva(e.target.value)}
+                >
+                  <option value="">Não importar</option>
+                  {comprasSalvas.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.title} · {fmt(c.itemCount)} itens · {fmt(c.totalQtdManual)} un ·{" "}
+                      {ymdToBr(c.savedAt.slice(0, 10))}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {/* Sem compra importada o detalhe item a item continua disponível: é o mesmo
+                cálculo, só que as linhas saem do recorte em vez da compra. */}
+            {metrica === "produtos" && !compraImportada && (
+              <label className={styles.field}>
+                <span className={styles.fieldLabel}>Detalhe</span>
+                <label className={styles.checkField} title="Uma linha por produto × cor, mês a mês">
+                  <input
+                    type="checkbox"
+                    checked={porItem}
+                    onChange={(e) => setPorItem(e.target.checked)}
+                  />
+                  item a item
+                </label>
+              </label>
+            )}
           </div>
 
           {/* Produto: busca no cadastro (mesma do Gerador de Relatórios). Cada escolha vira
@@ -1135,10 +1351,13 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
                   type="text"
                   value={produtoQuery}
                   placeholder={
-                    produtoChips.length > 0 ? "Adicionar outro produto…" : "Buscar produto, código…"
+                    produtoChips.length > 0
+                      ? "Adicionar outro produto — ou colar uma lista…"
+                      : "Buscar produto, código — ou colar uma lista de códigos…"
                   }
                   onChange={(e) => onProdutoQueryChange(e.target.value)}
                   onFocus={() => setProdutoOpen(true)}
+                  onPaste={onProdutoPaste}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") e.preventDefault();
                   }}
@@ -1395,6 +1614,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
       ) : (
         <>
           {projErro && <div className={styles.erro}>{projErro}</div>}
+          {erroCompra && <div className={styles.erro}>{erroCompra}</div>}
 
           {/* ── KPIs ──────────────────────────────────────────────────────── */}
           <div className={`${styles.kpiStrip} ${ehTickets ? styles.kpiStripTickets : ""}`}>
@@ -1567,6 +1787,20 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
               </table>
             </div>
           </div>
+
+          {/* ── Item a item (produto × cor por mês) ───────────────────────── */}
+          {!ehTickets && pedido?.porItem && (
+            <ProjecaoItensMensais
+              itens={Object.values(projItens)}
+              compra={pedido.compra}
+              dataBase={dataBase}
+              diasHorizonte={diasHorizonte}
+              regra={regra}
+              carregando={projLoading}
+              omitido={detalheItem.omitido}
+              maxItens={detalheItem.max}
+            />
+          )}
         </>
       )}
     </div>

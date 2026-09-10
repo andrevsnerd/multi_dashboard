@@ -114,6 +114,11 @@ export async function GET(request: Request) {
   const filialParam = searchParams.get('filial')?.trim() || null;
   // `produtos` (padrão) mede unidades vendidas; `tickets` mede a contagem de vendas.
   const metrica = searchParams.get('metrica') === 'tickets' ? 'tickets' : 'produtos';
+  // Série MENSAL por item (produto × cor), e não só o total do escopo. É o que a visão
+  // "item a item" e a importação de Compra Salva precisam. Fica atrás de um parâmetro
+  // porque obriga as 24 consultas do ano a quebrarem por cor: num escopo largo (um GRUPO
+  // inteiro) isso é caro, e a tela normal não usa o detalhe.
+  const porItem = searchParams.get('porItem') === '1';
 
   if (!companyKey) {
     return NextResponse.json({ error: 'Parâmetro "company" obrigatório' }, { status: 400 });
@@ -413,18 +418,6 @@ export async function GET(request: Request) {
       });
     });
 
-    const itens = Array.from(acc.values()).map((item) => ({
-      produto: item.produto,
-      cor: item.cor,
-      corDescricao: item.corDescricao,
-      descricao: item.descricao,
-      codigoBarra: item.codigoBarra,
-      grade: item.grade,
-      subgrupo: item.subgrupo,
-      colecao: item.colecao,
-      janelas: Object.fromEntries(WINDOWS.map((d) => [d, item.qtde[d] ?? 0])),
-    }));
-
     // ── Série MENSAL: ano da data base + o mesmo mês do ano anterior, para a regra
     //    comparativa de crescimento (jan/26 x jan/25, fev x fev …). Meses ainda no futuro
     //    não são consultados (venda futura é sempre 0); do ano anterior vêm todos os 12.
@@ -434,8 +427,11 @@ export async function GET(request: Request) {
     for (let mes = 1; mes <= mesBase; mes += 1) mesesConsulta.push({ ano: anoBase, mes });
 
     // Sem filtro de cor não precisa quebrar por cor — o total do mês é o mesmo e a consulta
-    // fica bem mais leve (some o join de PRODUTO_CORES).
-    const mensalPorCor = dimensoes.cores.length > 0;
+    // fica bem mais leve (some o join de PRODUTO_CORES). A visão item a item precisa da
+    // quebra, então ali ela volta.
+    const mensalPorCor = dimensoes.cores.length > 0 || porItem;
+    /** produto||cor → 'yyyy-MM' → quantidade. Só preenchido no modo item a item. */
+    const mensalPorItem = new Map<string, Map<string, number>>();
 
     const totaisMes = await mapLimit(mesesConsulta, 4, async ({ ano, mes }) => {
       const primeiro = `${ano}-${pad2(mes)}-01`;
@@ -448,8 +444,20 @@ export async function GET(request: Request) {
         groupByCor: mensalPorCor,
         ...escopo,
       });
+      const chave = `${ano}-${pad2(mes)}`;
+      if (porItem) {
+        rows.forEach((r) => {
+          const key = `${r.produto}||${(r.cor ?? '').trim()}`;
+          let porMes = mensalPorItem.get(key);
+          if (!porMes) {
+            porMes = new Map<string, number>();
+            mensalPorItem.set(key, porMes);
+          }
+          porMes.set(chave, (porMes.get(chave) ?? 0) + Number(r.qtde ?? 0));
+        });
+      }
       const qtde = rows.reduce((soma, r) => soma + Number(r.qtde ?? 0), 0);
-      return { chave: `${ano}-${pad2(mes)}`, qtde: Math.round(qtde) };
+      return { chave, qtde: Math.round(qtde) };
     });
 
     const qtdePorMes = new Map(totaisMes.map(({ chave, qtde }) => [chave, qtde]));
@@ -471,6 +479,44 @@ export async function GET(request: Request) {
       WINDOWS.map((dias) => [dias, Math.max(0, Math.round(somaJanela.get(dias) ?? 0))])
     );
 
+    // A série mensal por item é o que a tela usa para projetar linha a linha. Num escopo
+    // largo seriam milhares de linhas × 12 meses numa resposta que ninguém consegue ler,
+    // então acima do teto ela não vai — e a tela DIZ que não foi, em vez de mostrar uma
+    // tabela pela metade.
+    const MAX_ITENS_MENSAL = 400;
+    const porItemOmitido = porItem && acc.size > MAX_ITENS_MENSAL;
+    const detalharMensalItem = porItem && !porItemOmitido;
+
+    const itens = Array.from(acc.values()).map((item) => {
+      const key = `${item.produto}||${item.cor}`;
+      const serie = mensalPorItem.get(key);
+      return {
+        produto: item.produto,
+        cor: item.cor,
+        corDescricao: item.corDescricao,
+        descricao: item.descricao,
+        codigoBarra: item.codigoBarra,
+        grade: item.grade,
+        subgrupo: item.subgrupo,
+        colecao: item.colecao,
+        janelas: Object.fromEntries(WINDOWS.map((d) => [d, item.qtde[d] ?? 0])),
+        /** Estoque atual do item (só saldos positivos), da mesma fonte do total. */
+        estoque: Math.round(estoquePorItem.get(key) ?? 0),
+        mensal: detalharMensalItem
+          ? Array.from({ length: 12 }, (_, i) => {
+              const mes = i + 1;
+              return {
+                mes: `${anoBase}-${pad2(mes)}`,
+                qtde: Math.round(serie?.get(`${anoBase}-${pad2(mes)}`) ?? 0),
+                qtdeAnoAnterior: Math.round(serie?.get(`${anoBase - 1}-${pad2(mes)}`) ?? 0),
+                parcial: mes === mesBase,
+                futuro: mes > mesBase,
+              };
+            })
+          : undefined,
+      };
+    });
+
     return NextResponse.json(
       {
         dataBase: baseParam,
@@ -481,6 +527,9 @@ export async function GET(request: Request) {
         mensal,
         estoqueTotal,
         estoqueItens,
+        porItem: detalharMensalItem,
+        porItemOmitido,
+        maxItensMensal: MAX_ITENS_MENSAL,
       },
       { headers: { 'Cache-Control': 'no-store' } }
     );
