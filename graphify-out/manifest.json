@@ -655,7 +655,7 @@
     "semantic_hash": "b902bf3e0fd3ad63c77c2ccd57038ec9"
   },
   "app/api/curva-abc/route.ts": {
-    "mtime": 1788463009.4001358,
+    "mtime": 1789045364.7515914,
     "ast_hash": "9f1e6d6deb0a0c8539c271eb1da580a4",
     "semantic_hash": ""
   },
@@ -1340,8 +1340,8 @@
     "semantic_hash": "1f13894059c7c73365fb5303040f3f5a"
   },
   "components/extrato-produto/ExtratoProdutoPage.tsx": {
-    "mtime": 1788968420.8261929,
-    "ast_hash": "8cf53a369e78d48e252001d1256da501",
+    "mtime": 1788978471.168256,
+    "ast_hash": "ae61d5c23a6144be0b039e3b4d578383",
     "semantic_hash": ""
   },
   "components/faturamento/FaturamentoPage.tsx": {
@@ -1355,9 +1355,9 @@
     "semantic_hash": ""
   },
   "components/filters/FilialFilter.tsx": {
-    "mtime": 1780073682.6960843,
-    "ast_hash": "68d7039a756fac184cb8f87fffd99f7e",
-    "semantic_hash": "68d7039a756fac184cb8f87fffd99f7e"
+    "mtime": 1788973898.196103,
+    "ast_hash": "e61b989634f47600a43f7e24d008a304",
+    "semantic_hash": ""
   },
   "components/filters/MultiSelectFilter.tsx": {
     "mtime": 1780073682.6997192,
@@ -1590,8 +1590,8 @@
     "semantic_hash": "7100ad93329f4cae6f0cf2636fa8a06f"
   },
   "components/relatorios/GeradorRelatoriosPage.tsx": {
-    "mtime": 1788540582.799924,
-    "ast_hash": "97df6af8928860e80f3c9b2f22f8eca7",
+    "mtime": 1788973910.8383863,
+    "ast_hash": "750dfbe11bc780d0d0fae44bd7670d59",
     "semantic_hash": ""
   },
   "components/romaneios/RomaneioDeleteModal.tsx": {
@@ -1645,8 +1645,8 @@
     "semantic_hash": "f9f455e79710f72c6b9952301879ebc6"
   },
   "components/stock/CompraSalvaDetalhePage.tsx": {
-    "mtime": 1788878150.0039382,
-    "ast_hash": "8d22d3443cf6b32b2178750ae58886f6",
+    "mtime": 1789064083.965789,
+    "ast_hash": "1884a1e0cb17d9dc4ecc0a360594e61a",
     "semantic_hash": ""
   },
   "components/stock/ComprasSalvasListPanel.tsx": {
@@ -1680,8 +1680,8 @@
     "semantic_hash": ""
   },
   "components/stock/EstoqueItemPage.tsx": {
-    "mtime": 1788368544.365322,
-    "ast_hash": "e2dd7ab00138011206b72a6efc61f3a9",
+    "mtime": 1788973910.8383863,
+    "ast_hash": "bf2ad366f641655483566ed8270d516b",
     "semantic_hash": ""
   },
   "components/stock/ListaCompraSugeridaPage.tsx": {
@@ -2460,8 +2460,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/ecommerce.ts": {
-    "mtime": 1788544318.365391,
-    "ast_hash": "bdb97da7ad1914af4dcb32233b8a67e0",
+    "mtime": 1789045199.720497,
+    "ast_hash": "a1492a638b5959210f678ac00b841e75",
     "semantic_hash": ""
   },
   "lib/repositories/entries.ts": {
@@ -2635,8 +2635,8 @@
     "semantic_hash": "29ce1c73943d226f43e1886d06bd8173"
   },
   "lib/services/salesTotals.ts": {
-    "mtime": 1788544318.365391,
-    "ast_hash": "1f0f287d774c4ab30e80714c00e9b3e7",
+    "mtime": 1789044928.434448,
+    "ast_hash": "63477a8942a625237aacd43f0f2b5676",
     "semantic_hash": ""
   },
   "lib/transfer-executor.js": {
@@ -3835,8 +3835,8 @@
     "semantic_hash": ""
   },
   "lib/config/filiais-especiais.ts": {
-    "mtime": 1785761951.1789758,
-    "ast_hash": "ed84e6aac9e333acf438d4c8a37d4dab",
+    "mtime": 1788974074.5228422,
+    "ast_hash": "f1e6f4d6c7f04bfbd67104347542ca90",
     "semantic_hash": ""
   },
   "app/(companies)/[company]/alterar-cadastro/page.tsx": {
@@ -4190,8 +4190,8 @@
     "semantic_hash": ""
   },
   "app/api/compras-gastos/route.ts": {
-    "mtime": 1788279444.739215,
-    "ast_hash": "f1df9fbf78874ae1766828f221652487",
+    "mtime": 1789046423.3213966,
+    "ast_hash": "ce7442246752e6c8ae2eb26ce873b6be",
     "semantic_hash": ""
   },
   "app/api/saidas-entradas-produtos/rascunhos/route.ts": {
@@ -4205,8 +4205,8 @@
     "semantic_hash": ""
   },
   "components/compras/GastosCompraDrawer.tsx": {
-    "mtime": 1788355825.3613641,
-    "ast_hash": "368a05ebac3d7a3975d8fb2408d65152",
+    "mtime": 1789046526.9911916,
+    "ast_hash": "d6ea53d1ca84e36c9fc115a2ea2147ce",
     "semantic_hash": ""
   },
   "components/compras/GastosCompraGrafico.tsx": {
@@ -4215,13 +4215,13 @@
     "semantic_hash": ""
   },
   "components/compras/GastosCompraPanel.tsx": {
-    "mtime": 1788281539.4471848,
-    "ast_hash": "6ad69feadd1251af455d0f05ac444dd0",
+    "mtime": 1789046526.9911916,
+    "ast_hash": "98bd93cc3f32d4693e91b220fb089d6d",
     "semantic_hash": ""
   },
   "components/compras/NovaCompraModal.tsx": {
-    "mtime": 1788355807.5523124,
-    "ast_hash": "bc97590625710b16644bb83f960732a2",
+    "mtime": 1789046575.950281,
+    "ast_hash": "30641d434cd4dbdea32f66160e78c01a",
     "semantic_hash": ""
   },
   "components/compras/ParcelasEditor.tsx": {
@@ -4240,13 +4240,13 @@
     "semantic_hash": ""
   },
   "lib/types/compra-gasto.ts": {
-    "mtime": 1788355758.464805,
-    "ast_hash": "83e1f5367ed29d8ac20b9adada976289",
+    "mtime": 1789046399.367446,
+    "ast_hash": "59698f977ad87fcdb51c8a9c51d16eb3",
     "semantic_hash": ""
   },
   "lib/utils/compra-gastos-agregacao.ts": {
-    "mtime": 1788285251.368505,
-    "ast_hash": "d7b8aef2025f90e108a3b363a72e460c",
+    "mtime": 1789046406.085484,
+    "ast_hash": "ba01c5653d3a53215a76ecd19a399836",
     "semantic_hash": ""
   },
   "lib/utils/compra-gastos-import.ts": {
@@ -4255,8 +4255,8 @@
     "semantic_hash": ""
   },
   "lib/utils/compra-gastos-store.ts": {
-    "mtime": 1788355825.3623655,
-    "ast_hash": "e3420fb19e82a533fd1690bd4ff3a2a3",
+    "mtime": 1789046416.5251813,
+    "ast_hash": "12547e18faaf80d95f96e19322306526",
     "semantic_hash": ""
   },
   "lib/utils/exportGastosCompraXlsx.ts": {
@@ -4360,8 +4360,8 @@
     "semantic_hash": ""
   },
   "docs/GASTOS_COMPRA_FORNECEDORES.md": {
-    "mtime": 1788355885.840722,
-    "ast_hash": "7be001c3a0d0c2fc458b398480214103",
+    "mtime": 1789046614.0814545,
+    "ast_hash": "2a908cd044d33abb7b49c9df7a0995b9",
     "semantic_hash": ""
   },
   "app/api/saidas-entradas-produtos/entrada-editar/route.ts": {
@@ -4390,13 +4390,13 @@
     "semantic_hash": ""
   },
   "app/api/projecao-compra/route.ts": {
-    "mtime": 1788955675.506112,
-    "ast_hash": "5f8bc5f32b119acc631bb5462ed436db",
+    "mtime": 1789128282.6684878,
+    "ast_hash": "51ff8031bd96525777f397e735580b91",
     "semantic_hash": ""
   },
   "components/stock/ProjecaoCompraPage.tsx": {
-    "mtime": 1788956832.211306,
-    "ast_hash": "640a951cd342235dc94ae383a2ecac57",
+    "mtime": 1789128537.0911684,
+    "ast_hash": "c6eda47f51212a54a588784dcde6d87d",
     "semantic_hash": ""
   },
   "lib/config/saida-estoque-negativo.ts": {
@@ -4477,6 +4477,51 @@
   "scripts/conferir-movimento-estoque.mjs": {
     "mtime": 1788969866.276787,
     "ast_hash": "3db9ba78649f40adbe5466beeb60a44f",
+    "semantic_hash": ""
+  },
+  "app/api/projecao-embalagens/route.ts": {
+    "mtime": 1789048310.5410671,
+    "ast_hash": "f0a9e0d1d15dd56c2a80c4a76acaf7b0",
+    "semantic_hash": ""
+  },
+  "components/stock/ProjecaoComoFunciona.tsx": {
+    "mtime": 1789128372.509732,
+    "ast_hash": "74b6287b39b4b0171c84f3a639b276d6",
+    "semantic_hash": ""
+  },
+  "components/stock/ProjecaoEmbalagensPanel.tsx": {
+    "mtime": 1789060843.9848068,
+    "ast_hash": "61c9ca4f867b5311ef3888fbd7312dcf",
+    "semantic_hash": ""
+  },
+  "components/stock/ProjecaoItensMensais.tsx": {
+    "mtime": 1789128366.287978,
+    "ast_hash": "08722edafbea83b79b8de1214cbb568d",
+    "semantic_hash": ""
+  },
+  "lib/config/embalagens.ts": {
+    "mtime": 1789050017.6401243,
+    "ast_hash": "36b72eb2545bbd9a251aabac1ef78a04",
+    "semantic_hash": ""
+  },
+  "lib/repositories/projecaoEmbalagens.ts": {
+    "mtime": 1789050026.9463973,
+    "ast_hash": "4ff365548fa0ae6e0f5e5d9ed837bf30",
+    "semantic_hash": ""
+  },
+  "lib/utils/embalagens-estoque-store.ts": {
+    "mtime": 1789048281.8579736,
+    "ast_hash": "00bfc41cd44d18e5c137aee5ed73cfa9",
+    "semantic_hash": ""
+  },
+  "lib/utils/projecao-realista.ts": {
+    "mtime": 1789054601.3072846,
+    "ast_hash": "e2ff08c0a633638c4225fff4b028ea0a",
+    "semantic_hash": ""
+  },
+  "lib/utils/projecao-regras.ts": {
+    "mtime": 1789128756.2263525,
+    "ast_hash": "e5bad13ff17cdd4e0501b9564d0a696d",
     "semantic_hash": ""
   }
 }

@@ -1178,7 +1178,23 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
         : 0
       : agregado.unidades[dias] ?? 0;
     const ritmoDia = ehIdeal ? consumoIdealEscopo : dias > 0 ? un / dias : 0;
-    const sugestao = disponivel ? Math.max(0, Math.ceil(ritmoDia * diasHorizonte - estoqueAtual)) : 0;
+    /**
+     * Na régua ideal a conta fecha POR ITEM, e não no agregado: somar o estoque de todo o
+     * escopo antes de subtrair deixa a sobra de uma cor mascarar a falta de outra, e o total
+     * do topo não bate com a soma da coluna "Precisa comprar" da tabela item a item.
+     * Com estoque digitado à mão não há por item de que falar — aí volta ao agregado.
+     */
+    const sugestaoIdealPorItem = ehIdeal
+      ? Object.values(projItens).reduce((soma, it) => {
+          const necessidadeItem = (Number(it.consumoIdeal) || 0) * diasHorizonte;
+          return soma + Math.max(0, Math.ceil(necessidadeItem - Math.max(0, Number(it.estoque) || 0)));
+        }, 0)
+      : 0;
+    const sugestao = disponivel
+      ? ehIdeal && estoqueOverride == null
+        ? sugestaoIdealPorItem
+        : Math.max(0, Math.ceil(ritmoDia * diasHorizonte - estoqueAtual))
+      : 0;
     const qtd = qtdOverride[regra] ?? sugestao;
     const cobertura = ritmoDia > 0 ? (estoqueAtual + qtd) / ritmoDia : null;
     const duraAte = cobertura !== null ? addDaysFormatted(dataBase, Math.round(cobertura)) : null;
@@ -1206,6 +1222,8 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
     projecaoHorizonte,
     agregado.unidades,
     estoqueAtual,
+    estoqueOverride,
+    projItens,
     qtdOverride,
     dataBase,
   ]);
