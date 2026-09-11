@@ -71,21 +71,43 @@ export function ehRegraCompraIdeal(regra: RegraProjecao): boolean {
   return regra === REGRA_COMPRA_IDEAL;
 }
 
-/** Ordem do select — as de curva primeiro (realista é o padrão), depois as janelas. */
+/**
+ * O que o select da aba Produtos oferece.
+ *
+ * **Hoje só a Sazonal.** Decisão do dono (11/09/2026): ter seis réguas no select fazia duas
+ * pessoas olharem a mesma tela e verem números diferentes sem perceber que tinham escolhido
+ * réguas diferentes. A compra passa a ser decidida por UMA régua, e as outras ficam fora do
+ * caminho.
+ *
+ * As demais NÃO foram removidas — o motor de cada uma continua inteiro e testado, e elas
+ * voltam ao select bastando descomentar a linha. É de propósito que a lista seja o único
+ * ponto de corte: `regrasDisponiveis` na tela, o quadro do "Como esta projeção é calculada"
+ * e a tabela "Outras réguas" leem daqui, então descomentar devolve tudo de uma vez.
+ *
+ * `realista` continua sendo a régua das abas Tickets e Embalagens (ver `REGRAS_OUTRAS_ABAS`):
+ * a Sazonal precisa da curva da categoria, que não existe para ticket nem para embalagem.
+ */
 export const REGRAS: RegraProjecao[] = [
   "sazonalCategoria",
-  "realista",
-  "mais10",
-  "compraIdeal",
-  "60",
-  "365",
-  "120",
-  "90",
-  "30",
+  // "realista",
+  // "mais10",
+  // "compraIdeal",
+  // "60",
+  // "365",
+  // "120",
+  // "90",
+  // "30",
 ];
 
+/**
+ * A régua das abas que não são Produtos. Ticket não é item e embalagem não tem cadastro no
+ * Linx, então a Sazonal (que depende da curva da CATEGORIA) não se aplica lá — sem esta
+ * lista, aquelas abas ficariam sem régua nenhuma quando o select de Produtos foi reduzido.
+ */
+export const REGRAS_OUTRAS_ABAS: RegraProjecao[] = ["realista"];
+
 export const REGRA_LABEL: Record<RegraProjecao, string> = {
-  sazonalCategoria: "Sazonal da categoria (ritmo do ano × curva Nov/Dez)",
+  sazonalCategoria: "Projeção Realista Sazonal",
   realista: "Projeção realista (índice YoY)",
   mais10: "Projeção conservadora (+10%)",
   compraIdeal: "Ritmo Compra Ideal (igual à Curva ABC)",

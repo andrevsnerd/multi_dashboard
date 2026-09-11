@@ -39,6 +39,7 @@ import {
   CRITERIO_TEXTO,
   REGRAS,
   REGRAS_CURVA,
+  REGRAS_OUTRAS_ABAS,
   REGRA_LABEL,
   ehRegraCompraIdeal,
   ehRegraSazonalCategoria,
@@ -991,17 +992,25 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
     () =>
       metrica === "produtos"
         ? REGRAS
-        : REGRAS.filter((r) => !ehRegraCompraIdeal(r) && !ehRegraSazonalCategoria(r)),
+        : // Ticket e embalagem não têm curva de categoria nem trecho com estoque, então a
+          // Sazonal e a Compra Ideal não se aplicam. `REGRAS_OUTRAS_ABAS` existe porque o
+          // select de Produtos foi reduzido a uma régua só — filtrar `REGRAS` deixaria
+          // estas abas sem opção nenhuma.
+          REGRAS_OUTRAS_ABAS.filter((r) => !ehRegraCompraIdeal(r) && !ehRegraSazonalCategoria(r)),
     [metrica]
   );
 
-  // Trocar de aba com a regra da Compra Ideal (ou a sazonal) escolhida cairia numa regra que
-  // aquela aba não sabe calcular — volta para o padrão.
+  /**
+   * A régua sempre tem de ser uma das que a aba atual oferece.
+   *
+   * Nos dois sentidos: ir para Tickets com a Sazonal escolhida cairia numa régua que aquela
+   * aba não sabe calcular; e VOLTAR de Tickets para Produtos deixaria a `realista` presa —
+   * uma régua que o select de Produtos não oferece mais, exibida como se fosse a vigente.
+   */
   useEffect(() => {
-    if (metrica !== "produtos" && (ehRegraCompraIdeal(regra) || ehRegraSazonalCategoria(regra))) {
-      setRegra("realista");
-    }
-  }, [metrica, regra]);
+    if (regrasDisponiveis.length === 0 || regrasDisponiveis.includes(regra)) return;
+    setRegra(regrasDisponiveis[0]);
+  }, [regrasDisponiveis, regra]);
 
   /**
    * Troca a regra de cálculo. A régua da Compra Ideal mede o ritmo POR ITEM, então ela
@@ -1814,20 +1823,29 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
               <span className={styles.fieldLabel}>Horizonte</span>
               <span className={styles.pill}>{fmt(diasHorizonte)} dias</span>
             </div>
-            <label className={styles.field}>
-              <span className={styles.fieldLabel}>Regra de cálculo</span>
-              <select
-                className={styles.select}
-                value={regra}
-                onChange={(e) => escolherRegra(e.target.value as RegraProjecao)}
-              >
-                {regrasDisponiveis.map((key) => (
-                  <option key={key} value={key}>
-                    {REGRA_LABEL[key]}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {/* Uma opção só não é escolha: vira rótulo. O select volta sozinho quando
+                outra régua for reativada em REGRAS (lib/utils/projecao-regras.ts). */}
+            {regrasDisponiveis.length > 1 ? (
+              <label className={styles.field}>
+                <span className={styles.fieldLabel}>Regra de cálculo</span>
+                <select
+                  className={styles.select}
+                  value={regra}
+                  onChange={(e) => escolherRegra(e.target.value as RegraProjecao)}
+                >
+                  {regrasDisponiveis.map((key) => (
+                    <option key={key} value={key}>
+                      {REGRA_LABEL[key]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <div className={styles.field}>
+                <span className={styles.fieldLabel}>Regra de cálculo</span>
+                <span className={styles.pill}>{REGRA_LABEL[regra]}</span>
+              </div>
+            )}
             {/* Compras salvas: importa os itens e projeta cada um linha a linha, com a Qtd
                 salva ao lado do sugerido. Aceita VÁRIAS — o mesmo item pedido em duas listas
                 soma, porque o que se compara com a projeção é o pedido total. */}

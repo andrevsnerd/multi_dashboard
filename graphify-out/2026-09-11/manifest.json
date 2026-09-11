@@ -2435,8 +2435,8 @@
     "semantic_hash": "8c1d93a8e7b6ea254bb47828f9553e06"
   },
   "lib/repositories/controleEstoque.ts": {
-    "mtime": 1789151247.8362045,
-    "ast_hash": "c0e77dbdeb92f5bf5542960894078847",
+    "mtime": 1789152994.7804382,
+    "ast_hash": "0b82b6b6829730d59e72aefa254b685b",
     "semantic_hash": ""
   },
   "lib/repositories/controleMovimento.ts": {
@@ -4390,13 +4390,13 @@
     "semantic_hash": ""
   },
   "app/api/projecao-compra/route.ts": {
-    "mtime": 1789151350.3407245,
-    "ast_hash": "8f176eb1c371dbea742d3f403576b0bc",
+    "mtime": 1789155901.459227,
+    "ast_hash": "51712b8764708295b13726d32f3ff81b",
     "semantic_hash": ""
   },
   "components/stock/ProjecaoCompraPage.tsx": {
-    "mtime": 1789152351.2351184,
-    "ast_hash": "b94c691b8dd26968ebdb62892a835acb",
+    "mtime": 1789156433.4441328,
+    "ast_hash": "907aeaa411399aedd38d1373dc5c240e",
     "semantic_hash": ""
   },
   "lib/config/saida-estoque-negativo.ts": {
@@ -4480,23 +4480,23 @@
     "semantic_hash": ""
   },
   "app/api/projecao-embalagens/route.ts": {
-    "mtime": 1789048310.5410671,
-    "ast_hash": "f0a9e0d1d15dd56c2a80c4a76acaf7b0",
+    "mtime": 1789155412.7598016,
+    "ast_hash": "f0a09ae701093d71c71cdbf82425daf1",
     "semantic_hash": ""
   },
   "components/stock/ProjecaoComoFunciona.tsx": {
-    "mtime": 1789152636.0913475,
-    "ast_hash": "145c0077353bff4675cd6e99c4f4181c",
+    "mtime": 1789156292.5497139,
+    "ast_hash": "6ca88ff1cee9fa10d45b9896c4c38a76",
     "semantic_hash": ""
   },
   "components/stock/ProjecaoEmbalagensPanel.tsx": {
-    "mtime": 1789140533.5057127,
-    "ast_hash": "dc21f3f48b41c332c625ad4dd606f71e",
+    "mtime": 1789155854.9901593,
+    "ast_hash": "25615b421aa43c39399b7b2a56ca7293",
     "semantic_hash": ""
   },
   "components/stock/ProjecaoItensMensais.tsx": {
-    "mtime": 1789152351.2351184,
-    "ast_hash": "1aaa2a72351d57184b79004d90e29e21",
+    "mtime": 1789153110.0341,
+    "ast_hash": "bc984d0dd5603196f552a0634e71725f",
     "semantic_hash": ""
   },
   "lib/config/embalagens.ts": {
@@ -4505,8 +4505,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/projecaoEmbalagens.ts": {
-    "mtime": 1789050026.9463973,
-    "ast_hash": "4ff365548fa0ae6e0f5e5d9ed837bf30",
+    "mtime": 1789155386.381682,
+    "ast_hash": "5dba82efbb3470d09de71eb10ffe5fe1",
     "semantic_hash": ""
   },
   "lib/utils/embalagens-estoque-store.ts": {
@@ -4520,13 +4520,13 @@
     "semantic_hash": ""
   },
   "lib/utils/projecao-regras.ts": {
-    "mtime": 1789135409.3162217,
-    "ast_hash": "064e487f111c97351d39139313742fdd",
+    "mtime": 1789155549.9615643,
+    "ast_hash": "f04743a105231e7750457d7dc291d057",
     "semantic_hash": ""
   },
   "lib/repositories/projecaoSazonalCategoria.ts": {
-    "mtime": 1789135308.3601494,
-    "ast_hash": "a56d520fc493e6270c60880ef441f3fe",
+    "mtime": 1789155901.1602752,
+    "ast_hash": "ec2f1d83d9d281d2c5333d1eca717c5f",
     "semantic_hash": ""
   },
   "lib/server/compra-transito-index.ts": {

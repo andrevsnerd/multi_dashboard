@@ -4390,13 +4390,13 @@
     "semantic_hash": ""
   },
   "app/api/projecao-compra/route.ts": {
-    "mtime": 1789153231.269337,
+    "mtime": 1789157595.9715562,
     "ast_hash": "38a9daa3180bd56c420067e2a4c22f29",
     "semantic_hash": ""
   },
   "components/stock/ProjecaoCompraPage.tsx": {
-    "mtime": 1789153346.826713,
-    "ast_hash": "e816cda14e30836d35ffc2e5b6c1c786",
+    "mtime": 1789157720.427284,
+    "ast_hash": "49f12afd6f5a3a448fe4fd2c5a5f4276",
     "semantic_hash": ""
   },
   "lib/config/saida-estoque-negativo.ts": {
@@ -4480,17 +4480,17 @@
     "semantic_hash": ""
   },
   "app/api/projecao-embalagens/route.ts": {
-    "mtime": 1789048310.5410671,
-    "ast_hash": "f0a9e0d1d15dd56c2a80c4a76acaf7b0",
+    "mtime": 1789157679.9086993,
+    "ast_hash": "22879262d8cf07db7b2a6ec8f5a227b7",
     "semantic_hash": ""
   },
   "components/stock/ProjecaoComoFunciona.tsx": {
-    "mtime": 1789153398.897985,
-    "ast_hash": "b19170f32ea4a88de07028b0dbc1c1a9",
+    "mtime": 1789157720.4220233,
+    "ast_hash": "bfefd0bb4a70b57c93f4dfe16e7f26d7",
     "semantic_hash": ""
   },
   "components/stock/ProjecaoEmbalagensPanel.tsx": {
-    "mtime": 1789140533.5057127,
+    "mtime": 1789157679.9086993,
     "ast_hash": "dc21f3f48b41c332c625ad4dd606f71e",
     "semantic_hash": ""
   },
@@ -4505,7 +4505,7 @@
     "semantic_hash": ""
   },
   "lib/repositories/projecaoEmbalagens.ts": {
-    "mtime": 1789050026.9463973,
+    "mtime": 1789157679.905066,
     "ast_hash": "4ff365548fa0ae6e0f5e5d9ed837bf30",
     "semantic_hash": ""
   },
@@ -4520,13 +4520,13 @@
     "semantic_hash": ""
   },
   "lib/utils/projecao-regras.ts": {
-    "mtime": 1789135409.3162217,
-    "ast_hash": "064e487f111c97351d39139313742fdd",
+    "mtime": 1789157720.4192524,
+    "ast_hash": "913e8bb7cef6253594dcfcf041577e09",
     "semantic_hash": ""
   },
   "lib/repositories/projecaoSazonalCategoria.ts": {
-    "mtime": 1789135308.3601494,
-    "ast_hash": "a56d520fc493e6270c60880ef441f3fe",
+    "mtime": 1789157595.9728873,
+    "ast_hash": "ac58aa84dddc71697bceb1eb794d03fe",
     "semantic_hash": ""
   },
   "lib/server/compra-transito-index.ts": {

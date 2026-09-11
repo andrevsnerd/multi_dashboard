@@ -15,7 +15,7 @@ import {
   type CurvaSazonal,
   type PerfilSazonal,
 } from "@/lib/utils/projecao-sazonal";
-import type { RegraProjecao } from "@/lib/utils/projecao-regras";
+import { REGRAS, type RegraProjecao } from "@/lib/utils/projecao-regras";
 
 import styles from "./ProjecaoCompraPage.module.css";
 
@@ -107,7 +107,7 @@ const REGUAS: Array<{
 }> = [
   {
     chaves: ["sazonalCategoria"],
-    nome: "Sazonal da categoria",
+    nome: "Projeção Realista Sazonal",
     uso: "compra de fim de ano",
     mostra: "Ritmo atual ajustado pela força histórica de cada mês",
   },
@@ -149,6 +149,12 @@ export default function ProjecaoComoFunciona({
 
   const regraAtual: RegraProjecao = regra ?? "sazonalCategoria";
   const identidade = REGUAS.find((r) => r.chaves.includes(regraAtual)) ?? REGUAS[0];
+  /**
+   * Só as réguas que o select realmente oferece. Hoje é uma só, e então a tabela "Outras
+   * réguas" some — anunciar opção que não dá para escolher é pior que não anunciar nada.
+   * Volta sozinha quando alguma linha for descomentada em `REGRAS`.
+   */
+  const reguasOferecidas = REGUAS.filter((r) => r.chaves.some((k) => REGRAS.includes(k)));
 
   const ehSazonal = regraAtual === "sazonalCategoria";
   const ehRealista = regraAtual === "realista" || regraAtual === "mais10";
@@ -255,7 +261,7 @@ export default function ProjecaoComoFunciona({
           {ehSazonal && (
             <div className={`${styles.comoRegra} ${styles.comoRegraAtiva}`}>
               <div className={styles.comoRegraTitulo}>
-                Sazonal da categoria
+                Projeção Realista Sazonal
                 <span className={styles.comoSelo}>compra de fim de ano</span>
               </div>
               <p>Esta projeção considera duas coisas:</p>
@@ -745,31 +751,35 @@ export default function ProjecaoComoFunciona({
           </ul>
 
           {/* ── As outras réguas, em uma linha cada ────────────────────────── */}
-          <div className={styles.comoNumerosTitulo}>Outras réguas disponíveis</div>
-          <div className={styles.comoTabWrap}>
-            <table className={styles.comoTab}>
-              <thead>
-                <tr>
-                  <th>Régua</th>
-                  <th>O que mostra</th>
-                </tr>
-              </thead>
-              <tbody>
-                {REGUAS.map((r) => (
-                  <tr key={r.nome} className={r === identidade ? styles.comoLinhaAtiva : ""}>
-                    <td>
-                      <strong>{r.nome}</strong>
-                      {r === identidade && <span className={styles.comoSelo}>escolhida</span>}
-                    </td>
-                    <td>{r.mostra}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className={styles.comoNota}>
-            Ao trocar a régua, mudam a projeção e esta explicação.
-          </p>
+          {reguasOferecidas.length > 1 && (
+            <>
+              <div className={styles.comoNumerosTitulo}>Outras réguas disponíveis</div>
+              <div className={styles.comoTabWrap}>
+                <table className={styles.comoTab}>
+                  <thead>
+                    <tr>
+                      <th>Régua</th>
+                      <th>O que mostra</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reguasOferecidas.map((r) => (
+                      <tr key={r.nome} className={r === identidade ? styles.comoLinhaAtiva : ""}>
+                        <td>
+                          <strong>{r.nome}</strong>
+                          {r === identidade && <span className={styles.comoSelo}>escolhida</span>}
+                        </td>
+                        <td>{r.mostra}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className={styles.comoNota}>
+                Ao trocar a régua, mudam a projeção e esta explicação.
+              </p>
+            </>
+          )}
         </div>
       )}
     </div>
