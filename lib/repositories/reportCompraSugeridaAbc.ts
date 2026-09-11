@@ -13,17 +13,18 @@ import { productMatchesFornecedor, type ProdutoInfo } from "@/lib/utils/forneced
 import { fetchRupturasLoja, type RupturaItem } from "@/lib/repositories/lojaRaioX";
 import { normalizeRangeForQuery } from "@/lib/utils/date";
 import { canonicalKey, ROW_COR_FIELD, ROW_RUPTURA_FIELD } from "@/lib/reports/keys";
-import { getMappedColorDescription } from "@/lib/utils/colorMapping";
 import { getControleEstoqueMetricasItensBatched } from "@/lib/server/controle-estoque-metricas";
+import { fetchEstoqueProdutoPorFilialLote } from "@/lib/repositories/controleEstoque";
 import { buildControleEstoqueItemKey } from "@/lib/utils/controle-estoque-metricas";
 import {
   calcCompraIdealFromResumo,
   precisaComprarEssaSemana,
 } from "@/lib/utils/compra-ideal";
 import { ensureCompraCicloRuntime } from "@/lib/config/compra-ciclo-store";
-import { listComprasTransitoFull } from "@/lib/utils/compra-transito-store";
-import { isCompraTransitoDateActive } from "@/lib/utils/compra-transito-status";
-import type { CompraTransitoIndexEntry } from "@/lib/client/compras-transito";
+import {
+  buildCompraTransitoServerIndex,
+  transitDescKey,
+} from "@/lib/server/compra-transito-index";
 import { COMPRA_FILIAL_COL_PREFIX } from "@/lib/reports/compra-sugerida-abc";
 import { fetchControleTransferencias } from "@/lib/repositories/controleTransferencias";
 import {
@@ -46,67 +47,15 @@ import type {
 const FILIAL_CONCURRENCY = 3;
 
 /**
- * Matriz nunca é coluna de compra sugerida — mesma exclusão do export "Compra Ideal por Loja"
+ * Matriz nunca é COLUNA de compra sugerida — mesma exclusão do export "Compra Ideal por Loja"
  * da Curva ABC (CurvaAbcPage.tsx), que não sugere reposição de loja de varejo para a matriz.
+ * Ela continua entrando no "Estoque rede" (é peça da rede, e na SCARF ME é onde está a maior
+ * parte do estoque) — igual à coluna "Estoque rede" da tela da Curva ABC.
  */
 const MATRIZ_BY_COMPANY: Record<string, string[]> = {
   scarfme: ["SCARF ME - MATRIZ"],
   nerd: ["NERD"],
 };
-
-/**
- * Alias por DESCRIÇÃO de cor (espelha lib/client/compras-transito): casa quando o
- * código de cor gravado no trânsito difere do código de estoque/curva mas representa
- * a MESMA cor (ex.: '86' x '120' = AZUL/VERDE), quando o trânsito veio sem código,
- * ou quando gravaram a descrição no lugar do código. Prefixo dedicado para nunca
- * colidir com a chave canônica.
- */
-const TRANSIT_DESC_PREFIX = " desc ";
-
-function transitDescKey(
-  produto: string | null | undefined,
-  corProduto: string | null | undefined,
-  corDescricao?: string | null
-): string | null {
-  // A descrição de cor é escopada POR PRODUTO no Linx (o mesmo código descreve
-  // cores diferentes por produto). Prioriza a descrição do cadastro do item
-  // (corDescricao = PRODUTO_CORES.DESC_COR_PRODUTO / descCorProduto do detalhe);
-  // getMappedColorDescription (mapa global) entra só como fallback quando vazia.
-  const doProduto = (corDescricao ?? "").trim();
-  const base = doProduto || getMappedColorDescription(corProduto);
-  const raw = base.trim().toUpperCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
-  if (!raw) return null;
-  return `${TRANSIT_DESC_PREFIX}${String(produto ?? "").trim()}||${raw}`;
-}
-
-/** Índice de compras em trânsito ativas por (produto × cor canônica) — abatido como pool da rede. */
-async function buildTransitIndex(
-  company: string | undefined
-): Promise<Map<string, CompraTransitoIndexEntry[]>> {
-  const idx = new Map<string, CompraTransitoIndexEntry[]>();
-  if (!company) return idx;
-  const compras = await listComprasTransitoFull(company).catch(() => []);
-  const today = new Date();
-  for (const c of compras) {
-    for (const it of c.items ?? []) {
-      if (!isCompraTransitoDateActive(it.dataRecebimento, today)) continue;
-      const entry: CompraTransitoIndexEntry = {
-        itemKey: it.itemKey ?? "",
-        produto: it.produto,
-        corProduto: it.corProduto ?? null,
-        quantidade: Number(it.quantidade ?? 0),
-        dataRecebimento: it.dataRecebimento,
-        title: c.title ?? "",
-        confirmedAt: c.confirmedAt ?? "",
-      };
-      const k = canonicalKey(it.produto, it.corProduto ?? null);
-      idx.set(k, [...(idx.get(k) ?? []), entry]);
-      const dk = transitDescKey(it.produto, it.corProduto, it.corDescricao);
-      if (dk) idx.set(dk, [...(idx.get(dk) ?? []), entry]);
-    }
-  }
-  return idx;
-}
 
 async function mapWithConcurrency<T, R>(
   items: T[],
@@ -240,7 +189,8 @@ export async function fetchCompraSugeridaAbc(
 
   // ── Lojas da rede (nomes canônicos ativos, sem matriz) + rótulos de exibição (deduplicados) ──
   const company = await resolveCompanyLive(filters.company);
-  const matrizSet = new Set(MATRIZ_BY_COMPANY[filters.company ?? ""] ?? []);
+  const matrizNames = MATRIZ_BY_COMPANY[filters.company ?? ""] ?? [];
+  const matrizSet = new Set(matrizNames);
   const filialNames = company
     ? getOperationalFilials(company, "sales").filter((f) => !matrizSet.has(f))
     : [];
@@ -274,7 +224,7 @@ export async function fetchCompraSugeridaAbc(
   // em 0/N e avança a cada loja concluída; o front mostra "Calculando compra por loja… X/N".
   let lojasFeitas = 0;
   ctx?.onProgress?.(0, orderedNames.length, "lojas");
-  const [metricasPorFilial, transitIndex, transferLens] = await Promise.all([
+  const [metricasPorFilial, estoqueMatrizPorItem, transitIndex, transferLens] = await Promise.all([
     mapWithConcurrency(orderedNames, FILIAL_CONCURRENCY, (name) =>
       getControleEstoqueMetricasItensBatched({
         company: filters.company,
@@ -288,7 +238,17 @@ export async function fetchCompraSugeridaAbc(
           ctx?.onProgress?.(lojasFeitas, orderedNames.length, "lojas");
         })
     ),
-    buildTransitIndex(filters.company),
+    // Estoque da MATRIZ (só saldo, sem histórico/compra ideal): entra no "Estoque rede",
+    // nunca numa coluna de loja. Uma consulta em lote por matriz, bem mais barata que a
+    // rodada de métricas de uma loja.
+    Promise.all(
+      matrizNames.map((name) =>
+        fetchEstoqueProdutoPorFilialLote({ company: filters.company, filial: name, itens: itensInput }).catch(
+          () => new Map<string, Array<{ filial: string; estoque: number }>>()
+        )
+      )
+    ),
+    buildCompraTransitoServerIndex(filters.company),
     // Lente de transferência (opt-in): mesma régua/janela (30d) do Controle de Transferências.
     filters.considerarTransferencias
       ? fetchControleTransferencias({ company: filters.company, filial: null })
@@ -346,9 +306,16 @@ export async function fetchCompraSugeridaAbc(
       if (qtd > 0) qtyByLabel.set(label, (qtyByLabel.get(label) ?? 0) + qtd);
       total += qtd;
       custoMax = Math.max(custoMax, Number(metricas?.resumo?.custoUnitario ?? 0));
-      // Estoque negativo nunca conta — soma só os saldos positivos de cada loja (rede exclui matriz).
+      // Estoque negativo nunca conta — soma só os saldos positivos de cada loja.
       estoqueRede += Math.max(0, Number(metricas?.resumo?.estoqueTotal ?? 0));
     });
+    // + MATRIZ (sem coluna de compra): fecha com a coluna "Estoque rede" da tela da Curva ABC,
+    // que soma lojas + matriz. Sem isso o arquivo mostrava a rede sem o maior estoque dela.
+    for (const mapa of estoqueMatrizPorItem) {
+      for (const linha of mapa.get(itemKey) ?? []) {
+        estoqueRede += Math.max(0, Number(linha.estoque ?? 0));
+      }
+    }
 
     if (total <= 0) continue; // só itens que alguma loja precisa comprar agora/essa semana
 

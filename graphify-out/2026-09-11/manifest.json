@@ -1490,8 +1490,8 @@
     "semantic_hash": "3a1ac7d9dac7349b3338e8b433eb5031"
   },
   "components/performance/CurvaAbcPage.tsx": {
-    "mtime": 1789134489.7963204,
-    "ast_hash": "63d9b558f58a38ee9766f1673d739ad8",
+    "mtime": 1788463322.6449215,
+    "ast_hash": "abe739cf4d9b8cf9b7881bc8f3d87d0d",
     "semantic_hash": ""
   },
   "components/performance/CurvaPorProdutoPage.tsx": {
@@ -2545,8 +2545,8 @@
     "semantic_hash": "36ad099560d5d50a879355f562c7807a"
   },
   "lib/repositories/reportCompraSugeridaAbc.ts": {
-    "mtime": 1789135237.5008395,
-    "ast_hash": "e48654056eff0977a0d351961a52d2c9",
+    "mtime": 1788964892.472407,
+    "ast_hash": "ca4d085efb4b86dc5ec224256b8eba96",
     "semantic_hash": ""
   },
   "lib/repositories/reportEstoque.ts": {
@@ -4390,13 +4390,13 @@
     "semantic_hash": ""
   },
   "app/api/projecao-compra/route.ts": {
-    "mtime": 1789135352.5877817,
-    "ast_hash": "cc1b09c72d87e92ce12b7e3b9e59ca88",
+    "mtime": 1789128282.6684878,
+    "ast_hash": "51ff8031bd96525777f397e735580b91",
     "semantic_hash": ""
   },
   "components/stock/ProjecaoCompraPage.tsx": {
-    "mtime": 1789136193.9792926,
-    "ast_hash": "1102cd99f8e7f097eb8f60b9dbee4429",
+    "mtime": 1789128537.0911684,
+    "ast_hash": "c6eda47f51212a54a588784dcde6d87d",
     "semantic_hash": ""
   },
   "lib/config/saida-estoque-negativo.ts": {
@@ -4485,8 +4485,8 @@
     "semantic_hash": ""
   },
   "components/stock/ProjecaoComoFunciona.tsx": {
-    "mtime": 1789136023.9618623,
-    "ast_hash": "d3e4946b927050c46af71f9fba9fca6a",
+    "mtime": 1789128372.509732,
+    "ast_hash": "74b6287b39b4b0171c84f3a639b276d6",
     "semantic_hash": ""
   },
   "components/stock/ProjecaoEmbalagensPanel.tsx": {
@@ -4495,8 +4495,8 @@
     "semantic_hash": ""
   },
   "components/stock/ProjecaoItensMensais.tsx": {
-    "mtime": 1789135932.6132867,
-    "ast_hash": "2059679fc4bdfa626badccc2d42ad7db",
+    "mtime": 1789128366.287978,
+    "ast_hash": "08722edafbea83b79b8de1214cbb568d",
     "semantic_hash": ""
   },
   "lib/config/embalagens.ts": {
@@ -4515,28 +4515,13 @@
     "semantic_hash": ""
   },
   "lib/utils/projecao-realista.ts": {
-    "mtime": 1789135463.2412095,
-    "ast_hash": "8dcd98503d5e2b45377819fd125fc56a",
+    "mtime": 1789054601.3072846,
+    "ast_hash": "e2ff08c0a633638c4225fff4b028ea0a",
     "semantic_hash": ""
   },
   "lib/utils/projecao-regras.ts": {
-    "mtime": 1789135409.3162217,
-    "ast_hash": "064e487f111c97351d39139313742fdd",
-    "semantic_hash": ""
-  },
-  "lib/repositories/projecaoSazonalCategoria.ts": {
-    "mtime": 1789135308.3601494,
-    "ast_hash": "a56d520fc493e6270c60880ef441f3fe",
-    "semantic_hash": ""
-  },
-  "lib/server/compra-transito-index.ts": {
-    "mtime": 1789135214.6359212,
-    "ast_hash": "ed3c860a0daeefa3348dcaeee358d828",
-    "semantic_hash": ""
-  },
-  "lib/utils/projecao-sazonal.ts": {
-    "mtime": 1789135120.968696,
-    "ast_hash": "fe7bc075c72f95556e3542df4eade885",
+    "mtime": 1789128756.2263525,
+    "ast_hash": "e5bad13ff17cdd4e0501b9564d0a696d",
     "semantic_hash": ""
   }
 }

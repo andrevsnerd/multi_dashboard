@@ -1542,15 +1542,19 @@ async function buildCompraIdealPorFilialRowsCurvaAbc(
       ESTOQUE_REDE: 0,
     };
     let totalRede = 0;
-    let estoqueRede = 0;
+    let estoqueLojas = 0;
     filiais.forEach((_, idx) => {
       const cell = idealPorFilial[idx]?.get(plan.metricKey);
       const qtd = cell?.ci ?? 0;
       row[colunasFiliais[idx]] = qtd;
       totalRede += qtd;
-      estoqueRede += cell?.estoque ?? 0;
+      estoqueLojas += cell?.estoque ?? 0;
     });
-    row.ESTOQUE_REDE = estoqueRede;
+    // Estoque rede = MESMO número da tela (API /api/curva-abc), que soma as lojas + a
+    // MATRIZ. Somar só as colunas do export perderia a matriz (ela nunca é coluna de
+    // compra) — e ela é justamente onde mora a maior parte do estoque da SCARF ME.
+    // Fallback: soma das lojas, se a linha veio sem o estoque de rede da API.
+    row.ESTOQUE_REDE = p.estoqueRede ?? estoqueLojas;
     row["TOTAL REDE"] = totalRede;
     // Custo total = custo unit. × compra total da rede (vira fórmula dinâmica no XLSX).
     row.CUSTO_TOTAL = Math.round((Number(row.CUSTO_UNIT) || 0) * totalRede * 100) / 100;

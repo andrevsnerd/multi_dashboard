@@ -15,6 +15,7 @@ import type { CriterioMes, ModoProjecao } from "@/lib/utils/projecao-realista";
  */
 export type RegraProjecao =
   | "realista"
+  | "sazonalCategoria"
   | "mais10"
   | "compraIdeal"
   | "30"
@@ -42,6 +43,29 @@ export const REGRAS_CURVA: Record<string, ModoProjecao> = {
  */
 export const REGRA_COMPRA_IDEAL: RegraProjecao = "compraIdeal";
 
+/**
+ * Ritmo do ESCOPO × curva sazonal da CATEGORIA.
+ *
+ * Separa as duas perguntas que as outras regras misturam: QUANTO o item está entregando
+ * (patamar, medido no próprio escopo, no ano corrente, equilibrando o ano corrido com os
+ * últimos meses) e QUANDO esse volume aparece (curva, medida na categoria inteira ao longo
+ * de vários anos completos). É a única regra que enxerga a alta de Nov/Dez sem depender de
+ * o ano passado ter sido um ano bom — e a única que sabe dizer, em número, quanto a
+ * categoria cresce naqueles dois meses.
+ *
+ * O crescimento contra o ano passado NÃO é multiplicado: o patamar já sai das vendas deste
+ * ano. O YoY continua exibido, como leitura.
+ *
+ * Motor em [projecao-sazonal.ts](@/lib/utils/projecao-sazonal); a curva vem do servidor
+ * (`?sazonal=1`), porque medir a categoria inteira custa 12 consultas por ano-calendário.
+ */
+export const REGRA_SAZONAL_CATEGORIA: RegraProjecao = "sazonalCategoria";
+
+/** A regra sazonal precisa da curva da categoria, que só vem do servidor sob demanda. */
+export function ehRegraSazonalCategoria(regra: RegraProjecao): boolean {
+  return regra === REGRA_SAZONAL_CATEGORIA;
+}
+
 /** A regra da Compra Ideal precisa do detalhe por item (o ritmo é medido item a item). */
 export function ehRegraCompraIdeal(regra: RegraProjecao): boolean {
   return regra === REGRA_COMPRA_IDEAL;
@@ -49,6 +73,7 @@ export function ehRegraCompraIdeal(regra: RegraProjecao): boolean {
 
 /** Ordem do select — as de curva primeiro (realista é o padrão), depois as janelas. */
 export const REGRAS: RegraProjecao[] = [
+  "sazonalCategoria",
   "realista",
   "mais10",
   "compraIdeal",
@@ -60,6 +85,7 @@ export const REGRAS: RegraProjecao[] = [
 ];
 
 export const REGRA_LABEL: Record<RegraProjecao, string> = {
+  sazonalCategoria: "Sazonal da categoria (ritmo do ano × curva Nov/Dez)",
   realista: "Projeção realista (índice YoY)",
   mais10: "Projeção conservadora (+10%)",
   compraIdeal: "Ritmo Compra Ideal (igual à Curva ABC)",
@@ -77,4 +103,5 @@ export const CRITERIO_TEXTO: Record<CriterioMes, string> = {
   yoy: "Mesmo mês do ano anterior × índice YoY do escopo",
   ano_passado: "Mesmo mês do ano anterior + 10%",
   sem_base: "Sem base no ano anterior naquele mês: média dos últimos meses fechados",
+  sazonal: "Patamar do escopo neste ano × fator sazonal da categoria naquele mês",
 };

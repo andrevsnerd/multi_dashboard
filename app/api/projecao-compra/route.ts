@@ -7,6 +7,16 @@ import { buildControleEstoqueItemKey } from '@/lib/utils/controle-estoque-metric
 import { ensureCompraCicloRuntime } from '@/lib/config/compra-ciclo-store';
 import { calcCompraIdealFromResumo } from '@/lib/utils/compra-ideal';
 import { fetchSalesTotals } from '@/lib/services/salesTotals';
+import {
+  CHAVE_ESCOPO_TODO,
+  escolherDimCategoria,
+  fetchCurvasSazonaisCategoria,
+  valorDaDim,
+} from '@/lib/repositories/projecaoSazonalCategoria';
+import {
+  buildCompraTransitoServerIndex,
+  quantidadeEmTransito,
+} from '@/lib/server/compra-transito-index';
 import { VAREJO_VALUE, getFilialGroupMembers, type CompanyKey } from '@/lib/config/company';
 import { resolveCompanyDynamic } from '@/lib/config/company-server';
 import { normalizeRangeForQuery } from '@/lib/utils/date';
@@ -123,6 +133,10 @@ export async function GET(request: Request) {
   // porque obriga as 24 consultas do ano a quebrarem por cor: num escopo largo (um GRUPO
   // inteiro) isso é caro, e a tela normal não usa o detalhe.
   const porItem = searchParams.get('porItem') === '1';
+  // Curva sazonal da CATEGORIA (regra "Sazonal da categoria"). Fica atrás de parâmetro
+  // porque custa 12 consultas por ano-calendário medido, sobre a categoria INTEIRA e não
+  // sobre o recorte — caro demais para pagar em toda geração de projeção.
+  const comSazonal = searchParams.get('sazonal') === '1';
 
   if (!companyKey) {
     return NextResponse.json({ error: 'Parâmetro "company" obrigatório' }, { status: 400 });
@@ -381,6 +395,8 @@ export async function GET(request: Request) {
       subgrupo: string;
       /** Necessária para o ciclo de compra da regra "Ritmo Compra Ideal" (linha + subgrupo). */
       linha: string;
+      /** GRUPO_PRODUTO — a categoria mais ampla, usada quando não há subgrupo nem linha. */
+      grupo: string;
       colecao: string;
       qtde: Record<number, number>;
     };
@@ -408,6 +424,7 @@ export async function GET(request: Request) {
             grade: r.grade ?? '',
             subgrupo: r.subgrupo ?? '',
             linha: r.linha ?? '',
+            grupo: r.grupo ?? '',
             colecao: r.colecao ?? '',
             qtde: {},
           };
@@ -539,6 +556,80 @@ export async function GET(request: Request) {
       }
     }
 
+    // ── Trânsito: o que JÁ foi comprado e ainda não chegou ─────────────────────────
+    // A pergunta de compra não é "quanto tenho", é "quanto tenho + quanto vem". Sem isto a
+    // tela mandaria comprar de novo o que já está a caminho. Mesmo índice da Curva ABC
+    // (lib/server/compra-transito-index), então os dois números batem.
+    const transitoIndex = await buildCompraTransitoServerIndex(companyKey).catch(() => null);
+    const transitoPorItem = new Map<string, number>();
+    let transitoTotal = 0;
+    if (transitoIndex) {
+      acc.forEach((item, key) => {
+        const qtde = quantidadeEmTransito(
+          transitoIndex,
+          item.produto,
+          item.cor || null,
+          item.corDescricao
+        );
+        if (qtde <= 0) return;
+        transitoPorItem.set(key, qtde);
+        transitoTotal += qtde;
+      });
+    }
+
+    // ── Curva sazonal da CATEGORIA (regra "Sazonal da categoria") ──────────────────
+    // Quanto o escopo vende é medido no próprio escopo; QUANDO ele vende sai da categoria
+    // inteira, ao longo de vários anos completos — é a única amostra grande o bastante
+    // para dizer quanto novembro e dezembro crescem. Ver lib/utils/projecao-sazonal.ts.
+    let sazonal: {
+      dim: string;
+      anos: number[];
+      curvas: Record<string, unknown>;
+      categoriaPorItem: Record<string, string>;
+    } | null = null;
+    if (comSazonal) {
+      try {
+        const itensCat = Array.from(acc.values());
+        const dimCategoria = escolherDimCategoria(itensCat);
+        const categorias = Array.from(
+          new Set(itensCat.map((i) => valorDaDim(i, dimCategoria)).filter(Boolean))
+        );
+        const resultado = await fetchCurvasSazonaisCategoria({
+          company: companyKey,
+          posMembers,
+          ecomMembers,
+          anoBase,
+          dim: dimCategoria,
+          categorias,
+          // Só a classificação de cadastro segue valendo. Coleção, cor, tipo, produto e
+          // busca são recortes de ITEM: mantê-los devolveria a curva do próprio escopo,
+          // que é a amostra pequena de que esta regra está tentando fugir.
+          dimensoesFixas: {
+            grupos: dimensoes.grupos,
+            linhas: dimensoes.linhas,
+            subgrupos: dimensoes.subgrupos,
+            grades: dimensoes.grades,
+          },
+          filialKey: filialParam ?? '__REDE__',
+        });
+        const categoriaPorItem: Record<string, string> = {};
+        acc.forEach((item, key) => {
+          const chave = valorDaDim(item, dimCategoria);
+          categoriaPorItem[key] = chave && resultado.curvas[chave] ? chave : CHAVE_ESCOPO_TODO;
+        });
+        sazonal = {
+          dim: resultado.dim,
+          anos: resultado.anos,
+          curvas: resultado.curvas as unknown as Record<string, unknown>,
+          categoriaPorItem,
+        };
+      } catch (erro) {
+        // A curva é um adicional: sem ela as outras regras continuam funcionando e a tela
+        // avisa que a sazonal ficou sem base, em vez de a projeção inteira cair.
+        console.error('Projeção Compra: falha ao medir a curva sazonal da categoria', erro);
+      }
+    }
+
     const itens = Array.from(acc.values()).map((item) => {
       const key = `${item.produto}||${item.cor}`;
       const serie = mensalPorItem.get(key);
@@ -554,6 +645,10 @@ export async function GET(request: Request) {
         janelas: Object.fromEntries(WINDOWS.map((d) => [d, item.qtde[d] ?? 0])),
         /** Estoque atual do item (só saldos positivos), da mesma fonte do total. */
         estoque: Math.round(estoquePorItem.get(key) ?? 0),
+        /** Peças já compradas e a caminho (compras em trânsito ativas). */
+        transito: Math.round(transitoPorItem.get(key) ?? 0),
+        /** Categoria do item na curva sazonal (chave de `sazonal.curvas`). */
+        categoria: sazonal ? sazonal.categoriaPorItem[key] ?? CHAVE_ESCOPO_TODO : undefined,
         /**
          * Consumo/dia pela régua da Compra Ideal (Curva ABC). `undefined` = não medido
          * (fora do modo item a item, ou o item não tem métrica de disponibilidade).
@@ -584,6 +679,10 @@ export async function GET(request: Request) {
         mensal,
         estoqueTotal,
         estoqueItens,
+        /** Total já comprado e a caminho no MESMO recorte. */
+        transitoTotal: Math.round(transitoTotal),
+        /** Curvas sazonais por categoria — só quando `?sazonal=1`. */
+        sazonal,
         porItem: detalharMensalItem,
         porItemOmitido,
         maxItensMensal: MAX_ITENS_MENSAL,

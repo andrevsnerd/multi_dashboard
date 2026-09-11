@@ -41,7 +41,15 @@ export const FATOR_MAIS10 = 1.1;
 export type ModoProjecao = "realista" | "mais10";
 
 /** Critério que produziu o valor do mês — o que a tela mostra no tooltip. */
-export type CriterioMes = "real" | "parado" | "yoy" | "ano_passado" | "sem_base";
+export type CriterioMes =
+  | "real"
+  | "parado"
+  | "yoy"
+  | "ano_passado"
+  | "sem_base"
+  /** Regra "Sazonal da categoria": patamar do escopo × fator do mês. Outro motor — ver
+   *  [projecao-sazonal.ts](@/lib/utils/projecao-sazonal). */
+  | "sazonal";
 
 /** Um mês da série anual do escopo, do jeito que a API já devolve. */
 export interface MesSerie {
@@ -280,12 +288,41 @@ export function detalharHorizonte(
   dataBase: string,
   diasHorizonte: number
 ): ParteHorizonte[] {
+  return detalharIntervalo(
+    serie,
+    perfil,
+    modo,
+    indice,
+    Number(dataBase.slice(0, 4)),
+    dataBase,
+    diasHorizonte
+  );
+}
+
+/**
+ * A mesma conta de `detalharHorizonte`, mas com o ano da SÉRIE informado à parte do dia em
+ * que o trecho começa.
+ *
+ * Existe para projetar um trecho que NÃO começa na data base — "quanto isto vende de 01/01
+ * a 31/03 do ano que vem", que é o estoque de 90 dias que a compra precisa deixar sobrando
+ * na virada do ano. Em `detalharHorizonte` o ano da série é lido da própria data de início,
+ * então pedir 2027-01-01 faria a função procurar 2027 na série (que vai até 2026) e devolver
+ * zero em silêncio.
+ */
+export function detalharIntervalo(
+  serie: MesSerie[],
+  perfil: PerfilProjecao,
+  modo: ModoProjecao,
+  indice: number | null,
+  anoBase: number,
+  inicio: string,
+  diasHorizonte: number
+): ParteHorizonte[] {
   if (diasHorizonte <= 0 || perfil.ultimoMesReal < 1) return [];
-  const anoBase = Number(dataBase.slice(0, 4));
   const partes: ParteHorizonte[] = [];
-  let ano = anoBase;
-  let mes = Number(dataBase.slice(5, 7));
-  let dia = Number(dataBase.slice(8, 10));
+  let ano = Number(inicio.slice(0, 4));
+  let mes = Number(inicio.slice(5, 7));
+  let dia = Number(inicio.slice(8, 10));
   let restantes = diasHorizonte;
   // Teto de 48 meses: o horizonte é escolhido na tela e um erro de digitação na data não
   // pode virar laço infinito.
