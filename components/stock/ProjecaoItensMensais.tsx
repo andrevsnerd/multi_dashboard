@@ -62,6 +62,14 @@ export interface ItemProjecao {
   estoque?: number;
   /** Peças já compradas e a caminho — abatidas da sugestão, igual à Curva ABC. */
   transito?: number;
+  /**
+   * A linha existe SÓ por causa do trânsito: peça já comprada, de uma cor que nunca vendeu
+   * e não tem saldo. Sem ela a tabela escondia justamente o item que mais interessa ver, e
+   * o rodapé da coluna de trânsito fechava abaixo do total da faixa do topo.
+   */
+  soTransito?: boolean;
+  /** Chegada mais próxima do trânsito deste item ('yyyy-MM-dd'). */
+  chegada?: string;
   /** Chave da categoria do item na curva sazonal. */
   categoria?: string;
   mensal?: MesSerie[];
@@ -381,7 +389,16 @@ export default function ProjecaoItensMensais({
         i.produto,
         i.cor,
         i.descricao || i.produto,
-        [i.produto, i.corDescricao || i.cor, i.grade].filter(Boolean).join(" · "),
+        [
+          i.produto,
+          i.corDescricao || i.cor,
+          i.grade,
+          // Item que só existe na lista por causa do trânsito: a data de chegada é a
+          // informação que justifica ele estar ali.
+          i.soTransito && i.chegada ? `chega ${ymdToBr(i.chegada)}` : "",
+        ]
+          .filter(Boolean)
+          .join(" · "),
         null
       )
     );
@@ -414,8 +431,12 @@ export default function ProjecaoItensMensais({
           <span className={styles.cardTitle}>Itens por mês</span>
         </div>
         <div className={styles.tabelaNota}>
-          O recorte tem mais de {fmt(maxItens ?? 400)} itens — a projeção item a item não foi
-          calculada. Reduza o escopo (ou importe uma compra salva) para ver a tabela.
+          {/* A nota virou faixa de fragmentos: texto solto aqui dentro viraria item de flex
+              anônimo e perderia o espaçamento. */}
+          <span className={styles.notaItem}>
+            Mais de {fmt(maxItens ?? 400)} itens no recorte — a tabela item a item não foi
+            calculada. Reduza o escopo ou importe uma compra salva.
+          </span>
         </div>
       </div>
     );
@@ -423,6 +444,8 @@ export default function ProjecaoItensMensais({
 
   const colunas = 17 + (compra ? 2 : 0);
   const ateLabel = ymdToBr(venderAte);
+  /** Sem o ano: a tabela inteira é do ano da data base, e o cabeçalho é estreito. */
+  const ateCurto = ateLabel.slice(0, 5);
 
   return (
     <div className={styles.card}>
@@ -443,47 +466,44 @@ export default function ProjecaoItensMensais({
         </div>
       </div>
 
-      {/* A conta inteira em uma linha: sem isto "Precisa comprar" parece número mágico. */}
+      {/* Um parágrafo só, com meses + % + a conta + as colunas da compra, obrigava a ler
+          tudo para achar uma coisa. Vira fragmento curto com rótulo em negrito. */}
       <div className={styles.tabelaNota}>
-        Os meses mostram <strong>quanto vende</strong> — mês fechado é o realizado, à frente é
-        projeção
-        {ehRegraCompraIdeal(regra) ? (
-          <>
-            {" "}
-            pelo <strong>ritmo da Compra Ideal</strong> (consumo/dia × dias do mês, sem
-            sazonalidade e sem comparar com o ano passado)
-          </>
-        ) : null}
-        {ehRegraSazonalCategoria(regra) ? (
-          <>
-            {" "}
-            pelo <strong>patamar do item neste ano × a curva da categoria dele</strong> — é de
-            onde sai a alta de novembro e dezembro
-          </>
-        ) : null}
-        . A <strong>%</strong> compara sempre com o <strong>mesmo mês de {anoBase - 1}</strong>;
-        onde ela não aparece é porque o item não vendeu nada naquele mês do ano passado, então
-        não há com o que comparar. Depois vem a decisão:{" "}
-        <strong>Vai vender até {ateLabel}</strong> − <strong>Tem em estoque</strong> −{" "}
-        <strong>Em trânsito</strong> = <strong>Precisa comprar</strong>.
+        <span className={styles.notaItem}>
+          <strong>Meses:</strong> fechado = vendido, à frente = projeção
+          {ehRegraSazonalCategoria(regra)
+            ? " (patamar do item × curva da categoria)"
+            : ehRegraCompraIdeal(regra)
+            ? " (ritmo da Compra Ideal, sem sazonalidade)"
+            : ""}
+        </span>
+        <span className={styles.notaItem}>
+          <strong>%:</strong> contra o mesmo mês de {anoBase - 1} — vazio = não vendeu lá
+        </span>
+        <span className={styles.notaItem}>
+          <strong>Decisão:</strong> Vai vender − Estoque − Trânsito = Precisa comprar
+        </span>
         {compra ? (
-          <>
-            {" "}
-            <strong>Na compra</strong> é o que você salvou; <strong>Situação</strong> compara os
-            dois.
-          </>
+          <span className={styles.notaItem}>
+            <strong>Compra salva:</strong> Trânsito conta só compras <em>diferentes</em> desta
+            lista
+          </span>
         ) : null}
         {totais.semSerie > 0 ? (
-          <>
-            {" · "}
-            {fmt(totais.semSerie)}{" "}
+          <span className={styles.notaItem}>
+            <strong>{fmt(totais.semSerie)}</strong>{" "}
             {totais.semSerie === 1 ? "item sem venda" : "itens sem venda"} no período
-          </>
+          </span>
         ) : null}
       </div>
 
-      <div className={styles.tableScroll}>
-        <table className={`${styles.table} ${styles.mensalTable} ${styles.itensTable}`}>
+      {/* Rola DENTRO do card, com teto de altura: é o que faz o cabeçalho de dois andares
+          e a linha de totais ficarem parados quando a lista tem dezenas de itens — e, de
+          quebra, a página deixa de ter três metros de tabela. */}
+      <div className={`${styles.tableScroll} ${styles.tableScrollFixo}`}>
+        <table
+          className={`${styles.table} ${styles.mensalTable} ${styles.itensTable} ${styles.tabelaFixa}`}
+        >
           <thead>
             <tr>
               <th className={`${styles.thLeft} ${styles.stickyCol}`} rowSpan={2}>
@@ -506,7 +526,7 @@ export default function ProjecaoItensMensais({
                 title={`Projeção de venda da data base até ${ateLabel}`}
               >
                 Vai vender
-                <span className={styles.thSub}>até {ateLabel}</span>
+                <span className={styles.thSub}>até {ateCurto}</span>
               </th>
               <th
                 className={styles.colDecisao}
@@ -519,7 +539,10 @@ export default function ProjecaoItensMensais({
                 Tem
                 <span className={styles.thSub}>em estoque</span>
               </th>
-              <th className={styles.colDecisao} title="Vai vender − Tem em estoque (nunca negativo)">
+              <th
+                className={styles.colDecisao}
+                title="Vai vender − Tem em estoque − Já vem em trânsito (nunca negativo)"
+              >
                 Precisa
                 <span className={styles.thSub}>comprar</span>
               </th>
@@ -707,10 +730,19 @@ function DicaCompra({
 }) {
   const l = dica.linha;
   const curva = REGRAS_CURVA[regra] != null;
+  /**
+   * O abatimento da compra salva, fechado: quanto ainda falta pedir depois do que já foi
+   * salvo, ou quanto foi pedido a mais. `diferenca` (na compra − precisa) tem o sinal
+   * invertido para quem lê "falta", então as duas leituras ficam explícitas aqui.
+   */
+  const faltaPedir = l.qtdSalva == null ? 0 : Math.max(0, l.sugestao - l.qtdSalva);
+  const sobraPedida = l.qtdSalva == null ? 0 : Math.max(0, l.qtdSalva - l.sugestao);
 
   // Posiciona junto ao ponteiro, sem sair da janela.
   const largura = 340;
-  const altura = 250;
+  // Estimativa só para escolher o lado em que o painel abre. Cresce quando há compra salva
+  // (mais um bloco de conta) — subestimar fazia o painel nascer colado no rodapé da tela.
+  const altura = l.qtdSalva != null ? 400 : 320;
   const margem = 12;
   const janelaW = typeof window !== "undefined" ? window.innerWidth : 1280;
   const janelaH = typeof window !== "undefined" ? window.innerHeight : 800;
@@ -720,16 +752,6 @@ function DicaCompra({
     topAcima > margem
       ? topAcima
       : Math.min(dica.y + 16, Math.max(margem, janelaH - altura - margem));
-
-  /** Os meses do horizonte numa linha só: "set 31 (21d) + out 38 + nov 22 + dez 18". */
-  const somaMeses = l.partes
-    .map((parte) => {
-      const rotulo = MES_NOME[parte.mes - 1];
-      const valor = fmt(Math.round(parte.parcela));
-      const parcial = parte.diasUsados < parte.diasDoMes;
-      return parcial ? `${rotulo} ${valor} (${parte.diasUsados}d)` : `${rotulo} ${valor}`;
-    })
-    .join(" + ");
 
   /** Um mês do horizonte não veio da curva do ano anterior — vale dizer qual foi o desvio. */
   const criterioFora = l.meses.find(
@@ -747,6 +769,8 @@ function DicaCompra({
     <div className={styles.dicaPainel} style={{ left, top, width: largura }}>
       <div className={styles.dicaItem}>{l.rotulo}</div>
 
+      {/* PASSO 1 — quanto este item precisa. A conta que o dono aprovou: o que sai, menos
+          o que já existe. */}
       <div className={styles.dicaConta}>
         <div className={styles.dicaLinha}>
           <span>Vai vender até {ateLabel}</span>
@@ -758,7 +782,7 @@ function DicaCompra({
         </div>
         {l.transito > 0 && (
           <div className={styles.dicaLinha}>
-            <span>Já comprado (trânsito)</span>
+            <span>Já vem em trânsito</span>
             <span>− {fmt(l.transito)}</span>
           </div>
         )}
@@ -770,79 +794,141 @@ function DicaCompra({
         </div>
       </div>
 
+      {/* PASSO 2 — o que a compra salva já resolve. Antes "Na compra salva" aparecia solto
+          no rodapé, sem sinal e sem fechamento: dava para ler como se fosse mais uma
+          quantidade a comprar. Agora é um ABATIMENTO com resultado próprio. */}
+      {l.qtdSalva != null && (
+        <div className={styles.dicaConta}>
+          <div className={styles.dicaLinha}>
+            <span>Na compra salva</span>
+            <span>− {fmt(l.qtdSalva)}</span>
+          </div>
+          {/* Com várias compras importadas, de onde veio cada pedaço da soma. */}
+          {(l.origens ?? []).map((o, i) => (
+            <div key={`${o.titulo}-${i}`} className={styles.dicaLinha}>
+              <span className={styles.dicaFraco}>· {o.titulo}</span>
+              <span className={styles.dicaFraco}>{fmt(o.qtd)}</span>
+            </div>
+          ))}
+          <div className={`${styles.dicaLinha} ${styles.dicaTotal}`}>
+            {faltaPedir > 0 ? (
+              <>
+                <span>Ainda falta pedir</span>
+                <span>
+                  <strong className={styles.dicaFalta}>{fmt(faltaPedir)} un</strong>
+                </span>
+              </>
+            ) : sobraPedida > 0 ? (
+              <>
+                <span>Pedido acima do necessário</span>
+                <span>
+                  <strong className={styles.dicaSobra}>{fmt(sobraPedida)} un</strong>
+                </span>
+              </>
+            ) : (
+              <>
+                <span>A compra cobre</span>
+                <span>
+                  <strong className={styles.dicaOk}>no ponto</strong>
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* DE ONDE VEM O "vai vender" — era um parágrafo corrido com a soma dos meses, os
+          fatores e o patamar tudo na mesma frase. Vira lista: a soma mês a mês de um lado,
+          a régua embaixo em uma linha. */}
       {l.semSerie ? (
         <div className={styles.dicaNota}>
           Este item <strong>não vendeu nada</strong> no período, então não há o que projetar — a
           sugestão fica em 0 e a quantidade da compra é decisão sua.
         </div>
-      ) : ehRegraSazonalCategoria(regra) ? (
-        <div className={styles.dicaNota}>
-          {somaMeses ? (
-            <>
-              Os {fmt(Math.round(l.necessidade))} vêm de <strong>{somaMeses}</strong>. Cada mês é
-              o <strong>patamar do item</strong> neste ano
-              {l.patamarSazonal != null ? (
-                <>
-                  {" "}
-                  (<strong>{fmt(Math.round(l.patamarSazonal))}</strong> un/mês, já sem
-                  sazonalidade)
-                </>
-              ) : null}{" "}
-              × o fator daquele mês na categoria
-              {l.curvaSazonal ? (
-                <>
-                  {" "}
-                  <strong>{l.curvaSazonal.chave === "__ESCOPO__" ? "do escopo" : l.curvaSazonal.chave}</strong>{" "}
-                  (nov {fmtDec(l.curvaSazonal.fatores[11])}×, dez{" "}
-                  {fmtDec(l.curvaSazonal.fatores[12])}×)
-                </>
-              ) : null}
-              .
-            </>
-          ) : (
-            "Sem meses fechados no ano, o patamar não tem de onde sair."
-          )}
-        </div>
-      ) : curva ? (
-        <div className={styles.dicaNota}>
-          {somaMeses ? (
-            <>
-              Os {fmt(Math.round(l.necessidade))} vêm de <strong>{somaMeses}</strong>. Cada mês é o
-              que este item vendeu no mesmo mês de {anoBase - 1}
-              {l.indice != null ? (
-                <>
-                  , × <strong>{fmtDec(l.indice)}</strong>
-                </>
-              ) : null}
-              .{noLimite ? ` Índice ${noLimite}.` : ""}
-            </>
-          ) : (
-            "Sem meses fechados no ano, a curva não tem de onde sair."
-          )}
-          {criterioFora ? ` ${CRITERIO_TEXTO[criterioFora]}.` : ""}
-        </div>
-      ) : ehRegraCompraIdeal(regra) ? (
-        <div className={styles.dicaNota}>
-          {l.semRitmoIdeal ? (
-            <>
-              Este item <strong>não tem ritmo medido</strong> pela régua da Compra Ideal (sem
-              trecho com estoque positivo no histórico), então a projeção fica em 0.
-            </>
-          ) : (
-            <>
-              Ritmo da <strong>Compra Ideal</strong>: <strong>{fmtDec(l.ritmoDia)}/dia</strong> ×{" "}
-              {fmt(diasHorizonte)} dias = {fmt(Math.round(l.necessidade))}. O consumo/dia é o
-              mesmo que a Curva ABC usa — vendas do maior trecho contínuo com estoque, não dias
-              corridos. <strong>Sem comparação com o ano passado.</strong>
-            </>
-          )}
-        </div>
       ) : (
-        <div className={styles.dicaNota}>
-          {REGRA_LABEL[regra]}: o que saiu nos últimos {regra} dias ({fmtDec(l.ritmoDia)}/dia),
-          esticado para os {fmt(diasHorizonte)} dias do horizonte.{" "}
-          <strong>Sem sazonalidade.</strong>
-        </div>
+        <>
+          {l.partes.length > 0 && (
+            <>
+              <div className={styles.dicaSecao}>
+                De onde vêm os {fmt(Math.round(l.necessidade))}
+              </div>
+              <div className={styles.dicaMeses}>
+                {l.partes.map((parte) => (
+                  <div key={`${parte.ano}-${parte.mes}`} className={styles.dicaMes}>
+                    <span className={styles.dicaMesNome}>
+                      {MES_NOME[parte.mes - 1]}
+                      {parte.diasUsados < parte.diasDoMes && (
+                        <span className={styles.dicaMesDias}> {parte.diasUsados}d</span>
+                      )}
+                    </span>
+                    <span className={styles.dicaMesQtd}>{fmt(Math.round(parte.parcela))}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          <div className={styles.dicaNota}>
+            {ehRegraSazonalCategoria(regra) ? (
+              l.partes.length === 0 ? (
+                "Sem meses fechados no ano, o patamar não tem de onde sair."
+              ) : (
+                <>
+                  Cada mês é o <strong>patamar deste item</strong>
+                  {l.patamarSazonal != null ? (
+                    <> — {fmt(Math.round(l.patamarSazonal))} un/mês, já sem sazonalidade</>
+                  ) : null}{" "}
+                  × a <strong>força do mês na categoria</strong>
+                  {l.curvaSazonal ? (
+                    <>
+                      {" "}
+                      {l.curvaSazonal.chave === "__ESCOPO__" ? "do escopo" : l.curvaSazonal.chave}{" "}
+                      (nov {fmtDec(l.curvaSazonal.fatores[11])}× · dez{" "}
+                      {fmtDec(l.curvaSazonal.fatores[12])}×)
+                    </>
+                  ) : null}
+                  .
+                </>
+              )
+            ) : curva ? (
+              l.partes.length === 0 ? (
+                "Sem meses fechados no ano, a curva não tem de onde sair."
+              ) : (
+                <>
+                  Cada mês é o que este item vendeu no <strong>mesmo mês de {anoBase - 1}</strong>
+                  {l.indice != null ? (
+                    <>
+                      {" "}
+                      × <strong>{fmtDec(l.indice)}</strong>
+                    </>
+                  ) : null}
+                  .{noLimite ? ` Índice ${noLimite}.` : ""}
+                  {criterioFora ? ` ${CRITERIO_TEXTO[criterioFora]}.` : ""}
+                </>
+              )
+            ) : ehRegraCompraIdeal(regra) ? (
+              l.semRitmoIdeal ? (
+                <>
+                  Este item <strong>não tem ritmo medido</strong> pela régua da Compra Ideal (sem
+                  trecho com estoque positivo no histórico), então a projeção fica em 0.
+                </>
+              ) : (
+                <>
+                  Ritmo da <strong>Compra Ideal</strong>: <strong>{fmtDec(l.ritmoDia)}/dia</strong>{" "}
+                  × {fmt(diasHorizonte)} dias. O consumo/dia é o mesmo da Curva ABC — vendas do
+                  maior trecho contínuo com estoque, não dias corridos.{" "}
+                  <strong>Sem comparação com o ano passado.</strong>
+                </>
+              )
+            ) : (
+              <>
+                {REGRA_LABEL[regra]}: o que saiu nos últimos {regra} dias (
+                {fmtDec(l.ritmoDia)}/dia), esticado para os {fmt(diasHorizonte)} dias do
+                horizonte. <strong>Sem sazonalidade.</strong>
+              </>
+            )}
+          </div>
+        </>
       )}
 
       {l.estoque > l.necessidade ? (
@@ -850,25 +936,6 @@ function DicaCompra({
           O estoque já cobre o período, com {fmt(Math.round(l.estoque - l.necessidade))} un de
           folga.
         </div>
-      ) : null}
-
-      {l.qtdSalva != null ? (
-        <>
-          <div className={styles.dicaDivisor} />
-          <div className={styles.dicaLinha}>
-            <span>Na compra salva</span>
-            <span>
-              <strong>{fmt(l.qtdSalva)} un</strong>
-            </span>
-          </div>
-          {/* Com várias compras importadas, de onde veio cada pedaço da soma. */}
-          {(l.origens ?? []).map((o, i) => (
-            <div key={`${o.titulo}-${i}`} className={styles.dicaLinha}>
-              <span className={styles.dicaFraco}>{o.titulo}</span>
-              <span className={styles.dicaFraco}>{fmt(o.qtd)}</span>
-            </div>
-          ))}
-        </>
       ) : null}
     </div>
   );

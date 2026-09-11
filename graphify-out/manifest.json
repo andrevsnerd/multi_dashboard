@@ -2435,8 +2435,8 @@
     "semantic_hash": "8c1d93a8e7b6ea254bb47828f9553e06"
   },
   "lib/repositories/controleEstoque.ts": {
-    "mtime": 1788956754.2646456,
-    "ast_hash": "8a8ff0832c4815a9cecbd7f437e9f548",
+    "mtime": 1789152994.7804382,
+    "ast_hash": "0b82b6b6829730d59e72aefa254b685b",
     "semantic_hash": ""
   },
   "lib/repositories/controleMovimento.ts": {
@@ -4390,13 +4390,13 @@
     "semantic_hash": ""
   },
   "app/api/projecao-compra/route.ts": {
-    "mtime": 1789135352.5877817,
-    "ast_hash": "cc1b09c72d87e92ce12b7e3b9e59ca88",
+    "mtime": 1789153231.269337,
+    "ast_hash": "38a9daa3180bd56c420067e2a4c22f29",
     "semantic_hash": ""
   },
   "components/stock/ProjecaoCompraPage.tsx": {
-    "mtime": 1789136193.9792926,
-    "ast_hash": "1102cd99f8e7f097eb8f60b9dbee4429",
+    "mtime": 1789153346.826713,
+    "ast_hash": "e816cda14e30836d35ffc2e5b6c1c786",
     "semantic_hash": ""
   },
   "lib/config/saida-estoque-negativo.ts": {
@@ -4485,18 +4485,18 @@
     "semantic_hash": ""
   },
   "components/stock/ProjecaoComoFunciona.tsx": {
-    "mtime": 1789136023.9618623,
-    "ast_hash": "d3e4946b927050c46af71f9fba9fca6a",
+    "mtime": 1789153398.897985,
+    "ast_hash": "b19170f32ea4a88de07028b0dbc1c1a9",
     "semantic_hash": ""
   },
   "components/stock/ProjecaoEmbalagensPanel.tsx": {
-    "mtime": 1789060843.9848068,
-    "ast_hash": "61c9ca4f867b5311ef3888fbd7312dcf",
+    "mtime": 1789140533.5057127,
+    "ast_hash": "dc21f3f48b41c332c625ad4dd606f71e",
     "semantic_hash": ""
   },
   "components/stock/ProjecaoItensMensais.tsx": {
-    "mtime": 1789135932.6132867,
-    "ast_hash": "2059679fc4bdfa626badccc2d42ad7db",
+    "mtime": 1789153110.0341,
+    "ast_hash": "bc984d0dd5603196f552a0634e71725f",
     "semantic_hash": ""
   },
   "lib/config/embalagens.ts": {
@@ -4530,8 +4530,8 @@
     "semantic_hash": ""
   },
   "lib/server/compra-transito-index.ts": {
-    "mtime": 1789135214.6359212,
-    "ast_hash": "ed3c860a0daeefa3348dcaeee358d828",
+    "mtime": 1789151324.2988913,
+    "ast_hash": "93502607e2236dff9fa725c4c12286a2",
     "semantic_hash": ""
   },
   "lib/utils/projecao-sazonal.ts": {

@@ -1,58 +1,89 @@
+/* Tokens locais da tela. Os globais não têm cor de status (ok/alerta/falta) nem raio
+   padrão, e espalhar #16a34a pelo arquivo fazia cada bloco escolher o seu verde — além de
+   quebrar no tema escuro, onde um verde de texto claro precisa ser bem mais claro. */
 .wrapper {
+  --pc-raio: 12px;
+  --pc-raio-sm: 8px;
+  --pc-ok: #15803d;
+  --pc-ok-bg: rgba(22, 163, 74, 0.1);
+  --pc-ok-bd: rgba(22, 163, 74, 0.32);
+  --pc-bad: #b91c1c;
+  --pc-bad-bg: rgba(220, 38, 38, 0.09);
+  --pc-bad-bd: rgba(220, 38, 38, 0.3);
+  --pc-warn: #b45309;
+  --pc-warn-bg: rgba(245, 158, 11, 0.12);
+  --pc-proj: #2563eb;
+  --pc-proj-bg: rgba(37, 99, 235, 0.06);
+  /* Altura da 1ª linha do cabeçalho de dois andares — é o `top` da 2ª quando ela gruda. */
+  --pc-head1: 26px;
+
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 4px 2px 48px;
+  gap: 10px;
+  padding: 2px 2px 40px;
+}
+:global(:root[data-theme="dark"]) .wrapper {
+  --pc-ok: #4ade80;
+  --pc-ok-bg: rgba(34, 197, 94, 0.14);
+  --pc-ok-bd: rgba(74, 222, 128, 0.32);
+  --pc-bad: #f87171;
+  --pc-bad-bg: rgba(248, 113, 113, 0.14);
+  --pc-bad-bd: rgba(248, 113, 113, 0.32);
+  --pc-warn: #fbbf24;
+  --pc-warn-bg: rgba(251, 191, 36, 0.14);
+  --pc-proj: #93c5fd;
+  --pc-proj-bg: rgba(147, 197, 253, 0.08);
 }
 
 /* ── Cabeçalho: parâmetros + filtros na mesma superfície ─────────────────── */
 .headerCard {
   background: var(--s-white);
   border: 1px solid var(--b-200);
-  border-radius: 10px;
+  border-radius: var(--pc-raio);
+  box-shadow: var(--elev-1);
 }
 .topBar {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 16px;
-  padding: 12px 16px;
+  gap: 12px;
+  padding: 10px 14px;
 }
 .topFields {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: 14px;
+  gap: 10px;
 }
 .field {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 3px;
 }
 .fieldLabel {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 11.5px;
+  font-size: 10.5px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   color: var(--t-500);
 }
 .input {
-  height: 40px;
-  width: 172px;
-  padding: 0 12px;
+  height: 34px;
+  width: 152px;
+  padding: 0 10px;
   border: 1px solid var(--b-300);
-  border-radius: 8px;
+  border-radius: var(--pc-raio-sm);
   background: var(--s-white);
   color: var(--t-900);
-  font-size: 15px;
+  font-size: 13.5px;
   font-weight: 500;
 }
 .inputNum {
-  width: 116px;
+  width: 96px;
   text-align: right;
   font-weight: 600;
 }
@@ -70,17 +101,17 @@
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 .pill {
-  height: 40px;
-  min-width: 104px;
+  height: 34px;
+  min-width: 92px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 0 12px;
   border: 1px solid var(--b-200);
-  border-radius: 8px;
+  border-radius: var(--pc-raio-sm);
   background: var(--s-50, #f1f5f9);
   color: var(--t-900);
-  font-size: 15px;
+  font-size: 13.5px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
@@ -103,14 +134,14 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  height: 40px;
-  width: 300px;
-  padding: 0 12px;
+  height: 34px;
+  width: 270px;
+  padding: 0 10px;
   border: 1px solid var(--b-300);
-  border-radius: 8px;
+  border-radius: var(--pc-raio-sm);
   background: var(--s-white);
   color: var(--t-900);
-  font-size: 15px;
+  font-size: 13.5px;
   font-weight: 500;
   cursor: pointer;
 }
@@ -141,9 +172,10 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
+  gap: 6px;
+  padding: 8px 14px;
   border-top: 1px solid var(--b-200);
+  background: var(--s-50);
 }
 .dimWrap {
   position: relative;
@@ -152,12 +184,12 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 36px;
-  padding: 0 14px;
+  height: 30px;
+  padding: 0 12px;
   border: 1px solid var(--b-200);
   border-radius: 999px;
   background: var(--s-white);
-  font-size: 13.5px;
+  font-size: 12.5px;
   cursor: pointer;
   transition: background 0.12s ease, border-color 0.12s ease;
   max-width: 250px;
@@ -166,9 +198,12 @@
   border-color: var(--b-300);
   background: var(--s-50, #f8fafc);
 }
+/* Filtro aplicado tem de se distinguir do não aplicado ANTES de o usuário ler o texto —
+   senão a barra inteira parece igual e ninguém lembra o que está recortado. */
 .dimPillActive {
-  background: var(--s-50, #eef2f7);
+  background: var(--s-blue50);
   border-color: var(--b-300);
+  box-shadow: inset 0 0 0 1px var(--b-200);
 }
 .dimLabel {
   color: var(--t-500);
@@ -187,8 +222,8 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  height: 34px;
-  padding: 0 14px;
+  height: 30px;
+  padding: 0 12px;
   border: none;
   border-radius: 999px;
   background: #1e3a5f;
@@ -384,26 +419,27 @@
 }
 
 /* ── Título + escopo ────────────────────────────────────────────────────── */
+/* Faixa do título: era um CARD inteiro só para repetir o nome da tela, e comia ~60px de
+   altura antes do primeiro número. Virou uma linha seca — o escopo aplicado, que é a única
+   informação dela, ganhou destaque em vez de disputar com a moldura. */
 .titleBar {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   gap: 10px;
-  padding: 12px 16px;
-  background: var(--s-50, #f8fafc);
-  border: 1px solid var(--b-200);
-  border-radius: 10px;
+  padding: 2px 2px 0;
 }
 .title {
-  font-size: 24px;
+  font-size: 18px;
   font-weight: 700;
   color: var(--t-900);
   margin: 0;
   letter-spacing: -0.01em;
 }
 .scopeText {
-  font-size: 14px;
-  color: var(--brand-scarfme, #2563eb);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--t-600);
 }
 .loadingCue {
   display: inline-flex;
@@ -435,8 +471,8 @@
 .emptyPanel {
   background: var(--s-white);
   border: 1px dashed var(--b-300);
-  border-radius: 10px;
-  padding: 56px 24px;
+  border-radius: var(--pc-raio);
+  padding: 32px 24px;
   text-align: center;
 }
 .emptyTitle {
@@ -450,70 +486,72 @@
   margin-top: 4px;
 }
 .erro {
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  border-radius: 10px;
-  padding: 12px 18px;
-  color: #b91c1c;
-  font-size: 14px;
+  background: var(--pc-bad-bg);
+  border: 1px solid var(--pc-bad-bd);
+  border-radius: var(--pc-raio);
+  padding: 10px 14px;
+  color: var(--pc-bad);
+  font-size: 13.5px;
 }
 
 /* ── Faixa de KPIs ──────────────────────────────────────────────────────── */
+/**
+ * `auto-fit` em vez de um número fixo de colunas: a faixa tem 6 KPIs em Produtos e 3 em
+ * Tickets, e a grade fixa de 6 deixava três buracos na segunda aba.
+ *
+ * Os separadores são o PRÓPRIO fundo da faixa aparecendo pelo gap de 1px — com
+ * `border-left` a linha quebrava no primeiro item de cada fila nova (ele não tem vizinho
+ * à esquerda, mas ganhava a borda mesmo assim).
+ */
 .kpiStrip {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  background: var(--s-white);
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: 1px;
+  background: var(--b-200);
   border: 1px solid var(--b-200);
-  border-radius: 10px;
+  border-radius: var(--pc-raio);
+  box-shadow: var(--elev-1);
   overflow: hidden;
-}
-@media (max-width: 1100px) {
-  .kpiStrip {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-@media (max-width: 640px) {
-  .kpiStrip {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 .kpi {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 18px 22px;
-  border-left: 1px solid var(--b-200);
+  gap: 2px;
+  padding: 11px 14px;
+  background: var(--s-white);
   min-width: 0;
 }
-.kpi:first-child {
-  border-left: none;
+/* O número em que se age ganha um fio da cor da marca — numa fila de seis caixas iguais,
+   nada dizia por onde começar a ler. */
+.kpiPrimario {
+  box-shadow: inset 3px 0 0 var(--brand-scarfme);
 }
 .kpiLabel {
-  font-size: 11.5px;
+  font-size: 10.5px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   color: var(--t-500);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .kpiValue {
-  font-size: 28px;
+  font-size: 21px;
   font-weight: 700;
   color: var(--t-900);
-  line-height: 1.15;
+  line-height: 1.2;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 .kpiUnit {
-  margin-left: 5px;
-  font-size: 14px;
+  margin-left: 4px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--t-500);
 }
 .kpiHint {
-  font-size: 11.5px;
+  font-size: 11px;
   color: var(--t-500);
   white-space: nowrap;
   overflow: hidden;
@@ -524,7 +562,8 @@
 .card {
   background: var(--s-white);
   border: 1px solid var(--b-200);
-  border-radius: 10px;
+  border-radius: var(--pc-raio);
+  box-shadow: var(--elev-1);
   overflow: hidden;
 }
 .cardHead {
@@ -532,14 +571,15 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 14px 18px;
+  gap: 10px;
+  padding: 10px 14px;
   border-bottom: 1px solid var(--b-200);
 }
 .cardTitle {
-  font-size: 15.5px;
+  font-size: 13.5px;
   font-weight: 700;
   color: var(--t-900);
+  letter-spacing: -0.01em;
 }
 .select {
   height: 40px;
@@ -585,16 +625,30 @@
 .tableScroll {
   overflow-x: auto;
 }
+/**
+ * Tabela longa: rola DENTRO do card, com teto de altura, em vez de esticar a página.
+ *
+ * É o que faz o cabeçalho grudar de verdade. Com `overflow-x: auto` sozinho o navegador
+ * calcula `overflow-y: auto` junto, então o contêiner já é um bloco de rolagem — só que sem
+ * altura máxima ele nunca rola, e um `position: sticky` lá dentro não tem contra o que
+ * grudar (fica preso ao bloco, que acompanha a página inteira). Com o teto, o corpo rola
+ * dentro dele e o `thead`/`tfoot` ficam parados.
+ */
+.tableScrollFixo {
+  overflow: auto;
+  max-height: min(68vh, 760px);
+}
 .table {
   width: 100%;
-  border-collapse: collapse;
-  font-size: 15px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13.5px;
 }
 .table thead th {
-  padding: 11px 16px;
+  padding: 7px 12px;
   background: var(--s-50, #f8fafc);
   color: var(--t-500);
-  font-size: 11.5px;
+  font-size: 10.5px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -606,9 +660,48 @@
   text-align: left;
 }
 .table tbody td {
-  padding: 15px 16px;
+  padding: 8px 12px;
   color: var(--t-900);
-  border-bottom: 1px solid var(--b-100, var(--b-200));
+  border-bottom: 1px solid var(--b-200);
+}
+/* O hover realça a linha SEM apagar os fundos que CARREGAM SIGNIFICADO: projetado, mês em
+   curso, bloco de decisão, coluna Total e os meses de alta da curva sazonal. Pintar tudo
+   por cima trocaria informação por enfeite — e a lista precisa ser explícita porque o
+   `:hover` ganha de qualquer uma dessas classes no desempate. */
+.table tbody tr:hover td:not(.cellProj):not(.cellParcial):not(.colDecisao):not(.colTotal):not(.mesAlto):not(.mesPico) {
+  background: var(--s-50);
+}
+.table tbody tr:hover .stickyCol {
+  background: var(--s-100);
+}
+
+/**
+ * Cabeçalho e rodapé presos.
+ *
+ * `border-collapse: separate` acima é requisito: com `collapse` as bordas pertencem à
+ * tabela, não às células, e somem quando a célula vira sticky — o cabeçalho flutua sem
+ * linha e o conteúdo passa por baixo dele "colado".
+ */
+.tabelaFixa thead th {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+}
+/* Cabeçalho de dois andares: a 2ª linha gruda logo abaixo da 1ª. */
+.tabelaFixa thead tr:nth-child(2) th {
+  top: var(--pc-head1);
+}
+.tabelaFixa thead th.stickyCol {
+  /* Canto: preso nos dois eixos, tem de ficar acima de ambos. */
+  z-index: 6;
+}
+.tabelaFixa tfoot td {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+}
+.tabelaFixa tfoot td.stickyCol {
+  z-index: 6;
 }
 .table tbody tr:last-child td {
   border-bottom: none;
@@ -630,7 +723,7 @@
   min-width: 1080px;
 }
 .mensalTable thead th {
-  min-width: 74px;
+  min-width: 68px;
 }
 .stickyCol {
   position: sticky;
@@ -644,8 +737,10 @@
   background: var(--s-50, #f8fafc);
   z-index: 3;
 }
-.colTotal {
-  background: var(--s-50, #f1f5f9) !important;
+.table thead th.colTotal,
+.table tbody td.colTotal,
+.table tfoot td.colTotal {
+  background: var(--s-100, #f1f5f9);
   border-left: 1px solid var(--b-200);
 }
 .cellMes {
@@ -653,13 +748,13 @@
 }
 .cellQtd {
   display: block;
-  font-size: 15.5px;
+  font-size: 13.5px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 .cellPct {
   display: block;
-  font-size: 11.5px;
+  font-size: 10.5px;
   font-weight: 600;
   margin-top: 1px;
 }
@@ -673,30 +768,38 @@
   margin-top: 1px;
 }
 .cellParcial {
-  background: #fffaeb;
+  background: var(--pc-warn-bg);
+}
+/* Projetado ganhou FUNDO, não só cor de texto: numa tabela de 13 colunas a fronteira entre
+   o que aconteceu e o que é chute tem de ser vista de relance, sem ler os números. */
+.cellProj {
+  background: var(--pc-proj-bg);
 }
 .cellProj .cellQtd {
-  color: var(--brand-scarfme, #2563eb);
+  color: var(--pc-proj);
 }
 .varUp {
-  color: #16a34a;
+  color: var(--pc-ok);
 }
 .varDown {
-  color: #dc2626;
+  color: var(--pc-bad);
 }
 
 .btnGerar {
   margin-left: auto;
-  height: 36px;
-  padding: 0 18px;
+  height: 30px;
+  padding: 0 16px;
   border: none;
-  border-radius: 8px;
+  border-radius: 999px;
   background: #1e3a5f;
   color: #fff;
-  font-size: 13.5px;
-  font-weight: 600;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
   cursor: pointer;
   white-space: nowrap;
+  box-shadow: var(--elev-1);
+  transition: background 0.12s ease;
 }
 .btnGerar:hover:not(:disabled) {
   background: #2b4d7e;
@@ -707,25 +810,25 @@
   cursor: default;
 }
 .cellParcial .cellQtd {
-  color: var(--brand-scarfme, #2563eb);
+  color: var(--pc-warn);
 }
 
 /* ── Seletor de métrica (Produtos x Tickets) ────────────────────────────── */
 .segmented {
   display: inline-flex;
-  height: 40px;
+  height: 34px;
   padding: 3px;
   border: 1px solid var(--b-300);
-  border-radius: 8px;
+  border-radius: var(--pc-raio-sm);
   background: var(--s-50, #f1f5f9);
 }
 .segment {
   border: none;
   background: none;
-  padding: 0 16px;
+  padding: 0 13px;
   border-radius: 6px;
   color: var(--t-500);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -737,21 +840,18 @@
   color: var(--t-900);
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
 }
-.kpiStripTickets {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
 
 /* ── Busca de produto (mesma lógica do Gerador de Relatórios) ────────────── */
 .produtoInput {
-  height: 40px;
-  width: 300px;
+  height: 34px;
+  width: 270px;
   max-width: 100%;
-  padding: 0 32px 0 12px;
+  padding: 0 30px 0 10px;
   border: 1px solid var(--b-300);
-  border-radius: 8px;
+  border-radius: var(--pc-raio-sm);
   background: var(--s-white);
   color: var(--t-900);
-  font-size: 15px;
+  font-size: 13.5px;
   font-weight: 500;
 }
 .produtoInput:focus {
@@ -818,11 +918,11 @@
 .filterHint {
   display: inline-flex;
   align-items: center;
-  height: 34px;
+  height: 30px;
   padding: 0 10px;
   border: 1px dashed var(--b-300);
   border-radius: 999px;
-  font-size: 11.5px;
+  font-size: 10.5px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -870,7 +970,7 @@
 
 .embComprar {
   font-weight: 700;
-  color: #b45309;
+  color: var(--pc-warn);
 }
 
 /* A tabela de embalagem é larga: nome + estoque + 12 meses + total + comprar. */
@@ -905,19 +1005,49 @@
 
 /* ── Tabela item a item (produto × cor por mês) ─────────────────────────── */
 
+/* Com a coluna Item em 200 e os meses em 56, a tabela inteira — inclusive as duas colunas
+   extras da compra salva — cabe numa tela comum sem rolagem horizontal. */
 .itensTable {
-  min-width: 1560px;
+  min-width: 1240px;
 }
 
-.itensTable thead th:first-child,
+/**
+ * Largura da coluna Item.
+ *
+ * O seletor tinha de ser `thead tr:first-child`, e não `thead th:first-child`: o cabeçalho
+ * tem DOIS andares, e na segunda linha o primeiro `th` é JANEIRO (a coluna Item tem
+ * rowSpan=2 e vive só na primeira linha). Sem a âncora na linha, janeiro herdava
+ * `min-width: 230px` e ficava três vezes mais largo que os outros meses — era aquele vão
+ * entre a coluna Item e a primeira coluna de mês, e eram ~160px roubados das colunas da
+ * direita, que é o que empurrava "Na compra salva" e "Situação" para fora da tela.
+ */
+.itensTable thead tr:first-child th:first-child,
 .itensTable tbody td:first-child,
 .itensTable tfoot td:first-child {
-  min-width: 280px;
-  max-width: 320px;
+  min-width: 200px;
+  max-width: 240px;
+}
+/* Meses são números curtos: não precisam da largura da tabela mensal do escopo, que tem
+   uma linha só e pode se dar ao luxo de respirar. */
+.itensTable thead th {
+  min-width: 56px;
+}
+.itensTable thead th.colDecisao,
+.itensTable thead th.colTotal {
+  min-width: 64px;
+}
+/* O bloco de decisão fica mais apertado: são seis colunas quando há compra importada, e
+   elas são justamente as que precisam caber na tela. */
+.itensTable thead th.colDecisao,
+.itensTable tbody td.colDecisao,
+.itensTable tfoot td.colDecisao {
+  padding-left: 8px;
+  padding-right: 8px;
 }
 
 .itemNome {
   display: block;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--t-900);
   white-space: nowrap;
@@ -927,7 +1057,7 @@
 
 .itemMeta {
   display: block;
-  font-size: 11px;
+  font-size: 10.5px;
   color: var(--t-500);
   white-space: nowrap;
   overflow: hidden;
@@ -935,7 +1065,7 @@
 }
 
 .itensTable tfoot td {
-  border-top: 2px solid var(--b-200);
+  border-top: 2px solid var(--b-300);
   font-weight: 700;
   background: var(--s-50);
 }
@@ -974,16 +1104,19 @@
 
 /* ── Cabeçalho de dois andares e bloco de decisão da tabela item a item ── */
 
-.grupoHead {
-  text-align: center !important;
-  font-size: 11px;
+.table thead th.grupoHead {
+  height: var(--pc-head1);
+  padding-top: 0;
+  padding-bottom: 0;
+  text-align: center;
+  font-size: 10px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--t-500);
   border-bottom: 1px solid var(--b-200);
 }
 
-.grupoDecisao {
+.table thead th.grupoDecisao {
   background: var(--s-blue50);
   color: var(--t-700);
   border-left: 2px solid var(--b-300);
@@ -992,14 +1125,17 @@
 /* Subtítulo da coluna (a data alvo, "em estoque"…) numa segunda linha menor. */
 .thSub {
   display: block;
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 500;
   text-transform: none;
   letter-spacing: 0;
   color: var(--t-500);
 }
 
-.colDecisao {
+/* O bloco de decisão é tingido do cabeçalho ao rodapé: é onde o olho tem de parar. */
+.table thead th.colDecisao,
+.table tbody td.colDecisao,
+.table tfoot td.colDecisao {
   background: var(--s-blue50);
 }
 
@@ -1024,34 +1160,36 @@
 /* Veredito em palavra, não em número com sinal. */
 .situacao {
   display: inline-block;
-  padding: 2px 8px;
+  padding: 1px 8px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 700;
   white-space: nowrap;
 }
 
 .sitFalta {
-  background: rgba(220, 38, 38, 0.12);
-  color: #b91c1c;
+  background: var(--pc-bad-bg);
+  color: var(--pc-bad);
 }
 
 .sitSobra {
-  background: rgba(180, 83, 9, 0.12);
-  color: #b45309;
+  background: var(--pc-warn-bg);
+  color: var(--pc-warn);
 }
 
 .sitOk {
-  background: rgba(22, 163, 74, 0.12);
-  color: #15803d;
+  background: var(--pc-ok-bg);
+  color: var(--pc-ok);
 }
 
 /* Linha de explicação entre o título do card e a tabela. */
 .tabelaNota {
-  padding: 0 16px 10px;
-  font-size: 12px;
-  line-height: 1.5;
+  padding: 8px 14px;
+  font-size: 11.5px;
+  line-height: 1.55;
   color: var(--t-500);
+  border-bottom: 1px solid var(--b-200);
+  background: var(--s-50);
 }
 
 .tabelaNota strong {
@@ -1063,7 +1201,7 @@
 
 .comoCard {
   border: 1px solid var(--b-200);
-  border-radius: 12px;
+  border-radius: var(--pc-raio);
   background: var(--s-white);
   box-shadow: var(--elev-1);
   overflow: hidden;
@@ -1074,7 +1212,7 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 12px 16px;
+  padding: 9px 14px;
   border: 0;
   background: transparent;
   color: var(--t-800);
@@ -1101,7 +1239,7 @@
 }
 
 .comoCorpo {
-  padding: 4px 20px 18px;
+  padding: 4px 16px 16px;
   border-top: 1px solid var(--b-200);
   font-size: 13px;
   line-height: 1.65;
@@ -1174,7 +1312,7 @@
   padding-top: 8px;
   border-top: 1px solid var(--b-200);
   font-size: 12px;
-  color: #b45309;
+  color: var(--pc-warn);
 }
 
 /* ── Memoria de calculo de "Precisa comprar" (painel flutuante) ────────── */
@@ -1186,9 +1324,9 @@
 .dicaPainel {
   position: fixed;
   z-index: 200;
-  padding: 12px 14px;
+  padding: 11px 13px;
   border: 1px solid var(--b-300);
-  border-radius: 10px;
+  border-radius: var(--pc-raio);
   background: var(--s-white);
   box-shadow: var(--elev-2);
   font-size: 12px;
@@ -1221,6 +1359,7 @@
 }
 
 .dicaSecao {
+  margin-top: 9px;
   margin-bottom: 5px;
   font-size: 10.5px;
   font-weight: 700;
@@ -1253,6 +1392,65 @@
   font-size: 11px;
   line-height: 1.5;
   color: var(--t-500);
+}
+
+/* Cada bloco de conta é uma caixa própria: "quanto precisa" e "o que a compra já resolve"
+   são duas perguntas, e empilhá-las soltas fazia a segunda parecer mais uma quantidade a
+   comprar em vez de um abatimento. */
+.dicaConta {
+  margin-top: 8px;
+  padding: 7px 9px;
+  border-radius: var(--pc-raio-sm);
+  background: var(--s-50);
+}
+.dicaConta + .dicaConta {
+  margin-top: 6px;
+}
+
+.dicaFalta {
+  color: var(--pc-bad);
+}
+.dicaSobra {
+  color: var(--pc-warn);
+}
+.dicaOk {
+  color: var(--pc-ok);
+}
+
+/* A soma mês a mês do "vai vender": era um parágrafo corrido ("set 7 (20d) + out 11 +
+   nov 25 + dez 24") em que ninguém achava o mês que queria. Vira grade. */
+.dicaMeses {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(56px, 1fr));
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.dicaMes {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 2px;
+  border-radius: 6px;
+  background: var(--s-100);
+}
+.dicaMesNome {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--t-500);
+  white-space: nowrap;
+}
+.dicaMesDias {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.dicaMesQtd {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--t-900);
+  font-variant-numeric: tabular-nums;
 }
 
 .dicaNota strong {
@@ -1327,50 +1525,135 @@
   font-size: 13px;
 }
 
-/* ── Plano até a data alvo (estoque + trânsito − venda = saldo) ──────────── */
-/* Faixa própria, separada dos KPIs da regra: aqui não se mede ritmo, se fecha
-   a conta da compra. São 6 caixas na mesma grade da faixa de cima para as duas
-   lerem como um bloco só. */
-.planoStrip {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+/* ── Plano até a data alvo ───────────────────────────────────────────────── */
+/**
+ * Era uma segunda grade de seis caixas, igual à de cima: ~90px de altura para dizer uma
+ * conta que cabe numa linha, e duas faixas idênticas empilhadas que o olho não sabia
+ * diferenciar.
+ *
+ * Virou a PRÓPRIA conta escrita na horizontal — estoque + trânsito − venda = saldo, e
+ * daí o alvo de 90 dias até o veredito. Os operadores estão ali porque é isso que
+ * defende o número final: ninguém precisa abrir tooltip para saber de onde ele saiu.
+ */
+.planoEq {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 2px;
+  padding: 8px 10px;
   background: var(--s-white);
   border: 1px solid var(--b-200);
-  border-radius: 10px;
-  overflow: hidden;
+  border-radius: var(--pc-raio);
+  box-shadow: var(--elev-1);
 }
-@media (max-width: 1100px) {
-  .planoStrip {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
+.planoTermo {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  padding: 4px 10px;
+  border-radius: var(--pc-raio-sm);
+  min-width: 0;
 }
-@media (max-width: 640px) {
-  .planoStrip {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+.planoRot {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--t-500);
+  white-space: nowrap;
 }
-/* A caixa do resultado (comprar / sobra) fecha a leitura, então ela é a única
-   colorida — o resto da faixa é o caminho até ela. */
-.planoAlvo {
-  background: var(--s-50, #f8fafc);
+.planoNum {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--t-900);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* `.varDown` é declarada bem antes no arquivo e perderia para `.planoNum` no desempate
+   por ordem — saldo negativo ficaria preto. */
+.planoNum.varDown {
+  color: var(--pc-bad);
+}
+.planoSub {
+  font-size: 10.5px;
+  color: var(--t-500);
+  white-space: nowrap;
+}
+.planoOp {
+  display: flex;
+  align-items: center;
+  padding: 0 2px;
+  color: var(--t-400);
+  font-size: 15px;
+  font-weight: 700;
+}
+/* O saldo na virada é o meio da conta: fundo neutro para marcar que ali ela fecha. */
+.planoSaldo {
+  background: var(--s-50);
+}
+/* Separa "o que sobra" de "o que isso precisa cobrir" — são duas perguntas. O `auto` à
+   esquerda empurra o segundo grupo INTEIRO para a direita; posto no resultado, ele abriria
+   um buraco entre a seta e o número que ela aponta. */
+.planoDivisor {
+  width: 1px;
+  margin: 4px 10px 4px auto;
+  background: var(--b-200);
+}
+/* O veredito. Única peça colorida da faixa: é a que muda a decisão. */
+.planoResultado {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  padding: 4px 14px;
+  border-radius: var(--pc-raio-sm);
+  border: 1px solid transparent;
 }
 .planoFalta {
-  background: rgba(220, 38, 38, 0.07);
+  background: var(--pc-bad-bg);
+  border-color: var(--pc-bad-bd);
+}
+.planoFalta .planoNum,
+.planoFalta .planoRot {
+  color: var(--pc-bad);
 }
 .planoSobra {
-  background: rgba(22, 163, 74, 0.08);
+  background: var(--pc-ok-bg);
+  border-color: var(--pc-ok-bd);
 }
-.planoSeta {
-  color: var(--t-400, #94a3b8);
-  font-weight: 700;
+.planoSobra .planoNum,
+.planoSobra .planoRot {
+  color: var(--pc-ok);
+}
+.planoNeutro {
+  background: var(--s-50);
+}
+@media (max-width: 900px) {
+  /* Numa tela estreita a conta empilha: os operadores viram ruído e saem. */
+  .planoOp,
+  .planoDivisor {
+    display: none;
+  }
 }
 
 /* ── Sazonalidade da categoria ───────────────────────────────────────────── */
 .sazonalNota {
-  padding: 12px 18px;
-  font-size: 13px;
+  padding: 8px 14px;
+  font-size: 12px;
+  line-height: 1.55;
   color: var(--t-500);
   border-bottom: 1px solid var(--b-200);
+}
+.sazonalNota strong {
+  color: var(--t-700);
+  font-weight: 600;
+}
+/* Quando a nota fecha o card (a das categorias sem histórico), a borda de baixo sobra. */
+.card > .sazonalNota:last-child {
+  border-bottom: none;
+  border-top: 1px solid var(--b-200);
 }
 .sazonalTag {
   display: inline-block;
@@ -1378,25 +1661,238 @@
   border-radius: 999px;
   background: var(--s-100, #f1f5f9);
   color: var(--t-700, #334155);
-  font-size: 11.5px;
+  font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
-/* Mês acima da média do ano: é o que a régua existe para mostrar. */
-.mesAlto {
-  background: rgba(22, 163, 74, 0.1);
+/* Mês acima da média do ano: é o que a régua existe para mostrar. A intensidade acompanha
+   o tamanho da alta, então dezembro salta de uma tabela de 12 números iguais. */
+.table tbody td.mesAlto {
+  background: var(--pc-ok-bg);
+  font-weight: 700;
+}
+.table tbody td.mesPico {
+  background: var(--pc-ok-bg);
+  box-shadow: inset 0 -2px 0 var(--pc-ok-bd);
   font-weight: 700;
 }
 .mesBaixo {
   color: var(--t-500);
 }
+/* O cabeçalho da tabela é alinhado à direita (`.table thead th`), e estas células não
+   declaravam alinhamento nenhum — caíam no padrão do `td`, à esquerda. Resultado: mês e
+   fator não ficavam na mesma coluna visual. */
 .fatorCell {
+  text-align: right;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 .fatorPct {
   display: block;
-  font-size: 11px;
+  font-size: 10px;
+  font-weight: 500;
   color: var(--t-500);
+}
+
+/* ── "Como a projeção é calculada": comparativo + quadro por régua ───────── */
+
+/* Um quadro por régua, sempre na mesma ordem: pergunta → conta → números → onde erra. */
+.comoRegra {
+  margin: 14px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--b-200);
+  border-left: 3px solid var(--b-300);
+  border-radius: var(--pc-raio-sm);
+  background: var(--s-white);
+}
+.comoRegraAtiva {
+  border-left-color: var(--brand-scarfme);
+  background: var(--s-50);
+}
+.comoRegraTitulo {
+  margin-bottom: 6px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--t-900);
+}
+.comoRegra p {
+  margin: 8px 0;
+}
+/* A pergunta que a régua responde — é ela que faz a diferença entre elas ficar óbvia. */
+.comoPergunta {
+  font-size: 13px;
+  font-style: italic;
+  color: var(--t-700);
+}
+/* Exemplo numérico dentro do texto, para a regra não ficar abstrata. */
+.comoExemplo {
+  padding: 8px 12px;
+  border-radius: var(--pc-raio-sm);
+  background: var(--s-100);
+  font-size: 12.5px;
+}
+/* O limite declarado de cada régua. Régua sem limite escrito vira fé. */
+.comoOnde {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--b-200);
+  font-size: 12.5px;
+}
+.comoNota {
+  font-size: 12px;
+  color: var(--t-500);
+}
+.comoDica {
+  color: var(--t-500);
+  font-weight: 500;
+}
+/* Nas réguas de janela, a linha da janela ESCOLHIDA entre as cinco comparadas. */
+.comoLinhaDestaque {
+  margin: 0 -8px;
+  padding-left: 8px;
+  padding-right: 8px;
+  border-radius: 6px;
+  background: var(--s-blue50);
+  color: var(--t-900);
+}
+.comoSelo {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--brand-scarfme);
+  color: var(--s-white);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+/* ── Notas das tabelas: fragmentos, não parágrafo ────────────────────────── */
+/* As duas notas (curva sazonal e tabela item a item) eram blocos de texto corrido em que
+   achar uma informação exigia ler a frase inteira. Cada ideia virou um fragmento com
+   rótulo em negrito, separados por um fio — dá para varrer com o olho e parar no que
+   interessa. */
+.sazonalNota,
+.tabelaNota {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 0;
+}
+.notaItem {
+  padding: 0 12px;
+  border-left: 1px solid var(--b-200);
+  white-space: normal;
+}
+.notaItem:first-of-type {
+  padding-left: 0;
+  border-left: none;
+}
+.notaItem strong {
+  color: var(--t-700);
+  font-weight: 600;
+}
+.notaAlerta {
+  color: var(--pc-warn);
+}
+.notaAlerta strong {
+  color: var(--pc-warn);
+}
+
+/* ── "Como esta projeção é calculada": passos, contas e tabelinhas ───────── */
+
+/* Subtítulo de passo dentro do quadro da régua ("1. Qual é o ritmo atual?"). */
+.comoPasso {
+  margin: 14px 0 6px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--t-900);
+}
+
+/* Bloco de conta: rótulo à esquerda, valor à direita, fechando num total. Substitui os
+   parágrafos em que a conta vinha escrita por extenso no meio da frase. */
+.comoCalc {
+  margin: 8px 0;
+  padding: 8px 10px;
+  border-radius: var(--pc-raio-sm);
+  background: var(--s-50);
+  border: 1px solid var(--b-200);
+}
+.comoCalcLinha {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 3px 0;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+.comoCalcLinha > span:last-child {
+  white-space: nowrap;
+  color: var(--t-900);
+}
+.comoCalcTotal {
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--b-200);
+}
+
+/* Tabelinha de apoio (força do mês, meses do horizonte, lista de réguas). */
+.comoTabWrap {
+  margin: 10px 0;
+  overflow-x: auto;
+  border: 1px solid var(--b-200);
+  border-radius: var(--pc-raio-sm);
+}
+.comoTab {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 12.5px;
+}
+.comoTab th {
+  padding: 6px 10px;
+  background: var(--s-50);
+  color: var(--t-500);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--b-200);
+}
+.comoTab td {
+  padding: 7px 10px;
+  vertical-align: top;
+  color: var(--t-600);
+  border-bottom: 1px solid var(--b-200);
+}
+.comoTab tbody tr:last-child td {
+  border-bottom: none;
+}
+.comoTab td strong {
+  color: var(--t-900);
+}
+.comoTabNum {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* A régua escolhida, marcada na lista final. */
+.comoLinhaAtiva td {
+  background: var(--s-blue50);
+}
+
+/* A frase que carrega o recado ("projetar 1.000 não é comprar 1.000"). */
+.comoDestaque {
+  padding: 8px 12px;
+  border-left: 3px solid var(--brand-scarfme);
+  border-radius: 0 var(--pc-raio-sm) var(--pc-raio-sm) 0;
+  background: var(--s-50);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t-900);
 }

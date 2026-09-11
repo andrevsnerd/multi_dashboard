@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 
 import { fetchFilialProdutoSales } from '@/lib/repositories/performance';
-import { fetchEstoqueRedePorProduto } from '@/lib/repositories/controleEstoque';
+import {
+  fetchEstoqueRedePorProduto,
+  fetchProdutosNoEscopoCadastro,
+} from '@/lib/repositories/controleEstoque';
 import { getControleEstoqueMetricasItensBatched } from '@/lib/server/controle-estoque-metricas';
 import { buildControleEstoqueItemKey } from '@/lib/utils/controle-estoque-metricas';
 import { ensureCompraCicloRuntime } from '@/lib/config/compra-ciclo-store';
@@ -14,8 +17,8 @@ import {
   valorDaDim,
 } from '@/lib/repositories/projecaoSazonalCategoria';
 import {
-  buildCompraTransitoServerIndex,
-  quantidadeEmTransito,
+  listTransitoAtivoPorItem,
+  type TransitoItemAgregado,
 } from '@/lib/server/compra-transito-index';
 import { VAREJO_VALUE, getFilialGroupMembers, type CompanyKey } from '@/lib/config/company';
 import { resolveCompanyDynamic } from '@/lib/config/company-server';
@@ -137,6 +140,18 @@ export async function GET(request: Request) {
   // porque custa 12 consultas por ano-calendário medido, sobre a categoria INTEIRA e não
   // sobre o recorte — caro demais para pagar em toda geração de projeção.
   const comSazonal = searchParams.get('sazonal') === '1';
+  // Compras SALVAS importadas na tela. O trânsito que NASCEU delas fica de fora da coluna
+  // "Já vem em trânsito": a mesma peça já está sendo mostrada em "Na compra salva", e
+  // contá-la duas vezes derrubaria a sugestão pelo dobro.
+  const compraSalvaIds = Array.from(
+    new Set(
+      searchParams
+        .getAll('compraSalva')
+        .flatMap((v) => v.split(','))
+        .map((v) => v.trim())
+        .filter(Boolean)
+    )
+  );
 
   if (!companyKey) {
     return NextResponse.json({ error: 'Parâmetro "company" obrigatório' }, { status: 400 });
@@ -398,6 +413,13 @@ export async function GET(request: Request) {
       /** GRUPO_PRODUTO — a categoria mais ampla, usada quando não há subgrupo nem linha. */
       grupo: string;
       colecao: string;
+      /**
+       * Linha que existe SÓ por causa do trânsito: o item pertence ao recorte pelo cadastro,
+       * mas nunca vendeu e não tem saldo, então a consulta de vendas não o devolveu.
+       */
+      soTransito?: boolean;
+      /** Data de chegada mais próxima, nas linhas de trânsito. */
+      chegada?: string;
       qtde: Record<number, number>;
     };
     const acc = new Map<string, ItemAcc>();
@@ -558,22 +580,93 @@ export async function GET(request: Request) {
 
     // ── Trânsito: o que JÁ foi comprado e ainda não chegou ─────────────────────────
     // A pergunta de compra não é "quanto tenho", é "quanto tenho + quanto vem". Sem isto a
-    // tela mandaria comprar de novo o que já está a caminho. Mesmo índice da Curva ABC
+    // tela mandaria comprar de novo o que já está a caminho. Mesma fonte da Curva ABC
     // (lib/server/compra-transito-index), então os dois números batem.
-    const transitoIndex = await buildCompraTransitoServerIndex(companyKey).catch(() => null);
+    //
+    // A varredura é pelo TRÂNSITO, não pela lista de itens que a consulta de vendas
+    // devolveu. Pelo caminho antigo — percorrer `acc` e perguntar o trânsito de cada item —
+    // duas coisas sumiam:
+    //   1. o total da REDE INTEIRA (sem recorte) vinha ZERO, porque ali `acc` nem chega a
+    //      ser preenchido: a tela mostrava 40.925 em estoque e 0 em trânsito;
+    //   2. peça que está chegando e NUNCA VENDEU ficava invisível — justo o caso em que
+    //      saber "isso já está comprado" mais importa. Medido em 11/09/2026 no subgrupo
+    //      CETIM DE SEDA 90X90: 1.026 un em vez de 1.056, faltando as 30 peças da cor
+    //      151/MOCHA do 13.71.0115, que chegam em 23/09 e não têm venda nem saldo.
+    //
+    // Quem decide o pertencimento agora é o CADASTRO — é a régua certa, porque o item
+    // existe no recorte mesmo sem histórico de venda e sem saldo.
+    const transitoBruto = await listTransitoAtivoPorItem(companyKey, {
+      excluirCompraSalvaIds: compraSalvaIds,
+    }).catch(() => new Map<string, TransitoItemAgregado>());
     const transitoPorItem = new Map<string, number>();
     let transitoTotal = 0;
-    if (transitoIndex) {
+    if (transitoBruto.size > 0) {
+      // A descrição da cor que o filtro compara: a da linha de venda quando ela existe, e a
+      // que a compra gravou quando o item nunca vendeu.
+      const descDaVenda = new Map<string, string>();
       acc.forEach((item, key) => {
-        const qtde = quantidadeEmTransito(
-          transitoIndex,
-          item.produto,
-          item.cor || null,
-          item.corDescricao
-        );
-        if (qtde <= 0) return;
-        transitoPorItem.set(key, qtde);
-        transitoTotal += qtde;
+        if (item.corDescricao) descDaVenda.set(key, item.corDescricao);
+      });
+
+      const candidatos = Array.from(new Set(Array.from(transitoBruto.values()).map((i) => i.produto)));
+      // Sem recorte nenhum a rede inteira é o escopo: não há cadastro a consultar.
+      const noEscopo = temEscopo
+        ? await fetchProdutosNoEscopoCadastro({
+            company: companyKey,
+            candidatos,
+            grupos: orNull(dimensoes.grupos),
+            linhas: orNull(dimensoes.linhas),
+            subgrupos: orNull(dimensoes.subgrupos),
+            grades: orNull(dimensoes.grades),
+            colecoes: orNull(dimensoes.colecoes),
+            tipos: orNull(dimensoes.tipos),
+            produtoSearchTerm: temBusca ? buscaProduto : null,
+          }).catch(() => null)
+        : null;
+      // Seleção manual de produto é recorte de LISTA: resolve em memória, sem gastar
+      // parâmetro de SQL com até 600 códigos.
+      const produtosEscolhidos = produtoIds.length > 0 ? new Set(produtoIds) : null;
+      // O filtro de Cor casa pela DESCRIÇÃO, igual ao resto da tela.
+      const coresFiltro = dimensoes.cores.length > 0 ? new Set(dimensoes.cores) : null;
+
+      transitoBruto.forEach((item, key) => {
+        if (noEscopo && !noEscopo.has(item.produto)) return;
+        if (produtosEscolhidos && !produtosEscolhidos.has(item.produto)) return;
+        if (coresFiltro) {
+          const desc = (descDaVenda.get(key) || item.corDescricao || '').trim().toUpperCase();
+          if (!desc || !coresFiltro.has(desc)) return;
+        }
+        transitoPorItem.set(key, item.quantidade);
+        transitoTotal += item.quantidade;
+
+        // ── Linha para o item que SÓ tem trânsito ───────────────────────────
+        // Peça já comprada, chegando, de uma cor que nunca vendeu e não tem saldo: a
+        // consulta de vendas não devolve nada para ela, então ela não tinha linha na tabela
+        // item a item — e o rodapé da coluna fechava abaixo da faixa do topo (1.026 contra
+        // 1.056 no CETIM DE SEDA 90X90). Pior que a diferença: era justamente o item que
+        // mais interessa ver, e ele estava invisível.
+        //
+        // O cadastro do produto vem da MESMA consulta que decidiu o recorte, então a linha
+        // não custa ida nova ao banco. Sem cadastro (consulta falhou, ou escopo é a rede
+        // inteira e não houve consulta) não se inventa linha.
+        if (!detalharItens || acc.has(key)) return;
+        const cadastro = noEscopo?.get(item.produto);
+        if (!cadastro) return;
+        acc.set(key, {
+          produto: item.produto,
+          cor: item.cor,
+          corDescricao: item.corDescricao,
+          descricao: cadastro.descricao,
+          codigoBarra: '',
+          grade: cadastro.grade,
+          subgrupo: cadastro.subgrupo,
+          linha: cadastro.linha,
+          grupo: cadastro.grupo,
+          colecao: cadastro.colecao,
+          qtde: {},
+          soTransito: true,
+          chegada: item.proximaChegada,
+        });
       });
     }
 
@@ -641,6 +734,8 @@ export async function GET(request: Request) {
         codigoBarra: item.codigoBarra,
         grade: item.grade,
         subgrupo: item.subgrupo,
+        /** A regra de Ciclo de Compra casa por LINHA ou por SUBGRUPO — as duas vão. */
+        linha: item.linha,
         colecao: item.colecao,
         janelas: Object.fromEntries(WINDOWS.map((d) => [d, item.qtde[d] ?? 0])),
         /** Estoque atual do item (só saldos positivos), da mesma fonte do total. */
@@ -649,12 +744,19 @@ export async function GET(request: Request) {
         transito: Math.round(transitoPorItem.get(key) ?? 0),
         /** Categoria do item na curva sazonal (chave de `sazonal.curvas`). */
         categoria: sazonal ? sazonal.categoriaPorItem[key] ?? CHAVE_ESCOPO_TODO : undefined,
+        /** A linha existe só por causa do trânsito: nunca vendeu, não tem saldo. */
+        soTransito: item.soTransito === true ? true : undefined,
+        /** Chegada mais próxima do trânsito deste item ('yyyy-MM-dd'). */
+        chegada: item.chegada,
         /**
          * Consumo/dia pela régua da Compra Ideal (Curva ABC). `undefined` = não medido
          * (fora do modo item a item, ou o item não tem métrica de disponibilidade).
          */
         consumoIdeal: consumoIdealPorItem.has(key) ? consumoIdealPorItem.get(key) : undefined,
-        mensal: detalharMensalItem
+        // Item só-trânsito vai SEM série: com doze meses de zero o cliente trataria como
+        // "vendeu zero" e a dica mostraria a soma de doze zeros. Sem série ele diz o que é
+        // verdade — "não vendeu nada no período".
+        mensal: detalharMensalItem && !item.soTransito
           ? Array.from({ length: 12 }, (_, i) => {
               const mes = i + 1;
               return {
@@ -681,6 +783,8 @@ export async function GET(request: Request) {
         estoqueItens,
         /** Total já comprado e a caminho no MESMO recorte. */
         transitoTotal: Math.round(transitoTotal),
+        /** Compras salvas cujo trânsito foi descontado (para a tela poder dizer isso). */
+        transitoExcluiCompraSalva: compraSalvaIds.length > 0,
         /** Curvas sazonais por categoria — só quando `?sazonal=1`. */
         sazonal,
         porItem: detalharMensalItem,

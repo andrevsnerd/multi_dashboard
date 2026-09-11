@@ -69,6 +69,80 @@ export async function buildCompraTransitoServerIndex(
   return idx;
 }
 
+/** Uma linha do trânsito ativo, somada por produto × cor. */
+export interface TransitoItemAgregado {
+  produto: string;
+  /** Código da cor como o trânsito gravou (pode não existir no estoque). */
+  cor: string;
+  /** Descrição da cor gravada na compra — é por ela que o filtro de Cor da tela casa. */
+  corDescricao: string;
+  quantidade: number;
+  /** Data de chegada mais próxima entre as linhas somadas. */
+  proximaChegada: string;
+}
+
+/**
+ * TODO o trânsito ativo da empresa, somado por produto × cor.
+ *
+ * Serve para ENUMERAR ("o que está vindo?"), enquanto o índice acima serve para CONSULTAR
+ * ("está vindo algo deste item?"). São funções diferentes e a diferença importa: o índice
+ * grava cada compra em DUAS chaves (a canônica e o alias por descrição de cor), então
+ * varrê-lo inteiro contaria a mesma peça duas vezes. Aqui a leitura é da própria lista de
+ * compras, uma vez por linha.
+ */
+export async function listTransitoAtivoPorItem(
+  company: string | undefined,
+  opcoes?: {
+    /**
+     * Compras SALVAS cujo trânsito deve ficar de fora.
+     *
+     * Existe para a Projeção Compra não contar a mesma peça duas vezes quando uma compra
+     * salva é importada: a lista já mostra "Na compra salva 30", e se aquela mesma compra
+     * virou trânsito ("Exportar para trânsito"), as 30 apareceriam de novo em "Já vem em
+     * trânsito" e a sugestão desceria pelo dobro. Trânsito de OUTRA compra continua
+     * contando — é peça diferente, a caminho de verdade.
+     */
+    excluirCompraSalvaIds?: string[] | null;
+  }
+): Promise<Map<string, TransitoItemAgregado>> {
+  const out = new Map<string, TransitoItemAgregado>();
+  if (!company) return out;
+  const compras = await listComprasTransitoFull(company).catch(() => []);
+  const excluir = new Set(
+    (opcoes?.excluirCompraSalvaIds ?? []).map((id) => String(id ?? '').trim()).filter(Boolean)
+  );
+  const today = new Date();
+  for (const c of compras) {
+    if (excluir.size > 0 && c.compraSalvaId && excluir.has(String(c.compraSalvaId).trim())) continue;
+    for (const it of c.items ?? []) {
+      if (!isCompraTransitoDateActive(it.dataRecebimento, today)) continue;
+      const produto = String(it.produto ?? "").trim();
+      if (!produto) continue;
+      const quantidade = Number(it.quantidade ?? 0) || 0;
+      if (quantidade <= 0) continue;
+      const cor = String(it.corProduto ?? "").trim();
+      const key = `${produto}||${cor}`;
+      const atual = out.get(key);
+      if (atual) {
+        atual.quantidade += quantidade;
+        if (!atual.corDescricao && it.corDescricao) atual.corDescricao = String(it.corDescricao).trim();
+        if (it.dataRecebimento && it.dataRecebimento < atual.proximaChegada) {
+          atual.proximaChegada = it.dataRecebimento;
+        }
+      } else {
+        out.set(key, {
+          produto,
+          cor,
+          corDescricao: String(it.corDescricao ?? "").trim(),
+          quantidade,
+          proximaChegada: it.dataRecebimento,
+        });
+      }
+    }
+  }
+  return out;
+}
+
 /**
  * Entradas de trânsito de UM item, com o fallback por descrição de cor.
  *

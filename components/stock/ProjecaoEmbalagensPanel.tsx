@@ -388,8 +388,10 @@ export default function ProjecaoEmbalagensPanel({
             </button>
           </div>
         </div>
-        <div className={styles.tableScroll}>
-          <table className={`${styles.table} ${styles.mensalTable} ${styles.embTable}`}>
+        <div className={`${styles.tableScroll} ${styles.tableScrollFixo}`}>
+          <table
+            className={`${styles.table} ${styles.mensalTable} ${styles.embTable} ${styles.tabelaFixa}`}
+          >
             <thead>
               <tr>
                 <th className={`${styles.thLeft} ${styles.stickyCol}`}>Embalagem</th>
@@ -526,7 +528,7 @@ function ComparativoAno({ linha, anoBase }: { linha: LinhaEmbalagem; anoBase: nu
         {linha.item.nota && <span className={styles.embAviso}>{linha.item.nota}</span>}
       </div>
       <div className={styles.tableScroll}>
-        <table className={`${styles.table} ${styles.mensalTable}`}>
+        <table className={`${styles.table} ${styles.mensalTable} ${styles.tabelaFixa}`}>
           <thead>
             <tr>
               <th className={`${styles.thLeft} ${styles.stickyCol}`}>Série</th>

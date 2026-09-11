@@ -9254,6 +9254,135 @@ export async function fetchAvailableCores({
   });
 }
 
+/**
+ * Quais dos produtos pedidos pertencem ao recorte de CADASTRO — pelo cadastro, não pela
+ * venda nem pelo estoque.
+ *
+ * Existe por causa do TRÂNSITO da Projeção Compra. Lá o recorte era decidido pela lista de
+ * itens que a consulta de VENDAS devolveu, e com isso a peça que está chegando e nunca
+ * vendeu ficava invisível — justamente o caso em que saber "isso já está comprado" mais
+ * importa. Medido em 11/09/2026: o produto 13.71.0115 (NEIVA C12/22) tem 30 peças da cor
+ * 151/MOCHA chegando em 23/09, cor cadastrada no Linx, sem nenhuma venda e sem saldo; o
+ * total de trânsito do subgrupo saía 1.026 em vez de 1.056.
+ *
+ * Uma consulta só, em PRODUTOS, restrita à lista de candidatos (o trânsito tem centenas de
+ * códigos, não milhares — folgado dentro do limite de parâmetros do SQL Server).
+ *
+ * A COR fica de fora de propósito: o recorte de cor casa pela DESCRIÇÃO, e quem chama já
+ * tem a descrição da cor na própria linha de trânsito. Resolver aqui obrigaria a um segundo
+ * join por uma informação que o chamador já carrega.
+ *
+ * Devolve um MAPA, não um conjunto: além de responder "pertence?", a mesma consulta já traz
+ * a descrição e a categoria do produto — o que é preciso para MONTAR a linha de um item que
+ * a consulta de vendas nunca devolveu (peça nova, comprada e a caminho, sem histórico).
+ */
+export interface ProdutoCadastroBasico {
+  produto: string;
+  descricao: string;
+  grupo: string;
+  linha: string;
+  subgrupo: string;
+  grade: string;
+  colecao: string;
+  tipo: string;
+}
+
+export async function fetchProdutosNoEscopoCadastro({
+  company,
+  candidatos,
+  grupos,
+  linhas,
+  subgrupos,
+  grades,
+  colecoes,
+  tipos,
+  produtoSearchTerm,
+}: {
+  company?: string;
+  /** Códigos a testar. Fora desta lista nada é devolvido. */
+  candidatos: string[];
+  grupos?: string[] | null;
+  linhas?: string[] | null;
+  subgrupos?: string[] | null;
+  grades?: string[] | null;
+  colecoes?: string[] | null;
+  tipos?: string[] | null;
+  produtoSearchTerm?: string | null;
+}): Promise<Map<string, ProdutoCadastroBasico>> {
+  const lista = Array.from(
+    new Set((candidatos ?? []).map((v) => String(v ?? '').trim()).filter(Boolean))
+  );
+  if (!company || lista.length === 0) return new Map<string, ProdutoCadastroBasico>();
+
+  return withRequest(async (request) => {
+    const grupoFilter = buildGrupoFilter(request, company, grupos ?? null, 'p');
+    const linhaFilter = buildLinhaFilter(request, company, linhas ?? null, 'p');
+    const colecaoFilter = buildColecaoFilter(request, company, colecoes ?? null, 'p');
+    const subgrupoFilter = buildSubgrupoFilter(request, company, subgrupos ?? null, 'p');
+    const gradeFilter = buildGradeFilter(request, company, grades ?? null, 'p');
+    const exclusionFilter = buildExclusionFilter(request, company, 'p', 'excludedLineEscopoCad');
+    const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
+
+    lista.forEach((v, i) => request.input(`escCadProd${i}`, sql.VarChar, v));
+    const ph = lista.map((_, i) => `@escCadProd${i}`).join(', ');
+
+    let tipoFilter = '';
+    const tiposList = (tipos ?? []).map((t) => t.trim().toUpperCase()).filter(Boolean);
+    if (tiposList.length > 0) {
+      tiposList.forEach((tv, i) => request.input(`escCadTipo${i}`, sql.VarChar, tv));
+      const phT = tiposList.map((_, i) => `@escCadTipo${i}`).join(', ');
+      tipoFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.TIPO_PRODUTO, '')))) IN (${phT})`;
+    }
+
+    let buscaFilter = '';
+    const termo = (produtoSearchTerm ?? '').trim();
+    if (termo.length >= 2) {
+      request.input('escCadBusca', sql.VarChar, `%${termo}%`);
+      buscaFilter = `AND p.DESC_PRODUTO LIKE @escCadBusca`;
+    }
+
+    const result = await request.query<ProdutoCadastroBasico>(`
+      SELECT
+        RTRIM(LTRIM(CAST(p.PRODUTO AS VARCHAR(50)))) AS produto,
+        ISNULL(RTRIM(p.DESC_PRODUTO), '') AS descricao,
+        ISNULL(RTRIM(p.GRUPO_PRODUTO), '') AS grupo,
+        ISNULL(RTRIM(p.LINHA), '') AS linha,
+        ISNULL(RTRIM(p.SUBGRUPO_PRODUTO), '') AS subgrupo,
+        ISNULL(RTRIM(CONVERT(VARCHAR, p.GRADE)), '') AS grade,
+        ISNULL(RTRIM(p.COLECAO), '') AS colecao,
+        ISNULL(RTRIM(p.TIPO_PRODUTO), '') AS tipo
+      FROM PRODUTOS p WITH (NOLOCK)
+      WHERE p.PRODUTO IN (${ph})
+        ${grupoFilter}
+        ${linhaFilter}
+        ${subgrupoFilter}
+        ${gradeFilter}
+        ${colecaoFilter}
+        ${tipoFilter}
+        ${buscaFilter}
+        ${exclusionFilter}
+        ${nerdOnlyEletronicosFilter}
+    `);
+
+    const mapa = new Map<string, ProdutoCadastroBasico>();
+    result.recordset.forEach((r) => {
+      const produto = (r.produto ?? '').trim();
+      if (!produto) return;
+      mapa.set(produto, {
+        produto,
+        descricao: (r.descricao ?? '').trim(),
+        grupo: (r.grupo ?? '').trim(),
+        linha: (r.linha ?? '').trim(),
+        subgrupo: (r.subgrupo ?? '').trim(),
+        grade: (r.grade ?? '').trim(),
+        colecao: (r.colecao ?? '').trim(),
+        tipo: (r.tipo ?? '').trim(),
+      });
+    });
+    return mapa;
+  });
+}
+
 /** As dimensões de cadastro de um recorte de produtos, prontas para os selects da tela. */
 export interface DimensoesDoEscopo {
   grupos: string[];

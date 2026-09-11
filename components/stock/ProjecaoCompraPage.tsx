@@ -13,6 +13,7 @@ import ProjecaoItensMensais, {
 } from "@/components/stock/ProjecaoItensMensais";
 import { formatDateForQuery } from "@/lib/utils/date";
 import { VAREJO_VALUE, resolveCompany, type CompanyKey } from "@/lib/config/company";
+import { resolveCicloCompra } from "@/lib/config/compra-ciclo";
 import {
   INDICE_MAX,
   INDICE_MIN,
@@ -82,6 +83,8 @@ interface ProjecaoItem {
   codigoBarra: string;
   grade: string;
   subgrupo: string;
+  /** LINHA do cadastro — junto com o subgrupo, é o que casa a regra de Ciclo de Compra. */
+  linha?: string;
   colecao: string;
   janelas: Record<string, number>;
   /** Estoque atual do item (só saldos positivos). */
@@ -90,6 +93,10 @@ interface ProjecaoItem {
   transito?: number;
   /** Chave da categoria do item na curva sazonal. */
   categoria?: string;
+  /** A linha existe só por causa do trânsito: nunca vendeu e não tem saldo. */
+  soTransito?: boolean;
+  /** Chegada mais próxima do trânsito deste item ('yyyy-MM-dd'). */
+  chegada?: string;
   /** Série do ano por item — só vem no modo "item a item". */
   mensal?: MensalItem[];
   /** Consumo/dia pela régua da Compra Ideal (Curva ABC). Só no modo "item a item". */
@@ -168,11 +175,47 @@ interface SazonalResposta {
 const CHAVE_ESCOPO_TODO = "__ESCOPO__";
 
 /**
- * O estoque que deve SOBRAR na data alvo, em dias de venda. O pedido do dono: "idealmente o
- * estoque em 31/12 deveria durar 90 dias" — ou seja, a compra tem de cobrir o que vai vender
- * até lá E deixar a rede abastecida para o trimestre seguinte.
+ * Quantos dias de venda o estoque deve durar na data alvo.
+ *
+ * NÃO é 90 fixo. Sai da regra de **Ciclo de Compra** (`/[company]/compra-ciclo`), que é
+ * editável e vale por categoria: Seda 90, Pashmina e Lenços Brasil 60, Eletrônicos 30, e o
+ * padrão da empresa quando nenhuma regra casa. O 90 do pedido original ("o estoque em 31/12
+ * deveria durar 90 dias") era a regra da SEDA — aplicá-lo a tudo mandaria comprar 50% a mais
+ * do que o necessário numa linha de 60 dias.
+ *
+ * O escopo pode misturar categorias. Aí vale a regra de MAIOR PESO em unidades vendidas
+ * (quem manda no volume manda na cobertura), e a tela diz qual regra usou.
  */
-const DIAS_COBERTURA_ALVO = 90;
+function resolverCoberturaDoEscopo(
+  companyKey: CompanyKey,
+  itens: ProjecaoItem[]
+): { dias: number; grupo: string; misturado: boolean; alternativas: string } {
+  const padrao = resolveCicloCompra(companyKey, {});
+  if (itens.length === 0) {
+    return { dias: padrao.coberturaDias, grupo: padrao.grupo, misturado: false, alternativas: "" };
+  }
+  const porRegra = new Map<string, { dias: number; grupo: string; peso: number }>();
+  itens.forEach((it) => {
+    const ciclo = resolveCicloCompra(companyKey, { linha: it.linha, subgrupo: it.subgrupo });
+    // Peso = unidades vendidas em 12 meses. Item sem venda (o que só tem trânsito) ainda
+    // conta 1, senão uma categoria inteira de itens novos ficaria invisível na escolha.
+    const peso = Math.max(1, Number(it.janelas?.["365"] ?? 0) || 0);
+    const atual = porRegra.get(ciclo.grupo);
+    if (atual) atual.peso += peso;
+    else porRegra.set(ciclo.grupo, { dias: ciclo.coberturaDias, grupo: ciclo.grupo, peso });
+  });
+  const ordenadas = Array.from(porRegra.values()).sort((a, b) => b.peso - a.peso);
+  const vencedora = ordenadas[0];
+  return {
+    dias: vencedora.dias,
+    grupo: vencedora.grupo,
+    misturado: ordenadas.length > 1,
+    alternativas: ordenadas
+      .slice(1)
+      .map((r) => `${r.grupo} ${r.dias}d`)
+      .join(" · "),
+  };
+}
 
 /**
  * O que a análise mede. `produtos` = unidades vendidas (visão de compra, com estoque,
@@ -379,8 +422,12 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   const [compraImportada, setCompraImportada] = useState<CompraImportada | null>(null);
   const [carregandoCompra, setCarregandoCompra] = useState(false);
   const [erroCompra, setErroCompra] = useState<string | null>(null);
-  /** Projetar produto × cor linha a linha. Importar uma compra salva liga isto sozinho. */
-  const [porItem, setPorItem] = useState(false);
+  /**
+   * Projetar produto × cor linha a linha. LIGADO por padrão: o agregado diz quanto comprar,
+   * mas quem compra precisa saber de QUAL cor — e ninguém lembrava de marcar a caixa.
+   * Importar uma compra salva também liga isto sozinho.
+   */
+  const [porItem, setPorItem] = useState(true);
   /** O que o servidor respondeu sobre o detalhe por item na última projeção. */
   const [detalheItem, setDetalheItem] = useState({ disponivel: false, omitido: false, max: 400 });
   const [projItens, setProjItens] = useState<Record<string, ProjecaoItem>>({});
@@ -401,10 +448,15 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
    * escolhida. Uma vez ligado não desliga: voltar para ela depois não deve custar outra
    * rodada de consultas.
    */
-  const [comSazonal, setComSazonal] = useState(false);
+  const [comSazonal, setComSazonal] = useState(true);
   const [projLoading, setProjLoading] = useState(false);
   const [projErro, setProjErro] = useState<string | null>(null);
-  const [regra, setRegra] = useState<RegraProjecao>("realista");
+  /**
+   * Régua padrão = SAZONAL DA CATEGORIA. É a única que enxerga a alta de novembro e
+   * dezembro sem depender de o ano passado ter sido um ano bom, e é com ela que a compra de
+   * fim de ano é decidida. As outras ficam no select como conferência.
+   */
+  const [regra, setRegra] = useState<RegraProjecao>("sazonalCategoria");
   /**
    * Filial do recorte (null = rede inteira). Fica FORA de `dims` de propósito: as dimensões
    * filtram o cadastro de PRODUTOS, a filial restringe o universo de lojas consultado.
@@ -611,7 +663,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
     setComprasSelecionadas(ids);
     if (ids.length === 0) {
       setCompraImportada(null);
-      setPorItem(false);
+      setPorItem(true);
       setErroCompra(null);
       return;
     }
@@ -1019,6 +1071,8 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
     if (pedido.filial) params.set("filial", pedido.filial);
     if (pedido.porItem) params.set("porItem", "1");
     if (pedido.sazonal) params.set("sazonal", "1");
+    // As compras salvas importadas: o trânsito que saiu delas não pode ser contado de novo.
+    pedido.compra?.ids.forEach((id) => params.append("compraSalva", id));
     DIM_KEYS.forEach((dim) => pedido.dims[dim].forEach((v) => params.append(dim, v)));
     pedido.produtos.forEach((produto) => params.append("produto", produto));
     if (pedido.busca) params.set("busca", pedido.busca);
@@ -1427,15 +1481,45 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   ]);
 
   /**
+   * As linhas da tabela de sazonalidade, na ordem em que ela é lida.
+   *
+   * A curva do ESCOPO (a soma das categorias) só ganha linha própria quando há mais de uma
+   * categoria com histórico — é aí que ela é de fato outra curva. Com uma categoria só, ela
+   * é aquela mesma categoria, e a tabela mostrava duas linhas com doze números idênticos.
+   */
+  const linhasCurva = useMemo(() => {
+    const curvas = sazonalResp?.curvas;
+    if (!curvas) return [] as Array<[string, CurvaSazonal]>;
+    const comBase = Object.entries(curvas).filter(([, curva]) => curva.anosUsados > 0);
+    const categorias = comBase.filter(([chave]) => chave !== CHAVE_ESCOPO_TODO);
+    const lista = categorias.length > 1 ? comBase : categorias.length === 1 ? categorias : comBase;
+    return lista.sort((a, b) => {
+      // A soma primeiro: é a curva que move os números do topo da tela.
+      if (a[0] === CHAVE_ESCOPO_TODO) return -1;
+      if (b[0] === CHAVE_ESCOPO_TODO) return 1;
+      return b[1].volumeBase - a[1].volumeBase;
+    });
+  }, [sazonalResp]);
+
+  /**
+   * A cobertura que o estoque da virada precisa ter, pela regra de Ciclo de Compra do
+   * escopo. Muda com o recorte: Seda pede 90 dias, Lenços Brasil 60, Eletrônicos 30.
+   */
+  const cobertura = useMemo(
+    () => resolverCoberturaDoEscopo(companyKey, Object.values(projItens)),
+    [companyKey, projItens]
+  );
+
+  /**
    * O PLANO ATÉ A DATA ALVO — as cinco contas que decidem a compra de fim de ano, na ordem
    * em que a pergunta é feita: o que eu tenho, o que já comprei, o que vou vender, o que
    * sobra e se esse resto dura.
    *
    * A última é a que muda a decisão: um saldo positivo em 31/12 não significa nada se ele
-   * acabar em três semanas de janeiro. O alvo é o estoque em 31/12 durar
-   * `DIAS_COBERTURA_ALVO` dias — então a conta de comprar é
+   * acabar em três semanas de janeiro. O alvo é o estoque na data durar os dias de
+   * COBERTURA da categoria (regra do Ciclo de Compra, editável) — então a conta é
    *
-   *     comprar = (venda até a data alvo) + (venda nos 90 dias seguintes) − estoque − trânsito
+   *     comprar = (venda até a data alvo) + (venda na cobertura seguinte) − estoque − trânsito
    *
    * Vale para TODAS as regras: cada uma responde "quanto vende" à sua maneira, e o resto da
    * conta é o mesmo. Só a sazonal, porém, sabe que os 90 dias seguintes a 31/12 são jan–mar
@@ -1445,12 +1529,12 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
     const inicioApos = addDaysYmd(venderAte, 1);
     const vendaAteAlvo = linhaAtiva.disponivel ? projetarIntervalo(dataBase, diasHorizonte) : null;
     const vendaApos = linhaAtiva.disponivel
-      ? projetarIntervalo(inicioApos, DIAS_COBERTURA_ALVO)
+      ? projetarIntervalo(inicioApos, cobertura.dias)
       : null;
     const disponivel = vendaAteAlvo != null && vendaApos != null;
     const saldoAlvo = disponivel ? estoqueAtual + transitoEscopo - (vendaAteAlvo as number) : null;
     // Quantos dias o saldo da virada duraria no ritmo do trimestre seguinte.
-    const ritmoApos = disponivel ? (vendaApos as number) / DIAS_COBERTURA_ALVO : 0;
+    const ritmoApos = disponivel ? (vendaApos as number) / cobertura.dias : 0;
     const duracaoSaldo =
       saldoAlvo != null && ritmoApos > 0 ? Math.max(0, saldoAlvo) / ritmoApos : null;
     const comprar =
@@ -1479,6 +1563,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
     projetarIntervalo,
     estoqueAtual,
     transitoEscopo,
+    cobertura.dias,
   ]);
 
   // ── Tabela de vendas por mês (ano todo: realizado + projeção) ─────────────
@@ -1547,7 +1632,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
     setComprasSelecionadas([]);
     setCompraImportada(null);
     setErroCompra(null);
-    setPorItem(false);
+    setPorItem(true);
   };
 
   /** O que está na tela é a rede inteira (geraram sem nenhum recorte). */
@@ -1584,6 +1669,52 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
 
   return (
     <div className={styles.wrapper}>
+      {/* ── Título + escopo ──────────────────────────────────────────────── */}
+      <div className={styles.titleBar}>
+        <h1 className={styles.title}>Projeção Compra</h1>
+        {gerado && ehEmbalagensAplicada && (
+          <span className={styles.scopeText}>
+            {filialAplicadaLabel ? `${filialAplicadaLabel} · ` : "Rede inteira · "}
+            embalagens ScarfMe
+          </span>
+        )}
+        {gerado && !ehEmbalagensAplicada && (
+          <span className={styles.scopeText}>
+            {soUm ? (
+              <>
+                {filialAplicadaLabel && <>{filialAplicadaLabel} · </>}
+                {soUm.descricao}
+                {soUm.codigoBarra && <> · cód. {soUm.codigoBarra}</>}
+                {soUm.grade && <> · {soUm.grade}</>}
+                {soUm.cores > 0 && (
+                  <>
+                    {" · "}
+                    {soUm.cores} {soUm.cores === 1 ? "cor" : "cores"}
+                  </>
+                )}
+                {!ehTickets && <> · estoque {fmt(estoqueAtual)} un</>}
+              </>
+            ) : (
+              <>
+                {escopoRede && <>Rede inteira · </>}
+                {filialAplicadaLabel && <>{filialAplicadaLabel} · </>}
+                {fmt(agregado.itens)} itens
+                {!ehTickets && <> · estoque {fmt(estoqueAtual)} un</>}
+              </>
+            )}
+          </span>
+        )}
+        {/* Só a projeção acende o "calculando". A busca de produto é sob demanda e mostra o
+            próprio "Buscando…" dentro do dropdown. */}
+        <span
+          className={`${styles.loadingCue} ${projLoading ? styles.loadingCueActive : ""}`}
+          role="status"
+        >
+          <span className={styles.spinner} aria-hidden="true" />
+          calculando
+        </span>
+      </div>
+
       {/* ── Parâmetros + filtros (uma só superfície) ─────────────────────── */}
       <div className={styles.headerCard}>
         <div className={styles.topBar}>
@@ -1963,52 +2094,6 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
         </div>
       </div>
 
-      {/* ── Título + escopo ──────────────────────────────────────────────── */}
-      <div className={styles.titleBar}>
-        <h1 className={styles.title}>Projeção Compra</h1>
-        {gerado && ehEmbalagensAplicada && (
-          <span className={styles.scopeText}>
-            {filialAplicadaLabel ? `${filialAplicadaLabel} · ` : "Rede inteira · "}
-            embalagens ScarfMe
-          </span>
-        )}
-        {gerado && !ehEmbalagensAplicada && (
-          <span className={styles.scopeText}>
-            {soUm ? (
-              <>
-                {filialAplicadaLabel && <>{filialAplicadaLabel} · </>}
-                {soUm.descricao}
-                {soUm.codigoBarra && <> · cód. {soUm.codigoBarra}</>}
-                {soUm.grade && <> · {soUm.grade}</>}
-                {soUm.cores > 0 && (
-                  <>
-                    {" · "}
-                    {soUm.cores} {soUm.cores === 1 ? "cor" : "cores"}
-                  </>
-                )}
-                {!ehTickets && <> · estoque {fmt(estoqueAtual)} un</>}
-              </>
-            ) : (
-              <>
-                {escopoRede && <>Rede inteira · </>}
-                {filialAplicadaLabel && <>{filialAplicadaLabel} · </>}
-                {fmt(agregado.itens)} itens
-                {!ehTickets && <> · estoque {fmt(estoqueAtual)} un</>}
-              </>
-            )}
-          </span>
-        )}
-        {/* Só a projeção acende o "calculando". A busca de produto é sob demanda e mostra o
-            próprio "Buscando…" dentro do dropdown. */}
-        <span
-          className={`${styles.loadingCue} ${projLoading ? styles.loadingCueActive : ""}`}
-          role="status"
-        >
-          <span className={styles.spinner} aria-hidden="true" />
-          calculando
-        </span>
-      </div>
-
       {/* A régua da projeção, recolhida por padrão. Vale para as três abas — todas usam o
           mesmo motor —, e fica ACIMA dos números porque é onde a dúvida aparece. */}
       <ProjecaoComoFunciona
@@ -2016,6 +2101,16 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
         anoBase={anoBase}
         curvaSazonal={gerado && sazonalResp ? curvaEscopo : null}
         perfilSazonal={gerado && sazonalResp ? perfilSazonal : null}
+        /* Os números do escopo entram no texto: cada régua mostra a conta DELA com o que
+           está na tela, em vez de repetir a fórmula com valores inventados. */
+        regra={regra}
+        janelas={gerado ? agregado.unidades : null}
+        consumoIdeal={gerado ? consumoIdealEscopo : null}
+        dataBase={dataBase}
+        venderAte={venderAte}
+        diasHorizonte={diasHorizonte}
+        coberturaDias={cobertura.dias}
+        coberturaGrupo={cobertura.grupo}
       />
 
       {ehEmbalagensAplicada ? (
@@ -2042,9 +2137,9 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
           {erroCompra && <div className={styles.erro}>{erroCompra}</div>}
 
           {/* ── KPIs ──────────────────────────────────────────────────────── */}
-          <div className={`${styles.kpiStrip} ${ehTickets ? styles.kpiStripTickets : ""}`}>
+          <div className={styles.kpiStrip}>
             {!ehTickets && (
-              <div className={styles.kpi}>
+              <div className={`${styles.kpi} ${styles.kpiPrimario}`}>
                 <span className={styles.kpiLabel}>Sugestão de compra</span>
                 <span className={styles.kpiValue}>
                   {linhaAtiva.disponivel ? fmt(linhaAtiva.sugestao) : "—"}
@@ -2056,9 +2151,10 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
                 </span>
               </div>
             )}
-            {/* "Projeção que falta" não dizia o que faltava. É o que ainda vai SAIR daqui
-                até a data alvo — a mesma coisa que a coluna "Vai vender" da tabela item a
-                item, para os dois nomes não divergirem. */}
+            {/* Em Produtos este número já é o termo "Vende até X" da conta logo abaixo:
+                mostrá-lo duas vezes só empurrava a tela para baixo. Em Tickets não há
+                conta de plano (estoque não se aplica), então ele fica. */}
+            {ehTickets && (
             <div
               className={styles.kpi}
               title={
@@ -2087,16 +2183,28 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
                   : `${unidadeLabel} em ${fmt(linhaAtiva.dias)} dias`}
               </span>
             </div>
-            <div className={styles.kpi}>
+            )}
+            <div
+              className={styles.kpi}
+              title={
+                linhaAtiva.curva
+                  ? "Ritmo médio do horizonte: a projeção dividida pelos dias que faltam."
+                  : `Medido na janela de ${fmt(linhaAtiva.dias)} dias anteriores à data base.`
+              }
+            >
               <span className={styles.kpiLabel}>Ritmo</span>
               <span className={styles.kpiValue}>
                 {linhaAtiva.disponivel ? fmtDec(linhaAtiva.ritmoDia) : "—"}
                 <span className={styles.kpiUnit}>{unidadeLabel}/dia</span>
               </span>
+              {/* Nas regras de janela a base do ritmo é a venda crua daquele trecho, e ela
+                  perdeu o KPI próprio — cabe aqui, que é onde ela explica o número. */}
               <span className={styles.kpiHint}>
-                {linhaAtiva.disponivel
+                {!linhaAtiva.disponivel
+                  ? "—"
+                  : linhaAtiva.curva
                   ? `${fmtDec(linhaAtiva.ritmoMes, 1)} ${unidadeLabel}/mês`
-                  : "—"}
+                  : `${fmt(linhaAtiva.un)} ${unidadeLabel} em ${fmt(linhaAtiva.dias)} dias`}
               </span>
             </div>
             {!ehTickets && (
@@ -2137,100 +2245,118 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
           </div>
 
           {/* ── Plano até a data alvo ───────────────────────────────────────
-              A pergunta de compra inteira em seis caixas, na ordem em que ela é
-              feita: tenho / já comprei / vou vender / sobra / preciso que dure
-              90 dias / então compro isto. Vale para todas as regras — cada uma
-              responde "quanto vende" à sua maneira e o resto da conta é igual. */}
+              A conta de compra escrita na horizontal, na ordem em que ela é
+              feita: o que tenho + o que já comprei − o que vou vender = o que
+              sobra; e esse resto precisa cobrir os 90 dias seguintes. Os
+              operadores estão na tela de propósito — é o que faz o número final
+              se defender sozinho. Vale para todas as regras: cada uma responde
+              "quanto vende" à sua maneira e o resto da conta é igual. */}
           {!ehTickets && (
-            <div className={styles.planoStrip}>
+            <div className={styles.planoEq}>
               <div
-                className={styles.kpi}
+                className={styles.planoTermo}
                 title={
                   estoqueOverride != null
                     ? `Estoque digitado à mão. O real do recorte é ${fmt(agregado.estoqueSomado)} un.`
                     : "Estoque da rede no recorte — só saldos positivos, mesma fonte da Estoque Consulta."
                 }
               >
-                <span className={styles.kpiLabel}>Estoque atual</span>
-                <span className={styles.kpiValue}>{fmt(plano.estoque)}</span>
-                <span className={styles.kpiHint}>
-                  {estoqueOverride != null ? "digitado" : `${fmt(agregado.itens)} itens na rede`}
+                <span className={styles.planoRot}>Estoque</span>
+                <span className={styles.planoNum}>{fmt(plano.estoque)}</span>
+                <span className={styles.planoSub}>
+                  {estoqueOverride != null ? "digitado" : `${fmt(agregado.itens)} itens`}
                 </span>
               </div>
+              <span className={styles.planoOp}>+</span>
               <div
-                className={styles.kpi}
+                className={styles.planoTermo}
                 title="Peças já compradas e ainda a caminho (compras em trânsito ativas) — o mesmo trânsito que a Curva ABC abate da sugestão de compra."
               >
-                <span className={styles.kpiLabel}>Já comprado (trânsito)</span>
-                <span className={styles.kpiValue}>{fmt(plano.transito)}</span>
-                <span className={styles.kpiHint}>disponível: {fmt(plano.disponivelTotal)} un</span>
+                <span className={styles.planoRot}>Já comprado</span>
+                <span className={styles.planoNum}>{fmt(plano.transito)}</span>
+                <span className={styles.planoSub}>em trânsito</span>
               </div>
+              <span className={styles.planoOp}>−</span>
               <div
-                className={styles.kpi}
+                className={styles.planoTermo}
                 title={`Projeção de venda entre ${ymdToBr(dataBase)} e ${ymdToBr(venderAte)} pela regra "${REGRA_LABEL[regra]}".`}
               >
-                <span className={styles.kpiLabel}>
-                  <span className={styles.planoSeta}>−</span> Vende até {ymdToBr(venderAte)}
-                </span>
-                <span className={styles.kpiValue}>
+                <span className={styles.planoRot}>Vende até {ymdToBr(venderAte)}</span>
+                <span className={styles.planoNum}>
                   {plano.vendaAteAlvo != null ? fmt(plano.vendaAteAlvo) : "—"}
                 </span>
-                <span className={styles.kpiHint}>{fmt(diasHorizonte)} dias</span>
+                <span className={styles.planoSub}>{fmt(diasHorizonte)} dias</span>
               </div>
+              <span className={styles.planoOp}>=</span>
               <div
-                className={`${styles.kpi} ${styles.planoAlvo}`}
+                className={`${styles.planoTermo} ${styles.planoSaldo}`}
                 title="Estoque atual + trânsito − o que a projeção diz que vai sair até a data alvo."
               >
-                <span className={styles.kpiLabel}>Saldo em {ymdToBr(venderAte)}</span>
+                <span className={styles.planoRot}>Saldo em {ymdToBr(venderAte)}</span>
                 <span
-                  className={`${styles.kpiValue} ${
+                  className={`${styles.planoNum} ${
                     plano.saldoAlvo != null && plano.saldoAlvo < 0 ? styles.varDown : ""
                   }`}
                 >
                   {plano.saldoAlvo != null ? fmt(plano.saldoAlvo) : "—"}
                 </span>
-                <span className={styles.kpiHint}>
-                  {plano.duracaoSaldo != null
-                    ? `dura ${fmt(plano.duracaoSaldo)} dias`
-                    : "sem ritmo medido"}
+                <span className={styles.planoSub}>
+                  {plano.duracaoSaldo != null ? `dura ${fmt(plano.duracaoSaldo)} dias` : "—"}
                 </span>
               </div>
+
+              <div className={styles.planoDivisor} aria-hidden="true" />
+
               <div
-                className={styles.kpi}
-                title={`Quanto o escopo vende nos ${DIAS_COBERTURA_ALVO} dias seguintes a ${ymdToBr(venderAte)} (a partir de ${ymdToBr(plano.inicioApos)}). É o estoque que a virada do ano precisa deixar de pé.`}
+                className={styles.planoTermo}
+                title={
+                  `Quanto o escopo vende nos ${fmt(cobertura.dias)} dias seguintes a ${ymdToBr(venderAte)} ` +
+                  `(a partir de ${ymdToBr(plano.inicioApos)}). É o estoque que a virada precisa deixar de pé.\n\n` +
+                  `Os ${fmt(cobertura.dias)} dias vêm da regra "${cobertura.grupo}" do Ciclo de Compra — ` +
+                  `não é número fixo, é editável na tela Ciclo de Compra.` +
+                  (cobertura.misturado
+                    ? `\n\nO recorte mistura categorias com coberturas diferentes (${cobertura.alternativas}). ` +
+                      `Vale a regra de maior volume; para a conta exata de uma categoria, filtre por ela.`
+                    : "")
+                }
               >
-                <span className={styles.kpiLabel}>Alvo: {DIAS_COBERTURA_ALVO} dias de estoque</span>
-                <span className={styles.kpiValue}>
+                <span className={styles.planoRot}>Alvo: {fmt(cobertura.dias)} dias</span>
+                <span className={styles.planoNum}>
                   {plano.vendaApos != null ? fmt(plano.vendaApos) : "—"}
                 </span>
-                <span className={styles.kpiHint}>venda de {ymdToBr(plano.inicioApos)} em diante</span>
+                {/* Qual regra mandou. Sem isso o "90 dias" parecia constante do sistema. */}
+                <span className={styles.planoSub}>
+                  regra {cobertura.grupo}
+                  {cobertura.misturado ? " ·  misto" : ""}
+                </span>
               </div>
+              <span className={styles.planoOp}>→</span>
               <div
-                className={`${styles.kpi} ${
+                className={`${styles.planoResultado} ${
                   plano.comprar == null
-                    ? ""
+                    ? styles.planoNeutro
                     : plano.comprar > 0
                     ? styles.planoFalta
                     : styles.planoSobra
                 }`}
-                title={`Comprar = venda até ${ymdToBr(venderAte)} + venda dos ${DIAS_COBERTURA_ALVO} dias seguintes − estoque − trânsito. Zero significa que o que já existe cobre o ano e ainda deixa o trimestre seguinte abastecido.`}
+                title={`Comprar = venda até ${ymdToBr(venderAte)} + venda dos ${fmt(cobertura.dias)} dias seguintes (regra ${cobertura.grupo}) − estoque − trânsito. Zero significa que o que já existe cobre o período e ainda deixa a cobertura seguinte de pé.`}
               >
-                <span className={styles.kpiLabel}>
+                <span className={styles.planoRot}>
                   {plano.comprar != null && plano.comprar === 0 ? "Sobra" : "Precisa comprar"}
                 </span>
-                <span className={styles.kpiValue}>
+                <span className={styles.planoNum}>
                   {plano.comprar == null
                     ? "—"
                     : plano.comprar > 0
                     ? fmt(plano.comprar)
                     : fmt(Math.max(0, plano.sobra ?? 0))}
                 </span>
-                <span className={styles.kpiHint}>
+                <span className={styles.planoSub}>
                   {plano.comprar == null
                     ? "—"
                     : plano.comprar > 0
-                    ? "un para fechar o ano e o trimestre"
-                    : "un acima do alvo de 90 dias"}
+                    ? "un para fechar o ano + 90 dias"
+                    : "un acima do alvo"}
                 </span>
               </div>
             </div>
@@ -2248,24 +2374,33 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
                   {sazonalResp.dim} · {sazonalResp.anos.slice().sort().join(" · ")}
                 </span>
               </div>
+              {/* Era um parágrafo de cinco linhas com tudo junto: o que o número é, como
+                  ler, de onde sai a base e o que o tooltip mostra. Vira fragmento curto com
+                  rótulo em negrito — quem bate o olho pega a régua sem ler a frase toda. */}
               <div className={styles.sazonalNota}>
-                Quanto cada mês vale contra o <strong>mês médio</strong> da categoria, medido em
-                anos-calendário FECHADOS e na categoria INTEIRA — não no recorte. Cada ano entra
-                normalizado por si só, então crescimento de um ano para o outro não vira
-                sazonalidade. O ano mais recente pesa mais.
+                <span className={styles.notaItem}>
+                  <strong>É força do mês, não venda.</strong> 1,00× = mês médio da categoria
+                </span>
+                <span className={styles.notaItem}>
+                  <strong>1,20×</strong> vende 20% acima · <strong>0,84×</strong> vende 16% abaixo
+                </span>
+                <span className={styles.notaItem}>
+                  <strong>Base:</strong> categoria inteira da rede, anos fechados, cada ano
+                  normalizado por si
+                </span>
+                <span className={styles.notaItem}>
+                  <strong>Mouse na célula</strong> mostra ano a ano
+                </span>
                 {!curvaEscopo.confiavel && (
-                  <>
-                    {" "}
-                    <strong>
-                      Atenção: só {curvaEscopo.anosUsados}{" "}
-                      {curvaEscopo.anosUsados === 1 ? "ano completo" : "anos completos"} de base
-                    </strong>{" "}
-                    — a curva ainda é frágil.
-                  </>
+                  <span className={`${styles.notaItem} ${styles.notaAlerta}`}>
+                    Só {curvaEscopo.anosUsados}{" "}
+                    {curvaEscopo.anosUsados === 1 ? "ano de base" : "anos de base"} — trate
+                    nov/dez como indicação
+                  </span>
                 )}
               </div>
               <div className={styles.tableScroll}>
-                <table className={`${styles.table} ${styles.mensalTable}`}>
+                <table className={`${styles.table} ${styles.mensalTable} ${styles.tabelaFixa}`}>
                   <thead>
                     <tr>
                       <th className={`${styles.thLeft} ${styles.stickyCol}`}>Categoria</th>
@@ -2275,34 +2410,48 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
                     </tr>
                   </thead>
                   <tbody>
-                    {/* Categoria sem nenhum ano completo devolve curva neutra (doze 1,00×):
-                        doze células iguais não dizem nada e só empurram para baixo as que
-                        dizem. Elas somem daqui e viram a contagem do rodapé — quem projeta
-                        esses itens é a curva do escopo, que está na primeira linha. */}
-                    {Object.entries(sazonalResp.curvas)
-                      .filter(([, curva]) => curva.anosUsados > 0)
-                      .sort((a, b) => {
-                        // O escopo somado primeiro: é a curva que move os KPIs do topo.
-                        if (a[0] === CHAVE_ESCOPO_TODO) return -1;
-                        if (b[0] === CHAVE_ESCOPO_TODO) return 1;
-                        return b[1].volumeBase - a[1].volumeBase;
-                      })
-                      .map(([chave, curva]) => (
+                    {/* Duas podas, e as duas por legibilidade:
+                        1. Categoria sem nenhum ano fechado devolve curva neutra (doze
+                           1,00×) — doze células iguais não dizem nada e empurram para baixo
+                           as que dizem. Viram a contagem do rodapé.
+                        2. A linha "Todo o recorte" (a soma) só aparece quando há MAIS DE
+                           UMA categoria com curva. Com uma só, ela é a própria categoria
+                           repetida: dois nomes, doze números idênticos e nenhuma pista do
+                           porquê. */}
+                    {linhasCurva.map(([chave, curva]) => (
                         <tr key={chave}>
-                          <td className={`${styles.thLeft} ${styles.stickyCol}`}>
-                            {chave === CHAVE_ESCOPO_TODO ? "Escopo (soma)" : chave}
+                          <td
+                            className={`${styles.thLeft} ${styles.stickyCol}`}
+                            title={
+                              chave === CHAVE_ESCOPO_TODO
+                                ? "A soma de todas as categorias do recorte. É esta a curva que os números do topo da tela usam, e a que vale para item de categoria sem histórico próprio."
+                                : `Curva de ${chave}, medida na categoria inteira da rede.`
+                            }
+                          >
+                            {chave === CHAVE_ESCOPO_TODO ? "Todo o recorte" : chave}
                             <span className={styles.fatorPct}>
-                              {fmt(curva.volumeBase)} un em {curva.anosUsados}{" "}
+                              {chave === CHAVE_ESCOPO_TODO ? "soma das categorias · " : ""}
+                              base {fmt(curva.volumeBase)} un · {curva.anosUsados}{" "}
                               {curva.anosUsados === 1 ? "ano" : "anos"}
                             </span>
                           </td>
-                          {MES_NOME.map((nome, i) => {
-                            const fator = curva.fatores[i + 1] ?? 1;
-                            return (
+                          {/* O mês de PICO da categoria ganha marca própria: numa linha de
+                              doze números parecidos, saber qual é o maior é a leitura que
+                              se está buscando ("dezembro é o mês"). */}
+                          {(() => {
+                            const pico = curva.fatores
+                              .slice(1, 13)
+                              .reduce((maior, f) => Math.max(maior, f), 0);
+                            return MES_NOME.map((nome, i) => {
+                              const fator = curva.fatores[i + 1] ?? 1;
+                              const ehPico = fator >= 1.1 && fator >= pico - 1e-9;
+                              return (
                               <td
                                 key={nome}
                                 className={`${styles.fatorCell} ${
-                                  fator >= 1.1
+                                  ehPico
+                                    ? styles.mesPico
+                                    : fator >= 1.1
                                     ? styles.mesAlto
                                     : fator < 0.9
                                     ? styles.mesBaixo
@@ -2319,8 +2468,9 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
                                 {fmtDec(fator, 2)}×
                                 <span className={styles.fatorPct}>{fmtPct(fator - 1)}</span>
                               </td>
-                            );
-                          })}
+                              );
+                            });
+                          })()}
                         </tr>
                       ))}
                   </tbody>
@@ -2333,10 +2483,12 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
                 if (semBase.length === 0) return null;
                 return (
                   <div className={styles.sazonalNota}>
-                    Fora da tabela: <strong>{semBase.map(([chave]) => chave).join(", ")}</strong>{" "}
-                    — {semBase.length === 1 ? "não tem" : "não têm"} nenhum ano-calendário
-                    fechado com volume, então {semBase.length === 1 ? "segue" : "seguem"} a curva
-                    do escopo.
+                    <span className={styles.notaItem}>
+                      <strong>Sem curva própria:</strong>{" "}
+                      {semBase.map(([chave]) => chave).join(", ")} — sem ano fechado com volume.
+                      {semBase.length === 1 ? " Segue" : " Seguem"} a curva{" "}
+                      {linhasCurva.length > 1 ? "de todo o recorte" : "acima"}.
+                    </span>
                   </div>
                 );
               })()}
@@ -2365,7 +2517,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
               </div>
             </div>
             <div className={styles.tableScroll}>
-              <table className={`${styles.table} ${styles.mensalTable}`}>
+              <table className={`${styles.table} ${styles.mensalTable} ${styles.tabelaFixa}`}>
                 <thead>
                   <tr>
                     <th className={`${styles.thLeft} ${styles.stickyCol}`}>Série</th>
