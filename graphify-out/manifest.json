@@ -1530,8 +1530,8 @@
     "semantic_hash": ""
   },
   "components/products/ProductDetailPage.tsx": {
-    "mtime": 1789409221.9933405,
-    "ast_hash": "960fb6d8bf837b43b388aa0ec680f35a",
+    "mtime": 1789410567.065307,
+    "ast_hash": "6b8714562796c73a208dd2d9e7c4666e",
     "semantic_hash": ""
   },
   "components/products/ProductPerformancePage.tsx": {
@@ -1590,8 +1590,8 @@
     "semantic_hash": "7100ad93329f4cae6f0cf2636fa8a06f"
   },
   "components/relatorios/GeradorRelatoriosPage.tsx": {
-    "mtime": 1788973910.8383863,
-    "ast_hash": "750dfbe11bc780d0d0fae44bd7670d59",
+    "mtime": 1789409624.706188,
+    "ast_hash": "c67f5a1a2b7ee8f6e4477fbb9b340307",
     "semantic_hash": ""
   },
   "components/romaneios/RomaneioDeleteModal.tsx": {
@@ -2320,8 +2320,8 @@
     "semantic_hash": "d907b2b11f2629a2edb97e34f6158c45"
   },
   "lib/reports/compra-sugerida-abc.ts": {
-    "mtime": 1788540413.9422603,
-    "ast_hash": "cbec2e350233ae8f353c0d22022107df",
+    "mtime": 1789409703.581668,
+    "ast_hash": "5b540e6bb228abd6e09c5c9604db27cb",
     "semantic_hash": ""
   },
   "lib/reports/enrich.server.ts": {
@@ -2355,8 +2355,8 @@
     "semantic_hash": ""
   },
   "lib/reports/registry.server.ts": {
-    "mtime": 1788535376.5774956,
-    "ast_hash": "a6d4f532fb5abd3b083bb9db76caea10",
+    "mtime": 1789409554.0686176,
+    "ast_hash": "ae7e41b98ce524da17f0283fa0f88a4c",
     "semantic_hash": ""
   },
   "lib/reports/registry.ts": {
@@ -2405,8 +2405,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/colecao.ts": {
-    "mtime": 1786988601.6623185,
-    "ast_hash": "c3c99da7316189ebbee10646e4573ced",
+    "mtime": 1789409670.888868,
+    "ast_hash": "e9cfee23e0a0e04eb1d002fa408dec84",
     "semantic_hash": ""
   },
   "lib/repositories/colecaoPresentation.ts": {
@@ -2545,8 +2545,8 @@
     "semantic_hash": "36ad099560d5d50a879355f562c7807a"
   },
   "lib/repositories/reportCompraSugeridaAbc.ts": {
-    "mtime": 1789409356.6060517,
-    "ast_hash": "d5379f8bd5dce02c4fe3a3c6b7dc55b3",
+    "mtime": 1789410055.9807189,
+    "ast_hash": "98eecc9cb05d67b2b097b7b84ae363c5",
     "semantic_hash": ""
   },
   "lib/repositories/reportEstoque.ts": {
@@ -4560,8 +4560,8 @@
     "semantic_hash": ""
   },
   "app/api/product-detail/rename/route.ts": {
-    "mtime": 1789409018.3610713,
-    "ast_hash": "37714434d90a8fc1c02d04ca10cfebf6",
+    "mtime": 1789410598.7464588,
+    "ast_hash": "8ef58d70796e1396cc0ee74f83ad3935",
     "semantic_hash": ""
   }
 }

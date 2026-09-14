@@ -405,6 +405,17 @@ export async function fetchCompraSugeridaAbc(
    * linha de grupo é um rótulo, não serve de chave.
    */
   const baseMemberKeys = new Set<string>();
+  /**
+   * Cada grupo AVALIADO (tenha emitido linha ou não), por loja: estoque do grupo naquela
+   * loja (membros somados) e a compra ideal do grupo SEM o corte de "comprar agora". É o que
+   * a fase de rupturas consulta — num agrupamento os membros são o mesmo item com outro nome,
+   * então membro zerado com irmão cheio na mesma loja NÃO é ruptura.
+   */
+  interface GrupoAvaliado {
+    porLabel: Map<string, { estoque: number; idealFull: number }>;
+    membros: Array<{ produto: string; corProduto: string | null }>;
+  }
+  const gruposAvaliados = new Map<string, GrupoAvaliado>();
   for (const plan of plans) {
     const d = plan.detail;
     const revenue = d.totalRevenue ?? 0;
@@ -434,6 +445,9 @@ export async function fetchCompraSugeridaAbc(
 
     // Compra sugerida de cada loja, somada por rótulo (lojas que colapsam no mesmo label).
     const qtyByLabel = new Map<string, number>();
+    const statsByLabel = plan.agrupado
+      ? new Map<string, { estoque: number; idealFull: number }>()
+      : null;
     let total = 0;
     let custoMax = 0;
     let estoqueRede = 0;
@@ -465,8 +479,28 @@ export async function fetchCompraSugeridaAbc(
       total += qtd;
       custoMax = Math.max(custoMax, Number(metricas?.resumo?.custoUnitario ?? 0));
       // Estoque negativo nunca conta — soma só os saldos positivos de cada loja.
-      estoqueRede += Math.max(0, Number(metricas?.resumo?.estoqueTotal ?? 0));
+      const estoqueLoja = Math.max(0, Number(metricas?.resumo?.estoqueTotal ?? 0));
+      estoqueRede += estoqueLoja;
+      if (statsByLabel) {
+        // Ungated: a fase de rupturas existe justamente para furar o corte de "comprar agora".
+        const idealFull = isDescontinuado ? 0 : Math.max(0, ideal.compraIdeal);
+        const atual = statsByLabel.get(label);
+        if (atual) {
+          atual.estoque += estoqueLoja;
+          atual.idealFull += idealFull;
+        } else {
+          statsByLabel.set(label, { estoque: estoqueLoja, idealFull });
+        }
+      }
     });
+    // Registrado ANTES do corte por total — grupo sem necessidade é exatamente o caso que a
+    // fase de rupturas precisa enxergar para não ressuscitar o membro zerado.
+    if (plan.agrupado && statsByLabel && d.groupId) {
+      gruposAvaliados.set(`${d.groupId}||${String(d.corProduto ?? "").trim()}`, {
+        porLabel: statsByLabel,
+        membros: plan.membros,
+      });
+    }
     // + MATRIZ (sem coluna de compra): fecha com a coluna "Estoque rede" da tela da Curva ABC,
     // que soma lojas + matriz. Sem isso o arquivo mostrava a rede sem o maior estoque dela.
     for (const mapa of estoqueMatrizPorItem) {
@@ -584,8 +618,8 @@ export async function fetchCompraSugeridaAbc(
       /** Estoque de rede por MEMBRO (o mesmo membro repete por loja → fica o maior). */
       estoqueRedePorMembro: Map<string, number>;
       membros: Map<string, { produto: string; cor: string | null }>;
+      /** Quantidade por loja — o total da linha é a soma dela (ver emissão abaixo). */
       qtyByLabel: Map<string, number>;
-      total: number;
     }
     const extraByKey = new Map<string, ExtraAcc>();
     orderedNames.forEach((name, idx) => {
@@ -601,13 +635,25 @@ export async function fetchCompraSugeridaAbc(
         if (baseMemberKeys.has(membroKey)) continue; // já coberto pela lista principal
 
         // Membro de grupo cujo grupo NÃO tem linha: os membros em ruptura se juntam numa
-        // linha só, com o nome do grupo. Somar as necessidades aqui não infla como no
-        // universo principal — ruptura é item ZERADO, não há estoque de irmão para abater.
+        // linha só, com o nome do grupo.
         const grupo = grupoLookup.get(buildProdutoAgrupadoProductKey(item.produto));
         const corGrupo = grupo
           ? resolveProdutoAgrupadoCor(item.produto, item.cor, item.corDescricao, corDescricoes)
           : null;
         const key = grupo && corGrupo ? `${grupo.id}||${corGrupo.key}` : membroKey;
+
+        // ⛔ Num agrupamento os membros são O MESMO item com outro nome: `fetchRupturasLoja`
+        // olha um código por vez e enxerga ruptura onde o grupo tem estoque no irmão. Quem
+        // decide é o grupo — com saldo do grupo NAQUELA loja, não há ruptura e a linha nem
+        // nasce. Sem saldo, a quantidade é a do GRUPO (ungated), nunca a soma dos membros:
+        // somar membro a membro seria a mesma inflação que o agrupamento existe para evitar.
+        const avaliado =
+          grupo && corGrupo ? gruposAvaliados.get(`${grupo.id}||${corGrupo.key}`) : undefined;
+        if (avaliado) {
+          const cell = avaliado.porLabel.get(label);
+          if ((cell?.estoque ?? 0) > 0) continue; // irmão cobre esta loja — não é ruptura
+          if ((cell?.idealFull ?? 0) <= 0) continue; // grupo não precisa repor nem sem o corte
+        }
 
         const acc = extraByKey.get(key) ?? {
           agrupado: Boolean(grupo),
@@ -623,21 +669,33 @@ export async function fetchCompraSugeridaAbc(
           estoqueRedePorMembro: new Map<string, number>(),
           membros: new Map<string, { produto: string; cor: string | null }>(),
           qtyByLabel: new Map<string, number>(),
-          total: 0,
         };
         acc.custoUnitario = Math.max(acc.custoUnitario, item.custoUnitario);
         acc.estoqueRedePorMembro.set(
           membroKey,
           Math.max(acc.estoqueRedePorMembro.get(membroKey) ?? 0, item.estoqueRede)
         );
-        acc.membros.set(membroKey, { produto: item.produto, cor: item.cor || null });
-        acc.qtyByLabel.set(label, (acc.qtyByLabel.get(label) ?? 0) + item.compraIdealQtd);
-        acc.total += item.compraIdealQtd;
+        if (avaliado) {
+          // Grupo avaliado: membros vindos do plano (lista completa) e quantidade do grupo,
+          // gravada com `set` — idempotente, o 2º membro da mesma loja não soma de novo.
+          for (const membro of avaliado.membros) {
+            acc.membros.set(canonicalKey(membro.produto, membro.corProduto), {
+              produto: membro.produto,
+              cor: membro.corProduto,
+            });
+          }
+          acc.qtyByLabel.set(label, avaliado.porLabel.get(label)?.idealFull ?? 0);
+        } else {
+          acc.membros.set(membroKey, { produto: item.produto, cor: item.cor || null });
+          acc.qtyByLabel.set(label, (acc.qtyByLabel.get(label) ?? 0) + item.compraIdealQtd);
+        }
         extraByKey.set(key, acc);
       }
     });
 
     for (const acc of extraByKey.values()) {
+      const total = Array.from(acc.qtyByLabel.values()).reduce((s, v) => s + Math.max(0, v), 0);
+      if (total <= 0) continue; // grupo que acabou sem necessidade nenhuma não vira linha
       const membros = Array.from(acc.membros.values());
       const estoqueRede = Array.from(acc.estoqueRedePorMembro.values()).reduce(
         (s, v) => s + Math.max(0, v),
@@ -658,8 +716,8 @@ export async function fetchCompraSugeridaAbc(
         GRADE: acc.grade,
         CUSTO_UNITARIO: round2(acc.custoUnitario),
         ESTOQUE_REDE: roundInt(estoqueRede),
-        COMPRA_TOTAL: roundInt(acc.total),
-        CUSTO_TOTAL: round2(acc.custoUnitario * acc.total),
+        COMPRA_TOTAL: roundInt(total),
+        CUSTO_TOTAL: round2(acc.custoUnitario * total),
       };
       if (acc.agrupado) {
         row[ROW_MEMBROS_FIELD] = encodeRowMembros(membros);
@@ -670,7 +728,7 @@ export async function fetchCompraSugeridaAbc(
       }
       rows.push(row);
     }
-    itensRuptura = extraByKey.size;
+    itensRuptura = rows.filter((r) => Number(r[ROW_RUPTURA_FIELD] ?? 0) === 1).length;
   }
 
   const sumQtde = rows.reduce((s, r) => s + Number(r.COMPRA_TOTAL ?? 0), 0);

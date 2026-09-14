@@ -197,6 +197,13 @@ export default function ProductDetailPage({
   const [colorSaving, setColorSaving] = useState(false);
   const [nameModalOpen, setNameModalOpen] = useState(false);
   const [nameForm, setNameForm] = useState("");
+  // Descricao da NF (PRODUTOS.DESC_PROD_NF): o segundo campo da tela do Linx, que
+  // e o texto impresso na nota. O Linx nao sincroniza os dois — aqui eles andam
+  // juntos por padrao, e quem precisa de NF diferente desmarca.
+  const [nfForm, setNfForm] = useState("");
+  const [nfAplicar, setNfAplicar] = useState(true);
+  const [nfAtual, setNfAtual] = useState("");
+  const [nameLoading, setNameLoading] = useState(false);
   const [nameModalError, setNameModalError] = useState<string | null>(null);
   const [nameSaving, setNameSaving] = useState(false);
   const refetchDetail = useCallback(() => setRefreshTrigger((t) => t + 1), []);
@@ -506,18 +513,57 @@ export default function ProductDetailPage({
   const currentProductName = data?.detail.productName ?? selectedProductName ?? "";
 
   const openNameModal = useCallback(() => {
-    // DESC_PRODUTO e CHAR(40): o nome chega preenchido de espaco a direita. Sem
-    // aparar, o maxLength de 40 do input ja nasce estourado e trava a digitacao.
-    setNameForm(currentProductName.trim());
+    // DESC_PRODUTO vem preenchido de espaco a direita. Sem aparar, o maxLength de
+    // 40 do input ja nasce estourado e trava a digitacao.
+    const nomeAtual = currentProductName.trim();
+    setNameForm(nomeAtual);
+    setNfForm(nomeAtual);
+    setNfAtual("");
+    setNfAplicar(true);
     setNameModalError(null);
     setNameModalOpen(true);
-  }, [currentProductName]);
+
+    if (!selectedProductId || !user?.username) return;
+
+    // A descricao da NF nao vem no payload da tela — le so aqui, para quem pode
+    // renomear. Se hoje ela ja e diferente do nome, a diferenca e deliberada
+    // (ex.: descricao fiscal mais completa) e o padrao passa a ser NAO mexer.
+    setNameLoading(true);
+    void fetch(
+      `/api/product-detail/rename?productId=${encodeURIComponent(selectedProductId)}`,
+      { cache: "no-store", headers: { "x-auth-username": user.username } }
+    )
+      .then(async (response) => {
+        const json = (await response.json()) as {
+          error?: string;
+          data?: { nome?: string; nomeNf?: string; nfIgualAoNome?: boolean };
+        };
+        if (!response.ok || json.error || !json.data) {
+          throw new Error(json.error || "Erro ao ler o cadastro do produto.");
+        }
+        const nome = (json.data.nome ?? nomeAtual).trim();
+        const nf = (json.data.nomeNf ?? "").trim();
+        setNameForm(nome);
+        setNfAtual(nf);
+        setNfForm(nf || nome);
+        setNfAplicar(json.data.nfIgualAoNome !== false);
+      })
+      .catch((err) => {
+        setNameModalError(
+          err instanceof Error ? err.message : "Erro ao ler o cadastro do produto."
+        );
+      })
+      .finally(() => setNameLoading(false));
+  }, [currentProductName, selectedProductId, user?.username]);
 
   const closeNameModal = useCallback(() => {
     if (nameSaving) return;
     setNameModalOpen(false);
     setNameModalError(null);
   }, [nameSaving]);
+
+  /** O que vai sair na NF depois de gravar — e o que o aviso do modal mostra. */
+  const nfResultante = nfAplicar ? nameForm.trim() : nfForm.trim();
 
   const saveName = useCallback(async () => {
     if (!selectedProductId || !user?.username) return;
@@ -529,6 +575,18 @@ export default function ProductDetailPage({
     }
     if (nome.length > 40) {
       setNameModalError("Nome do produto deve ter no maximo 40 caracteres.");
+      return;
+    }
+
+    const nf = nfAplicar ? nome : nfForm.trim().replace(/\s+/g, " ").toUpperCase();
+    if (!nf) {
+      setNameModalError(
+        "Informe a descricao da nota fiscal ou marque para usar o nome do produto."
+      );
+      return;
+    }
+    if (nf.length > 40) {
+      setNameModalError("Descricao da nota fiscal deve ter no maximo 40 caracteres.");
       return;
     }
 
@@ -545,6 +603,8 @@ export default function ProductDetailPage({
           productId: selectedProductId,
           company: companyKey,
           nome,
+          nomeNf: nf,
+          aplicarNaNf: nfAplicar,
         }),
       });
       const json = (await response.json()) as {
@@ -569,7 +629,7 @@ export default function ProductDetailPage({
     } finally {
       setNameSaving(false);
     }
-  }, [companyKey, nameForm, refetchDetail, selectedProductId, user?.username]);
+  }, [companyKey, nameForm, nfAplicar, nfForm, refetchDetail, selectedProductId, user?.username]);
 
   const loadingTitle =
     loadingPhase === "color"
@@ -1006,7 +1066,9 @@ export default function ProductDetailPage({
             </div>
             <div className={styles.colorForm}>
               <label className={styles.colorFormField}>
-                <span>Nome do produto ({selectedProductId})</span>
+                <span>
+                  Nome do produto ({selectedProductId}) — {nameForm.trim().length}/40
+                </span>
                 <input
                   className={styles.colorFormInput}
                   value={nameForm}
@@ -1016,14 +1078,63 @@ export default function ProductDetailPage({
                   onKeyDown={(event) => {
                     if (event.key === "Enter" && !nameSaving) void saveName();
                   }}
-                  disabled={nameSaving}
+                  disabled={nameSaving || nameLoading}
                 />
               </label>
+
+              <label className={styles.formCheck}>
+                <input
+                  type="checkbox"
+                  checked={nfAplicar}
+                  onChange={(event) => {
+                    const marcado = event.target.checked;
+                    setNfAplicar(marcado);
+                    if (!marcado && !nfForm.trim()) setNfForm(nfAtual || nameForm);
+                  }}
+                  disabled={nameSaving || nameLoading}
+                />
+                <span>Usar o mesmo texto na nota fiscal</span>
+              </label>
+
+              {!nfAplicar && (
+                <label className={styles.colorFormField}>
+                  <span>Descricao na nota fiscal — {nfForm.trim().length}/40</span>
+                  <input
+                    className={styles.colorFormInput}
+                    value={nfForm}
+                    maxLength={40}
+                    onChange={(event) => setNfForm(event.target.value.toUpperCase())}
+                    disabled={nameSaving || nameLoading}
+                  />
+                </label>
+              )}
+
               <div className={styles.formHint}>
-                {nameForm.trim().length}/40 caracteres. Grava no cadastro do Linx
-                (DESC_PRODUTO): o nome novo passa a valer em todas as telas, relatorios e
-                exports. A descricao da nota fiscal nao muda — essa se altera em Alterar
-                Cadastro, onde tambem fica o historico para estorno.
+                {nameLoading ? (
+                  "Lendo o cadastro..."
+                ) : (
+                  <>
+                    Grava direto no cadastro do Linx: <strong>DESC_PRODUTO</strong> (o nome
+                    que aparece em toda tela, relatorio e export) e{" "}
+                    <strong>DESC_PROD_NF</strong> (o texto impresso na nota fiscal). Sao os
+                    dois campos da tela de Cadastro de Produtos do Linx, e o Linx nao liga
+                    um no outro — por isso eles vao juntos aqui por padrao.
+                    {nfAtual && nfAtual !== nameForm.trim() && (
+                      <>
+                        {" "}Hoje a NF desse produto sai como <strong>{nfAtual}</strong>.
+                      </>
+                    )}
+                    {nfResultante && nfResultante !== nameForm.trim() && (
+                      <>
+                        {" "}Do jeito que esta, o nome passa a ser{" "}
+                        <strong>{nameForm.trim()}</strong> mas a nota vai continuar saindo
+                        como <strong>{nfResultante}</strong>.
+                      </>
+                    )}{" "}
+                    O Linx guarda o nome anterior sozinho (PRODUTOS_LOG) e replica a
+                    mudanca para os PDVs; o estorno fica em Alterar Cadastro.
+                  </>
+                )}
               </div>
               {nameModalError && <div className={styles.modalError}>{nameModalError}</div>}
             </div>
@@ -1040,7 +1151,7 @@ export default function ProductDetailPage({
                 type="button"
                 className={`${styles.modalButton} ${styles.modalButtonPrimary}`}
                 onClick={saveName}
-                disabled={nameSaving || !nameForm.trim()}
+                disabled={nameSaving || nameLoading || !nameForm.trim()}
               >
                 {nameSaving ? "Salvando..." : "Salvar"}
               </button>

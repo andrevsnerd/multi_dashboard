@@ -855,6 +855,23 @@
   color: var(--t-500);
 }
 
+.formCheck {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t-600);
+  cursor: pointer;
+}
+
+.formCheck input {
+  width: 15px;
+  height: 15px;
+  accent-color: #0f172a;
+  cursor: pointer;
+}
+
 .modalActions {
   display: flex;
   justify-content: flex-end;
