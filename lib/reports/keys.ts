@@ -38,3 +38,40 @@ export function diasDesde(iso: string | null | undefined, nowMs: number): number
   if (Number.isNaN(t)) return null;
   return Math.max(0, Math.floor((nowMs - t) / 86400000));
 }
+
+/* ─── Membros de um PRODUTO AGRUPADO embutidos na linha ──────────────────────
+ *
+ * Uma linha de grupo ("CAPA BASIC" = CP BASIC 1 + CP BASIC 2) não tem código de
+ * produto real: o `PRODUTO` dela é um rótulo do grupo, não existe no ERP. Todo
+ * pós-processamento por produto (filtro de fornecedor, coluna Código de barra)
+ * casaria ZERO nessas linhas e elas sumiriam em silêncio. Por isso a linha carrega
+ * os membros reais neste campo oculto, e o `runReport` usa eles quando existe.
+ */
+export const ROW_MEMBROS_FIELD = "__membros";
+
+export interface RowMembro {
+  produto: string;
+  cor: string | null;
+}
+
+export function encodeRowMembros(membros: RowMembro[]): string {
+  return JSON.stringify(
+    membros.map((m) => ({ p: String(m.produto ?? "").trim(), c: String(m.cor ?? "").trim() }))
+  );
+}
+
+export function decodeRowMembros(value: unknown): RowMembro[] {
+  if (typeof value !== "string" || value.trim() === "") return [];
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((m) => ({
+        produto: String((m as { p?: unknown })?.p ?? "").trim(),
+        cor: String((m as { c?: unknown })?.c ?? "").trim() || null,
+      }))
+      .filter((m) => m.produto !== "");
+  } catch {
+    return [];
+  }
+}

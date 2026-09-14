@@ -12,10 +12,30 @@ import { listFornecedoresByCompany } from "@/lib/utils/fornecedores-store";
 import { productMatchesFornecedor, type ProdutoInfo } from "@/lib/utils/fornecedor-matcher";
 import { fetchRupturasLoja, type RupturaItem } from "@/lib/repositories/lojaRaioX";
 import { normalizeRangeForQuery } from "@/lib/utils/date";
-import { canonicalKey, ROW_COR_FIELD, ROW_RUPTURA_FIELD } from "@/lib/reports/keys";
+import {
+  canonicalKey,
+  encodeRowMembros,
+  ROW_COR_FIELD,
+  ROW_MEMBROS_FIELD,
+  ROW_RUPTURA_FIELD,
+} from "@/lib/reports/keys";
 import { getControleEstoqueMetricasItensBatched } from "@/lib/server/controle-estoque-metricas";
 import { fetchEstoqueProdutoPorFilialLote } from "@/lib/repositories/controleEstoque";
-import { buildControleEstoqueItemKey } from "@/lib/utils/controle-estoque-metricas";
+import {
+  buildControleEstoqueItemKey,
+  mergeControleEstoqueMetricasEntries,
+  type ControleEstoqueItemMetricas,
+} from "@/lib/utils/controle-estoque-metricas";
+import { listProdutoAgrupadoGroups } from "@/lib/utils/produto-agrupado-store";
+import { aggregateProductDetailsWithGroups } from "@/lib/utils/produto-agrupado-aggregation";
+import {
+  buildProdutoAgrupadoLookup,
+  buildProdutoAgrupadoProductKey,
+  resolveProdutoAgrupadoCor,
+  type ProdutoAgrupadoCorLookup,
+  type ProdutoAgrupadoGroup,
+} from "@/lib/utils/produtos-agrupados";
+import { fetchProdutoCorDescricoes } from "@/lib/repositories/performance";
 import {
   calcCompraIdealFromResumo,
   precisaComprarEssaSemana,
@@ -31,9 +51,12 @@ import {
   buildTransferLensIndex,
   resolveTransferLens,
   applyTransferLens,
+  type TransferLensDoadora,
+  type TransferLensEntry,
   type TransferLensIndex,
 } from "@/lib/utils/transferencia-regras";
 import type { CompanyKey } from "@/lib/config/company";
+import type { ProductDetail } from "@/lib/repositories/products";
 import type { ReportRunContext } from "@/lib/reports/registry.server";
 import type {
   ReportColumnDef,
@@ -96,6 +119,36 @@ function round2(value: number | null | undefined): number {
 function roundInt(value: number | null | undefined): number {
   if (value == null || !Number.isFinite(value)) return 0;
   return Math.round(value);
+}
+
+/**
+ * Lente de transferência de um PRODUTO AGRUPADO: o excedente que a rede pode mover pelo
+ * grupo é a soma do excedente dos membros, com as doadoras somadas por loja de origem.
+ */
+function mergeTransferLensEntries(entries: TransferLensEntry[]): TransferLensEntry | undefined {
+  if (entries.length === 0) return undefined;
+  if (entries.length === 1) return entries[0];
+
+  const doadoras = new Map<string, TransferLensDoadora>();
+  let totalTransferivel = 0;
+  for (const entry of entries) {
+    totalTransferivel += Number(entry.totalTransferivel ?? 0);
+    for (const doadora of entry.doadoras ?? []) {
+      const current = doadoras.get(doadora.origemCanonico);
+      if (current) {
+        current.quantidade += Number(doadora.quantidade ?? 0);
+      } else {
+        doadoras.set(doadora.origemCanonico, { ...doadora });
+      }
+    }
+  }
+
+  return {
+    ...entries[0]!,
+    totalTransferivel,
+    doadoras: Array.from(doadoras.values()),
+    destinos: entries.flatMap((entry) => entry.destinos ?? []),
+  };
 }
 
 /**
@@ -185,7 +238,65 @@ export async function fetchCompraSugeridaAbc(
   const sumRevenue = filtered.reduce((s, d) => s + (d.totalRevenue ?? 0), 0);
   // Sem teto de itens — mesmo universo (sem corte de cauda) do export canônico da Curva ABC.
   const truncated = false;
-  const candidates = filtered;
+
+  // ── PRODUTO AGRUPADO (ligado por padrão) ──────────────────────────────────────────
+  // O cadastro "Produto agrupado" diz quais códigos o dono trata como UM item. Com os
+  // membros soltos, cada código pede reposição ignorando o estoque dos irmãos e a lista
+  // infla (medido em ago/2026: alça universal deu 56 un somando 10 códigos contra 10 un
+  // no grupo). A fusão acontece DEPOIS dos filtros de cor/tipo/fornecedor, sobre linhas
+  // reais — assim o grupo só carrega os membros que passaram pelo filtro.
+  //
+  // O relatório é sempre por COR, então o grupo quebra por cor (CAPA BASIC AZUL =
+  // CP BASIC 1 AZUL + CP BASIC 2 AZUL) casando pela DESCRIÇÃO da cor, nunca pelo código
+  // (o código é escopado por produto). `fetchProdutoCorDescricoes` monta esse mapa só
+  // para os membros de grupo — mesma fonte/regra da Curva ABC.
+  const agruparProdutos = filters.agruparProdutos !== false;
+  const grupos: ProdutoAgrupadoGroup[] =
+    agruparProdutos && filters.company
+      ? await listProdutoAgrupadoGroups(filters.company as CompanyKey).catch(() => [])
+      : [];
+  let corDescricoes: ProdutoAgrupadoCorLookup | null = null;
+  if (grupos.length > 0) {
+    corDescricoes = await fetchProdutoCorDescricoes(
+      grupos.flatMap((grupo) => grupo.members.map((member) => member.produto))
+    ).catch(() => null);
+  }
+  const candidates =
+    grupos.length > 0
+      ? aggregateProductDetailsWithGroups(filtered, grupos, {
+          groupByColor: true,
+          corDescricoes,
+        })
+      : filtered;
+
+  /**
+   * Plano por linha: a linha do grupo é calculada a partir dos MEMBROS reais (o id
+   * sintético `__PRODUTO_AGRUPADO__:…` não existe no ERP e não tem métrica nem estoque).
+   * Linha normal = um membro só, ela mesma.
+   */
+  interface ItemPlan {
+    detail: ProductDetail;
+    agrupado: boolean;
+    membros: Array<{ produto: string; corProduto: string | null }>;
+  }
+  const plans: ItemPlan[] = candidates.map((d) => {
+    const agrupado = d.isGroupedProduct === true && (d.groupedMembers?.length ?? 0) > 0;
+    return {
+      detail: d,
+      agrupado,
+      membros: agrupado
+        ? d.groupedMembers!.map((member) => ({
+            produto: String(member.produto ?? "").trim(),
+            corProduto: String(member.cor ?? "").trim() || null,
+          }))
+        : [
+            {
+              produto: String(d.productId ?? "").trim(),
+              corProduto: d.corProduto ?? null,
+            },
+          ],
+    };
+  });
 
   // ── Lojas da rede (nomes canônicos ativos, sem matriz) + rótulos de exibição (deduplicados) ──
   const company = await resolveCompanyLive(filters.company);
@@ -216,10 +327,16 @@ export async function fetchCompraSugeridaAbc(
   }
 
   // ── Métricas por loja (1 lote por loja) + trânsito da rede ──
-  const itensInput = candidates.map((d) => ({
-    produto: String(d.productId ?? "").trim(),
-    corProduto: d.corProduto ?? null,
-  }));
+  // Consulta os MEMBROS (deduplicados): é deles que vem estoque/venda/ritmo; o grupo é
+  // montado somando os membros com `mergeControleEstoqueMetricasEntries`.
+  const itensLookup = new Map<string, { produto: string; corProduto: string | null }>();
+  for (const plan of plans) {
+    for (const membro of plan.membros) {
+      if (!membro.produto) continue;
+      itensLookup.set(buildControleEstoqueItemKey(membro.produto, membro.corProduto), membro);
+    }
+  }
+  const itensInput = Array.from(itensLookup.values());
   // Progresso por loja (cada loja = 1 lote, parte cara da análise). A fase "lojas" começa
   // em 0/N e avança a cada loja concluída; o front mostra "Calculando compra por loja… X/N".
   let lojasFeitas = 0;
@@ -267,18 +384,34 @@ export async function fetchCompraSugeridaAbc(
   let acumPerc = 0;
   let itensRuptura = 0;
   const rows: ReportRow[] = [];
-  for (const d of candidates) {
+  /**
+   * Chave produto×cor REAL de tudo que já saiu numa linha (inclusive de cada membro de
+   * grupo). É por ela que a fase de rupturas sabe o que já está coberto — o `PRODUTO` da
+   * linha de grupo é um rótulo, não serve de chave.
+   */
+  const baseMemberKeys = new Set<string>();
+  for (const plan of plans) {
+    const d = plan.detail;
     const revenue = d.totalRevenue ?? 0;
     const partPerc = sumRevenue !== 0 ? (revenue / sumRevenue) * 100 : 0;
     acumPerc += partPerc;
     const curva = acumPerc <= 60 ? "A" : acumPerc <= 90 ? "B" : "C";
 
-    const pid = String(d.productId ?? "").trim();
+    // Linha de grupo: o "Código" mostra os membros reais (o id sintético é interno e não
+    // existe no ERP). A descrição já vem com o nome do grupo, vindo da agregação.
+    const pid = plan.agrupado
+      ? joinDistinct(plan.membros.map((m) => m.produto))
+      : String(d.productId ?? "").trim();
     const corKey = d.corProduto ? String(d.corProduto).trim() : null;
-    const itemKey = buildControleEstoqueItemKey(d.productId, d.corProduto);
-    const isDescontinuado = isProdutoDescontinuado(descontinuadoKeys, pid);
-    let transit = transitIndex.get(canonicalKey(pid, corKey)) ?? [];
-    if (transit.length === 0) {
+    const itemKeys = plan.membros.map((m) => buildControleEstoqueItemKey(m.produto, m.corProduto));
+    // Grupo só é descontinuado quando TODOS os membros são — um membro vivo ainda repõe.
+    const isDescontinuado = plan.membros.every((m) =>
+      isProdutoDescontinuado(descontinuadoKeys, m.produto)
+    );
+    // ⛔ Trânsito de grupo NÃO é a união do trânsito dos membros: já foi tentado (ago/2026)
+    // e zerou a necessidade de grupos inteiros. A linha agrupada não abate trânsito.
+    let transit = plan.agrupado ? [] : transitIndex.get(canonicalKey(pid, corKey)) ?? [];
+    if (!plan.agrupado && transit.length === 0) {
       // Fallback por descrição de cor (códigos divergentes para a mesma cor, etc.).
       const dk = transitDescKey(pid, corKey, d.descCorProduto);
       if (dk) transit = transitIndex.get(dk) ?? [];
@@ -290,7 +423,17 @@ export async function fetchCompraSugeridaAbc(
     let custoMax = 0;
     let estoqueRede = 0;
     orderedNames.forEach((name, idx) => {
-      const metricas = metricasPorFilial[idx]?.[itemKey] ?? null;
+      // Grupo: soma os membros (estoque nunca soma negativo, janela de ritmo agregada) —
+      // mesma fusão da Curva ABC. Item normal: a métrica dele, sem custo extra.
+      const metricasMembros = itemKeys
+        .map((key) => metricasPorFilial[idx]?.[key])
+        .filter((m): m is ControleEstoqueItemMetricas => Boolean(m));
+      const metricas =
+        metricasMembros.length === 0
+          ? null
+          : metricasMembros.length === 1
+            ? metricasMembros[0]!
+            : mergeControleEstoqueMetricasEntries(metricasMembros);
       const ideal = calcCompraIdealFromResumo(metricas?.resumo ?? null, transit, {
         linha: d.linha,
         subgrupo: d.subgrupo,
@@ -312,12 +455,18 @@ export async function fetchCompraSugeridaAbc(
     // + MATRIZ (sem coluna de compra): fecha com a coluna "Estoque rede" da tela da Curva ABC,
     // que soma lojas + matriz. Sem isso o arquivo mostrava a rede sem o maior estoque dela.
     for (const mapa of estoqueMatrizPorItem) {
-      for (const linha of mapa.get(itemKey) ?? []) {
-        estoqueRede += Math.max(0, Number(linha.estoque ?? 0));
+      for (const key of itemKeys) {
+        for (const linha of mapa.get(key) ?? []) {
+          estoqueRede += Math.max(0, Number(linha.estoque ?? 0));
+        }
       }
     }
 
     if (total <= 0) continue; // só itens que alguma loja precisa comprar agora/essa semana
+
+    for (const membro of plan.membros) {
+      baseMemberKeys.add(canonicalKey(membro.produto, membro.corProduto));
+    }
 
     const custoUnit = custoMax > 0 ? custoMax : (d.cost ?? 0);
     const row: ReportRow = {
@@ -337,14 +486,29 @@ export async function fetchCompraSugeridaAbc(
       COMPRA_TOTAL: roundInt(total),
       CUSTO_TOTAL: round2(custoUnit * total),
     };
+    // Linha de grupo carrega os membros reais: sem isso o pós-processamento por produto
+    // (filtro de fornecedor, coluna Código de barra) casaria zero e ela sumiria calada.
+    if (plan.agrupado) {
+      row[ROW_MEMBROS_FIELD] = encodeRowMembros(
+        plan.membros.map((m) => ({ produto: m.produto, cor: m.corProduto }))
+      );
+    }
     for (const dyn of dynamicColumns) {
       const label = dyn.key.slice(COMPRA_FILIAL_COL_PREFIX.length);
       row[dyn.key] = roundInt(qtyByLabel.get(label) ?? 0);
     }
 
     // Lente de transferência: desconta da compra o que a rede pode mover (read-only).
+    // Linha de grupo: a lente é resolvida MEMBRO A MEMBRO e somada — o rótulo do grupo
+    // não existe no índice. (É soma de excedente real, não união de trânsito.)
     if (transferLens) {
-      const entry = resolveTransferLens(transferLens, pid, corKey);
+      const entry = plan.agrupado
+        ? mergeTransferLensEntries(
+            plan.membros
+              .map((m) => resolveTransferLens(transferLens, m.produto, m.corProduto))
+              .filter((e): e is TransferLensEntry => Boolean(e))
+          )
+        : resolveTransferLens(transferLens, pid, corKey);
       const lente = applyTransferLens(total, entry);
       row.TRANSFERIVEL = roundInt(lente.disponivelTransferir);
       row.COMPRA_LIQUIDA = roundInt(lente.compraLiquida);

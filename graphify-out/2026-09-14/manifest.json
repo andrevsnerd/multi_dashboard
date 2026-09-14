@@ -4395,8 +4395,8 @@
     "semantic_hash": ""
   },
   "components/stock/ProjecaoCompraPage.tsx": {
-    "mtime": 1789389496.9414148,
-    "ast_hash": "942bfde68ba57b6b2d28115f483ed2b6",
+    "mtime": 1789391989.3270898,
+    "ast_hash": "a5e92bb05bedd13d9ccfe04fcb87e061",
     "semantic_hash": ""
   },
   "lib/config/saida-estoque-negativo.ts": {
@@ -4495,8 +4495,8 @@
     "semantic_hash": ""
   },
   "components/stock/ProjecaoItensMensais.tsx": {
-    "mtime": 1789389593.4580722,
-    "ast_hash": "3813847ff0e25e4ec244d9d3d5a7468c",
+    "mtime": 1789391985.158607,
+    "ast_hash": "22784ed06250c7731730c1683f829e48",
     "semantic_hash": ""
   },
   "lib/config/embalagens.ts": {

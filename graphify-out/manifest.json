@@ -1530,9 +1530,9 @@
     "semantic_hash": ""
   },
   "components/products/ProductDetailPage.tsx": {
-    "mtime": 1782490117.427578,
-    "ast_hash": "ba5eded1ca29de5f1ef8e69cde797b12",
-    "semantic_hash": "ba5eded1ca29de5f1ef8e69cde797b12"
+    "mtime": 1789409221.9933405,
+    "ast_hash": "960fb6d8bf837b43b388aa0ec680f35a",
+    "semantic_hash": ""
   },
   "components/products/ProductPerformancePage.tsx": {
     "mtime": 1781267484.1546042,
@@ -2075,8 +2075,8 @@
     "semantic_hash": ""
   },
   "lib/auth/permissions.ts": {
-    "mtime": 1788965099.1909637,
-    "ast_hash": "bd4dfa4de029a5e2776b15d0c5eb9f45",
+    "mtime": 1789408999.0064988,
+    "ast_hash": "7ede9be12ebbabbe6212408274db14ff",
     "semantic_hash": ""
   },
   "lib/auth/users-store-neon.ts": {
@@ -2340,8 +2340,8 @@
     "semantic_hash": ""
   },
   "lib/reports/keys.ts": {
-    "mtime": 1786988601.6563017,
-    "ast_hash": "8270554a999324032f9b1205bfd5c07e",
+    "mtime": 1789409303.949674,
+    "ast_hash": "166cd5480bc4b86608452394975c14a3",
     "semantic_hash": ""
   },
   "lib/reports/produtos-cadastro.ts": {
@@ -2365,8 +2365,8 @@
     "semantic_hash": ""
   },
   "lib/reports/types.ts": {
-    "mtime": 1788540413.9374597,
-    "ast_hash": "dc9e67d1cb3c9f9d08dedc43459038fe",
+    "mtime": 1789409311.416335,
+    "ast_hash": "1df4d4561e7f60717f07d63bc1a350b4",
     "semantic_hash": ""
   },
   "lib/reports/vendas-faturamento.ts": {
@@ -2545,8 +2545,8 @@
     "semantic_hash": "36ad099560d5d50a879355f562c7807a"
   },
   "lib/repositories/reportCompraSugeridaAbc.ts": {
-    "mtime": 1789135237.5008395,
-    "ast_hash": "e48654056eff0977a0d351961a52d2c9",
+    "mtime": 1789409356.6060517,
+    "ast_hash": "d5379f8bd5dce02c4fe3a3c6b7dc55b3",
     "semantic_hash": ""
   },
   "lib/repositories/reportEstoque.ts": {
@@ -4285,8 +4285,8 @@
     "semantic_hash": ""
   },
   "lib/reports/params.ts": {
-    "mtime": 1787844328.0923216,
-    "ast_hash": "0ada3b5e21241c2a96b20a7cb53fa01c",
+    "mtime": 1789409311.416335,
+    "ast_hash": "5e5a9de0c218bd2093ae0e4fcd85a58f",
     "semantic_hash": ""
   },
   "lib/reports/projecao-vendas.ts": {
@@ -4557,6 +4557,11 @@
   "scripts/lib/alias-register.mjs": {
     "mtime": 1789389746.3349605,
     "ast_hash": "a20e98b9b7b852660ddb2af51f45cd96",
+    "semantic_hash": ""
+  },
+  "app/api/product-detail/rename/route.ts": {
+    "mtime": 1789409018.3610713,
+    "ast_hash": "37714434d90a8fc1c02d04ca10cfebf6",
     "semantic_hash": ""
   }
 }

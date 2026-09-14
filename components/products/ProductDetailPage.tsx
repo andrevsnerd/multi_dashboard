@@ -7,6 +7,7 @@ import DateRangeFilter, {
 } from "@/components/filters/DateRangeFilter";
 import { getCurrentMonthRange } from "@/lib/utils/date";
 import { useAuth } from "@/components/auth/AuthContext";
+import { canRenomearProduto } from "@/lib/auth/permissions";
 import type { CompanyKey } from "@/lib/config/company";
 import type {
   ProductDetailInfo,
@@ -153,6 +154,10 @@ export default function ProductDetailPage({
 }: ProductDetailPageProps) {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
+  // Renomear o produto e ato de cadastro: so de logistica pra cima (admin,
+  // diretor, logistica) e so nas empresas que tem cadastro no Linx.
+  const canRenameProduct =
+    canRenomearProduto(user?.role) && (companyKey === "nerd" || companyKey === "scarfme");
   const searchParams = useSearchParams();
   const lastUrlProductId = useRef<string | null>(null);
 
@@ -190,6 +195,10 @@ export default function ProductDetailPage({
   const [colorForm, setColorForm] = useState({ code: "", description: "" });
   const [colorModalError, setColorModalError] = useState<string | null>(null);
   const [colorSaving, setColorSaving] = useState(false);
+  const [nameModalOpen, setNameModalOpen] = useState(false);
+  const [nameForm, setNameForm] = useState("");
+  const [nameModalError, setNameModalError] = useState<string | null>(null);
+  const [nameSaving, setNameSaving] = useState(false);
   const refetchDetail = useCallback(() => setRefreshTrigger((t) => t + 1), []);
 
   const selectedColorCode = selectedColors[0] ?? null;
@@ -494,6 +503,74 @@ export default function ProductDetailPage({
     }
   }, [colorCacheKey, colorForm, refetchDetail, selectedColor, selectedProductId, user?.username]);
 
+  const currentProductName = data?.detail.productName ?? selectedProductName ?? "";
+
+  const openNameModal = useCallback(() => {
+    // DESC_PRODUTO e CHAR(40): o nome chega preenchido de espaco a direita. Sem
+    // aparar, o maxLength de 40 do input ja nasce estourado e trava a digitacao.
+    setNameForm(currentProductName.trim());
+    setNameModalError(null);
+    setNameModalOpen(true);
+  }, [currentProductName]);
+
+  const closeNameModal = useCallback(() => {
+    if (nameSaving) return;
+    setNameModalOpen(false);
+    setNameModalError(null);
+  }, [nameSaving]);
+
+  const saveName = useCallback(async () => {
+    if (!selectedProductId || !user?.username) return;
+    // Espaco duplo em DESC_PRODUTO quebra a busca por nome — colapsa antes de enviar.
+    const nome = nameForm.trim().replace(/\s+/g, " ").toUpperCase();
+    if (!nome) {
+      setNameModalError("Informe o nome do produto.");
+      return;
+    }
+    if (nome.length > 40) {
+      setNameModalError("Nome do produto deve ter no maximo 40 caracteres.");
+      return;
+    }
+
+    setNameSaving(true);
+    setNameModalError(null);
+    try {
+      const response = await fetch("/api/product-detail/rename", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "x-auth-username": user.username,
+        },
+        body: JSON.stringify({
+          productId: selectedProductId,
+          company: companyKey,
+          nome,
+        }),
+      });
+      const json = (await response.json()) as {
+        error?: string;
+        data?: { productName?: string };
+      };
+      if (!response.ok || json.error) {
+        throw new Error(json.error || "Erro ao renomear o produto.");
+      }
+      const salvo = json.data?.productName || nome;
+      // O campo de busca guarda o nome selecionado: sem atualizar os dois, o
+      // efeito de busca acha que o texto mudou e reabre o dropdown.
+      setSelectedProductName(salvo);
+      setSearchTerm(salvo);
+      setData((current) =>
+        current ? { ...current, detail: { ...current.detail, productName: salvo } } : current
+      );
+      setNameModalOpen(false);
+      refetchDetail();
+    } catch (err) {
+      setNameModalError(err instanceof Error ? err.message : "Erro ao renomear o produto.");
+    } finally {
+      setNameSaving(false);
+    }
+  }, [companyKey, nameForm, refetchDetail, selectedProductId, user?.username]);
+
   const loadingTitle =
     loadingPhase === "color"
       ? "Atualizando cor"
@@ -522,6 +599,21 @@ export default function ProductDetailPage({
                 <span className={styles.productGrade}> {data.detail.grade}</span>
               )}
             </h2>
+            {canRenameProduct && (
+              <button
+                type="button"
+                className={styles.colorEditButton}
+                onClick={openNameModal}
+                disabled={loading}
+                aria-label="Renomear produto no cadastro"
+                title="Renomear produto no cadastro"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path d="M12 20h9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            )}
           </div>
           <div className={styles.productCodeRow}>
             <span className={styles.productCodeLabel}>COD</span>
@@ -892,6 +984,65 @@ export default function ProductDetailPage({
                 disabled={colorSaving}
               >
                 {colorSaving ? "Salvando..." : "Salvar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {nameModalOpen && (
+        <div className={styles.modalOverlay} onClick={closeNameModal}>
+          <div className={styles.modalContent} onClick={(event) => event.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h3 className={styles.modalTitle}>Renomear produto</h3>
+              <button
+                type="button"
+                className={styles.modalCloseButton}
+                onClick={closeNameModal}
+                aria-label="Fechar"
+                disabled={nameSaving}
+              >
+                x
+              </button>
+            </div>
+            <div className={styles.colorForm}>
+              <label className={styles.colorFormField}>
+                <span>Nome do produto ({selectedProductId})</span>
+                <input
+                  className={styles.colorFormInput}
+                  value={nameForm}
+                  maxLength={40}
+                  autoFocus
+                  onChange={(event) => setNameForm(event.target.value.toUpperCase())}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !nameSaving) void saveName();
+                  }}
+                  disabled={nameSaving}
+                />
+              </label>
+              <div className={styles.formHint}>
+                {nameForm.trim().length}/40 caracteres. Grava no cadastro do Linx
+                (DESC_PRODUTO): o nome novo passa a valer em todas as telas, relatorios e
+                exports. A descricao da nota fiscal nao muda — essa se altera em Alterar
+                Cadastro, onde tambem fica o historico para estorno.
+              </div>
+              {nameModalError && <div className={styles.modalError}>{nameModalError}</div>}
+            </div>
+            <div className={styles.modalActions}>
+              <button
+                type="button"
+                className={`${styles.modalButton} ${styles.modalButtonSecondary}`}
+                onClick={closeNameModal}
+                disabled={nameSaving}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className={`${styles.modalButton} ${styles.modalButtonPrimary}`}
+                onClick={saveName}
+                disabled={nameSaving || !nameForm.trim()}
+              >
+                {nameSaving ? "Salvando..." : "Salvar"}
               </button>
             </div>
           </div>

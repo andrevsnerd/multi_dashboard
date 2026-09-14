@@ -67,6 +67,21 @@ export function canApproveCadastro(role: RoleKey | undefined | null): boolean {
 }
 
 /**
+ * Excecao ao read-only geral: renomear o PRODUTO (PRODUTOS.DESC_PRODUTO) direto
+ * na tela Produto Detalhado. O nome e cadastro: ele cascateia para toda tela,
+ * export e relatorio da rede, entao e ato de logistica pra cima — admin, diretor
+ * e logistica, o mesmo conjunto das telas de cadastro (CADASTRO_VIEW_ROLES).
+ * O gerente NUNCA renomeia. Diretor entra aqui por decisao da diretoria, apesar
+ * de ser somente-leitura no restante do sistema.
+ */
+export const RENOMEAR_PRODUTO_ROLES: RoleKey[] = ["admin", "diretor", "logistica"];
+
+/** True se a funcao pode renomear o produto no cadastro do Linx. */
+export function canRenomearProduto(role: RoleKey | undefined | null): boolean {
+  return !!role && RENOMEAR_PRODUTO_ROLES.includes(role);
+}
+
+/**
  * Funcoes que enxergam TODAS as filiais em transferencias/romaneios.
  * So o gerente fica restrito a sua filial atribuida (filialAtribuida).
  */

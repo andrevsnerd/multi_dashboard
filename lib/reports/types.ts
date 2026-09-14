@@ -192,6 +192,13 @@ export interface ReportFilters {
    * de Compra Ideal por item×loja já feito.
    */
   incluirRupturas?: boolean;
+  /**
+   * Compra sugerida ABC: reconhece os PRODUTOS AGRUPADOS (cadastro do "Produto agrupado")
+   * e calcula a necessidade no nível do GRUPO — venda, estoque e ritmo dos membros somados,
+   * uma linha só com o nome do grupo, igual à Curva ABC. LIGADO por padrão: com os membros
+   * soltos cada código pede reposição ignorando o estoque dos irmãos e a lista infla.
+   */
+  agruparProdutos?: boolean;
 }
 
 /** Cartão de KPI exibido no topo do resultado (ex.: Vendas Total, Ticket Médio). */

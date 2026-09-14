@@ -59,6 +59,8 @@ export function parseReportFilters(searchParams: URLSearchParams): ReportFilters
     incluirNegativos: searchParams.get("incluirNegativos") === "1",
     considerarTransferencias: searchParams.get("considerarTransferencias") === "1",
     incluirRupturas: searchParams.get("incluirRupturas") === "1",
+    // Default LIGADO: só desliga quando a tela manda explicitamente "0".
+    agruparProdutos: searchParams.get("agruparProdutos") !== "0",
     projecaoJanelaMeses: janelaRaw != null && janelaRaw > 0 ? Math.floor(janelaRaw) : null,
     projecaoSazonalidade: searchParams.get("projecaoSazonalidade") === "1",
     // Default LIGADO: só desliga quando a tela manda explicitamente "0".

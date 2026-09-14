@@ -622,6 +622,11 @@
   flex-wrap: wrap;
 }
 
+/* O titulo alinha por baseline; o botao de lapis precisa centralizar na linha. */
+.productTitleRow .colorEditButton {
+  align-self: center;
+}
+
 .productCodeRow {
   display: flex;
   align-items: center;
@@ -842,6 +847,12 @@
   background: #fef2f2;
   color: #b91c1c;
   font-size: 13px;
+}
+
+.formHint {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--t-500);
 }
 
 .modalActions {
