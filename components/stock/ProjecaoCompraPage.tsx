@@ -34,6 +34,7 @@ import {
   projetarMesSazonal,
   type CurvaSazonal,
 } from "@/lib/utils/projecao-sazonal";
+import type { SerieCategoria } from "@/lib/utils/projecao-linha-ajuste";
 
 import {
   CRITERIO_TEXTO,
@@ -170,6 +171,11 @@ interface SazonalResposta {
   curvas: Record<string, CurvaSazonal>;
   /** produto||cor → chave da categoria daquele item. */
   categoriaPorItem: Record<string, string>;
+  /**
+   * Realizado mensal da categoria no ano base e no anterior. Não entra na curva — é a base
+   * da trava que impede a linha item a item de inflar. Ver [projecao-linha-ajuste.ts].
+   */
+  series?: Record<string, SerieCategoria>;
 }
 
 /** Curva agregada do escopo — o fallback de item sem categoria e a curva da visão somada. */
@@ -2719,6 +2725,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
               diasHorizonte={diasHorizonte}
               regra={regra}
               curvasSazonais={sazonalResp?.curvas ?? null}
+              seriesSazonais={sazonalResp?.series ?? null}
               carregando={projLoading}
               omitido={detalheItem.omitido}
               maxItens={detalheItem.max}

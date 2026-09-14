@@ -1151,6 +1151,29 @@
   color: var(--t-900);
 }
 
+/* Selo da trava de linha. Fica ABAIXO do número, num bloco próprio: a coluna é numérica e
+   alinhada à direita, e um selo em linha empurraria o número para fora do alinhamento da
+   coluna inteira — o olho perde a comparação vertical, que é o que se lê nessa tabela. */
+.seloAjuste,
+.seloAviso {
+  display: block;
+  margin-top: 2px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.seloAjuste {
+  color: var(--pc-proj);
+}
+/* Sinalizada mas sem base da categoria para corrigir: o número é o antigo, e o aviso não
+   pode ter a mesma cor de quem já foi corrigido. */
+.seloAviso {
+  color: var(--pc-warn);
+}
+
 /* Mês sem venda: um ponto apagado em vez de uma parede de zeros. */
 .zero {
   color: var(--t-400, var(--t-500));

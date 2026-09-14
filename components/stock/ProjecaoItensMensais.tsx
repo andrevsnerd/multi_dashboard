@@ -22,6 +22,12 @@ import {
   type CurvaSazonal,
 } from "@/lib/utils/projecao-sazonal";
 import {
+  avaliarAjusteLinha,
+  rotuloAjuste,
+  type AjusteLinha,
+  type SerieCategoria,
+} from "@/lib/utils/projecao-linha-ajuste";
+import {
   CRITERIO_TEXTO,
   REGRAS_CURVA,
   REGRA_LABEL,
@@ -127,6 +133,13 @@ interface Props {
    * diferentes e projetar os dois pela mesma curva erraria os dois.
    */
   curvasSazonais?: Record<string, CurvaSazonal> | null;
+  /**
+   * Realizado mensal de cada categoria (ano base + anterior). É o que permite comparar o
+   * item com a categoria dele e travar a linha que está apoiada em base curta demais —
+   * ver [projecao-linha-ajuste.ts](@/lib/utils/projecao-linha-ajuste). Sem isto a tela
+   * ainda SINALIZA a linha frágil, mas não troca o número.
+   */
+  seriesSazonais?: Record<string, SerieCategoria> | null;
   carregando?: boolean;
   /** Escopo grande demais: o servidor não mandou o detalhe mensal. */
   omitido?: boolean;
@@ -211,6 +224,11 @@ interface LinhaItem {
   patamarSazonal: number | null;
   /** Curva da categoria que projetou esta linha (só na regra sazonal). */
   curvaSazonal: CurvaSazonal | null;
+  /**
+   * Diagnóstico da trava de linha: a linha está apoiada em base curta / fatia em alta, e
+   * (quando há base da categoria) qual conta entrou no lugar. `null` fora da regra sazonal.
+   */
+  ajuste: AjusteLinha | null;
   /** Índice YoY do próprio item (null nas regras de janela ou sem base). */
   indice: number | null;
   /** Quantos meses fechados entraram no índice. */
@@ -235,6 +253,7 @@ export default function ProjecaoItensMensais({
   diasHorizonte,
   regra,
   curvasSazonais,
+  seriesSazonais,
   carregando,
   omitido,
   maxItens,
@@ -360,10 +379,30 @@ export default function ProjecaoItensMensais({
         : [];
       // Regras que somam mês a mês (as duas curvas e a sazonal) usam as parcelas; as de
       // janela e a régua da Compra Ideal esticam o ritmo/dia.
-      const necessidade =
+      const necessidadeRegra =
         curva || ehSazonal
           ? partes.reduce((soma, parte) => soma + parte.parcela, 0)
           : ritmoDia * diasHorizonte;
+
+      // ── Trava de linha (só na regra sazonal) ──────────────────────────────
+      // A regra sazonal acerta no ESCOPO e infla na LINHA, porque cada item descarta os
+      // PRÓPRIOS meses mortos e passa a ser lido pelo pico. Quem dispara um dos dois sinais
+      // troca a conta por participação na categoria; quem não dispara sai idêntico ao que
+      // saía antes — medido: nos itens confiáveis a conta atual já vai bem (viés +8%,
+      // MAE 6,3) e trocá-la não melhorava. Ver [projecao-linha-ajuste.ts].
+      const ajuste =
+        ehSazonal && !semSerie
+          ? avaliarAjusteLinha({
+              serieItem: serie,
+              serieCategoria: seriesSazonais?.[item?.categoria ?? "__ESCOPO__"] ??
+                seriesSazonais?.["__ESCOPO__"] ?? null,
+              curva: curvaItem,
+              dataBase,
+              diasHorizonte,
+              necessidadeOriginal: necessidadeRegra,
+            })
+          : null;
+      const necessidade = ajuste?.aplicado ? ajuste.necessidade : necessidadeRegra;
       // O trânsito entra aqui pelo mesmo motivo da Curva ABC: peça já comprada não se
       // compra de novo. Sem isso a tela mandaria repetir o pedido que está a caminho.
       const sugestao = Math.max(0, Math.ceil(necessidade - estoque - transito));
@@ -389,6 +428,7 @@ export default function ProjecaoItensMensais({
         indice: curva ? indice : null,
         patamarSazonal: ehSazonal ? perfilSaz.patamar : null,
         curvaSazonal: ehSazonal ? curvaItem : null,
+        ajuste,
         mesesFechados: perfil.ultimoMesReal,
         origens,
         fonte:
@@ -443,6 +483,7 @@ export default function ProjecaoItensMensais({
     modoCurva,
     ehSazonal,
     curvasSazonais,
+    seriesSazonais,
     regra,
     dataBase,
     diasHorizonte,
@@ -684,6 +725,20 @@ export default function ProjecaoItensMensais({
                     onMouseLeave={() => setDica(null)}
                   >
                     {fmt(l.sugestao)}
+                    {/* A linha frágil DIZ que é frágil. Sem o selo, um número corrigido é
+                        indistinguível de um número normal — e a decisão vira caixa-preta. */}
+                    {l.ajuste?.sinalizada && (
+                      <span
+                        className={l.ajuste.aplicado ? styles.seloAjuste : styles.seloAviso}
+                        aria-label={
+                          l.ajuste.aplicado
+                            ? `Conta ajustada: ${rotuloAjuste(l.ajuste.sinais)}`
+                            : `Base frágil: ${rotuloAjuste(l.ajuste.sinais)}`
+                        }
+                      >
+                        {l.ajuste.aplicado ? "ajustado" : "base frágil"}
+                      </span>
+                    )}
                   </td>
                   {compra ? (
                     <td className={`${styles.num} ${styles.colDecisao}`}>
@@ -954,6 +1009,44 @@ function DicaCompra({
           </span>
         </div>
       </div>
+
+      {/* A trava de linha, quando entrou. Mostra a conta que FOI USADA e a que teria saído,
+          porque um número corrigido sem a conta ao lado é pior que o número errado: ninguém
+          consegue discordar dele. */}
+      {l.ajuste?.sinalizada && (
+        <div className={styles.dicaNota}>
+          {l.ajuste.aplicado ? (
+            <>
+              <strong>Conta ajustada ({rotuloAjuste(l.ajuste.sinais)}).</strong>{" "}
+              {l.ajuste.sinais.baseCurta && (
+                <>
+                  Este item só voltou a vender em {MES_NOME[l.ajuste.primeiroMesComVenda - 1]}, então
+                  a régua normal mediria o patamar dele em {l.ajuste.ultimoMesReal - l.ajuste.primeiroMesComVenda + 1}
+                  {" "}mês(es) — e ainda multiplicaria por Nov/Dez.{" "}
+                </>
+              )}
+              {l.ajuste.sinais.participacaoEmAlta && (
+                <>
+                  A fatia dele na categoria pulou de {fmtPct(l.ajuste.participacaoLonga, 2)} (12 meses)
+                  para {fmtPct(l.ajuste.participacaoRecente, 2)} (3 meses).{" "}
+                </>
+              )}
+              No lugar, a linha sai da <strong>participação na categoria</strong>:{" "}
+              {fmt(Math.round(l.ajuste.projecaoCategoria))} un da categoria ×{" "}
+              {fmtPct(l.ajuste.participacaoAplicada, 2)} (metade da fatia de 3 meses, metade da de 12)
+              = <strong>{fmt(Math.round(l.ajuste.necessidade))} un</strong>. Sem o ajuste seriam{" "}
+              {fmt(Math.round(l.ajuste.necessidadeOriginal))} un.
+            </>
+          ) : (
+            <>
+              <strong>Base frágil ({rotuloAjuste(l.ajuste.sinais)}).</strong> O patamar deste item
+              saiu de {l.ajuste.ultimoMesReal - l.ajuste.primeiroMesComVenda + 1} mês(es) de venda.
+              A correção por participação não entrou porque a categoria não tem série medida neste
+              recorte — trate o número como estimativa grossa.
+            </>
+          )}
+        </div>
+      )}
 
       {/* PASSO 2 — o que a compra salva já resolve. Antes "Na compra salva" aparecia solto
           no rodapé, sem sinal e sem fechamento: dava para ler como se fosse mais uma

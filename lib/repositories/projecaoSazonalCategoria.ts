@@ -78,6 +78,12 @@ export interface CurvasCategoriaParams {
   ecomMembers: string[];
   /** Ano da data base. A curva olha os anos COMPLETOS anteriores a ele. */
   anoBase: number;
+  /**
+   * Último mês FECHADO do ano base (0 = nenhum). A curva não usa — ela só olha ano cheio —,
+   * mas a série do ano corrente é o que a trava de linha precisa para medir a participação
+   * do item na categoria e a projeção da categoria. Ver [projecao-linha-ajuste.ts].
+   */
+  ultimoMesFechado: number;
   /** Dimensão que define a categoria. */
   dim: DimCategoria;
   /** Categorias presentes no escopo (valores da dimensão acima). */
@@ -102,6 +108,12 @@ export interface CurvasCategoriaResultado {
   curvas: Record<string, CurvaSazonal>;
   /** Anos-calendário completos que entraram na medição. */
   anos: number[];
+  /**
+   * Realizado mensal de cada categoria (1-based) no ano BASE (meses fechados) e no ano
+   * anterior. Não entra na curva — serve à trava de linha, que compara o item com a
+   * categoria dele em duas janelas. Mesma chave de `curvas`.
+   */
+  series: Record<string, { base: number[]; anterior: number[] }>;
 }
 
 /** Cache em processo: a curva olha só anos FECHADOS, então ela não muda durante o dia. */
@@ -157,6 +169,9 @@ export async function fetchCurvasSazonaisCategoria(
     params.company,
     params.filialKey,
     params.anoBase,
+    // O ano corrente entra no resultado, então a chave precisa dele: sem isto a série de
+    // agosto continuaria servindo depois que setembro fechasse.
+    params.ultimoMesFechado,
     params.dim,
     categorias,
     params.dimensoesFixas,
@@ -202,6 +217,11 @@ async function medirCurvas(
   anos.forEach((ano) => {
     for (let mes = 1; mes <= 12; mes += 1) consultas.push({ ano, mes });
   });
+  // Meses FECHADOS do ano corrente. Eles não entram na curva (meia amostra de um ano não
+  // sabe nada sobre novembro), mas são a base da trava de linha: sem a categoria medida no
+  // ano corrente não dá para saber que fatia dela o item está levando AGORA.
+  const ultimoMesFechado = Math.max(0, Math.min(12, Math.floor(params.ultimoMesFechado || 0)));
+  for (let mes = 1; mes <= ultimoMesFechado; mes += 1) consultas.push({ ano: anoBase, mes });
 
   /** categoria → ano → mês (1-based) → quantidade. */
   const porCategoria = new Map<string, Map<number, number[]>>();
@@ -253,5 +273,16 @@ async function medirCurvas(
   // agregada usa quando o recorte mistura categorias.
   montar(CHAVE_ESCOPO_TODO, somaEscopo);
 
-  return { dim, curvas, anos };
+  // Séries cruas (ano base + ano anterior) de cada categoria, para a trava de linha.
+  const series: Record<string, { base: number[]; anterior: number[] }> = {};
+  const guardarSerie = (chave: string, porAno: Map<number, number[]>) => {
+    series[chave] = {
+      base: porAno.get(anoBase) ?? new Array<number>(13).fill(0),
+      anterior: porAno.get(anoBase - 1) ?? new Array<number>(13).fill(0),
+    };
+  };
+  porCategoria.forEach((porAno, chave) => guardarSerie(chave, porAno));
+  guardarSerie(CHAVE_ESCOPO_TODO, somaEscopo);
+
+  return { dim, curvas, anos, series };
 }

@@ -679,6 +679,8 @@ export async function GET(request: Request) {
       anos: number[];
       curvas: Record<string, unknown>;
       categoriaPorItem: Record<string, string>;
+      /** Série da categoria no ano base e no anterior — base da trava de linha. */
+      series: Record<string, { base: number[]; anterior: number[] }>;
     } | null = null;
     if (comSazonal) {
       try {
@@ -692,6 +694,9 @@ export async function GET(request: Request) {
           posMembers,
           ecomMembers,
           anoBase,
+          // Mês em curso é parcial (as janelas fecham em base−1), então o último FECHADO é
+          // o anterior a ele — a mesma régua de `montarPerfilSazonal`.
+          ultimoMesFechado: mesBase - 1,
           dim: dimCategoria,
           categorias,
           // Só a classificação de cadastro segue valendo. Coleção, cor, tipo, produto e
@@ -715,6 +720,7 @@ export async function GET(request: Request) {
           anos: resultado.anos,
           curvas: resultado.curvas as unknown as Record<string, unknown>,
           categoriaPorItem,
+          series: resultado.series,
         };
       } catch (erro) {
         // A curva é um adicional: sem ela as outras regras continuam funcionando e a tela
