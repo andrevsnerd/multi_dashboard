@@ -91,6 +91,8 @@ export interface ItemCompra {
   cor: string;
   corDescricao: string;
   descricao: string;
+  /** Grade do cadastro ("45X210"). A compra salva já a grava; compra antiga pode não ter. */
+  grade?: string;
   qtdManual: number;
   custoUnitario?: number;
   /**
@@ -445,12 +447,19 @@ export default function ProjecaoItensMensais({
         // O que já foi ajustado na tela vale mais que o número importado — ele já está
         // gravado na compra salva, é só o objeto `compra` desta sessão que não foi trocado.
         const editada = qtdSalvaOverride?.[key];
+        // A grade sai da compra salva; compra gravada antes de o campo existir cai na do
+        // item projetado — é o mesmo cadastro, só outra fonte.
+        const grade =
+          c.grade ||
+          porChave.get(key)?.grade ||
+          porChaveFrouxa.get(chaveFrouxa(c.produto, c.cor))?.grade ||
+          "";
         return montar(
           key,
           c.produto,
           c.cor,
           c.descricao || c.produto,
-          [c.produto, c.corDescricao || c.cor].filter(Boolean).join(" · "),
+          [c.produto, c.corDescricao || c.cor, grade].filter(Boolean).join(" · "),
           Math.max(0, Math.round(editada ?? c.qtdManual ?? 0)),
           c.origens
         );
@@ -984,6 +993,9 @@ function DicaCompra({
   return (
     <div className={styles.dicaPainel} style={{ left, top, width: largura }}>
       <div className={styles.dicaItem}>{l.rotulo}</div>
+      {/* Código, cor e GRADE. Sem isto o painel abria só com a descrição, e num produto de
+          várias cores/grades não dava para saber de qual linha era a conta. */}
+      {l.detalhe && <div className={styles.dicaFraco}>{l.detalhe}</div>}
 
       {/* PASSO 1 — quanto este item precisa. A conta que o dono aprovou: o que sai, menos
           o que já existe. */}

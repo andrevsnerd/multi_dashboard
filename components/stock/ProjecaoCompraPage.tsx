@@ -729,6 +729,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
             cor,
             corDescricao: String(raw.corDescricao ?? "").trim(),
             descricao: String(raw.descricao ?? "").trim(),
+            grade: String(raw.grade ?? "").trim(),
             qtdManual: qtd,
             custoUnitario: Number(raw.custoUnitario ?? 0) || undefined,
             origens: [origem],

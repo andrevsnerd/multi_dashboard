@@ -4390,13 +4390,13 @@
     "semantic_hash": ""
   },
   "app/api/projecao-compra/route.ts": {
-    "mtime": 1789157595.9715562,
-    "ast_hash": "38a9daa3180bd56c420067e2a4c22f29",
+    "mtime": 1789389477.7852008,
+    "ast_hash": "14f0bb8858ac11fb2d87c3be85c9b203",
     "semantic_hash": ""
   },
   "components/stock/ProjecaoCompraPage.tsx": {
-    "mtime": 1789157720.427284,
-    "ast_hash": "49f12afd6f5a3a448fe4fd2c5a5f4276",
+    "mtime": 1789389496.9414148,
+    "ast_hash": "942bfde68ba57b6b2d28115f483ed2b6",
     "semantic_hash": ""
   },
   "lib/config/saida-estoque-negativo.ts": {
@@ -4495,8 +4495,8 @@
     "semantic_hash": ""
   },
   "components/stock/ProjecaoItensMensais.tsx": {
-    "mtime": 1789153110.0341,
-    "ast_hash": "bc984d0dd5603196f552a0634e71725f",
+    "mtime": 1789389593.4580722,
+    "ast_hash": "3813847ff0e25e4ec244d9d3d5a7468c",
     "semantic_hash": ""
   },
   "lib/config/embalagens.ts": {
@@ -4525,8 +4525,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/projecaoSazonalCategoria.ts": {
-    "mtime": 1789157595.9728873,
-    "ast_hash": "ac58aa84dddc71697bceb1eb794d03fe",
+    "mtime": 1789389459.3672233,
+    "ast_hash": "4349c32d8cebfe789dada15306b72d47",
     "semantic_hash": ""
   },
   "lib/server/compra-transito-index.ts": {
@@ -4537,6 +4537,26 @@
   "lib/utils/projecao-sazonal.ts": {
     "mtime": 1789135120.968696,
     "ast_hash": "fe7bc075c72f95556e3542df4eade885",
+    "semantic_hash": ""
+  },
+  "lib/utils/projecao-linha-ajuste.ts": {
+    "mtime": 1789389417.2781951,
+    "ast_hash": "26d6ee4313c7845f690ea3317851ce0b",
+    "semantic_hash": ""
+  },
+  "scripts/backtest-projecao.mjs": {
+    "mtime": 1789390057.5070329,
+    "ast_hash": "eb6f291504a0165619dc2c8db5578958",
+    "semantic_hash": ""
+  },
+  "scripts/lib/alias-hooks.mjs": {
+    "mtime": 1789389742.1992614,
+    "ast_hash": "f343ab798f651359104ce6e029976f32",
+    "semantic_hash": ""
+  },
+  "scripts/lib/alias-register.mjs": {
+    "mtime": 1789389746.3349605,
+    "ast_hash": "a20e98b9b7b852660ddb2af51f45cd96",
     "semantic_hash": ""
   }
 }

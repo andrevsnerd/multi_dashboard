@@ -4357,7 +4357,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_ajuste_estoque_executar_route",
-      "community": 121,
+      "community": 6,
       "norm_label": "route.ts"
     },
     {
@@ -4367,7 +4367,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "app_api_ajuste_estoque_executar_route_executarrequest",
-      "community": 121,
+      "community": 6,
       "norm_label": "executarrequest"
     },
     {
@@ -4377,7 +4377,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "app_api_ajuste_estoque_executar_route_isvaliddate",
-      "community": 121,
+      "community": 6,
       "norm_label": "isvaliddate()"
     },
     {
@@ -4387,7 +4387,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "app_api_ajuste_estoque_executar_route_post",
-      "community": 121,
+      "community": 6,
       "norm_label": "post()"
     },
     {
@@ -9237,7 +9237,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_relatorios_compra_sugerida_abc_stream_route",
-      "community": 470,
+      "community": 231,
       "norm_label": "route.ts"
     },
     {
@@ -9247,7 +9247,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "app_api_relatorios_compra_sugerida_abc_stream_route_get",
-      "community": 470,
+      "community": 231,
       "norm_label": "get()"
     },
     {
@@ -9277,7 +9277,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_relatorios_dados_route",
-      "community": 470,
+      "community": 231,
       "norm_label": "route.ts"
     },
     {
@@ -9287,7 +9287,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "app_api_relatorios_dados_route_get",
-      "community": 470,
+      "community": 231,
       "norm_label": "get()"
     },
     {
@@ -9597,7 +9597,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_relatorios_stream_route",
-      "community": 470,
+      "community": 231,
       "norm_label": "route.ts"
     },
     {
@@ -9607,7 +9607,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "app_api_relatorios_stream_route_get",
-      "community": 470,
+      "community": 231,
       "norm_label": "get()"
     },
     {
@@ -10707,7 +10707,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_produtos_route",
-      "community": 6,
+      "community": 492,
       "norm_label": "route.ts"
     },
     {
@@ -10717,7 +10717,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_produtos_route_normalizebarcode",
-      "community": 6,
+      "community": 492,
       "norm_label": "normalizebarcode()"
     },
     {
@@ -10727,7 +10727,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_produtos_route_comparebarcodepreference",
-      "community": 6,
+      "community": 492,
       "norm_label": "comparebarcodepreference()"
     },
     {
@@ -10737,7 +10737,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_produtos_route_choosepreferredbarcode",
-      "community": 6,
+      "community": 492,
       "norm_label": "choosepreferredbarcode()"
     },
     {
@@ -10747,7 +10747,7 @@
       "source_location": "L47",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_produtos_route_get",
-      "community": 6,
+      "community": 492,
       "norm_label": "get()"
     },
     {
@@ -17919,7 +17919,7 @@
       "source_location": "L91",
       "_origin": "ast",
       "id": "components_lista_loja_listalojapage_filiallabel",
-      "community": 477,
+      "community": 231,
       "norm_label": "filiallabel()"
     },
     {
@@ -21349,7 +21349,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_performance_filialvendedorestab",
-      "community": 126,
+      "community": 302,
       "norm_label": "filialvendedorestab.tsx"
     },
     {
@@ -21359,7 +21359,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "components_performance_filialvendedorestab_props",
-      "community": 126,
+      "community": 302,
       "norm_label": "props"
     },
     {
@@ -21369,7 +21369,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "components_performance_filialvendedorestab_fetchvendedores",
-      "community": 126,
+      "community": 302,
       "norm_label": "fetchvendedores()"
     },
     {
@@ -21379,7 +21379,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "components_performance_filialvendedorestab_filialvendedorestab",
-      "community": 126,
+      "community": 302,
       "norm_label": "filialvendedorestab()"
     },
     {
@@ -22419,7 +22419,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_products_productsrecentpage",
-      "community": 142,
+      "community": 118,
       "norm_label": "productsrecentpage.tsx"
     },
     {
@@ -22429,7 +22429,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "components_products_productsrecentpage_productsrecentpageprops",
-      "community": 142,
+      "community": 118,
       "norm_label": "productsrecentpageprops"
     },
     {
@@ -22439,7 +22439,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "components_products_productsrecentpage_empty_summary",
-      "community": 142,
+      "community": 118,
       "norm_label": "empty_summary"
     },
     {
@@ -22449,7 +22449,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "components_products_productsrecentpage_fetchproducts",
-      "community": 142,
+      "community": 118,
       "norm_label": "fetchproducts()"
     },
     {
@@ -22459,7 +22459,7 @@
       "source_location": "L106",
       "_origin": "ast",
       "id": "components_products_productsrecentpage_fetchsummary",
-      "community": 142,
+      "community": 118,
       "norm_label": "fetchsummary()"
     },
     {
@@ -22469,7 +22469,7 @@
       "source_location": "L174",
       "_origin": "ast",
       "id": "components_products_productsrecentpage_searchproducts",
-      "community": 142,
+      "community": 118,
       "norm_label": "searchproducts()"
     },
     {
@@ -22479,7 +22479,7 @@
       "source_location": "L200",
       "_origin": "ast",
       "id": "components_products_productsrecentpage_productsrecentpage",
-      "community": 142,
+      "community": 118,
       "norm_label": "productsrecentpage()"
     },
     {
@@ -22489,7 +22489,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_products_productsrecenttable",
-      "community": 23,
+      "community": 118,
       "norm_label": "productsrecenttable.tsx"
     },
     {
@@ -22499,7 +22499,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "components_products_productsrecenttable_productsrecenttableprops",
-      "community": 23,
+      "community": 118,
       "norm_label": "productsrecenttableprops"
     },
     {
@@ -27446,7 +27446,7 @@
       "label": "MultiSelectOpcao",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L2748",
+      "source_location": "L2749",
       "_origin": "ast",
       "id": "components_stock_projecaocomprapage_multiselectopcao",
       "community": 25,
@@ -27456,7 +27456,7 @@
       "label": "MultiSelectProps",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L2757",
+      "source_location": "L2758",
       "_origin": "ast",
       "id": "components_stock_projecaocomprapage_multiselectprops",
       "community": 25,
@@ -27466,7 +27466,7 @@
       "label": "MultiSelect()",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L2779",
+      "source_location": "L2780",
       "_origin": "ast",
       "id": "components_stock_projecaocomprapage_multiselect",
       "community": 25,
@@ -27926,7 +27926,7 @@
       "label": "Props",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L105",
+      "source_location": "L107",
       "_origin": "ast",
       "id": "components_stock_projecaoitensmensais_props",
       "community": 487,
@@ -27936,7 +27936,7 @@
       "label": "fmt()",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L149",
+      "source_location": "L151",
       "_origin": "ast",
       "id": "components_stock_projecaoitensmensais_fmt",
       "community": 450,
@@ -27946,7 +27946,7 @@
       "label": "fmtPct()",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L152",
+      "source_location": "L154",
       "_origin": "ast",
       "id": "components_stock_projecaoitensmensais_fmtpct",
       "community": 450,
@@ -27956,7 +27956,7 @@
       "label": "fmtDec()",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L157",
+      "source_location": "L159",
       "_origin": "ast",
       "id": "components_stock_projecaoitensmensais_fmtdec",
       "community": 450,
@@ -27966,7 +27966,7 @@
       "label": "ymdToBr()",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L161",
+      "source_location": "L163",
       "_origin": "ast",
       "id": "components_stock_projecaoitensmensais_ymdtobr",
       "community": 450,
@@ -27976,7 +27976,7 @@
       "label": "diasNoMes()",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L165",
+      "source_location": "L167",
       "_origin": "ast",
       "id": "components_stock_projecaoitensmensais_diasnomes",
       "community": 450,
@@ -27986,7 +27986,7 @@
       "label": "chave()",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L168",
+      "source_location": "L170",
       "_origin": "ast",
       "id": "components_stock_projecaoitensmensais_chave",
       "community": 450,
@@ -27996,7 +27996,7 @@
       "label": "chaveFrouxa()",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L177",
+      "source_location": "L179",
       "_origin": "ast",
       "id": "components_stock_projecaoitensmensais_chavefrouxa",
       "community": 450,
@@ -28006,7 +28006,7 @@
       "label": "LinhaItem",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L184",
+      "source_location": "L186",
       "_origin": "ast",
       "id": "components_stock_projecaoitensmensais_linhaitem",
       "community": 450,
@@ -28016,7 +28016,7 @@
       "label": "ProjecaoItensMensais()",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L246",
+      "source_location": "L248",
       "_origin": "ast",
       "id": "components_stock_projecaoitensmensais_projecaoitensmensais",
       "community": 450,
@@ -28026,7 +28026,7 @@
       "label": "CelulaQtdSalva()",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L853",
+      "source_location": "L862",
       "_origin": "ast",
       "id": "components_stock_projecaoitensmensais_celulaqtdsalva",
       "community": 450,
@@ -28036,7 +28036,7 @@
       "label": "DicaCompra()",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L934",
+      "source_location": "L943",
       "_origin": "ast",
       "id": "components_stock_projecaoitensmensais_dicacompra",
       "community": 450,
@@ -28046,7 +28046,7 @@
       "label": "Situacao()",
       "file_type": "code",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L1202",
+      "source_location": "L1214",
       "_origin": "ast",
       "id": "components_stock_projecaoitensmensais_situacao",
       "community": 450,
@@ -28109,7 +28109,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "components_stock_stockbyfilialtable_stockbyfilialtableprops",
-      "community": 469,
+      "community": 126,
       "norm_label": "stockbyfilialtableprops"
     },
     {
@@ -28669,7 +28669,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_vendedores_vendedorestable",
-      "community": 126,
+      "community": 302,
       "norm_label": "vendedorestable.tsx"
     },
     {
@@ -28679,7 +28679,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "components_vendedores_vendedorestable_vendedorestableprops",
-      "community": 126,
+      "community": 302,
       "norm_label": "vendedorestableprops"
     },
     {
@@ -28689,7 +28689,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "components_vendedores_vendedorestable_builddetalheurl",
-      "community": 126,
+      "community": 302,
       "norm_label": "builddetalheurl()"
     },
     {
@@ -28699,7 +28699,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "components_vendedores_vendedorestable_vendedorestable",
-      "community": 126,
+      "community": 302,
       "norm_label": "vendedorestable()"
     },
     {
@@ -34439,7 +34439,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "lib_ajuste_estoque_executor_ajustecontagemitem",
-      "community": 121,
+      "community": 6,
       "norm_label": "ajustecontagemitem"
     },
     {
@@ -34989,7 +34989,7 @@
       "source_location": "L111",
       "_origin": "ast",
       "id": "lib_auth_permissions_editar_saida_roles",
-      "community": 6,
+      "community": 236,
       "norm_label": "editar_saida_roles"
     },
     {
@@ -34999,7 +34999,7 @@
       "source_location": "L114",
       "_origin": "ast",
       "id": "lib_auth_permissions_caneditarromaneiosaida",
-      "community": 6,
+      "community": 236,
       "norm_label": "caneditarromaneiosaida()"
     },
     {
@@ -38089,7 +38089,7 @@
       "source_location": "L88",
       "_origin": "ast",
       "id": "lib_db_connection_isdatabaseconnectionerror",
-      "community": 6,
+      "community": 492,
       "norm_label": "isdatabaseconnectionerror()"
     },
     {
@@ -38099,7 +38099,7 @@
       "source_location": "L109",
       "_origin": "ast",
       "id": "lib_db_connection_getpublicdatabaseerrormessage",
-      "community": 6,
+      "community": 492,
       "norm_label": "getpublicdatabaseerrormessage()"
     },
     {
@@ -40579,7 +40579,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "lib_reports_column_sources_native_source",
-      "community": 231,
+      "community": 13,
       "norm_label": "native_source"
     },
     {
@@ -40599,7 +40599,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "lib_reports_column_sources_all_defs",
-      "community": 96,
+      "community": 13,
       "norm_label": "all_defs"
     },
     {
@@ -40619,7 +40619,7 @@
       "source_location": "L68",
       "_origin": "ast",
       "id": "lib_reports_column_sources_geteditorextracolumns",
-      "community": 96,
+      "community": 13,
       "norm_label": "geteditorextracolumns()"
     },
     {
@@ -40639,7 +40639,7 @@
       "source_location": "L106",
       "_origin": "ast",
       "id": "lib_reports_column_sources_cross_column_keys",
-      "community": 251,
+      "community": 13,
       "norm_label": "cross_column_keys"
     },
     {
@@ -40819,7 +40819,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "lib_reports_enrich_server_enrichresult",
-      "community": 96,
+      "community": 231,
       "norm_label": "enrichresult"
     },
     {
@@ -41069,7 +41069,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_reports_params",
-      "community": 470,
+      "community": 231,
       "norm_label": "params.ts"
     },
     {
@@ -41079,7 +41079,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "lib_reports_params_valid_sources",
-      "community": 470,
+      "community": 231,
       "norm_label": "valid_sources"
     },
     {
@@ -41089,7 +41089,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "lib_reports_params_parsereportfilters",
-      "community": 470,
+      "community": 231,
       "norm_label": "parsereportfilters()"
     },
     {
@@ -41099,7 +41099,7 @@
       "source_location": "L70",
       "_origin": "ast",
       "id": "lib_reports_params_parseextrasources",
-      "community": 470,
+      "community": 231,
       "norm_label": "parseextrasources()"
     },
     {
@@ -41569,7 +41569,7 @@
       "source_location": "L122",
       "_origin": "ast",
       "id": "lib_reports_types_reportrow",
-      "community": 96,
+      "community": 231,
       "norm_label": "reportrow"
     },
     {
@@ -41939,7 +41939,7 @@
       "source_location": "L218",
       "_origin": "ast",
       "id": "lib_repositories_ajusteestoque_resolvernomefilial",
-      "community": 121,
+      "community": 6,
       "norm_label": "resolvernomefilial()"
     },
     {
@@ -51979,7 +51979,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_reportvendashistorico",
-      "community": 477,
+      "community": 231,
       "norm_label": "reportvendashistorico.ts"
     },
     {
@@ -51989,7 +51989,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "lib_repositories_reportvendashistorico_round2",
-      "community": 477,
+      "community": 231,
       "norm_label": "round2()"
     },
     {
@@ -51999,7 +51999,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "lib_repositories_reportvendashistorico_roundint",
-      "community": 477,
+      "community": 231,
       "norm_label": "roundint()"
     },
     {
@@ -52009,7 +52009,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "lib_repositories_reportvendashistorico_toisodate",
-      "community": 477,
+      "community": 231,
       "norm_label": "toisodate()"
     },
     {
@@ -52019,7 +52019,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "lib_repositories_reportvendashistorico_prepinlist",
-      "community": 477,
+      "community": 231,
       "norm_label": "prepinlist()"
     },
     {
@@ -52029,7 +52029,7 @@
       "source_location": "L53",
       "_origin": "ast",
       "id": "lib_repositories_reportvendashistorico_rawrow",
-      "community": 477,
+      "community": 231,
       "norm_label": "rawrow"
     },
     {
@@ -52039,7 +52039,7 @@
       "source_location": "L83",
       "_origin": "ast",
       "id": "lib_repositories_reportvendashistorico_fetchvendashistorico",
-      "community": 477,
+      "community": 231,
       "norm_label": "fetchvendashistorico()"
     },
     {
@@ -52289,7 +52289,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "lib_repositories_stockbyfilial_stockbyfilialitem",
-      "community": 469,
+      "community": 126,
       "norm_label": "stockbyfilialitem"
     },
     {
@@ -52739,7 +52739,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "lib_repositories_vendedores_v2_vendedoritem",
-      "community": 126,
+      "community": 302,
       "norm_label": "vendedoritem"
     },
     {
@@ -60569,7 +60569,7 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "lib_utils_exportrelatorioabasxlsx_abagroup",
-      "community": 96,
+      "community": 231,
       "norm_label": "abagroup"
     },
     {
@@ -60989,7 +60989,7 @@
       "source_location": "L79",
       "_origin": "ast",
       "id": "lib_utils_exportticketsxlsx_ticketgroup",
-      "community": 96,
+      "community": 231,
       "norm_label": "ticketgroup"
     },
     {
@@ -61459,7 +61459,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_utils_generatestockactionspdf",
-      "community": 469,
+      "community": 126,
       "norm_label": "generatestockactionspdf.ts"
     },
     {
@@ -61469,7 +61469,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "lib_utils_generatestockactionspdf_transferaction",
-      "community": 469,
+      "community": 126,
       "norm_label": "transferaction"
     },
     {
@@ -61479,7 +61479,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "lib_utils_generatestockactionspdf_purchaseaction",
-      "community": 469,
+      "community": 126,
       "norm_label": "purchaseaction"
     },
     {
@@ -61489,7 +61489,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "lib_utils_generatestockactionspdf_calculatemonthlyprojection",
-      "community": 469,
+      "community": 126,
       "norm_label": "calculatemonthlyprojection()"
     },
     {
@@ -61499,7 +61499,7 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "lib_utils_generatestockactionspdf_formatproductdescription",
-      "community": 469,
+      "community": 126,
       "norm_label": "formatproductdescription()"
     },
     {
@@ -61509,7 +61509,7 @@
       "source_location": "L71",
       "_origin": "ast",
       "id": "lib_utils_generatestockactionspdf_analyzestockactions",
-      "community": 469,
+      "community": 126,
       "norm_label": "analyzestockactions()"
     },
     {
@@ -61519,7 +61519,7 @@
       "source_location": "L260",
       "_origin": "ast",
       "id": "lib_utils_generatestockactionspdf_generatestockactionspdf",
-      "community": 469,
+      "community": 126,
       "norm_label": "generatestockactionspdf()"
     },
     {
@@ -70259,7 +70259,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tmp_test_projecao",
-      "community": 230,
+      "community": 69,
       "norm_label": "test-projecao.js"
     },
     {
@@ -70269,7 +70269,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "tmp_test_projecao_p",
-      "community": 230,
+      "community": 69,
       "norm_label": "p"
     },
     {
@@ -70289,7 +70289,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "tmp_test_projecao_check",
-      "community": 230,
+      "community": 69,
       "norm_label": "check()"
     },
     {
@@ -70299,7 +70299,7 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "tmp_test_projecao_r",
-      "community": 230,
+      "community": 69,
       "norm_label": "r"
     },
     {
@@ -70309,7 +70309,7 @@
       "source_location": "L68",
       "_origin": "ast",
       "id": "tmp_test_projecao_proj",
-      "community": 230,
+      "community": 69,
       "norm_label": "proj"
     },
     {
@@ -70319,7 +70319,7 @@
       "source_location": "L71",
       "_origin": "ast",
       "id": "tmp_test_projecao_somaproj",
-      "community": 230,
+      "community": 69,
       "norm_label": "somaproj"
     },
     {
@@ -70329,7 +70329,7 @@
       "source_location": "L92",
       "_origin": "ast",
       "id": "tmp_test_projecao_serieag",
-      "community": 230,
+      "community": 69,
       "norm_label": "serieag"
     },
     {
@@ -70339,7 +70339,7 @@
       "source_location": "L98",
       "_origin": "ast",
       "id": "tmp_test_projecao_idx",
-      "community": 230,
+      "community": 69,
       "norm_label": "idx"
     },
     {
@@ -70349,7 +70349,7 @@
       "source_location": "L101",
       "_origin": "ast",
       "id": "tmp_test_projecao_semdados",
-      "community": 230,
+      "community": 69,
       "norm_label": "semdados"
     },
     {
@@ -70359,7 +70359,7 @@
       "source_location": "L105",
       "_origin": "ast",
       "id": "tmp_test_projecao_vals",
-      "community": 230,
+      "community": 69,
       "norm_label": "vals"
     },
     {
@@ -70369,7 +70369,7 @@
       "source_location": "L106",
       "_origin": "ast",
       "id": "tmp_test_projecao_arr",
-      "community": 230,
+      "community": 69,
       "norm_label": "arr"
     },
     {
@@ -70379,7 +70379,7 @@
       "source_location": "L111",
       "_origin": "ast",
       "id": "tmp_test_projecao_projsaz",
-      "community": 230,
+      "community": 69,
       "norm_label": "projsaz"
     },
     {
@@ -70389,7 +70389,7 @@
       "source_location": "L142",
       "_origin": "ast",
       "id": "tmp_test_projecao_comteto",
-      "community": 230,
+      "community": 69,
       "norm_label": "comteto"
     },
     {
@@ -70399,7 +70399,7 @@
       "source_location": "L143",
       "_origin": "ast",
       "id": "tmp_test_projecao_semteto",
-      "community": 230,
+      "community": 69,
       "norm_label": "semteto"
     },
     {
@@ -70639,7 +70639,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "types_auth_userrecord",
-      "community": 236,
+      "community": 67,
       "norm_label": "userrecord"
     },
     {
@@ -167439,7 +167439,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L2779",
+      "source_location": "L2780",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_multiselect",
@@ -167449,7 +167449,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L2748",
+      "source_location": "L2749",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_multiselectopcao",
@@ -167459,7 +167459,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L2757",
+      "source_location": "L2758",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_multiselectprops",
@@ -168029,7 +168029,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L1610",
+      "source_location": "L1611",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_resolvercoberturadoescopo",
@@ -168052,7 +168052,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L1269",
+      "source_location": "L1270",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_windows_dias"
@@ -168063,7 +168063,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L905",
+      "source_location": "L906",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_dim_keys"
@@ -168073,7 +168073,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L2954",
+      "source_location": "L2955",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_multiselect",
       "target": "components_stock_projecaocomprapage_fmt",
@@ -168084,7 +168084,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L1157",
+      "source_location": "L1158",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_fmt",
@@ -168095,7 +168095,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L1365",
+      "source_location": "L1366",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_fmtdec",
@@ -168106,7 +168106,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L1192",
+      "source_location": "L1193",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_rowkey",
@@ -168150,7 +168150,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L1307",
+      "source_location": "L1308",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_diffdays",
@@ -168161,7 +168161,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L1546",
+      "source_location": "L1547",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_adddaysformatted",
@@ -168172,7 +168172,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L1630",
+      "source_location": "L1631",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_adddaysymd",
@@ -168183,7 +168183,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L1963",
+      "source_location": "L1964",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_ymdtobr",
@@ -168194,7 +168194,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L1473",
+      "source_location": "L1474",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_diasnomes",
@@ -168205,7 +168205,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L2350",
+      "source_location": "L2351",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_fmtpct",
@@ -168227,7 +168227,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L961",
+      "source_location": "L962",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "components_stock_projecaocomprapage_janela12meses",
@@ -168250,7 +168250,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L1752",
+      "source_location": "L1753",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "lib_config_company_resolvecompany"
@@ -168261,7 +168261,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L2688",
+      "source_location": "L2689",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "lib_repositories_topprodutospresentation_pct"
@@ -168272,7 +168272,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L1421",
+      "source_location": "L1422",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "lib_utils_projecao_realista_detalharintervalo"
@@ -168283,7 +168283,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L1338",
+      "source_location": "L1339",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "lib_utils_projecao_realista_indicedomodo"
@@ -168294,7 +168294,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L1316",
+      "source_location": "L1317",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "lib_utils_projecao_realista_montarperfil"
@@ -168305,7 +168305,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L1487",
+      "source_location": "L1488",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "lib_utils_projecao_realista_projetarhorizonte"
@@ -168316,7 +168316,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L1469",
+      "source_location": "L1470",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "lib_utils_projecao_realista_projetarmescheio"
@@ -168327,7 +168327,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L1089",
+      "source_location": "L1090",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "lib_utils_projecao_regras_ehregracompraideal"
@@ -168338,7 +168338,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L1089",
+      "source_location": "L1090",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "lib_utils_projecao_regras_ehregrasazonalcategoria"
@@ -168349,7 +168349,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L1325",
+      "source_location": "L1326",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "lib_utils_projecao_sazonal_curvaneutra"
@@ -168360,7 +168360,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L1329",
+      "source_location": "L1330",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "lib_utils_projecao_sazonal_montarperfilsazonal"
@@ -168371,7 +168371,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L1419",
+      "source_location": "L1420",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "lib_utils_projecao_sazonal_projetarhorizontesazonal"
@@ -168382,7 +168382,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L1463",
+      "source_location": "L1464",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "lib_utils_projecao_sazonal_projetarmessazonal"
@@ -168393,7 +168393,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "components/stock/ProjecaoCompraPage.tsx",
-      "source_location": "L807",
+      "source_location": "L808",
       "weight": 1.0,
       "source": "components_stock_projecaocomprapage_projecaocomprapage",
       "target": "lib_utils_romaneio_confirmacao_store_itemkey"
@@ -169815,7 +169815,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L853",
+      "source_location": "L862",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais",
       "target": "components_stock_projecaoitensmensais_celulaqtdsalva",
@@ -169825,7 +169825,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L168",
+      "source_location": "L170",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais",
       "target": "components_stock_projecaoitensmensais_chave",
@@ -169835,7 +169835,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L177",
+      "source_location": "L179",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais",
       "target": "components_stock_projecaoitensmensais_chavefrouxa",
@@ -169845,7 +169845,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L165",
+      "source_location": "L167",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais",
       "target": "components_stock_projecaoitensmensais_diasnomes",
@@ -169855,7 +169855,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L934",
+      "source_location": "L943",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais",
       "target": "components_stock_projecaoitensmensais_dicacompra",
@@ -169865,7 +169865,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L149",
+      "source_location": "L151",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais",
       "target": "components_stock_projecaoitensmensais_fmt",
@@ -169875,7 +169875,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L157",
+      "source_location": "L159",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais",
       "target": "components_stock_projecaoitensmensais_fmtdec",
@@ -169885,7 +169885,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L152",
+      "source_location": "L154",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais",
       "target": "components_stock_projecaoitensmensais_fmtpct",
@@ -169915,7 +169915,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L184",
+      "source_location": "L186",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais",
       "target": "components_stock_projecaoitensmensais_linhaitem",
@@ -169935,7 +169935,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L246",
+      "source_location": "L248",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais",
       "target": "components_stock_projecaoitensmensais_projecaoitensmensais",
@@ -169945,7 +169945,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L105",
+      "source_location": "L107",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais",
       "target": "components_stock_projecaoitensmensais_props",
@@ -169955,7 +169955,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L1202",
+      "source_location": "L1214",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais",
       "target": "components_stock_projecaoitensmensais_situacao",
@@ -169965,7 +169965,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L161",
+      "source_location": "L163",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais",
       "target": "components_stock_projecaoitensmensais_ymdtobr",
@@ -170284,7 +170284,7 @@
       "context": "generic_arg",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L142",
+      "source_location": "L144",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais_props",
       "target": "lib_utils_projecao_linha_ajuste_seriecategoria",
@@ -170295,7 +170295,7 @@
       "context": "field",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L129",
+      "source_location": "L131",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais_props",
       "target": "lib_utils_projecao_regras_regraprojecao",
@@ -170306,7 +170306,7 @@
       "context": "generic_arg",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L135",
+      "source_location": "L137",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais_props",
       "target": "lib_utils_projecao_sazonal_curvasazonal",
@@ -170317,7 +170317,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L993",
+      "source_location": "L1005",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais_dicacompra",
       "target": "components_stock_projecaoitensmensais_fmt",
@@ -170328,7 +170328,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L523",
+      "source_location": "L532",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais_projecaoitensmensais",
       "target": "components_stock_projecaoitensmensais_fmt",
@@ -170339,7 +170339,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L1212",
+      "source_location": "L1224",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais_situacao",
       "target": "components_stock_projecaoitensmensais_fmt",
@@ -170350,7 +170350,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L1030",
+      "source_location": "L1042",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais_dicacompra",
       "target": "components_stock_projecaoitensmensais_fmtpct",
@@ -170361,7 +170361,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L703",
+      "source_location": "L712",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais_projecaoitensmensais",
       "target": "components_stock_projecaoitensmensais_fmtpct",
@@ -170372,7 +170372,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L1140",
+      "source_location": "L1152",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais_dicacompra",
       "target": "components_stock_projecaoitensmensais_fmtdec",
@@ -170383,7 +170383,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L472",
+      "source_location": "L481",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais_projecaoitensmensais",
       "target": "components_stock_projecaoitensmensais_ymdtobr",
@@ -170394,7 +170394,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L343",
+      "source_location": "L345",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais_projecaoitensmensais",
       "target": "components_stock_projecaoitensmensais_diasnomes",
@@ -170405,7 +170405,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L272",
+      "source_location": "L274",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais_projecaoitensmensais",
       "target": "components_stock_projecaoitensmensais_chave",
@@ -170416,7 +170416,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L273",
+      "source_location": "L275",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais_projecaoitensmensais",
       "target": "components_stock_projecaoitensmensais_chavefrouxa",
@@ -170427,7 +170427,7 @@
       "context": "field",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L231",
+      "source_location": "L233",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais_linhaitem",
       "target": "lib_utils_projecao_linha_ajuste_ajustelinha",
@@ -170438,7 +170438,7 @@
       "context": "generic_arg",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L194",
+      "source_location": "L196",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais_linhaitem",
       "target": "lib_utils_projecao_realista_criteriomes",
@@ -170449,7 +170449,7 @@
       "context": "field",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L222",
+      "source_location": "L224",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais_linhaitem",
       "target": "lib_utils_projecao_realista_partehorizonte",
@@ -170460,7 +170460,7 @@
       "context": "field",
       "confidence": "EXTRACTED",
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L226",
+      "source_location": "L228",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais_linhaitem",
       "target": "lib_utils_projecao_sazonal_curvasazonal",
@@ -170472,7 +170472,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L285",
+      "source_location": "L287",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais_projecaoitensmensais",
       "target": "lib_utils_destino_romaneio_store_key"
@@ -170483,7 +170483,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L395",
+      "source_location": "L397",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais_projecaoitensmensais",
       "target": "lib_utils_projecao_linha_ajuste_avaliarajustelinha"
@@ -170494,7 +170494,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L735",
+      "source_location": "L744",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais_projecaoitensmensais",
       "target": "lib_utils_projecao_linha_ajuste_rotuloajuste"
@@ -170505,7 +170505,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L378",
+      "source_location": "L380",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais_projecaoitensmensais",
       "target": "lib_utils_projecao_realista_detalharhorizonte"
@@ -170516,7 +170516,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L292",
+      "source_location": "L294",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais_projecaoitensmensais",
       "target": "lib_utils_projecao_realista_indicedomodo"
@@ -170527,7 +170527,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L291",
+      "source_location": "L293",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais_projecaoitensmensais",
       "target": "lib_utils_projecao_realista_montarperfil"
@@ -170538,7 +170538,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L338",
+      "source_location": "L340",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais_projecaoitensmensais",
       "target": "lib_utils_projecao_realista_projetarmescheio"
@@ -170549,7 +170549,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L303",
+      "source_location": "L305",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais_projecaoitensmensais",
       "target": "lib_utils_projecao_regras_ehregracompraideal"
@@ -170560,7 +170560,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L263",
+      "source_location": "L265",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais_projecaoitensmensais",
       "target": "lib_utils_projecao_regras_ehregrasazonalcategoria"
@@ -170571,7 +170571,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L299",
+      "source_location": "L301",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais_projecaoitensmensais",
       "target": "lib_utils_projecao_sazonal_curvaneutra"
@@ -170582,7 +170582,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L369",
+      "source_location": "L371",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais_projecaoitensmensais",
       "target": "lib_utils_projecao_sazonal_detalharhorizontesazonal"
@@ -170593,7 +170593,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L300",
+      "source_location": "L302",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais_projecaoitensmensais",
       "target": "lib_utils_projecao_sazonal_montarperfilsazonal"
@@ -170604,7 +170604,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L334",
+      "source_location": "L336",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais_projecaoitensmensais",
       "target": "lib_utils_projecao_sazonal_projetarmessazonal"
@@ -170615,7 +170615,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L1020",
+      "source_location": "L1032",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais_dicacompra",
       "target": "lib_utils_projecao_linha_ajuste_rotuloajuste"
@@ -170626,7 +170626,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L1163",
+      "source_location": "L1175",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais_dicacompra",
       "target": "lib_utils_projecao_regras_ehregracompraideal"
@@ -170637,7 +170637,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/stock/ProjecaoItensMensais.tsx",
-      "source_location": "L1126",
+      "source_location": "L1138",
       "weight": 1.0,
       "source": "components_stock_projecaoitensmensais_dicacompra",
       "target": "lib_utils_projecao_regras_ehregrasazonalcategoria"
@@ -288293,5 +288293,5 @@
       "source_file": "tmp_scarfme_poliester_pages.txt"
     }
   ],
-  "built_at_commit": "5da1d1964c18f3bc5364fe1c563e97f8fc2422e0"
+  "built_at_commit": "cfa09a6b16cfbbd812c6fe23ab7bba67f0032347"
 }
