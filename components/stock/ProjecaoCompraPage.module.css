@@ -1182,6 +1182,51 @@
   color: var(--pc-ok);
 }
 
+/* Qtd salva editável na própria célula: o ajuste fino da compra é feito olhando o
+   sugerido ao lado, então o campo tem de caber na coluna sem alargá-la. */
+.qtdSalvaInput {
+  width: 100%;
+  min-width: 48px;
+  max-width: 72px;
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid var(--b-300);
+  border-radius: var(--pc-raio-sm);
+  background: var(--s-white);
+  color: var(--t-900);
+  font-size: 12.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.qtdSalvaInput:hover {
+  border-color: var(--b-400, var(--b-300));
+}
+.qtdSalvaInput:focus {
+  outline: none;
+  border-color: var(--brand-scarfme, #2563eb);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+.qtdSalvaInput:disabled {
+  opacity: 0.6;
+}
+/* Gravação recusada: o campo volta ao valor gravado e a borda diz por que ele "voltou". */
+.qtdSalvaErro,
+.qtdSalvaErro:focus {
+  border-color: var(--pc-bad);
+  box-shadow: 0 0 0 3px var(--pc-bad-bg);
+}
+/* Esconde as setinhas do input number — a coluna é estreita e elas comem o número. */
+.qtdSalvaInput::-webkit-outer-spin-button,
+.qtdSalvaInput::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+.qtdSalvaInput[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
 /* Linha de explicação entre o título do card e a tabela. */
 .tabelaNota {
   padding: 8px 14px;

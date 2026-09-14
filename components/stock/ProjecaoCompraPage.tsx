@@ -424,6 +424,12 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   const [carregandoCompra, setCarregandoCompra] = useState(false);
   const [erroCompra, setErroCompra] = useState<string | null>(null);
   /**
+   * Quantidades da compra salva ajustadas nesta tela (chave `produto||cor` → quantidade).
+   * Já estão GRAVADAS na compra — este mapa só existe porque a tabela lê `pedido.compra`, e
+   * trocar aquele objeto refaria a projeção inteira a cada ajuste de uma linha.
+   */
+  const [qtdSalvaEdit, setQtdSalvaEdit] = useState<Record<string, number>>({});
+  /**
    * Projetar produto × cor linha a linha. LIGADO por padrão: o agregado diz quanto comprar,
    * mas quem compra precisa saber de QUAL cor — e ninguém lembrava de marcar a caixa.
    * Importar uma compra salva também liga isto sozinho.
@@ -698,10 +704,18 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
           const cor = String(raw.corProduto ?? "").trim();
           const qtd = Math.max(0, Math.round(Number(raw.qtdManual ?? 0) || 0));
           const chaveItem = `${produto}||${cor}`;
+          // A linha de origem na compra salva. É ela que a edição da Qtd salva grava —
+          // por isso a origem vem SEMPRE, não só quando há várias compras importadas.
+          const origem = {
+            compraId: compra.id,
+            titulo,
+            itemKey: String(raw.itemKey ?? "") || chaveItem,
+            qtd,
+          };
           const existente = porItemChave.get(chaveItem);
           if (existente) {
             existente.qtdManual += qtd;
-            existente.origens = [...(existente.origens ?? []), { titulo, qtd }];
+            existente.origens = [...(existente.origens ?? []), origem];
             return;
           }
           porItemChave.set(chaveItem, {
@@ -711,7 +725,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
             descricao: String(raw.descricao ?? "").trim(),
             qtdManual: qtd,
             custoUnitario: Number(raw.custoUnitario ?? 0) || undefined,
-            origens: respostas.length > 1 ? [{ titulo, qtd }] : undefined,
+            origens: [origem],
           });
         });
       });
@@ -755,6 +769,76 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
       setCompraImportada(null);
     } finally {
       setCarregandoCompra(false);
+    }
+  };
+
+  /**
+   * Grava na compra salva a quantidade ajustada na coluna "Na compra salva".
+   *
+   * O ajuste fino da compra é feito olhando o "Precisa comprar" ao lado — então ele tem de
+   * valer na compra de verdade, não só nesta tela. Atualiza também `compraImportada` (é
+   * dela que sai o próximo "Gerar projeção") e o total do select, que ficaria mentindo.
+   *
+   * Devolve `false` quando a gravação falhou, para a célula voltar ao número gravado.
+   */
+  const editarQtdSalva = async ({
+    chave,
+    compraId,
+    itemKey,
+    qtd,
+  }: {
+    chave: string;
+    compraId: string;
+    itemKey: string;
+    qtd: number;
+  }): Promise<boolean> => {
+    try {
+      const res = await fetch(
+        `/api/controle-estoque/compras-salvas/${compraId}?company=${companyKey}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ itemKey, qtdManual: qtd }),
+        }
+      );
+      const json = (await res.json()) as {
+        data?: { items?: Array<{ qtdManual?: number }> };
+        error?: string;
+      };
+      if (!res.ok) throw new Error(json?.error || "Erro ao gravar a quantidade");
+
+      setQtdSalvaEdit((prev) => ({ ...prev, [chave]: qtd }));
+      setCompraImportada((prev) =>
+        prev
+          ? {
+              ...prev,
+              items: prev.items.map((it) =>
+                `${it.produto}||${it.cor}` === chave
+                  ? {
+                      ...it,
+                      qtdManual: qtd,
+                      origens: (it.origens ?? []).map((o) =>
+                        o.compraId === compraId && o.itemKey === itemKey ? { ...o, qtd } : o
+                      ),
+                    }
+                  : it
+              ),
+            }
+          : prev
+      );
+      // O select mostra o total de peças de cada compra: sem isto ele fica no número antigo.
+      const total = (json.data?.items ?? []).reduce(
+        (soma, it) => soma + Math.max(0, Math.round(Number(it.qtdManual ?? 0) || 0)),
+        0
+      );
+      setComprasSalvas((prev) =>
+        prev.map((c) => (c.id === compraId ? { ...c, totalQtdManual: total } : c))
+      );
+      setErroCompra(null);
+      return true;
+    } catch (e) {
+      setErroCompra(e instanceof Error ? e.message : "Erro ao gravar a quantidade");
+      return false;
     }
   };
 
@@ -1134,10 +1218,12 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
     };
   }, [companyKey, pedido]);
 
-  // Gerar de novo zera os ajustes manuais (a base de cálculo mudou).
+  // Gerar de novo zera os ajustes manuais (a base de cálculo mudou). O mapa da Qtd salva
+  // também: o `pedido` novo já carrega as quantidades gravadas.
   useEffect(() => {
     setEstoqueOverride(null);
     setQtdOverride({});
+    setQtdSalvaEdit({});
   }, [pedido]);
 
   // ── Produtos do escopo APLICADO: descrição, código e nº de cores. Sai das linhas que o
@@ -2636,6 +2722,8 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
               carregando={projLoading}
               omitido={detalheItem.omitido}
               maxItens={detalheItem.max}
+              qtdSalvaOverride={qtdSalvaEdit}
+              onEditarQtdSalva={editarQtdSalva}
             />
           )}
         </>

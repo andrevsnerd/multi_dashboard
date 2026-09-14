@@ -88,16 +88,34 @@ export interface ItemCompra {
   qtdManual: number;
   custoUnitario?: number;
   /**
-   * Quando MAIS DE UMA compra foi importada, de onde veio cada pedaço da quantidade. Sem
-   * isso a soma de duas listas viraria um número sem procedência.
+   * De onde veio cada pedaço da quantidade: a compra salva e a LINHA dela (`itemKey`).
+   * Vem SEMPRE, mesmo com uma compra só — é por esta origem que a edição da coluna "Na
+   * compra salva" sabe onde gravar. O tooltip só lista as origens quando são várias, que
+   * é quando a soma de duas listas precisaria de procedência.
    */
-  origens?: Array<{ titulo: string; qtd: number }>;
+  origens?: Array<{ compraId: string; titulo: string; itemKey: string; qtd: number }>;
 }
 
 interface Props {
   itens: ItemProjecao[];
   /** Quando veio de uma compra salva, é ela que manda nas linhas. */
   compra?: { title: string; items: ItemCompra[] } | null;
+  /**
+   * Qtd salva já ajustada nesta tela (chave `produto||cor` → quantidade). Fica FORA do
+   * objeto `compra` de propósito: a projeção só é refeita quando o recorte muda, e trocar
+   * a compra dispararia a consulta inteira de novo a cada ajuste de quantidade.
+   */
+  qtdSalvaOverride?: Record<string, number>;
+  /**
+   * Grava a nova quantidade na compra salva de origem. Sem este callback a coluna "Na
+   * compra salva" continua só de leitura. Devolve `true` quando gravou.
+   */
+  onEditarQtdSalva?: (alvo: {
+    chave: string;
+    compraId: string;
+    itemKey: string;
+    qtd: number;
+  }) => Promise<boolean>;
   dataBase: string;
   /** Data alvo ('yyyy-MM-dd') — aparece no cabeçalho da coluna "Vai vender". */
   venderAte: string;
@@ -198,12 +216,20 @@ interface LinhaItem {
   /** Quantos meses fechados entraram no índice. */
   mesesFechados: number;
   /** De qual compra veio cada pedaço da Qtd salva (só com várias compras importadas). */
-  origens?: Array<{ titulo: string; qtd: number }>;
+  origens?: Array<{ compraId: string; titulo: string; itemKey: string; qtd: number }>;
+  /**
+   * A linha da compra salva que esta linha edita. Só existe quando a quantidade vem de UMA
+   * compra: somando duas listas não há onde gravar um número só, então a célula fica de
+   * leitura em vez de escolher uma das duas por conta própria.
+   */
+  fonte: { compraId: string; itemKey: string } | null;
 }
 
 export default function ProjecaoItensMensais({
   itens,
   compra,
+  qtdSalvaOverride,
+  onEditarQtdSalva,
   dataBase,
   venderAte,
   diasHorizonte,
@@ -235,7 +261,7 @@ export default function ProjecaoItensMensais({
       rotulo: string,
       detalhe: string,
       qtdSalva: number | null,
-      origens?: Array<{ titulo: string; qtd: number }>
+      origens?: Array<{ compraId: string; titulo: string; itemKey: string; qtd: number }>
     ): LinhaItem => {
       const item = porChave.get(key) ?? porChaveFrouxa.get(chaveFrouxa(produto, cor));
       const serie = item?.mensal ?? [];
@@ -365,22 +391,30 @@ export default function ProjecaoItensMensais({
         curvaSazonal: ehSazonal ? curvaItem : null,
         mesesFechados: perfil.ultimoMesReal,
         origens,
+        fonte:
+          origens && origens.length === 1
+            ? { compraId: origens[0].compraId, itemKey: origens[0].itemKey }
+            : null,
       };
     };
 
     if (compra) {
       // A compra manda: cada item dela vira uma linha, tenha vendido ou não.
-      return compra.items.map((c) =>
-        montar(
-          chave(c.produto, c.cor),
+      return compra.items.map((c) => {
+        const key = chave(c.produto, c.cor);
+        // O que já foi ajustado na tela vale mais que o número importado — ele já está
+        // gravado na compra salva, é só o objeto `compra` desta sessão que não foi trocado.
+        const editada = qtdSalvaOverride?.[key];
+        return montar(
+          key,
           c.produto,
           c.cor,
           c.descricao || c.produto,
           [c.produto, c.corDescricao || c.cor].filter(Boolean).join(" · "),
-          Math.max(0, Math.round(c.qtdManual ?? 0)),
+          Math.max(0, Math.round(editada ?? c.qtdManual ?? 0)),
           c.origens
-        )
-      );
+        );
+      });
     }
 
     return itens.map((i) =>
@@ -402,7 +436,18 @@ export default function ProjecaoItensMensais({
         null
       )
     );
-  }, [itens, compra, modoCurva, ehSazonal, curvasSazonais, regra, dataBase, diasHorizonte, anoBase]);
+  }, [
+    itens,
+    compra,
+    qtdSalvaOverride,
+    modoCurva,
+    ehSazonal,
+    curvasSazonais,
+    regra,
+    dataBase,
+    diasHorizonte,
+    anoBase,
+  ]);
 
   const totais = useMemo(() => {
     const comFalta = linhas.filter((l) => (l.diferenca ?? 0) < 0);
@@ -489,6 +534,12 @@ export default function ProjecaoItensMensais({
             lista
           </span>
         ) : null}
+        {compra && onEditarQtdSalva ? (
+          <span className={styles.notaItem}>
+            <strong>Na compra salva:</strong> edite a quantidade na célula — grava direto na
+            compra
+          </span>
+        ) : null}
         {totais.semSerie > 0 ? (
           <span className={styles.notaItem}>
             <strong>{fmt(totais.semSerie)}</strong>{" "}
@@ -547,9 +598,16 @@ export default function ProjecaoItensMensais({
                 <span className={styles.thSub}>comprar</span>
               </th>
               {compra ? (
-                <th className={styles.colDecisao} title="Quantidade que está na compra salva">
+                <th
+                  className={styles.colDecisao}
+                  title={
+                    onEditarQtdSalva
+                      ? "Quantidade que está na compra salva — editável: o que você digitar é gravado na compra"
+                      : "Quantidade que está na compra salva"
+                  }
+                >
                   Na compra
-                  <span className={styles.thSub}>salva</span>
+                  <span className={styles.thSub}>{onEditarQtdSalva ? "salva · editável" : "salva"}</span>
                 </th>
               ) : null}
               {compra ? (
@@ -628,7 +686,27 @@ export default function ProjecaoItensMensais({
                     {fmt(l.sugestao)}
                   </td>
                   {compra ? (
-                    <td className={`${styles.num} ${styles.colDecisao}`}>{fmt(l.qtdSalva ?? 0)}</td>
+                    <td className={`${styles.num} ${styles.colDecisao}`}>
+                      {onEditarQtdSalva && l.fonte ? (
+                        <CelulaQtdSalva
+                          key={`${l.key}:${l.qtdSalva ?? 0}`}
+                          chave={l.key}
+                          fonte={l.fonte}
+                          valor={l.qtdSalva ?? 0}
+                          onEditar={onEditarQtdSalva}
+                        />
+                      ) : (
+                        <span
+                          title={
+                            l.origens && l.origens.length > 1
+                              ? "Este item está em mais de uma compra salva — para editar, importe uma compra de cada vez"
+                              : undefined
+                          }
+                        >
+                          {fmt(l.qtdSalva ?? 0)}
+                        </span>
+                      )}
+                    </td>
                   ) : null}
                   {compra ? (
                     <td className={`${styles.num} ${styles.colDecisao}`}>
@@ -703,6 +781,89 @@ export default function ProjecaoItensMensais({
         />
       )}
     </div>
+  );
+}
+
+/**
+ * A Qtd salva, editável na própria célula — e gravada na compra salva de origem.
+ *
+ * O ajuste fino da compra acontece AQUI, com o "Precisa comprar" na coluna ao lado: obrigar
+ * o usuário a decidir na projeção e depois repetir o número na tela da compra seria o mesmo
+ * trabalho duas vezes, com a chance de sair diferente.
+ *
+ * Grava ao sair do campo ou no Enter, e só quando o número mudou de verdade. Se a gravação
+ * falhar o campo volta ao valor que está gravado: melhor mostrar o que a compra tem do que
+ * deixar na tela um número que ninguém mais guardou.
+ */
+function CelulaQtdSalva({
+  chave: chaveItem,
+  fonte,
+  valor,
+  onEditar,
+}: {
+  chave: string;
+  fonte: { compraId: string; itemKey: string };
+  valor: number;
+  onEditar: (alvo: {
+    chave: string;
+    compraId: string;
+    itemKey: string;
+    qtd: number;
+  }) => Promise<boolean>;
+}) {
+  // O campo nasce com o valor gravado. Quando ele muda por fora (a própria gravação, uma
+  // nova importação), o `key` de quem renderiza esta célula troca e o campo nasce de novo —
+  // sincronizar por efeito atropelaria o que está sendo digitado.
+  const [texto, setTexto] = useState(String(valor));
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState(false);
+
+  const comitar = async () => {
+    const limpo = texto.trim().replace(/\./g, "").replace(",", ".");
+    const qtd = Math.max(0, Math.round(Number(limpo) || 0));
+    if (qtd === valor) {
+      setTexto(String(valor));
+      return;
+    }
+    setSalvando(true);
+    setErro(false);
+    const ok = await onEditar({ chave: chaveItem, compraId: fonte.compraId, itemKey: fonte.itemKey, qtd });
+    setSalvando(false);
+    if (!ok) {
+      setErro(true);
+      setTexto(String(valor));
+    }
+  };
+
+  return (
+    <input
+      type="number"
+      min={0}
+      step={1}
+      inputMode="numeric"
+      className={`${styles.qtdSalvaInput} ${erro ? styles.qtdSalvaErro : ""}`}
+      value={texto}
+      disabled={salvando}
+      title="Quantidade na compra salva — edite aqui e a compra é atualizada"
+      onFocus={(e) => {
+        setErro(false);
+        e.currentTarget.select();
+      }}
+      onChange={(e) => setTexto(e.target.value)}
+      onBlur={() => {
+        void comitar();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.currentTarget.blur();
+          return;
+        }
+        if (e.key === "Escape") {
+          setTexto(String(valor));
+          e.currentTarget.blur();
+        }
+      }}
+    />
   );
 }
 
