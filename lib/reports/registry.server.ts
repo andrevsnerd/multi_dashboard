@@ -13,7 +13,7 @@ import { fetchMenorCodigoBarra } from "@/lib/repositories/products";
 import { listFornecedoresByCompany } from "@/lib/utils/fornecedores-store";
 import { productMatchesFornecedor } from "@/lib/utils/fornecedor-matcher";
 import { runEnricher } from "./enrich.server";
-import { canonicalKey, ROW_COR_FIELD } from "./keys";
+import { canonicalKey, decodeRowMembros, ROW_COR_FIELD, ROW_MEMBROS_FIELD } from "./keys";
 import { NATIVE_SOURCE, type SourceId } from "./column-sources";
 import type { ReportColumnDef, ReportFilters, ReportResult } from "./types";
 import { VENDAS_FATURAMENTO_ID } from "./vendas-faturamento";
@@ -87,13 +87,25 @@ export async function runReport(
   // só as linhas filtradas sejam enriquecidas. Ver lib/utils/fornecedor-matcher.ts.
   if (filters.fornecedor && filters.company) {
     const fornecedores = await listFornecedoresByCompany(filters.company);
-    result.rows = result.rows.filter((row) =>
-      productMatchesFornecedor(fornecedores, filters.fornecedor as string, {
+    result.rows = result.rows.filter((row) => {
+      // Linha de PRODUTO AGRUPADO: o `PRODUTO` é o rótulo do grupo e não casa com nada.
+      // Vale o grupo inteiro quando QUALQUER membro real pertence ao fornecedor.
+      const membros = decodeRowMembros(row[ROW_MEMBROS_FIELD]);
+      if (membros.length > 0) {
+        return membros.some((membro) =>
+          productMatchesFornecedor(fornecedores, filters.fornecedor as string, {
+            produto: membro.produto,
+            cor: membro.cor ?? "",
+            descricao: String(row.DESCRICAO ?? ""),
+          })
+        );
+      }
+      return productMatchesFornecedor(fornecedores, filters.fornecedor as string, {
         produto: String(row.PRODUTO ?? ""),
         cor: String(row[ROW_COR_FIELD] ?? row.COR ?? ""),
         descricao: String(row.DESCRICAO ?? ""),
-      })
-    );
+      });
+    });
     result.total = result.rows.length;
   }
 
@@ -150,7 +162,14 @@ const CODIGO_BARRA_COL: ReportColumnDef = {
 async function appendCodigoBarra(result: ReportResult): Promise<void> {
   if (result.rows.length === 0) return;
 
-  const produtos = result.rows.map((r) => String(r.PRODUTO ?? "").trim()).filter(Boolean);
+  // Linha de PRODUTO AGRUPADO consulta os códigos dos MEMBROS (o rótulo do grupo não existe
+  // no cadastro); as demais, o próprio PRODUTO.
+  const produtos = result.rows.flatMap((r) => {
+    const membros = decodeRowMembros(r[ROW_MEMBROS_FIELD]);
+    if (membros.length > 0) return membros.map((m) => m.produto);
+    const produto = String(r.PRODUTO ?? "").trim();
+    return produto ? [produto] : [];
+  });
   const codigos = await fetchMenorCodigoBarra(produtos).catch(() => []);
 
   // Mapa por chave canônica (produto×cor) — tolerante a zero à esquerda na cor, igual aos
@@ -165,6 +184,19 @@ async function appendCodigoBarra(result: ReportResult): Promise<void> {
   }
 
   for (const row of result.rows) {
+    // Grupo: o código do primeiro membro que tiver um (a cor do grupo é uma chave
+    // canônica de descrição, então o match útil aqui é o do membro).
+    const membros = decodeRowMembros(row[ROW_MEMBROS_FIELD]);
+    if (membros.length > 0) {
+      let codigo = "";
+      for (const membro of membros) {
+        codigo =
+          byKey.get(canonicalKey(membro.produto, membro.cor)) ?? byProduto.get(membro.produto) ?? "";
+        if (codigo) break;
+      }
+      row.CODIGO_BARRA = codigo;
+      continue;
+    }
     const produto = String(row.PRODUTO ?? "").trim();
     const k = canonicalKey(row.PRODUTO, row[ROW_COR_FIELD]);
     row.CODIGO_BARRA = byKey.get(k) ?? byProduto.get(produto) ?? "";

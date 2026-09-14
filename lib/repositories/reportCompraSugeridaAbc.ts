@@ -111,6 +111,13 @@ function normalizeSet(values: string[] | null | undefined): Set<string> | null {
   return list.length > 0 ? new Set(list) : null;
 }
 
+/** Junta valores distintos num rótulo só ("101 / 102") — usado no "Código" da linha de grupo. */
+function joinDistinct(values: Array<string | null | undefined>): string {
+  return Array.from(
+    new Set(values.map((value) => String(value ?? "").trim()).filter(Boolean))
+  ).join(" / ");
+}
+
 function round2(value: number | null | undefined): number {
   if (value == null || !Number.isFinite(value)) return 0;
   return Math.round(value * 100) / 100;
@@ -175,6 +182,14 @@ function mergeTransferLensEntries(entries: TransferLensEntry[]): TransferLensEnt
  *
  * Grupo de fornecedor (NERD, `filters.fornecedor`): aplicado aos DOIS lados (universo principal
  * e itens de ruptura) com o matcher compartilhado, antes do cálculo — ver `matchesFornecedor`.
+ *
+ * Produto agrupado (`filters.agruparProdutos`, LIGADO por padrão): os códigos cadastrados como
+ * um item só viram UMA linha, com o nome do grupo, e a necessidade sai do grupo — venda,
+ * estoque e janela de ritmo dos membros somados (`mergeControleEstoqueMetricasEntries`), igual
+ * à Curva ABC. Sem isso cada membro pede reposição ignorando o estoque dos irmãos e a lista
+ * infla. A linha de grupo carrega os membros reais em `ROW_MEMBROS_FIELD` — é por eles que o
+ * `runReport` faz o filtro de fornecedor e a coluna "Código de barra". Ela NÃO abate trânsito
+ * (unir o trânsito dos membros já zerou grupos inteiros em ago/2026).
  */
 export async function fetchCompraSugeridaAbc(
   filters: ReportFilters,
@@ -527,7 +542,9 @@ export async function fetchCompraSugeridaAbc(
   // capturou. Nunca duplica: item já presente na lista principal (mesma chave produto×cor)
   // é ignorado — as colunas dele não são tocadas.
   if (filters.incluirRupturas && filters.start && filters.end && orderedNames.length > 0) {
-    const baseKeys = new Set(rows.map((r) => canonicalKey(r.PRODUTO, r[ROW_COR_FIELD])));
+    // Cobertura medida pelos MEMBROS reais (ver `baseMemberKeys`): ruptura de um membro cuja
+    // linha de grupo já saiu é absorvida (o grupo decidiu), nunca vira linha duplicada.
+    const grupoLookup = buildProdutoAgrupadoLookup(grupos);
     const rupturaRange = normalizeRangeForQuery({ start: filters.start, end: filters.end });
 
     let rupturasFeitas = 0;
@@ -554,7 +571,7 @@ export async function fetchCompraSugeridaAbc(
     });
 
     interface ExtraAcc {
-      produto: string;
+      agrupado: boolean;
       cor: string;
       corDescricao: string;
       descricao: string;
@@ -564,7 +581,9 @@ export async function fetchCompraSugeridaAbc(
       tipo: string;
       grade: string;
       custoUnitario: number;
-      estoqueRede: number;
+      /** Estoque de rede por MEMBRO (o mesmo membro repete por loja → fica o maior). */
+      estoqueRedePorMembro: Map<string, number>;
+      membros: Map<string, { produto: string; cor: string | null }>;
       qtyByLabel: Map<string, number>;
       total: number;
     }
@@ -578,26 +597,40 @@ export async function fetchCompraSugeridaAbc(
         if (!matchesFornecedor({ produto: item.produto, cor: item.cor, descricao: item.descricao })) {
           continue;
         }
-        const key = canonicalKey(item.produto, item.cor);
-        if (baseKeys.has(key)) continue; // já está na lista principal — nunca duplica
+        const membroKey = canonicalKey(item.produto, item.cor);
+        if (baseMemberKeys.has(membroKey)) continue; // já coberto pela lista principal
+
+        // Membro de grupo cujo grupo NÃO tem linha: os membros em ruptura se juntam numa
+        // linha só, com o nome do grupo. Somar as necessidades aqui não infla como no
+        // universo principal — ruptura é item ZERADO, não há estoque de irmão para abater.
+        const grupo = grupoLookup.get(buildProdutoAgrupadoProductKey(item.produto));
+        const corGrupo = grupo
+          ? resolveProdutoAgrupadoCor(item.produto, item.cor, item.corDescricao, corDescricoes)
+          : null;
+        const key = grupo && corGrupo ? `${grupo.id}||${corGrupo.key}` : membroKey;
 
         const acc = extraByKey.get(key) ?? {
-          produto: item.produto,
-          cor: item.cor,
-          corDescricao: item.corDescricao,
-          descricao: item.descricao,
+          agrupado: Boolean(grupo),
+          cor: grupo && corGrupo ? corGrupo.key : item.cor,
+          corDescricao: grupo && corGrupo ? corGrupo.label : item.corDescricao,
+          descricao: grupo ? grupo.nome : item.descricao,
           grupo: item.grupo ?? "",
           subgrupo: item.subgrupo ?? "",
           linha: item.linha ?? "",
           tipo: item.tipo ?? "",
           grade: item.grade ?? "",
           custoUnitario: item.custoUnitario,
-          estoqueRede: item.estoqueRede,
+          estoqueRedePorMembro: new Map<string, number>(),
+          membros: new Map<string, { produto: string; cor: string | null }>(),
           qtyByLabel: new Map<string, number>(),
           total: 0,
         };
         acc.custoUnitario = Math.max(acc.custoUnitario, item.custoUnitario);
-        acc.estoqueRede = Math.max(acc.estoqueRede, item.estoqueRede);
+        acc.estoqueRedePorMembro.set(
+          membroKey,
+          Math.max(acc.estoqueRedePorMembro.get(membroKey) ?? 0, item.estoqueRede)
+        );
+        acc.membros.set(membroKey, { produto: item.produto, cor: item.cor || null });
         acc.qtyByLabel.set(label, (acc.qtyByLabel.get(label) ?? 0) + item.compraIdealQtd);
         acc.total += item.compraIdealQtd;
         extraByKey.set(key, acc);
@@ -605,11 +638,16 @@ export async function fetchCompraSugeridaAbc(
     });
 
     for (const acc of extraByKey.values()) {
+      const membros = Array.from(acc.membros.values());
+      const estoqueRede = Array.from(acc.estoqueRedePorMembro.values()).reduce(
+        (s, v) => s + Math.max(0, v),
+        0
+      );
       const row: ReportRow = {
         [ROW_COR_FIELD]: acc.cor ?? "",
         [ROW_RUPTURA_FIELD]: 1,
         CURVA: "RUPTURA",
-        PRODUTO: acc.produto,
+        PRODUTO: joinDistinct(membros.map((m) => m.produto)),
         COR: acc.cor ?? "",
         COR_DESCRICAO: acc.corDescricao ?? "",
         DESCRICAO: acc.descricao ?? "",
@@ -619,10 +657,13 @@ export async function fetchCompraSugeridaAbc(
         TIPO: acc.tipo,
         GRADE: acc.grade,
         CUSTO_UNITARIO: round2(acc.custoUnitario),
-        ESTOQUE_REDE: roundInt(acc.estoqueRede),
+        ESTOQUE_REDE: roundInt(estoqueRede),
         COMPRA_TOTAL: roundInt(acc.total),
         CUSTO_TOTAL: round2(acc.custoUnitario * acc.total),
       };
+      if (acc.agrupado) {
+        row[ROW_MEMBROS_FIELD] = encodeRowMembros(membros);
+      }
       for (const dyn of dynamicColumns) {
         const label = dyn.key.slice(COMPRA_FILIAL_COL_PREFIX.length);
         row[dyn.key] = roundInt(acc.qtyByLabel.get(label) ?? 0);

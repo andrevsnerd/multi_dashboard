@@ -3,7 +3,12 @@ import sql from "mssql";
 import { getFiliaisByCompany, type FilialDef } from "@/lib/config/filial-registry";
 import type { CompanyKey } from "@/lib/config/company";
 import { withRequest } from "@/lib/db/connection";
-import { ROW_COLECAO_COD_FIELD, ROW_COLECAO_DESC_FIELD } from "@/lib/reports/keys";
+import {
+  decodeRowMembros,
+  ROW_COLECAO_COD_FIELD,
+  ROW_COLECAO_DESC_FIELD,
+  ROW_MEMBROS_FIELD,
+} from "@/lib/reports/keys";
 import type { ReportRow } from "@/lib/reports/types";
 import { nameForId } from "@/lib/server/filial-resolver";
 
@@ -134,15 +139,27 @@ export async function applyColecaoLabels(
 ): Promise<void> {
   if (company !== "scarfme" || rows.length === 0) return;
 
-  const produtos = rows.map((r) => String(r.PRODUTO ?? "").trim()).filter(Boolean);
+  // Linha de PRODUTO AGRUPADO: o `PRODUTO` é o rótulo do grupo e não existe no cadastro —
+  // a coleção vem do primeiro membro real que tiver uma.
+  const produtosDaLinha = (r: ReportRow): string[] => {
+    const membros = decodeRowMembros(r[ROW_MEMBROS_FIELD]);
+    if (membros.length > 0) return membros.map((m) => m.produto);
+    const produto = String(r.PRODUTO ?? "").trim();
+    return produto ? [produto] : [];
+  };
+
+  const produtos = rows.flatMap(produtosDaLinha);
   const [descByCode, codeByProduto] = await Promise.all([
     getColecaoDescMap(),
     fetchColecaoCodeByProduto(produtos),
   ]);
 
   for (const r of rows) {
-    const produto = String(r.PRODUTO ?? "").trim();
-    const code = codeByProduto.get(produto) ?? "";
+    let code = "";
+    for (const produto of produtosDaLinha(r)) {
+      code = codeByProduto.get(produto) ?? "";
+      if (code) break;
+    }
     const desc = code ? descByCode.get(code) ?? "" : "";
     // Tela: "DESC (COD)" numa coluna só (cai no próprio código se faltar descrição).
     r.COLECAO = code ? (desc ? `${desc} (${code})` : code) : "";

@@ -199,6 +199,10 @@ export default function GeradorRelatoriosPage({
   // Lente de transferência da Compra sugerida por Curva ABC (opt-in, sempre inicia desligada):
   // adiciona as colunas "Transferência" e "Compra líquida" ao preset.
   const [considerarTransferencias, setConsiderarTransferencias] = useState(false);
+  // Produtos agrupados da Compra sugerida por Curva ABC: LIGADO por padrão. Com os membros
+  // soltos, cada código do grupo pede reposição ignorando o estoque dos irmãos e a lista
+  // infla — igual à Curva ABC, o grupo vira uma linha só com o nome cadastrado.
+  const [agruparProdutos, setAgruparProdutos] = useState(true);
   // Preset "Faturamento em abas": dimensão que quebra o XLSX em abas ("" = automático,
   // escolhe o filtro com mais valores marcados).
   const [abaDimensao, setAbaDimensao] = useState<"" | AbaDimensaoId>("");
@@ -883,7 +887,7 @@ export default function GeradorRelatoriosPage({
           (c) => c.enabled && COMPRA_TRANSFER_LENS_COLUMNS.includes(c.key as (typeof COMPRA_TRANSFER_LENS_COLUMNS)[number])
         );
         await generateViaStream(
-          `/api/relatorios/compra-sugerida-abc/stream?reportType=${encodeURIComponent(reportTypeId)}&${qs}${transferOn ? "&considerarTransferencias=1" : ""}${wantsRupturas ? "&incluirRupturas=1" : ""}`
+          `/api/relatorios/compra-sugerida-abc/stream?reportType=${encodeURIComponent(reportTypeId)}&${qs}${transferOn ? "&considerarTransferencias=1" : ""}${wantsRupturas ? "&incluirRupturas=1" : ""}${agruparProdutos ? "" : "&agruparProdutos=0"}`
         );
         return;
       }
@@ -923,6 +927,7 @@ export default function GeradorRelatoriosPage({
     wantsFilialStock,
     wantsFilialSales,
     wantsRupturas,
+    agruparProdutos,
     reportTypeId,
     workingColumns,
     catalog,
@@ -1711,6 +1716,27 @@ export default function GeradorRelatoriosPage({
                 daquela aba) + uma aba &quot;Resumo&quot; comparando todas. Sem valores
                 marcados no filtro, gera uma aba por valor encontrado (máx. 40, o resto vai
                 para &quot;Outros&quot;).
+              </p>
+            </div>
+          )}
+          {reportTypeId === COMPRA_SUGERIDA_ABC_ID && (
+            <div className={styles.searchField}>
+              <label className={styles.fieldLabel}>Produtos agrupados</label>
+              <div className={styles.saldoRow}>
+                <label className={styles.checkLabel}>
+                  <input
+                    type="checkbox"
+                    checked={agruparProdutos}
+                    onChange={(e) => setAgruparProdutos(e.target.checked)}
+                  />
+                  Reconhecer produtos agrupados (uma linha por grupo)
+                </label>
+              </div>
+              <p className={styles.hint}>
+                Usa o cadastro de <strong>Produto agrupado</strong>: os códigos do grupo viram
+                uma linha só, com o nome do grupo, e a necessidade é calculada somando venda e
+                estoque dos membros — igual à Curva ABC. Desligado, cada código pede reposição
+                por conta própria, ignorando o estoque dos irmãos.
               </p>
             </div>
           )}

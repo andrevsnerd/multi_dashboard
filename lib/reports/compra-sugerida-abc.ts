@@ -123,7 +123,7 @@ export const compraSugeridaAbcMeta: ReportTypeMeta = {
   label: "Compra sugerida por Curva ABC",
   fileSlug: "compra-sugerida",
   description:
-    "Lista de compras consolidada da rede: para cada item da Curva ABC, traz a compra sugerida de CADA loja (só o que precisa comprar agora ou comprar essa semana). Uma coluna por loja; a Compra total e o Custo total são fórmulas dinâmicas no Excel — altere as quantidades das lojas e os totais se recalculam.",
+    "Lista de compras consolidada da rede: para cada item da Curva ABC, traz a compra sugerida de CADA loja (só o que precisa comprar agora ou comprar essa semana). Uma coluna por loja; a Compra total e o Custo total são fórmulas dinâmicas no Excel — altere as quantidades das lojas e os totais se recalculam. Produtos agrupados saem em uma linha só, com o nome do grupo (dá para desligar).",
   // Sem filtro de filial: o relatório é sempre da rede inteira (uma coluna por loja).
   supportedFilters: ["periodo", "nome", "linha", "subgrupo", "grupo", "grade", "colecao", "tipo"],
   columns: COMPRA_SUGERIDA_ABC_COLUMNS,
