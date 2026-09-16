@@ -334,6 +334,8 @@ export interface FilialProdutoSalesRow {
   /** Código de cor (COR_PRODUTO) quando agrupado por cor */
   cor?: string;
   corDescricao?: string;
+  /** Nome CRU da filial no ERP — só vem com `groupByFilial`. */
+  filial?: string;
   codigoBarra?: string;
   vendas: number;
   qtde: number;
@@ -355,9 +357,14 @@ export interface FilialProdutoVendedorSalesRow {
   vendasPrevious: number;
 }
 
-function filialProdutoMergeKey(r: FilialProdutoSalesRow, groupByCor: boolean): string {
+function filialProdutoMergeKey(
+  r: FilialProdutoSalesRow,
+  groupByCor: boolean,
+  groupByFilial = false
+): string {
   const cor = groupByCor ? (r.cor ?? '').trim() : '';
-  return `${r.produto}||${r.categoria}||${r.grade}||${cor}`;
+  const filial = groupByFilial ? (r.filial ?? '').trim() : '';
+  return `${r.produto}||${r.categoria}||${r.grade}||${cor}||${filial}`;
 }
 
 export async function fetchFilialProdutoSales(
@@ -368,6 +375,13 @@ export async function fetchFilialProdutoSales(
   comparisonMode: 'month' | 'year' = 'month',
   options?: {
     groupByCor?: boolean;
+    /**
+     * Quebra o resultado também por FILIAL (nome cru do ERP), sem mudar nada da conta: a
+     * mesma CTE validada, só com uma coluna a mais no GROUP BY. É o que dá o "onde vendeu"
+     * do tooltip da Projeção Compra. Multiplica o número de linhas pelo número de lojas,
+     * então só se liga quando o detalhe vai mesmo ser usado.
+     */
+    groupByFilial?: boolean;
     limit?: number;
     linhas?: string[] | null;
     /** Restringe a consulta a uma lista de produtos (scoping da mesma query validada, não nova lógica). */
@@ -401,6 +415,7 @@ export async function fetchFilialProdutoSales(
   },
 ): Promise<FilialProdutoSalesRow[]> {
   const groupByCor = options?.groupByCor === true;
+  const groupByFilial = options?.groupByFilial === true;
   const includePrevious = options?.includePrevious !== false;
   const produtoIdList = (options?.produtoIds ?? [])
     .map((p) => (p ?? '').trim())
@@ -490,6 +505,7 @@ export async function fetchFilialProdutoSales(
     CODIGO_BARRA?: string;
     COR_PRODUTO?: string;
     COR_DESCRICAO?: string;
+    FILIAL?: string;
     CUSTO_UNIT: number;
     QTDE: number;
     VENDAS: number;
@@ -516,6 +532,7 @@ export async function fetchFilialProdutoSales(
       base.cor = r.COR_PRODUTO?.trim() ?? '';
       base.corDescricao = r.COR_DESCRICAO?.trim() ?? '';
     }
+    if (groupByFilial) base.filial = r.FILIAL?.trim() ?? '';
     return base;
   };
 
@@ -539,6 +556,9 @@ export async function fetchFilialProdutoSales(
              AND (RTRIM(LTRIM(CAST(cor_ref.COR_PRODUTO AS VARCHAR(20)))) = RTRIM(LTRIM(CAST(m.COR_PRODUTO AS VARCHAR(20)))) OR TRY_CONVERT(INT, cor_ref.COR_PRODUTO) = TRY_CONVERT(INT, m.COR_PRODUTO))`
         : '';
       const corGroupBy = groupByCor ? ', ISNULL(m.COR_PRODUTO, \'\')' : '';
+      // Mesma CTE validada; a filial só entra como mais uma coluna do GROUP BY.
+      const filialSelect = groupByFilial ? 'm.FILIAL AS FILIAL,' : '';
+      const filialGroupBy = groupByFilial ? ', m.FILIAL' : '';
 
       let linhaFinalClause = '';
       if (linhaList.length > 0) {
@@ -694,6 +714,7 @@ export async function fetchFilialProdutoSales(
           ${gradeExpr} AS GRADE,
           MAX(ISNULL(pbsel.CODIGO_BARRA, '')) AS CODIGO_BARRA,
           ${corSelect}
+          ${filialSelect}
           MAX(ISNULL(p.CUSTO_REPOSICAO1, 0)) AS CUSTO_UNIT,
           SUM(m.QTDE_LIQUIDA_CALC) AS QTDE,
           SUM(m.VALOR_LIQUIDO_CALC) AS VENDAS
@@ -712,7 +733,7 @@ export async function fetchFilialProdutoSales(
         WHERE m.FILIAL IS NOT NULL
           ${linhaFinalClause}
           ${dimFinalClauses}
-        GROUP BY ISNULL(m.PRODUTO, ''), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))), ${categoriaExpr}${gradeGroupBy}${corGroupBy}
+        GROUP BY ISNULL(m.PRODUTO, ''), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))), ${categoriaExpr}${gradeGroupBy}${corGroupBy}${filialGroupBy}
         ORDER BY VENDAS DESC
       `;
       const result = await request.query<RawRow>(query);
@@ -740,6 +761,8 @@ export async function fetchFilialProdutoSales(
              AND (RTRIM(LTRIM(CAST(cor_ref.COR_PRODUTO AS VARCHAR(20)))) = RTRIM(LTRIM(CAST(fp.COR_PRODUTO AS VARCHAR(20)))) OR TRY_CONVERT(INT, cor_ref.COR_PRODUTO) = TRY_CONVERT(INT, fp.COR_PRODUTO))`
         : '';
       const corGroupBy = groupByCor ? ', ISNULL(fp.COR_PRODUTO, \'\')' : '';
+      const filialSelect = groupByFilial ? 'f.FILIAL AS FILIAL,' : '';
+      const filialGroupBy = groupByFilial ? ', f.FILIAL' : '';
 
       let linhaEcomClause = '';
       if (linhaList.length > 0) {
@@ -778,6 +801,7 @@ export async function fetchFilialProdutoSales(
           ${gradeExpr} AS GRADE,
           MAX(ISNULL(pbsel.CODIGO_BARRA, '')) AS CODIGO_BARRA,
           ${corSelect}
+          ${filialSelect}
           ISNULL(p.CUSTO_REPOSICAO1, 0) AS CUSTO_UNIT,
           SUM(fp.QTDE) AS QTDE,
           SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS VENDAS
@@ -803,7 +827,7 @@ export async function fetchFilialProdutoSales(
           ${linhaEcomClause}
           ${produtoFpClause}
           ${dimEcomClauses}
-        GROUP BY ISNULL(fp.PRODUTO, ''), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))), ${categoriaExpr}${gradeGroupBy}, ISNULL(p.CUSTO_REPOSICAO1, 0)${corGroupBy}
+        GROUP BY ISNULL(fp.PRODUTO, ''), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))), ${categoriaExpr}${gradeGroupBy}, ISNULL(p.CUSTO_REPOSICAO1, 0)${corGroupBy}${filialGroupBy}
         ORDER BY VENDAS DESC
       `;
       const result = await request.query<RawRow>(query);
@@ -820,7 +844,7 @@ export async function fetchFilialProdutoSales(
 
   const merged = new Map<string, FilialProdutoSalesRow>();
   [...posCur, ...ecomCur].forEach(r => {
-    const key = filialProdutoMergeKey(r, groupByCor);
+    const key = filialProdutoMergeKey(r, groupByCor, groupByFilial);
     const existing = merged.get(key);
     if (existing) {
       existing.vendas += r.vendas;
@@ -833,12 +857,12 @@ export async function fetchFilialProdutoSales(
 
   const prevMap = new Map<string, number>();
   [...posPrev, ...ecomPrev].forEach(r => {
-    const key = filialProdutoMergeKey(r, groupByCor);
+    const key = filialProdutoMergeKey(r, groupByCor, groupByFilial);
     prevMap.set(key, (prevMap.get(key) ?? 0) + r.vendas);
   });
 
   merged.forEach(row => {
-    row.vendasPrevious = prevMap.get(filialProdutoMergeKey(row, groupByCor)) ?? 0;
+    row.vendasPrevious = prevMap.get(filialProdutoMergeKey(row, groupByCor, groupByFilial)) ?? 0;
   });
 
   return Array.from(merged.values()).sort((a, b) => b.vendas - a.vendas);

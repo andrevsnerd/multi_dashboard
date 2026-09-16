@@ -9176,6 +9176,7 @@ export async function fetchAvailableCores({
   filial,
   produtoIds,
   produtoSearchTerm,
+  dimensoes,
 }: {
   company?: string;
   filial?: string | null;
@@ -9183,6 +9184,13 @@ export async function fetchAvailableCores({
   produtoIds?: string[] | null;
   /** Restringe às cores dos produtos cujo nome casa com o termo (`DESC_PRODUTO LIKE`). */
   produtoSearchTerm?: string | null;
+  /**
+   * Restringe às cores dos produtos que casam com os filtros de CADASTRO já marcados na
+   * tela (grupo/linha/subgrupo/grade/coleção/tipo). É o cruzamento dos selects da Projeção
+   * Compra: escolher uma grade tem de enxugar a lista de cores também. `cores` fica de fora
+   * de propósito — uma dimensão nunca se filtra por ela mesma.
+   */
+  dimensoes?: Omit<DimensoesFiltro, 'cores'> | null;
 }): Promise<string[]> {
   if (!company) return [];
 
@@ -9190,7 +9198,25 @@ export async function fetchAvailableCores({
     new Set((produtoIds ?? []).map((v) => String(v ?? '').trim()).filter(Boolean))
   );
   const termo = (produtoSearchTerm ?? '').trim();
-  const temEscopoProduto = produtoIdList.length > 0 || termo.length >= 2;
+  const dimEntries = (
+    [
+      ['CorDimGrp', `UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, ''))))`, dimensoes?.grupos],
+      ['CorDimLin', `UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, ''))))`, dimensoes?.linhas],
+      ['CorDimSub', `UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, ''))))`, dimensoes?.subgrupos],
+      ['CorDimGra', `UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), ''))))`, dimensoes?.grades],
+      ['CorDimCol', `UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, ''))))`, dimensoes?.colecoes],
+      ['CorDimTip', `UPPER(LTRIM(RTRIM(ISNULL(p.TIPO_PRODUTO, ''))))`, dimensoes?.tipos],
+    ] as Array<[string, string, string[] | null | undefined]>
+  )
+    .map(([name, expr, values]) => ({
+      name,
+      expr,
+      values: Array.from(
+        new Set((values ?? []).map((v) => String(v ?? '').trim().toUpperCase()).filter(Boolean))
+      ),
+    }))
+    .filter((entry) => entry.values.length > 0);
+  const temEscopoProduto = produtoIdList.length > 0 || termo.length >= 2 || dimEntries.length > 0;
 
   // ── Cores DE UM RECORTE de produtos ───────────────────────────────────────────────
   // O mesmo código de cor é outra cor em outro produto, então listar o mapa global ao lado
@@ -9211,6 +9237,11 @@ export async function fetchAvailableCores({
         request.input('corBusca', sql.VarChar, `%${termo}%`);
         produtoFilter += ` AND p.DESC_PRODUTO LIKE @corBusca`;
       }
+      dimEntries.forEach(({ name, expr, values }) => {
+        values.forEach((v, i) => request.input(`${name}${i}`, sql.VarChar, v));
+        const ph = values.map((_, i) => `@${name}${i}`).join(', ');
+        produtoFilter += ` AND ${expr} IN (${ph})`;
+      });
 
       const result = await request.query<{ cor: string }>(`
         SELECT DISTINCT
@@ -9395,16 +9426,44 @@ export interface DimensoesDoEscopo {
   cores: string[];
 }
 
+/** As sete dimensões de cadastro que a tela filtra, como o chamador as manda. */
+export interface DimensoesFiltro {
+  grupos?: string[] | null;
+  linhas?: string[] | null;
+  subgrupos?: string[] | null;
+  grades?: string[] | null;
+  colecoes?: string[] | null;
+  tipos?: string[] | null;
+  /** Cor casa pela DESCRIÇÃO (DESC_COR_PRODUTO) — é o que o select mostra. */
+  cores?: string[] | null;
+}
+
+/** Dimensão do cadastro, na ordem em que a tela as apresenta. */
+type DimNome = 'grupo' | 'linha' | 'subgrupo' | 'grade' | 'colecao' | 'tipo';
+
+const DIM_NOMES: DimNome[] = ['grupo', 'linha', 'subgrupo', 'grade', 'colecao', 'tipo'];
+
+function limparValoresDim(values?: string[] | null): string[] {
+  return Array.from(
+    new Set((values ?? []).map((v) => String(v ?? '').trim().toUpperCase()).filter(Boolean))
+  );
+}
+
 /**
  * Dimensões de cadastro DOS PRODUTOS de um recorte — o que alimenta os selects quando o
- * usuário já escolheu item(ns) ou digitou um nome: mostrar o cadastro inteiro ao lado de uma
- * seleção só confunde ("subgrupo mostra todos por padrão, porém se selecionar um item, ele só
- * mostra os que estão nesses itens").
+ * usuário já escolheu item(ns), digitou um nome OU marcou algum filtro: mostrar o cadastro
+ * inteiro ao lado de um recorte só confunde ("subgrupo mostra todos por padrão, porém se
+ * selecionar um item, ele só mostra os que estão nesses itens").
+ *
+ * As dimensões se filtram UMAS ÀS OUTRAS: escolher uma GRADE faz Grupo, Subgrupo, Coleção,
+ * Tipo e Cor listarem só o que existe naquela grade. Cada dimensão é medida com todos os
+ * filtros MENOS o dela própria — senão o select de Grade passaria a mostrar só a grade já
+ * marcada e não daria para trocar nem para marcar uma segunda.
  *
  * Tudo sai de UMA varredura em PRODUTOS (grupo/linha/subgrupo/grade/coleção/tipo são colunas
- * do próprio produto), mais `fetchAvailableCores` para a cor — assim o recorte inteiro custa
- * duas consultas em vez de sete. Sem recorte esta função não é usada: aí valem os endpoints de
- * sempre, que listam o que teve VENDA no período.
+ * do próprio produto) — o cruzamento é feito em memória sobre as combinações DISTINTAS,
+ * que são poucas — mais `fetchAvailableCores` para a cor. O recorte inteiro continua
+ * custando duas consultas em vez de sete.
  *
  * As dimensões que os endpoints originais não servem para a empresa (subgrupo, grade e coleção
  * só existem para a Scarf Me) continuam vazias aqui — o recorte não pode fazer aparecer um
@@ -9414,10 +9473,13 @@ export async function fetchDimensoesDosProdutos({
   company,
   produtoIds,
   produtoSearchTerm,
+  dimensoes,
 }: {
   company?: string;
   produtoIds?: string[] | null;
   produtoSearchTerm?: string | null;
+  /** Filtros já marcados na tela. Cada dimensão é medida sem o filtro dela própria. */
+  dimensoes?: DimensoesFiltro | null;
 }): Promise<DimensoesDoEscopo> {
   const vazio: DimensoesDoEscopo = {
     grupos: [],
@@ -9434,7 +9496,20 @@ export async function fetchDimensoesDosProdutos({
     new Set((produtoIds ?? []).map((v) => String(v ?? '').trim()).filter(Boolean))
   );
   const termo = (produtoSearchTerm ?? '').trim();
-  if (produtoIdList.length === 0 && termo.length < 2) return vazio;
+
+  const filtros: Record<DimNome, string[]> = {
+    grupo: limparValoresDim(dimensoes?.grupos),
+    linha: limparValoresDim(dimensoes?.linhas),
+    subgrupo: limparValoresDim(dimensoes?.subgrupos),
+    grade: limparValoresDim(dimensoes?.grades),
+    colecao: limparValoresDim(dimensoes?.colecoes),
+    tipo: limparValoresDim(dimensoes?.tipos),
+  };
+  const coresFiltro = limparValoresDim(dimensoes?.cores);
+  const temDimensao = DIM_NOMES.some((d) => filtros[d].length > 0) || coresFiltro.length > 0;
+
+  // Sem recorte nenhum a tela usa os endpoints de sempre (o que teve VENDA no período).
+  if (produtoIdList.length === 0 && termo.length < 2 && !temDimensao) return vazio;
 
   const [cadastro, cores] = await Promise.all([
     withRequest(async (request) => {
@@ -9449,6 +9524,18 @@ export async function fetchDimensoesDosProdutos({
       if (termo.length >= 2) {
         request.input('dimBusca', sql.VarChar, `%${termo}%`);
         produtoFilter += ` AND p.DESC_PRODUTO LIKE @dimBusca`;
+      }
+      // Cor não é coluna de PRODUTOS: quando ela está marcada, as OUTRAS dimensões só
+      // podem listar o que existe naquela(s) cor(es) — daí o EXISTS em PRODUTO_CORES.
+      if (coresFiltro.length > 0) {
+        coresFiltro.forEach((v, i) => request.input(`dimCorSel${i}`, sql.VarChar, v));
+        const ph = coresFiltro.map((_, i) => `@dimCorSel${i}`).join(', ');
+        produtoFilter += `
+          AND EXISTS (
+            SELECT 1 FROM PRODUTO_CORES pc WITH (NOLOCK)
+            WHERE RTRIM(LTRIM(pc.PRODUTO)) = RTRIM(LTRIM(p.PRODUTO))
+              AND UPPER(LTRIM(RTRIM(ISNULL(pc.DESC_COR_PRODUTO, '')))) IN (${ph})
+          )`;
       }
 
       return request.query<{
@@ -9472,21 +9559,55 @@ export async function fetchDimensoesDosProdutos({
           ${nerdLinhaFilter}
       `);
     }),
-    fetchAvailableCores({ company, produtoIds: produtoIdList, produtoSearchTerm: termo }),
+    // A cor é medida com TODOS os filtros de cadastro (menos o de cor): escolher uma grade
+    // tem de enxugar a lista de cores junto com as outras dimensões.
+    fetchAvailableCores({
+      company,
+      produtoIds: produtoIdList,
+      produtoSearchTerm: termo,
+      dimensoes: {
+        grupos: filtros.grupo,
+        linhas: filtros.linha,
+        subgrupos: filtros.subgrupo,
+        grades: filtros.grade,
+        colecoes: filtros.colecao,
+        tipos: filtros.tipo,
+      },
+    }),
   ]);
 
-  const distintos = (pegar: (row: Record<string, string>) => string): string[] =>
-    Array.from(
-      new Set(
-        cadastro.recordset
-          .map((row) => (pegar(row as unknown as Record<string, string>) ?? '').trim())
-          .filter(Boolean)
-      )
-    ).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  const linhasCadastro: Array<Record<DimNome, string>> = cadastro.recordset.map((row) => {
+    const r = row as unknown as Record<string, string>;
+    return {
+      grupo: (r.grupo ?? '').trim(),
+      linha: (r.linha ?? '').trim(),
+      subgrupo: (r.subgrupo ?? '').trim(),
+      grade: (r.grade ?? '').trim(),
+      colecao: (r.colecao ?? '').trim(),
+      tipo: (r.tipo ?? '').trim(),
+    };
+  });
+
+  /**
+   * Valores distintos de `alvo` entre as linhas que casam com todos os filtros MENOS o do
+   * próprio `alvo` — o cruzamento que faz "escolhi a grade X" enxugar Grupo e Subgrupo.
+   */
+  const distintos = (alvo: DimNome): string[] => {
+    const ativos = DIM_NOMES.filter((d) => d !== alvo && filtros[d].length > 0);
+    const conjuntos = ativos.map((d) => [d, new Set(filtros[d])] as const);
+    const out = new Set<string>();
+    linhasCadastro.forEach((row) => {
+      for (const [d, valores] of conjuntos) {
+        if (!valores.has(row[d])) return;
+      }
+      if (row[alvo]) out.add(row[alvo]);
+    });
+    return Array.from(out).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  };
 
   // Descrição da coleção SEMPRE da tabela mestre COLECOES — mesmo rótulo do select de sempre.
   const descByCode = await getColecaoDescMap().catch(() => new Map<string, string>());
-  const colecoes = distintos((r) => r.colecao)
+  const colecoes = distintos('colecao')
     .map((value) => {
       const descricao = (descByCode.get(value) || '').trim();
       return {
@@ -9498,15 +9619,16 @@ export async function fetchDimensoesDosProdutos({
 
   const soScarfme = company === 'scarfme';
   return {
-    grupos: distintos((r) => r.grupo),
-    linhas: distintos((r) => r.linha),
-    subgrupos: soScarfme ? distintos((r) => r.subgrupo) : [],
-    grades: soScarfme ? distintos((r) => r.grade) : [],
+    grupos: distintos('grupo'),
+    linhas: distintos('linha'),
+    subgrupos: soScarfme ? distintos('subgrupo') : [],
+    grades: soScarfme ? distintos('grade') : [],
     colecoes: soScarfme ? colecoes : [],
-    tipos: distintos((r) => r.tipo),
+    tipos: distintos('tipo'),
     cores,
   };
 }
+
 
 /** Linha de estoque por (produto, cor, filial) para o relatório de Estoque por filial. */
 export interface EstoqueRedeItemRow {

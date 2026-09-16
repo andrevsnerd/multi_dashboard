@@ -274,11 +274,34 @@
   flex-direction: column;
   gap: 8px;
 }
+/* O menu do campo de busca é bem mais largo que o campo (460 × 270). Preso à borda DIREITA
+   do campo, o excesso ficava pendurado à ESQUERDA e, com o campo perto da margem da janela,
+   esse pedaço saa do viewport — o texto aparecia cortado pela metade. Agora ele nasce
+   alinhado à esquerda e quem decide o `left`/`width` finais é a medição em `produtoMenuPos`,
+   que escorrega o menu só o necessário para caber. Os valores abaixo são o fallback do
+   primeiro quadro, antes da medida. */
 .produtoWrap .dropdown {
-  right: 0;
-  left: auto;
+  left: 0;
+  right: auto;
   width: 460px;
-  max-width: min(460px, 88vw);
+  max-width: min(460px, calc(100vw - 24px));
+}
+.dropdownProduto {
+  box-sizing: border-box;
+  /* A largura vem medida em pixels: um `max-width` em vw por cima dela só a encolheria de
+     novo e traria o corte de volta. */
+  max-width: none;
+}
+/* A lista e o campo de colar nunca podem empurrar o menu além da largura medida. */
+.dropdownProduto .optionList,
+.dropdownProduto .pasteBox,
+.dropdownProduto .pasteArea,
+.dropdownProduto .dropdownFoot {
+  min-width: 0;
+  max-width: 100%;
+}
+.dropdownProduto .optionEmpty {
+  text-wrap: balance;
 }
 .searchBox {
   position: relative;
@@ -621,6 +644,7 @@
   background: var(--brand-scarfme, #2563eb);
 }
 
+
 /* ── Tabelas ────────────────────────────────────────────────────────────── */
 .tableScroll {
   overflow-x: auto;
@@ -723,7 +747,7 @@
   min-width: 1080px;
 }
 .mensalTable thead th {
-  min-width: 68px;
+  min-width: 76px;
 }
 .stickyCol {
   position: sticky;
@@ -766,6 +790,39 @@
   letter-spacing: 0.05em;
   color: var(--t-500);
   margin-top: 1px;
+}
+/* Linha própria do custo, logo abaixo da do ano. É leitura de apoio — a pergunta da tela
+   continua sendo "quantas peças" — então o número vem menor e mais apagado que o de cima,
+   e a linha inteira ganha um fundo levemente distinto para não ser lida como outra série. */
+/* Sem `background` aqui de propósito: um fundo nesta regra (0,1,1) venceria `.cellProj` e
+   `.cellParcial` (0,1,0) e apagaria a fronteira entre realizado e projetado. O que separa a
+   linha é o tracejado. */
+.linhaCusto td {
+  border-top: 1px dashed var(--b-200);
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+.linhaCusto .stickyCol {
+  background: var(--s-50, #f8fafc);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--t-500);
+  cursor: help;
+}
+.cellCusto {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--t-500);
+}
+.linhaCusto .cellProj .cellCusto {
+  color: var(--pc-proj);
+}
+.linhaCusto .cellParcial .cellCusto {
+  color: var(--pc-warn);
 }
 .cellParcial {
   background: var(--pc-warn-bg);

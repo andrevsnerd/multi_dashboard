@@ -78,7 +78,13 @@ export interface ItemProjecao {
   chegada?: string;
   /** Chave da categoria do item na curva sazonal. */
   categoria?: string;
-  mensal?: MesSerie[];
+  /**
+   * Série mensal do item. Além do `MesSerie` de sempre, cada mês JÁ REALIZADO carrega
+   * "onde vendeu": pares `[índice em filiaisRotulos, quantidade]`. Vai indexado porque a
+   * mesma quebra se repete em até 400 itens × 12 meses — o nome da loja por extenso em
+   * cada par inflaria a resposta à toa.
+   */
+  mensal?: Array<MesSerie & { filiais?: Array<[number, number]> }>;
   /** Consumo nas janelas de N dias — usado pelas regras "Ritmo N dias". */
   janelas?: Record<string, number>;
   /** Consumo/dia pela régua da Compra Ideal — usado pela regra "Ritmo Compra Ideal". */
@@ -143,6 +149,11 @@ interface Props {
    */
   seriesSazonais?: Record<string, SerieCategoria> | null;
   carregando?: boolean;
+  /**
+   * Rótulos de filial (de exibição) que indexam a quebra "onde vendeu" das séries. Vazio
+   * quando o servidor não mandou a quebra — aí o tooltip só não mostra essa parte.
+   */
+  filiaisRotulos?: string[];
   /** Escopo grande demais: o servidor não mandou o detalhe mensal. */
   omitido?: boolean;
   maxItens?: number;
@@ -169,6 +180,24 @@ function diasNoMes(ano: number, mes: number): number {
 }
 function chave(produto: string, cor: string | null | undefined): string {
   return `${(produto ?? "").trim()}||${(cor ?? "").trim()}`;
+}
+
+/**
+ * "Onde vendeu" de um mês, como texto de tooltip: uma loja por linha, da que mais vendeu
+ * para a que menos vendeu (o servidor já manda ordenado). String vazia quando não há
+ * quebra — mês futuro não tem venda para repartir.
+ */
+function textoPorFilial(
+  pares: Array<[number, number]> | undefined,
+  rotulos: string[]
+): string {
+  if (!pares || pares.length === 0 || rotulos.length === 0) return "";
+  const linhas = pares
+    .map(([idx, qtde]) => (rotulos[idx] ? `${rotulos[idx]}: ${fmt(qtde)}` : null))
+    .filter((linha): linha is string => linha !== null);
+  if (linhas.length === 0) return "";
+  const total = pares.reduce((soma, [, qtde]) => soma + qtde, 0);
+  return `Onde vendeu (${fmt(total)} un)\n${linhas.join("\n")}`;
 }
 
 /**
@@ -204,6 +233,8 @@ interface LinhaItem {
     parcial: boolean;
     futuro: boolean;
     criterio: CriterioMes | null;
+    /** Onde vendeu no mês: pares `[índice em filiaisRotulos, quantidade]`. */
+    filiais?: Array<[number, number]>;
   }>;
   totalAno: number;
   /** Quanto o item deve vender entre a data base e "Vender até". */
@@ -257,6 +288,7 @@ export default function ProjecaoItensMensais({
   curvasSazonais,
   seriesSazonais,
   carregando,
+  filiaisRotulos,
   omitido,
   maxItens,
 }: Props) {
@@ -324,6 +356,8 @@ export default function ProjecaoItensMensais({
               qtdeAnoAnterior: 0,
               parcial: false,
               futuro: false,
+              // Item da compra que não vendeu nada: não há onde vendeu a mostrar.
+              filiais: undefined as Array<[number, number]> | undefined,
             }))
           : serie
       ).map((m) => {
@@ -360,6 +394,7 @@ export default function ProjecaoItensMensais({
           parcial: m.parcial,
           futuro: m.futuro,
           criterio,
+          filiais: m.filiais,
         };
       });
 
@@ -685,12 +720,16 @@ export default function ProjecaoItensMensais({
                   </td>
                   {l.meses.map((m) => {
                     const valor = m.valor == null ? null : Math.round(m.valor);
+                    // Onde vendeu — só nos meses realizados; mês futuro não tem venda para
+                    // repartir e o mês em curso mostra o realizado até a data base.
+                    const ondeVendeu = textoPorFilial(m.filiais, filiaisRotulos ?? []);
                     return (
                       <td
                         key={m.mes}
                         className={`${styles.num} ${styles.cellMes} ${
                           m.futuro ? styles.cellProj : m.parcial ? styles.cellParcial : ""
                         }`}
+                        title={ondeVendeu || undefined}
                       >
                         {/* Zero vira um ponto apagado: numa tabela esparsa, a parede de
                             "0" esconde os números que importam. */}

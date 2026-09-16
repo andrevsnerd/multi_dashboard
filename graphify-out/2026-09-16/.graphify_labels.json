@@ -502,17 +502,5 @@
   "500": "page.tsx",
   "501": "page.tsx",
   "502": "page.tsx",
-  "503": "page.tsx",
-  "504": "page.tsx",
-  "505": "page.tsx",
-  "506": "page.tsx",
-  "507": "page.tsx",
-  "508": "page.tsx",
-  "509": "page.tsx",
-  "510": "page.tsx",
-  "511": "page.tsx",
-  "512": "page.tsx",
-  "513": "page.tsx",
-  "514": "page.tsx",
-  "515": "fetchHistoricoLinhas"
+  "503": "page.tsx"
 }

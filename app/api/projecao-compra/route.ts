@@ -20,7 +20,13 @@ import {
   listTransitoAtivoPorItem,
   type TransitoItemAgregado,
 } from '@/lib/server/compra-transito-index';
-import { VAREJO_VALUE, getFilialGroupMembers, type CompanyKey } from '@/lib/config/company';
+import {
+  VAREJO_VALUE,
+  compareFilialDisplayOrder,
+  getFilialGroupMembers,
+  getFilialLabelForDisplay,
+  type CompanyKey,
+} from '@/lib/config/company';
 import { resolveCompanyDynamic } from '@/lib/config/company-server';
 import { normalizeRangeForQuery } from '@/lib/utils/date';
 
@@ -479,15 +485,31 @@ export async function GET(request: Request) {
     /** produto||cor → 'yyyy-MM' → quantidade. Só preenchido no modo item a item. */
     const mensalPorItem = new Map<string, Map<string, number>>();
 
+    // ── "Onde vendeu": quebra por FILIAL das mesmas consultas mensais ─────────────
+    // É o tooltip das duas tabelas de mês. Não custa consulta nova: entra como mais uma
+    // coluna no GROUP BY da consulta que já está sendo feita. Só nos meses do ANO BASE —
+    // o ano anterior só serve de base de comparação e ninguém passa o mouse nele, e pedir a
+    // quebra lá dobraria as linhas trafegadas à toa.
+    //
+    // O rótulo é o de EXIBIÇÃO, não o nome cru: o e-commerce reveza CNPJ (MSC↔AKS) e a
+    // Paulista já trocou de CNPJ — mostrar os nomes crus partiria a mesma loja em duas
+    // linhas no tooltip. Ver [[ecommerce-scarfme-rodizio-msc-aks]].
+    /** 'yyyy-MM' → rótulo da filial → quantidade (escopo inteiro). */
+    const mensalPorFilial = new Map<string, Map<string, number>>();
+    /** produto||cor → 'yyyy-MM' → rótulo da filial → quantidade (modo item a item). */
+    const mensalFilialPorItem = new Map<string, Map<string, Map<string, number>>>();
+
     const totaisMes = await mapLimit(mesesConsulta, 4, async ({ ano, mes }) => {
       const primeiro = `${ano}-${pad2(mes)}-01`;
       // No mês da data base a janela para no dia anterior à base (mês em curso, parcial).
       const ultimo =
         ano === anoBase && mes === mesBase ? addDaysYmd(baseParam, -1) : lastDayOfMonth(ano, mes);
-      if (ultimo < primeiro) return { chave: `${ano}-${pad2(mes)}`, qtde: 0 };
+      if (ultimo < primeiro) return { chave: `${ano}-${pad2(mes)}`, qtde: 0, custo: 0 };
       const range = normalizeRangeForQuery({ start: primeiro, end: ultimo });
+      const quebrarPorFilial = ano === anoBase;
       const rows = await fetchFilialProdutoSales(companyKey, posMembers, ecomMembers, range, 'month', {
         groupByCor: mensalPorCor,
+        groupByFilial: quebrarPorFilial,
         ...escopo,
       });
       const chave = `${ano}-${pad2(mes)}`;
@@ -502,20 +524,79 @@ export async function GET(request: Request) {
           porMes.set(chave, (porMes.get(chave) ?? 0) + Number(r.qtde ?? 0));
         });
       }
+      if (quebrarPorFilial) {
+        const doMes = new Map<string, number>();
+        rows.forEach((r) => {
+          const qtde = Number(r.qtde ?? 0);
+          if (!qtde) return;
+          const rotulo = getFilialLabelForDisplay(company, r.filial ?? '');
+          if (!rotulo) return;
+          doMes.set(rotulo, (doMes.get(rotulo) ?? 0) + qtde);
+          if (!porItem) return;
+          const key = `${r.produto}||${(r.cor ?? '').trim()}`;
+          let porMes = mensalFilialPorItem.get(key);
+          if (!porMes) {
+            porMes = new Map<string, Map<string, number>>();
+            mensalFilialPorItem.set(key, porMes);
+          }
+          let porFilial = porMes.get(chave);
+          if (!porFilial) {
+            porFilial = new Map<string, number>();
+            porMes.set(chave, porFilial);
+          }
+          porFilial.set(rotulo, (porFilial.get(rotulo) ?? 0) + qtde);
+        });
+        mensalPorFilial.set(chave, doMes);
+      }
       const qtde = rows.reduce((soma, r) => soma + Number(r.qtde ?? 0), 0);
-      return { chave, qtde: Math.round(qtde) };
+      // Custo da venda do mês = qtde × custo unitário da TABELA MESTRE (CUSTO_REPOSICAO1,
+      // que é o que `fetchFilialProdutoSales` devolve em `custo`) — mesma régua do Gerador
+      // de Relatórios, ver [[gerador-custo-preco-da-tabela-mestre]]. Não é custo histórico:
+      // é quanto custaria repor hoje o que saiu naquele mês.
+      const custo = rows.reduce(
+        (soma, r) => soma + Number(r.qtde ?? 0) * (Number(r.custo ?? 0) || 0),
+        0
+      );
+      return { chave, qtde: Math.round(qtde), custo };
     });
 
+    // Índice único de rótulos de filial: no JSON cada quebra vira [índice, qtde] em vez de
+    // repetir o nome da loja milhares de vezes (400 itens × 12 meses × N lojas).
+    const rotulosFilial: string[] = Array.from(
+      new Set(
+        Array.from(mensalPorFilial.values()).flatMap((porFilial) => Array.from(porFilial.keys()))
+      )
+    ).sort((a, b) => compareFilialDisplayOrder(a, b, company));
+    const indiceFilial = new Map(rotulosFilial.map((rotulo, i) => [rotulo, i]));
+    /** Mapa rótulo→qtde como pares [índice, qtde arredondada], sem as lojas zeradas. */
+    const comprimirFiliais = (
+      porFilial: Map<string, number> | undefined
+    ): Array<[number, number]> | undefined => {
+      if (!porFilial || porFilial.size === 0) return undefined;
+      const pares = Array.from(porFilial.entries())
+        .map(([rotulo, qtde]) => [indiceFilial.get(rotulo) ?? -1, Math.round(qtde)] as [number, number])
+        .filter(([idx, qtde]) => idx >= 0 && qtde !== 0)
+        .sort((a, b) => b[1] - a[1]);
+      return pares.length > 0 ? pares : undefined;
+    };
+
     const qtdePorMes = new Map(totaisMes.map(({ chave, qtde }) => [chave, qtde]));
+    const custoPorMes = new Map(totaisMes.map(({ chave, custo }) => [chave, custo ?? 0]));
     const mensal = Array.from({ length: 12 }, (_, i) => {
       const mes = i + 1;
       return {
         mes: `${anoBase}-${pad2(mes)}`,
         qtde: qtdePorMes.get(`${anoBase}-${pad2(mes)}`) ?? 0,
         qtdeAnoAnterior: qtdePorMes.get(`${anoBase - 1}-${pad2(mes)}`) ?? 0,
+        /** Custo (reposição) do que foi vendido no mês. Centavos exatos: arredondar por mês
+            e depois somar diverge do total — ver [[produto-giro-arredondamento-somar-exato]]. */
+        custo: custoPorMes.get(`${anoBase}-${pad2(mes)}`) ?? 0,
+        custoAnoAnterior: custoPorMes.get(`${anoBase - 1}-${pad2(mes)}`) ?? 0,
         /** Mês em curso: fechado só até a data base, não serve de base de crescimento. */
         parcial: mes === mesBase,
         futuro: mes > mesBase,
+        /** Onde vendeu: pares [índice em `filiais`, quantidade]. Tooltip da célula. */
+        filiais: comprimirFiliais(mensalPorFilial.get(`${anoBase}-${pad2(mes)}`)),
       };
     });
 
@@ -732,6 +813,7 @@ export async function GET(request: Request) {
     const itens = Array.from(acc.values()).map((item) => {
       const key = `${item.produto}||${item.cor}`;
       const serie = mensalPorItem.get(key);
+      const serieFilial = mensalFilialPorItem.get(key);
       return {
         produto: item.produto,
         cor: item.cor,
@@ -771,6 +853,8 @@ export async function GET(request: Request) {
                 qtdeAnoAnterior: Math.round(serie?.get(`${anoBase - 1}-${pad2(mes)}`) ?? 0),
                 parcial: mes === mesBase,
                 futuro: mes > mesBase,
+                /** Onde vendeu no mês: pares [índice em `filiais`, quantidade]. */
+                filiais: comprimirFiliais(serieFilial?.get(`${anoBase}-${pad2(mes)}`)),
               };
             })
           : undefined,
@@ -785,6 +869,8 @@ export async function GET(request: Request) {
         itens,
         totaisJanela,
         mensal,
+        /** Rótulos de filial na ordem de exibição — índice dos pares `filiais` das séries. */
+        filiais: rotulosFilial,
         estoqueTotal,
         estoqueItens,
         /** Total já comprado e a caminho no MESMO recorte. */

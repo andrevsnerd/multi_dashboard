@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent 
 
 import FilialFilter from "@/components/filters/FilialFilter";
 import { useAuth } from "@/components/auth/AuthContext";
+import { canSeeCusto } from "@/lib/auth/permissions";
 import ProjecaoEmbalagensPanel, {
   type PedidoEmbalagens,
 } from "@/components/stock/ProjecaoEmbalagensPanel";
@@ -130,6 +131,19 @@ interface MensalItem {
   mes: string;
   qtde: number;
   qtdeAnoAnterior: number;
+  /**
+   * Custo de reposição do que foi vendido no mês (qtde × CUSTO_REPOSICAO1 da tabela
+   * mestre). Só vem na métrica `produtos` — ticket não tem custo.
+   */
+  custo?: number;
+  custoAnoAnterior?: number;
+  /**
+   * Onde vendeu no mês, como pares `[índice em ProjecaoResponse.filiais, quantidade]`. Vai
+   * indexado (e não com o nome da loja repetido) porque a mesma quebra acompanha também
+   * cada item da tabela item a item. Só nos meses JÁ REALIZADOS: mês futuro não tem venda
+   * para repartir.
+   */
+  filiais?: Array<[number, number]>;
   /** Mês em curso (fechado só até a data base) — não serve de base de crescimento. */
   parcial: boolean;
   futuro: boolean;
@@ -143,6 +157,8 @@ interface ProjecaoResponse {
   /** Total do escopo por janela de dias, já com piso 0 (vale para as duas métricas). */
   totaisJanela: Record<string, number>;
   mensal: MensalItem[];
+  /** Rótulos de filial (de exibição) — o índice dos pares `filiais` das séries. */
+  filiais?: string[];
   /** Estoque atual do MESMO recorte (só saldos positivos) — vem do servidor, não das vendas. */
   estoqueTotal?: number;
   /** Itens (produto × cor) com estoque no recorte — usado como contagem do escopo. */
@@ -370,6 +386,30 @@ function diasNoMes(ano: number, mes: number): number {
 const MES_NOME = [
   "jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez",
 ];
+/**
+ * "Onde vendeu" de um mês, como texto de tooltip: uma loja por linha, da que mais vendeu
+ * para a que menos vendeu (o servidor já manda ordenado). Devolve string vazia quando não
+ * há quebra — mês futuro não tem venda para repartir.
+ */
+function textoPorFilial(
+  pares: Array<[number, number]> | undefined,
+  rotulos: string[],
+  unidade: string
+): string {
+  if (!pares || pares.length === 0 || rotulos.length === 0) return "";
+  const linhas = pares
+    .map(([idx, qtde]) => (rotulos[idx] ? `${rotulos[idx]}: ${fmt(qtde)}` : null))
+    .filter((linha): linha is string => linha !== null);
+  if (linhas.length === 0) return "";
+  const total = pares.reduce((soma, [, qtde]) => soma + qtde, 0);
+  return `Onde vendeu (${fmt(total)} ${unidade})\n${linhas.join("\n")}`;
+}
+
+/** Dinheiro por extenso — o valor cheio do tooltip da linha de custo. */
+function fmtDinheiro(v: number | null): string {
+  if (v == null || !Number.isFinite(v)) return "—";
+  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+}
 function fmtPct(v: number | null, dec = 1): string {
   if (v == null || !Number.isFinite(v)) return "—";
   const sinal = v > 0 ? "+" : "";
@@ -413,7 +453,21 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   const [produtoOpen, setProdutoOpen] = useState(false);
   const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchWrapRef = useRef<HTMLDivElement | null>(null);
+  const produtoWrapRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  /**
+   * Posição e largura do menu de busca, medidas na hora de abrir.
+   *
+   * Ancorado só por CSS o menu saa da tela: ele é bem mais largo que o campo (460 contra
+   * 270) e ficava preso à borda DIREITA do campo, então sobrava quase 200px pendurados à
+   * esquerda — com a barra de filtros perto da margem da janela, esse pedaço saa do
+   * viewport e o navegador cortava o texto (o "Digite ao menos 2 letras…" aparecia pela
+   * metade). Aqui ele nasce alinhado à ESQUERDA do campo e só escorrega o necessário para
+   * caber, respeitando uma margem dos dois lados.
+   */
+  const [produtoMenuPos, setProdutoMenuPos] = useState<{ left: number; width: number } | null>(
+    null
+  );
   // Colar lista de códigos (código de barra interno ou código do produto) — mesmo campo do
   // Gerador de Relatórios, resolvido em lote numa requisição só.
   const [codigosColados, setCodigosColados] = useState("");
@@ -451,6 +505,8 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
     itens: 0,
   });
   const [mensal, setMensal] = useState<MensalItem[]>([]);
+  /** Rótulos de filial que indexam a quebra "onde vendeu" das séries mensais. */
+  const [filiaisRotulos, setFiliaisRotulos] = useState<string[]>([]);
   /** Peças do recorte já compradas e a caminho (vem do servidor, junto com o estoque). */
   const [transitoEscopo, setTransitoEscopo] = useState(0);
   /** Curvas sazonais da categoria — só chegam quando a projeção foi pedida com `sazonal`. */
@@ -849,6 +905,36 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
     }
   };
 
+  // Mantém o menu de busca dentro da janela (ver `produtoMenuPos`).
+  useEffect(() => {
+    if (!produtoOpen) return;
+    const MARGEM = 12;
+    const LARGURA_IDEAL = 460;
+    const medir = () => {
+      const wrap = produtoWrapRef.current;
+      if (!wrap) return;
+      const rect = wrap.getBoundingClientRect();
+      const largura = Math.max(240, Math.min(LARGURA_IDEAL, window.innerWidth - MARGEM * 2));
+      // Ponto de partida: alinhado à esquerda do campo. Depois só se corrige o que estoura.
+      let left = 0;
+      const excedeDireita = rect.left + largura - (window.innerWidth - MARGEM);
+      if (excedeDireita > 0) left -= excedeDireita;
+      const faltaEsquerda = MARGEM - (rect.left + left);
+      if (faltaEsquerda > 0) left += faltaEsquerda;
+      setProdutoMenuPos((prev) =>
+        prev && prev.left === left && prev.width === largura ? prev : { left, width: largura }
+      );
+    };
+    medir();
+    window.addEventListener("resize", medir);
+    // `true` para pegar a rolagem de qualquer contêiner, não só a da janela.
+    window.addEventListener("scroll", medir, true);
+    return () => {
+      window.removeEventListener("resize", medir);
+      window.removeEventListener("scroll", medir, true);
+    };
+  }, [produtoOpen]);
+
   // Fecha o dropdown de busca ao clicar fora ou apertar Esc.
   useEffect(() => {
     if (!produtoOpen) return;
@@ -905,17 +991,32 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
   const totalRecortes =
     produtosSelecionados.length + DIM_KEYS.reduce((soma, dim) => soma + dims[dim].length, 0);
 
-  // ── Opções dos filtros: reagem ao item escolhido ──────────────────────────
+  // ── Opções dos filtros: reagem ao recorte inteiro ──────────────────────────
   // Sem recorte, cada dimensão vem do seu endpoint de sempre (o que teve VENDA nos 12 meses,
   // mesma régua do Gerador de Relatórios). Com item(ns) escolhido(s) — ou busca por nome —
   // os selects passam a listar só o que existe NAQUELES itens: oferecer o cadastro inteiro ao
   // lado de uma seleção só confunde, e em Cor é pior ainda, porque no Linx o mesmo código de
   // cor é outra cor em outro produto (ver [[cor-escopada-por-produto-vs-mapa-global]]).
-  const escopoDeProduto = temSelecao || temBusca;
+  //
+  // Os filtros também se cruzam ENTRE SI: escolher uma GRADE faz Grupo, Subgrupo, Coleção,
+  // Tipo e Cor mostrarem só o que existe naquela grade. Quem monta isso é o servidor, que
+  // mede cada dimensão SEM o filtro dela própria — do contrário o select de Grade passaria
+  // a listar só a grade já marcada e não daria para trocar nem para marcar uma segunda.
+  const escopoDeProduto = temSelecao || temBusca || temDimensao;
+
+  /** Os filtros marcados, numa querystring estável — serve de dependência do efeito. */
+  const dimsQuery = useMemo(() => {
+    const params = new URLSearchParams();
+    DIM_KEYS.forEach((dim) => {
+      [...dims[dim]].sort().forEach((v) => params.append(dim, v));
+    });
+    return params.toString();
+  }, [dims]);
 
   useEffect(() => {
     let cancelled = false;
-    const escopado = produtosSelecionados.length > 0 || buscaLivre !== "";
+    const escopado =
+      produtosSelecionados.length > 0 || buscaLivre !== "" || dimsQuery !== "";
 
     // Voltar ao estado sem recorte é instantâneo: as opções globais ficam guardadas.
     if (!escopado && dimOptionsGlobais.current) {
@@ -929,7 +1030,8 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
     const carregar = () => {
       if (escopado) {
         // Um request só para as 7 dimensões (o servidor varre PRODUTOS uma vez).
-        const params = new URLSearchParams({ company: companyKey });
+        const params = new URLSearchParams(dimsQuery);
+        params.set("company", companyKey);
         produtosSelecionados.forEach((p) => params.append("produto", p));
         if (buscaLivre) params.set("busca", buscaLivre);
 
@@ -1005,7 +1107,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [companyKey, produtosSelecionados, buscaLivre]);
+  }, [companyKey, produtosSelecionados, buscaLivre, dimsQuery]);
 
   // Valor que saiu do recorte não pode continuar marcado — filtraria por algo que não existe
   // nos itens escolhidos e a projeção voltaria vazia sem explicação. Só poda com a lista já
@@ -1195,6 +1297,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
         setProjItens(next);
         setTotaisJanela(json.totaisJanela ?? {});
         setMensal(Array.isArray(json.mensal) ? json.mensal : []);
+        setFiliaisRotulos(Array.isArray(json.filiais) ? json.filiais : []);
         setEstoqueEscopo({
           total: Math.max(0, Number(json.estoqueTotal ?? 0) || 0),
           itens: Math.max(0, Number(json.estoqueItens ?? 0) || 0),
@@ -1212,6 +1315,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
         setProjItens({});
         setTotaisJanela({});
         setMensal([]);
+        setFiliaisRotulos([]);
         setEstoqueEscopo({ total: 0, itens: 0 });
         setTransitoEscopo(0);
         setSazonalResp(null);
@@ -1668,6 +1772,32 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
     cobertura.dias,
   ]);
 
+  /**
+   * Custo unitário médio do recorte, para dar preço à projeção. O mês futuro não tem venda,
+   * logo não tem custo medido: o que dá para dizer é quanto custaria repor as peças que a
+   * projeção diz que vão sair. A base é o realizado do ano; sem ele, o ano anterior.
+   */
+  const custoUnitMedio = useMemo(() => {
+    const somar = (pegar: (m: MensalItem) => { qtde: number; custo: number }) =>
+      mensal.reduce(
+        (acc, m) => {
+          const { qtde, custo } = pegar(m);
+          return { qtde: acc.qtde + qtde, custo: acc.custo + custo };
+        },
+        { qtde: 0, custo: 0 }
+      );
+    const ano = somar((m) => ({
+      qtde: m.futuro ? 0 : m.qtde,
+      custo: m.futuro ? 0 : Number(m.custo ?? 0),
+    }));
+    if (ano.qtde > 0 && ano.custo > 0) return ano.custo / ano.qtde;
+    const anterior = somar((m) => ({
+      qtde: m.qtdeAnoAnterior,
+      custo: Number(m.custoAnoAnterior ?? 0),
+    }));
+    return anterior.qtde > 0 && anterior.custo > 0 ? anterior.custo / anterior.qtde : null;
+  }, [mensal]);
+
   // ── Tabela de vendas por mês (ano todo: realizado + projeção) ─────────────
   const mensalRows = useMemo(
     () =>
@@ -1687,27 +1817,50 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
         const valorCelula = m.futuro ? projetado : m.parcial ? valorAno : m.qtde;
         const pctSobreAnoAnterior =
           m.qtdeAnoAnterior > 0 && valorCelula != null ? valorCelula / m.qtdeAnoAnterior - 1 : null;
+        // Custo da célula: mês fechado usa o custo MEDIDO daquele mês; mês em curso e mês
+        // futuro não têm venda inteira, então o custo acompanha a quantidade projetada pelo
+        // custo unitário médio do recorte. Soma exata em centavos — o arredondamento fica
+        // só na exibição, ver [[produto-giro-arredondamento-somar-exato]].
+        const custoMedido = Number(m.custo ?? 0);
+        const custoCelula =
+          m.futuro || m.parcial
+            ? valorCelula != null && custoUnitMedio != null
+              ? valorCelula * custoUnitMedio
+              : null
+            : custoMedido;
+        const custoAno =
+          m.futuro || m.parcial
+            ? custoUnitMedio != null
+              ? valorAno * custoUnitMedio
+              : 0
+            : custoMedido;
         return {
           ...m,
           projetado,
           criterio,
           valorAno,
           pctSobreAnoAnterior,
+          custoCelula,
+          custoAno,
           /** Mês fechado com base no ano anterior: é o que alimenta o índice YoY. */
           usadoNoIndice: !m.futuro && !m.parcial && m.qtdeAnoAnterior > 0,
         };
       }),
-    [mensal, serieMes]
+    [mensal, serieMes, custoUnitMedio]
   );
 
   const mensalTotais = useMemo(() => {
     const anoAnterior = mensalRows.reduce((s, r) => s + r.qtdeAnoAnterior, 0);
     const realizado = mensalRows.reduce((s, r) => s + (r.futuro ? 0 : r.qtde), 0);
     const ano = mensalRows.reduce((s, r) => s + r.valorAno, 0);
+    const custoAno = mensalRows.reduce((s, r) => s + r.custoAno, 0);
+    const custoAnoAnterior = mensalRows.reduce((s, r) => s + Number(r.custoAnoAnterior ?? 0), 0);
     return {
       anoAnterior,
       realizado,
       ano,
+      custoAno,
+      custoAnoAnterior,
       variacao: anoAnterior > 0 ? ano / anoAnterior - 1 : null,
     };
   }, [mensalRows]);
@@ -1767,6 +1920,11 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
       ? { dataBase: pedido.dataBase, filial: pedido.filial }
       : null;
   const unidadeLabel = ehTickets ? "tickets" : "un";
+  /**
+   * Custo é informação restrita (gerente e supervisor nunca veem) — ver
+   * [[roles-reestruturaçao-6-funcoes]]. Ticket não tem custo: ali a linha nem existe.
+   */
+  const mostrarCustoMensal = !ehTickets && canSeeCusto(user);
   const soUm = selectedItems.length === 1 ? selectedItems[0] : null;
 
   return (
@@ -2001,7 +2159,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
                 </span>
               )}
             </span>
-            <div className={styles.produtoWrap}>
+            <div className={styles.produtoWrap} ref={produtoWrapRef}>
               <div className={styles.searchBox}>
                 <input
                   ref={searchInputRef}
@@ -2037,7 +2195,14 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
               </div>
 
               {produtoOpen && (
-                <div className={styles.dropdown}>
+                <div
+                  className={`${styles.dropdown} ${styles.dropdownProduto}`}
+                  style={
+                    produtoMenuPos
+                      ? { left: produtoMenuPos.left, width: produtoMenuPos.width }
+                      : undefined
+                  }
+                >
                   <div className={styles.optionList}>
                     {produtoQuery.trim().length < 2 ? (
                       <div className={styles.optionEmpty}>
@@ -2120,9 +2285,9 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
           {escopoDeProduto && (
             <span
               className={styles.filterHint}
-              title="Grupo, Linha, Subgrupo, Grade, Coleção, Cor e Tipo mostram só o que existe nos itens do recorte."
+              title="Grupo, Linha, Subgrupo, Grade, Coleção, Cor e Tipo mostram só o que existe no recorte — e se filtram entre si: marcar uma Grade enxuga as outras listas."
             >
-              filtros do item
+              filtros do recorte
             </span>
           )}
           {DIM_KEYS.map((dim) => (
@@ -2648,11 +2813,27 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
                       </td>
                     </tr>
                   ) : (
+                    <>
                     <tr>
                       <td className={`${styles.tdLeft} ${styles.stickyCol}`}>{anoBase}</td>
                       {mensalRows.map((m) => {
                         const valor = m.futuro ? m.projetado : m.parcial ? m.valorAno : m.qtde;
                         const pct = m.pctSobreAnoAnterior;
+                        // Onde vendeu: vai ABAIXO da explicação da célula, no mesmo tooltip.
+                        // No mês em curso é o realizado até a data base (o número mostrado é a
+                        // projeção do mês cheio), e no mês futuro não existe.
+                        const ondeVendeu = textoPorFilial(m.filiais, filiaisRotulos, unidadeLabel);
+                        const explicacao = m.futuro
+                          ? `${REGRA_LABEL[regra]}${
+                              m.criterio ? ` · ${CRITERIO_TEXTO[m.criterio]}` : ""
+                            }`
+                          : m.parcial
+                          ? `Mês em curso: projeção do mês cheio por ${REGRA_LABEL[regra]}${
+                              m.criterio ? ` · ${CRITERIO_TEXTO[m.criterio]}` : ""
+                            } · já vendeu ${fmt(m.qtde)} ${unidadeLabel} até ${ymdToBr(
+                              dataBase
+                            )} · fora do índice`
+                          : `Realizado${m.usadoNoIndice ? " · entra no índice YoY" : ""}`;
                         return (
                           <td
                             key={m.mes}
@@ -2660,17 +2841,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
                               m.futuro ? styles.cellProj : m.parcial ? styles.cellParcial : ""
                             }`}
                             title={
-                              m.futuro
-                                ? `${REGRA_LABEL[regra]}${
-                                    m.criterio ? ` · ${CRITERIO_TEXTO[m.criterio]}` : ""
-                                  }`
-                                : m.parcial
-                                ? `Mês em curso: projeção do mês cheio por ${REGRA_LABEL[regra]}${
-                                    m.criterio ? ` · ${CRITERIO_TEXTO[m.criterio]}` : ""
-                                  } · já vendeu ${fmt(m.qtde)} ${unidadeLabel} até ${ymdToBr(
-                                    dataBase
-                                  )} · fora do índice`
-                                : `Realizado${m.usadoNoIndice ? " · entra no índice YoY" : ""}`
+                              ondeVendeu ? `${explicacao}\n\n${ondeVendeu}` : explicacao
                             }
                           >
                             <span className={styles.cellQtd}>
@@ -2710,6 +2881,52 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
                         </span>
                       </td>
                     </tr>
+                    {/* Custo em LINHA própria, e não empilhado dentro da célula do mês: são
+                        duas leituras diferentes (peça e dinheiro) e a célula já carrega a
+                        variação e o selo "proj.". O sombreado de mês em curso / projetado
+                        acompanha, para a fronteira entre realizado e chute continuar visível. */}
+                    {mostrarCustoMensal && (
+                      <tr className={styles.linhaCusto}>
+                        <td
+                          className={`${styles.tdLeft} ${styles.stickyCol}`}
+                          title="Custo de reposição do que saiu no mês (qtde × CUSTO_REPOSICAO1 da tabela mestre). No mês em curso e no mês futuro acompanha a quantidade projetada, pelo custo unitário médio do recorte."
+                        >
+                          Custo (R$)
+                        </td>
+                        {mensalRows.map((m) => (
+                          <td
+                            key={m.mes}
+                            className={`${styles.num} ${styles.cellMes} ${
+                              m.futuro ? styles.cellProj : m.parcial ? styles.cellParcial : ""
+                            }`}
+                            title={
+                              m.custoCelula == null
+                                ? "Sem base de custo no recorte"
+                                : `${fmtDinheiro(m.custoCelula)}${
+                                    m.futuro || m.parcial
+                                      ? " · custo da projeção (qtde projetada × custo unitário médio)"
+                                      : " · custo de reposição do que foi vendido"
+                                  }`
+                            }
+                          >
+                            <span className={styles.cellCusto}>
+                              {m.custoCelula == null ? "—" : fmt(Math.round(m.custoCelula))}
+                            </span>
+                          </td>
+                        ))}
+                        <td
+                          className={`${styles.num} ${styles.colTotal}`}
+                          title={`${fmtDinheiro(mensalTotais.custoAno)} no ano · ${fmtDinheiro(
+                            mensalTotais.custoAnoAnterior
+                          )} no ano anterior`}
+                        >
+                          <span className={styles.cellCusto}>
+                            {fmt(Math.round(mensalTotais.custoAno))}
+                          </span>
+                        </td>
+                      </tr>
+                    )}
+                    </>
                   )}
                 </tbody>
               </table>
@@ -2720,6 +2937,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
           {!ehTickets && pedido?.porItem && (
             <ProjecaoItensMensais
               itens={Object.values(projItens)}
+              filiaisRotulos={filiaisRotulos}
               compra={pedido.compra}
               dataBase={dataBase}
               venderAte={venderAte}
