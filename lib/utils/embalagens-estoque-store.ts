@@ -26,7 +26,6 @@ export type EstoqueEmbalagens = Record<string, number>;
 
 let tabelaChecada = false;
 let ensurePromise: Promise<void> | null = null;
-const cache = new Map<string, EstoqueEmbalagens>();
 
 type ArquivoEstoque = Record<string, unknown>;
 
@@ -95,11 +94,14 @@ function normalizar(bruto: unknown): EstoqueEmbalagens {
   return base;
 }
 
-/** Estoque salvo da empresa, completado com a contagem de fábrica de quem nunca foi editado. */
+/**
+ * Estoque salvo da empresa, completado com a contagem de fábrica de quem nunca foi editado.
+ *
+ * Sem cache de propósito. É uma linha só de leitura, e um cache de processo em serverless
+ * devolve o número velho para sempre: quem gravou caiu numa instância e quem lê cai em
+ * outra, que ficou com o valor de antes — era o que fazia a célula "voltar sozinha".
+ */
 export async function carregarEstoqueEmbalagens(company: string): Promise<EstoqueEmbalagens> {
-  const emCache = cache.get(company);
-  if (emCache) return { ...emCache };
-
   let bruto: unknown = null;
   if (!hasPostgres()) {
     bruto = lerArquivo()[company] ?? null;
@@ -110,9 +112,7 @@ export async function carregarEstoqueEmbalagens(company: string): Promise<Estoqu
     bruto = rows[0]?.estoque ?? null;
   }
 
-  const estoque = normalizar(bruto);
-  cache.set(company, estoque);
-  return { ...estoque };
+  return normalizar(bruto);
 }
 
 export async function salvarEstoqueEmbalagens(
@@ -141,6 +141,5 @@ export async function salvarEstoqueEmbalagens(
     `;
   }
 
-  cache.set(company, estoque);
   return { ...estoque };
 }

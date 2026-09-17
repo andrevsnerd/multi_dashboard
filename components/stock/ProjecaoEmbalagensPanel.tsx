@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   indiceDoModo,
@@ -37,8 +37,17 @@ import styles from "./ProjecaoCompraPage.module.css";
  * embalagem em vez da série de venda de um produto.
  *
  * O estoque é digitado: embalagem não é produto do Linx, não tem saldo para consultar. O
- * valor começa na contagem da planilha e, a partir do primeiro "Salvar estoque", vale o que
- * ficou gravado.
+ * valor começa na contagem da planilha e, assim que alguém altera a célula, GRAVA SOZINHO
+ * (sem botão) e passa a valer o número digitado.
+ *
+ * Duas coisas seguram isso de pé, e as duas já quebraram antes:
+ *
+ *   1. Enquanto o campo está sendo digitado, quem manda é o RASCUNHO (texto). Se o valor
+ *      exibido fosse sempre o número já normalizado, apagar o campo viraria 0 na hora e o
+ *      cursor ficaria preso.
+ *   2. Uma nova consulta NÃO apaga o que foi digitado. O que está na fila de gravação vence
+ *      o que veio do servidor até a gravação confirmar — senão gerar a projeção de novo
+ *      devolve a célula ao número antigo.
  */
 
 interface EmbalagemSerie {
@@ -131,8 +140,10 @@ export default function ProjecaoEmbalagensPanel({
 }: Props) {
   const [itens, setItens] = useState<EmbalagemSerie[]>([]);
   const [estoqueSalvo, setEstoqueSalvo] = useState<Record<string, number>>({});
-  /** Edições ainda não gravadas (id → unidades). */
+  /** Edições ainda não confirmadas pelo servidor (id → unidades). Vencem o que veio do GET. */
   const [estoqueEditado, setEstoqueEditado] = useState<Record<string, number>>({});
+  /** Texto cru da célula que está sendo digitada (id → string), para o campo não travar. */
+  const [rascunho, setRascunho] = useState<Record<string, string>>({});
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -158,8 +169,9 @@ export default function ProjecaoEmbalagensPanel({
       .then((json) => {
         if (cancelado) return;
         setItens(Array.isArray(json.itens) ? json.itens : []);
+        // O que está na fila de gravação continua valendo: gerar a projeção de novo não pode
+        // devolver a célula ao número antigo.
         setEstoqueSalvo(json.estoque ?? {});
-        setEstoqueEditado({});
       })
       .catch((e: Error) => {
         if (cancelado) return;
@@ -278,29 +290,76 @@ export default function ProjecaoEmbalagensPanel({
     };
   }, [linhas]);
 
-  const temEdicao = Object.keys(estoqueEditado).length > 0;
+  // ── Gravação automática do estoque digitado ──
+  /** Linhas esperando gravação (id → unidades). Fora do estado: o timer lê o valor da hora. */
+  const filaRef = useRef<Record<string, number>>({});
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const salvarEstoque = async () => {
-    if (!temEdicao || salvando) return;
+  const gravarFila = useCallback(async () => {
+    const lote = filaRef.current;
+    filaRef.current = {};
+    const ids = Object.keys(lote);
+    if (ids.length === 0) return;
+
     setSalvando(true);
     setAviso(null);
     try {
       const res = await fetch("/api/projecao-embalagens", {
         method: "PUT",
         headers: { "Content-Type": "application/json", "x-auth-username": username },
-        body: JSON.stringify({ company: companyKey, estoque: estoqueEditado }),
+        body: JSON.stringify({ company: companyKey, estoque: lote }),
       });
       const json = (await res.json()) as { estoque?: Record<string, number>; error?: string };
       if (!res.ok) throw new Error(json?.error || "Erro ao salvar o estoque");
       setEstoqueSalvo(json.estoque ?? {});
-      setEstoqueEditado({});
+      // Sai da lista de pendentes só quem foi gravado com o valor que ainda está na tela:
+      // se a pessoa digitou de novo enquanto o PUT ia, a edição nova continua mandando.
+      setEstoqueEditado((prev) => {
+        const proximo = { ...prev };
+        ids.forEach((id) => {
+          if (proximo[id] === lote[id] && filaRef.current[id] == null) delete proximo[id];
+        });
+        return proximo;
+      });
       setAviso("Estoque salvo.");
     } catch (e) {
+      // O lote volta para a fila: a próxima digitação (ou a saída do campo) tenta de novo.
+      filaRef.current = { ...lote, ...filaRef.current };
       setAviso(e instanceof Error ? e.message : "Erro ao salvar o estoque");
     } finally {
       setSalvando(false);
     }
-  };
+  }, [companyKey, username]);
+
+  /** Enfileira a célula e grava sozinho depois de uma pausa na digitação. */
+  const agendarGravacao = useCallback(
+    (id: string, valor: number) => {
+      filaRef.current = { ...filaRef.current, [id]: valor };
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => {
+        timerRef.current = null;
+        void gravarFila();
+      }, 700);
+    },
+    [gravarFila]
+  );
+
+  /** Sair do campo não espera a pausa: grava na hora. */
+  const gravarAgora = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    void gravarFila();
+  }, [gravarFila]);
+
+  // Trocar de aba ou fechar a tela não pode engolir o que ficou na fila.
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      void gravarFila();
+    };
+  }, [gravarFila]);
 
   const linhaExpandida = linhas.find((l) => l.item.id === expandida) ?? null;
 
@@ -376,16 +435,9 @@ export default function ProjecaoEmbalagensPanel({
             </span>
           </div>
           <div className={styles.embActions}>
-            {aviso && <span className={styles.embAviso}>{aviso}</span>}
-            <button
-              type="button"
-              className={styles.btnGerar}
-              onClick={salvarEstoque}
-              disabled={!temEdicao || salvando}
-              title={temEdicao ? "Gravar o estoque digitado" : "Nenhum estoque foi alterado"}
-            >
-              {salvando ? "Salvando…" : "Salvar estoque"}
-            </button>
+            <span className={styles.embAviso}>
+              {salvando ? "Salvando…" : aviso || "O estoque grava sozinho ao ser alterado."}
+            </span>
           </div>
         </div>
         <div className={`${styles.tableScroll} ${styles.tableScrollFixo}`}>
@@ -433,16 +485,28 @@ export default function ProjecaoEmbalagensPanel({
                           className={`${styles.input} ${styles.inputNum} ${
                             editado ? styles.inputEdited : ""
                           }`}
-                          value={l.estoque}
+                          value={rascunho[l.item.id] ?? String(l.estoque)}
                           min={0}
                           onClick={(e) => e.stopPropagation()}
                           onChange={(e) => {
-                            const v = e.target.value;
+                            const texto = e.target.value;
                             setAviso(null);
-                            setEstoqueEditado((prev) => ({
-                              ...prev,
-                              [l.item.id]: v === "" ? 0 : Math.max(0, Math.round(Number(v) || 0)),
-                            }));
+                            // O campo mostra o que foi digitado, inclusive vazio: só vira
+                            // número (e vai para a fila) quando há algo para gravar.
+                            setRascunho((prev) => ({ ...prev, [l.item.id]: texto }));
+                            if (texto.trim() === "") return;
+                            const valor = Math.max(0, Math.round(Number(texto) || 0));
+                            setEstoqueEditado((prev) => ({ ...prev, [l.item.id]: valor }));
+                            agendarGravacao(l.item.id, valor);
+                          }}
+                          onBlur={() => {
+                            // Campo deixado vazio volta a mostrar o valor que vale hoje.
+                            setRascunho((prev) => {
+                              const proximo = { ...prev };
+                              delete proximo[l.item.id];
+                              return proximo;
+                            });
+                            gravarAgora();
                           }}
                         />
                       </td>
