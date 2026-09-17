@@ -89,13 +89,6 @@ export const COLECAO = {
 export const FILIAL_GRU = "000079";
 
 /**
- * `COD_FILIAL` da Oscar Freire. A loja segue a mesma regra de fim de ano do site: entre 1º
- * de novembro e 25 de dezembro, cada lenço sai na sua sacola em vez de a compra inteira ir
- * numa só.
- */
-export const FILIAL_OSCAR_FREIRE = "000062";
-
-/**
  * Ordem = prioridade. Primeira categoria que casar leva o item; quem não casa com nenhuma
  * fica sem categoria (o ticket ainda conta — a caixa dos Correios é por pedido, não por peça).
  */
@@ -163,41 +156,39 @@ export interface ContextoTicket {
   /** `COD_FILIAL` da venda ('' no e-commerce). */
   filialId: string;
   /**
-   * A venda caiu entre 1º de novembro e 25 de dezembro — a janela em que o pedido do site
-   * leva uma sacola por lenço (regra 7).
+   * A venda caiu entre 1º de novembro e 25 de dezembro — a janela em que cada lenço leva a
+   * sua própria sacola, em TODA a rede (loja e site).
    */
   janelaNatal: boolean;
-}
-
-/**
- * A compra está na janela de fim de ano em que a sacola acompanha a PEÇA e não o pedido:
- * de 1º de novembro a 25 de dezembro, nos pedidos do site e na loja Oscar Freire.
- */
-function sacolaPorPeca(ctx: ContextoTicket): boolean {
-  if (!ctx.janelaNatal) return false;
-  return ctx.canal === "site" || ctx.filialId === FILIAL_OSCAR_FREIRE;
 }
 
 /**
  * Sacola ScarfMe do ticket. É UMA por compra e EXCLUSIVA entre os tamanhos: a cliente sai
  * da loja com uma sacola só, então P/M/G não podem somar no mesmo ticket.
  *
- * A exceção é a regra 7: na janela de fim de ano do site e da Oscar Freire, vai uma sacola
- * M por lenço.
+ * A exceção é a janela de fim de ano, em que vai uma sacola M por lenço.
  */
 function sacolaScarfme(ctx: ContextoTicket): { tamanho: "P" | "M" | "G"; qtde: number } | null {
   const lencos = ctx.qtd.lenco;
   const twillys = ctx.qtd.twilly;
+  // Pashmina ScarfMe: a de viscose e a de toque de lã. Cashmere é pashmina também, mas já
+  // manda em G logo abaixo; a Tarsila tem sacola própria e não pode levar duas.
+  const pashminas = ctx.qtd.pashminaViscose + ctx.qtd.pashminaLa;
 
   // Fashion e Cashmere mandam na sacola: os dois saem em G (regras 1 e 2).
   if (ctx.qtd.fashion > 0 || ctx.qtd.cashmere > 0) return { tamanho: "G", qtde: 1 };
 
-  // Regra 7: na janela de fim de ano vai uma sacola por lenço, não uma por compra.
-  if (sacolaPorPeca(ctx) && lencos > 0) return { tamanho: "M", qtde: lencos };
+  // Janela de 1º/nov a 25/dez: vai uma sacola por lenço, não uma por compra. Vale para a
+  // rede inteira — loja física e site.
+  if (ctx.janelaNatal && lencos > 0) return { tamanho: "M", qtde: lencos };
 
   // Faixa por quantidade de lenços: até 3 vai só na caixinha, 4-6 em M, 7+ em G.
   if (lencos > 6) return { tamanho: "G", qtde: 1 };
   if (lencos >= 4) return { tamanho: "M", qtde: 1 };
+
+  // Pashmina não cabe na P: qualquer pashmina no ticket já pede a M. Vem depois da faixa de
+  // lenço para que a compra grande (7+) continue saindo em G.
+  if (pashminas > 0) return { tamanho: "M", qtde: 1 };
 
   // Twilly: 1 ou 2 em sacola P, mais que isso em M.
   if (twillys > 2) return { tamanho: "M", qtde: 1 };
@@ -384,7 +375,7 @@ export const EMBALAGENS: EmbalagemDef[] = [
     nota: "1 por peça Fashion da coleção Tarsila do Amaral.",
   },
 
-  // ── Sacolas: uma por compra (a de fim de ano do site é a exceção) ──
+  // ── Sacolas: uma por compra (a janela de fim de ano é a exceção) ──
   {
     id: "sacola-scarfme-p",
     nome: "Sacola ScarfMe - P",
@@ -397,7 +388,7 @@ export const EMBALAGENS: EmbalagemDef[] = [
     nome: "Sacola ScarfMe - M",
     estoqueInicial: 8250,
     regra: (ctx) => sacola(ctx, "M"),
-    nota: "4 a 6 lenços, ou mais de 2 Twilly. No site e na Oscar Freire, de 1º/nov a 25/dez: 1 por lenço.",
+    nota: "4 a 6 lenços, qualquer pashmina, ou mais de 2 Twilly. De 1º/nov a 25/dez, na rede toda: 1 por lenço.",
   },
   {
     id: "sacola-scarfme-g",
