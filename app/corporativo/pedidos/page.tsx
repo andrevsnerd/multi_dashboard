@@ -52,7 +52,7 @@ const STATUS_LABEL: Record<string, string> = {
   cancelado: "Cancelado",
 };
 /** Funções que podem efetivar pedidos no Linx (exceção ao read-only geral). */
-const APPROVE_ROLES = ["admin", "diretor", "supervisor"];
+const APPROVE_ROLES = ["admin", "diretor", "supervisor", "marketing"];
 const brl = (n: number) => (n ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 export default function PedidosAdminPage() {

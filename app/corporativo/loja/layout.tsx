@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { useAuth } from "@/components/auth/AuthContext";
+import { isCorporativoStaff } from "@/lib/auth/permissions";
 import { CartProvider, useCart } from "./CartContext";
 import styles from "./loja.module.css";
 
@@ -41,7 +42,7 @@ function LojaHeader() {
         </form>
 
         <div className={styles.headerActions}>
-          {user?.role === "admin" && (
+          {isCorporativoStaff(user?.role) && (
             <div className={styles.adminNav}>
               <Link href="/corporativo/catalogo" className={styles.adminNavLink}>
                 Catálogo

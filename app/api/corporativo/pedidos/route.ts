@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { findUserByUsername } from "@/lib/auth/users-store";
 import { readOnlyBlock } from "@/lib/auth/route-guards";
+import { isCorporativoStaff } from "@/lib/auth/permissions";
 import { criarPedido, listPedidos, type PedidoItem } from "@/lib/repositories/corporativoStore";
 import { FRETE_FIXO } from "@/lib/corporativo/config";
 
@@ -9,7 +10,7 @@ export const maxDuration = 60;
 
 /**
  * GET: lista pedidos.
- *  - admin  → todos os pedidos (gestão).
+ *  - equipe de gestão (admin/diretor/marketing) → todos os pedidos.
  *  - cliente_corporativo → apenas os do próprio cliente (via ?codigo= vinculado).
  * POST: cria um pedido (checkout). Persiste no Neon com status 'pendente'.
  */
@@ -19,7 +20,7 @@ export async function GET(request: Request) {
     const user = username ? await findUserByUsername(username) : null;
     const { searchParams } = new URL(request.url);
 
-    if (user?.role === "admin") {
+    if (isCorporativoStaff(user?.role)) {
       const data = await listPedidos({ limit: 500 });
       return NextResponse.json({ data });
     }

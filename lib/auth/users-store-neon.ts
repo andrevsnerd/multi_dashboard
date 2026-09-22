@@ -13,7 +13,7 @@ async function ensureTable(sql: ReturnType<typeof getNeonSql>) {
       id TEXT PRIMARY KEY,
       username TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
-      role TEXT NOT NULL CHECK (role IN ('admin', 'diretor', 'supervisor', 'logistica', 'gerente', 'cliente_corporativo')),
+      role TEXT NOT NULL CHECK (role IN ('admin', 'diretor', 'supervisor', 'logistica', 'gerente', 'marketing', 'cliente_corporativo')),
       permissions JSONB NOT NULL DEFAULT '[]'::jsonb,
       allowed_companies JSONB
     )
@@ -31,7 +31,7 @@ async function ensureTable(sql: ReturnType<typeof getNeonSql>) {
       UPDATE dashboard_users SET role = 'gerente' WHERE role = 'gestor';
       ALTER TABLE dashboard_users
         ADD CONSTRAINT dashboard_users_role_check
-        CHECK (role IN ('admin', 'diretor', 'supervisor', 'logistica', 'gerente', 'cliente_corporativo'));
+        CHECK (role IN ('admin', 'diretor', 'supervisor', 'logistica', 'gerente', 'marketing', 'cliente_corporativo'));
     EXCEPTION WHEN others THEN NULL;
     END$$
   `;

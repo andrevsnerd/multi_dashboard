@@ -43,11 +43,39 @@ export function canMutate(user: UserSession | null): boolean {
 }
 
 /**
+ * MARKETING: funcao dedicada a area CORPORATIVO e a nada mais. Ve e opera TODA
+ * a area /corporativo (gestao de clientes, catalogo da loja, pedidos, aprovacoes,
+ * imagens de produto), e NAO enxerga NERD/ScarfMe — nem pelas permissoes de
+ * pagina, nem pela selecao de empresa (ver getVisibleCompanies).
+ *
+ * Diferente do cliente_corporativo, que so ve a loja; e diferente do supervisor,
+ * que so tem as excecoes pontuais de catalogo/aprovacoes.
+ */
+export const CORPORATIVO_ONLY_ROLES: RoleKey[] = ["marketing"];
+
+/** True se a funcao existe SOMENTE dentro da area corporativo. */
+export function isCorporativoOnlyRole(role: RoleKey | undefined | null): boolean {
+  return !!role && CORPORATIVO_ONLY_ROLES.includes(role);
+}
+
+/**
+ * Equipe de gestao do corporativo: enxerga a area inteira (todos os clientes,
+ * todo o catalogo, TODOS os pedidos), ao contrario do cliente_corporativo, que
+ * so ve a loja e os proprios pedidos.
+ */
+export const CORPORATIVO_STAFF_ROLES: RoleKey[] = ["admin", "diretor", "marketing"];
+
+/** True se a funcao faz parte da equipe de gestao do corporativo. */
+export function isCorporativoStaff(role: RoleKey | undefined | null): boolean {
+  return !!role && CORPORATIVO_STAFF_ROLES.includes(role);
+}
+
+/**
  * Excecao ao read-only geral: admin, diretor e supervisor podem administrar
  * o catalogo da loja corporativa (adicionar/editar/remover produtos), mesmo
  * que diretor/supervisor sejam somente-leitura no restante do sistema.
  */
-export const CATALOGO_MANAGER_ROLES: RoleKey[] = ["admin", "diretor", "supervisor"];
+export const CATALOGO_MANAGER_ROLES: RoleKey[] = ["admin", "diretor", "supervisor", "marketing"];
 
 /** True se a funcao pode administrar o catalogo da loja corporativa. */
 export function canManageCatalogo(role: RoleKey | undefined | null): boolean {
@@ -59,11 +87,23 @@ export function canManageCatalogo(role: RoleKey | undefined | null): boolean {
  * autocadastros corporativos (efetivar o cliente no Linx), mesmo sendo
  * diretor/supervisor somente-leitura no restante do sistema.
  */
-export const APPROVE_CADASTRO_ROLES: RoleKey[] = ["admin", "diretor", "supervisor"];
+export const APPROVE_CADASTRO_ROLES: RoleKey[] = ["admin", "diretor", "supervisor", "marketing"];
 
 /** True se a funcao pode aprovar/rejeitar autocadastros corporativos. */
 export function canApproveCadastro(role: RoleKey | undefined | null): boolean {
   return !!role && APPROVE_CADASTRO_ROLES.includes(role);
+}
+
+/**
+ * Imagens de produto sao GLOBAIS (produto x cor x posicao) e alimentam a vitrine
+ * da loja corporativa: quem monta o item na loja precisa subir a foto, entao o
+ * marketing entra junto com o admin. Diretor/supervisor continuam de fora.
+ */
+export const IMAGEM_MANAGER_ROLES: RoleKey[] = ["admin", "marketing"];
+
+/** True se a funcao pode subir/remover imagem de produto. */
+export function canManageProdutoImagem(role: RoleKey | undefined | null): boolean {
+  return !!role && IMAGEM_MANAGER_ROLES.includes(role);
 }
 
 /**
@@ -187,7 +227,7 @@ export const ROLE_RESTRICTED_PERMISSIONS: Partial<Record<PermissionKey, RoleKey[
   "compra-ciclo": ["admin", "diretor", "logistica"],
   // Área corporativo é exclusiva do admin, diretor e do cliente_corporativo. Supervisor/gerente/logística
   // nunca acessam, pois roleAllowsPermission barra.
-  "clientes-corporativos": ["admin", "diretor", "cliente_corporativo"],
+  "clientes-corporativos": ["admin", "diretor", "marketing", "cliente_corporativo"],
 };
 
 /** True se a funcao do usuario pode, em tese, receber/usar essa permissao. */
@@ -201,6 +241,9 @@ export function roleAllowsPermission(role: RoleKey, key: PermissionKey): boolean
 /** Empresas que o usuario pode ver. Se allowedCompanies nao definido ou vazio = as duas. */
 export function getVisibleCompanies(user: UserSession | null): CompanyKey[] {
   if (!user) return [];
+  // Funcoes exclusivas do corporativo nunca veem NERD/ScarfMe, mesmo que o
+  // cadastro tenha ficado com allowedCompanies vazio (= "ve as duas").
+  if (isCorporativoOnlyRole(user.role)) return ["corporativo"];
   const list = user.allowedCompanies;
   if (!list || list.length === 0) return ALL_COMPANIES;
   return list;
@@ -278,6 +321,7 @@ export function canAccessPath(user: UserSession | null, pathname: string | null)
   //  - supervisor: exceção pontual, só acessa /corporativo/catalogo (gerenciar catálogo).
   if (companySegment === "corporativo") {
     if (hasFullPageAccess(user.role)) return true; // admin (gestão) e diretor (leitura)
+    if (user.role === "marketing") return true; // equipe do corporativo: area inteira
     if (user.role === "cliente_corporativo") return parts[1] === "loja";
     // Supervisor: exceções pontuais — gerenciar catálogo e aprovar autocadastros.
     if (user.role === "supervisor") return parts[1] === "catalogo" || parts[1] === "aprovacoes";
@@ -293,6 +337,8 @@ export function getFirstAllowedPath(user: UserSession | null, company: string): 
   if (!user) return `/${company}`;
   // Cliente corporativo entra direto na LOJA; admin cai na gestão do corporativo.
   if (user.role === "cliente_corporativo") return "/corporativo/loja";
+  // Marketing so existe dentro do corporativo: cai na gestao, venha de onde vier.
+  if (user.role === "marketing") return "/corporativo";
   // Supervisor só tem acesso ao catálogo dentro de /corporativo (evita loop de redirect).
   if (user.role === "supervisor" && company === "corporativo") return "/corporativo/catalogo";
   if (company === "corporativo") return "/corporativo";

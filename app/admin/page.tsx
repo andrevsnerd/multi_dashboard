@@ -305,10 +305,10 @@ export default function AdminPage() {
     setClienteSearch("");
   }
 
-  /** Ao escolher cliente_corporativo, a empresa é sempre CORPORATIVO. */
+  /** cliente_corporativo e marketing vivem só no CORPORATIVO: a empresa é fixa. */
   function handleRoleChange(role: RoleKey) {
     setFormRole(role);
-    if (role === "cliente_corporativo") setFormEmpresa("corporativo");
+    if (role === "cliente_corporativo" || role === "marketing") setFormEmpresa("corporativo");
   }
 
   function openAdd() {

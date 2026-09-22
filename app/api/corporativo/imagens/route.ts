@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { findUserByUsername } from "@/lib/auth/users-store";
+import { canManageProdutoImagem } from "@/lib/auth/permissions";
 import {
   listProdutoImagens,
   upsertProdutoImagem,
@@ -9,17 +10,17 @@ import {
 
 export const maxDuration = 60;
 
-async function isAdmin(request: Request): Promise<boolean> {
+async function canManageImagem(request: Request): Promise<boolean> {
   const username = request.headers.get("x-auth-username");
   if (!username) return false;
   const user = await findUserByUsername(username);
-  return user?.role === "admin";
+  return canManageProdutoImagem(user?.role);
 }
 
 /**
  * Imagens de produto GLOBAIS do sistema (produto × cor × posição). São
  * compartilhadas — no futuro NERD/ScarfMe também leem daqui. Guardadas como
- * data-URL base64. Só admin gerencia por enquanto.
+ * data-URL base64. Quem gerencia: admin e marketing (IMAGEM_MANAGER_ROLES).
  */
 export async function GET(request: Request) {
   try {
@@ -35,7 +36,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!(await isAdmin(request)))
+  if (!(await canManageImagem(request)))
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   try {
     const body = await request.json();
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  if (!(await isAdmin(request)))
+  if (!(await canManageImagem(request)))
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   try {
     const { searchParams } = new URL(request.url);

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { findUserByUsername } from "@/lib/auth/users-store";
+import { canApproveCadastro, normalizeRole } from "@/lib/auth/permissions";
 import { getPedido, updatePedidoStatus } from "@/lib/repositories/corporativoStore";
 
 export const maxDuration = 60;
@@ -20,14 +21,14 @@ export async function GET(
   }
 }
 
-/** Atualiza o status do pedido (admin). */
+/** Atualiza o status do pedido. Mesmo conjunto que efetiva no Linx (APPROVE_CADASTRO_ROLES). */
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const username = request.headers.get("x-auth-username");
   const user = username ? await findUserByUsername(username) : null;
-  if (user?.role !== "admin")
+  if (!user || !canApproveCadastro(normalizeRole(user.role)))
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   try {
     const { id } = await params;
