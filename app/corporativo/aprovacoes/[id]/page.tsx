@@ -18,6 +18,7 @@ import styles from "../../corporativo.module.css";
 const EMPTY_OPTIONS: CorporativoLookups = {
   condicoesPgto: [], tabelasPreco: [], transportadoras: [], regioes: [], conceitos: [],
   pontualidades: [], tipos: [], tiposTributacao: [], indicadoresFiscais: [], filiais: [],
+  contasContabeis: [], representantes: [],
   proximoCodigoPreview: "",
 };
 

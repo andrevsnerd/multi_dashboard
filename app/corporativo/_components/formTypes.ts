@@ -1,3 +1,4 @@
+import { CONTA_CONTABIL_PADRAO, REPRESENTANTE_PADRAO } from "@/lib/corporativo/config";
 import type { ClienteCorporativoInput, TipoPessoa } from "@/lib/corporativo/types";
 
 /** UF → macro-região (para preencher REGIAO automaticamente). Fonte única em lib/corporativo/regioes. */
@@ -32,6 +33,7 @@ export interface FormState extends EnderecoFields {
   filial: string; condicaoPgto: string; codigoTabPreco: string;
   transportadora: string; regiao: string; conceito: string; tipo: string; pontualidade: string;
   limiteCredito: string; indicadorVenda: string; matrizCliente: string; observacao: string;
+  contaContabil: string; representante: string;
 }
 
 export const initialForm: FormState = {
@@ -46,6 +48,7 @@ export const initialForm: FormState = {
   filial: "", condicaoPgto: "", codigoTabPreco: "", transportadora: "", regiao: "",
   conceito: "", tipo: "", pontualidade: "INDEFINIDO",
   limiteCredito: "0", indicadorVenda: "", matrizCliente: "", observacao: "",
+  contaContabil: CONTA_CONTABIL_PADRAO, representante: REPRESENTANTE_PADRAO,
 };
 
 export function pickOption(options: { value: string }[], prefer: string[]): string {
@@ -87,6 +90,7 @@ export function formStateToInput(form: FormState): ClienteCorporativoInput {
     tipo: form.tipo, pontualidade: form.pontualidade,
     limiteCredito: Number(form.limiteCredito) || 0,
     indicadorVenda: form.indicadorVenda, matrizCliente: form.matrizCliente, observacao: form.observacao,
+    contaContabil: form.contaContabil, representante: form.representante,
   };
 }
 
@@ -150,5 +154,7 @@ export function inputToFormState(input: ClienteCorporativoInput): FormState {
     indicadorVenda: input.indicadorVenda ?? "",
     matrizCliente: input.matrizCliente ?? "",
     observacao: input.observacao ?? "",
+    contaContabil: input.contaContabil ?? "",
+    representante: input.representante ?? "",
   };
 }

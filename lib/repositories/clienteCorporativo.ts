@@ -42,6 +42,8 @@ export async function fetchCorporativoLookups(): Promise<CorporativoLookups> {
     pontualidades,
     tipos,
     filiais,
+    contasContabeis,
+    representantes,
     proximoCodigoPreview,
   ] = await Promise.all([
     fetchCondicoesPgto(),
@@ -51,6 +53,8 @@ export async function fetchCorporativoLookups(): Promise<CorporativoLookups> {
     fetchPontualidades(),
     fetchTipos(),
     fetchFiliais(),
+    fetchContasContabeis(),
+    fetchRepresentantes(),
     fetchProximoCodigoPreview(),
   ]);
 
@@ -62,6 +66,8 @@ export async function fetchCorporativoLookups(): Promise<CorporativoLookups> {
     pontualidades,
     tipos,
     filiais,
+    contasContabeis,
+    representantes,
     // Regiões e tipos de tributação são estáveis — lista fixa evita varredura.
     regioes: ["CENTRO OESTE", "NORDESTE", "NORTE", "SUDESTE", "SUL"].map((r) => ({ value: r, label: r })),
     tiposTributacao: ["SIMPLES NACIONAL", "PRESUMIDO", "REAL"].map((t) => ({ value: t, label: t })),
@@ -131,6 +137,38 @@ async function fetchFiliais(): Promise<OptionItem[]> {
      WHERE FILIAL IS NOT NULL AND LTRIM(RTRIM(FILIAL)) <> '' ORDER BY FILIAL`
   );
   return rows.map((r) => ({ value: r.FILIAL, label: r.FILIAL }));
+}
+
+/**
+ * Plano de contas contábil (CTB_CONTA_PLANO) — é a FK de
+ * CLIENTES_ATACADO.CTB_CONTA_CONTABIL. Só contas ativas.
+ */
+async function fetchContasContabeis(): Promise<OptionItem[]> {
+  const rows = await query<{ CONTA_CONTABIL: string; DESC_CONTA: string }>(
+    `SELECT LTRIM(RTRIM(CONTA_CONTABIL)) AS CONTA_CONTABIL, LTRIM(RTRIM(DESC_CONTA)) AS DESC_CONTA
+     FROM CTB_CONTA_PLANO WITH (NOLOCK) WHERE ISNULL(INATIVA, 0) = 0 ORDER BY CONTA_CONTABIL`
+  );
+  return rows
+    .filter((r) => r.CONTA_CONTABIL)
+    .map((r) => ({ value: r.CONTA_CONTABIL, label: `${r.CONTA_CONTABIL} - ${r.DESC_CONTA || ""}`.trim() }));
+}
+
+/**
+ * Representantes ativos. "SEM REPRESENTANTE" é um cadastro real do Linx (0001) e
+ * vem primeiro, porque é o padrão da venda direta.
+ */
+async function fetchRepresentantes(): Promise<OptionItem[]> {
+  const rows = await query<{ REPRESENTANTE: string; COD_REPRESENTANTE: string }>(
+    `SELECT LTRIM(RTRIM(REPRESENTANTE)) AS REPRESENTANTE, LTRIM(RTRIM(COD_REPRESENTANTE)) AS COD_REPRESENTANTE
+     FROM REPRESENTANTES WITH (NOLOCK) WHERE ISNULL(INATIVO, 0) = 0
+     ORDER BY CASE WHEN UPPER(LTRIM(RTRIM(REPRESENTANTE))) = 'SEM REPRESENTANTE' THEN 0 ELSE 1 END, REPRESENTANTE`
+  );
+  return rows
+    .filter((r) => r.REPRESENTANTE)
+    .map((r) => ({
+      value: r.REPRESENTANTE,
+      label: r.COD_REPRESENTANTE ? `${r.COD_REPRESENTANTE} - ${r.REPRESENTANTE}` : r.REPRESENTANTE,
+    }));
 }
 
 export async function fetchProximoCodigoPreview(): Promise<string> {
@@ -253,6 +291,7 @@ interface RawDetalheRow {
   transportadora: string; regiao: string; conceito: string; tipo: string;
   pontualidade: string; limiteCredito: number; indicadorVenda: string;
   matrizCliente: string; observacao: string | null;
+  contaContabil: string | null; contaContabilDesc: string | null; representante: string | null;
 
   cadastramento: Date | string | null;
   inativo: boolean;
@@ -308,12 +347,17 @@ export async function fetchClienteCorporativoDetalhe(
         LTRIM(RTRIM(ca.PONTUALIDADE)) AS pontualidade, ISNULL(ca.LIMITE_CREDITO, 0) AS limiteCredito,
         LTRIM(RTRIM(ca.INDICADOR_VENDA)) AS indicadorVenda, LTRIM(RTRIM(ca.MATRIZ_CLIENTE)) AS matrizCliente,
         ca.OBS AS observacao,
+        LTRIM(RTRIM(ca.CTB_CONTA_CONTABIL)) AS contaContabil, LTRIM(RTRIM(cc.DESC_CONTA)) AS contaContabilDesc,
+        LTRIM(RTRIM(cr.REPRESENTANTE)) AS representante,
 
         cf.CADASTRAMENTO AS cadastramento, ISNULL(ca.INATIVO, 0) AS inativo
       FROM CADASTRO_CLI_FOR cf WITH (NOLOCK)
       LEFT JOIN CLIENTES_ATACADO ca WITH (NOLOCK) ON LTRIM(RTRIM(ca.CLIFOR)) = LTRIM(RTRIM(cf.CLIFOR))
       LEFT JOIN COND_ATAC_PGTOS cp WITH (NOLOCK) ON LTRIM(RTRIM(cp.CONDICAO_PGTO)) = LTRIM(RTRIM(ca.CONDICAO_PGTO))
       LEFT JOIN TABELAS_PRECO tp WITH (NOLOCK) ON LTRIM(RTRIM(tp.CODIGO_TAB_PRECO)) = LTRIM(RTRIM(ca.CODIGO_TAB_PRECO))
+      LEFT JOIN CTB_CONTA_PLANO cc WITH (NOLOCK) ON LTRIM(RTRIM(cc.CONTA_CONTABIL)) = LTRIM(RTRIM(ca.CTB_CONTA_CONTABIL))
+      LEFT JOIN CLIENTE_REPRE cr WITH (NOLOCK) ON LTRIM(RTRIM(cr.CLIENTE_ATACADO)) = LTRIM(RTRIM(ca.CLIENTE_ATACADO))
+                                              AND cr.REPRESENTANTE_PRINCIPAL = 1
       WHERE LTRIM(RTRIM(cf.CLIFOR)) = @codigo`);
     return result.recordset as RawDetalheRow[];
   });
@@ -362,6 +406,9 @@ export async function fetchClienteCorporativoDetalhe(
     indicadorVenda: r.indicadorVenda ?? "",
     matrizCliente: r.matrizCliente ?? "",
     observacao: r.observacao ?? "",
+    contaContabil: r.contaContabil ?? "",
+    contaContabilDescricao: r.contaContabilDesc ?? "",
+    representante: r.representante ?? "",
     cadastramento: r.cadastramento ? new Date(r.cadastramento).toISOString() : null,
     inativo: Boolean(r.inativo),
   };
@@ -479,6 +526,10 @@ export async function criarClienteCorporativo(
   const matrizCliente = cut(input.matrizCliente, 25) || nomeBase;
   const limiteCredito = Number.isFinite(input.limiteCredito as number) ? Number(input.limiteCredito) : 0;
   const observacao = cutRaw(input.observacao, 4000);
+  // Conta contábil e representante são FKs (CTB_CONTA_PLANO / REPRESENTANTES):
+  // vazio = não grava (conta fica NULL, cliente fica sem vínculo de representante).
+  const contaContabil = cut(input.contaContabil, 20);
+  const representante = cut(input.representante, 25);
 
   const aniversario = (input.aniversario ?? "").trim(); // '' ou 'YYYY-MM-DD'
   const tipoTributacao = isPJ ? cut(input.tipoTributacao, 25) : "";
@@ -553,6 +604,8 @@ export async function criarClienteCorporativo(
     bind("matrizCliente", matrizCliente);
     bind("limiteCredito", limiteCredito);
     bind("observacao", observacao);
+    bind("contaContabil", contaContabil);
+    bind("representante", representante);
 
     const batch = buildInsertBatch();
     let result;
@@ -617,6 +670,21 @@ BEGIN TRY
   DECLARE @aniv DATETIME = CASE WHEN LTRIM(RTRIM(@aniversario)) = '' THEN NULL
                                 ELSE TRY_CONVERT(DATETIME, @aniversario, 120) END;
 
+  -- FKs opcionais: falham com mensagem própria em vez de erro cru de constraint.
+  IF LTRIM(RTRIM(@contaContabil)) <> ''
+     AND NOT EXISTS (SELECT 1 FROM CTB_CONTA_PLANO WHERE LTRIM(RTRIM(CONTA_CONTABIL)) = LTRIM(RTRIM(@contaContabil)))
+  BEGIN
+    ;THROW 51002, 'Conta contábil informada não existe no plano de contas do Linx.', 1;
+  END
+
+  DECLARE @repNome VARCHAR(25), @repComissao NUMERIC(18,4);
+  IF LTRIM(RTRIM(@representante)) <> ''
+  BEGIN
+    SELECT TOP 1 @repNome = REPRESENTANTE, @repComissao = ISNULL(COMISSAO, 0)
+      FROM REPRESENTANTES WHERE LTRIM(RTRIM(REPRESENTANTE)) = LTRIM(RTRIM(@representante));
+    IF @repNome IS NULL BEGIN ;THROW 51003, 'Representante informado não existe no Linx.', 1; END
+  END
+
   INSERT INTO CADASTRO_CLI_FOR (
     NOME_CLIFOR, CLIFOR, COD_CLIFOR, CGC_CPF, RAZAO_SOCIAL, PJ_PF, RG_IE,
     CEP, ENDERECO, NUMERO, COMPLEMENTO, BAIRRO, CIDADE, UF, PAIS, COD_MUNICIPIO_IBGE,
@@ -658,7 +726,7 @@ BEGIN TRY
     INATIVO, INDICA_FRANQUIA, INDICADOR_VENDA, DATA_PARA_TRANSFERENCIA,
     EXPEDICAO_COMPLETO_PEDIDO, EXPEDICAO_COMPLETO_PACK, EXPEDICAO_COMPLETO_TAMANHOS,
     EXPEDICAO_COMPLETO_COR, EXPEDICAO_COMPLETO_COORDENADO, EXPEDICAO_COMPLETO_CARTELA,
-    EXPEDICAO_COMPLETO_FAIXAS, MULTI_DESCONTO_ACUMULAR, CONTEUDO_XPED_NFE, OBS
+    EXPEDICAO_COMPLETO_FAIXAS, MULTI_DESCONTO_ACUMULAR, CONTEUDO_XPED_NFE, OBS, CTB_CONTA_CONTABIL
   ) VALUES (
     @nome, @codigo, @codigo, @cgc,
     @condicaoPgto, @regiao, @filial, @pontualidade, @transportadora, @conceito, @tipo, 'INDEFINIDO',
@@ -666,8 +734,19 @@ BEGIN TRY
     0, 0, @indicadorVenda, GETDATE(),
     0, 0, 0,
     0, 0, 0,
-    0, 0, 0, NULLIF(@observacao,'')
+    0, 0, 0, NULLIF(@observacao,''), NULLIF(LTRIM(RTRIM(@contaContabil)),'')
   );
+
+  -- Vínculo com o representante (CLIENTE_REPRE). "SEM REPRESENTANTE" também é um
+  -- vínculo de verdade no Linx — é como o ERP marca venda direta, sem comissão.
+  IF @repNome IS NOT NULL
+  BEGIN
+    INSERT INTO CLIENTE_REPRE (
+      REPRESENTANTE, CLIENTE_ATACADO, DATA_PARA_TRANSFERENCIA, COMISSAO, REPRESENTANTE_PRINCIPAL
+    ) VALUES (
+      @repNome, @nome, GETDATE(), ISNULL(@repComissao, 0), 1
+    );
+  END
 
   COMMIT;
   SELECT @codigo AS codigo, @nome AS nome;

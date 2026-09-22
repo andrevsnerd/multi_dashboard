@@ -28,6 +28,10 @@ export interface CorporativoLookups {
   tiposTributacao: OptionItem[];
   indicadoresFiscais: OptionItem[];
   filiais: OptionItem[];
+  /** Plano de contas ativo (CTB_CONTA_PLANO) — conta contábil do cliente. */
+  contasContabeis: OptionItem[];
+  /** Representantes ativos (REPRESENTANTES). Inclui "SEM REPRESENTANTE". */
+  representantes: OptionItem[];
   /** Próximo código que SERIA gerado (apenas visualização; não reserva). */
   proximoCodigoPreview: string;
 }
@@ -104,6 +108,10 @@ export interface ClienteCorporativoInput {
   indicadorVenda?: string;
   matrizCliente?: string;
   observacao?: string;
+  /** Conta contábil (CLIENTES_ATACADO.CTB_CONTA_CONTABIL → CTB_CONTA_PLANO). */
+  contaContabil?: string;
+  /** Representante (CLIENTE_REPRE.REPRESENTANTE → REPRESENTANTES). "" = não grava vínculo. */
+  representante?: string;
 }
 
 /** Resultado da criação. */
@@ -217,6 +225,9 @@ export interface ClienteCorporativoDetalhe {
   indicadorVenda: string;
   matrizCliente: string;
   observacao: string;
+  contaContabil: string;
+  contaContabilDescricao: string;
+  representante: string;
 
   cadastramento: string | null;
   inativo: boolean;

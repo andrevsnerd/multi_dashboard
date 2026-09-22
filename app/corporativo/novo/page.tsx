@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { CONTA_CONTABIL_PADRAO, REPRESENTANTE_PADRAO } from "@/lib/corporativo/config";
 import type { ClienteCorporativoCriado, CorporativoLookups, TipoPessoa } from "@/lib/corporativo/types";
 import { ClienteCorporativoForm } from "../_components/ClienteCorporativoForm";
 import { initialForm, pickOption, UF_REGIAO, type EnderecoFields, type FormState } from "../_components/formTypes";
@@ -37,6 +38,8 @@ export default function NovoClienteCorporativoPage() {
           tipo: pickOption(lk.tipos, ["CORPORATIVO", "ATACADO"]),
           pontualidade: pickOption(lk.pontualidades, ["INDEFINIDO"]),
           filial: pickOption(lk.filiais, ["SCARF ME - MATRIZ"]),
+          contaContabil: pickOption(lk.contasContabeis, [CONTA_CONTABIL_PADRAO]),
+          representante: pickOption(lk.representantes, [REPRESENTANTE_PADRAO]),
         }));
       } catch (e) {
         setError(e instanceof Error ? e.message : "Erro ao carregar formulário.");
@@ -183,6 +186,7 @@ export default function NovoClienteCorporativoPage() {
       tipo: form.tipo, pontualidade: form.pontualidade,
       limiteCredito: Number(form.limiteCredito) || 0,
       indicadorVenda: form.indicadorVenda, matrizCliente: form.matrizCliente, observacao: form.observacao,
+      contaContabil: form.contaContabil, representante: form.representante,
       forcar,
     };
   }
@@ -237,6 +241,8 @@ export default function NovoClienteCorporativoPage() {
       tipo: f.tipo,
       pontualidade: f.pontualidade,
       filial: f.filial,
+      contaContabil: f.contaContabil,
+      representante: f.representante,
     }));
   }
 
@@ -330,5 +336,6 @@ export default function NovoClienteCorporativoPage() {
 const EMPTY_OPTIONS: CorporativoLookups = {
   condicoesPgto: [], tabelasPreco: [], transportadoras: [], regioes: [], conceitos: [],
   pontualidades: [], tipos: [], tiposTributacao: [], indicadoresFiscais: [], filiais: [],
+  contasContabeis: [], representantes: [],
   proximoCodigoPreview: "",
 };

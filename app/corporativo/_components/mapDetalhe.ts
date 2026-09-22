@@ -55,6 +55,8 @@ export function detalheToFormState(d: ClienteCorporativoDetalhe): FormState {
     indicadorVenda: d.indicadorVenda,
     matrizCliente: d.matrizCliente,
     observacao: d.observacao,
+    contaContabil: d.contaContabil,
+    representante: d.representante,
   };
 }
 
@@ -87,5 +89,10 @@ export function detalheToViewOptions(d: ClienteCorporativoDetalhe): ComercialOpt
     filiais: single(d.filial),
     indicadoresFiscais: single(d.indicadorFiscal, INDICADOR_FISCAL_LABELS[d.indicadorFiscal]),
     tiposTributacao: single(d.tipoTributacao),
+    contasContabeis: single(
+      d.contaContabil,
+      d.contaContabilDescricao ? `${d.contaContabil} - ${d.contaContabilDescricao}` : undefined
+    ),
+    representantes: single(d.representante),
   };
 }

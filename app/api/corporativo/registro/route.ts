@@ -138,6 +138,8 @@ export async function POST(request: Request) {
       indicadorVenda: "",
       matrizCliente: "",
       observacao: "Autocadastro (loja corporativa) — pendente de aprovação.",
+      contaContabil: padrao.contaContabil,
+      representante: padrao.representante,
     };
 
     // Cria o usuário do sistema (pronto para login; SEM clienteCodigo até aprovar).

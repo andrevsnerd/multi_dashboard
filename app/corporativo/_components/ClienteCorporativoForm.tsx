@@ -15,6 +15,8 @@ export interface ComercialOptions {
   filiais: OptionItem[];
   indicadoresFiscais: OptionItem[];
   tiposTributacao: OptionItem[];
+  contasContabeis: OptionItem[];
+  representantes: OptionItem[];
 }
 
 interface ClienteCorporativoFormProps {
@@ -298,6 +300,12 @@ export function ClienteCorporativoForm({
             options={options.conceitos} disabled={readOnly} onChange={(v) => set("conceito", v)} />
           <SelectField className={styles.col4} label="Pontualidade" value={form.pontualidade}
             options={options.pontualidades} disabled={readOnly} onChange={(v) => set("pontualidade", v)} />
+          <SelectField className={styles.col6} label="Conta contábil" value={form.contaContabil}
+            options={options.contasContabeis} disabled={readOnly} allowEmpty
+            onChange={(v) => set("contaContabil", v)} />
+          <SelectField className={styles.col6} label="Representante" value={form.representante}
+            options={options.representantes} disabled={readOnly} allowEmpty
+            onChange={(v) => set("representante", v)} />
           <div className={`${styles.field} ${styles.col4}`}>
             <span className={styles.label}>Limite de crédito</span>
             <input className={styles.input} value={form.limiteCredito} inputMode="decimal" disabled={readOnly}

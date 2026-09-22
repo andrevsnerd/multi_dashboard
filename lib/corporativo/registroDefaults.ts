@@ -13,8 +13,11 @@
  *  - Conceito: BOM. Pontualidade: INDEFINIDO. Filial: SCARF ME - MATRIZ.
  *  - Região: derivada da UF do endereço.
  *  - Indicador fiscal: PJ → 1 (Empresa); PF → 8 (Não Contribuinte).
+ *  - Conta contábil: 1120101 (DUPLICATAS A RECEBER - CLIENTE NACIONAL).
+ *  - Representante: SEM REPRESENTANTE (venda direta, sem comissão).
  *  - PF é sempre ISENTO (RG_IE = "ISENTO"); PJ informa Inscrição Estadual.
  */
+import { CONTA_CONTABIL_PADRAO, REPRESENTANTE_PADRAO } from "@/lib/corporativo/config";
 import type { CorporativoLookups, OptionItem, TipoPessoa } from "@/lib/corporativo/types";
 import { regiaoFromUf } from "@/lib/corporativo/regioes";
 
@@ -55,6 +58,8 @@ export interface RegistroComercialPadrao {
   filial: string;
   indicadorFiscal: number;
   limiteCredito: number;
+  contaContabil: string;
+  representante: string;
 }
 
 /**
@@ -100,6 +105,12 @@ export function resolveRegistroComercial(
     pickByLabelIncludes(lookups.filiais, [["SCARF", "MATRIZ"], ["MATRIZ"]]) ?? "";
   if (!filial) avisos.push("Filial SCARF ME - MATRIZ não encontrada no Linx.");
 
+  const contaContabil = pickByValue(lookups.contasContabeis, [CONTA_CONTABIL_PADRAO]) ?? "";
+  if (!contaContabil) avisos.push(`Conta contábil ${CONTA_CONTABIL_PADRAO} não encontrada no plano de contas.`);
+
+  const representante = pickByValue(lookups.representantes, [REPRESENTANTE_PADRAO]) ?? "";
+  if (!representante) avisos.push(`Representante "${REPRESENTANTE_PADRAO}" não encontrado no Linx.`);
+
   return {
     padrao: {
       condicaoPgto,
@@ -112,6 +123,8 @@ export function resolveRegistroComercial(
       filial,
       indicadorFiscal: isPJ ? 1 : 8,
       limiteCredito: 0,
+      contaContabil,
+      representante,
     },
     avisos,
   };
