@@ -8,10 +8,14 @@ import {
   confirmarItem,
   desconfirmarItem,
 } from "@/lib/utils/romaneio-confirmacao-store";
-import { withRequest } from "@/lib/db/connection";
+import { withRequest, getConnectionPool } from "@/lib/db/connection";
 import sql from "mssql";
 import { getActiveFilial } from "@/lib/config/company";
 import { resolveCompanyDynamic } from "@/lib/config/company-server";
+import { shouldUseProxy, ProxyPool } from "@/lib/db/proxy";
+import { resolveResponsavelLinx } from "@/lib/server/responsavel-linx";
+import { inserirAjuste } from "@/lib/repositories/ajuste-historico";
+import { executeItemQtdeSet } from "@/lib/saida-entrada-executor";
 
 /**
  * GET /api/romaneio-confirmar-entrada?company=X&romaneio=Y&filialDestino=Z
@@ -85,6 +89,17 @@ export async function POST(request: Request) {
       corProduto: string;
       qtdeConfirmada?: number;
       acao: "confirmar" | "desconfirmar";
+      /**
+       * Filial de ORIGEM do romaneio de saída. Quando vem, confirmar menos do
+       * que saiu devolve a diferença ao estoque dela (ver o bloco de correção).
+       */
+      filialOrigem?: string;
+      /**
+       * Romaneio de ENTRADA gerado no destino nesta conferência. Guardado junto
+       * com a confirmação porque o Linx não liga a entrada avulsa à saída, e sem
+       * esse vínculo não há como corrigir o destino depois.
+       */
+      romaneioEntrada?: string;
     };
 
     const { companyKey, romaneioId, filialDestino, produto, corProduto, qtdeConfirmada = 0, acao } = body;
@@ -161,6 +176,78 @@ export async function POST(request: Request) {
         });
       }
     } else {
+      // CONFERIU MENOS DO QUE SAIU → a peça que não chegou volta para a loja.
+      //
+      // Antes, confirmar 2 de uma saída de 3 dava entrada de 2 no destino e
+      // deixava a loja de origem 1 peça a menos para sempre: a divergência
+      // desaparecia sem que ninguém devolvesse nada. Aqui a saída passa a valer
+      // a quantidade conferida e o trigger do Linx devolve a diferença.
+      //
+      // Só vale para saída AVULSA: o executor recusa romaneio pareado com
+      // entrada/nota de transferência, porque lá o outro lado é amarrado pelo
+      // ERP e a diferença é assunto de conferência, não de correção. Por isso a
+      // falha aqui NÃO derruba a confirmação — ela só volta descrita na resposta.
+      let origem: { corrigido: boolean; detalhe: string } | null = null;
+      const filialOrigem = (body.filialOrigem ?? "").trim();
+
+      if (filialOrigem && qtdeConfirmada > 0) {
+        try {
+          const qtdeSaida = await withRequest(async (req) => {
+            req.input("romaneio", sql.VarChar, romaneioId.trim());
+            req.input("filial", sql.VarChar, filialOrigem);
+            req.input("produto", sql.VarChar, produto.trim());
+            req.input("cor", sql.VarChar, (corProduto ?? "").trim());
+            const r = await req.query<{ qtde: number | null }>(`
+              SELECT TOP 1 ISNULL(i.QTDE, 0) AS qtde
+                FROM ESTOQUE_PROD1_SAI i WITH (NOLOCK)
+               WHERE LTRIM(RTRIM(i.ROMANEIO_PRODUTO)) = @romaneio
+                 AND LTRIM(RTRIM(i.FILIAL)) = LTRIM(RTRIM(@filial))
+                 AND LTRIM(RTRIM(i.PRODUTO)) = @produto
+                 AND (
+                   ISNULL(LTRIM(RTRIM(CAST(i.COR_PRODUTO AS VARCHAR(20)))), '') = @cor
+                   OR TRY_CONVERT(INT, i.COR_PRODUTO) = TRY_CONVERT(INT, @cor)
+                 )
+            `);
+            return Number(r.recordset[0]?.qtde ?? 0);
+          });
+
+          if (qtdeSaida > qtdeConfirmada) {
+            const pool = shouldUseProxy() ? new ProxyPool() : await getConnectionPool();
+            const res = await executeItemQtdeSet(pool, {
+              tipo: "saida",
+              romaneio: romaneioId,
+              filial: filialOrigem,
+              produto,
+              corProduto: corProduto ?? "",
+              qtdeNova: qtdeConfirmada,
+            });
+            const devolvido = -res.delta;
+            origem = {
+              corrigido: true,
+              detalhe: `${devolvido} peça(s) devolvida(s) ao estoque de ${res.filial}: a saída ${romaneioId} passou de ${res.qtdeAnterior} para ${qtdeConfirmada}.`,
+            };
+            inserirAjuste({
+              filial: res.filial,
+              itens: [{ produto, cor: (corProduto ?? "").trim(), qtde: devolvido }],
+              romaneioRef: romaneioId,
+              tipoAjuste: "CORRECAO_CONFERENCIA_SAIDA",
+              responsavel: await resolveResponsavelLinx(username),
+              obs: `Conferência de ${fd}: ${res.qtdeAnterior} → ${qtdeConfirmada}`,
+            }).catch((e) =>
+              console.error("[ajuste-historico] Falha ao registrar auditoria:", e)
+            );
+          }
+        } catch (e) {
+          origem = {
+            corrigido: false,
+            detalhe:
+              e instanceof Error
+                ? `O item foi confirmado, mas a saída não pôde ser corrigida: ${e.message}`
+                : "O item foi confirmado, mas a saída não pôde ser corrigida.",
+          };
+        }
+      }
+
       await confirmarItem(
         companyKey,
         romaneioId,
@@ -168,8 +255,11 @@ export async function POST(request: Request) {
         produto,
         corProduto ?? "",
         qtdeConfirmada,
-        username
+        username,
+        (body.romaneioEntrada ?? "").trim()
       );
+
+      return NextResponse.json({ success: true, acao, origem });
     }
 
     return NextResponse.json({ success: true, acao });

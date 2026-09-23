@@ -43,6 +43,7 @@ export const PAGE_PERMISSION_DEFINITIONS = [
   { key: "transferencia-produtos", label: "Transferencia de Produtos", routeSegments: ["transferencia-produtos"] },
   { key: "distribuicao-matriz", label: "Distribuicao Matriz", routeSegments: ["distribuicao-matriz"] },
   { key: "romaneios", label: "Romaneios", routeSegments: ["romaneios"] },
+  { key: "defeitos", label: "Defeitos", routeSegments: ["defeitos"] },
   { key: "saidas-entradas-produtos", label: "Saidas e Entradas de Produtos", routeSegments: ["saidas-entradas-produtos"] },
   { key: "extrato-produto", label: "Extrato de Produto", routeSegments: ["extrato-produto"] },
   { key: "ajuste-estoque", label: "Ajuste de Estoque", routeSegments: ["ajuste-estoque"] },

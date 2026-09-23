@@ -50,6 +50,12 @@ async function fetchConfirmados(
   return new Map(Object.entries(json.data || {}));
 }
 
+/**
+ * `filialOrigem` e `romaneioEntrada` são opcionais de propósito: só a conferência
+ * de uma SAÍDA tem os dois. Quando vão, o servidor devolve à loja de origem a
+ * peça que não chegou (confirmou 2 de uma saída de 3 → 1 volta) e guarda o
+ * romaneio de entrada gerado, que é o que permite corrigir o destino depois.
+ */
 async function postConfirmacao(
   username: string,
   companyKey: string,
@@ -58,8 +64,9 @@ async function postConfirmacao(
   produto: string,
   corProduto: string,
   qtdeConfirmada: number,
-  acao: "confirmar" | "desconfirmar"
-): Promise<boolean> {
+  acao: "confirmar" | "desconfirmar",
+  extra?: { filialOrigem?: string; romaneioEntrada?: string }
+): Promise<{ ok: boolean; origem?: { corrigido: boolean; detalhe: string } | null }> {
   const res = await fetch("/api/romaneio-confirmar-entrada", {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-auth-username": username },
@@ -71,9 +78,15 @@ async function postConfirmacao(
       corProduto: corProduto ?? "",
       qtdeConfirmada,
       acao,
+      filialOrigem: extra?.filialOrigem,
+      romaneioEntrada: extra?.romaneioEntrada,
     }),
   });
-  return res.ok;
+  if (!res.ok) return { ok: false };
+  const json = (await res.json().catch(() => ({}))) as {
+    origem?: { corrigido: boolean; detalhe: string } | null;
+  };
+  return { ok: true, origem: json.origem ?? null };
 }
 
 /** Registra entrada de estoque em lote (todos os itens no mesmo romaneio). */
@@ -378,6 +391,8 @@ export default function RomaneioDetalhePage({
   const [editRomaneioErro, setEditRomaneioErro] = useState<string | null>(null);
   const [editRomaneioSucesso, setEditRomaneioSucesso] = useState<string | null>(null);
   const [liberacaoTransitoMsg, setLiberacaoTransitoMsg] = useState<string | null>(null);
+  /** O que voltou para a loja de origem por ter sido conferido a menos. */
+  const [devolucoesOrigem, setDevolucoesOrigem] = useState<string[]>([]);
 
   // Inicializa quantidades quando itens carregam
   useEffect(() => {
@@ -482,7 +497,17 @@ export default function RomaneioDetalhePage({
       .map((item) => {
         const chave = `${item.produto}|${item.corProduto ?? ""}`;
         const qtde = quantidades.get(chave) ?? item.qtde;
-        return { produto: item.produto, corProduto: item.corProduto, quantidade: qtde, chave };
+        return {
+          produto: item.produto,
+          corProduto: item.corProduto,
+          quantidade: qtde,
+          chave,
+          // Conferiu menos do que o romaneio diz → a diferença tem que voltar
+          // para a loja. Marcado aqui para que só estes itens paguem a consulta
+          // extra no servidor: numa conferência normal (tudo integral) ninguém
+          // paga nada, e um romaneio de 600 itens não vira 600 idas ao banco.
+          divergente: qtde < item.qtde,
+        };
       })
       .filter((i) => i.quantidade > 0);
 
@@ -490,6 +515,8 @@ export default function RomaneioDetalhePage({
 
     setConfirmandoTudo(true);
     setErroConfirmacao(null);
+    setDevolucoesOrigem([]);
+    let romaneioEntradaGerado = "";
 
     try {
       if (isTransito) {
@@ -531,15 +558,30 @@ export default function RomaneioDetalhePage({
           return;
         }
         if (result.romaneio) setRomaneioGerado(result.romaneio);
+        romaneioEntradaGerado = result.romaneio ?? "";
       }
 
-      // Marca confirmação no romaneio para cada item
+      // Marca confirmação no romaneio para cada item. Numa SAÍDA vão junto a
+      // filial de origem e o romaneio de entrada: é o que faz o servidor
+      // devolver à loja a peça que não chegou e guardar o vínculo saída→entrada.
+      const devolucoes: string[] = [];
       for (const item of itensParaConfirmar) {
-        await postConfirmacao(
+        const res = await postConfirmacao(
           user.username, companySlug, romaneioId, filialRef,
-          item.produto, item.corProduto ?? "", item.quantidade, "confirmar"
+          item.produto, item.corProduto ?? "", item.quantidade, "confirmar",
+          isSaida
+            ? {
+                // `filialOrigem` só vai no item divergente: é ele que dispara a
+                // devolução de estoque no servidor (que confere a quantidade real
+                // antes de mexer em qualquer coisa).
+                filialOrigem: item.divergente ? filialOrigem : undefined,
+                romaneioEntrada: romaneioEntradaGerado,
+              }
+            : undefined
         );
+        if (res.origem?.detalhe) devolucoes.push(res.origem.detalhe);
       }
+      setDevolucoesOrigem(devolucoes);
 
       // Atualiza estado local
       setConfirmados((prev) => {
@@ -569,7 +611,7 @@ export default function RomaneioDetalhePage({
     const chave = `${produto}|${cor}`;
     setConfirmandoKey(chave);
     const filialRef = isSaida ? destinoSelected : filialDestino;
-    const ok = await postConfirmacao(
+    const { ok } = await postConfirmacao(
       user.username, companySlug, romaneioId, filialRef,
       produto, cor, 0, "desconfirmar"
     );
@@ -1129,6 +1171,26 @@ export default function RomaneioDetalhePage({
             type="button"
             className={styles.fecharBannerBtn}
             onClick={() => setRomaneioGerado(null)}
+            title="Fechar"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {devolucoesOrigem.length > 0 && (
+        <div className={styles.romaneioGeradoBanner}>
+          <span>
+            {devolucoesOrigem.map((texto, i) => (
+              <span key={i} style={{ display: "block" }}>
+                {texto}
+              </span>
+            ))}
+          </span>
+          <button
+            type="button"
+            className={styles.fecharBannerBtn}
+            onClick={() => setDevolucoesOrigem([])}
             title="Fechar"
           >
             ✕

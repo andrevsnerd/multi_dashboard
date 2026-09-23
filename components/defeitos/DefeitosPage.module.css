@@ -1,0 +1,625 @@
+.wrapper {
+  width: 100%;
+  padding: 24px;
+  min-height: 100vh;
+  background: var(--s-gray50);
+}
+
+.header {
+  margin-bottom: 20px;
+}
+
+.title {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--t-gray900);
+  margin: 0 0 4px 0;
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: var(--t-gray500);
+}
+
+/* Dois lados. Abaixo de 1100px empilham — a tabela de custos não cabe em meia
+   tela estreita e o operador usa a esquerda no tablet da conferência. */
+.colunas {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .colunas {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.painel {
+  background: var(--s-white);
+  border: 1px solid var(--b-gray200);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: var(--elev-1);
+  min-width: 0;
+}
+
+.painelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.painelTitulo {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--t-gray900);
+  margin: 0;
+}
+
+.contador {
+  font-size: 12px;
+  color: var(--t-gray500);
+  white-space: nowrap;
+}
+
+.filtros {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.input,
+.select,
+.inputData {
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--t-gray800);
+  background: var(--s-white);
+  border: 1px solid var(--b-gray300);
+  border-radius: 8px;
+  min-width: 0;
+}
+
+.input {
+  flex: 1 1 200px;
+}
+
+.input:focus,
+.select:focus,
+.inputData:focus {
+  outline: 2px solid var(--ring-accent);
+  outline-offset: -1px;
+}
+
+.campoData {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--t-gray500);
+}
+
+.chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.chip {
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--t-gray600);
+  background: var(--s-gray50);
+  border: 1px solid var(--b-gray200);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.chip:hover {
+  background: var(--s-100);
+}
+
+.chipAtivo {
+  color: var(--s-white);
+  background: var(--t-800);
+  border-color: var(--t-800);
+}
+
+/* ───────────────────────── lista de romaneios ───────────────────────── */
+
+.lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.cardRomaneio {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  background: var(--s-white);
+  border: 1px solid var(--b-gray200);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.cardRomaneio:hover {
+  background: var(--s-gray50);
+  border-color: var(--b-gray300);
+}
+
+.cardLinha1 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.romaneioNum {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--t-gray900);
+}
+
+.cardFilial {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--t-gray700);
+}
+
+.cardLinha2,
+.cardLinha3 {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--t-gray500);
+}
+
+.divergente {
+  color: #b45309;
+  font-weight: 600;
+}
+
+.cancelado {
+  font-size: 11px;
+  font-weight: 600;
+  color: #b91c1c;
+}
+
+.badge {
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.badge_pendentes {
+  color: #92400e;
+  background: rgba(245, 158, 11, 0.16);
+}
+
+.badge_parciais {
+  color: #1d4ed8;
+  background: rgba(59, 130, 246, 0.16);
+}
+
+.badge_confirmados {
+  color: #166534;
+  background: rgba(34, 197, 94, 0.16);
+}
+
+/* ───────────────────────── itens do romaneio ───────────────────────── */
+
+.voltar {
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--t-gray700);
+  background: var(--s-gray50);
+  border: 1px solid var(--b-gray200);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.voltar:hover {
+  background: var(--s-100);
+}
+
+.detalheCabecalho {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: baseline;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: var(--t-gray600);
+  background: var(--s-gray50);
+  border: 1px solid var(--b-gray200);
+  border-radius: 10px;
+}
+
+.explicacao {
+  margin: 0 0 12px 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--t-gray600);
+}
+
+.itens {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 62vh;
+  overflow-y: auto;
+}
+
+.item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  background: var(--s-white);
+  border: 1px solid var(--b-gray200);
+  border-radius: 10px;
+}
+
+@media (max-width: 640px) {
+  .item {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Item corrigido para zero continua na lista (apagar a linha duplicaria a
+   devolução de estoque), então fica visivelmente apagado. */
+.itemZerado {
+  opacity: 0.6;
+  background: var(--s-gray50);
+}
+
+.itemInfo {
+  min-width: 0;
+}
+
+.itemNome {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t-gray900);
+  margin-bottom: 2px;
+}
+
+.itemMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--t-gray500);
+}
+
+.conferido {
+  color: #166534;
+  font-weight: 600;
+}
+
+.naoConferido {
+  color: #92400e;
+  font-weight: 600;
+}
+
+.avisoItem {
+  margin-top: 6px;
+  padding: 6px 8px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--t-gray700);
+  background: var(--s-blue50);
+  border-radius: 6px;
+}
+
+/* Origem corrigida, destino não: repetir a correção duplicaria a devolução, então
+   este aviso não pode se parecer com os outros. */
+.avisoItemGrave {
+  margin-top: 6px;
+  padding: 6px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: #991b1b;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.stepBtn {
+  width: 30px;
+  height: 30px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--t-gray700);
+  background: var(--s-gray50);
+  border: 1px solid var(--b-gray300);
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.stepBtn:hover:not(:disabled) {
+  background: var(--s-100);
+}
+
+.stepBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.stepInput {
+  width: 52px;
+  height: 30px;
+  padding: 0 6px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t-gray900);
+  background: var(--s-white);
+  border: 1px solid var(--b-gray300);
+  border-radius: 7px;
+}
+
+.itemAcao {
+  display: flex;
+  justify-content: flex-end;
+  min-width: 120px;
+}
+
+.semMudanca {
+  font-size: 11px;
+  color: var(--t-gray400);
+  white-space: nowrap;
+}
+
+.salvar {
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffffff;
+  background: #1d4ed8;
+  border: 1px solid #1d4ed8;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.salvar:hover:not(:disabled) {
+  background: #1e40af;
+}
+
+.salvar:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.adicionar {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--b-gray200);
+}
+
+/* ───────────────────────── entradas / custos ───────────────────────── */
+
+.exportar {
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--t-gray800);
+  background: var(--s-gray50);
+  border: 1px solid var(--b-gray300);
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.exportar:hover:not(:disabled) {
+  background: var(--s-100);
+}
+
+.exportar:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  background: var(--s-gray50);
+  border: 1px solid var(--b-gray200);
+  border-radius: 10px;
+}
+
+.kpiLabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--t-gray500);
+}
+
+.kpiValor {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--t-gray900);
+}
+
+.filiais {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.filialBloco {
+  border: 1px solid var(--b-gray200);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.filialHeader {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  text-align: left;
+  background: var(--s-gray50);
+  border: none;
+  cursor: pointer;
+}
+
+.filialHeader:hover {
+  background: var(--s-100);
+}
+
+.filialSeta {
+  font-size: 11px;
+  color: var(--t-gray500);
+}
+
+.filialNome {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t-gray900);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filialQtde {
+  font-size: 12px;
+  color: var(--t-gray500);
+  white-space: nowrap;
+}
+
+.filialCusto {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--t-gray900);
+  white-space: nowrap;
+}
+
+.tabelaScroll {
+  overflow-x: auto;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.tabela th,
+.tabela td {
+  padding: 7px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--b-subtle);
+  vertical-align: top;
+}
+
+.tabela thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--t-gray500);
+  background: var(--s-white);
+}
+
+.tabela tfoot td {
+  font-weight: 700;
+  color: var(--t-gray900);
+  background: var(--s-gray50);
+  border-bottom: none;
+}
+
+.num {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.celNome {
+  color: var(--t-gray800);
+}
+
+.celMeta {
+  font-size: 10px;
+  color: var(--t-gray400);
+}
+
+/* ───────────────────────── estados ───────────────────────── */
+
+.vazio {
+  padding: 28px 12px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--t-gray500);
+}
+
+.erro {
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #991b1b;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+}
+
+.nota {
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--t-gray600);
+  background: var(--s-gray50);
+  border: 1px solid var(--b-gray200);
+  border-radius: 8px;
+}

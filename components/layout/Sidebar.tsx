@@ -153,6 +153,8 @@ export default function Sidebar({ companyName }: SidebarProps) {
       : "/distribuicao-matriz";
   const romaneiosHref =
     basePath && basePath !== "/" ? `${basePath}/romaneios` : "/romaneios";
+  const defeitosHref =
+    basePath && basePath !== "/" ? `${basePath}/defeitos` : "/defeitos";
   const saidasEntradasProdutosHref =
     basePath && basePath !== "/"
       ? `${basePath}/saidas-entradas-produtos`
@@ -262,6 +264,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     "/transferencia-produtos",
     "/distribuicao-matriz",
     "/romaneios",
+    "/defeitos",
     "/saidas-entradas-produtos",
     "/extrato-produto",
     "/ajuste-estoque",
@@ -499,6 +502,13 @@ export default function Sidebar({ companyName }: SidebarProps) {
           href: romaneiosHref,
           permission: "romaneios",
           isActive: (currentPathname) => matchesSegment(currentPathname, "/romaneios", romaneiosHref),
+        },
+        {
+          key: "defeitos",
+          label: "Defeitos",
+          href: defeitosHref,
+          permission: "defeitos",
+          isActive: (currentPathname) => matchesSegment(currentPathname, "/defeitos", defeitosHref),
         },
         {
           key: "saidas-entradas-produtos",

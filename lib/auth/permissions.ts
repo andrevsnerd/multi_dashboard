@@ -190,6 +190,21 @@ export function canConfirmarEntradaDefeito(
 }
 
 /**
+ * Tela DEFEITOS — conferencia dos romaneios que vao para a filial de defeito e
+ * o custo do que entrou la. Mesmo conjunto restrito das telas de custo
+ * (CUSTO_VISIBLE_ROLES): o painel de entradas e custo de ponta a ponta, entao
+ * gerente e supervisor nunca entram. Diretor entra somente-leitura (isReadOnlyRole
+ * barra a correcao); quem corrige e admin e logistica, os mesmos de
+ * EDITAR_SAIDA_ROLES e DEFEITO_ENTRADA_ROLES.
+ */
+export const DEFEITOS_ROLES: RoleKey[] = ["admin", "diretor", "logistica"];
+
+/** True se a funcao pode corrigir a quantidade de um item de romaneio de defeito. */
+export function canCorrigirDefeito(role: RoleKey | undefined | null): boolean {
+  return !!role && EDITAR_SAIDA_ROLES.includes(role);
+}
+
+/**
  * Funcoes que podem ver o CUSTO (KPIs, colunas, valores, exports).
  * supervisor e gerente NUNCA veem custo.
  */
@@ -208,6 +223,9 @@ export function canSeeCusto(user: UserSession | null): boolean {
  */
 export const ROLE_RESTRICTED_PERMISSIONS: Partial<Record<PermissionKey, RoleKey[]>> = {
   "extrato-produto": ["admin", "diretor", "logistica"],
+  // Tela Defeitos: o painel de entradas mostra custo por item e por filial, entao
+  // vale a mesma regra de CUSTO_VISIBLE_ROLES (ver DEFEITOS_ROLES).
+  defeitos: ["admin", "diretor", "logistica"],
   // Alterar Custo / Preco mexe em custo: mesma regra de CUSTO_VISIBLE_ROLES
   // (gerente e supervisor nunca veem custo). Diretor abre, mas e somente-leitura.
   "alterar-precos": ["admin", "diretor", "logistica"],
