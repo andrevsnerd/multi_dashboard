@@ -22,8 +22,7 @@
   color: var(--t-gray500);
 }
 
-/* Dois lados. Abaixo de 1100px empilham — a tabela de custos não cabe em meia
-   tela estreita e o operador usa a esquerda no tablet da conferência. */
+/* Dois lados para navegar. Abaixo de 1200px empilham. */
 .colunas {
   display: grid;
   grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
@@ -31,7 +30,13 @@
   align-items: start;
 }
 
-@media (max-width: 1100px) {
+/* Com um romaneio aberto vira coluna única: a tabela do romaneio tem dez
+   colunas e não se lê em meia tela. O painel de custos fica logo abaixo. */
+.colunaUnica {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (max-width: 1200px) {
   .colunas {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -76,7 +81,8 @@
 
 .input,
 .select,
-.inputData {
+.inputData,
+.inputFiltroItem {
   padding: 8px 10px;
   font-size: 13px;
   color: var(--t-gray800);
@@ -90,9 +96,14 @@
   flex: 1 1 200px;
 }
 
+.inputFiltroItem {
+  width: 240px;
+}
+
 .input:focus,
 .select:focus,
-.inputData:focus {
+.inputData:focus,
+.inputFiltroItem:focus {
   outline: 2px solid var(--ring-accent);
   outline-offset: -1px;
 }
@@ -226,10 +237,45 @@
   background: rgba(34, 197, 94, 0.16);
 }
 
-/* ───────────────────────── itens do romaneio ───────────────────────── */
+/* ───────────────────────── topo do romaneio aberto ───────────────────────── */
+
+.detalheTopo {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.detalheIdent {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.detalheFilial {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--t-gray800);
+}
+
+.detalheMeta {
+  font-size: 12px;
+  color: var(--t-gray500);
+}
+
+.detalheAcoes {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
 
 .voltar {
-  padding: 5px 10px;
+  padding: 6px 12px;
   font-size: 12px;
   font-weight: 600;
   color: var(--t-gray700);
@@ -237,116 +283,177 @@
   border: 1px solid var(--b-gray200);
   border-radius: 8px;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .voltar:hover {
   background: var(--s-100);
 }
 
-.detalheCabecalho {
+.confirmarTudoBtn {
+  padding: 9px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+  background: #10b981;
+  border: 1px solid #10b981;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.confirmarTudoBtn:hover:not(:disabled) {
+  background: #059669;
+  border-color: #059669;
+}
+
+.confirmarTudoBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.resumoRomaneio {
   display: flex;
+  gap: 16px;
   flex-wrap: wrap;
-  gap: 12px;
-  align-items: baseline;
-  padding: 10px 12px;
+  padding: 8px 12px;
   margin-bottom: 10px;
   font-size: 12px;
   color: var(--t-gray600);
   background: var(--s-gray50);
   border: 1px solid var(--b-gray200);
-  border-radius: 10px;
+  border-radius: 8px;
 }
 
 .explicacao {
   margin: 0 0 12px 0;
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 1.6;
   color: var(--t-gray600);
 }
 
-.itens {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 62vh;
-  overflow-y: auto;
-}
+/* ───────────────────────── tabela (igual à do romaneio) ───────────────────────── */
 
-.item {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: 12px;
-  align-items: center;
-  padding: 10px 12px;
+.tableWrap {
   background: var(--s-white);
+  border-radius: 12px;
   border: 1px solid var(--b-gray200);
-  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  overflow-x: auto;
 }
 
-@media (max-width: 640px) {
-  .item {
-    grid-template-columns: minmax(0, 1fr);
-  }
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.table th {
+  text-align: left;
+  padding: 12px 14px;
+  background: var(--s-gray50);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  color: var(--t-gray700);
+  border-bottom: 1px solid var(--b-gray200);
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--s-gray100);
+  color: var(--t-gray900);
+  vertical-align: top;
+}
+
+.table tbody tr:hover {
+  background: var(--s-gray50);
+}
+
+.table tfoot td {
+  font-weight: 700;
+  color: var(--t-gray900);
+  background: var(--s-gray50);
+  border-bottom: none;
+}
+
+.groupBannerRow:hover {
+  background: transparent !important;
+}
+
+.groupBannerCell {
+  padding: 10px 14px !important;
+  background: #eef2ff;
+  color: #312e81 !important;
+  border-top: 1px solid #c7d2fe;
+  border-bottom: 1px solid #c7d2fe;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+:global(:root[data-theme="dark"]) .groupBannerCell {
+  background: rgba(51, 65, 85, 0.72);
+  color: #e2e8f0 !important;
+  border-top: 1px solid rgba(148, 163, 184, 0.24);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.24);
+}
+
+.num {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.celMeta {
+  font-size: 10px;
+  color: var(--t-gray400);
+}
+
+/* Linha já confirmada — recuada, mas a coluna CONFIRMAR fica legível. */
+.rowConfirmada td {
+  opacity: 0.6;
+}
+
+.rowConfirmada td:last-child {
+  opacity: 1;
 }
 
 /* Item corrigido para zero continua na lista (apagar a linha duplicaria a
    devolução de estoque), então fica visivelmente apagado. */
-.itemZerado {
-  opacity: 0.6;
+.rowZerada td {
   background: var(--s-gray50);
+  color: var(--t-gray400);
 }
 
-.itemInfo {
-  min-width: 0;
-}
-
-.itemNome {
-  font-size: 13px;
+.qtdValue {
   font-weight: 600;
   color: var(--t-gray900);
-  margin-bottom: 2px;
 }
 
-.itemMeta {
+.estoqueValor {
+  font-weight: 600;
+  color: var(--t-gray900);
+}
+
+.estoqueZero {
+  font-weight: 600;
+  color: #ef4444;
+}
+
+/* ───────────────────────── correção de quantidade ───────────────────────── */
+
+.correcaoCell {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  font-size: 11px;
-  color: var(--t-gray500);
-}
-
-.conferido {
-  color: #166534;
-  font-weight: 600;
-}
-
-.naoConferido {
-  color: #92400e;
-  font-weight: 600;
-}
-
-.avisoItem {
-  margin-top: 6px;
-  padding: 6px 8px;
-  font-size: 11px;
-  line-height: 1.5;
-  color: var(--t-gray700);
-  background: var(--s-blue50);
-  border-radius: 6px;
-}
-
-/* Origem corrigida, destino não: repetir a correção duplicaria a devolução, então
-   este aviso não pode se parecer com os outros. */
-.avisoItemGrave {
-  margin-top: 6px;
-  padding: 6px 8px;
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1.5;
-  color: #991b1b;
-  background: rgba(239, 68, 68, 0.12);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  border-radius: 6px;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  min-width: 130px;
 }
 
 .stepper {
@@ -356,15 +463,19 @@
 }
 
 .stepBtn {
-  width: 30px;
-  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  background: var(--s-gray100);
+  color: var(--t-gray700);
   font-size: 16px;
   font-weight: 700;
-  color: var(--t-gray700);
-  background: var(--s-gray50);
   border: 1px solid var(--b-gray300);
-  border-radius: 7px;
+  border-radius: 6px;
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .stepBtn:hover:not(:disabled) {
@@ -377,49 +488,173 @@
 }
 
 .stepInput {
-  width: 52px;
-  height: 30px;
-  padding: 0 6px;
+  width: 56px;
+  height: 26px;
+  padding: 0 4px;
   text-align: center;
   font-size: 13px;
   font-weight: 600;
   color: var(--t-gray900);
   background: var(--s-white);
   border: 1px solid var(--b-gray300);
-  border-radius: 7px;
+  border-radius: 6px;
+  outline: none;
 }
 
-.itemAcao {
-  display: flex;
-  justify-content: flex-end;
-  min-width: 120px;
-}
-
-.semMudanca {
+.salvarCorrecaoBtn {
+  padding: 5px 10px;
   font-size: 11px;
-  color: var(--t-gray400);
-  white-space: nowrap;
-}
-
-.salvar {
-  padding: 7px 12px;
-  font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   color: #ffffff;
   background: #1d4ed8;
   border: 1px solid #1d4ed8;
-  border-radius: 8px;
+  border-radius: 7px;
   cursor: pointer;
   white-space: nowrap;
 }
 
-.salvar:hover:not(:disabled) {
+.salvarCorrecaoBtn:hover:not(:disabled) {
   background: #1e40af;
 }
 
-.salvar:disabled {
+.salvarCorrecaoBtn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.avisoItem {
+  padding: 6px 8px;
+  font-size: 11px;
+  line-height: 1.5;
+  text-align: left;
+  color: var(--t-gray700);
+  background: var(--s-blue50);
+  border-radius: 6px;
+  max-width: 300px;
+}
+
+/* Origem corrigida, destino não: repetir a correção duplicaria a devolução, então
+   este aviso não pode se parecer com os outros. */
+.avisoItemGrave {
+  padding: 6px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+  text-align: left;
+  color: #991b1b;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  max-width: 300px;
+}
+
+/* ───────────────────────── coluna confirmar ───────────────────────── */
+
+.confirmarCell {
+  min-width: 180px;
+}
+
+.confirmadoWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  align-items: flex-start;
+}
+
+.confirmadoBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid #6ee7b7;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.confirmadoBadgeDivergente {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.originalBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.entradaTag {
+  font-size: 10px;
+  color: var(--t-gray400);
+}
+
+.naoConfirmado {
+  font-size: 11px;
+  font-weight: 600;
+  color: #92400e;
+}
+
+.desfazerBtn {
+  padding: 3px 10px;
+  background: transparent;
+  color: var(--t-gray400);
+  font-size: 11px;
+  font-weight: 500;
+  border: 1px solid var(--b-gray200);
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.desfazerBtn:hover:not(:disabled) {
+  color: #ef4444;
+  border-color: #fca5a5;
+}
+
+.desfazerBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.qtdeInputWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.qtdeInputRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.divergenciaAviso {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #d97706;
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+  border-radius: 6px;
+  padding: 4px 7px;
 }
 
 .adicionar {
@@ -539,60 +774,6 @@
   white-space: nowrap;
 }
 
-.tabelaScroll {
-  overflow-x: auto;
-  max-height: 420px;
-  overflow-y: auto;
-}
-
-.tabela {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
-}
-
-.tabela th,
-.tabela td {
-  padding: 7px 10px;
-  text-align: left;
-  border-bottom: 1px solid var(--b-subtle);
-  vertical-align: top;
-}
-
-.tabela thead th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--t-gray500);
-  background: var(--s-white);
-}
-
-.tabela tfoot td {
-  font-weight: 700;
-  color: var(--t-gray900);
-  background: var(--s-gray50);
-  border-bottom: none;
-}
-
-.num {
-  text-align: right;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-
-.celNome {
-  color: var(--t-gray800);
-}
-
-.celMeta {
-  font-size: 10px;
-  color: var(--t-gray400);
-}
-
 /* ───────────────────────── estados ───────────────────────── */
 
 .vazio {
@@ -610,6 +791,20 @@
   color: #991b1b;
   background: rgba(239, 68, 68, 0.12);
   border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+}
+
+.sucesso {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #065f46;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
   border-radius: 8px;
 }
 

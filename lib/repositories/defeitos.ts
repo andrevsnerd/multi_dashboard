@@ -206,6 +206,10 @@ export interface DefeitoRomaneioItem {
   descCor: string;
   codigoBarra: string | null;
   grade: string;
+  /** Dimensões do cadastro — é por elas que a tabela agrupa (ver romaneio-agrupamento). */
+  grupo: string;
+  subgrupo: string;
+  linha: string;
   /** Quantidade lançada no romaneio de saída. */
   qtde: number;
   /** Quantidade confirmada na chegada (null = ainda não conferido). */
@@ -243,6 +247,9 @@ export async function fetchDefeitoRomaneioItens(params: {
       descCor: string;
       codigoBarra: string | null;
       grade: string;
+      grupo: string;
+      subgrupo: string;
+      linha: string;
       qtde: number | null;
       custoUnitario: number | null;
       estoqueOrigem: number | null;
@@ -272,6 +279,9 @@ export async function fetchDefeitoRomaneioItens(params: {
             )
           ORDER BY LEN(LTRIM(RTRIM(pb.CODIGO_BARRA))) ASC, pb.CODIGO_BARRA ASC) AS codigoBarra,
         LTRIM(RTRIM(ISNULL(pr.GRADE, ''))) AS grade,
+        LTRIM(RTRIM(ISNULL(pr.GRUPO_PRODUTO, ''))) AS grupo,
+        LTRIM(RTRIM(ISNULL(pr.SUBGRUPO_PRODUTO, ''))) AS subgrupo,
+        LTRIM(RTRIM(ISNULL(pr.LINHA, ''))) AS linha,
         ISNULL(i.QTDE, 0) AS qtde,
         ${CUSTO_EXPR} AS custoUnitario,
         ISNULL((
@@ -314,6 +324,9 @@ export async function fetchDefeitoRomaneioItens(params: {
       descCor: item.descCor,
       codigoBarra: item.codigoBarra,
       grade: item.grade,
+      grupo: item.grupo,
+      subgrupo: item.subgrupo,
+      linha: item.linha,
       qtde: Number(item.qtde) || 0,
       qtdeConfirmada: conf ? conf.qtde : null,
       romaneioEntrada: conf?.romaneioEntrada ?? '',

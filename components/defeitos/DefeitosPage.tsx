@@ -4,6 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 
 import { useAuth } from "@/components/auth/AuthContext";
+import {
+  categoriaDoItem,
+  planejarItensAgrupados,
+} from "@/lib/utils/romaneio-agrupamento";
 import styles from "./DefeitosPage.module.css";
 
 // ───────────────────────────────── tipos ─────────────────────────────────
@@ -28,6 +32,9 @@ interface DefeitoItem {
   descCor: string;
   codigoBarra: string | null;
   grade: string;
+  grupo: string;
+  subgrupo: string;
+  linha: string;
   qtde: number;
   qtdeConfirmada: number | null;
   romaneioEntrada: string;
@@ -116,10 +123,13 @@ function statusDoRomaneio(r: DefeitoRomaneio): {
   chave: Exclude<StatusFiltro, "todos">;
   label: string;
 } {
-  if (r.linhasConfirmadas === 0) return { chave: "pendentes", label: "Não conferido" };
+  if (r.linhasConfirmadas === 0) return { chave: "pendentes", label: "Não confirmado" };
   if (r.linhasConfirmadas < r.linhas) return { chave: "parciais", label: "Parcial" };
-  return { chave: "confirmados", label: "Conferido" };
+  return { chave: "confirmados", label: "Confirmado" };
 }
+
+const chaveDoItem = (item: { produto: string; corProduto: string }) =>
+  `${item.produto}|${item.corProduto}`;
 
 // ───────────────────────────── componente ─────────────────────────────
 
@@ -148,12 +158,22 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
   const [carregandoItens, setCarregandoItens] = useState(false);
   const [erroItens, setErroItens] = useState<string | null>(null);
   const [podeCorrigir, setPodeCorrigir] = useState(false);
-  /** Quantidade que o operador está digitando, por item. */
-  const [pendentes, setPendentes] = useState<Map<string, number>>(new Map());
+  const [filtroItem, setFiltroItem] = useState("");
+
+  /** Quantidade que o operador está corrigindo no ROMANEIO, por item. */
+  const [correcoes, setCorrecoes] = useState<Map<string, number>>(new Map());
+  /** Quantidade a CONFIRMAR na chegada, por item. */
+  const [quantidades, setQuantidades] = useState<Map<string, number>>(new Map());
   const [salvandoChave, setSalvandoChave] = useState<string | null>(null);
   const [avisos, setAvisos] = useState<Map<string, string>>(new Map());
   /** Itens em que a origem foi corrigida mas o destino não — aviso de risco. */
   const [falhasDestino, setFalhasDestino] = useState<Set<string>>(new Set());
+
+  // ── confirmação
+  const [confirmando, setConfirmando] = useState(false);
+  const [erroConfirmacao, setErroConfirmacao] = useState<string | null>(null);
+  const [msgConfirmacao, setMsgConfirmacao] = useState<string[]>([]);
+  const [desconfirmandoChave, setDesconfirmandoChave] = useState<string | null>(null);
 
   // ── acrescentar item
   const [codigoBarras, setCodigoBarras] = useState("");
@@ -231,9 +251,13 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json?.error || "Erro ao carregar itens");
-        setItens(json.data ?? []);
+        const lista: DefeitoItem[] = json.data ?? [];
+        setItens(lista);
         setPodeCorrigir(Boolean(json.podeCorrigir));
-        setPendentes(new Map());
+        setCorrecoes(new Map());
+        // A quantidade a confirmar nasce igual à do romaneio: o caso comum é
+        // chegar tudo, e quem divergir mexe só na linha que divergiu.
+        setQuantidades(new Map(lista.map((i) => [chaveDoItem(i), i.qtde])));
       } catch (e) {
         setErroItens(e instanceof Error ? e.message : "Erro ao carregar itens");
         setItens([]);
@@ -258,11 +282,13 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
 
   // ───────────────────────── ações ─────────────────────────
 
-  const chaveDoItem = (item: DefeitoItem) => `${item.produto}|${item.corProduto}`;
-
   const abrirRomaneio = useCallback(
     (r: DefeitoRomaneio) => {
       setSelecionado(r);
+      setFiltroItem("");
+      setErroConfirmacao(null);
+      setMsgConfirmacao([]);
+      setFalhasDestino(new Set());
       void carregarItens(r);
     },
     [carregarItens]
@@ -271,33 +297,38 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
   const fecharRomaneio = useCallback(() => {
     setSelecionado(null);
     setItens([]);
-    setPendentes(new Map());
+    setCorrecoes(new Map());
+    setQuantidades(new Map());
     setAvisos(new Map());
     setFalhasDestino(new Set());
     setCodigoBarras("");
+    setFiltroItem("");
+    setErroConfirmacao(null);
+    setMsgConfirmacao([]);
   }, []);
 
-  const ajustarPendente = useCallback(
-    (item: DefeitoItem, delta: number) => {
-      const chave = chaveDoItem(item);
-      setPendentes((prev) => {
-        const next = new Map(prev);
-        const atual = next.get(chave) ?? item.qtde;
-        next.set(chave, Math.max(0, atual + delta));
-        return next;
-      });
-    },
-    []
-  );
-
-  const definirPendente = useCallback((item: DefeitoItem, valor: string) => {
+  const ajustarCorrecao = useCallback((item: DefeitoItem, delta: number) => {
     const chave = chaveDoItem(item);
-    const n = Number(valor);
-    setPendentes((prev) => {
+    setCorrecoes((prev) => {
       const next = new Map(prev);
-      next.set(chave, Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0);
+      const atual = next.get(chave) ?? item.qtde;
+      next.set(chave, Math.max(0, atual + delta));
       return next;
     });
+  }, []);
+
+  const definirCorrecao = useCallback((item: DefeitoItem, valor: string) => {
+    const chave = chaveDoItem(item);
+    const n = parseInt(valor, 10);
+    setCorrecoes((prev) => {
+      const next = new Map(prev);
+      next.set(chave, Number.isFinite(n) && n >= 0 ? n : 0);
+      return next;
+    });
+  }, []);
+
+  const definirQuantidade = useCallback((chave: string, valor: number) => {
+    setQuantidades((prev) => new Map(prev).set(chave, Math.max(0, valor)));
   }, []);
 
   /**
@@ -306,11 +337,11 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
    * nunca voltaria a aparecer e o saldo da filial de defeito ficaria errado.
    * Repetir é seguro: a origem não se mexe duas vezes (delta 0).
    */
-  const salvarItem = useCallback(
+  const salvarCorrecao = useCallback(
     async (item: DefeitoItem, forcar = false) => {
       if (!selecionado || !username) return;
       const chave = chaveDoItem(item);
-      const qtdeNova = pendentes.get(chave) ?? (forcar ? item.qtde : undefined);
+      const qtdeNova = correcoes.get(chave) ?? (forcar ? item.qtde : undefined);
       if (qtdeNova === undefined || (qtdeNova === item.qtde && !forcar)) return;
 
       setSalvandoChave(chave);
@@ -364,7 +395,164 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
     [
       selecionado,
       username,
-      pendentes,
+      correcoes,
+      companyKey,
+      carregarItens,
+      carregarRomaneios,
+      carregarEntradas,
+    ]
+  );
+
+  /**
+   * CONFIRMAR — mesma mecânica da tela Romaneios: UM romaneio de entrada na
+   * filial de defeito para todos os itens, e depois a marca de confirmação item
+   * por item. Quem confirmar MENOS do que o romaneio diz manda também a filial
+   * de origem, e o servidor devolve a diferença ao estoque da loja.
+   */
+  const confirmarTudo = useCallback(async () => {
+    if (!selecionado || !username || !defeitoFilial) return;
+
+    const paraConfirmar = itens
+      .filter((i) => i.qtdeConfirmada === null)
+      .map((item) => {
+        const chave = chaveDoItem(item);
+        return {
+          produto: item.produto,
+          corProduto: item.corProduto,
+          quantidade: quantidades.get(chave) ?? item.qtde,
+          qtdeRomaneio: item.qtde,
+          chave,
+        };
+      })
+      .filter((i) => i.quantidade > 0);
+
+    if (paraConfirmar.length === 0) return;
+
+    setConfirmando(true);
+    setErroConfirmacao(null);
+    setMsgConfirmacao([]);
+
+    try {
+      // 1) Entrada de estoque na filial de defeito (um romaneio para o lote).
+      const resEntrada = await fetch("/api/saidas-entradas-produtos/executar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-auth-username": username },
+        body: JSON.stringify({
+          tipoOperacao: "entrada",
+          companyKey,
+          filial: defeitoFilial,
+          itens: paraConfirmar.map((i) => ({
+            produto: i.produto,
+            corProduto: i.corProduto,
+            quantidade: i.quantidade,
+          })),
+          tipoRomaneio: "TRANSFERENCIA ENTRE LOJAS",
+          observacao: `DEFEITO ROMANEIO ${selecionado.romaneio} - ${selecionado.filialOrigem}`,
+        }),
+      });
+      const jsonEntrada = await resEntrada.json().catch(() => ({}));
+      if (!resEntrada.ok) {
+        throw new Error(
+          jsonEntrada?.error
+            ? `Erro ao dar entrada em ${defeitoFilial}: ${jsonEntrada.error}`
+            : `Erro ao dar entrada em ${defeitoFilial}.`
+        );
+      }
+      const romaneioEntrada: string = jsonEntrada?.romaneio ?? "";
+
+      // 2) Marca a confirmação de cada item. `filialOrigem` só vai no item
+      //    divergente: é ele que dispara a devolução no servidor, e mandar em
+      //    todos faria uma consulta extra por item sem precisar.
+      const mensagens: string[] = [];
+      if (romaneioEntrada) {
+        mensagens.push(`Entrada registrada em ${defeitoFilial} — romaneio ${romaneioEntrada}.`);
+      }
+
+      for (const item of paraConfirmar) {
+        const res = await fetch("/api/romaneio-confirmar-entrada", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-auth-username": username },
+          body: JSON.stringify({
+            companyKey,
+            romaneioId: selecionado.romaneio,
+            filialDestino: defeitoFilial,
+            produto: item.produto,
+            corProduto: item.corProduto,
+            qtdeConfirmada: item.quantidade,
+            acao: "confirmar",
+            filialOrigem:
+              item.quantidade < item.qtdeRomaneio ? selecionado.filialOrigem : undefined,
+            romaneioEntrada,
+          }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          mensagens.push(
+            `${item.produto}: entrada feita, mas a confirmação não foi gravada${
+              json?.error ? ` (${json.error})` : ""
+            }.`
+          );
+        } else if (json?.origem?.detalhe) {
+          mensagens.push(json.origem.detalhe as string);
+        }
+      }
+
+      setMsgConfirmacao(mensagens);
+      await carregarItens(selecionado);
+      void carregarRomaneios();
+      void carregarEntradas();
+    } catch (e) {
+      setErroConfirmacao(e instanceof Error ? e.message : "Erro ao confirmar.");
+    } finally {
+      setConfirmando(false);
+    }
+  }, [
+    selecionado,
+    username,
+    defeitoFilial,
+    itens,
+    quantidades,
+    companyKey,
+    carregarItens,
+    carregarRomaneios,
+    carregarEntradas,
+  ]);
+
+  const desconfirmarItem = useCallback(
+    async (item: DefeitoItem) => {
+      if (!selecionado || !username || !defeitoFilial) return;
+      const chave = chaveDoItem(item);
+      setDesconfirmandoChave(chave);
+      try {
+        const res = await fetch("/api/romaneio-confirmar-entrada", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-auth-username": username },
+          body: JSON.stringify({
+            companyKey,
+            romaneioId: selecionado.romaneio,
+            filialDestino: defeitoFilial,
+            produto: item.produto,
+            corProduto: item.corProduto,
+            acao: "desconfirmar",
+          }),
+        });
+        if (!res.ok) {
+          const json = await res.json().catch(() => ({}));
+          throw new Error(json?.error || "Erro ao zerar a confirmação");
+        }
+        await carregarItens(selecionado);
+        void carregarRomaneios();
+        void carregarEntradas();
+      } catch (e) {
+        setErroConfirmacao(e instanceof Error ? e.message : "Erro ao zerar a confirmação");
+      } finally {
+        setDesconfirmandoChave(null);
+      }
+    },
+    [
+      selecionado,
+      username,
+      defeitoFilial,
       companyKey,
       carregarItens,
       carregarRomaneios,
@@ -427,136 +615,6 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
     });
   }, []);
 
-  // ───────────────────────── export XLSX ─────────────────────────
-
-  const exportarXlsx = useCallback(() => {
-    if (!entradas || entradas.filiais.length === 0) return;
-
-    const wb = XLSX.utils.book_new();
-
-    // Aba 1 — todos os itens, com a filial em coluna para filtrar/agrupar.
-    const cabecalho = [
-      "Filial de origem",
-      "Romaneio saída",
-      "Romaneio entrada",
-      "Produto",
-      "Descrição",
-      "Cor",
-      "Descrição da cor",
-      "Grade",
-      "Linha",
-      "Grupo",
-      "Subgrupo",
-      "Qtd",
-      "Custo unitário",
-      "Custo total",
-      "Conferido em",
-      "Conferido por",
-    ];
-
-    const linhas: (string | number)[][] = [];
-    for (const filial of entradas.filiais) {
-      for (const item of filial.itens) {
-        linhas.push([
-          filial.filialOrigem,
-          item.romaneio,
-          item.romaneioEntrada || "—",
-          item.produto,
-          item.descProduto,
-          item.corProduto,
-          item.descCor,
-          item.grade,
-          item.linha,
-          item.grupo,
-          item.subgrupo,
-          item.qtde,
-          item.custoUnitario,
-          item.custoTotal,
-          formatarDataHora(item.confirmadoEm),
-          item.confirmadoPor,
-        ]);
-      }
-    }
-
-    const meta = [
-      [`Defeitos — ${entradas.defeitoFilial || defeitoFilial}`],
-      [`Empresa: ${companyName}`],
-      [`Período de conferência: ${formatarData(start)} a ${formatarData(end)}`],
-      [`Peças: ${entradas.totalQtde}    Custo total: ${moeda(entradas.totalCusto)}`],
-      [],
-    ];
-
-    const ws = XLSX.utils.aoa_to_sheet(meta);
-    XLSX.utils.sheet_add_aoa(ws, [cabecalho, ...linhas], { origin: -1 });
-
-    // Custo total como FÓRMULA (qtd × custo) e o total geral como SUM: a planilha
-    // continua certa se alguém filtrar, reordenar ou corrigir uma quantidade.
-    const primeiraLinha = meta.length + 2; // 1-based, logo abaixo do cabeçalho
-    linhas.forEach((_, i) => {
-      const r = primeiraLinha + i;
-      ws[`N${r}`] = { t: "n", f: `L${r}*M${r}` };
-    });
-    const ultimaLinha = primeiraLinha + linhas.length - 1;
-    if (linhas.length > 0) {
-      const totalRow = ultimaLinha + 1;
-      ws[`K${totalRow}`] = { t: "s", v: "TOTAL" };
-      ws[`L${totalRow}`] = { t: "n", f: `SUM(L${primeiraLinha}:L${ultimaLinha})` };
-      ws[`N${totalRow}`] = { t: "n", f: `SUM(N${primeiraLinha}:N${ultimaLinha})` };
-      ws["!ref"] = `A1:P${totalRow}`;
-    }
-
-    ws["!cols"] = [
-      { wch: 26 }, { wch: 14 }, { wch: 15 }, { wch: 14 }, { wch: 42 }, { wch: 8 },
-      { wch: 20 }, { wch: 10 }, { wch: 16 }, { wch: 16 }, { wch: 18 }, { wch: 7 },
-      { wch: 14 }, { wch: 14 }, { wch: 18 }, { wch: 18 },
-    ];
-    ws["!autofilter"] = { ref: `A${primeiraLinha - 1}:P${ultimaLinha}` };
-    XLSX.utils.book_append_sheet(wb, ws, "Itens");
-
-    // Aba 2 — total por filial, somando a aba de itens por SUMIF.
-    const resumoCab = ["Filial de origem", "Peças", "Custo total", "% do custo"];
-    const resumo: (string | number)[][] = entradas.filiais.map((f) => [
-      f.filialOrigem,
-      f.qtde,
-      f.custoTotal,
-      f.custoTotal,
-    ]);
-    const ws2 = XLSX.utils.aoa_to_sheet([
-      [`Defeitos por filial — ${formatarData(start)} a ${formatarData(end)}`],
-      [],
-      resumoCab,
-      ...resumo,
-    ]);
-
-    const inicioResumo = 4; // 1-based
-    resumo.forEach((_, i) => {
-      const r = inicioResumo + i;
-      ws2[`B${r}`] = { t: "n", f: `SUMIF(Itens!$A:$A,$A${r},Itens!$L:$L)` };
-      ws2[`C${r}`] = { t: "n", f: `SUMIF(Itens!$A:$A,$A${r},Itens!$N:$N)` };
-      ws2[`D${r}`] = {
-        t: "n",
-        f: `IF($C$${inicioResumo + resumo.length}=0,0,C${r}/$C$${inicioResumo + resumo.length})`,
-        z: "0.0%",
-      };
-    });
-    const totalResumo = inicioResumo + resumo.length;
-    ws2[`A${totalResumo}`] = { t: "s", v: "TOTAL" };
-    ws2[`B${totalResumo}`] = {
-      t: "n",
-      f: `SUM(B${inicioResumo}:B${totalResumo - 1})`,
-    };
-    ws2[`C${totalResumo}`] = {
-      t: "n",
-      f: `SUM(C${inicioResumo}:C${totalResumo - 1})`,
-    };
-    ws2["!ref"] = `A1:D${totalResumo}`;
-    ws2["!cols"] = [{ wch: 28 }, { wch: 10 }, { wch: 16 }, { wch: 12 }];
-    XLSX.utils.book_append_sheet(wb, ws2, "Por filial");
-
-    const nome = `defeitos-${companyKey}-${start}-a-${end}.xlsx`;
-    XLSX.writeFile(wb, nome, { compression: true });
-  }, [entradas, companyKey, companyName, start, end, defeitoFilial]);
-
   // ───────────────────────── derivados ─────────────────────────
 
   const romaneiosFiltrados = useMemo(
@@ -580,16 +638,204 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
     return { pendentesN, parciais, confirmados };
   }, [romaneios]);
 
-  const totalItensRomaneio = useMemo(
-    () => itens.reduce((acc, i) => acc + i.qtde, 0),
-    [itens]
-  );
-  const custoRomaneio = useMemo(
-    () => itens.reduce((acc, i) => acc + i.qtde * i.custoUnitario, 0),
-    [itens]
+  const normalizaBusca = (v: string | null | undefined) =>
+    (v || "")
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .toLowerCase()
+      .trim();
+
+  const itensFiltrados = useMemo(() => {
+    const termo = normalizaBusca(filtroItem);
+    if (!termo) return itens;
+    return itens.filter(
+      (i) =>
+        normalizaBusca(i.descProduto).includes(termo) ||
+        normalizaBusca(i.produto).includes(termo) ||
+        normalizaBusca(i.codigoBarra).includes(termo)
+    );
+  }, [itens, filtroItem]);
+
+  // Mesma organização da tabela do romaneio: banner por categoria e, dentro
+  // dela, os de nome parecido juntos e em ordem de modelo.
+  const itensPlanejados = useMemo(
+    () => planejarItensAgrupados(itensFiltrados, companyKey),
+    [itensFiltrados, companyKey]
   );
 
+  const totalQtdeRomaneio = useMemo(() => itens.reduce((a, i) => a + i.qtde, 0), [itens]);
+  const custoRomaneio = useMemo(
+    () => itens.reduce((a, i) => a + i.qtde * i.custoUnitario, 0),
+    [itens]
+  );
+  const naoConfirmados = useMemo(
+    () => itens.filter((i) => i.qtdeConfirmada === null),
+    [itens]
+  );
+  const podeConfirmarAgora =
+    podeCorrigir &&
+    !confirmando &&
+    naoConfirmados.some((i) => (quantidades.get(chaveDoItem(i)) ?? i.qtde) > 0);
+
+  // ───────────────────────── export XLSX ─────────────────────────
+
+  const exportarXlsx = useCallback(() => {
+    if (!entradas || entradas.filiais.length === 0) return;
+
+    const wb = XLSX.utils.book_new();
+
+    const cabecalho = [
+      "Filial de origem",
+      "Grupo",
+      "Produto",
+      "Descrição",
+      "Cor",
+      "Descrição da cor",
+      "Subgrupo",
+      "Grade",
+      "Romaneio saída",
+      "Romaneio entrada",
+      "Qtd",
+      "Custo unitário",
+      "Custo total",
+      "Confirmado em",
+      "Confirmado por",
+    ];
+
+    // As linhas saem na MESMA ordem da tela: filial → categoria → nomes
+    // parecidos juntos. A categoria vai em coluna (e não em linha de banner)
+    // para o autofiltro e os SUMIF continuarem funcionando na planilha.
+    const linhas: (string | number)[][] = [];
+    for (const filial of entradas.filiais) {
+      for (const entry of planejarItensAgrupados(filial.itens, companyKey)) {
+        if (entry.kind !== "item") continue;
+        const item = entry.item;
+        linhas.push([
+          filial.filialOrigem,
+          categoriaDoItem(item, companyKey),
+          item.produto,
+          item.descProduto,
+          item.corProduto,
+          item.descCor,
+          item.subgrupo,
+          item.grade,
+          item.romaneio,
+          item.romaneioEntrada || "—",
+          item.qtde,
+          item.custoUnitario,
+          item.custoTotal,
+          formatarDataHora(item.confirmadoEm),
+          item.confirmadoPor,
+        ]);
+      }
+    }
+
+    const meta = [
+      [`Defeitos — ${entradas.defeitoFilial || defeitoFilial}`],
+      [`Empresa: ${companyName}`],
+      [`Período de confirmação: ${formatarData(start)} a ${formatarData(end)}`],
+      [`Peças: ${entradas.totalQtde}    Custo total: ${moeda(entradas.totalCusto)}`],
+      [],
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(meta);
+    XLSX.utils.sheet_add_aoa(ws, [cabecalho, ...linhas], { origin: -1 });
+
+    // Custo total como FÓRMULA (qtd × custo) e o total geral como SUM: a planilha
+    // continua certa se alguém filtrar, reordenar ou corrigir uma quantidade.
+    const primeiraLinha = meta.length + 2; // 1-based, logo abaixo do cabeçalho
+    linhas.forEach((_, i) => {
+      const r = primeiraLinha + i;
+      ws[`M${r}`] = { t: "n", f: `K${r}*L${r}` };
+    });
+    const ultimaLinha = primeiraLinha + linhas.length - 1;
+    if (linhas.length > 0) {
+      const totalRow = ultimaLinha + 1;
+      ws[`J${totalRow}`] = { t: "s", v: "TOTAL" };
+      ws[`K${totalRow}`] = { t: "n", f: `SUM(K${primeiraLinha}:K${ultimaLinha})` };
+      ws[`M${totalRow}`] = { t: "n", f: `SUM(M${primeiraLinha}:M${ultimaLinha})` };
+      ws["!ref"] = `A1:O${totalRow}`;
+    }
+
+    ws["!cols"] = [
+      { wch: 26 }, { wch: 20 }, { wch: 14 }, { wch: 42 }, { wch: 8 }, { wch: 20 },
+      { wch: 18 }, { wch: 10 }, { wch: 14 }, { wch: 15 }, { wch: 7 }, { wch: 14 },
+      { wch: 14 }, { wch: 18 }, { wch: 18 },
+    ];
+    ws["!autofilter"] = { ref: `A${primeiraLinha - 1}:O${ultimaLinha}` };
+    XLSX.utils.book_append_sheet(wb, ws, "Itens");
+
+    // Aba 2 — total por filial, somando a aba de itens por SUMIF.
+    const resumo: (string | number)[][] = entradas.filiais.map((f) => [
+      f.filialOrigem,
+      f.qtde,
+      f.custoTotal,
+      f.custoTotal,
+    ]);
+    const ws2 = XLSX.utils.aoa_to_sheet([
+      [`Defeitos por filial — ${formatarData(start)} a ${formatarData(end)}`],
+      [],
+      ["Filial de origem", "Peças", "Custo total", "% do custo"],
+      ...resumo,
+    ]);
+
+    const inicioResumo = 4; // 1-based
+    const totalResumo = inicioResumo + resumo.length;
+    resumo.forEach((_, i) => {
+      const r = inicioResumo + i;
+      ws2[`B${r}`] = { t: "n", f: `SUMIF(Itens!$A:$A,$A${r},Itens!$K:$K)` };
+      ws2[`C${r}`] = { t: "n", f: `SUMIF(Itens!$A:$A,$A${r},Itens!$M:$M)` };
+      ws2[`D${r}`] = {
+        t: "n",
+        f: `IF($C$${totalResumo}=0,0,C${r}/$C$${totalResumo})`,
+        z: "0.0%",
+      };
+    });
+    ws2[`A${totalResumo}`] = { t: "s", v: "TOTAL" };
+    ws2[`B${totalResumo}`] = { t: "n", f: `SUM(B${inicioResumo}:B${totalResumo - 1})` };
+    ws2[`C${totalResumo}`] = { t: "n", f: `SUM(C${inicioResumo}:C${totalResumo - 1})` };
+    ws2["!ref"] = `A1:D${totalResumo}`;
+    ws2["!cols"] = [{ wch: 28 }, { wch: 10 }, { wch: 16 }, { wch: 12 }];
+    XLSX.utils.book_append_sheet(wb, ws2, "Por filial");
+
+    // Aba 3 — total por grupo, a mesma quebra que a tela mostra nos banners.
+    const porGrupo = new Map<string, { qtde: number; custo: number }>();
+    for (const filial of entradas.filiais) {
+      for (const item of filial.itens) {
+        const g = categoriaDoItem(item, companyKey);
+        const atual = porGrupo.get(g) ?? { qtde: 0, custo: 0 };
+        atual.qtde += item.qtde;
+        atual.custo += item.custoTotal;
+        porGrupo.set(g, atual);
+      }
+    }
+    const grupos = [...porGrupo.entries()].sort((a, b) => b[1].custo - a[1].custo);
+    const ws3 = XLSX.utils.aoa_to_sheet([
+      [`Defeitos por grupo — ${formatarData(start)} a ${formatarData(end)}`],
+      [],
+      ["Grupo", "Peças", "Custo total"],
+      ...grupos.map(([g, v]) => [g, v.qtde, v.custo]),
+    ]);
+    const inicioGrupo = 4;
+    const totalGrupo = inicioGrupo + grupos.length;
+    grupos.forEach((_, i) => {
+      const r = inicioGrupo + i;
+      ws3[`B${r}`] = { t: "n", f: `SUMIF(Itens!$B:$B,$A${r},Itens!$K:$K)` };
+      ws3[`C${r}`] = { t: "n", f: `SUMIF(Itens!$B:$B,$A${r},Itens!$M:$M)` };
+    });
+    ws3[`A${totalGrupo}`] = { t: "s", v: "TOTAL" };
+    ws3[`B${totalGrupo}`] = { t: "n", f: `SUM(B${inicioGrupo}:B${totalGrupo - 1})` };
+    ws3[`C${totalGrupo}`] = { t: "n", f: `SUM(C${inicioGrupo}:C${totalGrupo - 1})` };
+    ws3["!ref"] = `A1:C${totalGrupo}`;
+    ws3["!cols"] = [{ wch: 28 }, { wch: 10 }, { wch: 16 }];
+    XLSX.utils.book_append_sheet(wb, ws3, "Por grupo");
+
+    XLSX.writeFile(wb, `defeitos-${companyKey}-${start}-a-${end}.xlsx`, { compression: true });
+  }, [entradas, companyKey, companyName, start, end, defeitoFilial]);
+
   // ───────────────────────── render ─────────────────────────
+
+  const COLUNAS_TABELA = 10;
 
   return (
     <div className={styles.wrapper}>
@@ -598,14 +844,16 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
           <h1 className={styles.title}>Defeitos</h1>
           <p className={styles.subtitle}>
             {defeitoFilial
-              ? `Conferência dos romaneios que vão para ${defeitoFilial} e o custo do que entrou lá.`
-              : "Conferência dos romaneios de defeito e o custo do que entrou na filial de defeito."}
+              ? `Confirmação dos romaneios que vão para ${defeitoFilial} e o custo do que entrou lá.`
+              : "Confirmação dos romaneios de defeito e o custo do que entrou na filial de defeito."}
           </p>
         </div>
       </header>
 
-      <div className={styles.colunas}>
-        {/* ══════════════════ ESQUERDA ══════════════════ */}
+      {/* Com um romaneio aberto a tela vira coluna única: a tabela do romaneio
+          tem dez colunas e não se lê em meia tela. */}
+      <div className={`${styles.colunas} ${selecionado ? styles.colunaUnica : ""}`}>
+        {/* ══════════════════ ROMANEIOS / ITENS ══════════════════ */}
         <section className={styles.painel}>
           {!selecionado ? (
             <>
@@ -639,9 +887,9 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
                 {(
                   [
                     ["todos", `Todos (${romaneios.length})`],
-                    ["pendentes", `Não conferidos (${contagens.pendentesN})`],
+                    ["pendentes", `Não confirmados (${contagens.pendentesN})`],
                     ["parciais", `Parciais (${contagens.parciais})`],
-                    ["confirmados", `Conferidos (${contagens.confirmados})`],
+                    ["confirmados", `Confirmados (${contagens.confirmados})`],
                   ] as [StatusFiltro, string][]
                 ).map(([chave, label]) => (
                   <button
@@ -691,7 +939,7 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
                             </span>
                             {r.linhasConfirmadas > 0 && (
                               <span className={divergente ? styles.divergente : undefined}>
-                                conferido: {inteiro(r.qtdeConfirmada)}
+                                confirmado: {inteiro(r.qtdeConfirmada)}
                               </span>
                             )}
                           </div>
@@ -707,155 +955,328 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
             </>
           ) : (
             <>
-              <div className={styles.painelHeader}>
+              <div className={styles.detalheTopo}>
                 <button type="button" className={styles.voltar} onClick={fecharRomaneio}>
                   ← Romaneios
                 </button>
-                <span className={styles.contador}>
-                  {inteiro(totalItensRomaneio)} peça(s) · {moeda(custoRomaneio)}
-                </span>
+                <div className={styles.detalheIdent}>
+                  <strong className={styles.romaneioNum}>#{selecionado.romaneio}</strong>
+                  <span className={styles.detalheFilial}>{selecionado.filialOrigem}</span>
+                  <span className={styles.detalheMeta}>
+                    {formatarData(selecionado.emissao)} · {selecionado.responsavel || "—"}
+                  </span>
+                </div>
+                <div className={styles.detalheAcoes}>
+                  <input
+                    className={styles.inputFiltroItem}
+                    type="search"
+                    placeholder="Filtrar item por nome ou código"
+                    value={filtroItem}
+                    onChange={(e) => setFiltroItem(e.target.value)}
+                  />
+                  {podeCorrigir && (
+                    <button
+                      type="button"
+                      className={styles.confirmarTudoBtn}
+                      onClick={() => void confirmarTudo()}
+                      disabled={!podeConfirmarAgora}
+                      title={
+                        naoConfirmados.length === 0
+                          ? "Todos os itens já estão confirmados"
+                          : `Dar entrada em ${defeitoFilial} e confirmar`
+                      }
+                    >
+                      {confirmando
+                        ? "Confirmando…"
+                        : naoConfirmados.length === 0
+                        ? "Tudo confirmado"
+                        : `Confirmar ${naoConfirmados.length} item(ns)`}
+                    </button>
+                  )}
+                </div>
               </div>
 
-              <div className={styles.detalheCabecalho}>
-                <strong className={styles.romaneioNum}>#{selecionado.romaneio}</strong>
-                <span>{selecionado.filialOrigem}</span>
-                <span>{formatarData(selecionado.emissao)}</span>
-                <span>{selecionado.responsavel || "—"}</span>
+              <div className={styles.resumoRomaneio}>
+                <span>
+                  {inteiro(itens.length)} produto(s) • {inteiro(totalQtdeRomaneio)} peça(s) no
+                  romaneio
+                </span>
+                <span>custo {moeda(custoRomaneio)}</span>
               </div>
 
               {podeCorrigir ? (
                 <p className={styles.explicacao}>
-                  Corrigir a quantidade mexe no estoque de verdade: reduzir devolve a peça
-                  a <strong>{selecionado.filialOrigem}</strong>, e se o item já foi conferido
-                  o saldo de <strong>{defeitoFilial}</strong> acompanha.
+                  <strong>Confirmar</strong> dá entrada em {defeitoFilial} pela quantidade que
+                  chegou — se for menos do que o romaneio diz, a diferença volta para o estoque
+                  de {selecionado.filialOrigem}. A coluna <strong>Qtd romaneio</strong> corrige
+                  o próprio romaneio, e aí o estoque das duas pontas acompanha.
                 </p>
               ) : (
                 <p className={styles.explicacao}>
-                  Somente leitura: sua função não corrige quantidade de romaneio.
+                  Somente leitura: sua função não confirma nem corrige romaneio.
                 </p>
               )}
 
+              {erroConfirmacao && <div className={styles.erro}>{erroConfirmacao}</div>}
               {erroItens && <div className={styles.erro}>{erroItens}</div>}
+              {msgConfirmacao.length > 0 && (
+                <div className={styles.sucesso}>
+                  {msgConfirmacao.map((m, i) => (
+                    <div key={i}>{m}</div>
+                  ))}
+                </div>
+              )}
 
               {carregandoItens ? (
                 <div className={styles.vazio}>Carregando itens…</div>
               ) : itens.length === 0 ? (
                 <div className={styles.vazio}>Este romaneio não tem itens.</div>
               ) : (
-                <div className={styles.itens}>
-                  {itens.map((item) => {
-                    const chave = chaveDoItem(item);
-                    const valor = pendentes.get(chave) ?? item.qtde;
-                    const mudou = valor !== item.qtde;
-                    const salvando = salvandoChave === chave;
-                    const aviso = avisos.get(chave);
-                    return (
-                      <div
-                        key={chave}
-                        className={`${styles.item} ${item.qtde === 0 ? styles.itemZerado : ""}`}
-                      >
-                        <div className={styles.itemInfo}>
-                          <div className={styles.itemNome}>
-                            {item.descProduto || item.produto}
-                          </div>
-                          <div className={styles.itemMeta}>
-                            <span>{item.produto}</span>
-                            {item.descCor && <span>{item.descCor}</span>}
-                            {item.corProduto && <span>cor {item.corProduto}</span>}
-                            {item.grade && <span>({item.grade})</span>}
-                          </div>
-                          <div className={styles.itemMeta}>
-                            <span>custo {moeda(item.custoUnitario)}</span>
-                            <span>estoque na loja: {inteiro(item.estoqueOrigem)}</span>
-                            {item.qtdeConfirmada === null ? (
-                              <span className={styles.naoConferido}>não conferido</span>
-                            ) : (
-                              <span className={styles.conferido}>
-                                conferido: {inteiro(item.qtdeConfirmada)}
-                                {item.romaneioEntrada
-                                  ? ` (entrada ${item.romaneioEntrada})`
-                                  : ""}
+                <div className={styles.tableWrap}>
+                  <table className={styles.table}>
+                    <thead>
+                      <tr>
+                        <th>PRODUTO</th>
+                        <th>CÓD. BARRA</th>
+                        <th>SUBGRUPO</th>
+                        <th>GRADE</th>
+                        <th>DESCRIÇÃO</th>
+                        <th>COR</th>
+                        <th className={styles.num}>QTD ROMANEIO</th>
+                        <th className={styles.num}>CUSTO UN.</th>
+                        <th className={styles.num}>ESTOQUE LOJA</th>
+                        <th>CONFIRMAR</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {itensPlanejados.map((entry, idx) => {
+                        if (entry.kind === "banner") {
+                          return (
+                            <tr
+                              key={`banner-${entry.label}-${idx}`}
+                              className={styles.groupBannerRow}
+                            >
+                              <td colSpan={COLUNAS_TABELA} className={styles.groupBannerCell}>
+                                {entry.label}
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        const item = entry.item;
+                        const chave = chaveDoItem(item);
+                        const confirmado = item.qtdeConfirmada !== null;
+                        const qtdeConf = item.qtdeConfirmada ?? 0;
+                        const divergenteConf = confirmado && qtdeConf !== item.qtde;
+
+                        const correcao = correcoes.get(chave) ?? item.qtde;
+                        const mudouCorrecao = correcao !== item.qtde;
+                        const salvando = salvandoChave === chave;
+                        const aviso = avisos.get(chave);
+
+                        const qtdeAConfirmar = quantidades.get(chave) ?? item.qtde;
+                        const divergenteInput = qtdeAConfirmar !== item.qtde;
+
+                        return (
+                          <tr
+                            key={`${chave}-${idx}`}
+                            className={`${confirmado ? styles.rowConfirmada : ""} ${
+                              item.qtde === 0 ? styles.rowZerada : ""
+                            }`}
+                          >
+                            <td>{item.produto}</td>
+                            <td>{item.codigoBarra ?? "—"}</td>
+                            <td>{item.subgrupo || "—"}</td>
+                            <td>{item.grade || "—"}</td>
+                            <td>{item.descProduto || "—"}</td>
+                            <td>{item.descCor || item.corProduto || "—"}</td>
+
+                            {/* Qtd do romaneio + correção (mexe nos dois estoques) */}
+                            <td className={styles.num}>
+                              <div className={styles.correcaoCell}>
+                                {podeCorrigir ? (
+                                  <div className={styles.stepper}>
+                                    <button
+                                      type="button"
+                                      className={styles.stepBtn}
+                                      disabled={salvando || correcao <= 0}
+                                      onClick={() => ajustarCorrecao(item, -1)}
+                                      aria-label="Diminuir"
+                                    >
+                                      −
+                                    </button>
+                                    <input
+                                      className={styles.stepInput}
+                                      type="number"
+                                      min={0}
+                                      value={correcao}
+                                      disabled={salvando}
+                                      onChange={(e) => definirCorrecao(item, e.target.value)}
+                                    />
+                                    <button
+                                      type="button"
+                                      className={styles.stepBtn}
+                                      disabled={salvando}
+                                      onClick={() => ajustarCorrecao(item, 1)}
+                                      aria-label="Aumentar"
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <span className={styles.qtdValue}>{item.qtde}</span>
+                                )}
+
+                                {mudouCorrecao && (
+                                  <button
+                                    type="button"
+                                    className={styles.salvarCorrecaoBtn}
+                                    disabled={salvando}
+                                    onClick={() => void salvarCorrecao(item)}
+                                  >
+                                    {salvando ? "Salvando…" : `Corrigir ${item.qtde} → ${correcao}`}
+                                  </button>
+                                )}
+                                {!mudouCorrecao && falhasDestino.has(chave) && (
+                                  <button
+                                    type="button"
+                                    className={styles.salvarCorrecaoBtn}
+                                    disabled={salvando}
+                                    onClick={() => void salvarCorrecao(item, true)}
+                                  >
+                                    {salvando ? "Salvando…" : "Concluir correção"}
+                                  </button>
+                                )}
+                                {aviso && (
+                                  <div
+                                    className={
+                                      falhasDestino.has(chave)
+                                        ? styles.avisoItemGrave
+                                        : styles.avisoItem
+                                    }
+                                  >
+                                    {aviso}
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+
+                            <td className={styles.num}>{moeda(item.custoUnitario)}</td>
+                            <td className={styles.num}>
+                              <span
+                                className={
+                                  item.estoqueOrigem === 0 ? styles.estoqueZero : styles.estoqueValor
+                                }
+                              >
+                                {inteiro(item.estoqueOrigem)}
                               </span>
-                            )}
-                          </div>
-                          {aviso && (
-                            <div
-                              className={
-                                falhasDestino.has(chave)
-                                  ? styles.avisoItemGrave
-                                  : styles.avisoItem
-                              }
-                            >
-                              {aviso}
-                            </div>
-                          )}
-                        </div>
+                            </td>
 
-                        <div className={styles.stepper}>
-                          <button
-                            type="button"
-                            className={styles.stepBtn}
-                            disabled={!podeCorrigir || salvando || valor <= 0}
-                            onClick={() => ajustarPendente(item, -1)}
-                            aria-label="Diminuir"
-                          >
-                            −
-                          </button>
-                          <input
-                            className={styles.stepInput}
-                            type="number"
-                            min={0}
-                            value={valor}
-                            disabled={!podeCorrigir || salvando}
-                            onChange={(e) => definirPendente(item, e.target.value)}
-                          />
-                          <button
-                            type="button"
-                            className={styles.stepBtn}
-                            disabled={!podeCorrigir || salvando}
-                            onClick={() => ajustarPendente(item, 1)}
-                            aria-label="Aumentar"
-                          >
-                            +
-                          </button>
-                        </div>
-
-                        <div className={styles.itemAcao}>
-                          {mudou ? (
-                            <button
-                              type="button"
-                              className={styles.salvar}
-                              disabled={salvando}
-                              onClick={() => void salvarItem(item)}
-                            >
-                              {salvando ? "Salvando…" : `Salvar ${item.qtde} → ${valor}`}
-                            </button>
-                          ) : falhasDestino.has(chave) ? (
-                            <button
-                              type="button"
-                              className={styles.salvar}
-                              disabled={salvando}
-                              onClick={() => void salvarItem(item, true)}
-                            >
-                              {salvando ? "Salvando…" : "Concluir correção"}
-                            </button>
-                          ) : (
-                            <span className={styles.semMudanca}>
-                              {inteiro(item.qtde)} no romaneio
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
+                            {/* Confirmação */}
+                            <td className={styles.confirmarCell}>
+                              {confirmado ? (
+                                <div className={styles.confirmadoWrap}>
+                                  <span
+                                    className={
+                                      divergenteConf
+                                        ? styles.confirmadoBadgeDivergente
+                                        : styles.confirmadoBadge
+                                    }
+                                  >
+                                    ✓ {inteiro(qtdeConf)} confirmado
+                                    {qtdeConf !== 1 ? "s" : ""}
+                                  </span>
+                                  {divergenteConf && (
+                                    <span className={styles.originalBadge}>
+                                      {qtdeConf < item.qtde
+                                        ? `▼ faltou ${item.qtde - qtdeConf}`
+                                        : `▲ excesso ${qtdeConf - item.qtde}`}
+                                    </span>
+                                  )}
+                                  {item.romaneioEntrada && (
+                                    <span className={styles.entradaTag}>
+                                      entrada {item.romaneioEntrada}
+                                    </span>
+                                  )}
+                                  {user?.role === "admin" && (
+                                    <button
+                                      type="button"
+                                      className={styles.desfazerBtn}
+                                      disabled={desconfirmandoChave === chave}
+                                      onClick={() => void desconfirmarItem(item)}
+                                    >
+                                      {desconfirmandoChave === chave ? "..." : "Zerar"}
+                                    </button>
+                                  )}
+                                </div>
+                              ) : !podeCorrigir ? (
+                                <span className={styles.naoConfirmado}>não confirmado</span>
+                              ) : (
+                                <div className={styles.qtdeInputWrap}>
+                                  <div className={styles.qtdeInputRow}>
+                                    <button
+                                      type="button"
+                                      className={styles.stepBtn}
+                                      disabled={confirmando}
+                                      onClick={() =>
+                                        definirQuantidade(chave, qtdeAConfirmar - 1)
+                                      }
+                                    >
+                                      −
+                                    </button>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      className={styles.stepInput}
+                                      value={qtdeAConfirmar}
+                                      disabled={confirmando}
+                                      onChange={(e) =>
+                                        definirQuantidade(chave, parseInt(e.target.value, 10) || 0)
+                                      }
+                                    />
+                                    <button
+                                      type="button"
+                                      className={styles.stepBtn}
+                                      disabled={confirmando}
+                                      onClick={() =>
+                                        definirQuantidade(chave, qtdeAConfirmar + 1)
+                                      }
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                  {divergenteInput && qtdeAConfirmar > 0 && (
+                                    <div className={styles.divergenciaAviso}>
+                                      {qtdeAConfirmar < item.qtde
+                                        ? `⚠ Faltam ${item.qtde - qtdeAConfirmar} un. — voltam para a loja`
+                                        : `⚠ Excesso de ${qtdeAConfirmar - item.qtde} un. (romaneio: ${item.qtde})`}
+                                    </div>
+                                  )}
+                                  {qtdeAConfirmar === 0 && (
+                                    <div className={styles.divergenciaAviso}>
+                                      ⚠ Item não será confirmado
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
+              )}
+
+              {itens.length > 0 && itensPlanejados.length === 0 && (
+                <div className={styles.vazio}>Nenhum item para o filtro informado.</div>
               )}
 
               {podeCorrigir && (
                 <div className={styles.adicionar}>
                   <input
                     className={styles.input}
-                    placeholder="Bipe o código de barras para acrescentar uma peça"
+                    placeholder="Bipe o código de barras para acrescentar uma peça ao romaneio"
                     value={codigoBarras}
                     onChange={(e) => setCodigoBarras(e.target.value)}
                     onKeyDown={(e) => {
@@ -865,7 +1286,7 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
                   />
                   <button
                     type="button"
-                    className={styles.salvar}
+                    className={styles.confirmarTudoBtn}
                     onClick={() => void acrescentarPorCodigo()}
                     disabled={adicionando || !codigoBarras.trim()}
                   >
@@ -877,12 +1298,10 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
           )}
         </section>
 
-        {/* ══════════════════ DIREITA ══════════════════ */}
+        {/* ══════════════════ ENTRADAS / CUSTOS ══════════════════ */}
         <section className={styles.painel}>
           <div className={styles.painelHeader}>
-            <h2 className={styles.painelTitulo}>
-              Entrou em {defeitoFilial || "defeitos"}
-            </h2>
+            <h2 className={styles.painelTitulo}>Entrou em {defeitoFilial || "defeitos"}</h2>
             <button
               type="button"
               className={styles.exportar}
@@ -917,8 +1336,8 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
           </div>
 
           <p className={styles.explicacao}>
-            Só item conferido, pela quantidade conferida, contado pela data da conferência
-            — é quando a peça de fato entrou.
+            Só item confirmado, pela quantidade confirmada, contado pela data da confirmação —
+            é quando a peça de fato entrou.
           </p>
 
           {erroEntradas && <div className={styles.erro}>{erroEntradas}</div>}
@@ -926,7 +1345,7 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
           {carregandoEntradas ? (
             <div className={styles.vazio}>Carregando entradas…</div>
           ) : !entradas || entradas.filiais.length === 0 ? (
-            <div className={styles.vazio}>Nada conferido neste período.</div>
+            <div className={styles.vazio}>Nada confirmado neste período.</div>
           ) : (
             <>
               <div className={styles.kpis}>
@@ -962,6 +1381,7 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
               <div className={styles.filiais}>
                 {entradas.filiais.map((f) => {
                   const aberta = expandidas.has(f.filialOrigem);
+                  const plano = aberta ? planejarItensAgrupados(f.itens, companyKey) : [];
                   return (
                     <div key={f.filialOrigem} className={styles.filialBloco}>
                       <button
@@ -976,55 +1396,66 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
                       </button>
 
                       {aberta && (
-                        <div className={styles.tabelaScroll}>
-                          <table className={styles.tabela}>
+                        <div className={styles.tableWrap}>
+                          <table className={styles.table}>
                             <thead>
                               <tr>
-                                <th>Produto</th>
-                                <th>Cor</th>
-                                <th>Romaneio</th>
-                                <th className={styles.num}>Qtd</th>
-                                <th className={styles.num}>Custo un.</th>
-                                <th className={styles.num}>Custo total</th>
-                                <th>Conferido</th>
+                                <th>PRODUTO</th>
+                                <th>SUBGRUPO</th>
+                                <th>GRADE</th>
+                                <th>DESCRIÇÃO</th>
+                                <th>COR</th>
+                                <th>ROMANEIO</th>
+                                <th className={styles.num}>QTD</th>
+                                <th className={styles.num}>CUSTO UN.</th>
+                                <th className={styles.num}>CUSTO TOTAL</th>
+                                <th>CONFIRMADO</th>
                               </tr>
                             </thead>
                             <tbody>
-                              {f.itens.map((item, i) => (
-                                <tr key={`${item.produto}|${item.corProduto}|${item.romaneio}|${i}`}>
-                                  <td>
-                                    <div className={styles.celNome}>
-                                      {item.descProduto || item.produto}
-                                    </div>
-                                    <div className={styles.celMeta}>{item.produto}</div>
-                                  </td>
-                                  <td>
-                                    <div className={styles.celNome}>{item.descCor || "—"}</div>
-                                    <div className={styles.celMeta}>{item.corProduto}</div>
-                                  </td>
-                                  <td>
-                                    <div className={styles.celNome}>#{item.romaneio}</div>
-                                    {item.romaneioEntrada && (
-                                      <div className={styles.celMeta}>
-                                        ent. {item.romaneioEntrada}
-                                      </div>
-                                    )}
-                                  </td>
-                                  <td className={styles.num}>{inteiro(item.qtde)}</td>
-                                  <td className={styles.num}>{moeda(item.custoUnitario)}</td>
-                                  <td className={styles.num}>{moeda(item.custoTotal)}</td>
-                                  <td>
-                                    <div className={styles.celNome}>
-                                      {formatarDataHora(item.confirmadoEm)}
-                                    </div>
-                                    <div className={styles.celMeta}>{item.confirmadoPor}</div>
-                                  </td>
-                                </tr>
-                              ))}
+                              {plano.map((entry, idx) => {
+                                if (entry.kind === "banner") {
+                                  return (
+                                    <tr
+                                      key={`b-${f.filialOrigem}-${entry.label}-${idx}`}
+                                      className={styles.groupBannerRow}
+                                    >
+                                      <td colSpan={10} className={styles.groupBannerCell}>
+                                        {entry.label}
+                                      </td>
+                                    </tr>
+                                  );
+                                }
+                                const item = entry.item;
+                                return (
+                                  <tr key={`${item.produto}-${item.corProduto}-${item.romaneio}-${idx}`}>
+                                    <td>{item.produto}</td>
+                                    <td>{item.subgrupo || "—"}</td>
+                                    <td>{item.grade || "—"}</td>
+                                    <td>{item.descProduto || "—"}</td>
+                                    <td>{item.descCor || item.corProduto || "—"}</td>
+                                    <td>
+                                      <div>#{item.romaneio}</div>
+                                      {item.romaneioEntrada && (
+                                        <div className={styles.celMeta}>
+                                          ent. {item.romaneioEntrada}
+                                        </div>
+                                      )}
+                                    </td>
+                                    <td className={styles.num}>{inteiro(item.qtde)}</td>
+                                    <td className={styles.num}>{moeda(item.custoUnitario)}</td>
+                                    <td className={styles.num}>{moeda(item.custoTotal)}</td>
+                                    <td>
+                                      <div>{formatarDataHora(item.confirmadoEm)}</div>
+                                      <div className={styles.celMeta}>{item.confirmadoPor}</div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
                             </tbody>
                             <tfoot>
                               <tr>
-                                <td colSpan={3}>Total {f.filialOrigem}</td>
+                                <td colSpan={6}>Total {f.filialOrigem}</td>
                                 <td className={styles.num}>{inteiro(f.qtde)}</td>
                                 <td />
                                 <td className={styles.num}>{moeda(f.custoTotal)}</td>
