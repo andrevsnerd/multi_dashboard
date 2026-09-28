@@ -141,6 +141,14 @@ async function liberarTransitoLinx(
 
 // ---------- tipos ----------
 
+/** "P:1 M:3 G:2" — só os tamanhos que foram no romaneio. */
+function formatTamanhos(tamanhos: RomaneioDetalheItem["tamanhos"]): string {
+  return (tamanhos ?? [])
+    .filter((t) => t.qtde !== 0)
+    .map((t) => `${t.label}:${t.qtde}`)
+    .join(" ");
+}
+
 export interface RomaneioDetalheItem {
   produto: string;
   corProduto: string | null;
@@ -152,6 +160,8 @@ export interface RomaneioDetalheItem {
   subgrupo: string;
   grade: string;
   qtde: number;
+  /** Qtd do romaneio por tamanho (P/M/G...); vazio em produto de tamanho único. */
+  tamanhos?: Array<{ label: string; qtde: number }>;
   estoqueOrigem: number;
   estoqueDestino: number;
   filialOrigem?: string;
@@ -657,6 +667,8 @@ export default function RomaneioDetalhePage({
         return {
           ...i,
           qtde: novaQtd,
+          // A quebra por tamanho lida do Linx não vale mais para a qtd nova; volta ao recarregar.
+          tamanhos: [],
           estoqueOrigem: isSaida ? i.estoqueOrigem - diff : i.estoqueOrigem,
           estoqueDestino: isEntradaLike ? i.estoqueDestino + diff : i.estoqueDestino,
         };
@@ -712,6 +724,7 @@ export default function RomaneioDetalhePage({
       "CÓD. BARRAS",
       "SUBGRUPO",
       "GRADE",
+      "TAMANHOS",
       "DESCRIÇÃO",
       "COR",
       "DESTINO",
@@ -740,6 +753,7 @@ export default function RomaneioDetalhePage({
         item.codigoBarra ?? "—",
         item.subgrupo || "—",
         item.grade || "—",
+        formatTamanhos(item.tamanhos) || "—",
         item.descProduto || "—",
         item.descCor || item.corProduto || "—",
         destinoCell,
@@ -1457,7 +1471,21 @@ export default function RomaneioDetalhePage({
                   <td>{item.produto}</td>
                   <td>{item.codigoBarra ?? "—"}</td>
                   <td>{item.subgrupo || "—"}</td>
-                  <td>{item.grade || "—"}</td>
+                  <td>
+                    {item.grade || "—"}
+                    {item.tamanhos && item.tamanhos.length > 0 && (
+                      <div className={styles.tamanhosList} title="Quantidade enviada por tamanho">
+                        {item.tamanhos.map((t) => (
+                          <span
+                            key={t.label}
+                            className={`${styles.tamanhoChip} ${t.qtde === 0 ? styles.tamanhoChipZero : ""}`}
+                          >
+                            {t.label} <strong>{t.qtde}</strong>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </td>
                   <td>{item.descProduto || "—"}</td>
                   <td>{item.descCor || item.corProduto || "—"}</td>
                   <td>

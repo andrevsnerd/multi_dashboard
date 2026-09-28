@@ -930,8 +930,8 @@
     "semantic_hash": "3136877746d42feabbd7abeab02e36c2"
   },
   "app/api/romaneio-confirmar-entrada/route.ts": {
-    "mtime": 1790192980.731615,
-    "ast_hash": "b0024ce767bc3573583fb75d6fddc2c9",
+    "mtime": 1785761951.1689668,
+    "ast_hash": "7dc43e1ca67d4b907a71b706566edc35",
     "semantic_hash": ""
   },
   "app/api/romaneios/editar-qtd/route.ts": {
@@ -1020,8 +1020,8 @@
     "semantic_hash": "6be9e0704a0dc0e8bd1622d08ead7b12"
   },
   "app/api/transferencia-produtos/log-detalhes/route.ts": {
-    "mtime": 1790619548.156881,
-    "ast_hash": "502c6a4158a0019aa006d27bfb1f7712",
+    "mtime": 1787079004.0227654,
+    "ast_hash": "6b373b4849786ac17d7e781a2fec4651",
     "semantic_hash": ""
   },
   "app/api/transferencia-produtos/log-saidas/route.ts": {
@@ -1430,8 +1430,8 @@
     "semantic_hash": "7a672d31b6ac254cb25f6a420501049d"
   },
   "components/layout/Sidebar.tsx": {
-    "mtime": 1790192980.7329445,
-    "ast_hash": "9c4d67765ee9647a0d4b3328228b833b",
+    "mtime": 1788965099.282777,
+    "ast_hash": "b737617854b97a0fe2dfd60d6c49d9a8",
     "semantic_hash": ""
   },
   "components/layout/SidebarContext.tsx": {
@@ -1600,8 +1600,8 @@
     "semantic_hash": "c1db24d3ffabe5b57c07dc935de08446"
   },
   "components/romaneios/RomaneioDetalhePage.tsx": {
-    "mtime": 1790619511.2942672,
-    "ast_hash": "2e0fb27fde02dcca82d2880fa453a4a3",
+    "mtime": 1787079304.293019,
+    "ast_hash": "6c4b6ea5ad84ed51b2e2b5ebb2f7a353",
     "semantic_hash": ""
   },
   "components/romaneios/RomaneiosDuplicadosPanel.tsx": {
@@ -2075,8 +2075,8 @@
     "semantic_hash": ""
   },
   "lib/auth/permissions.ts": {
-    "mtime": 1790192980.7356403,
-    "ast_hash": "f944256f5efc7d9b277253f6b261867c",
+    "mtime": 1790081291.020007,
+    "ast_hash": "22137399a42437ea1e511727090439de",
     "semantic_hash": ""
   },
   "lib/auth/users-store-neon.ts": {
@@ -2155,8 +2155,8 @@
     "semantic_hash": "29590f1b0f773ebbcd60e9dc314eec58"
   },
   "lib/config/page-permissions.ts": {
-    "mtime": 1790192980.7366383,
-    "ast_hash": "906db020097a9ac0b21844c9d72de13e",
+    "mtime": 1788965099.1868172,
+    "ast_hash": "2d150924374e9c7bcceb586a5aae87d7",
     "semantic_hash": ""
   },
   "lib/constants/columns.ts": {
@@ -2595,8 +2595,8 @@
     "semantic_hash": ""
   },
   "lib/saida-entrada-executor.js": {
-    "mtime": 1790192980.738006,
-    "ast_hash": "4fb285b6fd95f3927e23188a4631b900",
+    "mtime": 1789652830.0036285,
+    "ast_hash": "c1a5ac1046df9edba733b98bd60dd312",
     "semantic_hash": ""
   },
   "lib/server/company-live.ts": {
@@ -2925,8 +2925,8 @@
     "semantic_hash": "8574a22068d81c11c33afb088ddecd70"
   },
   "lib/utils/romaneio-confirmacao-store.ts": {
-    "mtime": 1790192980.7390053,
-    "ast_hash": "a2dd629064b1605e3ec348f8ac1de0e3",
+    "mtime": 1784199366.3421924,
+    "ast_hash": "cfca45b7f853a8919ca5059a6c3e4fc9",
     "semantic_hash": ""
   },
   "lib/utils/romaneios-date.ts": {
@@ -4562,46 +4562,6 @@
   "app/api/product-detail/rename/route.ts": {
     "mtime": 1789410598.7464588,
     "ast_hash": "8ef58d70796e1396cc0ee74f83ad3935",
-    "semantic_hash": ""
-  },
-  "app/(companies)/[company]/defeitos/page.tsx": {
-    "mtime": 1790192693.3278396,
-    "ast_hash": "0388d582c869832fa1ba6ec4fb43e48e",
-    "semantic_hash": ""
-  },
-  "app/api/defeitos/entradas/route.ts": {
-    "mtime": 1790192229.4067008,
-    "ast_hash": "eb6fc8c8112c7547cc8f7f6b1f283377",
-    "semantic_hash": ""
-  },
-  "app/api/defeitos/item/route.ts": {
-    "mtime": 1790193488.2175012,
-    "ast_hash": "811c2ba48523aaec378c32744a1e2a0f",
-    "semantic_hash": ""
-  },
-  "app/api/defeitos/itens/route.ts": {
-    "mtime": 1790192216.270064,
-    "ast_hash": "1911a4bf2a46946345dfae91a372725a",
-    "semantic_hash": ""
-  },
-  "app/api/defeitos/romaneios/route.ts": {
-    "mtime": 1790192169.298423,
-    "ast_hash": "0c9ff358e8c3209524b69aa3e60a2ab0",
-    "semantic_hash": ""
-  },
-  "components/defeitos/DefeitosPage.tsx": {
-    "mtime": 1790194416.8634102,
-    "ast_hash": "3e1f24e061b38aa0bd85987fc481a696",
-    "semantic_hash": ""
-  },
-  "lib/repositories/defeitos.ts": {
-    "mtime": 1790194218.168437,
-    "ast_hash": "04b8b913cde2b74d48a5db224664b91b",
-    "semantic_hash": ""
-  },
-  "lib/utils/romaneio-agrupamento.ts": {
-    "mtime": 1790194160.7730596,
-    "ast_hash": "c8f144e364a3265ebeeee42b67786507",
     "semantic_hash": ""
   }
 }

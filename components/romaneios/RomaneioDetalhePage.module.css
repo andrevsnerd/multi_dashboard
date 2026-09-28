@@ -249,6 +249,35 @@
   border-bottom: 1px solid rgba(148, 163, 184, 0.24);
 }
 
+/* Quebra por tamanho (P/M/G) embaixo da grade */
+.tamanhosList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.tamanhoChip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--b-subtle);
+  background: var(--brand-scarfme-tint);
+  color: var(--brand-scarfme);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.tamanhoChip strong {
+  font-weight: 700;
+}
+
+.tamanhoChipZero {
+  opacity: 0.4;
+}
+
 .destinoTag {
   display: inline-block;
   padding: 4px 10px;

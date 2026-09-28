@@ -2,6 +2,20 @@ import { NextResponse } from 'next/server';
 import { withRequest } from '@/lib/db/connection';
 import sql from 'mssql';
 
+import { MAX_TAMANHOS_GRADE, type TamanhoGrade } from '@/lib/utils/grade-tamanhos';
+
+/**
+ * Colunas posicionais da grade apelidadas T1..T48. Cada tabela usa um prefixo:
+ * LOJA_SAIDAS_PRODUTO/LOJA_ENTRADAS_PRODUTO = EN1.., ESTOQUE_PROD1_SAI = SA_1..,
+ * ESTOQUE_PROD1_ENT = EN_1.. (ver lib/utils/grade-tamanhos.ts).
+ */
+function gradeColsSql(alias: string, prefixo: string): string {
+  return Array.from(
+    { length: MAX_TAMANHOS_GRADE },
+    (_, i) => `ISNULL(${alias}.${prefixo}${i + 1}, 0) AS T${i + 1}`
+  ).join(', ');
+}
+
 interface LogDetalheItem {
   produto: string;
   corProduto: string | null;
@@ -13,6 +27,11 @@ interface LogDetalheItem {
   subgrupo: string;
   grade: string;
   qtde: number;
+  /**
+   * Quantidade do romaneio por tamanho da grade (P/M/G...), na ordem da grade. Vazio em
+   * produto de tamanho único — lenço, eletrônico — que segue mostrando só o total.
+   */
+  tamanhos: Array<{ label: string; qtde: number }>;
   estoqueOrigem: number;
   estoqueDestino: number;
   filialOrigem?: string;
@@ -126,7 +145,8 @@ export async function GET(request: Request) {
             ISNULL(p.GRUPO_PRODUTO, '') AS GRUPO,
             ISNULL(p.LINHA, '') AS LINHA,
             ISNULL(p.SUBGRUPO_PRODUTO, '') AS SUBGRUPO,
-            ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS GRADE
+            ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS GRADE,
+            ${gradeColsSql('sp', 'EN')}
           FROM LOJA_SAIDAS_PRODUTO sp WITH (NOLOCK)
           LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = sp.PRODUTO
           LEFT JOIN (
@@ -148,7 +168,8 @@ export async function GET(request: Request) {
             ISNULL(p2.GRUPO_PRODUTO, '') AS GRUPO,
             ISNULL(p2.LINHA, '') AS LINHA,
             ISNULL(p2.SUBGRUPO_PRODUTO, '') AS SUBGRUPO,
-            ISNULL(CONVERT(VARCHAR, p2.GRADE), '') AS GRADE
+            ISNULL(CONVERT(VARCHAR, p2.GRADE), '') AS GRADE,
+            ${gradeColsSql('ep', 'SA_')}
           FROM ESTOQUE_PROD1_SAI ep WITH (NOLOCK)
           LEFT JOIN PRODUTOS p2 WITH (NOLOCK) ON p2.PRODUTO = ep.PRODUTO
           LEFT JOIN (
@@ -180,7 +201,8 @@ export async function GET(request: Request) {
             ISNULL(p.GRUPO_PRODUTO, '') AS GRUPO,
             ISNULL(p.LINHA, '') AS LINHA,
             ISNULL(p.SUBGRUPO_PRODUTO, '') AS SUBGRUPO,
-            ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS GRADE
+            ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS GRADE,
+            ${gradeColsSql('ep', 'EN_')}
           FROM ESTOQUE_PROD1_ENT ep WITH (NOLOCK)
           LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = ep.PRODUTO
           LEFT JOIN (
@@ -202,7 +224,8 @@ export async function GET(request: Request) {
             ISNULL(p2.GRUPO_PRODUTO, '') AS GRUPO,
             ISNULL(p2.LINHA, '') AS LINHA,
             ISNULL(p2.SUBGRUPO_PRODUTO, '') AS SUBGRUPO,
-            ISNULL(CONVERT(VARCHAR, p2.GRADE), '') AS GRADE
+            ISNULL(CONVERT(VARCHAR, p2.GRADE), '') AS GRADE,
+            ${gradeColsSql('lep', 'EN')}
           FROM LOJA_ENTRADAS_PRODUTO lep WITH (NOLOCK)
           LEFT JOIN PRODUTOS p2 WITH (NOLOCK) ON p2.PRODUTO = lep.PRODUTO
           LEFT JOIN (
@@ -235,6 +258,7 @@ export async function GET(request: Request) {
         LINHA: string;
         SUBGRUPO: string;
         GRADE: string;
+        [coluna: `T${number}`]: number;
       }>(itemsQuery);
 
       return itemsResult.recordset;
@@ -322,11 +346,16 @@ export async function GET(request: Request) {
       LINHA?: string;
       SUBGRUPO?: string;
       GRADE?: string;
+      [coluna: `T${number}`]: number | undefined;
     }>;
 
     if (rows.length === 0) {
       return NextResponse.json({ data: [] });
     }
+
+    const tamanhosPorGrade = await fetchTamanhosPorGrade(
+      rows.map((r) => r.GRADE?.toString().trim() ?? '')
+    );
 
     const detalhes: LogDetalheItem[] = rows.map((row) => {
       const produto = row.PRODUTO?.toString().trim() ?? '';
@@ -352,6 +381,10 @@ export async function GET(request: Request) {
         subgrupo: row.SUBGRUPO?.toString().trim() ?? '',
         grade: row.GRADE?.toString().trim() ?? '',
         qtde: Number(row.QTDE) || 0,
+        tamanhos: (tamanhosPorGrade.get(row.GRADE?.toString().trim() ?? '') ?? []).map((t) => ({
+          label: t.label,
+          qtde: Number(row[`T${t.ordinal}`]) || 0,
+        })),
         estoqueOrigem,
         estoqueDestino,
         filialOrigem: nomeOrigem,
@@ -368,4 +401,46 @@ export async function GET(request: Request) {
       { status: 500 }
     );
   }
+}
+
+/**
+ * Rótulos das grades dos itens (PRODUTOS.GRADE → PRODUTOS_TAMANHOS.TAMANHO_1..48), numa
+ * consulta só. Grade com ≤1 tamanho fica de fora — é tamanho único e não tem o que quebrar.
+ * NUMERO_TAMANHOS é lixo no cadastro; vale quais TAMANHO_n estão preenchidos.
+ */
+async function fetchTamanhosPorGrade(grades: string[]): Promise<Map<string, TamanhoGrade[]>> {
+  const distintas = [...new Set(grades.filter(Boolean))];
+  const mapa = new Map<string, TamanhoGrade[]>();
+  if (distintas.length === 0) return mapa;
+
+  const cols = Array.from(
+    { length: MAX_TAMANHOS_GRADE },
+    (_, i) => `LTRIM(RTRIM(ISNULL(CAST(pt.TAMANHO_${i + 1} AS VARCHAR(20)), ''))) AS T${i + 1}`
+  ).join(', ');
+
+  const rows = await withRequest(async (req) => {
+    const params = distintas.map((g, i) => {
+      req.input(`g${i}`, sql.VarChar, g);
+      return `@g${i}`;
+    });
+    const res = await req.query<Record<string, string>>(`
+      SELECT LTRIM(RTRIM(CAST(pt.GRADE AS VARCHAR(60)))) AS GRADE,
+        ${cols}
+      FROM PRODUTOS_TAMANHOS pt WITH (NOLOCK)
+      WHERE LTRIM(RTRIM(CAST(pt.GRADE AS VARCHAR(60)))) IN (${params.join(', ')})
+    `);
+    return res.recordset;
+  });
+
+  for (const row of rows) {
+    const grade = (row.GRADE ?? '').trim();
+    if (!grade || mapa.has(grade)) continue;
+    const tamanhos: TamanhoGrade[] = [];
+    for (let i = 1; i <= MAX_TAMANHOS_GRADE; i += 1) {
+      const label = (row[`T${i}`] ?? '').trim();
+      if (label) tamanhos.push({ ordinal: i, label });
+    }
+    if (tamanhos.length > 1) mapa.set(grade, tamanhos);
+  }
+  return mapa;
 }
