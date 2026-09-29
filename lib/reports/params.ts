@@ -28,6 +28,7 @@ export function parseReportFilters(searchParams: URLSearchParams): ReportFilters
   const diasParadoValorRaw = num("diasParadoValor");
   const diasParadoModoRaw = searchParams.get("diasParadoModo");
   const janelaRaw = num("projecaoJanelaMeses");
+  const valorMinimoTicketRaw = num("valorMinimoTicket");
 
   return {
     company: searchParams.get("company") ?? undefined,
@@ -52,6 +53,8 @@ export function parseReportFilters(searchParams: URLSearchParams): ReportFilters
     diasParadoValor: diasParadoValorRaw != null && diasParadoValorRaw >= 0 ? diasParadoValorRaw : null,
     diasParadoModo:
       diasParadoModoRaw === "lte" ? "lte" : diasParadoModoRaw === "gte" ? "gte" : null,
+    valorMinimoTicket:
+      valorMinimoTicketRaw != null && valorMinimoTicketRaw > 0 ? valorMinimoTicketRaw : null,
     estoquePorFilial: searchParams.get("estoquePorFilial") === "1",
     vendasPorFilial: searchParams.get("vendasPorFilial") === "1",
     compraIdeal: searchParams.get("compraIdeal") === "1",

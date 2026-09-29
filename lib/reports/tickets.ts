@@ -12,7 +12,9 @@ export const TICKETS_ID = "tickets";
  */
 export const TICKETS_COLUMNS: ReportColumnDef[] = [
   // ── Cabeçalho do ticket (repetido em todos os itens dele) ──
-  { key: "TICKET", defaultLabel: "Ticket", type: "text" },
+  // Loja (ticket do POS) ou E-commerce (nota fiscal — o site não tem ticket).
+  { key: "CANAL", defaultLabel: "Canal", type: "text" },
+  { key: "TICKET", defaultLabel: "Ticket / NF", type: "text" },
   { key: "DATA_VENDA", defaultLabel: "Data", type: "date" },
   { key: "FILIAL", defaultLabel: "Filial", type: "text" },
   { key: "VENDEDOR", defaultLabel: "Vendedor", type: "text" },
@@ -52,6 +54,7 @@ const col = (key: string, label?: string) => ({
  * de cada ticket (e para NÃO repetir esses valores em cada linha de item).
  */
 export const TICKET_HEADER_KEYS = [
+  "CANAL",
   "TICKET",
   "DATA_VENDA",
   "FILIAL",
@@ -70,6 +73,7 @@ const TICKETS_PRESETS: ReportPresetDef[] = [
     sortBy: "DATA_VENDA",
     sortDir: "desc",
     columns: [
+      col("CANAL"),
       col("TICKET"),
       col("DATA_VENDA"),
       col("FILIAL"),
@@ -93,6 +97,7 @@ const TICKETS_PRESETS: ReportPresetDef[] = [
     sortBy: "DATA_VENDA",
     sortDir: "desc",
     columns: [
+      col("CANAL"),
       col("TICKET"),
       col("DATA_VENDA"),
       col("FILIAL"),
@@ -129,7 +134,7 @@ export const ticketsMeta: ReportTypeMeta = {
   label: "Tickets detalhados",
   fileSlug: "tickets",
   description:
-    "Os tickets (vendas) do período, abertos item por item: uma linha por produto × cor × tamanho, com o vendedor, o valor do ticket e o valor de cada item. Os filtros de produto (nome, grupo, linha, subgrupo, coleção, cor…) escolhem quais TICKETS entram — e o ticket vem inteiro, com todos os seus itens, mesmo os que não casam com o filtro. Sem filtro nenhum, vêm todos os tickets do período com os totais. Só venda de loja física (POS): ticket e vendedor não existem no e-commerce.",
+    "Os tickets (vendas) do período, abertos item por item: uma linha por produto × cor × tamanho, com o vendedor, o valor do ticket e o valor de cada item. Os filtros de produto (nome, grupo, linha, subgrupo, coleção, cor…) escolhem quais TICKETS entram — e o ticket vem inteiro, com todos os seus itens, mesmo os que não casam com o filtro. Sem filtro nenhum, vêm todos os tickets do período com os totais. Inclui o e-commerce: lá a venda é a nota fiscal (coluna Canal = E-commerce, vendedor \"E-COMMERCE\", sem tamanho).",
   supportedFilters: [
     "periodo",
     "filial",

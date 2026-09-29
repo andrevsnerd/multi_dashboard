@@ -94,7 +94,9 @@ export type ReportFilterKey =
   | "tipo"
   | "filial"
   | "diasParado"
-  | "saldoEstoque";
+  | "saldoEstoque"
+  /** Valor mínimo do ticket (análise Vendas por preço). */
+  | "valorTicket";
 
 /** Metadados puros de um tipo de análise (sem o fetcher). */
 export interface ReportTypeMeta {
@@ -167,6 +169,8 @@ export interface ReportFilters {
   diasParadoValor?: number | null;
   /** Modo do corte: "lte" = até X dias; "gte" = igual ou mais de X dias. */
   diasParadoModo?: "lte" | "gte" | null;
+  /** Vendas por preço: só tickets com valor líquido IGUAL OU MAIOR que este (R$). */
+  valorMinimoTicket?: number | null;
   /** Quando true, calcula e anexa estoque por filial (rede inteira) por linha. */
   estoquePorFilial?: boolean;
   /** Quando true, calcula e anexa a quantidade vendida por filial (rede inteira) por linha. */

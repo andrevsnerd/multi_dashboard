@@ -33,6 +33,8 @@ import { exportProjecaoVendasXlsx } from "@/lib/utils/exportProjecaoVendasXlsx";
 import { exportCustosDefeitosXlsx } from "@/lib/utils/exportCustosDefeitosXlsx";
 import { exportTicketsXlsx } from "@/lib/utils/exportTicketsXlsx";
 import { TICKETS_ID } from "@/lib/reports/tickets";
+import { VENDAS_POR_PRECO_ID } from "@/lib/reports/vendas-por-preco";
+import { exportVendasPorPrecoXlsx } from "@/lib/utils/exportVendasPorPrecoXlsx";
 import { formatData, formatDataVenda, formatDiasAcabar, formatDiasParado } from "@/lib/reports/format";
 import { getDefaultPresets, getReportMeta, REPORT_TYPES, VENDAS_FATURAMENTO_ID } from "@/lib/reports/registry";
 import { computeExtraSources, getEditorExtraColumns } from "@/lib/reports/column-sources";
@@ -134,6 +136,19 @@ function formatCell(value: ReportRow[string], type: ColumnType): string {
   return num.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 }
 
+/**
+ * Valor em reais digitado no formato brasileiro: "1.000" → 1000, "1.500,50" → 1500.5,
+ * "1500.5" → 1500.5. Vazio, zero ou inválido → null (sem corte).
+ */
+function parseValorReais(raw: string): number | null {
+  let t = raw.trim().replace(/^R\$\s*/i, "").replace(/\s/g, "");
+  if (!t) return null;
+  if (t.includes(",")) t = t.replace(/\./g, "").replace(",", ".");
+  else if (/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, "");
+  const n = Number(t);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 function isNumericType(type: ColumnType): boolean {
   // datas alinham/ordenam como texto (ISO ordena cronologicamente); diasParado é numérico.
   return type !== "text" && type !== "dataVenda" && type !== "date";
@@ -194,6 +209,8 @@ export default function GeradorRelatoriosPage({
   // Filtro opcional de dias parado (análise Produtos Parados): valor + modo.
   const [diasParadoValor, setDiasParadoValor] = useState<string>("");
   const [diasParadoModo, setDiasParadoModo] = useState<"lte" | "gte">("gte");
+  // Valor mínimo do ticket (análise Vendas por preço), digitado em R$ ("1.000", "1500,50").
+  const [valorMinimoTicket, setValorMinimoTicket] = useState<string>("");
   const [incluirZerados, setIncluirZerados] = useState(false);
   const [incluirNegativos, setIncluirNegativos] = useState(false);
   // Lente de transferência da Compra sugerida por Curva ABC (opt-in, sempre inicia desligada):
@@ -738,6 +755,10 @@ export default function GeradorRelatoriosPage({
       params.set("diasParadoValor", String(Math.round(diasNum)));
       params.set("diasParadoModo", diasParadoModo);
     }
+    const valorMinNum = parseValorReais(valorMinimoTicket);
+    if (meta?.supportedFilters.includes("valorTicket" as never) && valorMinNum != null) {
+      params.set("valorMinimoTicket", String(valorMinNum));
+    }
     const suportaSaldo = meta?.supportedFilters.includes("saldoEstoque" as never) ?? false;
     if (suportaSaldo && incluirZerados) params.set("incluirZerados", "1");
     if (suportaSaldo && incluirNegativos) params.set("incluirNegativos", "1");
@@ -747,7 +768,8 @@ export default function GeradorRelatoriosPage({
     companyKey, filial, startStr, endStr, grupos, linhas, subgrupos, grades,
     colecoes, cores, tipos, produtoSelected, produtoQuery, produtosSelecionados,
     projecaoJanela, projecaoSazonalidade, projecaoConsiderarEstoque,
-    diasParadoValor, diasParadoModo, incluirZerados, incluirNegativos, fornecedor, meta,
+    diasParadoValor, diasParadoModo, valorMinimoTicket, incluirZerados, incluirNegativos,
+    fornecedor, meta,
   ]);
 
   // Aplica o ReportResult recebido (fetch único OU stream) ao estado da página.
@@ -1208,6 +1230,22 @@ export default function GeradorRelatoriosPage({
       );
       return;
     }
+    // Vendas por preço: uma linha por ticket, com TOTAL e MÉDIA POR TICKET no rodapé.
+    if (reportTypeId === VENDAS_POR_PRECO_ID) {
+      void exportVendasPorPrecoXlsx(
+        sortedRows,
+        enabledColumns.map((c) => ({ key: c.key, label: c.label })),
+        {
+          companyKey,
+          range: { startDate: range.startDate, endDate: range.endDate },
+          filialLabel,
+          valorMinimo: parseValorReais(valorMinimoTicket),
+          sheetName: meta?.label,
+          columnTypes,
+        }
+      );
+      return;
+    }
     // Clientes por filial: export dedicado com estilo (cabeçalho, zebra, linha TOTAL).
     if (reportTypeId === CLIENTES_FILIAL_ID) {
       void exportClientesFilialXlsx(
@@ -1392,6 +1430,31 @@ export default function GeradorRelatoriosPage({
               // (Produtos parados, Produtos cadastro) escopadas na filial de defeito.
               includeFilialDefeito
             />
+          )}
+          {supports("valorTicket") && (
+            <div className={styles.searchField}>
+              <label className={styles.fieldLabel}>Valor do ticket igual ou maior que (R$)</label>
+              <div className={styles.diasParadoRow}>
+                <input
+                  className={styles.input}
+                  type="text"
+                  inputMode="decimal"
+                  value={valorMinimoTicket}
+                  placeholder="ex.: 1.000"
+                  onChange={(e) => setValorMinimoTicket(e.target.value)}
+                />
+                {valorMinimoTicket.trim() !== "" && (
+                  <button
+                    type="button"
+                    className={styles.diasParadoClear}
+                    onClick={() => setValorMinimoTicket("")}
+                    aria-label="Limpar valor mínimo"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            </div>
           )}
           {companyKey === "nerd" && fornecedoresOpts.length > 0 && (
             <div className={styles.searchField}>

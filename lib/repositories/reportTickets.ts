@@ -3,8 +3,9 @@ import sql from "mssql";
 import { withRequest } from "@/lib/db/connection";
 import type { RequestLike } from "@/lib/db/proxy";
 import { buildFilialFilter } from "@/lib/repositories/clientes";
-import { resolveCompanyLive } from "@/lib/server/company-live";
-import { getFilialLabelForDisplay } from "@/lib/config/company";
+import { buildEcommerceFilialFilter } from "@/lib/repositories/ecommerce";
+import { liveNameForIncoming, resolveCompanyLive } from "@/lib/server/company-live";
+import { getFilialLabelForDisplay, VAREJO_VALUE } from "@/lib/config/company";
 import { MAX_TAMANHOS_GRADE } from "@/lib/utils/grade-tamanhos";
 import { normalizeRangeForQuery } from "@/lib/utils/date";
 import type {
@@ -53,7 +54,7 @@ function inListClause(
  * nomes com espaço duplo no meio, e quem digita o nome como aparece na tela (um espaço)
  * nunca acharia o produto. Ver [[desc-produto-espaco-duplo-busca]].
  */
-function descNormalizada(alias: string): string {
+export function descNormalizada(alias: string): string {
   let expr = `LTRIM(RTRIM(ISNULL(${alias}.DESC_PRODUTO, '')))`;
   for (let i = 0; i < 4; i += 1) expr = `REPLACE(${expr}, '  ', ' ')`;
   return expr;
@@ -84,7 +85,7 @@ function nomeClause(
  * `fetchSalesTotals`. Ver [[cor-escopada-por-produto-vs-mapa-global]]. O `TRY_CONVERT(INT)`
  * tolera o zero à esquerda ('06' vs '6'), ver [[cor-produto-formato-duas-fontes]].
  */
-function coresJoin(alias: string, joinAlias: string): string {
+export function coresJoin(alias: string, joinAlias: string): string {
   return `LEFT JOIN (
           SELECT PRODUTO, COR_PRODUTO, MAX(DESC_COR_PRODUTO) AS DESC_COR
           FROM PRODUTO_CORES WITH (NOLOCK)
@@ -112,6 +113,8 @@ function tamanhoLabelExpr(): string {
 
 /** Linha crua do banco: um item de ticket. */
 interface TicketItemRaw {
+  /** LOJA = ticket do POS; ECOMMERCE = nota fiscal (o "ticket" do site). */
+  canal: "LOJA" | "ECOMMERCE";
   codigoFilial: string;
   filial: string;
   ticket: string;
@@ -142,6 +145,7 @@ interface TicketItemRaw {
 /** Ticket montado em memória: cabeçalho + itens. */
 interface TicketAgg {
   key: string;
+  canal: "LOJA" | "ECOMMERCE";
   codigoFilial: string;
   filialLabel: string;
   ticket: string;
@@ -151,6 +155,446 @@ interface TicketAgg {
   valorTicket: number;
   pecas: number;
   itens: TicketItemRaw[];
+}
+
+/**
+ * Filtros de PRODUTO do Gerador (grupo, linha, subgrupo, grade, coleção, tipo, cor, nome,
+ * lista de produtos, pares produto|cor) como um trecho de WHERE sobre uma linha de item.
+ * Espera `p` = PRODUTOS e, quando `needsCores`, o join `coresJoin(itemAlias, "cf")`.
+ * Compartilhado pela venda de loja (LOJA_VENDA_PRODUTO) e pela do e-commerce
+ * (W_FATURAMENTO_PROD_02) — mesma semântica nas duas.
+ */
+export function buildItemFilterClauses(
+  request: sql.Request | RequestLike,
+  filters: ReportFilters,
+  prefix: string,
+  itemAlias: string
+): { whereSql: string; needsCores: boolean; active: boolean } {
+  const a = itemAlias;
+  // ── Filtros de atributo do produto (todos opcionais; '' quando vazios) ──
+  const grupoClause = inListClause(request, filters.grupos, `${prefix}Grupo`, "p.GRUPO_PRODUTO");
+  const linhaClause = inListClause(request, filters.linhas, `${prefix}Linha`, "p.LINHA");
+  const subgrupoClause = inListClause(request, filters.subgrupos, `${prefix}Subgrupo`, "p.SUBGRUPO_PRODUTO");
+  const gradeClause = inListClause(request, filters.grades, `${prefix}Grade`, "CONVERT(VARCHAR, p.GRADE)");
+  const colecaoClause = inListClause(request, filters.colecoes, `${prefix}Colecao`, "p.COLECAO");
+  const tipoClause = inListClause(request, filters.tipos, `${prefix}Tipo`, "p.TIPO_PRODUTO");
+  const corClause = inListClause(request, filters.cores, `${prefix}Cor`, "cf.DESC_COR");
+  const buscaNomeClause = nomeClause(request, filters.produtoSearchTerm, `${prefix}Nome`);
+
+  // Produto específico / lista de produtos (chips) / pares produto|cor (código de barra).
+  const produtoIdsList = (filters.produtoIds ?? []).map((p) => (p ?? "").trim()).filter(Boolean);
+  const produtoUnico = (filters.produtoId ?? "").trim();
+  const alvoProdutos = Array.from(
+    new Set([...(produtoUnico ? [produtoUnico] : []), ...produtoIdsList])
+  );
+  let produtoClause = "";
+  if (alvoProdutos.length > 0) {
+    alvoProdutos.forEach((p, i) => request.input(`${prefix}Prod${i}`, sql.VarChar, p));
+    const placeholders = alvoProdutos.map((_, i) => `@${prefix}Prod${i}`).join(", ");
+    produtoClause = `AND LTRIM(RTRIM(${a}.PRODUTO)) IN (${placeholders})`;
+  }
+
+  // Pares "PRODUTO|COR": o código de barra identifica a variação, então restringe à cor.
+  const pares = (filters.produtoChaves ?? [])
+    .map((k) => (k ?? "").trim())
+    .filter(Boolean)
+    .map((k) => {
+      const idx = k.indexOf("|");
+      return idx < 0 ? null : { produto: k.slice(0, idx).trim(), cor: k.slice(idx + 1).trim() };
+    })
+    .filter((p): p is { produto: string; cor: string } => !!p && !!p.produto);
+  let paresClause = "";
+  if (pares.length > 0) {
+    const ors = pares.map((par, i) => {
+      request.input(`${prefix}PcP${i}`, sql.VarChar, par.produto);
+      request.input(`${prefix}PcC${i}`, sql.VarChar, par.cor);
+      return `(LTRIM(RTRIM(${a}.PRODUTO)) = @${prefix}PcP${i} AND (LTRIM(RTRIM(CAST(${a}.COR_PRODUTO AS VARCHAR(20)))) = @${prefix}PcC${i} OR TRY_CONVERT(INT, ${a}.COR_PRODUTO) = TRY_CONVERT(INT, @${prefix}PcC${i})))`;
+    });
+    paresClause = `AND (${ors.join(" OR ")})`;
+  }
+
+  // `produtoClause` e `paresClause` são ADITIVAS entre si (um produto colado pelo código
+  // e outro pelo barra convivem), então valem como um OR quando as duas existem.
+  const escolhaProdutoClause =
+    produtoClause && paresClause
+      ? `AND ((${produtoClause.slice(4)}) OR (${paresClause.slice(4)}))`
+      : produtoClause || paresClause;
+
+  const active = Boolean(
+    grupoClause ||
+      linhaClause ||
+      subgrupoClause ||
+      gradeClause ||
+      colecaoClause ||
+      tipoClause ||
+      corClause ||
+      buscaNomeClause ||
+      escolhaProdutoClause
+  );
+
+  const whereSql = [
+    grupoClause,
+    linhaClause,
+    subgrupoClause,
+    gradeClause,
+    colecaoClause,
+    tipoClause,
+    corClause,
+    buscaNomeClause,
+    escolhaProdutoClause,
+  ]
+    .filter(Boolean)
+    .join("\n        ");
+  return { whereSql, needsCores: Boolean(corClause), active };
+}
+
+/**
+ * Monta os CTEs da regra canônica de venda líquida "com trocas" no grão de ITEM de ticket
+ * (`movimento`) + o recorte `tickets_alvo` dos filtros de produto. Compartilhado entre
+ * "Tickets detalhados" e "Vendas por preço" — só o SELECT final muda entre as duas.
+ * Registra no `request` os parâmetros de período/filial/filtros.
+ */
+export async function buildTicketsMovimentoSql(
+  request: sql.Request | RequestLike,
+  filters: ReportFilters
+): Promise<{ withClause: string; ticketsAlvoJoin: string }> {
+  const { start, end } = normalizeRangeForQuery({ start: filters.start, end: filters.end });
+  request.input("tkStart", sql.DateTime, start);
+  request.input("tkEnd", sql.DateTime, end);
+
+  // Filial: o mesmo escopo das outras análises do Gerador (alias `f` = FILIAIS).
+  const filialClause = await buildFilialFilter(
+    request,
+    filters.company,
+    "sales",
+    filters.filial ?? null,
+    "f"
+  );
+
+  const {
+    whereSql: filtroItemSql,
+    needsCores,
+    active: filtroDeProdutoAtivo,
+  } = buildItemFilterClauses(request, filters, "tk", "m");
+
+  /**
+   * Tickets alvo: os que contêm ao menos UM item casando com os filtros de produto. O
+   * SELECT final volta por aqui para trazer o ticket inteiro. Sem filtro de produto a
+   * CTE é dispensada (todos os tickets do período entram).
+   */
+  const ticketsAlvoCte = filtroDeProdutoAtivo
+    ? `,
+    tickets_alvo AS (
+      SELECT DISTINCT m.CODIGO_FILIAL, m.TICKET
+      FROM movimento m
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = m.PRODUTO
+      ${needsCores ? coresJoin("m", "cf") : ""}
+      WHERE 1 = 1
+        ${filtroItemSql}
+    )`
+    : "";
+
+  const ticketsAlvoJoin = filtroDeProdutoAtivo
+    ? `INNER JOIN tickets_alvo ta
+        ON ta.CODIGO_FILIAL = m.CODIGO_FILIAL AND ta.TICKET = m.TICKET`
+    : "";
+
+  const withClause = `
+    WITH vendas_base AS (
+      SELECT
+        vp.TICKET,
+        vp.CODIGO_FILIAL,
+        vp.PRODUTO,
+        ISNULL(vp.COR_PRODUTO, '') AS COR_PRODUTO,
+        ISNULL(vp.TAMANHO, 0) AS TAMANHO,
+        vp.QTDE,
+        vp.PRECO_LIQUIDO,
+        LTRIM(RTRIM(ISNULL(CAST(vp.CODIGO_BARRA AS VARCHAR(100)), ''))) AS CODIGO_BARRA,
+        CAST((vp.QTDE * vp.PRECO_LIQUIDO * ISNULL(vp.FATOR_DESCONTO_VENDA, 0)) AS DECIMAL(38,6)) AS DESCONTO_VENDA
+      FROM LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
+      INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+        ON v.CODIGO_FILIAL = vp.CODIGO_FILIAL AND v.TICKET = vp.TICKET
+      LEFT JOIN FILIAIS f WITH (NOLOCK)
+        ON f.COD_FILIAL = vp.CODIGO_FILIAL
+      WHERE vp.DATA_VENDA >= @tkStart
+        AND vp.DATA_VENDA < @tkEnd
+        AND ISNULL(vp.QTDE_CANCELADA, 0) = 0
+        ${filialClause}
+    ),
+    trocas_item AS (
+      SELECT
+        vt.TICKET,
+        vt.CODIGO_FILIAL,
+        vt.PRODUTO,
+        ISNULL(vt.COR_PRODUTO, '') AS COR_PRODUTO,
+        ISNULL(vt.TAMANHO, 0) AS TAMANHO,
+        SUM(vt.QTDE) AS QTDE_TROCA,
+        CAST(SUM(vt.PRECO_LIQUIDO * vt.QTDE) AS DECIMAL(38,6)) AS VALOR_TROCA
+      FROM LOJA_VENDA_TROCA vt WITH (NOLOCK)
+      INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+        ON v.CODIGO_FILIAL = vt.CODIGO_FILIAL AND v.TICKET = vt.TICKET
+      WHERE vt.QTDE_CANCELADA = 0
+        AND v.DATA_VENDA >= @tkStart
+        AND v.DATA_VENDA < @tkEnd
+      GROUP BY vt.TICKET, vt.CODIGO_FILIAL, vt.PRODUTO, ISNULL(vt.COR_PRODUTO, ''), ISNULL(vt.TAMANHO, 0)
+    ),
+    trocas_puras AS (
+      SELECT
+        vt.TICKET,
+        vt.CODIGO_FILIAL,
+        vt.PRODUTO,
+        ISNULL(vt.COR_PRODUTO, '') AS COR_PRODUTO,
+        ISNULL(vt.TAMANHO, 0) AS TAMANHO,
+        '' AS CODIGO_BARRA,
+        vt.PRECO_LIQUIDO,
+        CAST(0 AS DECIMAL(38,6)) AS DESCONTO_VENDA,
+        CAST((0 - vt.PRECO_LIQUIDO * vt.QTDE) AS DECIMAL(38,6)) AS VALOR_LIQUIDO_CALC,
+        (0 - vt.QTDE) AS QTDE_LIQUIDA_CALC
+      FROM LOJA_VENDA_TROCA vt WITH (NOLOCK)
+      INNER JOIN LOJA_VENDA v WITH (NOLOCK)
+        ON v.CODIGO_FILIAL = vt.CODIGO_FILIAL AND v.TICKET = vt.TICKET
+      LEFT JOIN FILIAIS f WITH (NOLOCK)
+        ON f.COD_FILIAL = vt.CODIGO_FILIAL
+      WHERE vt.QTDE_CANCELADA = 0
+        AND v.DATA_VENDA >= @tkStart
+        AND v.DATA_VENDA < @tkEnd
+        AND NOT EXISTS (
+          SELECT 1
+          FROM LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
+          WHERE vp.TICKET = vt.TICKET
+            AND vp.CODIGO_FILIAL = vt.CODIGO_FILIAL
+            AND vp.PRODUTO = vt.PRODUTO
+            AND ISNULL(vp.COR_PRODUTO, '') = ISNULL(vt.COR_PRODUTO, '')
+            AND ISNULL(vp.TAMANHO, 0) = ISNULL(vt.TAMANHO, 0)
+            AND ISNULL(vp.QTDE_CANCELADA, 0) = 0
+        )
+        ${filialClause}
+    ),
+    vendas_num AS (
+      SELECT
+        vb.*,
+        ROW_NUMBER() OVER (
+          PARTITION BY vb.TICKET, vb.CODIGO_FILIAL, vb.PRODUTO, vb.COR_PRODUTO, vb.TAMANHO
+          ORDER BY vb.TICKET, vb.CODIGO_FILIAL, vb.PRODUTO, vb.COR_PRODUTO, vb.TAMANHO
+        ) AS RN
+      FROM vendas_base vb
+    ),
+    movimento AS (
+      SELECT
+        vn.TICKET,
+        vn.CODIGO_FILIAL,
+        vn.PRODUTO,
+        vn.COR_PRODUTO,
+        vn.TAMANHO,
+        vn.CODIGO_BARRA,
+        vn.PRECO_LIQUIDO,
+        vn.DESCONTO_VENDA,
+        CAST((
+          CAST(vn.PRECO_LIQUIDO * vn.QTDE AS DECIMAL(38,6))
+          - CAST(vn.DESCONTO_VENDA AS DECIMAL(38,6))
+          - CAST(CASE WHEN vn.RN = 1 THEN ISNULL(ti.VALOR_TROCA, 0) ELSE 0 END AS DECIMAL(38,6))
+        ) AS DECIMAL(38,6)) AS VALOR_LIQUIDO_CALC,
+        (vn.QTDE - CASE WHEN vn.RN = 1 THEN ISNULL(ti.QTDE_TROCA, 0) ELSE 0 END) AS QTDE_LIQUIDA_CALC
+      FROM vendas_num vn
+      LEFT JOIN trocas_item ti
+        ON ti.TICKET = vn.TICKET
+        AND ti.CODIGO_FILIAL = vn.CODIGO_FILIAL
+        AND ti.PRODUTO = vn.PRODUTO
+        AND ti.COR_PRODUTO = vn.COR_PRODUTO
+        AND ti.TAMANHO = vn.TAMANHO
+      UNION ALL
+      SELECT
+        tp.TICKET,
+        tp.CODIGO_FILIAL,
+        tp.PRODUTO,
+        tp.COR_PRODUTO,
+        tp.TAMANHO,
+        tp.CODIGO_BARRA,
+        tp.PRECO_LIQUIDO,
+        tp.DESCONTO_VENDA,
+        tp.VALOR_LIQUIDO_CALC,
+        tp.QTDE_LIQUIDA_CALC
+      FROM trocas_puras tp
+    )${ticketsAlvoCte}`;
+
+  return { withClause, ticketsAlvoJoin };
+}
+
+/**
+ * Quais canais entram numa análise por ticket, pela filial escolhida — mesma régua de
+ * `fetchSalesTotals`: "todas as filiais" = loja + e-commerce (só onde a empresa tem
+ * e-commerce); filial de e-commerce = só as notas (o grupo inteiro, rodízio MSC↔AKS);
+ * "Varejo" ou uma loja = só o POS.
+ */
+export async function resolveCanaisTicket(
+  filters: ReportFilters
+): Promise<{ incluiLoja: boolean; incluiEcommerce: boolean }> {
+  const company = await resolveCompanyLive(filters.company);
+  const ecommerceFilials = company?.ecommerceFilials ?? [];
+  const filialLive = filters.filial ? await liveNameForIncoming(filters.filial) : null;
+  const filialEhEcommerce = !!filialLive && ecommerceFilials.includes(filialLive);
+  return {
+    incluiLoja: !filialEhEcommerce,
+    incluiEcommerce: ecommerceFilials.length > 0 && (filters.filial == null || filialEhEcommerce),
+  };
+}
+
+/**
+ * CTEs da venda do E-COMMERCE no grão de item de nota (`ecom_itens`: nota × produto × cor).
+ * O e-commerce não tem ticket: a "venda" é a NOTA FISCAL, identidade FILIAL + NF_SAIDA +
+ * SERIE_NF (a mesma chave do `fetchEcommerceSummary`). Regra canônica do e-commerce
+ * (CLAUDE.md): `FATURAMENTO` + `W_FATURAMENTO_PROD_02`, `NOTA_CANCELADA = 0`,
+ * `NATUREZA_SAIDA IN ('100.02','100.022')`, valor = `SUM(VALOR_LIQUIDO)`; recorte de data
+ * igual ao do `fetchEcommerceSummary`. Desconto do item = `VALOR − VALOR_LIQUIDO` (fecha
+ * com o `FATURAMENTO.DESCONTO` do cabeçalho). Não há tamanho: essa visão não abre a grade.
+ *
+ * Filtros de produto escolhem a NOTA (`notas_alvo`, semi-join) e ela vem inteira — mesma
+ * semântica do `tickets_alvo` da loja.
+ */
+export async function buildEcommerceItensSql(
+  request: sql.Request | RequestLike,
+  filters: ReportFilters
+): Promise<string> {
+  const { start, end } = normalizeRangeForQuery({ start: filters.start, end: filters.end });
+  request.input("ecStart", sql.DateTime, start);
+  request.input("ecEnd", sql.DateTime, end);
+
+  // null = todas as filiais de e-commerce da empresa; filial de e-commerce = o grupo todo.
+  const filial = filters.filial && filters.filial !== VAREJO_VALUE ? filters.filial : null;
+  const filialClause = await buildEcommerceFilialFilter(request, filters.company, filial, "f");
+
+  const baseWhere = `CAST(f.EMISSAO AS DATE) >= CAST(@ecStart AS DATE)
+        AND CAST(f.EMISSAO AS DATE) < CAST(@ecEnd AS DATE)
+        AND f.NOTA_CANCELADA = 0
+        AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
+        ${filialClause}`;
+
+  const { whereSql, needsCores, active } = buildItemFilterClauses(request, filters, "ec", "fp");
+  const notasAlvoCte = active
+    ? `notas_alvo AS (
+      SELECT DISTINCT fp.FILIAL, fp.NF_SAIDA, fp.SERIE_NF
+      FROM FATURAMENTO f WITH (NOLOCK)
+      JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+        ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+      LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = fp.PRODUTO
+      ${needsCores ? coresJoin("fp", "cf") : ""}
+      WHERE ${baseWhere}
+        ${whereSql}
+    ),`
+    : "";
+  const notasAlvoJoin = active
+    ? `INNER JOIN notas_alvo na
+        ON na.FILIAL = f.FILIAL AND na.NF_SAIDA = f.NF_SAIDA AND na.SERIE_NF = f.SERIE_NF`
+    : "";
+
+  return `
+    WITH ${notasAlvoCte}
+    ecom_itens AS (
+      SELECT
+        f.FILIAL,
+        f.NF_SAIDA,
+        f.SERIE_NF,
+        fp.PRODUTO,
+        ISNULL(fp.COR_PRODUTO, '') AS COR_PRODUTO,
+        MAX(f.EMISSAO) AS EMISSAO,
+        MAX(LTRIM(RTRIM(ISNULL(f.NOME_CLIFOR, '')))) AS CLIENTE,
+        SUM(ISNULL(fp.QTDE, 0)) AS QTDE,
+        CAST(SUM(ISNULL(fp.VALOR, 0) - ISNULL(fp.VALOR_LIQUIDO, 0)) AS DECIMAL(38,6)) AS DESCONTO,
+        CAST(SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS DECIMAL(38,6)) AS VALOR
+      FROM FATURAMENTO f WITH (NOLOCK)
+      JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
+        ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
+      ${notasAlvoJoin}
+      WHERE ${baseWhere}
+      GROUP BY f.FILIAL, f.NF_SAIDA, f.SERIE_NF, fp.PRODUTO, ISNULL(fp.COR_PRODUTO, '')
+    )`;
+}
+
+/** Itens das NOTAS do e-commerce, no mesmo formato dos itens de ticket da loja. */
+async function fetchTicketItensEcommerce(
+  filters: ReportFilters
+): Promise<{ rows: TicketItemRaw[]; capped: boolean }> {
+  return withRequest(async (request) => {
+    const ecomWith = await buildEcommerceItensSql(request, filters);
+    const query = `
+      ${ecomWith}
+      SELECT TOP ${MAX_SQL_ROWS}
+        -- Identidade da nota = filial + NF + série (a numeração é por CNPJ).
+        LTRIM(RTRIM(e.FILIAL)) + '|NF|' + LTRIM(RTRIM(e.SERIE_NF)) AS codigoFilial,
+        LTRIM(RTRIM(e.FILIAL)) AS filial,
+        LTRIM(RTRIM(e.NF_SAIDA)) AS ticket,
+        CONVERT(VARCHAR(10), e.EMISSAO, 23) AS dataVenda,
+        '' AS vendedor,
+        e.CLIENTE AS cliente,
+        LTRIM(RTRIM(e.PRODUTO)) AS produto,
+        ${descNormalizada("p")} AS descricao,
+        LTRIM(RTRIM(CAST(e.COR_PRODUTO AS VARCHAR(20)))) AS cor,
+        ISNULL(LTRIM(RTRIM(cf.DESC_COR)), '') AS corDescricao,
+        0 AS tamanho,
+        '' AS tamanhoLabel,
+        0 AS multiTamanho,
+        '' AS codigoBarra,
+        LTRIM(RTRIM(ISNULL(CAST(p.GRUPO_PRODUTO AS VARCHAR(60)), ''))) AS grupo,
+        LTRIM(RTRIM(ISNULL(CAST(p.SUBGRUPO_PRODUTO AS VARCHAR(60)), ''))) AS subgrupo,
+        LTRIM(RTRIM(ISNULL(CAST(p.LINHA AS VARCHAR(60)), ''))) AS linha,
+        LTRIM(RTRIM(ISNULL(CAST(p.COLECAO AS VARCHAR(60)), ''))) AS colecao,
+        LTRIM(RTRIM(ISNULL(CAST(p.GRADE AS VARCHAR(60)), ''))) AS grade,
+        e.QTDE AS qtde,
+        COALESCE(
+          NULLIF(CAST(p.PRECO_REPOSICAO_1 AS DECIMAL(18, 2)), 0),
+          NULLIF(CAST(pp.PRECO1 AS DECIMAL(18, 2)), 0)
+        ) AS precoUnitario,
+        e.DESCONTO AS desconto,
+        e.VALOR AS valorItem
+      FROM ecom_itens e
+      LEFT JOIN PRODUTOS p WITH (NOLOCK)
+        ON p.PRODUTO = e.PRODUTO
+      LEFT JOIN PRODUTOS_PRECOS pp WITH (NOLOCK)
+        ON LTRIM(RTRIM(pp.PRODUTO)) = LTRIM(RTRIM(e.PRODUTO))
+        AND LTRIM(RTRIM(pp.CODIGO_TAB_PRECO)) = '01'
+      ${coresJoin("e", "cf")}
+      ORDER BY e.EMISSAO DESC, e.FILIAL, e.NF_SAIDA, e.PRODUTO
+    `;
+    const result = await request.query<TicketItemRaw>(query);
+    const recs = result.recordset;
+    return {
+      capped: recs.length >= MAX_SQL_ROWS,
+      rows: recs.map<TicketItemRaw>((r) => ({
+        ...normalizeItemRaw(r),
+        canal: "ECOMMERCE",
+      })),
+    };
+  });
+}
+
+/** Normaliza a linha crua do banco (trim/número) — igual para loja e e-commerce. */
+function normalizeItemRaw(r: TicketItemRaw): Omit<TicketItemRaw, "canal"> {
+  return {
+    codigoFilial: (r.codigoFilial ?? "").trim(),
+    filial: (r.filial ?? "").trim(),
+    ticket: (r.ticket ?? "").trim(),
+    dataVenda: r.dataVenda ?? null,
+    vendedor: (r.vendedor ?? "").trim(),
+    cliente: (r.cliente ?? "").trim(),
+    produto: (r.produto ?? "").trim(),
+    descricao: (r.descricao ?? "").trim(),
+    cor: (r.cor ?? "").trim(),
+    corDescricao: (r.corDescricao ?? "").trim(),
+    tamanho: Number(r.tamanho ?? 0),
+    tamanhoLabel: (r.tamanhoLabel ?? "").trim(),
+    multiTamanho: Number(r.multiTamanho ?? 0),
+    codigoBarra: (r.codigoBarra ?? "").trim(),
+    grupo: (r.grupo ?? "").trim(),
+    subgrupo: (r.subgrupo ?? "").trim(),
+    linha: (r.linha ?? "").trim(),
+    colecao: (r.colecao ?? "").trim(),
+    grade: (r.grade ?? "").trim(),
+    qtde: Number(r.qtde ?? 0),
+    precoUnitario:
+      r.precoUnitario != null && Number(r.precoUnitario) > 0 ? Number(r.precoUnitario) : null,
+    desconto: Number(r.desconto ?? 0),
+    valorItem: Number(r.valorItem ?? 0),
+  };
 }
 
 /**
@@ -197,228 +641,13 @@ interface TicketAgg {
 export async function fetchTickets(filters: ReportFilters): Promise<ReportResult> {
   const company = await resolveCompanyLive(filters.company);
 
-  const { rows: rowsRaw, capped } = await withRequest(async (request) => {
-    const { start, end } = normalizeRangeForQuery({ start: filters.start, end: filters.end });
-    request.input("tkStart", sql.DateTime, start);
-    request.input("tkEnd", sql.DateTime, end);
+  const canais = await resolveCanaisTicket(filters);
 
-    // Filial: o mesmo escopo das outras análises do Gerador (alias `f` = FILIAIS).
-    const filialClause = await buildFilialFilter(
-      request,
-      filters.company,
-      "sales",
-      filters.filial ?? null,
-      "f"
-    );
-
-    // ── Filtros de atributo do produto (todos opcionais; '' quando vazios) ──
-    const grupoClause = inListClause(request, filters.grupos, "tkGrupo", "p.GRUPO_PRODUTO");
-    const linhaClause = inListClause(request, filters.linhas, "tkLinha", "p.LINHA");
-    const subgrupoClause = inListClause(request, filters.subgrupos, "tkSubgrupo", "p.SUBGRUPO_PRODUTO");
-    const gradeClause = inListClause(request, filters.grades, "tkGrade", "CONVERT(VARCHAR, p.GRADE)");
-    const colecaoClause = inListClause(request, filters.colecoes, "tkColecao", "p.COLECAO");
-    const tipoClause = inListClause(request, filters.tipos, "tkTipo", "p.TIPO_PRODUTO");
-    const corClause = inListClause(request, filters.cores, "tkCor", "cf.DESC_COR");
-    const buscaNomeClause = nomeClause(request, filters.produtoSearchTerm, "tkNome");
-
-    // Produto específico / lista de produtos (chips) / pares produto|cor (código de barra).
-    const produtoIdsList = (filters.produtoIds ?? []).map((p) => (p ?? "").trim()).filter(Boolean);
-    const produtoUnico = (filters.produtoId ?? "").trim();
-    const alvoProdutos = Array.from(
-      new Set([...(produtoUnico ? [produtoUnico] : []), ...produtoIdsList])
-    );
-    let produtoClause = "";
-    if (alvoProdutos.length > 0) {
-      alvoProdutos.forEach((p, i) => request.input(`tkProd${i}`, sql.VarChar, p));
-      const placeholders = alvoProdutos.map((_, i) => `@tkProd${i}`).join(", ");
-      produtoClause = `AND LTRIM(RTRIM(m.PRODUTO)) IN (${placeholders})`;
-    }
-
-    // Pares "PRODUTO|COR": o código de barra identifica a variação, então restringe à cor.
-    const pares = (filters.produtoChaves ?? [])
-      .map((k) => (k ?? "").trim())
-      .filter(Boolean)
-      .map((k) => {
-        const idx = k.indexOf("|");
-        return idx < 0 ? null : { produto: k.slice(0, idx).trim(), cor: k.slice(idx + 1).trim() };
-      })
-      .filter((p): p is { produto: string; cor: string } => !!p && !!p.produto);
-    let paresClause = "";
-    if (pares.length > 0) {
-      const ors = pares.map((par, i) => {
-        request.input(`tkPcP${i}`, sql.VarChar, par.produto);
-        request.input(`tkPcC${i}`, sql.VarChar, par.cor);
-        return `(LTRIM(RTRIM(m.PRODUTO)) = @tkPcP${i} AND (LTRIM(RTRIM(CAST(m.COR_PRODUTO AS VARCHAR(20)))) = @tkPcC${i} OR TRY_CONVERT(INT, m.COR_PRODUTO) = TRY_CONVERT(INT, @tkPcC${i})))`;
-      });
-      paresClause = `AND (${ors.join(" OR ")})`;
-    }
-
-    // `produtoClause` e `paresClause` são ADITIVAS entre si (um produto colado pelo código
-    // e outro pelo barra convivem), então valem como um OR quando as duas existem.
-    const escolhaProdutoClause =
-      produtoClause && paresClause
-        ? `AND ((${produtoClause.slice(4)}) OR (${paresClause.slice(4)}))`
-        : produtoClause || paresClause;
-
-    const filtroDeProdutoAtivo = Boolean(
-      grupoClause ||
-        linhaClause ||
-        subgrupoClause ||
-        gradeClause ||
-        colecaoClause ||
-        tipoClause ||
-        corClause ||
-        buscaNomeClause ||
-        escolhaProdutoClause
-    );
-
-    /**
-     * Tickets alvo: os que contêm ao menos UM item casando com os filtros de produto. O
-     * SELECT final volta por aqui para trazer o ticket inteiro. Sem filtro de produto a
-     * CTE é dispensada (todos os tickets do período entram).
-     */
-    const ticketsAlvoCte = filtroDeProdutoAtivo
-      ? `,
-      tickets_alvo AS (
-        SELECT DISTINCT m.CODIGO_FILIAL, m.TICKET
-        FROM movimento m
-        LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = m.PRODUTO
-        ${corClause ? coresJoin("m", "cf") : ""}
-        WHERE 1 = 1
-          ${grupoClause}
-          ${linhaClause}
-          ${subgrupoClause}
-          ${gradeClause}
-          ${colecaoClause}
-          ${tipoClause}
-          ${corClause}
-          ${buscaNomeClause}
-          ${escolhaProdutoClause}
-      )`
-      : "";
-
-    const ticketsAlvoJoin = filtroDeProdutoAtivo
-      ? `INNER JOIN tickets_alvo ta
-          ON ta.CODIGO_FILIAL = m.CODIGO_FILIAL AND ta.TICKET = m.TICKET`
-      : "";
+  const fetchItensLoja = () => withRequest(async (request) => {
+    const { withClause, ticketsAlvoJoin } = await buildTicketsMovimentoSql(request, filters);
 
     const query = `
-      WITH vendas_base AS (
-        SELECT
-          vp.TICKET,
-          vp.CODIGO_FILIAL,
-          vp.PRODUTO,
-          ISNULL(vp.COR_PRODUTO, '') AS COR_PRODUTO,
-          ISNULL(vp.TAMANHO, 0) AS TAMANHO,
-          vp.QTDE,
-          vp.PRECO_LIQUIDO,
-          LTRIM(RTRIM(ISNULL(CAST(vp.CODIGO_BARRA AS VARCHAR(100)), ''))) AS CODIGO_BARRA,
-          CAST((vp.QTDE * vp.PRECO_LIQUIDO * ISNULL(vp.FATOR_DESCONTO_VENDA, 0)) AS DECIMAL(38,6)) AS DESCONTO_VENDA
-        FROM LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
-        INNER JOIN LOJA_VENDA v WITH (NOLOCK)
-          ON v.CODIGO_FILIAL = vp.CODIGO_FILIAL AND v.TICKET = vp.TICKET
-        LEFT JOIN FILIAIS f WITH (NOLOCK)
-          ON f.COD_FILIAL = vp.CODIGO_FILIAL
-        WHERE vp.DATA_VENDA >= @tkStart
-          AND vp.DATA_VENDA < @tkEnd
-          AND ISNULL(vp.QTDE_CANCELADA, 0) = 0
-          ${filialClause}
-      ),
-      trocas_item AS (
-        SELECT
-          vt.TICKET,
-          vt.CODIGO_FILIAL,
-          vt.PRODUTO,
-          ISNULL(vt.COR_PRODUTO, '') AS COR_PRODUTO,
-          ISNULL(vt.TAMANHO, 0) AS TAMANHO,
-          SUM(vt.QTDE) AS QTDE_TROCA,
-          CAST(SUM(vt.PRECO_LIQUIDO * vt.QTDE) AS DECIMAL(38,6)) AS VALOR_TROCA
-        FROM LOJA_VENDA_TROCA vt WITH (NOLOCK)
-        INNER JOIN LOJA_VENDA v WITH (NOLOCK)
-          ON v.CODIGO_FILIAL = vt.CODIGO_FILIAL AND v.TICKET = vt.TICKET
-        WHERE vt.QTDE_CANCELADA = 0
-          AND v.DATA_VENDA >= @tkStart
-          AND v.DATA_VENDA < @tkEnd
-        GROUP BY vt.TICKET, vt.CODIGO_FILIAL, vt.PRODUTO, ISNULL(vt.COR_PRODUTO, ''), ISNULL(vt.TAMANHO, 0)
-      ),
-      trocas_puras AS (
-        SELECT
-          vt.TICKET,
-          vt.CODIGO_FILIAL,
-          vt.PRODUTO,
-          ISNULL(vt.COR_PRODUTO, '') AS COR_PRODUTO,
-          ISNULL(vt.TAMANHO, 0) AS TAMANHO,
-          '' AS CODIGO_BARRA,
-          vt.PRECO_LIQUIDO,
-          CAST(0 AS DECIMAL(38,6)) AS DESCONTO_VENDA,
-          CAST((0 - vt.PRECO_LIQUIDO * vt.QTDE) AS DECIMAL(38,6)) AS VALOR_LIQUIDO_CALC,
-          (0 - vt.QTDE) AS QTDE_LIQUIDA_CALC
-        FROM LOJA_VENDA_TROCA vt WITH (NOLOCK)
-        INNER JOIN LOJA_VENDA v WITH (NOLOCK)
-          ON v.CODIGO_FILIAL = vt.CODIGO_FILIAL AND v.TICKET = vt.TICKET
-        LEFT JOIN FILIAIS f WITH (NOLOCK)
-          ON f.COD_FILIAL = vt.CODIGO_FILIAL
-        WHERE vt.QTDE_CANCELADA = 0
-          AND v.DATA_VENDA >= @tkStart
-          AND v.DATA_VENDA < @tkEnd
-          AND NOT EXISTS (
-            SELECT 1
-            FROM LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
-            WHERE vp.TICKET = vt.TICKET
-              AND vp.CODIGO_FILIAL = vt.CODIGO_FILIAL
-              AND vp.PRODUTO = vt.PRODUTO
-              AND ISNULL(vp.COR_PRODUTO, '') = ISNULL(vt.COR_PRODUTO, '')
-              AND ISNULL(vp.TAMANHO, 0) = ISNULL(vt.TAMANHO, 0)
-              AND ISNULL(vp.QTDE_CANCELADA, 0) = 0
-          )
-          ${filialClause}
-      ),
-      vendas_num AS (
-        SELECT
-          vb.*,
-          ROW_NUMBER() OVER (
-            PARTITION BY vb.TICKET, vb.CODIGO_FILIAL, vb.PRODUTO, vb.COR_PRODUTO, vb.TAMANHO
-            ORDER BY vb.TICKET, vb.CODIGO_FILIAL, vb.PRODUTO, vb.COR_PRODUTO, vb.TAMANHO
-          ) AS RN
-        FROM vendas_base vb
-      ),
-      movimento AS (
-        SELECT
-          vn.TICKET,
-          vn.CODIGO_FILIAL,
-          vn.PRODUTO,
-          vn.COR_PRODUTO,
-          vn.TAMANHO,
-          vn.CODIGO_BARRA,
-          vn.PRECO_LIQUIDO,
-          vn.DESCONTO_VENDA,
-          CAST((
-            CAST(vn.PRECO_LIQUIDO * vn.QTDE AS DECIMAL(38,6))
-            - CAST(vn.DESCONTO_VENDA AS DECIMAL(38,6))
-            - CAST(CASE WHEN vn.RN = 1 THEN ISNULL(ti.VALOR_TROCA, 0) ELSE 0 END AS DECIMAL(38,6))
-          ) AS DECIMAL(38,6)) AS VALOR_LIQUIDO_CALC,
-          (vn.QTDE - CASE WHEN vn.RN = 1 THEN ISNULL(ti.QTDE_TROCA, 0) ELSE 0 END) AS QTDE_LIQUIDA_CALC
-        FROM vendas_num vn
-        LEFT JOIN trocas_item ti
-          ON ti.TICKET = vn.TICKET
-          AND ti.CODIGO_FILIAL = vn.CODIGO_FILIAL
-          AND ti.PRODUTO = vn.PRODUTO
-          AND ti.COR_PRODUTO = vn.COR_PRODUTO
-          AND ti.TAMANHO = vn.TAMANHO
-        UNION ALL
-        SELECT
-          tp.TICKET,
-          tp.CODIGO_FILIAL,
-          tp.PRODUTO,
-          tp.COR_PRODUTO,
-          tp.TAMANHO,
-          tp.CODIGO_BARRA,
-          tp.PRECO_LIQUIDO,
-          tp.DESCONTO_VENDA,
-          tp.VALOR_LIQUIDO_CALC,
-          tp.QTDE_LIQUIDA_CALC
-        FROM trocas_puras tp
-      )${ticketsAlvoCte}
+      ${withClause}
       SELECT TOP ${MAX_SQL_ROWS}
         LTRIM(RTRIM(m.CODIGO_FILIAL)) AS codigoFilial,
         LTRIM(RTRIM(ISNULL(CAST(f.FILIAL AS VARCHAR(60)), ''))) AS filial,
@@ -486,33 +715,19 @@ export async function fetchTickets(filters: ReportFilters): Promise<ReportResult
     return {
       capped: recs.length >= MAX_SQL_ROWS,
       rows: recs.map<TicketItemRaw>((r) => ({
-        codigoFilial: (r.codigoFilial ?? "").trim(),
-        filial: (r.filial ?? "").trim(),
-        ticket: (r.ticket ?? "").trim(),
-        dataVenda: r.dataVenda ?? null,
-        vendedor: (r.vendedor ?? "").trim(),
-        cliente: (r.cliente ?? "").trim(),
-        produto: (r.produto ?? "").trim(),
-        descricao: (r.descricao ?? "").trim(),
-        cor: (r.cor ?? "").trim(),
-        corDescricao: (r.corDescricao ?? "").trim(),
-        tamanho: Number(r.tamanho ?? 0),
-        tamanhoLabel: (r.tamanhoLabel ?? "").trim(),
-        multiTamanho: Number(r.multiTamanho ?? 0),
-        codigoBarra: (r.codigoBarra ?? "").trim(),
-        grupo: (r.grupo ?? "").trim(),
-        subgrupo: (r.subgrupo ?? "").trim(),
-        linha: (r.linha ?? "").trim(),
-        colecao: (r.colecao ?? "").trim(),
-        grade: (r.grade ?? "").trim(),
-        qtde: Number(r.qtde ?? 0),
-        precoUnitario:
-          r.precoUnitario != null && Number(r.precoUnitario) > 0 ? Number(r.precoUnitario) : null,
-        desconto: Number(r.desconto ?? 0),
-        valorItem: Number(r.valorItem ?? 0),
+        ...normalizeItemRaw(r),
+        canal: "LOJA",
       })),
     };
   });
+
+  const vazio = { rows: [] as TicketItemRaw[], capped: false };
+  const [loja, ecom] = await Promise.all([
+    canais.incluiLoja ? fetchItensLoja() : Promise.resolve(vazio),
+    canais.incluiEcommerce ? fetchTicketItensEcommerce(filters) : Promise.resolve(vazio),
+  ]);
+  const capped = loja.capped || ecom.capped;
+  const rowsRaw = [...loja.rows, ...ecom.rows];
 
   // ── Monta os tickets em memória (ordem de chegada = a do ORDER BY do SQL) ──
   const byTicket = new Map<string, TicketAgg>();
@@ -522,6 +737,7 @@ export async function fetchTickets(filters: ReportFilters): Promise<ReportResult
     if (!agg) {
       agg = {
         key,
+        canal: item.canal,
         codigoFilial: item.codigoFilial,
         filialLabel: company ? getFilialLabelForDisplay(company, item.filial) : item.filial,
         ticket: item.ticket,
@@ -541,7 +757,11 @@ export async function fetchTickets(filters: ReportFilters): Promise<ReportResult
     agg.pecas += item.qtde;
   }
 
-  const tickets = Array.from(byTicket.values());
+  // Loja e e-commerce intercalados pela data (mais recente primeiro). O sort é estável,
+  // então dentro do mesmo dia cada canal mantém a ordem do seu SQL.
+  const tickets = Array.from(byTicket.values()).sort((a, b) =>
+    (b.dataVenda ?? "").localeCompare(a.dataVenda ?? "")
+  );
 
   // ── KPIs sobre TODOS os tickets encontrados (antes do corte de exibição) ──
   const totalFaturado = tickets.reduce((s, t) => s + t.valorTicket, 0);
@@ -603,10 +823,14 @@ export async function fetchTickets(filters: ReportFilters): Promise<ReportResult
   for (const t of mantidos) {
     for (const item of t.itens) {
       rows.push({
+        // Chave oculta do ticket para o export agrupar: no e-commerce as 5 filiais viram o
+        // mesmo rótulo "E-COMMERCE" e o nº da nota se repete entre CNPJs.
+        __ticketKey: t.key,
+        CANAL: t.canal === "ECOMMERCE" ? "E-commerce" : "Loja",
         TICKET: t.ticket,
         DATA_VENDA: t.dataVenda,
         FILIAL: t.filialLabel,
-        VENDEDOR: t.vendedor || "SEM VENDEDOR",
+        VENDEDOR: t.canal === "ECOMMERCE" ? "E-COMMERCE" : t.vendedor || "SEM VENDEDOR",
         CLIENTE: t.cliente,
         VALOR_TICKET: round2(t.valorTicket),
         PECAS_TICKET: roundInt(t.pecas),

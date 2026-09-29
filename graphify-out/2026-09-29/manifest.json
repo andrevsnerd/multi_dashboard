@@ -2460,8 +2460,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/ecommerce.ts": {
-    "mtime": 1790694295.0424335,
-    "ast_hash": "3297e8af6dc3a667a2fb5eea668e7f60",
+    "mtime": 1789045199.720497,
+    "ast_hash": "a1492a638b5959210f678ac00b841e75",
     "semantic_hash": ""
   },
   "lib/repositories/entries.ts": {
@@ -4420,8 +4420,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/reportTickets.ts": {
-    "mtime": 1790694271.1045048,
-    "ast_hash": "b21920084a636b2cb0f56908bd1ec703",
+    "mtime": 1790692153.325335,
+    "ast_hash": "293c65e4471581733622626ec8c62e7c",
     "semantic_hash": ""
   },
   "lib/utils/exportTicketsXlsx.ts": {
@@ -4605,18 +4605,18 @@
     "semantic_hash": ""
   },
   "lib/reports/vendas-por-preco.ts": {
-    "mtime": 1790694367.6504838,
-    "ast_hash": "298b211a37a95525111e493325de0fa4",
+    "mtime": 1790692204.2590053,
+    "ast_hash": "564c87e870f30bb2cd437c2d59aee56e",
     "semantic_hash": ""
   },
   "lib/repositories/reportVendasPorPreco.ts": {
-    "mtime": 1790694367.6482296,
-    "ast_hash": "ab0803b599cabc64541355a8396ebc96",
+    "mtime": 1790692243.0061896,
+    "ast_hash": "22f8086a20319ef2bf874e654fc90740",
     "semantic_hash": ""
   },
   "lib/utils/exportVendasPorPrecoXlsx.ts": {
-    "mtime": 1790694367.6532483,
-    "ast_hash": "9dd5b6a27956b51d368eebd7b5418f1e",
+    "mtime": 1790692290.5431204,
+    "ast_hash": "aaf722f8dff95df0e97d49ef467d158d",
     "semantic_hash": ""
   }
 }

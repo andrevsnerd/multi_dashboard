@@ -26,7 +26,7 @@ function resolveRange(range?: DateRangeInput) {
   });
 }
 
-async function buildEcommerceFilialFilter(
+export async function buildEcommerceFilialFilter(
   request: sql.Request | RequestLike,
   companySlug: string | undefined,
   specificFilial?: string | null,
