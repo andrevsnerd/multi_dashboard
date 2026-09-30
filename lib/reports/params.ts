@@ -58,6 +58,7 @@ export function parseReportFilters(searchParams: URLSearchParams): ReportFilters
     estoquePorFilial: searchParams.get("estoquePorFilial") === "1",
     vendasPorFilial: searchParams.get("vendasPorFilial") === "1",
     compraIdeal: searchParams.get("compraIdeal") === "1",
+    estoqueFiliais: list("estoqueFilial"),
     incluirZerados: searchParams.get("incluirZerados") === "1",
     incluirNegativos: searchParams.get("incluirNegativos") === "1",
     considerarTransferencias: searchParams.get("considerarTransferencias") === "1",

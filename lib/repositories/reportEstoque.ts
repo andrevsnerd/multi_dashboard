@@ -52,6 +52,13 @@ interface Agg {
  * KPI) soma só os POSITIVOS — batendo com o "Estoque Total" do Controle de Estoque.
  */
 export async function fetchEstoqueRede(filters: ReportFilters): Promise<ReportResult> {
+  // Filiais escolhidas na tela (rótulo de exibição). Vazio = rede inteira.
+  const filiaisEscolhidas = new Set(
+    (filters.estoqueFiliais ?? []).map((f) => f.trim().toUpperCase()).filter(Boolean)
+  );
+  const isForaDaSelecao = (label: string) =>
+    filiaisEscolhidas.size > 0 && !filiaisEscolhidas.has(label.trim().toUpperCase());
+
   const [company, itens] = await Promise.all([
     resolveCompanyLive(filters.company),
     fetchEstoqueRedePorProduto({
@@ -76,7 +83,7 @@ export async function fetchEstoqueRede(filters: ReportFilters): Promise<ReportRe
   if (company) {
     for (const f of getOperationalFilials(company, "inventory")) {
       const label = getFilialLabelForDisplay(company, f);
-      if (!isExcludedLabel(label)) labelSet.add(label);
+      if (!isExcludedLabel(label) && !isForaDaSelecao(label)) labelSet.add(label);
     }
   }
 
@@ -84,6 +91,7 @@ export async function fetchEstoqueRede(filters: ReportFilters): Promise<ReportRe
   for (const r of itens) {
     const label = company ? getFilialLabelForDisplay(company, r.filial) : r.filial;
     if (isExcludedLabel(label)) continue; // Ibirapuera fora desta análise (nem coluna nem total)
+    if (isForaDaSelecao(label)) continue; // filial não escolhida: nem coluna nem total
 
     const key = `${r.produto}||${r.cor}`;
     let agg = byKey.get(key);

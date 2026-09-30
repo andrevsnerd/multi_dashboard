@@ -93,6 +93,8 @@ export type ReportFilterKey =
   | "colecao"
   | "tipo"
   | "filial"
+  /** Estoque por filial: escolher uma ou mais filiais (multi-select). */
+  | "estoqueFiliais"
   | "diasParado"
   | "saldoEstoque"
   /** Valor mínimo do ticket (análise Vendas por preço). */
@@ -175,6 +177,12 @@ export interface ReportFilters {
   estoquePorFilial?: boolean;
   /** Quando true, calcula e anexa a quantidade vendida por filial (rede inteira) por linha. */
   vendasPorFilial?: boolean;
+  /**
+   * Estoque por filial: restringe o relatório a estas filiais (rótulo de exibição, igual ao
+   * cabeçalho da coluna). Vazio/ausente = rede inteira. Colunas e Estoque total só contam
+   * as escolhidas.
+   */
+  estoqueFiliais?: string[] | null;
   /** Estoque por filial: além dos positivos, lista também itens zerados (saldo 0 em tudo). */
   incluirZerados?: boolean;
   /** Estoque por filial: além dos positivos, lista também itens só negativos. */

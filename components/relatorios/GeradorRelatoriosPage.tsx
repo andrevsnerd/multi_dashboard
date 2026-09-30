@@ -6,7 +6,13 @@ import DateRangeFilter, { type DateRangeValue } from "@/components/filters/DateR
 import FilialFilter from "@/components/filters/FilialFilter";
 import MultiSelectFilter, { type MultiSelectOption } from "@/components/filters/MultiSelectFilter";
 import { useAuth } from "@/components/auth/AuthContext";
-import { resolveCompany, type CompanyKey } from "@/lib/config/company";
+import {
+  resolveCompany,
+  getOperationalFilials,
+  getFilialLabelForDisplay,
+  compareFilialDisplayOrder,
+  type CompanyKey,
+} from "@/lib/config/company";
 import { getCurrentMonthRange, formatDateForQuery } from "@/lib/utils/date";
 import { exportRelatorioXlsx } from "@/lib/utils/exportRelatorioXlsx";
 import { exportCompraSugeridaAbcXlsx, buildCompraSugeridaFileHint } from "@/lib/utils/exportCompraSugeridaAbcXlsx";
@@ -199,6 +205,18 @@ export default function GeradorRelatoriosPage({
   // Filtros
   const [range, setRange] = useState<DateRangeValue>(initialRange);
   const [filial, setFilial] = useState<string | null>(null);
+  // Estoque por filial: uma ou mais filiais (rótulo = cabeçalho da coluna). Vazio = todas.
+  const [estoqueFiliais, setEstoqueFiliais] = useState<string[]>([]);
+  // Mesmas filiais/rótulos que viram coluna em fetchEstoqueRede (Ibirapuera fica fora).
+  const estoqueFilialOptions = useMemo(() => {
+    const cfg = resolveCompany(companyKey);
+    const labels = new Set<string>();
+    for (const f of getOperationalFilials(cfg, "inventory")) {
+      const label = getFilialLabelForDisplay(cfg, f);
+      if (label.trim().toUpperCase() !== "IBIRAPUERA") labels.add(label);
+    }
+    return Array.from(labels).sort((a, b) => compareFilialDisplayOrder(a, b, cfg));
+  }, [companyKey]);
   const [grupos, setGrupos] = useState<string[]>([]);
   const [linhas, setLinhas] = useState<string[]>([]);
   const [subgrupos, setSubgrupos] = useState<string[]>([]);
@@ -732,6 +750,9 @@ export default function GeradorRelatoriosPage({
     colecoes.forEach((c) => params.append("colecao", c));
     cores.forEach((c) => params.append("cor", c));
     tipos.forEach((t) => params.append("tipo", t));
+    if (meta?.supportedFilters.includes("estoqueFiliais" as never)) {
+      estoqueFiliais.forEach((f) => params.append("estoqueFilial", f));
+    }
     if (produtoSelected) {
       params.set("produtoId", produtoSelected.id);
     } else if (produtoQuery.trim().length >= 2) {
@@ -765,7 +786,7 @@ export default function GeradorRelatoriosPage({
     if (companyKey === "nerd" && fornecedor) params.set("fornecedor", fornecedor);
     return params.toString();
   }, [
-    companyKey, filial, startStr, endStr, grupos, linhas, subgrupos, grades,
+    companyKey, filial, estoqueFiliais, startStr, endStr, grupos, linhas, subgrupos, grades,
     colecoes, cores, tipos, produtoSelected, produtoQuery, produtosSelecionados,
     projecaoJanela, projecaoSazonalidade, projecaoConsiderarEstoque,
     diasParadoValor, diasParadoModo, valorMinimoTicket, incluirZerados, incluirNegativos,
@@ -1123,10 +1144,13 @@ export default function GeradorRelatoriosPage({
 
   // ---------- exportar ----------
   const filialLabel = useMemo(() => {
+    if (reportTypeId === ESTOQUE_REDE_ID && estoqueFiliais.length > 0) {
+      return estoqueFiliais.length === 1 ? estoqueFiliais[0] : `${estoqueFiliais.length}-filiais`;
+    }
     if (!filial) return "todas-filiais";
     const cfg = resolveCompany(companyKey);
     return cfg?.filialDisplayNames?.[filial] ?? filial;
-  }, [filial, companyKey]);
+  }, [filial, companyKey, reportTypeId, estoqueFiliais]);
 
   const handleExport = () => {
     // Nome do arquivo: base CURTA da análise (`fileSlug` do registry, ex.: "vendas",
@@ -1429,6 +1453,14 @@ export default function GeradorRelatoriosPage({
               // Mesma opção da Estoque Consulta: permite rodar as análises de estoque
               // (Produtos parados, Produtos cadastro) escopadas na filial de defeito.
               includeFilialDefeito
+            />
+          )}
+          {supports("estoqueFiliais") && (
+            <MultiSelectFilter
+              label="Filiais"
+              value={estoqueFiliais}
+              options={estoqueFilialOptions}
+              onChange={setEstoqueFiliais}
             />
           )}
           {supports("valorTicket") && (

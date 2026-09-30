@@ -4728,6 +4728,42 @@ async function fetchGradesPMG(request: sql.Request | RequestLike): Promise<Map<s
 /**
  * Busca detalhes de um produto específico com todas as suas variações por filial
  */
+/** Filtro de dimensão: um valor, vários (multi-select) ou nada. */
+export type FiltroValor = string | string[] | undefined | null;
+
+/** Normaliza para lista UPPER/trim, sem vazios nem repetidos. */
+function toFiltroValores(value: FiltroValor): string[] {
+  const list = Array.isArray(value) ? value : value ? [value] : [];
+  return Array.from(new Set(list.map((v) => String(v).trim().toUpperCase()).filter(Boolean)));
+}
+
+/** ` AND expr IN (@p0, @p1…)` com parâmetros tipados; '' quando não há valor. */
+function bindInFiltro(
+  request: sql.Request | RequestLike,
+  prefix: string,
+  expr: string,
+  valores: string[],
+): string {
+  if (valores.length === 0) return '';
+  const names = valores.map((valor, i) => {
+    request.input(`${prefix}${i}`, sql.VarChar, valor);
+    return `@${prefix}${i}`;
+  });
+  return ` AND ${expr} IN (${names.join(', ')})`;
+}
+
+export type ProdutoDetalhesPorFilialParams = Omit<
+  ProdutoDetalhesParams,
+  'linha' | 'grupo' | 'subgrupo' | 'grade' | 'colecao' | 'cor'
+> & {
+  linha?: FiltroValor;
+  grupo?: FiltroValor;
+  subgrupo?: FiltroValor;
+  grade?: FiltroValor;
+  colecao?: FiltroValor;
+  cor?: FiltroValor;
+};
+
 export async function fetchProdutoDetalhesPorFilial({
   company,
   filial,
@@ -4742,8 +4778,19 @@ export async function fetchProdutoDetalhesPorFilial({
   buscaItens: buscaItensParam,
   mostrarZerados = false,
   mostrarNegativos = false,
-}: ProdutoDetalhesParams): Promise<ProdutoDetalhesCompletoPorFilial> {
+}: ProdutoDetalhesPorFilialParams): Promise<ProdutoDetalhesCompletoPorFilial> {
   return withRequest(async (request) => {
+    // Filtros de dimensão aceitam vários valores (multi-select da Estoque Consulta): viram IN.
+    const categoriaValores = toFiltroValores(company === 'nerd' ? grupo : linha);
+    const categoriaExpr =
+      company === 'nerd'
+        ? `UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, ''))))`
+        : `UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, ''))))`;
+    const subgrupoValores = toFiltroValores(subgrupo);
+    const gradeValores = toFiltroValores(grade);
+    const colecaoValores = toFiltroValores(colecao);
+    // Cor compara sem espaço nenhum dos dois lados (cadastro tem espaço duplo solto).
+    const corValores = toFiltroValores(cor).map((c) => c.replace(/\s+/g, ''));
     const useProdutosPermitidos = Array.isArray(produtosPermitidosParam) && produtosPermitidosParam.length > 0;
     const buscaItens = (buscaItensParam ?? [])
       .map((t) => String(t).trim())
@@ -4805,42 +4852,19 @@ export async function fetchProdutoDetalhesPorFilial({
         }
       });
       produtoFilter = `AND (${orParts.join(' OR ')})`;
-      if (company === 'nerd' && grupo) {
-        request.input('grupoFiltro', sql.VarChar, grupo.toUpperCase().trim());
-        produtoFilter += ` AND UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, '')))) = @grupoFiltro`;
-      } else if (linha) {
-        request.input('linhaFiltro', sql.VarChar, linha.toUpperCase().trim());
-        produtoFilter += ` AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) = @linhaFiltro`;
-      }
+      produtoFilter += bindInFiltro(request, 'catFiltro', categoriaExpr, categoriaValores);
     } else if (!useProdutosPermitidos && produtoNome) {
       const produtoCodigoNormalizado = produtoNome.toUpperCase().trim().replace(/\s+/g, '');
       request.input('produtoCodigoEstoque', sql.VarChar, produtoCodigoNormalizado);
       produtoFilter = `AND UPPER(REPLACE(LTRIM(RTRIM(e.PRODUTO)), ' ', '')) = @produtoCodigoEstoque`;
     } else if (!useProdutosPermitidos) {
-      if (company === 'nerd' && grupo) {
-        request.input('grupoFiltro', sql.VarChar, grupo.toUpperCase().trim());
-        produtoFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, '')))) = @grupoFiltro`;
-      } else if (linha) {
-        request.input('linhaFiltro', sql.VarChar, linha.toUpperCase().trim());
-        produtoFilter = `AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) = @linhaFiltro`;
-      }
+      produtoFilter = bindInFiltro(request, 'catFiltro', categoriaExpr, categoriaValores);
     }
 
     if (!useProdutosPermitidos) {
-      if (subgrupo) {
-        request.input('subgrupo', sql.VarChar, subgrupo.toUpperCase().trim());
-        produtoFilter += ` AND UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) = @subgrupo`;
-      }
-
-      if (grade) {
-        request.input('grade', sql.VarChar, grade.toUpperCase().trim());
-        produtoFilter += ` AND UPPER(LTRIM(RTRIM(CONVERT(VARCHAR, p.GRADE)))) = @grade`;
-      }
-
-      if (colecao) {
-        request.input('colecao', sql.VarChar, colecao.toUpperCase().trim());
-        produtoFilter += ` AND UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) = @colecao`;
-      }
+      produtoFilter += bindInFiltro(request, 'subgrupo', `UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, ''))))`, subgrupoValores);
+      produtoFilter += bindInFiltro(request, 'grade', `UPPER(LTRIM(RTRIM(CONVERT(VARCHAR, p.GRADE))))`, gradeValores);
+      produtoFilter += bindInFiltro(request, 'colecao', `UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, ''))))`, colecaoValores);
     }
 
     const nerdOnlyEletronicosFilter = buildNerdOnlyLinhaEletronicosFilter(company, 'p');
@@ -4865,11 +4889,13 @@ export async function fetchProdutoDetalhesPorFilial({
 
     // Filtro de cor (se fornecido)
     let corFilter = '';
-    if (cor) {
-      // Normalizar cor (remover espaços extras e converter para maiúsculo)
-      const corNormalizada = cor.trim().replace(/\s+/g, ' ').toUpperCase();
-      request.input('corFiltro', sql.VarChar, corNormalizada);
-      corFilter = `AND UPPER(LTRIM(RTRIM(REPLACE(ISNULL(COALESCE(c.DESC_COR, e.COR_PRODUTO), ''), ' ', '')))) = UPPER(REPLACE(LTRIM(RTRIM(@corFiltro)), ' ', ''))`;
+    if (corValores.length > 0) {
+      corFilter = bindInFiltro(
+        request,
+        'corFiltro',
+        `UPPER(LTRIM(RTRIM(REPLACE(ISNULL(COALESCE(c.DESC_COR, e.COR_PRODUTO), ''), ' ', ''))))`,
+        corValores,
+      );
     }
 
     // Buscar todas as variações do produto com estoque por filial (valores reais; filtro positivo/zero/negativo no fim)
@@ -4976,25 +5002,10 @@ export async function fetchProdutoDetalhesPorFilial({
         )`);
       });
       vendasFilter = `AND (${orPartsV.join(' OR ')})`;
-      if (company === 'nerd' && grupo) {
-        request.input('grupoFiltroVendas', sql.VarChar, grupo.toUpperCase().trim());
-        vendasFilter += ` AND UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, '')))) = @grupoFiltroVendas`;
-      } else if (linha) {
-        request.input('linhaFiltroVendas', sql.VarChar, linha.toUpperCase().trim());
-        vendasFilter += ` AND UPPER(LTRIM(RTRIM(ISNULL(p.LINHA, '')))) = @linhaFiltroVendas`;
-      }
-      if (subgrupo) {
-        request.input('subgrupoVendas', sql.VarChar, subgrupo.toUpperCase().trim());
-        vendasFilter += ` AND UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) = @subgrupoVendas`;
-      }
-      if (grade) {
-        request.input('gradeVendas', sql.VarChar, grade.toUpperCase().trim());
-        vendasFilter += ` AND UPPER(LTRIM(RTRIM(CONVERT(VARCHAR, p.GRADE)))) = @gradeVendas`;
-      }
-      if (colecao) {
-        request.input('colecaoVendas', sql.VarChar, colecao.toUpperCase().trim());
-        vendasFilter += ` AND UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) = @colecaoVendas`;
-      }
+      vendasFilter += bindInFiltro(request, 'catFiltroVendas', categoriaExpr, categoriaValores);
+      vendasFilter += bindInFiltro(request, 'subgrupoVendas', `UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, ''))))`, subgrupoValores);
+      vendasFilter += bindInFiltro(request, 'gradeVendas', `UPPER(LTRIM(RTRIM(CONVERT(VARCHAR, p.GRADE))))`, gradeValores);
+      vendasFilter += bindInFiltro(request, 'colecaoVendas', `UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, ''))))`, colecaoValores);
       usarFiltroFilialVendas = false;
     } else if (produtoNome) {
       // Quando temos código do produto específico, buscar vendas em TODAS as filiais
@@ -5009,11 +5020,13 @@ export async function fetchProdutoDetalhesPorFilial({
     }
     
     // Filtro de cor para vendas (se fornecido)
-    if (cor) {
-      // Normalizar cor (remover espaços extras e converter para maiúsculo)
-      const corNormalizadaVendas = cor.trim().replace(/\s+/g, ' ').toUpperCase();
-      request.input('corFiltroVendas', sql.VarChar, corNormalizadaVendas);
-      vendasCorFilter = `AND UPPER(REPLACE(LTRIM(RTRIM(ISNULL(COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO), ''))), ' ', '')) = UPPER(REPLACE(LTRIM(RTRIM(@corFiltroVendas)), ' ', ''))`;
+    if (corValores.length > 0) {
+      vendasCorFilter = bindInFiltro(
+        request,
+        'corFiltroVendas',
+        `UPPER(REPLACE(LTRIM(RTRIM(ISNULL(COALESCE(c.DESC_COR, vp.DESC_COR_PRODUTO), ''))), ' ', ''))`,
+        corValores,
+      );
     }
     
     const vendasQuery = `
@@ -5162,9 +5175,10 @@ export async function fetchProdutoDetalhesPorFilial({
     const vendasTotais = variacoes.reduce((sum, v) => sum + v.vendasTotais, 0);
 
     // Determinar nome do produto (usar linha se disponível, senão usar produtoNome ou linha do parâmetro)
+    const linhaNome = toFiltroValores(linha).join(', ');
     const nomeProduto = variacoes.length > 0
-      ? variacoes[0].linha || linha || produtoNome || 'Produto'
-      : linha || produtoNome || 'Produto';
+      ? variacoes[0].linha || linhaNome || produtoNome || 'Produto'
+      : linhaNome || produtoNome || 'Produto';
 
     return {
       nomeProduto,

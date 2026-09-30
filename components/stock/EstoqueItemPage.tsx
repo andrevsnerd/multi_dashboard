@@ -3,7 +3,9 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 
 import FilialFilter from "@/components/filters/FilialFilter";
-import type { MultiSelectOption as ColecaoOption } from "@/components/filters/MultiSelectFilter";
+import MultiSelectFilter, {
+  type MultiSelectOption as ColecaoOption,
+} from "@/components/filters/MultiSelectFilter";
 import {
   compareFilialDisplayOrder,
   getFilialLabelForDisplay,
@@ -56,10 +58,9 @@ type FiltroDimensao = keyof FiltroCombo;
 
 const FILTRO_DIMENSOES: FiltroDimensao[] = ["categoria", "subgrupo", "grade", "colecao"];
 
-/** Seleção do select -> mesma forma das opções (UPPER/trim), para casar os combos. */
-function normalizeFiltro(value: string | null): string | null {
-  const normalized = value?.trim().toUpperCase() ?? "";
-  return normalized || null;
+/** Seleção do filtro -> mesma forma das opções (UPPER/trim), para casar os combos. */
+function normalizeFiltro(values: string[]): Set<string> {
+  return new Set(values.map((value) => value.trim().toUpperCase()).filter(Boolean));
 }
 
 interface DetalhesPorFilialResponse {
@@ -175,12 +176,12 @@ async function fetchDetalhesPorFilial(params: {
   company: CompanyKey;
   filial: string | null;
   itens: string;
-  grupo: string | null;
-  linha: string | null;
-  subgrupo: string | null;
-  grade: string | null;
-  colecao: string | null;
-  cor: string | null;
+  grupo: string[];
+  linha: string[];
+  subgrupo: string[];
+  grade: string[];
+  colecao: string[];
+  cor: string[];
   mostrarZerados: boolean;
   mostrarNegativos: boolean;
 }): Promise<DetalhesPorFilialResponse> {
@@ -188,12 +189,13 @@ async function fetchDetalhesPorFilial(params: {
 
   if (params.filial) searchParams.set("filial", params.filial);
   if (params.itens.trim()) searchParams.set("itens", params.itens.trim());
-  if (params.grupo) searchParams.set("grupo", params.grupo);
-  if (params.linha) searchParams.set("linha", params.linha);
-  if (params.subgrupo) searchParams.set("subgrupo", params.subgrupo);
-  if (params.grade) searchParams.set("grade", params.grade);
-  if (params.colecao) searchParams.set("colecao", params.colecao);
-  if (params.cor) searchParams.set("cor", params.cor);
+  // Cada dimensão pode ter vários valores: ?grupo=A&grupo=B (a API faz IN).
+  params.grupo.forEach((value) => searchParams.append("grupo", value));
+  params.linha.forEach((value) => searchParams.append("linha", value));
+  params.subgrupo.forEach((value) => searchParams.append("subgrupo", value));
+  params.grade.forEach((value) => searchParams.append("grade", value));
+  params.colecao.forEach((value) => searchParams.append("colecao", value));
+  params.cor.forEach((value) => searchParams.append("cor", value));
   if (params.mostrarZerados) searchParams.set("mostrarZerados", "1");
   if (params.mostrarNegativos) searchParams.set("mostrarNegativos", "1");
 
@@ -302,13 +304,13 @@ export default function EstoqueItemPage({
   }, [companyCfg]);
 
   const [itensInput, setItensInput] = useState("");
-  const [grupo, setGrupo] = useState<string | null>(null);
-  const [linha, setLinha] = useState<string | null>(null);
-  const [subgrupo, setSubgrupo] = useState<string | null>(null);
-  const [grade, setGrade] = useState<string | null>(null);
-  const [colecao, setColecao] = useState<string | null>(null);
+  const [grupo, setGrupo] = useState<string[]>([]);
+  const [linha, setLinha] = useState<string[]>([]);
+  const [subgrupo, setSubgrupo] = useState<string[]>([]);
+  const [grade, setGrade] = useState<string[]>([]);
+  const [colecao, setColecao] = useState<string[]>([]);
   const [selectedFilial, setSelectedFilial] = useState<string | null>(null);
-  const [cor, setCor] = useState<string | null>(null);
+  const [cor, setCor] = useState<string[]>([]);
   const [mostrarZerados, setMostrarZerados] = useState(false);
   const [mostrarNegativos, setMostrarNegativos] = useState(false);
   const [hiddenFiliais, setHiddenFiliais] = useState<Set<string>>(new Set());
@@ -381,7 +383,7 @@ export default function EstoqueItemPage({
   // Cascata: cada lista respeita os OUTROS filtros selecionados, nunca o dela mesma
   // (mesma regra dos endpoints antigos de vendas).
   const opcoesPorDimensao = useMemo(() => {
-    const selecoes: Record<FiltroDimensao, string | null> = {
+    const selecoes: Record<FiltroDimensao, Set<string>> = {
       categoria: normalizeFiltro(companyKey === "nerd" ? grupo : linha),
       subgrupo: normalizeFiltro(subgrupo),
       grade: normalizeFiltro(grade),
@@ -394,7 +396,9 @@ export default function EstoqueItemPage({
       for (const combo of filtroOpcoes.combos) {
         const casa = FILTRO_DIMENSOES.every(
           (outra) =>
-            outra === dimensao || !selecoes[outra] || combo[outra] === selecoes[outra],
+            outra === dimensao ||
+            selecoes[outra].size === 0 ||
+            selecoes[outra].has(combo[outra]),
         );
         if (casa && combo[dimensao]) seen.add(combo[dimensao]);
       }
@@ -448,11 +452,11 @@ export default function EstoqueItemPage({
         company: companyKey,
         filial: selectedFilial,
         itens: itensInput,
-        grupo: companyKey === "nerd" ? grupo : null,
-        linha: companyKey === "scarfme" ? linha : null,
-        subgrupo: companyKey === "scarfme" ? subgrupo : null,
-        grade: companyKey === "scarfme" ? grade : null,
-        colecao: companyKey === "scarfme" ? colecao : null,
+        grupo: companyKey === "nerd" ? grupo : [],
+        linha: companyKey === "scarfme" ? linha : [],
+        subgrupo: companyKey === "scarfme" ? subgrupo : [],
+        grade: companyKey === "scarfme" ? grade : [],
+        colecao: companyKey === "scarfme" ? colecao : [],
         cor,
         mostrarZerados,
         mostrarNegativos,
@@ -571,66 +575,24 @@ export default function EstoqueItemPage({
     };
   }, [data, companyCfg]);
 
+  // Cores: catálogo + as que vieram na consulta (a API já filtra pelas cores marcadas,
+  // então só a tabela esconderia as outras e não daria para somar mais uma).
   const availableCores = useMemo(() => {
-    if (!pivotRows.length) return apiCores;
-    const seen = new Set<string>();
+    const seen = new Set<string>(apiCores);
     for (const row of pivotRows) {
       if (row.cor?.trim()) seen.add(row.cor.trim());
     }
     return Array.from(seen).sort();
   }, [pivotRows, apiCores]);
 
-  const availableGrupos = useMemo(() => {
-    if (!pivotRows.length) return apiGrupos;
-    const seen = new Set<string>();
-    for (const row of pivotRows) {
-      if (row.linha?.trim()) seen.add(row.linha.trim());
-    }
-    return Array.from(seen).sort();
-  }, [pivotRows, apiGrupos]);
-
-  const availableLinhas = useMemo(() => {
-    if (!pivotRows.length) return apiLinhas;
-    const seen = new Set<string>();
-    for (const row of pivotRows) {
-      if (row.linha?.trim() && !linhasExcluidas.has(row.linha.trim().toUpperCase())) {
-        seen.add(row.linha.trim());
-      }
-    }
-    return Array.from(seen).sort();
-  }, [pivotRows, apiLinhas, linhasExcluidas]);
-
-  const availableSubgrupos = useMemo(() => {
-    if (!pivotRows.length) return apiSubgrupos;
-    const seen = new Set<string>();
-    for (const row of pivotRows) {
-      if (row.subgrupo?.trim()) seen.add(row.subgrupo.trim());
-    }
-    return Array.from(seen).sort();
-  }, [pivotRows, apiSubgrupos]);
-
-  const availableGrades = useMemo(() => {
-    if (!pivotRows.length) return apiGrades;
-    const seen = new Set<string>();
-    for (const row of pivotRows) {
-      if (row.grade?.trim()) seen.add(row.grade.trim());
-    }
-    return Array.from(seen).sort();
-  }, [pivotRows, apiGrades]);
-
-  // Códigos vêm da tabela (pivotRows) quando há dados; a descrição vem sempre do
-  // catálogo (apiColecoes), casada pelo código. Sem descrição conhecida, exibe o código.
-  const availableColecoes = useMemo<ColecaoOption[]>(() => {
-    if (!pivotRows.length) return apiColecoes;
-    const labelByCode = new Map(apiColecoes.map((o) => [o.value.toUpperCase(), o.label]));
-    const seen = new Set<string>();
-    for (const row of pivotRows) {
-      if (row.colecao?.trim()) seen.add(row.colecao.trim());
-    }
-    return Array.from(seen)
-      .map((code) => ({ value: code, label: labelByCode.get(code.toUpperCase()) ?? code }))
-      .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
-  }, [pivotRows, apiColecoes]);
+  // Grupo/Linha/Subgrupo/Grade/Coleção saem sempre da cascata do estoque (opcoesPorDimensao),
+  // não da tabela consultada: com multi-select, derivar da tabela travava a lista no que já
+  // estava marcado.
+  const availableGrupos = apiGrupos;
+  const availableLinhas = apiLinhas;
+  const availableSubgrupos = apiSubgrupos;
+  const availableGrades = apiGrades;
+  const availableColecoes = apiColecoes;
 
   const visibleFiliaisColumns = useMemo(
     () => filiaisColumns.filter((filial) => !hiddenFiliais.has(filial)),
@@ -638,11 +600,11 @@ export default function EstoqueItemPage({
   );
 
   const filteredPivotRows = useMemo(() => {
-    const base = !cor
-      ? pivotRows
-      : pivotRows.filter(
-          (row) => row.cor.trim().toUpperCase() === cor.trim().toUpperCase(),
-        );
+    const coresSelecionadas = new Set(cor.map((item) => item.trim().toUpperCase()));
+    const base =
+      coresSelecionadas.size === 0
+        ? pivotRows
+        : pivotRows.filter((row) => coresSelecionadas.has(row.cor.trim().toUpperCase()));
 
     // Recalcula o total considerando apenas as filiais visiveis (colunas selecionadas).
     return base.map((row) => ({
@@ -771,13 +733,13 @@ export default function EstoqueItemPage({
 
     const filtros: string[] = [];
     if (itensInput.trim()) filtros.push(`Itens: ${itensInput.trim()}`);
-    if (cor) filtros.push(`Cor: ${cor}`);
-    if (companyKey === "nerd" && grupo) filtros.push(`Grupo: ${grupo}`);
+    if (cor.length) filtros.push(`Cor: ${cor.join(", ")}`);
+    if (companyKey === "nerd" && grupo.length) filtros.push(`Grupo: ${grupo.join(", ")}`);
     if (companyKey === "scarfme") {
-      if (linha) filtros.push(`Linha: ${linha}`);
-      if (subgrupo) filtros.push(`Subgrupo: ${subgrupo}`);
-      if (grade) filtros.push(`Grade: ${grade}`);
-      if (colecao) filtros.push(`Coleção: ${colecao}`);
+      if (linha.length) filtros.push(`Linha: ${linha.join(", ")}`);
+      if (subgrupo.length) filtros.push(`Subgrupo: ${subgrupo.join(", ")}`);
+      if (grade.length) filtros.push(`Grade: ${grade.join(", ")}`);
+      if (colecao.length) filtros.push(`Coleção: ${colecao.join(", ")}`);
     }
     if (mostrarZerados) filtros.push("Incluindo zerados");
     if (mostrarNegativos) filtros.push("Incluindo negativos");
@@ -835,12 +797,12 @@ export default function EstoqueItemPage({
 
   const limparFiltros = () => {
     setItensInput("");
-    setGrupo(null);
-    setLinha(null);
-    setSubgrupo(null);
-    setGrade(null);
-    setColecao(null);
-    setCor(null);
+    setGrupo([]);
+    setLinha([]);
+    setSubgrupo([]);
+    setGrade([]);
+    setColecao([]);
+    setCor([]);
     setSelectedFilial(null);
     setMostrarZerados(false);
     setMostrarNegativos(false);
@@ -894,117 +856,57 @@ export default function EstoqueItemPage({
             </div>
           </div>
 
-          <div>
-            <label className={styles.fieldLabel} htmlFor="estoque-cor">
-              Cor
-            </label>
-            <select
-              id="estoque-cor"
-              className={styles.select}
-              value={cor ?? ""}
-              onChange={(event) => setCor(event.target.value || null)}
-            >
-              <option value="">Todas</option>
-              {availableCores.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </select>
+          <div className={styles.multiField}>
+            <MultiSelectFilter
+              label="Cor"
+              value={cor}
+              options={availableCores}
+              onChange={setCor}
+            />
           </div>
 
           {companyKey === "nerd" ? (
-            <div>
-              <label className={styles.fieldLabel} htmlFor="estoque-grupo">
-                Grupo
-              </label>
-              <select
-                id="estoque-grupo"
-                className={styles.select}
-                value={grupo ?? ""}
-                onChange={(event) => setGrupo(event.target.value || null)}
-              >
-                <option value="">Todos</option>
-                {availableGrupos.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
+            <div className={styles.multiField}>
+              <MultiSelectFilter
+                label="Grupo"
+                value={grupo}
+                options={availableGrupos}
+                onChange={setGrupo}
+              />
             </div>
           ) : (
             <>
-              <div>
-                <label className={styles.fieldLabel} htmlFor="estoque-linha">
-                  Linha
-                </label>
-                <select
-                  id="estoque-linha"
-                  className={styles.select}
-                  value={linha ?? ""}
-                  onChange={(event) => setLinha(event.target.value || null)}
-                >
-                  <option value="">Todas</option>
-                  {availableLinhas.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </select>
+              <div className={styles.multiField}>
+                <MultiSelectFilter
+                  label="Linha"
+                  value={linha}
+                  options={availableLinhas}
+                  onChange={setLinha}
+                />
               </div>
-              <div>
-                <label className={styles.fieldLabel} htmlFor="estoque-subgrupo">
-                  Subgrupo
-                </label>
-                <select
-                  id="estoque-subgrupo"
-                  className={styles.select}
-                  value={subgrupo ?? ""}
-                  onChange={(event) => setSubgrupo(event.target.value || null)}
-                >
-                  <option value="">Todos</option>
-                  {availableSubgrupos.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </select>
+              <div className={styles.multiField}>
+                <MultiSelectFilter
+                  label="Subgrupo"
+                  value={subgrupo}
+                  options={availableSubgrupos}
+                  onChange={setSubgrupo}
+                />
               </div>
-              <div>
-                <label className={styles.fieldLabel} htmlFor="estoque-grade">
-                  Grade
-                </label>
-                <select
-                  id="estoque-grade"
-                  className={styles.select}
-                  value={grade ?? ""}
-                  onChange={(event) => setGrade(event.target.value || null)}
-                >
-                  <option value="">Todas</option>
-                  {availableGrades.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </select>
+              <div className={styles.multiField}>
+                <MultiSelectFilter
+                  label="Grade"
+                  value={grade}
+                  options={availableGrades}
+                  onChange={setGrade}
+                />
               </div>
-              <div>
-                <label className={styles.fieldLabel} htmlFor="estoque-colecao">
-                  Colecao
-                </label>
-                <select
-                  id="estoque-colecao"
-                  className={styles.select}
-                  value={colecao ?? ""}
-                  onChange={(event) => setColecao(event.target.value || null)}
-                >
-                  <option value="">Todas</option>
-                  {availableColecoes.map((item) => (
-                    <option key={item.value} value={item.value}>
-                      {item.label}
-                    </option>
-                  ))}
-                </select>
+              <div className={styles.multiField}>
+                <MultiSelectFilter
+                  label="Coleção"
+                  value={colecao}
+                  options={availableColecoes}
+                  onChange={setColecao}
+                />
               </div>
             </>
           )}

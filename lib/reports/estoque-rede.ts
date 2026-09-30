@@ -88,10 +88,11 @@ export const estoqueRedeMeta: ReportTypeMeta = {
   fileSlug: "estoque",
   description:
     "Estoque de todos os produtos (por produto × cor) da rede, com uma coluna por filial e o estoque total. Mesmo escopo da Estoque Consulta (saldos negativos só aparecem quando a filial está totalmente negativa).",
-  // Sem período (estoque é o saldo atual) e sem filtro de filial (mostra todas).
+  // Sem período (estoque é o saldo atual). "estoqueFiliais": escolhe uma ou mais filiais
+  // (vazio = todas); só as escolhidas viram coluna e entram no Estoque total.
   // "diasParado": filtra por defasagem de venda; o backend calcula a defasagem mesmo que
   // a coluna Dias parado não esteja habilitada.
-  supportedFilters: ["nome", "cor", "linha", "subgrupo", "grupo", "grade", "tipo", "colecao", "saldoEstoque", "diasParado"],
+  supportedFilters: ["nome", "estoqueFiliais", "cor", "linha", "subgrupo", "grupo", "grade", "tipo", "colecao", "saldoEstoque", "diasParado"],
   columns: ESTOQUE_REDE_COLUMNS,
   defaultPresets: ESTOQUE_REDE_PRESETS,
 };

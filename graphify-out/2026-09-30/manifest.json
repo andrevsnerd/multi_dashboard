@@ -1590,8 +1590,8 @@
     "semantic_hash": "7100ad93329f4cae6f0cf2636fa8a06f"
   },
   "components/relatorios/GeradorRelatoriosPage.tsx": {
-    "mtime": 1790786800.778004,
-    "ast_hash": "a4a7730ff7be5ad51a0aa49b85a1f0cb",
+    "mtime": 1790692329.4754968,
+    "ast_hash": "950df84c4429bb5c738047a06690b39e",
     "semantic_hash": ""
   },
   "components/romaneios/RomaneioDeleteModal.tsx": {
@@ -2330,8 +2330,8 @@
     "semantic_hash": "459288f759cd65627de962137ef9cd3f"
   },
   "lib/reports/estoque-rede.ts": {
-    "mtime": 1790786790.9244735,
-    "ast_hash": "8dc5c3e7c1913c0599bb1f4eac129839",
+    "mtime": 1788540413.9396448,
+    "ast_hash": "13dd4a0fa4539b7ec16ed0eb792e5135",
     "semantic_hash": ""
   },
   "lib/reports/format.ts": {
@@ -2365,8 +2365,8 @@
     "semantic_hash": ""
   },
   "lib/reports/types.ts": {
-    "mtime": 1790786790.922206,
-    "ast_hash": "90b4d38dcf66ac37aca8dbcf14fd876c",
+    "mtime": 1790692188.3333972,
+    "ast_hash": "c027163c8f75b14a437714452464fdd3",
     "semantic_hash": ""
   },
   "lib/reports/vendas-faturamento.ts": {
@@ -2550,9 +2550,9 @@
     "semantic_hash": ""
   },
   "lib/repositories/reportEstoque.ts": {
-    "mtime": 1790786775.530323,
-    "ast_hash": "b4d0e0c17ff72e2e01ab1afcf150754a",
-    "semantic_hash": ""
+    "mtime": 1782138474.5451996,
+    "ast_hash": "bb78c412b42caf9df42d8d926e43068c",
+    "semantic_hash": "bb78c412b42caf9df42d8d926e43068c"
   },
   "lib/repositories/reportProdutosCadastro.ts": {
     "mtime": 1781890583.2145603,
@@ -4285,8 +4285,8 @@
     "semantic_hash": ""
   },
   "lib/reports/params.ts": {
-    "mtime": 1790786775.528095,
-    "ast_hash": "738b3b38a253658a335a88b509a9e2b7",
+    "mtime": 1790692188.3333972,
+    "ast_hash": "37c26a96dafc439d16b70dc43c33f63c",
     "semantic_hash": ""
   },
   "lib/reports/projecao-vendas.ts": {

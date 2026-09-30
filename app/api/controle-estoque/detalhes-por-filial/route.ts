@@ -11,12 +11,14 @@ export async function GET(request: Request) {
   const buscaItens = itensBuscaRaw
     ? itensBuscaRaw.split(',').map((s) => s.trim()).filter(Boolean)
     : undefined;
-  const linha = searchParams.get('linha') || undefined;
-  const grupo = searchParams.get('grupo') || undefined; // Para NERD
-  const subgrupo = searchParams.get('subgrupo') || undefined;
-  const grade = searchParams.get('grade') || undefined;
-  const colecao = searchParams.get('colecao') || undefined;
-  const cor = searchParams.get('cor') || undefined;
+  // Cada dimensão aceita vários valores (?grupo=A&grupo=B) — multi-select da Estoque Consulta.
+  const multi = (key: string) => searchParams.getAll(key).map((v) => v.trim()).filter(Boolean);
+  const linha = multi('linha');
+  const grupo = multi('grupo'); // Para NERD
+  const subgrupo = multi('subgrupo');
+  const grade = multi('grade');
+  const colecao = multi('colecao');
+  const cor = multi('cor');
   const mostrarZerados =
     searchParams.get('mostrarZerados') === '1' ||
     searchParams.get('mostrarZerados') === 'true';
