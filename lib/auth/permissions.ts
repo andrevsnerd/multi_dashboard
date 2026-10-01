@@ -233,6 +233,9 @@ export const ROLE_RESTRICTED_PERMISSIONS: Partial<Record<PermissionKey, RoleKey[
   // milhares de produtos e desalinha regras que casam por nome. Ato estrutural:
   // mesmo conjunto restrito, com diretor entrando somente-leitura.
   "alterar-cadastro": ["admin", "diretor", "logistica"],
+  // Cadastrar Produto grava produto novo no Linx (ficha, cores, códigos de barra e
+  // preço, com custo): mesmo conjunto restrito do Alterar Cadastro.
+  "cadastrar-produto": ["admin", "diretor", "logistica"],
   "alterar-produtos-massa": ["admin", "diretor", "logistica"],
   // Gastos de Compra e planejamento de desembolso: tela 100% custo, entao vale
   // a mesma regra de CUSTO_VISIBLE_ROLES das outras (gerente e supervisor nunca

@@ -59,6 +59,7 @@ export const PAGE_PERMISSION_DEFINITIONS = [
   { key: "gerador-relatorios", label: "Gerador de Relatorios", routeSegments: ["gerador-relatorios"] },
   { key: "aumentos-descontos", label: "Aumentos e Descontos", routeSegments: ["aumentos-descontos"] },
   { key: "alterar-precos", label: "Alterar Custo / Preco", routeSegments: ["alterar-precos"] },
+  { key: "cadastrar-produto", label: "Cadastrar Produto", routeSegments: ["cadastrar-produto"] },
   { key: "alterar-cadastro", label: "Alterar Cadastro", routeSegments: ["alterar-cadastro"] },
   {
     key: "alterar-produtos-massa",

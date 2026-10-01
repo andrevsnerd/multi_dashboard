@@ -1430,8 +1430,8 @@
     "semantic_hash": "7a672d31b6ac254cb25f6a420501049d"
   },
   "components/layout/Sidebar.tsx": {
-    "mtime": 1790877190.803492,
-    "ast_hash": "860daac89a33a01f1ffac08420944238",
+    "mtime": 1790192980.7329445,
+    "ast_hash": "9c4d67765ee9647a0d4b3328228b833b",
     "semantic_hash": ""
   },
   "components/layout/SidebarContext.tsx": {
@@ -2075,8 +2075,8 @@
     "semantic_hash": ""
   },
   "lib/auth/permissions.ts": {
-    "mtime": 1790877190.8028018,
-    "ast_hash": "6e23d0fc821e24b04f48b787fa9a5a7b",
+    "mtime": 1790192980.7356403,
+    "ast_hash": "f944256f5efc7d9b277253f6b261867c",
     "semantic_hash": ""
   },
   "lib/auth/users-store-neon.ts": {
@@ -2155,8 +2155,8 @@
     "semantic_hash": "29590f1b0f773ebbcd60e9dc314eec58"
   },
   "lib/config/page-permissions.ts": {
-    "mtime": 1790877190.7977598,
-    "ast_hash": "8eeba1f16fb49b30897526f9ba0d3bd0",
+    "mtime": 1790192980.7366383,
+    "ast_hash": "906db020097a9ac0b21844c9d72de13e",
     "semantic_hash": ""
   },
   "lib/constants/columns.ts": {
@@ -4155,8 +4155,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/produtoCores.ts": {
-    "mtime": 1790876432.23248,
-    "ast_hash": "cbc5090df320437b3caef176166a06f7",
+    "mtime": 1787230886.0367534,
+    "ast_hash": "ccfc50e9f7b00ad53256a6fa9cb04714",
     "semantic_hash": ""
   },
   "app/api/saidas-entradas-produtos/defeito-do-dia/route.ts": {
@@ -4617,41 +4617,6 @@
   "lib/utils/exportVendasPorPrecoXlsx.ts": {
     "mtime": 1790694367.6532483,
     "ast_hash": "9dd5b6a27956b51d368eebd7b5418f1e",
-    "semantic_hash": ""
-  },
-  "app/(companies)/[company]/cadastrar-produto/page.tsx": {
-    "mtime": 1790877190.9836764,
-    "ast_hash": "3644b51083f55f647b5859bdb0966b56",
-    "semantic_hash": ""
-  },
-  "app/api/produto-novo/criar/route.ts": {
-    "mtime": 1790877173.8831577,
-    "ast_hash": "22e0931417d06be644270ab9b745c07b",
-    "semantic_hash": ""
-  },
-  "app/api/produto-novo/modelo/route.ts": {
-    "mtime": 1790877173.8315508,
-    "ast_hash": "18484e5c5b80958fd655c0603e589174",
-    "semantic_hash": ""
-  },
-  "app/api/produto-novo/opcoes/route.ts": {
-    "mtime": 1790877173.6733048,
-    "ast_hash": "5d6d5eb13acdffbc7c59a83538df1ec8",
-    "semantic_hash": ""
-  },
-  "app/api/produto-novo/previa/route.ts": {
-    "mtime": 1790877173.7516038,
-    "ast_hash": "fdd2de7d2fd5dd918c3fa8ddc9502135",
-    "semantic_hash": ""
-  },
-  "components/produto-novo/CadastrarProdutoPage.tsx": {
-    "mtime": 1790878039.3550227,
-    "ast_hash": "d2da64138e52f2fba8e5bc9f56508c22",
-    "semantic_hash": ""
-  },
-  "lib/repositories/produtoNovo.ts": {
-    "mtime": 1790877856.105131,
-    "ast_hash": "0416c06cb9f645c9bc6a594400d2ef92",
     "semantic_hash": ""
   }
 }

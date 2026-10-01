@@ -299,9 +299,24 @@ async function fetchCoresAtuais(
   });
 }
 
-async function fetchCatalogoCores(produto: string, filtroEmpresa: string): Promise<CorCatalogo[]> {
+/**
+ * Catálogo de cores para um produto que AINDA NÃO EXISTE — o cadastro de
+ * produto novo (`produtoNovo.ts`). Mesma lista e mesma descrição "mais usada
+ * pela empresa" de {@link fetchPreviaAdicionarCor}, sem as checagens de cor já
+ * presente no produto (não há produto para comparar).
+ */
+export async function fetchCatalogoCoresEmpresa(company: CorCompany): Promise<CorCatalogo[]> {
+  const empresas = EMPRESA_CODES[company] ?? [];
+  const filtroEmpresa = empresas.length > 0 ? `AND p.EMPRESA IN (${empresas.join(', ')})` : '';
+  return fetchCatalogoCores(null, filtroEmpresa);
+}
+
+async function fetchCatalogoCores(produto: string | null, filtroEmpresa: string): Promise<CorCatalogo[]> {
+  // Sem produto, as duas checagens viram constantes: evita varrer PRODUTO_CORES
+  // 450 vezes procurando um código que não existe.
+  const comProduto = produto !== null;
   const rows = await withRequest(async (request) => {
-    request.input('ccProduto', sql.VarChar, produto);
+    if (comProduto) request.input('ccProduto', sql.VarChar, produto);
     const r = await request.query<CorCatalogoRow>(`
       SELECT LTRIM(RTRIM(cb.COR)) AS COR,
              LTRIM(RTRIM(ISNULL(cb.DESC_COR, ''))) AS DESC_BASICA,
@@ -324,7 +339,9 @@ async function fetchCatalogoCores(produto: string, filtroEmpresa: string): Promi
         GROUP BY LTRIM(RTRIM(ISNULL(pc.DESC_COR_PRODUTO, '')))
         ORDER BY COUNT(*) DESC, LTRIM(RTRIM(ISNULL(pc.DESC_COR_PRODUTO, '')))
       ) emp
-      -- Já está no produto com a chave exata?
+      ${
+        comProduto
+          ? `      -- Já está no produto com a chave exata?
       OUTER APPLY (
         SELECT TOP 1 LTRIM(RTRIM(pc.COR_PRODUTO)) AS COR_NO_PRODUTO,
                      LTRIM(RTRIM(ISNULL(pc.DESC_COR_PRODUTO, ''))) AS DESC_NO_PRODUTO
@@ -341,6 +358,10 @@ async function fetchCatalogoCores(produto: string, filtroEmpresa: string): Promi
           AND TRY_CONVERT(INT, pc.COR_PRODUTO) IS NOT NULL
           AND TRY_CONVERT(INT, pc.COR_PRODUTO) = TRY_CONVERT(INT, cb.COR)
       ) equiv
+`
+          : `OUTER APPLY (SELECT CAST(NULL AS VARCHAR(10)) AS COR_NO_PRODUTO, CAST(NULL AS VARCHAR(40)) AS DESC_NO_PRODUTO) exata
+      OUTER APPLY (SELECT CAST(NULL AS VARCHAR(10)) AS COR_EQUIVALENTE, CAST(NULL AS VARCHAR(40)) AS DESC_EQUIVALENTE) equiv`
+      }
       WHERE ISNULL(cb.USO_PRODUTOS, 0) = 1
       ORDER BY
         CASE WHEN emp.USOS IS NULL THEN 1 ELSE 0 END,
@@ -370,7 +391,7 @@ async function fetchCatalogoCores(produto: string, filtroEmpresa: string): Promi
  * Ainda é só conferência: o valor que vale é o alocado dentro da transação,
  * porque o Linx pode consumir os mesmos números no meio do caminho.
  */
-async function fetchPreviaSequenciais(empresa: number | null): Promise<{
+export async function fetchPreviaSequenciais(empresa: number | null): Promise<{
   prefixo: string;
   proximoInterno: string;
   proximoEan: string;
@@ -442,6 +463,97 @@ interface BarraCriadaRow {
   TIPO_COD_BAR: number;
   CODIGO_BARRA: string;
 }
+
+/**
+ * Variáveis de trabalho de {@link SQL_GRAVAR_PAR_DE_CODIGOS}. Declarar UMA vez
+ * por batch, antes do laço de tamanhos.
+ */
+export const SQL_DECLARAR_PAR_DE_CODIGOS = `
+  DECLARE @t INT, @g VARCHAR(8), @seqTxt VARCHAR(20), @cod VARCHAR(25), @ean12 VARCHAR(20);
+  DECLARE @soma INT, @i INT, @i2 INT, @dv INT;`;
+
+/**
+ * Fragmento T-SQL que aloca e grava UM par de códigos (interno + EAN-13) para
+ * um tamanho de uma cor — a regra do Linx descrita no topo deste arquivo.
+ *
+ * É a mesma conta para "adicionar cor" e para o cadastro de produto novo
+ * (`produtoNovo.ts`): as duas telas montam o batch delas e encaixam isto dentro
+ * do laço de tamanhos, para não existirem duas versões da geração de código.
+ *
+ * Espera, já preenchidas pelo batch: `@produtoCh CHAR(12)`, `@corCh CHAR(10)`,
+ * `@t` (ordinal do tamanho), `@g` (rótulo do tamanho), `@prefixo` (PARAMETROS.EAN_13)
+ * e `@empresa` — mais as variáveis de {@link SQL_DECLARAR_PAR_DE_CODIGOS}.
+ */
+export const SQL_GRAVAR_PAR_DE_CODIGOS = `
+    /* interno (TIPO_COD_BAR = 3): sequencial PRODUTOS_BARRA.CODIGO_BARRA.
+       O laço existe porque o Linx pode ter gravado à mão um código que a
+       sequência ainda vai passar — nesse caso pula para o próximo. */
+    SET @cod = NULL; SET @i = 0;
+    WHILE @cod IS NULL AND @i < 50
+    BEGIN
+      SET @i += 1;
+      SET @seqTxt = NULL;
+      EXEC LX_SEQUENCIAL @TABELA_COLUNA = 'PRODUTOS_BARRA.CODIGO_BARRA',
+                         @EMPRESA = @empresa,
+                         @SEQUENCIA = @seqTxt OUTPUT,
+                         @UPDATE_SEQUENCIAL = 1;
+      -- A procedure monta a mensagem de erro mas volta sem levantar quando o
+      -- sequencial não existe (@SEQUENCIA fica nulo) — a checagem é nossa.
+      IF @seqTxt IS NULL OR TRY_CONVERT(BIGINT, @seqTxt) IS NULL
+        BEGIN ;THROW 51007, 'Sequencial PRODUTOS_BARRA.CODIGO_BARRA não encontrado em SEQUENCIAIS.', 1; END
+      -- Zero = a sequência estourou o TAMANHO e voltou para o começo.
+      IF TRY_CONVERT(BIGINT, @seqTxt) = 0
+        BEGIN ;THROW 51008, 'Sequencial de código interno esgotado (voltou a zero) — precisa aumentar o TAMANHO em SEQUENCIAIS.', 1; END
+      SET @cod = LTRIM(RTRIM(@seqTxt));
+      IF EXISTS (SELECT 1 FROM PRODUTOS_BARRA WHERE CODIGO_BARRA = @cod) SET @cod = NULL;
+    END
+    IF @cod IS NULL BEGIN ;THROW 51009, 'Não foi possível alocar um código interno livre.', 1; END
+
+    INSERT INTO PRODUTOS_BARRA (CODIGO_BARRA, PRODUTO, COR_PRODUTO, TAMANHO, GRADE,
+                                CODIGO_BARRA_PADRAO, INATIVO, TIPO_COD_BAR, LX_STATUS_REGISTRO)
+    VALUES (@cod, @produtoCh, @corCh, @t, @g, 0, 0, 3, 0);
+
+    /* EAN-13 (TIPO_COD_BAR = 1): prefixo do ERP + sequencial
+       PRODUTOS_BARRA.CODIGO_EAN + dígito verificador.
+       O DV é a única conta que fica do nosso lado — o banco não tem rotina para
+       isso (nenhum objeto do Linx lê o parâmetro EAN_13). É o algoritmo padrão
+       EAN-13, conferido contra os 44.039 EANs já gravados. */
+    SET @cod = NULL; SET @i = 0;
+    WHILE @cod IS NULL AND @i < 50
+    BEGIN
+      SET @i += 1;
+      SET @seqTxt = NULL;
+      EXEC LX_SEQUENCIAL @TABELA_COLUNA = 'PRODUTOS_BARRA.CODIGO_EAN',
+                         @EMPRESA = @empresa,
+                         @SEQUENCIA = @seqTxt OUTPUT,
+                         @UPDATE_SEQUENCIAL = 1;
+      IF @seqTxt IS NULL OR TRY_CONVERT(BIGINT, @seqTxt) IS NULL
+        BEGIN ;THROW 51010, 'Sequencial PRODUTOS_BARRA.CODIGO_EAN não encontrado em SEQUENCIAIS.', 1; END
+      IF TRY_CONVERT(BIGINT, @seqTxt) = 0
+        BEGIN ;THROW 51011, 'Sequencial de EAN esgotado (voltou a zero) — precisa de novo prefixo GS1.', 1; END
+
+      SET @ean12 = LTRIM(RTRIM(@prefixo)) + LTRIM(RTRIM(@seqTxt));
+      -- Prefixo + sequencial TEM que fechar 12 dígitos: quem define os tamanhos
+      -- é o cadastro do ERP (PARAMETROS.EAN_13 e SEQUENCIAIS.TAMANHO), então se
+      -- alguém mexer lá é melhor recusar do que gerar EAN inválido.
+      IF LEN(@ean12) <> 12
+        BEGIN ;THROW 51013, 'Prefixo EAN_13 + sequencial não fecham 12 dígitos — confira PARAMETROS.EAN_13 e o TAMANHO do sequencial PRODUTOS_BARRA.CODIGO_EAN.', 1; END
+      SET @soma = 0; SET @i2 = 1;
+      WHILE @i2 <= 12
+      BEGIN
+        SET @soma = @soma + CAST(SUBSTRING(@ean12, @i2, 1) AS INT) * CASE WHEN @i2 % 2 = 0 THEN 3 ELSE 1 END;
+        SET @i2 += 1;
+      END
+      SET @dv = (10 - (@soma % 10)) % 10;
+      SET @cod = @ean12 + CAST(@dv AS VARCHAR(1));
+      IF EXISTS (SELECT 1 FROM PRODUTOS_BARRA WHERE CODIGO_BARRA = @cod) SET @cod = NULL;
+    END
+    IF @cod IS NULL BEGIN ;THROW 51012, 'Não foi possível alocar um EAN livre.', 1; END
+
+    INSERT INTO PRODUTOS_BARRA (CODIGO_BARRA, PRODUTO, COR_PRODUTO, TAMANHO, GRADE,
+                                CODIGO_BARRA_PADRAO, INATIVO, TIPO_COD_BAR, LX_STATUS_REGISTRO)
+    VALUES (@cod, @produtoCh, @corCh, @t, @g, 0, 0, 1, 0);
+`;
 
 /**
  * Batch único, parametrizado — roda igual na conexão direta e via proxy (onde
@@ -545,82 +657,13 @@ BEGIN TRY
   DECLARE @empresa INT = (SELECT TOP 1 EMPRESA FROM PRODUTOS WHERE PRODUTO = @produtoCh);
 
   DECLARE @idx INT = 0, @total INT = (SELECT COUNT(*) FROM @tam);
-  DECLARE @t INT, @g VARCHAR(8), @seqTxt VARCHAR(20), @cod VARCHAR(25), @ean12 VARCHAR(20);
-  DECLARE @soma INT, @i INT, @i2 INT, @dv INT;
+  ${SQL_DECLARAR_PAR_DE_CODIGOS}
 
   WHILE @idx < @total
   BEGIN
     SET @idx += 1;
     SELECT @t = TAMANHO, @g = GRADE FROM @tam WHERE ORDEM = @idx;
-
-    /* interno (TIPO_COD_BAR = 3): sequencial PRODUTOS_BARRA.CODIGO_BARRA.
-       O laço existe porque o Linx pode ter gravado à mão um código que a
-       sequência ainda vai passar — nesse caso pula para o próximo. */
-    SET @cod = NULL; SET @i = 0;
-    WHILE @cod IS NULL AND @i < 50
-    BEGIN
-      SET @i += 1;
-      SET @seqTxt = NULL;
-      EXEC LX_SEQUENCIAL @TABELA_COLUNA = 'PRODUTOS_BARRA.CODIGO_BARRA',
-                         @EMPRESA = @empresa,
-                         @SEQUENCIA = @seqTxt OUTPUT,
-                         @UPDATE_SEQUENCIAL = 1;
-      -- A procedure monta a mensagem de erro mas volta sem levantar quando o
-      -- sequencial não existe (@SEQUENCIA fica nulo) — a checagem é nossa.
-      IF @seqTxt IS NULL OR TRY_CONVERT(BIGINT, @seqTxt) IS NULL
-        BEGIN ;THROW 51007, 'Sequencial PRODUTOS_BARRA.CODIGO_BARRA não encontrado em SEQUENCIAIS.', 1; END
-      -- Zero = a sequência estourou o TAMANHO e voltou para o começo.
-      IF TRY_CONVERT(BIGINT, @seqTxt) = 0
-        BEGIN ;THROW 51008, 'Sequencial de código interno esgotado (voltou a zero) — precisa aumentar o TAMANHO em SEQUENCIAIS.', 1; END
-      SET @cod = LTRIM(RTRIM(@seqTxt));
-      IF EXISTS (SELECT 1 FROM PRODUTOS_BARRA WHERE CODIGO_BARRA = @cod) SET @cod = NULL;
-    END
-    IF @cod IS NULL BEGIN ;THROW 51009, 'Não foi possível alocar um código interno livre.', 1; END
-
-    INSERT INTO PRODUTOS_BARRA (CODIGO_BARRA, PRODUTO, COR_PRODUTO, TAMANHO, GRADE,
-                                CODIGO_BARRA_PADRAO, INATIVO, TIPO_COD_BAR, LX_STATUS_REGISTRO)
-    VALUES (@cod, @produtoCh, @corCh, @t, @g, 0, 0, 3, 0);
-
-    /* EAN-13 (TIPO_COD_BAR = 1): prefixo do ERP + sequencial
-       PRODUTOS_BARRA.CODIGO_EAN + dígito verificador.
-       O DV é a única conta que fica do nosso lado — o banco não tem rotina para
-       isso (nenhum objeto do Linx lê o parâmetro EAN_13). É o algoritmo padrão
-       EAN-13, conferido contra os 44.039 EANs já gravados. */
-    SET @cod = NULL; SET @i = 0;
-    WHILE @cod IS NULL AND @i < 50
-    BEGIN
-      SET @i += 1;
-      SET @seqTxt = NULL;
-      EXEC LX_SEQUENCIAL @TABELA_COLUNA = 'PRODUTOS_BARRA.CODIGO_EAN',
-                         @EMPRESA = @empresa,
-                         @SEQUENCIA = @seqTxt OUTPUT,
-                         @UPDATE_SEQUENCIAL = 1;
-      IF @seqTxt IS NULL OR TRY_CONVERT(BIGINT, @seqTxt) IS NULL
-        BEGIN ;THROW 51010, 'Sequencial PRODUTOS_BARRA.CODIGO_EAN não encontrado em SEQUENCIAIS.', 1; END
-      IF TRY_CONVERT(BIGINT, @seqTxt) = 0
-        BEGIN ;THROW 51011, 'Sequencial de EAN esgotado (voltou a zero) — precisa de novo prefixo GS1.', 1; END
-
-      SET @ean12 = LTRIM(RTRIM(@prefixo)) + LTRIM(RTRIM(@seqTxt));
-      -- Prefixo + sequencial TEM que fechar 12 dígitos: quem define os tamanhos
-      -- é o cadastro do ERP (PARAMETROS.EAN_13 e SEQUENCIAIS.TAMANHO), então se
-      -- alguém mexer lá é melhor recusar do que gerar EAN inválido.
-      IF LEN(@ean12) <> 12
-        BEGIN ;THROW 51013, 'Prefixo EAN_13 + sequencial não fecham 12 dígitos — confira PARAMETROS.EAN_13 e o TAMANHO do sequencial PRODUTOS_BARRA.CODIGO_EAN.', 1; END
-      SET @soma = 0; SET @i2 = 1;
-      WHILE @i2 <= 12
-      BEGIN
-        SET @soma = @soma + CAST(SUBSTRING(@ean12, @i2, 1) AS INT) * CASE WHEN @i2 % 2 = 0 THEN 3 ELSE 1 END;
-        SET @i2 += 1;
-      END
-      SET @dv = (10 - (@soma % 10)) % 10;
-      SET @cod = @ean12 + CAST(@dv AS VARCHAR(1));
-      IF EXISTS (SELECT 1 FROM PRODUTOS_BARRA WHERE CODIGO_BARRA = @cod) SET @cod = NULL;
-    END
-    IF @cod IS NULL BEGIN ;THROW 51012, 'Não foi possível alocar um EAN livre.', 1; END
-
-    INSERT INTO PRODUTOS_BARRA (CODIGO_BARRA, PRODUTO, COR_PRODUTO, TAMANHO, GRADE,
-                                CODIGO_BARRA_PADRAO, INATIVO, TIPO_COD_BAR, LX_STATUS_REGISTRO)
-    VALUES (@cod, @produtoCh, @corCh, @t, @g, 0, 0, 1, 0);
+    ${SQL_GRAVAR_PAR_DE_CODIGOS}
   END
 
   /* ── 4) preço por cor ──────────────────────────────────────────────────

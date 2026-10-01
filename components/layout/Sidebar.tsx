@@ -108,6 +108,8 @@ export default function Sidebar({ companyName }: SidebarProps) {
     basePath && basePath !== "/" ? `${basePath}/aumentos-descontos` : "/aumentos-descontos";
   const alterarPrecosHref =
     basePath && basePath !== "/" ? `${basePath}/alterar-precos` : "/alterar-precos";
+  const cadastrarProdutoHref =
+    basePath && basePath !== "/" ? `${basePath}/cadastrar-produto` : "/cadastrar-produto";
   const alterarCadastroHref =
     basePath && basePath !== "/" ? `${basePath}/alterar-cadastro` : "/alterar-cadastro";
   const alterarProdutosMassaHref =
@@ -290,6 +292,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     "/gerador-relatorios",
     "/aumentos-descontos",
     "/alterar-precos",
+    "/cadastrar-produto",
     "/alterar-cadastro",
     "/alterar-produtos-massa",
     "/imprimir-etiquetas",
@@ -620,6 +623,14 @@ export default function Sidebar({ companyName }: SidebarProps) {
         },
         ...(isScarfme || isNerd
           ? [
+              {
+                key: "cadastrar-produto",
+                label: "Cadastrar Produto",
+                href: cadastrarProdutoHref,
+                permission: "cadastrar-produto" as const,
+                isActive: (currentPathname: string | null) =>
+                  matchesSegment(currentPathname, "/cadastrar-produto", cadastrarProdutoHref),
+              },
               {
                 key: "alterar-cadastro",
                 label: "Alterar Cadastro",
