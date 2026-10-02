@@ -10,6 +10,7 @@ import {
 } from "@/lib/utils/romaneios-date";
 import RomaneioDeleteModal from "./RomaneioDeleteModal";
 import RomaneiosDuplicadosPanel from "./RomaneiosDuplicadosPanel";
+import TravaInventarioPanel, { fmtDia, type TravaInventarioFilial } from "./TravaInventarioPanel";
 import styles from "./RomaneiosPage.module.css";
 
 export interface RomaneioListItem {
@@ -91,6 +92,22 @@ async function fetchLogTransito(
   return (json.data || []).map((row) => ({ ...row, tipo: "transito" as const }));
 }
 
+/** Travas de inventário aplicadas pelo admin (Neon — não consulta o Linx). */
+async function fetchTravas(companySlug: string): Promise<TravaInventarioFilial[]> {
+  const params = new URLSearchParams({ company: companySlug });
+  const response = await fetch(`/api/romaneios/trava-inventario?${params.toString()}`, { cache: "no-store" });
+  if (!response.ok) return [];
+  const json = (await response.json().catch(() => ({}))) as { travas?: TravaInventarioFilial[] };
+  return json.travas ?? [];
+}
+
+/** Dia (YYYY-MM-DD, horário de Brasília) de uma data de romaneio. */
+function diaDoRomaneio(value: string): string {
+  const parsed = parseRomaneioDateTime(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return parsed.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+}
+
 type TabType = "saida" | "entrada" | "transito" | "duplicados";
 
 export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
@@ -103,6 +120,7 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
   const [activeTab, setActiveTab] = useState<TabType>("saida");
   const [searchTerm, setSearchTerm] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<RomaneioListItem | null>(null);
+  const [travas, setTravas] = useState<TravaInventarioFilial[]>([]);
 
   const isAdmin = user?.role === "admin";
   const isLogistica = user?.role === "logistica";
@@ -197,9 +215,31 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
       : cleanDestinoValue(romaneio.filialDestino);
   }
 
+  /**
+   * Romaneio pendente de filial TRAVADA, com data anterior ao corte → só consulta.
+   * Mesma regra do servidor (que é quem bloqueia de fato); aqui é só o selo.
+   */
+  function getTravaInventario(romaneio: RomaneioListItem): TravaInventarioFilial | null {
+    if (travas.length === 0 || romaneio.tipo === "entrada") return null; // entrada não tem confirmação na tela
+    const confirmados = romaneio.qtdConfirmados ?? 0;
+    if (romaneio.tipo === "saida" && romaneio.qtdProdutos > 0 && confirmados >= romaneio.qtdProdutos) return null;
+    const chaves = new Set(
+      getFilialSearchValues(getDestinoFiltroValue(romaneio)).map((v) => v.toUpperCase())
+    );
+    const trava = travas.find(
+      (t) => chaves.has(t.filial.trim().toUpperCase()) || (!!t.codFilial && chaves.has(t.codFilial.trim().toUpperCase()))
+    );
+    if (!trava) return null;
+    const dia = diaDoRomaneio(romaneio.dataEmissao);
+    return !dia || dia < trava.dataCorte ? trava : null;
+  }
+
   useEffect(() => {
     if (authLoading) return;
     let cancelled = false;
+    fetchTravas(companySlug).then((data) => {
+      if (!cancelled) setTravas(data);
+    });
     Promise.all([
       fetchLogSaidas(companySlug, user?.username),
       fetchLogEntradas(companySlug, user?.username),
@@ -316,6 +356,21 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
         )}
       </div>
 
+      {isAdmin && user?.username && activeTab !== "duplicados" && (
+        <TravaInventarioPanel
+          companySlug={companySlug}
+          username={user.username}
+          travas={travas}
+          onTravasChange={setTravas}
+          travadosPorFilial={[...saidas, ...transitos].reduce((acc, r) => {
+            const t = getTravaInventario(r);
+            if (t) acc.set(t.filial, (acc.get(t.filial) ?? 0) + 1);
+            return acc;
+          }, new Map<string, number>())}
+          getFilialDisplayName={getFilialDisplayName}
+        />
+      )}
+
       {activeTab === "duplicados" ? (
         isAdmin ? (
           <RomaneiosDuplicadosPanel companySlug={companySlug} />
@@ -346,6 +401,7 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
               : "";
 
             const podeExcluir = isAdmin && !isTransito;
+            const travaInventario = getTravaInventario(rom);
 
             return (
               <Link
@@ -393,6 +449,14 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
                   ) : !isTransito && todosConfirmados ? (
                     <span className={styles.badgeConfirmado}>Confirmado</span>
                   ) : null}
+                  {travaInventario && (
+                    <span
+                      className={styles.badgeTravaInventario}
+                      title={`Filial travada para romaneios anteriores a ${fmtDia(travaInventario.dataCorte)}${travaInventario.inventarioNome ? ` (${travaInventario.inventarioNome})` : ""} — só consulta`}
+                    >
+                      🔒 Só consulta
+                    </span>
+                  )}
                 </div>
 
                 <div className={styles.cardDetails}>Responsavel: {rom.responsavel || "-"}</div>

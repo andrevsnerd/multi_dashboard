@@ -17,6 +17,7 @@ import {
   mensagemTravaDefeito,
   podeIgnorarTravaDefeito,
 } from '@/lib/server/trava-defeito';
+import { mensagemTravaInventario, verificarTravaInventario } from '@/lib/server/trava-inventario';
 import { getActiveFilial } from '@/lib/config/company';
 import { resolveCompanyDynamic } from '@/lib/config/company-server';
 import type { CompanyConfig } from '@/lib/config/company';
@@ -58,6 +59,11 @@ interface SaidaEntradaRequest {
   registrarTransferenciaPendente?: {
     items: ControleTransferenciaItemMeta[];
   };
+  /**
+   * Entrada que CONFIRMA um romaneio de saída (tela Romaneios / Defeitos). Quando
+   * vem, a trava de inventário do destino é conferida antes de gerar a entrada.
+   */
+  romaneioReferencia?: { romaneio: string; filialOrigem: string; dataRomaneio?: string } | null;
 }
 
 function isTransferenciaEntreLojas(tipoRomaneio: string): boolean {
@@ -270,6 +276,25 @@ export async function POST(request: Request) {
             travaDefeito: true,
             romaneioExistente: defeitoDoDia,
           },
+          { status: 409 }
+        );
+      }
+    }
+
+    // TRAVA DE INVENTÁRIO — confirmar saída anterior ao último inventário do
+    // destino somaria peça já contada. Ver lib/server/trava-inventario.ts.
+    if (tipoOperacao === 'entrada' && body.romaneioReferencia?.romaneio) {
+      const trava = await verificarTravaInventario({
+        companyKey,
+        filialDestino: filialTrim,
+        dataRomaneio: body.romaneioReferencia.dataRomaneio,
+      }).catch((e) => {
+        console.error('Erro ao verificar trava de inventário', e);
+        return null;
+      });
+      if (trava) {
+        return NextResponse.json(
+          { error: mensagemTravaInventario(trava), travaInventario: trava },
           { status: 409 }
         );
       }

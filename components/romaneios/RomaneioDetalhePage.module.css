@@ -133,6 +133,26 @@
   color: rgba(55, 65, 81, 0.48);
 }
 
+/* Romaneio anterior ao último inventário do destino — só consulta */
+.travaInventarioBanner {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.travaInventarioCell {
+  color: var(--t-gray400);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
 .erroConfirmacao {
   margin-bottom: 16px;
   padding: 10px 16px;
