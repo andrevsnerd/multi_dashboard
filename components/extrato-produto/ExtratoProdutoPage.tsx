@@ -214,6 +214,9 @@ const STATUS_TRANSITO: Record<number, string> = {
 
 function fmtDate(iso: string) {
   if (!iso) return "—";
+  // Data como gravada no Linx (sem conversão de fuso — evita 02/10 virar 01/10).
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (m) return `${m[3]}/${m[2]}/${m[1]}`;
   const d = new Date(iso);
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
 }
