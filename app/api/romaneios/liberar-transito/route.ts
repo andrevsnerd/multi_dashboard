@@ -2,11 +2,15 @@ import { NextResponse } from "next/server";
 import { getConnectionPool } from "@/lib/db/connection";
 import { ProxyPool, shouldUseProxy } from "@/lib/db/proxy";
 import { readOnlyBlock } from "@/lib/auth/route-guards";
+import { mensagemTravaInventario, verificarTravaInventario } from "@/lib/server/trava-inventario";
 
 interface LiberarTransitoRequest {
   romaneio: string;
   filialDestino: string;
   filialOrigem?: string;
+  companyKey?: string;
+  /** Data de emissão do romaneio (a que a tela mostra) — trava de inventário. */
+  dataRomaneio?: string;
 }
 
 export async function POST(request: Request) {
@@ -22,6 +26,23 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "romaneio e filialDestino são obrigatórios." },
         { status: 400 }
+      );
+    }
+
+    // TRAVA DE INVENTÁRIO — trânsito anterior ao último inventário do destino não
+    // se libera mais (ver lib/server/trava-inventario.ts).
+    const trava = await verificarTravaInventario({
+      companyKey: body.companyKey,
+      filialDestino,
+      dataRomaneio: body.dataRomaneio,
+    }).catch((e) => {
+      console.error("Erro ao verificar trava de inventário", e);
+      return null;
+    });
+    if (trava) {
+      return NextResponse.json(
+        { error: mensagemTravaInventario(trava), travaInventario: trava },
+        { status: 409 }
       );
     }
 

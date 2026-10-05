@@ -77,6 +77,12 @@ function hojeISO(): string {
   return `${d.getFullYear()}-${mm}-${dd}`;
 }
 
+// Data como gravada no Linx (sem conversão de fuso — evita 02/10 virar 01/10).
+function fmtDataLinx(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : new Date(iso).toLocaleDateString("pt-BR");
+}
+
 function sugerirNome(modo: Modo, display: string, dataISO: string): string {
   const compact = (display || "")
     .toUpperCase()
@@ -744,7 +750,7 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
                         </button>
                       </td>
                       <td>{r.filial}</td>
-                      <td>{r.emissao ? new Date(r.emissao).toLocaleDateString("pt-BR") : "—"}</td>
+                      <td>{r.emissao ? fmtDataLinx(r.emissao) : "—"}</td>
                       <td className={styles.num}>{r.itens}</td>
                       <td className={`${styles.num} ${r.soma < 0 ? styles.neg : styles.pos}`}>
                         {r.soma > 0 ? "+" : ""}

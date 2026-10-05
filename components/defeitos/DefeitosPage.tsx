@@ -448,6 +448,12 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
           })),
           tipoRomaneio: "TRANSFERENCIA ENTRE LOJAS",
           observacao: `DEFEITO ROMANEIO ${selecionado.romaneio} - ${selecionado.filialOrigem}`,
+          // Trava de inventário do destino (lib/server/trava-inventario.ts).
+          romaneioReferencia: {
+            romaneio: selecionado.romaneio,
+            filialOrigem: selecionado.filialOrigem,
+            dataRomaneio: selecionado.emissao ?? "",
+          },
         }),
       });
       const jsonEntrada = await resEntrada.json().catch(() => ({}));
@@ -483,6 +489,7 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
             filialOrigem:
               item.quantidade < item.qtdeRomaneio ? selecionado.filialOrigem : undefined,
             romaneioEntrada,
+            dataRomaneio: selecionado.emissao ?? "",
           }),
         });
         const json = await res.json().catch(() => ({}));
@@ -534,6 +541,7 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
             produto: item.produto,
             corProduto: item.corProduto,
             acao: "desconfirmar",
+            dataRomaneio: selecionado.emissao ?? "",
           }),
         });
         if (!res.ok) {

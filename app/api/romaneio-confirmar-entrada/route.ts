@@ -16,6 +16,7 @@ import { shouldUseProxy, ProxyPool } from "@/lib/db/proxy";
 import { resolveResponsavelLinx } from "@/lib/server/responsavel-linx";
 import { inserirAjuste } from "@/lib/repositories/ajuste-historico";
 import { executeItemQtdeSet } from "@/lib/saida-entrada-executor";
+import { mensagemTravaInventario, verificarTravaInventario } from "@/lib/server/trava-inventario";
 
 /**
  * GET /api/romaneio-confirmar-entrada?company=X&romaneio=Y&filialDestino=Z
@@ -100,6 +101,8 @@ export async function POST(request: Request) {
        * esse vínculo não há como corrigir o destino depois.
        */
       romaneioEntrada?: string;
+      /** Data de emissão do romaneio (a que a tela mostra) — usada pela trava de inventário. */
+      dataRomaneio?: string;
     };
 
     const { companyKey, romaneioId, filialDestino, produto, corProduto, qtdeConfirmada = 0, acao } = body;
@@ -143,6 +146,24 @@ export async function POST(request: Request) {
       if (!filialOk) {
         return NextResponse.json({ error: "Sem permissão para esta filial." }, { status: 403 });
       }
+    }
+
+    // TRAVA DE INVENTÁRIO — romaneio anterior ao último inventário da filial de
+    // destino fica só para consulta: nem confirma, nem desconfirma (as duas mexem
+    // no estoque que o inventário já contou). Ver lib/server/trava-inventario.ts.
+    const trava = await verificarTravaInventario({
+      companyKey,
+      filialDestino,
+      dataRomaneio: body.dataRomaneio,
+    }).catch((e) => {
+      console.error("Erro ao verificar trava de inventário", e);
+      return null;
+    });
+    if (trava) {
+      return NextResponse.json(
+        { error: mensagemTravaInventario(trava), travaInventario: trava },
+        { status: 409 }
+      );
     }
 
     if (acao === "desconfirmar") {

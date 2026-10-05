@@ -66,8 +66,13 @@ async function postConfirmacao(
   corProduto: string,
   qtdeConfirmada: number,
   acao: "confirmar" | "desconfirmar",
-  extra?: { filialOrigem?: string; romaneioEntrada?: string }
-): Promise<{ ok: boolean; origem?: { corrigido: boolean; detalhe: string } | null }> {
+  extra?: {
+    filialOrigem?: string;
+    romaneioEntrada?: string;
+    /** Data de emissão do romaneio — a trava de inventário compara com ela. */
+    dataRomaneio?: string;
+  }
+): Promise<{ ok: boolean; error?: string; origem?: { corrigido: boolean; detalhe: string } | null }> {
   const res = await fetch("/api/romaneio-confirmar-entrada", {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-auth-username": username },
@@ -81,9 +86,13 @@ async function postConfirmacao(
       acao,
       filialOrigem: extra?.filialOrigem,
       romaneioEntrada: extra?.romaneioEntrada,
+      dataRomaneio: extra?.dataRomaneio,
     }),
   });
-  if (!res.ok) return { ok: false };
+  if (!res.ok) {
+    const errJson = (await res.json().catch(() => ({}))) as { error?: string };
+    return { ok: false, error: errJson.error };
+  }
   const json = (await res.json().catch(() => ({}))) as {
     origem?: { corrigido: boolean; detalhe: string } | null;
   };
@@ -96,7 +105,8 @@ async function executarEntradaEstoqueLote(
   companyKey: string,
   filialCod: string,
   itens: Array<{ produto: string; corProduto: string | null; quantidade: number }>,
-  responsavel: string
+  responsavel: string,
+  romaneioReferencia: { romaneio: string; filialOrigem: string; dataRomaneio: string }
 ): Promise<{ ok: boolean; romaneio?: string; error?: string }> {
   const res = await fetch("/api/saidas-entradas-produtos/executar", {
     method: "POST",
@@ -109,6 +119,7 @@ async function executarEntradaEstoqueLote(
       tipoRomaneio: "TRANSFERENCIA ENTRE LOJAS",
       responsavel: responsavel || "LOGISTICA",
       observacao: null,
+      romaneioReferencia,
     }),
   });
   if (!res.ok) {
@@ -123,7 +134,9 @@ async function liberarTransitoLinx(
   username: string,
   romaneio: string,
   filialDestino: string,
-  filialOrigem: string
+  filialOrigem: string,
+  companyKey: string,
+  dataRomaneio: string
 ): Promise<{ ok: boolean; error?: string }> {
   const res = await fetch("/api/romaneios/liberar-transito", {
     method: "POST",
@@ -132,11 +145,32 @@ async function liberarTransitoLinx(
       romaneio,
       filialDestino,
       filialOrigem,
+      companyKey,
+      dataRomaneio,
     }),
   });
   if (res.ok) return { ok: true };
   const json = await res.json().catch(() => ({}));
   return { ok: false, error: (json as { error?: string }).error || "Erro ao liberar trânsito" };
+}
+
+interface TravaInventarioInfo {
+  trava: { filial: string; dataCorte: string; inventarioNome: string | null };
+  dataRomaneio: string;
+  mensagem: string;
+}
+
+/** Trava de inventário do destino (lib/server/trava-inventario.ts). null = liberado. */
+async function fetchTravaInventario(
+  companyKey: string,
+  filialDestino: string,
+  dataRomaneio: string
+): Promise<TravaInventarioInfo | null> {
+  const params = new URLSearchParams({ company: companyKey, filialDestino, dataRomaneio });
+  const res = await fetch(`/api/romaneios/trava-inventario?${params.toString()}`, { cache: "no-store" });
+  if (!res.ok) return null;
+  const json = (await res.json().catch(() => ({}))) as { trava?: TravaInventarioInfo | null };
+  return json.trava ?? null;
 }
 
 // ---------- tipos ----------
@@ -376,6 +410,8 @@ export default function RomaneioDetalhePage({
   const [liberacaoTransitoMsg, setLiberacaoTransitoMsg] = useState<string | null>(null);
   /** O que voltou para a loja de origem por ter sido conferido a menos. */
   const [devolucoesOrigem, setDevolucoesOrigem] = useState<string[]>([]);
+  /** Romaneio anterior ao último inventário do destino → só consulta. */
+  const [travaInventario, setTravaInventario] = useState<TravaInventarioInfo | null>(null);
 
   // Inicializa quantidades quando itens carregam
   useEffect(() => {
@@ -465,6 +501,19 @@ export default function RomaneioDetalhePage({
     }
   }, [isSaida, companySlug, romaneioId, destinoSelected]);
 
+  useEffect(() => {
+    const fd = isSaida ? destinoSelected : filialDestino;
+    if (!fd) {
+      setTravaInventario(null);
+      return;
+    }
+    let cancelled = false;
+    fetchTravaInventario(companySlug, fd, dataEmissaoProp)
+      .then((t) => { if (!cancelled) setTravaInventario(t); })
+      .catch(() => { if (!cancelled) setTravaInventario(null); });
+    return () => { cancelled = true; };
+  }, [companySlug, filialDestino, destinoSelected, isSaida, dataEmissaoProp]);
+
   // Confirmar tudo de uma vez
   const handleConfirmarTudo = useCallback(async () => {
     if (!user?.username) return;
@@ -516,7 +565,9 @@ export default function RomaneioDetalhePage({
           user.username,
           romaneioId,
           filialDestino,
-          filialOrigem
+          filialOrigem,
+          companySlug,
+          dataEmissaoProp
         );
         if (!result.ok) {
           setErroConfirmacao(result.error ?? "Erro ao liberar trânsito do Linx.");
@@ -534,7 +585,8 @@ export default function RomaneioDetalhePage({
             corProduto: i.corProduto,
             quantidade: i.quantidade,
           })),
-          responsavelPadrao || ""
+          responsavelPadrao || "",
+          { romaneio: romaneioId, filialOrigem, dataRomaneio: dataEmissaoProp }
         );
         if (!result.ok) {
           setErroConfirmacao(result.error ? `Erro ao registrar entrada de estoque: ${result.error}` : "Erro ao registrar entrada de estoque. Tente novamente.");
@@ -559,8 +611,9 @@ export default function RomaneioDetalhePage({
                 // antes de mexer em qualquer coisa).
                 filialOrigem: item.divergente ? filialOrigem : undefined,
                 romaneioEntrada: romaneioEntradaGerado,
+                dataRomaneio: dataEmissaoProp,
               }
-            : undefined
+            : { dataRomaneio: dataEmissaoProp }
         );
         if (res.origem?.detalhe) devolucoes.push(res.origem.detalhe);
       }
@@ -585,7 +638,7 @@ export default function RomaneioDetalhePage({
     } finally {
       setConfirmandoTudo(false);
     }
-  }, [user?.username, isSaida, itens, quantidades, isTransito, romaneioId, filialDestino, filialOrigem, companySlug, destinoSelected, responsavelPadrao, tipo]);
+  }, [user?.username, isSaida, itens, quantidades, isTransito, romaneioId, filialDestino, filialOrigem, companySlug, destinoSelected, responsavelPadrao, tipo, dataEmissaoProp]);
 
   // Desconfirma item individualmente (sem reverter estoque)
   const handleDesconfirmar = useCallback(async (produto: string, corProduto: string | null) => {
@@ -594,10 +647,12 @@ export default function RomaneioDetalhePage({
     const chave = `${produto}|${cor}`;
     setConfirmandoKey(chave);
     const filialRef = isSaida ? destinoSelected : filialDestino;
-    const { ok } = await postConfirmacao(
+    const { ok, error } = await postConfirmacao(
       user.username, companySlug, romaneioId, filialRef,
-      produto, cor, 0, "desconfirmar"
+      produto, cor, 0, "desconfirmar",
+      { dataRomaneio: dataEmissaoProp }
     );
+    if (!ok && error) setErroConfirmacao(error);
     if (ok) {
       setConfirmados((prev) => {
         const next = new Map(prev);
@@ -606,7 +661,7 @@ export default function RomaneioDetalhePage({
       });
     }
     setConfirmandoKey(null);
-  }, [user?.username, companySlug, romaneioId, filialDestino, destinoSelected, isSaida]);
+  }, [user?.username, companySlug, romaneioId, filialDestino, destinoSelected, isSaida, dataEmissaoProp]);
 
   const handleEditRomaneio = useCallback(async () => {
     if (!editRomaneioAlvo || !editRomaneioValor.trim() || !user?.username) return;
@@ -841,6 +896,7 @@ export default function RomaneioDetalhePage({
     !todosConfirmados &&
     itensParaConfirmar.length > 0 &&
     !confirmandoTudo &&
+    !travaInventario &&
     (!isSaida || !!destinoSelected);
 
   async function handleDarSaidaTodos() {
@@ -994,6 +1050,13 @@ export default function RomaneioDetalhePage({
         </>
       )}
 
+      {travaInventario && (
+        <div className={styles.travaInventarioBanner}>
+          <strong>🔒 Somente consulta</strong>
+          <span>{travaInventario.mensagem}</span>
+        </div>
+      )}
+
       {erroConfirmacao && (
         <div className={styles.erroConfirmacao}>{erroConfirmacao}</div>
       )}
@@ -1032,7 +1095,7 @@ export default function RomaneioDetalhePage({
       {/* Barra de ações */}
       {user && (
         <div className={styles.confirmarTudoBar}>
-          {(isSaida || isTransito) && !todosConfirmados && (
+          {(isSaida || isTransito) && !todosConfirmados && !travaInventario && (
             <button
               type="button"
               className={`${styles.confirmarTudoBtn} ${isTransito ? styles.confirmarTudoBtnTransit : ""}`}
@@ -1496,7 +1559,7 @@ export default function RomaneioDetalhePage({
                   <td>
                     <div className={styles.qtdCell}>
                       <span className={styles.qtdValue}>{item.qtde}</span>
-                      {!isTransito && (user?.role === "admin" || user?.role === "logistica") && (
+                      {!isTransito && !travaInventario && (user?.role === "admin" || user?.role === "logistica") && (
                         <button
                           type="button"
                           className={styles.editQtdBtn}
@@ -1547,7 +1610,7 @@ export default function RomaneioDetalhePage({
                                 : `▲ excesso ${qtdeConfirmada - item.qtde}`}
                             </span>
                           )}
-                          {user?.role === "admin" && (
+                          {user?.role === "admin" && !travaInventario && (
                             <button
                               type="button"
                               className={styles.desfazerBtn}
@@ -1557,6 +1620,8 @@ export default function RomaneioDetalhePage({
                             </button>
                           )}
                         </div>
+                      ) : travaInventario ? (
+                        <span className={styles.travaInventarioCell}>🔒 não confirmado</span>
                       ) : (
                         <div className={styles.qtdeInputWrap}>
                           <div className={styles.qtdeInputRow}>
