@@ -1906,6 +1906,182 @@ export async function fetchProdutosCadastro(
   };
 }
 
+// ───────────────────── busca para a tela Editar Produto ─────────────────────
+
+/** Uma linha do autocomplete da tela Editar Produto. */
+export interface ProdutoBuscaCadastro {
+  produto: string;
+  descricao: string;
+  grupo: string;
+  subgrupo: string;
+  linha: string;
+  griffe: string;
+  inativo: boolean;
+  /** PRODUTOS.EMPRESA fora da empresa da tela — só informativo, nunca filtra. */
+  outraEmpresa: boolean;
+  /** Código de barras que casou com o termo (quando a busca foi por barra). */
+  codigoBarra: string | null;
+  /** Quantas palavras do termo aparecem no nome. */
+  palavras: number;
+  totalPalavras: number;
+}
+
+const COLLATE_AI = 'COLLATE Latin1_General_CI_AI';
+
+/** Escapa os curingas do LIKE no valor digitado (vai como parâmetro). */
+function likeLiteral(value: string): string {
+  return value.replace(/\[/g, '[[]').replace(/%/g, '[%]').replace(/_/g, '[_]');
+}
+
+/** DESC_PRODUTO com os espaços repetidos colapsados (mesma regra do etiquetas.ts). */
+function descColapsada(alias = 'p'): string {
+  let expr = `LTRIM(RTRIM(ISNULL(${alias}.DESC_PRODUTO, '')))`;
+  for (let i = 0; i < 4; i += 1) expr = `REPLACE(${expr}, '  ', ' ')`;
+  return expr;
+}
+
+/**
+ * Busca TOLERANTE do cadastro: nome, código do produto ou código de barras.
+ *
+ * Diferente da busca das Etiquetas (que exige TODAS as palavras), aqui basta UMA
+ * palavra do termo aparecer no nome — e quem casa mais palavras sobe. Assim um
+ * termo com palavra a mais ou fora de ordem ainda mostra o produto certo no
+ * topo, em vez de lista vazia. Sem acento e sem caixa; os espaços duplos do
+ * cadastro (`CP COURO  MAGSAFE`) são colapsados antes de comparar.
+ *
+ * Código do produto casa por começo, por trecho e também sem os pontos
+ * ("N47P0100" acha N4.7P.0100). Código de barras casa só inteiro (ou igual
+ * numericamente, quando o leitor come o zero à esquerda) — trecho de EAN não
+ * identifica nada.
+ *
+ * Inativos entram (é tela de edição, reativar é um caso de uso), mas vão para
+ * o fim da fila. PRODUTOS.EMPRESA só desempata — ver produtos-empresa-nao-e-dono.
+ */
+export async function buscarProdutosCadastro(
+  company: CadastroCompany,
+  termo: string,
+  opts: { limite?: number } = {}
+): Promise<ProdutoBuscaCadastro[]> {
+  const t = limpar(termo).replace(/\s+/g, ' ');
+  if (t.length < 2) return [];
+
+  const limite = Math.min(60, Math.max(1, opts.limite ?? 40));
+  const todas = t.split(' ').filter(Boolean).slice(0, 8);
+  // Letra solta ("S", "P") casaria com o cadastro inteiro — não conta como palavra.
+  const palavras = todas.filter((p) => p.length >= 2);
+  if (palavras.length === 0) palavras.push(t);
+  const umaPalavra = todas.length === 1;
+  const soDigitos = /^\d{4,}$/.test(t);
+  const semPontos = t.replace(/[.\-\s]/g, '');
+
+  const rows = await withRequest(async (request) => {
+    request.input('bTermo', sql.VarChar, t);
+    request.input('bPrefixo', sql.VarChar, `${likeLiteral(t)}%`);
+    request.input('bContem', sql.VarChar, `%${likeLiteral(t)}%`);
+    request.input('bSemPontos', sql.VarChar, `%${likeLiteral(semPontos)}%`);
+    request.input('bFrase', sql.VarChar, todas.join(' '));
+    request.input('bFrasePrefixo', sql.VarChar, `${likeLiteral(todas.join(' '))}%`);
+    request.input('bFraseMeio', sql.VarChar, `% ${likeLiteral(todas.join(' '))}%`);
+    palavras.forEach((p, i) => request.input(`bPal${i}`, sql.VarChar, `%${likeLiteral(p)}%`));
+
+    const codes = EMPRESA_CODES[company] ?? [];
+    codes.forEach((c, i) => request.input(`bEmp${i}`, sql.Int, c));
+    const outraEmpresa =
+      codes.length > 0
+        ? `CASE WHEN p.EMPRESA IN (${codes.map((_, i) => `@bEmp${i}`).join(', ')}) THEN 0 ELSE 1 END`
+        : '0';
+
+    const desc = descColapsada('p');
+    const codigo = 'LTRIM(RTRIM(p.PRODUTO))';
+    const contagem = palavras
+      .map((_, i) => `CASE WHEN ${desc} ${COLLATE_AI} LIKE @bPal${i} THEN 1 ELSE 0 END`)
+      .join(' + ');
+
+    const casaCodigo = [
+      `${codigo} = @bTermo`,
+      `${codigo} ${COLLATE_AI} LIKE @bPrefixo`,
+      // Trecho do código só com termo de uma palavra: frase nunca casa código.
+      ...(umaPalavra
+        ? [
+            `${codigo} ${COLLATE_AI} LIKE @bContem`,
+            ...(semPontos.length >= 3
+              ? [`REPLACE(REPLACE(${codigo}, '.', ''), '-', '') ${COLLATE_AI} LIKE @bSemPontos`]
+              : []),
+          ]
+        : []),
+    ].join(' OR ');
+
+    const r = await request.query<Record<string, unknown>>(`
+      WITH ${
+        soDigitos
+          ? `barras AS (
+        SELECT LTRIM(RTRIM(pb.PRODUTO)) AS PRODUTO,
+               MIN(LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100))))) AS CODIGO_BARRA
+        FROM PRODUTOS_BARRA pb WITH (NOLOCK)
+        WHERE LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100)))) = @bTermo
+           OR TRY_CONVERT(BIGINT, LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100))))) = TRY_CONVERT(BIGINT, @bTermo)
+        GROUP BY LTRIM(RTRIM(pb.PRODUTO))
+      ),`
+          : ''
+      }
+      base AS (
+        SELECT
+          ${codigo} AS PRODUTO,
+          ${desc} AS DESCRICAO,
+          LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, ''))) AS GRUPO,
+          LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, ''))) AS SUBGRUPO,
+          LTRIM(RTRIM(ISNULL(p.LINHA, ''))) AS LINHA,
+          LTRIM(RTRIM(ISNULL(p.GRIFFE, ''))) AS GRIFFE,
+          CAST(ISNULL(p.INATIVO, 0) AS INT) AS INATIVO,
+          ${outraEmpresa} AS OUTRA_EMPRESA,
+          ${soDigitos ? 'b.CODIGO_BARRA' : 'CAST(NULL AS VARCHAR(100))'} AS CODIGO_BARRA,
+          (${contagem}) AS PALAVRAS,
+          CASE WHEN ${casaCodigo} THEN 1 ELSE 0 END AS CASA_CODIGO,
+          CASE
+            WHEN ${codigo} = @bTermo THEN 0
+            WHEN ${desc} ${COLLATE_AI} = @bFrase THEN 1
+            WHEN ${desc} ${COLLATE_AI} LIKE @bFrasePrefixo THEN 2
+            WHEN ${desc} ${COLLATE_AI} LIKE @bFraseMeio THEN 3
+            WHEN ${codigo} ${COLLATE_AI} LIKE @bPrefixo THEN 4
+            WHEN ${desc} ${COLLATE_AI} LIKE @bContem THEN 5
+            ELSE 6
+          END AS DEGRAU
+        FROM PRODUTOS p WITH (NOLOCK)
+        ${soDigitos ? `LEFT JOIN barras b ON b.PRODUTO = ${codigo}` : ''}
+      )
+      SELECT TOP ${limite} *
+      FROM base
+      WHERE PALAVRAS > 0 OR CASA_CODIGO = 1 OR CODIGO_BARRA IS NOT NULL
+      ORDER BY
+        CASE WHEN PRODUTO = @bTermo OR CODIGO_BARRA IS NOT NULL THEN 0 ELSE 1 END,
+        -- Casar pelo código vale tanto quanto casar o nome inteiro.
+        CASE WHEN CASA_CODIGO = 1 THEN ${palavras.length} ELSE PALAVRAS END DESC,
+        DEGRAU,
+        INATIVO,
+        OUTRA_EMPRESA,
+        -- Achou só pelo código: lista na ordem do código.
+        CASE WHEN PALAVRAS = 0 THEN PRODUTO END,
+        LEN(DESCRICAO),
+        DESCRICAO
+    `);
+    return r.recordset;
+  });
+
+  return rows.map((row) => ({
+    produto: limpar(row.PRODUTO),
+    descricao: limpar(row.DESCRICAO),
+    grupo: limpar(row.GRUPO),
+    subgrupo: limpar(row.SUBGRUPO),
+    linha: limpar(row.LINHA),
+    griffe: limpar(row.GRIFFE),
+    inativo: Number(row.INATIVO ?? 0) === 1,
+    outraEmpresa: Number(row.OUTRA_EMPRESA ?? 0) === 1,
+    codigoBarra: limpar(row.CODIGO_BARRA) || null,
+    palavras: Number(row.PALAVRAS ?? 0),
+    totalPalavras: palavras.length,
+  }));
+}
+
 // ───────────────────── valores válidos das dimensões ─────────────────────
 
 export interface OpcoesDimensoes {

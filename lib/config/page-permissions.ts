@@ -60,7 +60,12 @@ export const PAGE_PERMISSION_DEFINITIONS = [
   { key: "aumentos-descontos", label: "Aumentos e Descontos", routeSegments: ["aumentos-descontos"] },
   { key: "alterar-precos", label: "Alterar Custo / Preco", routeSegments: ["alterar-precos"] },
   { key: "cadastrar-produto", label: "Cadastrar Produto", routeSegments: ["cadastrar-produto"] },
-  { key: "alterar-cadastro", label: "Alterar Cadastro", routeSegments: ["alterar-cadastro"] },
+  // Editar Produto é a mesma edição de ficha da aba "Alterar Produto": herda a permissão.
+  {
+    key: "alterar-cadastro",
+    label: "Alterar Cadastro / Editar Produto",
+    routeSegments: ["alterar-cadastro", "editar-produto"],
+  },
   {
     key: "alterar-produtos-massa",
     label: "Alterar Multiplos Produtos",

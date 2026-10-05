@@ -1430,8 +1430,8 @@
     "semantic_hash": "7a672d31b6ac254cb25f6a420501049d"
   },
   "components/layout/Sidebar.tsx": {
-    "mtime": 1790877190.803492,
-    "ast_hash": "860daac89a33a01f1ffac08420944238",
+    "mtime": 1791220719.4493954,
+    "ast_hash": "813b5769da58a17d15316aa254c1601c",
     "semantic_hash": ""
   },
   "components/layout/SidebarContext.tsx": {
@@ -2155,8 +2155,8 @@
     "semantic_hash": "29590f1b0f773ebbcd60e9dc314eec58"
   },
   "lib/config/page-permissions.ts": {
-    "mtime": 1790877190.7977598,
-    "ast_hash": "8eeba1f16fb49b30897526f9ba0d3bd0",
+    "mtime": 1791220719.4493954,
+    "ast_hash": "0ece6eaf098cc701ec9aa1ab748a0a24",
     "semantic_hash": ""
   },
   "lib/constants/columns.ts": {
@@ -3950,8 +3950,8 @@
     "semantic_hash": ""
   },
   "components/cadastro/AlterarCadastroPage.tsx": {
-    "mtime": 1785937783.3994987,
-    "ast_hash": "3dc9040a2ba9fa43d97b3d60e841c245",
+    "mtime": 1791220706.3205943,
+    "ast_hash": "8c94c9e7553524034507bec2d794a26a",
     "semantic_hash": ""
   },
   "components/cadastro/AlterarMultiplosProdutosPage.tsx": {
@@ -4000,8 +4000,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/cadastro.ts": {
-    "mtime": 1787228812.2087483,
-    "ast_hash": "174455ddca0b467af3b3bc41cb365087",
+    "mtime": 1791220851.7930868,
+    "ast_hash": "68c7723bc68502577f930bcfe0fa7920",
     "semantic_hash": ""
   },
   "lib/repositories/precos.ts": {
@@ -4692,6 +4692,31 @@
   "lib/config/metragem-produto.ts": {
     "mtime": 1791214045.6346564,
     "ast_hash": "09024d4f0fbd2c5628a0a878a0632028",
+    "semantic_hash": ""
+  },
+  "app/(companies)/[company]/editar-produto/page.tsx": {
+    "mtime": 1791220719.1725008,
+    "ast_hash": "0926e5946c49d74fcf7f3969b0ff272d",
+    "semantic_hash": ""
+  },
+  "app/api/cadastro/busca/route.ts": {
+    "mtime": 1791220566.4632585,
+    "ast_hash": "cf85090b4d5e4a42676a1e4561990c11",
+    "semantic_hash": ""
+  },
+  "components/cadastro/BuscaProdutoCadastro.tsx": {
+    "mtime": 1791220665.7244973,
+    "ast_hash": "144312555fa77ba8031e902df81ece99",
+    "semantic_hash": ""
+  },
+  "components/cadastro/EditarProdutoPage.tsx": {
+    "mtime": 1791220695.696205,
+    "ast_hash": "7a70a1260fe437e9fb42dc2f91c0e5c3",
+    "semantic_hash": ""
+  },
+  "components/cadastro/FichaProdutoEditor.tsx": {
+    "mtime": 1791220695.696205,
+    "ast_hash": "faeef934f3fead745754c4ed2459286a",
     "semantic_hash": ""
   }
 }
