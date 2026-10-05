@@ -221,6 +221,12 @@ function fmtDate(iso: string) {
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
 }
 
+/** HH:mm do movimento, como gravado no Linx (sem conversão de fuso, igual fmtDate). */
+function fmtHora(iso: string | null) {
+  const m = iso ? /T(\d{2}):(\d{2})/.exec(iso) : null;
+  return m ? `${m[1]}:${m[2]}` : null;
+}
+
 function fmtNum(n: number) {
   return n === 0 ? "0" : n > 0 ? `+${n}` : `${n}`;
 }
@@ -1309,7 +1315,12 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
                         onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = diverge ? t.rowDiverge : t.rowHover; }}
                         onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = bgLinha; }}
                       >
-                        <td style={{ ...td, whiteSpace: "nowrap" }}>{fmtDate(l.emissao)}</td>
+                        <td style={{ ...td, whiteSpace: "nowrap" }}>
+                          {fmtDate(l.emissao)}
+                          {fmtHora(l.momento) && (
+                            <span style={{ color: t.muted, marginLeft: 6 }}>{fmtHora(l.momento)}</span>
+                          )}
+                        </td>
                         <td style={td}>{badge(l.tipo, t)}</td>
                         <td
                           style={{ ...td, fontFamily: MONO, color: t.mono, whiteSpace: l.cancelada ? "normal" : "nowrap", lineHeight: 1.45 }}
@@ -1443,7 +1454,7 @@ export default function ExtratoProdutoPage({ companyKey }: ExtratoProdutoPagePro
                 </div>
               )}
               <div>
-                <strong style={{ color: t.saldo }}>Saldo</strong> — acumulado cronológico pelo campo QTDE
+                <strong style={{ color: t.saldo }}>Saldo</strong> — acumulado cronológico pelo campo QTDE, na ordem da hora real do movimento (cupom digitado no caixa, ajuste gravado, romaneio digitado). Movimento sem hora fica no começo do dia
               </div>
               <div>
                 <strong style={{ color: t.highlight }}>⚠ Grade zerada</strong> — QTDE tem valor mas EN_1/SA_1 = 0 → divergência no Linx

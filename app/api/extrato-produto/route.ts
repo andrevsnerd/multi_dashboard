@@ -20,6 +20,13 @@ export interface TamanhoGrade {
 
 export interface ExtratoLinha {
   emissao: string;
+  /**
+   * Hora real do movimento (no mesmo dia de `emissao`), ou null quando a fonte só
+   * guarda a data. É o que ordena o dia: EMISSAO/DATA_VENDA vêm à meia-noite, e sem
+   * isso um inventário das 15h aparecia DEPOIS de uma venda das 17h — parecendo que
+   * o ajuste é que tinha negativado o item.
+   */
+  momento: string | null;
   tipo: string;
   tipoRomaneio: string | null;
   doc: string;
@@ -118,6 +125,25 @@ function sqlText(value: string) {
 
 function trimValue(value: unknown) {
   return value == null ? "" : String(value).trim();
+}
+
+/**
+ * Primeiro carimbo de hora (na ordem dada) que caia no mesmo dia da emissão e tenha
+ * hora de verdade. Carimbo de outro dia é descartado: DATA_PARA_TRANSFERENCIA muda
+ * quando o registro é editado depois, e aí não diz quando o movimento aconteceu.
+ */
+function momentoNoDia(
+  emissao: Date | null | undefined,
+  ...candidatos: Array<Date | null | undefined>
+): string | null {
+  if (!emissao) return null;
+  const dia = new Date(emissao).toISOString().slice(0, 10);
+  for (const c of candidatos) {
+    if (!c) continue;
+    const iso = new Date(c).toISOString();
+    if (iso.slice(0, 10) === dia && iso.slice(11, 19) !== "00:00:00") return iso;
+  }
+  return null;
 }
 
 function buildOpPedOs(...fields: Array<string | null | undefined>): string | null {
@@ -771,9 +797,11 @@ export async function GET(request: NextRequest) {
       TIPO_ENTRADA_SAIDA: string | null;
       DESC_TIPO: string | null;
       RESPONSAVEL: string | null;
+      MOMENTO: Date | null;
     }>(`
       SELECT
         le.EMISSAO,
+        le.DATA_PARA_TRANSFERENCIA AS MOMENTO,
         le.FILIAL,
         le.FILIAL_ORIGEM,
         NULLIF(LTRIM(RTRIM(CAST(le.RESPONSAVEL AS VARCHAR(50)))), '') AS RESPONSAVEL,
@@ -800,6 +828,7 @@ export async function GET(request: NextRequest) {
     for (const r of rows) {
       linhas.push({
         emissao: r.EMISSAO ? new Date(r.EMISSAO).toISOString() : "",
+        momento: momentoNoDia(r.EMISSAO, r.MOMENTO),
         tipo: resolveLinxTipoMovimento("E", r.DESC_TIPO, r.TIPO_ENTRADA_SAIDA, r.ROMANEIO_PRODUTO),
         tipoRomaneio: r.DESC_TIPO ?? r.TIPO_ENTRADA_SAIDA ?? null,
         doc: r.ROMANEIO_PRODUTO?.trim() ?? "",
@@ -840,9 +869,13 @@ export async function GET(request: NextRequest) {
       COMENTARIO: string | null;
       OBS: string | null;
       RESPONSAVEL: string | null;
+      DATA_DIGITACAO: Date | null;
+      DATA_PARA_TRANSFERENCIA: Date | null;
     }>(`
       SELECT
         e.EMISSAO,
+        e.DATA_DIGITACAO,
+        e.DATA_PARA_TRANSFERENCIA,
         e.FILIAL,
         e.FILIAL_DESTINO,
         NULLIF(LTRIM(RTRIM(CAST(e.RESPONSAVEL AS VARCHAR(50)))), '') AS RESPONSAVEL,
@@ -875,6 +908,7 @@ export async function GET(request: NextRequest) {
       const romEnt = r.ROMANEIO_ORIGEM?.trim() || r.COMENTARIO?.trim() || opPedOs;
       linhas.push({
         emissao: r.EMISSAO ? new Date(r.EMISSAO).toISOString() : "",
+        momento: momentoNoDia(r.EMISSAO, r.DATA_DIGITACAO, r.DATA_PARA_TRANSFERENCIA),
         tipo: resolveLinxTipoMovimento("E", r.TIPO_ROMANEIO, r.TIPO_ENTRADA, r.ROMANEIO_PRODUTO),
         tipoRomaneio: r.TIPO_ROMANEIO?.trim() ?? null,
         doc: r.ROMANEIO_PRODUTO?.trim() ?? "",
@@ -912,9 +946,13 @@ export async function GET(request: NextRequest) {
       COMENTARIO: string | null;
       OBS: string | null;
       RESPONSAVEL: string | null;
+      DATA_DIGITACAO: Date | null;
+      DATA_PARA_TRANSFERENCIA: Date | null;
     }>(`
       SELECT
         s.EMISSAO,
+        s.DATA_DIGITACAO,
+        s.DATA_PARA_TRANSFERENCIA,
         s.FILIAL,
         s.FILIAL_DESTINO,
         NULLIF(LTRIM(RTRIM(CAST(s.RESPONSAVEL AS VARCHAR(50)))), '') AS RESPONSAVEL,
@@ -941,6 +979,7 @@ export async function GET(request: NextRequest) {
       const romSai = r.ROMANEIO_DESTINO?.trim() || (r.OP?.trim() ? `OP:${r.OP.trim()}` : null) || r.COMENTARIO?.trim();
       linhas.push({
         emissao: r.EMISSAO ? new Date(r.EMISSAO).toISOString() : "",
+        momento: momentoNoDia(r.EMISSAO, r.DATA_DIGITACAO, r.DATA_PARA_TRANSFERENCIA),
         tipo: resolveLinxTipoMovimento("S", r.TIPO_ROMANEIO, r.ROMANEIO_PRODUTO),
         tipoRomaneio: r.TIPO_ROMANEIO?.trim() ?? null,
         doc: r.ROMANEIO_PRODUTO?.trim() ?? "",
@@ -976,9 +1015,11 @@ export async function GET(request: NextRequest) {
       QTDE_CANCELADA: number;
       TAMANHO: number | null;
       VENDEDOR_NOME: string | null;
+      DATA_DIGITACAO: Date | null;
     }>(`
       SELECT
         v.DATA_VENDA,
+        v.DATA_DIGITACAO,
         v.CODIGO_FILIAL,
         f.FILIAL AS FILIAL_VENDA,
         v.TICKET,
@@ -1021,6 +1062,8 @@ export async function GET(request: NextRequest) {
           : null;
       linhas.push({
         emissao: r.DATA_VENDA ? new Date(r.DATA_VENDA).toISOString() : "",
+        // Hora em que o cupom foi digitado no caixa — não a de chegada no banco central.
+        momento: momentoNoDia(r.DATA_VENDA, r.DATA_DIGITACAO),
         tipo: "LOJA VENDAS",
         tipoRomaneio: null,
         doc: r.TICKET?.trim() ?? "",
@@ -1058,9 +1101,11 @@ export async function GET(request: NextRequest) {
       PRECO_LIQUIDO: number;
       TAMANHO: number | null;
       VENDEDOR_NOME: string | null;
+      DATA_DIGITACAO: Date | null;
     }>(`
       SELECT
         t.DATA_VENDA,
+        v.DATA_DIGITACAO,
         t.CODIGO_FILIAL,
         f.FILIAL AS FILIAL_TROCA,
         t.TICKET,
@@ -1094,6 +1139,7 @@ export async function GET(request: NextRequest) {
           : null;
       linhas.push({
         emissao: r.DATA_VENDA ? new Date(r.DATA_VENDA).toISOString() : "",
+        momento: momentoNoDia(r.DATA_VENDA, r.DATA_DIGITACAO),
         tipo: "TROCA/DEVOLUÇÃO",
         tipoRomaneio: null,
         doc: r.TICKET?.trim() ?? "",
@@ -1135,9 +1181,13 @@ export async function GET(request: NextRequest) {
       NATUREZA_SAIDA: string | null;
       QTDE: number;
       PRECO: number;
+      DATA_HORA_EMISSAO: Date | null;
+      DATA_PARA_TRANSFERENCIA: Date | null;
     }>(`
       SELECT
         f.EMISSAO,
+        f.DATA_HORA_EMISSAO,
+        f.DATA_PARA_TRANSFERENCIA,
         f.FILIAL,
         f.NF_SAIDA,
         NULLIF(LTRIM(RTRIM(CAST(f.SERIE_NF AS VARCHAR(10)))), '') AS SERIE_NF,
@@ -1160,6 +1210,7 @@ export async function GET(request: NextRequest) {
       if (qtdeNf === 0) continue;
       linhas.push({
         emissao: r.EMISSAO ? new Date(r.EMISSAO).toISOString() : "",
+        momento: momentoNoDia(r.EMISSAO, r.DATA_HORA_EMISSAO, r.DATA_PARA_TRANSFERENCIA),
         tipo: "NF DE SAÍDA",
         tipoRomaneio: r.NATUREZA_SAIDA ?? null,
         doc: [r.NF_SAIDA?.trim(), r.SERIE_NF?.trim()].filter(Boolean).join("/"),
@@ -1197,9 +1248,11 @@ export async function GET(request: NextRequest) {
       EN1: number;
       OBS: string | null;
       RESPONSAVEL: string | null;
+      MOMENTO: Date | null;
     }>(`
       SELECT
         ls.EMISSAO,
+        ls.DATA_PARA_TRANSFERENCIA AS MOMENTO,
         ls.FILIAL,
         ls.FILIAL_DESTINO,
         NULLIF(LTRIM(RTRIM(CAST(ls.RESPONSAVEL AS VARCHAR(50)))), '') AS RESPONSAVEL,
@@ -1222,6 +1275,7 @@ export async function GET(request: NextRequest) {
     for (const r of rows) {
       linhas.push({
         emissao: r.EMISSAO ? new Date(r.EMISSAO).toISOString() : "",
+        momento: momentoNoDia(r.EMISSAO, r.MOMENTO),
         tipo: resolveLinxTipoMovimento("S", r.DESC_TIPO, r.TIPO_ENTRADA_SAIDA, r.ROMANEIO_PRODUTO),
         tipoRomaneio: r.DESC_TIPO ?? r.TIPO_ENTRADA_SAIDA ?? null,
         doc: r.ROMANEIO_PRODUTO?.trim() ?? "",
@@ -1256,9 +1310,13 @@ export async function GET(request: NextRequest) {
       TIPO: string | null;
       QTDE_AJUSTE: number;
       A1: number;
+      MOMENTO_ITEM: Date | null;
+      MOMENTO_CONTAGEM: Date | null;
     }>(`
       SELECT
         c.EMISSAO,
+        a.DATA_PARA_TRANSFERENCIA AS MOMENTO_ITEM,
+        c.DATA_PARA_TRANSFERENCIA AS MOMENTO_CONTAGEM,
         c.FILIAL,
         c.NOME_CONTAGEM,
         c.RESPONSAVEL,
@@ -1277,6 +1335,8 @@ export async function GET(request: NextRequest) {
     for (const r of rows) {
       linhas.push({
         emissao: r.EMISSAO ? new Date(r.EMISSAO).toISOString() : "",
+        // Hora em que o ajuste foi gravado (o trigger move o estoque nesse instante).
+        momento: momentoNoDia(r.EMISSAO, r.MOMENTO_ITEM, r.MOMENTO_CONTAGEM),
         tipo: "AJUSTE",
         tipoRomaneio: r.TIPO?.trim() ?? null,
         doc: r.NOME_CONTAGEM?.trim() ?? "",
@@ -1322,6 +1382,7 @@ export async function GET(request: NextRequest) {
     for (const r of ajustesNerd) {
       linhas.push({
         emissao: r.DATA_AJUSTE ? new Date(r.DATA_AJUSTE).toISOString() : "",
+        momento: momentoNoDia(r.DATA_AJUSTE, r.DATA_AJUSTE),
         tipo: "AJUSTE",
         tipoRomaneio: r.TIPO_AJUSTE ?? null,
         doc: r.ROMANEIO_REF ?? "AJUSTE",
@@ -1345,8 +1406,9 @@ export async function GET(request: NextRequest) {
     erros.push(`AJUSTE MANUAL: ${(e as Error).message}`);
   }
 
-  // Ordenar por data
-  linhas.sort((a, b) => a.emissao.localeCompare(b.emissao));
+  // Ordenar por data e, dentro do dia, pela hora real. Movimento sem hora fica no
+  // começo do dia (meia-noite da emissão); empate mantém a ordem das fontes.
+  linhas.sort((a, b) => (a.momento ?? a.emissao).localeCompare(b.momento ?? b.emissao));
 
   const response: ExtratoResponse = {
     produto,
