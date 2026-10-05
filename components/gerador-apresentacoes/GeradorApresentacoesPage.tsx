@@ -32,6 +32,7 @@ import type { ProdutoGiroPresentationPayload } from "@/lib/repositories/produtoG
 import type { TopProdutosPayload } from "@/lib/repositories/topProdutosPresentation";
 
 import ColecaoDeck from "./ColecaoDeck";
+import ColecaoExclusaoVendas from "./ColecaoExclusaoVendas";
 import ComparativoDeck from "./ComparativoDeck";
 import ComparativoResumidoDeck from "./ComparativoResumidoDeck";
 import ProdutoGiroDeck from "./ProdutoGiroDeck";
@@ -127,6 +128,11 @@ export default function GeradorApresentacoesPage({
   const [destaqueMatches, setDestaqueMatches] = useState<ProductPick[]>([]);
   const [destaqueOff, setDestaqueOff] = useState<string[]>([]);
   const [destaqueLoading, setDestaqueLoading] = useState(false);
+
+  // ---- Vendas tiradas do relatório (Relatório Completo de Coleção) ----
+  // Chaves das linhas de venda marcadas em <ColecaoExclusaoVendas>; o backend
+  // rebusca essas vendas e as abate de todo o deck.
+  const [excluirVendas, setExcluirVendas] = useState<string[]>([]);
 
   // Imagens (assets salvos no banco)
   const [logoDataUrl, setLogoDataUrl] = useState<string | null>(null);
@@ -830,6 +836,7 @@ export default function GeradorApresentacoesPage({
           range: { start: startStr, end: endStr },
           todosProdutos,
           produtoTotal,
+          excluirVendas: excluirVendas.length > 0 ? excluirVendas : undefined,
           destaque: pedeDestaque
             ? {
                 termo: termoDestaque,
@@ -851,6 +858,11 @@ export default function GeradorApresentacoesPage({
       if (pedeDestaque && json.data && !json.data.destaque) {
         setError(
           `Nenhum dos produtos de “${termoDestaque}” teve venda na coleção nesse período — o slide de destaque não entrou no deck.`
+        );
+      } else if (json.data?.exclusoes && json.data.exclusoes.naoEncontradas > 0) {
+        // A venda mudou no Linx entre a prévia e a geração (ex.: ticket cancelado).
+        setError(
+          `${json.data.exclusoes.naoEncontradas} venda(s) marcada(s) para tirar não existem mais no período — recarregue a lista de vendas e confira.`
         );
       }
     } catch (e) {
@@ -880,6 +892,7 @@ export default function GeradorApresentacoesPage({
     destaqueTermo,
     destaqueNome,
     destaqueSelecionados,
+    excluirVendas,
     singleColecaoLabel,
     startStr,
     endStr,
@@ -1344,6 +1357,17 @@ export default function GeradorApresentacoesPage({
           </div>
         )}
         {isColecaoType && (
+          <ColecaoExclusaoVendas
+            companyKey={companyKey}
+            filial={filial}
+            colecoes={colecoes}
+            start={startStr}
+            end={endStr}
+            excluidas={excluirVendas}
+            onChange={setExcluirVendas}
+          />
+        )}
+        {isColecaoType && (
           <p className={styles.hint}>
             A paleta sai por padrão igual à cor que a coleção tem no card do Painel de Coleções
             (coral SCARF·ME para coleções fora do painel). Escolher uma paleta na lista re-tinge os
@@ -1672,6 +1696,12 @@ export default function GeradorApresentacoesPage({
                   "pt-BR",
                   { minimumFractionDigits: 1, maximumFractionDigits: 1 }
                 )}%)`
+              : ""}
+            {report.exclusoes && report.exclusoes.linhas > 0
+              ? ` · ${report.exclusoes.linhas} venda(s) tirada(s): ${report.exclusoes.venda.toLocaleString(
+                  "pt-BR",
+                  { style: "currency", currency: "BRL" }
+                )} / ${report.exclusoes.qtd.toLocaleString("pt-BR")} peça(s)`
               : ""}
           </span>
         )}

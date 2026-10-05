@@ -1,0 +1,220 @@
+/* "Tirar vendas do relatório" (Relatório Completo de Coleção). Mesmo visual da
+   caixa de destaque da página do Gerador. */
+.box {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border: 1px dashed var(--b-300);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t-900);
+}
+
+.sub,
+.hint {
+  font-size: 12px;
+  color: var(--t-500);
+  margin: 0;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.btn {
+  background: var(--s-white);
+  border: 1px solid var(--b-300);
+  color: var(--t-900);
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.btn:hover:not(:disabled) {
+  border-color: #0ea5e9;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.linkBtn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 12px;
+  color: #0284c7;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.resumo {
+  font-size: 12px;
+  font-weight: 600;
+  color: #b91c1c;
+}
+
+.erro {
+  font-size: 12px;
+  color: #b91c1c;
+  margin: 0;
+}
+
+.colar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--t-600);
+}
+
+.label code {
+  font-weight: 400;
+  background: var(--s-100);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.textarea,
+.input {
+  border: 1px solid var(--b-300);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  background: var(--s-white);
+  color: var(--t-900);
+}
+
+.textarea {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  resize: vertical;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.input {
+  min-width: 260px;
+  flex: 1 1 260px;
+  max-width: 420px;
+}
+
+.textarea:focus,
+.input:focus {
+  outline: none;
+  border-color: #0ea5e9;
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--t-600);
+  cursor: pointer;
+}
+
+.problemas {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: #b45309;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tableWrap {
+  max-height: 380px;
+  overflow: auto;
+  border: 1px solid var(--b-200);
+  border-radius: 10px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  color: var(--t-800);
+}
+
+.table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--s-50);
+  color: var(--t-600);
+  font-weight: 600;
+  text-align: left;
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--b-200);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--b-200);
+  vertical-align: top;
+}
+
+.table tbody tr {
+  cursor: pointer;
+}
+
+.table tbody tr:hover {
+  background: var(--s-50);
+}
+
+.rowTroca td {
+  color: #b91c1c;
+}
+
+/* Marcada = sai do relatório: riscada, para ler de relance o que fica de fora. */
+.rowOn td {
+  background: rgba(239, 68, 68, 0.08);
+  text-decoration: line-through;
+  text-decoration-color: rgba(185, 28, 28, 0.6);
+}
+
+.rowOn td.cCheck {
+  text-decoration: none;
+}
+
+.cCheck {
+  width: 28px;
+  text-align: center;
+}
+
+.num {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.code {
+  font-size: 11px;
+  color: var(--t-500);
+  font-variant-numeric: tabular-nums;
+}

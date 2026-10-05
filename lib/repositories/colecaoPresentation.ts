@@ -11,6 +11,7 @@ import { canonicalKey } from "@/lib/reports/keys";
 import { normalizeRangeForQuery } from "@/lib/utils/date";
 import { fetchProductsWithDetails } from "@/lib/repositories/products";
 import { fetchProdutoQtdePorFilial } from "@/lib/repositories/performance";
+import { fetchTicketItens } from "@/lib/repositories/reportTickets";
 
 /**
  * Monta o payload do deck "Relatório Completo de Coleção" do Gerador de
@@ -71,6 +72,50 @@ export interface ColecaoPresentationParams {
    * consulta nova —, então faturamento/peças/estoque somam idêntico nos 2 modos.
    */
   produtoTotal?: boolean;
+  /**
+   * Vendas a TIRAR do relatório: chaves (`VendaColecaoRow.key`) escolhidas na prévia
+   * de vendas da página. Ver `fetchVendasDaColecao`.
+   */
+  excluirVendas?: string[];
+}
+
+/**
+ * Uma linha de venda da coleção: item de ticket (loja) ou de nota (e-commerce), no
+ * grão ticket × produto × cor × tamanho. É o que a página lista para o usuário
+ * escolher o que sai do relatório.
+ */
+export interface VendaColecaoRow {
+  /** Identidade estável da linha; é o que a página manda de volta em `excluirVendas`. */
+  key: string;
+  canal: "LOJA" | "ECOMMERCE";
+  /** Rótulo da loja; e-commerce sai como "E-COMMERCE" (mesmo balde do deck). */
+  loja: string;
+  /** Nº do ticket (loja) ou da NF (e-commerce). */
+  documento: string;
+  /** AAAA-MM-DD. */
+  data: string;
+  produto: string;
+  nome: string;
+  cor: string;
+  corDescricao: string;
+  tamanho: string;
+  /**
+   * Códigos de barra da variação vendida (PRODUTOS_BARRA): na loja, os do tamanho
+   * vendido, com o código bipado no caixa primeiro; no e-commerce (sem grade), todos
+   * os da cor. É o que deixa filtrar/colar a lista pelo código de barra.
+   */
+  codigosBarra: string[];
+  qtd: number;
+  valor: number;
+}
+
+/** Resumo do que foi tirado do deck (a página mostra; o deck não). */
+export interface ColecaoExclusoesResumo {
+  linhas: number;
+  qtd: number;
+  venda: number;
+  /** Chaves pedidas que não existem mais na venda do período (dado mudou no Linx). */
+  naoEncontradas: number;
 }
 
 export interface PresentationProductRow {
@@ -175,6 +220,8 @@ export interface ColecaoPresentationPayload {
   outros: { count: number; qtd: number; venda: number; estoque: number } | null;
   /** Slide extra de destaque; null quando não foi pedido ou nada casou. */
   destaque: PresentationDestaquePayload | null;
+  /** Vendas tiradas a pedido do usuário; null quando nada foi tirado. */
+  exclusoes: ColecaoExclusoesResumo | null;
   insightProdutos: { titulo: string; texto: string };
   stores: PresentationStoreRow[];
   storesTotal: { venda: number; qtd: number };
@@ -324,6 +371,133 @@ export async function fetchProdutosDaColecaoPorNome({
 }
 
 /**
+ * Vendas da coleção LINHA A LINHA (ticket/NF × produto × cor × tamanho) no mesmo
+ * escopo do deck (coleção + período + filial).
+ *
+ * Fonte: `fetchTicketItens` — a base de "Tickets detalhados" do Gerador de
+ * Relatórios, que segue a regra canônica com trocas e fecha ao centavo com
+ * `fetchProductsWithDetails`. Por isso tirar uma linha daqui do total do deck dá
+ * exatamente o número que o relatório teria sem aquela venda.
+ *
+ * O filtro de coleção da análise escolhe o TICKET inteiro; aqui só ficam os itens
+ * que são da coleção. Linhas de troca/devolução (qtd negativa) também aparecem —
+ * fazem parte da conta e também podem ser tiradas.
+ */
+export async function fetchVendasDaColecao({
+  company,
+  filial,
+  colecoes,
+  range,
+}: Pick<ColecaoPresentationParams, "company" | "filial" | "colecoes" | "range">): Promise<
+  VendaColecaoRow[]
+> {
+  const codes = new Set((colecoes ?? []).map((c) => c.trim().toUpperCase()).filter(Boolean));
+  if (codes.size === 0) return [];
+
+  const [{ rows }, companyLive] = await Promise.all([
+    fetchTicketItens({
+      company,
+      filial: filial ?? null,
+      start: range?.start,
+      end: range?.end,
+      colecoes: Array.from(codes),
+    }),
+    resolveCompanyLive(company),
+  ]);
+
+  const daColecao = rows
+    .filter((r) => codes.has(r.colecao.trim().toUpperCase()))
+    .filter((r) => r.qtde !== 0 || r.valorItem !== 0);
+
+  const barras = await fetchBarrasPorVariacao(daColecao.map((r) => r.produto));
+  const barrasDaLinha = (r: (typeof daColecao)[number]): string[] => {
+    const cor = normalizeCor(r.cor);
+    const doTamanho = r.tamanho > 0 ? barras.get(`${r.produto}||${cor}||${r.tamanho}`) : undefined;
+    const lista = doTamanho ?? barras.get(`${r.produto}||${cor}`) ?? [];
+    const bipado = r.codigoBarra.trim();
+    return bipado ? [bipado, ...lista.filter((c) => c !== bipado)] : lista;
+  };
+
+  return daColecao
+    .map((r) => ({
+      key: [
+        r.canal,
+        r.codigoFilial,
+        r.ticket,
+        r.dataVenda ?? "",
+        r.produto,
+        normalizeCor(r.cor),
+        r.tamanho,
+      ].join("~"),
+      canal: r.canal,
+      loja: r.canal === "ECOMMERCE" ? ECOMMERCE_BUCKET : storeBucket(companyLive, r.filial),
+      documento: r.ticket,
+      data: r.dataVenda ?? "",
+      produto: r.produto,
+      nome: r.descricao,
+      cor: r.cor,
+      corDescricao: r.corDescricao,
+      tamanho:
+        r.multiTamanho === 1 ? r.tamanhoLabel || (r.tamanho > 0 ? String(r.tamanho) : "") : "",
+      codigosBarra: barrasDaLinha(r),
+      qtd: r.qtde,
+      valor: r.valorItem,
+    }));
+}
+
+/**
+ * Códigos de barra cadastrados (PRODUTOS_BARRA) por variação, em duas chaves:
+ * `produto||cor||tamanho` (tamanho = ordinal da grade, ver
+ * [[grade-tamanhos-posicional-linx]]) e `produto||cor` (todos os tamanhos). Cor
+ * normalizada ('06' ≡ '6'), mesma chave do resto deste módulo.
+ */
+async function fetchBarrasPorVariacao(produtos: string[]): Promise<Map<string, string[]>> {
+  const ids = Array.from(new Set(produtos.map((p) => p.trim()).filter(Boolean)));
+  const out = new Map<string, string[]>();
+  const add = (key: string, codigo: string) => {
+    const lista = out.get(key);
+    if (!lista) out.set(key, [codigo]);
+    else if (!lista.includes(codigo)) lista.push(codigo);
+  };
+
+  const CHUNK = 1000;
+  for (let start = 0; start < ids.length; start += CHUNK) {
+    const chunk = ids.slice(start, start + CHUNK);
+    await withRequest(async (request) => {
+      chunk.forEach((id, i) => request.input(`bar${i}`, sql.VarChar, id));
+      const placeholders = chunk.map((_, i) => `@bar${i}`).join(", ");
+      const res = await request.query<{ PRODUTO: string; COR: string; TAMANHO: number | null; CODIGO: string }>(`
+        SELECT
+          LTRIM(RTRIM(pb.PRODUTO)) AS PRODUTO,
+          ISNULL(LTRIM(RTRIM(pb.COR_PRODUTO)), '') AS COR,
+          TRY_CONVERT(INT, pb.TAMANHO) AS TAMANHO,
+          LTRIM(RTRIM(pb.CODIGO_BARRA)) AS CODIGO
+        FROM PRODUTOS_BARRA pb WITH (NOLOCK)
+        WHERE pb.PRODUTO IN (${placeholders})
+          AND LTRIM(RTRIM(ISNULL(pb.CODIGO_BARRA, ''))) <> ''
+        ORDER BY LEN(LTRIM(RTRIM(pb.CODIGO_BARRA))), pb.CODIGO_BARRA
+      `);
+      for (const r of res.recordset) {
+        const base = `${(r.PRODUTO ?? "").trim()}||${normalizeCor(r.COR ?? "")}`;
+        const codigo = (r.CODIGO ?? "").trim();
+        add(base, codigo);
+        if (r.TAMANHO != null && r.TAMANHO > 0) add(`${base}||${r.TAMANHO}`, codigo);
+      }
+    });
+  }
+  return out;
+}
+
+/** Balde de loja do deck — o MESMO rótulo da quebra "Vendas por loja". */
+function storeBucket(
+  companyLive: Awaited<ReturnType<typeof resolveCompanyLive>>,
+  filialName: string
+): string {
+  const label = companyLive ? getFilialLabelForDisplay(companyLive, filialName) : filialName;
+  return (label || "OUTROS").toUpperCase().trim();
+}
+
+/**
  * Colapsa linhas de SKU (produto × cor) em 1 linha por PRODUTO.
  *
  * Trabalha sobre as linhas JÁ CALCULADAS — de propósito: assim o modo "Produto
@@ -455,33 +629,72 @@ export async function fetchColecaoPresentation({
   destaque,
   todosProdutos = false,
   produtoTotal = false,
+  excluirVendas,
 }: ColecaoPresentationParams): Promise<ColecaoPresentationPayload> {
   const rangeInput = { start: range?.start, end: range?.end };
 
+  // ---- Vendas a tirar (escolhidas na prévia de vendas da página) ----
+  // As linhas são buscadas de novo aqui, pela chave, em vez de confiar em valores
+  // vindos do navegador: o que sai do deck é sempre o número do banco.
+  const excluirKeys = new Set((excluirVendas ?? []).map((k) => k.trim()).filter(Boolean));
+
   // ---- Produtos × cor pela lógica VALIDADA (com trocas/descontos/cancelamentos) ----
-  const products = await fetchProductsWithDetails({
-    company,
-    filial: filial ?? null,
-    colecoes,
-    range: rangeInput,
-    groupByColor: true,
-  });
+  const [products, vendasDaColecao] = await Promise.all([
+    fetchProductsWithDetails({
+      company,
+      filial: filial ?? null,
+      colecoes,
+      range: rangeInput,
+      groupByColor: true,
+    }),
+    excluirKeys.size > 0
+      ? fetchVendasDaColecao({ company, filial, colecoes, range })
+      : Promise.resolve([] as VendaColecaoRow[]),
+  ]);
+  const vendasExcluidas = vendasDaColecao.filter((v) => excluirKeys.has(v.key));
+
+  // Abatimento por SKU (produto × cor). É subtração das MESMAS linhas que compõem o
+  // total — nenhuma outra linha é descartada.
+  const exclPorSku = new Map<string, { qtd: number; venda: number }>();
+  for (const v of vendasExcluidas) {
+    const k = skuKey(v.produto, v.cor);
+    const cur = exclPorSku.get(k) ?? { qtd: 0, venda: 0 };
+    cur.qtd += v.qtd;
+    cur.venda += v.valor;
+    exclPorSku.set(k, cur);
+  }
+  const exclusoes: ColecaoExclusoesResumo | null =
+    excluirKeys.size > 0
+      ? {
+          linhas: vendasExcluidas.length,
+          qtd: vendasExcluidas.reduce((s, v) => s + v.qtd, 0),
+          venda: vendasExcluidas.reduce((s, v) => s + v.valor, 0),
+          naoEncontradas: excluirKeys.size - vendasExcluidas.length,
+        }
+      : null;
 
   const skus: SkuAgg[] = products
-    .map((d) => ({
-      productId: String(d.productId ?? "").trim(),
-      // DESC_PRODUTO é CHAR: vem com padding ("DRACENA C 04/26        "). O HTML
-      // colapsa o espaço sozinho, mas o texto dos insights não — daí o trim aqui.
-      nome: (d.productName ?? "").trim(),
-      colorCode: d.corProduto ? String(d.corProduto).trim() : "",
-      colorDescription:
-        d.descCorProduto && d.descCorProduto !== "-" ? d.descCorProduto : "",
-      grade: d.grade && d.grade !== "-" ? d.grade : "",
-      tipo: (d.tipo ?? "").trim().toUpperCase(),
-      qtd: d.totalQuantity ?? 0,
-      venda: d.totalRevenue ?? 0,
-    }))
-    .filter((s) => s.productId && (s.venda !== 0 || s.qtd !== 0));
+    .map((d) => {
+      const productId = String(d.productId ?? "").trim();
+      const colorCode = d.corProduto ? String(d.corProduto).trim() : "";
+      const excl = exclPorSku.get(skuKey(productId, colorCode));
+      return {
+        productId,
+        // DESC_PRODUTO é CHAR: vem com padding ("DRACENA C 04/26        "). O HTML
+        // colapsa o espaço sozinho, mas o texto dos insights não — daí o trim aqui.
+        nome: (d.productName ?? "").trim(),
+        colorCode,
+        colorDescription:
+          d.descCorProduto && d.descCorProduto !== "-" ? d.descCorProduto : "",
+        grade: d.grade && d.grade !== "-" ? d.grade : "",
+        tipo: (d.tipo ?? "").trim().toUpperCase(),
+        qtd: (d.totalQuantity ?? 0) - (excl?.qtd ?? 0),
+        venda: (d.totalRevenue ?? 0) - (excl?.venda ?? 0),
+      };
+    })
+    // Tolerância só para o resíduo de ponto flutuante: SKU que teve toda a venda
+    // tirada precisa sair da lista (arredondar cada SKU desalinharia o total).
+    .filter((s) => s.productId && (Math.abs(s.venda) >= 0.005 || s.qtd !== 0));
 
   const stock = await fetchNetworkStock(skus.map((s) => s.productId));
 
@@ -597,9 +810,7 @@ export async function fetchColecaoPresentation({
       const skuCanonical = canonicalKey(r.produto, r.cor || null);
       if (!colecaoKeys.has(skuCanonical)) continue;
       const isEcom = ecommerceFilials.has(r.filial);
-      const bucket = isEcom
-        ? ECOMMERCE_BUCKET
-        : (getFilialLabelForDisplay(companyLive, r.filial) || "OUTROS").toUpperCase().trim();
+      const bucket = isEcom ? ECOMMERCE_BUCKET : storeBucket(companyLive, r.filial);
       const cur = storeAgg.get(bucket) ?? { venda: 0, qtd: 0 };
       cur.venda += r.vendas;
       cur.qtd += r.qtde;
@@ -611,6 +822,30 @@ export async function fetchColecaoPresentation({
         ecommerceRevenue += r.vendas;
       } else {
         retailRevenue += r.vendas;
+      }
+    }
+
+    // Venda tirada sai também da loja/canal onde aconteceu (mesmo balde). SKU que
+    // teve TODA a venda tirada já saiu de `colecaoKeys` e as linhas dele foram
+    // puladas acima — abater de novo tiraria em dobro.
+    for (const v of vendasExcluidas) {
+      if (!colecaoKeys.has(canonicalKey(v.produto, v.cor || null))) continue;
+      const cur = storeAgg.get(v.loja);
+      if (cur) {
+        cur.venda -= v.valor;
+        cur.qtd -= v.qtd;
+      }
+      if (destaqueSkuKeys.has(canonicalKey(v.produto, v.cor || null))) {
+        destaqueStoreAgg.set(v.loja, (destaqueStoreAgg.get(v.loja) ?? 0) - v.valor);
+      }
+      if (v.canal === "ECOMMERCE") ecommerceRevenue -= v.valor;
+      else retailRevenue -= v.valor;
+    }
+    if (vendasExcluidas.length > 0) {
+      // Loja que ficou sem nada some do gráfico (tolerância só para o resíduo de
+      // ponto flutuante — arredondar cada loja desalinharia a soma em centavos).
+      for (const [bucket, cur] of storeAgg) {
+        if (Math.abs(cur.venda) < 0.005 && cur.qtd === 0) storeAgg.delete(bucket);
       }
     }
   }
@@ -838,6 +1073,7 @@ export async function fetchColecaoPresentation({
     skus: sortedSkus.map((s) => ({ productId: s.productId, qtd: s.qtd })),
     outros,
     destaque: destaquePayload,
+    exclusoes,
     insightProdutos,
     stores: storesSortedDesc,
     storesTotal: { venda: totalRevenue, qtd: pecasVendidas },

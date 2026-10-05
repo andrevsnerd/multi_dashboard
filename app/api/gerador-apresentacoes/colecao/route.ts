@@ -16,6 +16,8 @@ type RequestBody = {
   todosProdutos?: boolean;
   /** Colapsa as cores: 1 linha por produto. */
   produtoTotal?: boolean;
+  /** Chaves das vendas a tirar do relatório (prévia em /colecao-vendas). */
+  excluirVendas?: string[];
 };
 
 export async function POST(request: Request) {
@@ -52,6 +54,9 @@ export async function POST(request: Request) {
       destaque: body.destaque,
       todosProdutos: body.todosProdutos === true,
       produtoTotal: body.produtoTotal === true,
+      excluirVendas: Array.isArray(body.excluirVendas)
+        ? body.excluirVendas.filter((k): k is string => typeof k === "string")
+        : undefined,
     });
     return NextResponse.json({ data }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {

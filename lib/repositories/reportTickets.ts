@@ -112,7 +112,7 @@ function tamanhoLabelExpr(): string {
 }
 
 /** Linha crua do banco: um item de ticket. */
-interface TicketItemRaw {
+export interface TicketItemRaw {
   /** LOJA = ticket do POS; ECOMMERCE = nota fiscal (o "ticket" do site). */
   canal: "LOJA" | "ECOMMERCE";
   codigoFilial: string;
@@ -415,7 +415,8 @@ export async function buildTicketsMovimentoSql(
         tp.VALOR_LIQUIDO_CALC,
         tp.QTDE_LIQUIDA_CALC
       FROM trocas_puras tp
-    )${ticketsAlvoCte}`;
+    )${ticketsAlvoCte}
+`;
 
   return { withClause, ticketsAlvoJoin };
 }
@@ -598,49 +599,17 @@ function normalizeItemRaw(r: TicketItemRaw): Omit<TicketItemRaw, "canal"> {
 }
 
 /**
- * Análise "Tickets detalhados": os tickets do período abertos item por item.
+ * Itens de ticket (loja) e de nota (e-commerce) do período, pela regra canônica com
+ * trocas — a mesma base de "Tickets detalhados", sem montar os tickets. Exportada para
+ * quem precisa da venda linha a linha (ex.: o Gerador de Apresentações, que deixa o
+ * usuário tirar vendas específicas do relatório de coleção).
  *
- * ── Faturamento ─────────────────────────────────────────────────────────────────
- * Segue a regra ÚNICA e validada de venda líquida "com trocas" (CLAUDE.md), no MESMO
- * formato de `fetchSalesTotals` ([lib/services/salesTotals.ts]) — a diferença é só o GRÃO
- * do SELECT final (aqui: ticket × produto × cor × tamanho; lá: totais):
- *   - base `LOJA_VENDA_PRODUTO` com `INNER JOIN LOJA_VENDA` e `ISNULL(QTDE_CANCELADA,0)=0`;
- *   - desconto = `QTDE × PRECO_LIQUIDO × ISNULL(FATOR_DESCONTO_VENDA,0)` (fator, não absoluto);
- *   - abate as trocas de item (`LOJA_VENDA_TROCA` casada por ticket/produto/cor/tamanho, uma
- *     única vez por combinação via `RN = 1`) e soma as trocas puras/devoluções como movimento
- *     negativo;
- *   - `VALOR_LIQUIDO = (PRECO_LIQUIDO × QTDE) − DESCONTO_VENDA − VALOR_TROCA`.
- * Nenhuma linha é descartada antes de somar (nem as negativas da devolução) — filtrar as
- * linhas da regra global infla o faturamento, ver [[vendas-nunca-filtrar-linhas-da-regra-global]].
- *
- * ── Semântica dos filtros ───────────────────────────────────────────────────────
- * Os filtros de PRODUTO (nome, lista de produtos, grupo, linha, subgrupo, grade, coleção,
- * cor, tipo) escolhem quais TICKETS entram — e o ticket vem INTEIRO, com todos os seus
- * itens. É o que se quer ao perguntar "o que mais sai junto com a capa de couro?".
- * Período e filial, por serem do próprio ticket, recortam normalmente.
- *
- * ── Preço ───────────────────────────────────────────────────────────────────────
- * "Preço Linx" (`PRECO_UNITARIO`) é o preço CADASTRADO, NÃO o `PRECO_LIQUIDO` da linha de
- * venda: o caixa pode bater um valor diferente do cadastro, e foi o que gerou o relato
- * (ticket 00014022, item N4.8M.0004 → saiu a 358 com o cadastro em 398). O preço
- * efetivamente cobrado não se perde: `Valor + Desconto` devolve `PRECO_LIQUIDO × QTDE`.
- *
- * Fonte primária: `PRODUTOS.PRECO_REPOSICAO_1` — a mesma tabela mestre que o resto do
- * Gerador usa para custo/preço ([[gerador-custo-preco-da-tabela-mestre]]). Reserva:
- * `PRODUTOS_PRECOS.PRECO1` da tabela de preço DO PRÓPRIO TICKET (`LOJA_VENDA
- * .CODIGO_TAB_PRECO`, hoje '01' em 100% dos 32.331 tickets NERD de 12 meses). A reserva
- * existe porque 84 produtos ativos têm o preço sugerido zerado e só têm preço na tabela —
- * sem ela a coluna sairia em branco justamente neles. As duas fontes concordam em 15.834
- * de 15.918 produtos ativos e acertam o preço batido o MESMO número de vezes, então a
- * escolha da primária é por consistência com o resto do Gerador, não por precisão.
- *
- * ── Escopo ──────────────────────────────────────────────────────────────────────
- * Só venda de loja física (POS): ticket e vendedor não existem no e-commerce
- * (`FATURAMENTO`/nota fiscal), então o e-commerce fica fora desta análise.
+ * Semântica dos filtros de produto igual à da análise: eles escolhem o TICKET/NOTA e o
+ * documento vem inteiro — quem quiser só os itens que casam filtra o resultado.
  */
-export async function fetchTickets(filters: ReportFilters): Promise<ReportResult> {
-  const company = await resolveCompanyLive(filters.company);
-
+export async function fetchTicketItens(
+  filters: ReportFilters
+): Promise<{ rows: TicketItemRaw[]; capped: boolean }> {
   const canais = await resolveCanaisTicket(filters);
 
   const fetchItensLoja = () => withRequest(async (request) => {
@@ -726,8 +695,54 @@ export async function fetchTickets(filters: ReportFilters): Promise<ReportResult
     canais.incluiLoja ? fetchItensLoja() : Promise.resolve(vazio),
     canais.incluiEcommerce ? fetchTicketItensEcommerce(filters) : Promise.resolve(vazio),
   ]);
-  const capped = loja.capped || ecom.capped;
-  const rowsRaw = [...loja.rows, ...ecom.rows];
+  return { rows: [...loja.rows, ...ecom.rows], capped: loja.capped || ecom.capped };
+}
+
+/**
+ * Análise "Tickets detalhados": os tickets do período abertos item por item.
+ *
+ * ── Faturamento ─────────────────────────────────────────────────────────────────
+ * Segue a regra ÚNICA e validada de venda líquida "com trocas" (CLAUDE.md), no MESMO
+ * formato de `fetchSalesTotals` ([lib/services/salesTotals.ts]) — a diferença é só o GRÃO
+ * do SELECT final (aqui: ticket × produto × cor × tamanho; lá: totais):
+ *   - base `LOJA_VENDA_PRODUTO` com `INNER JOIN LOJA_VENDA` e `ISNULL(QTDE_CANCELADA,0)=0`;
+ *   - desconto = `QTDE × PRECO_LIQUIDO × ISNULL(FATOR_DESCONTO_VENDA,0)` (fator, não absoluto);
+ *   - abate as trocas de item (`LOJA_VENDA_TROCA` casada por ticket/produto/cor/tamanho, uma
+ *     única vez por combinação via `RN = 1`) e soma as trocas puras/devoluções como movimento
+ *     negativo;
+ *   - `VALOR_LIQUIDO = (PRECO_LIQUIDO × QTDE) − DESCONTO_VENDA − VALOR_TROCA`.
+ * Nenhuma linha é descartada antes de somar (nem as negativas da devolução) — filtrar as
+ * linhas da regra global infla o faturamento, ver [[vendas-nunca-filtrar-linhas-da-regra-global]].
+ *
+ * ── Semântica dos filtros ───────────────────────────────────────────────────────
+ * Os filtros de PRODUTO (nome, lista de produtos, grupo, linha, subgrupo, grade, coleção,
+ * cor, tipo) escolhem quais TICKETS entram — e o ticket vem INTEIRO, com todos os seus
+ * itens. É o que se quer ao perguntar "o que mais sai junto com a capa de couro?".
+ * Período e filial, por serem do próprio ticket, recortam normalmente.
+ *
+ * ── Preço ───────────────────────────────────────────────────────────────────────
+ * "Preço Linx" (`PRECO_UNITARIO`) é o preço CADASTRADO, NÃO o `PRECO_LIQUIDO` da linha de
+ * venda: o caixa pode bater um valor diferente do cadastro, e foi o que gerou o relato
+ * (ticket 00014022, item N4.8M.0004 → saiu a 358 com o cadastro em 398). O preço
+ * efetivamente cobrado não se perde: `Valor + Desconto` devolve `PRECO_LIQUIDO × QTDE`.
+ *
+ * Fonte primária: `PRODUTOS.PRECO_REPOSICAO_1` — a mesma tabela mestre que o resto do
+ * Gerador usa para custo/preço ([[gerador-custo-preco-da-tabela-mestre]]). Reserva:
+ * `PRODUTOS_PRECOS.PRECO1` da tabela de preço DO PRÓPRIO TICKET (`LOJA_VENDA
+ * .CODIGO_TAB_PRECO`, hoje '01' em 100% dos 32.331 tickets NERD de 12 meses). A reserva
+ * existe porque 84 produtos ativos têm o preço sugerido zerado e só têm preço na tabela —
+ * sem ela a coluna sairia em branco justamente neles. As duas fontes concordam em 15.834
+ * de 15.918 produtos ativos e acertam o preço batido o MESMO número de vezes, então a
+ * escolha da primária é por consistência com o resto do Gerador, não por precisão.
+ *
+ * ── Escopo ──────────────────────────────────────────────────────────────────────
+ * Só venda de loja física (POS): ticket e vendedor não existem no e-commerce
+ * (`FATURAMENTO`/nota fiscal), então o e-commerce fica fora desta análise.
+ */
+export async function fetchTickets(filters: ReportFilters): Promise<ReportResult> {
+  const company = await resolveCompanyLive(filters.company);
+
+  const { rows: rowsRaw, capped } = await fetchTicketItens(filters);
 
   // ── Monta os tickets em memória (ordem de chegada = a do ORDER BY do SQL) ──
   const byTicket = new Map<string, TicketAgg>();
