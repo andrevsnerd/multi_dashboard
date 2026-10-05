@@ -8974,6 +8974,33 @@ export async function fetchCustosPorProdutos(
 }
 
 /**
+ * GRUPO_PRODUTO / SUBGRUPO_PRODUTO do cadastro, por produto — base da metragem por peça
+ * (ver lib/config/metragem-produto.ts).
+ */
+export async function fetchGrupoSubgrupoPorProdutos(
+  produtos: string[]
+): Promise<Map<string, { grupo: string; subgrupo: string }>> {
+  const normed = [...new Set(produtos.map((p) => p.trim()).filter(Boolean))];
+  if (normed.length === 0) return new Map();
+  return withRequest(async (request) => {
+    normed.forEach((p, i) => request.input(`gp${i}`, sql.VarChar, p));
+    const placeholders = normed.map((_, i) => `@gp${i}`).join(', ');
+    const result = await request.query<{ produto: string; grupo: string | null; subgrupo: string | null }>(`
+      SELECT LTRIM(RTRIM(PRODUTO)) AS produto,
+             LTRIM(RTRIM(GRUPO_PRODUTO)) AS grupo,
+             LTRIM(RTRIM(SUBGRUPO_PRODUTO)) AS subgrupo
+      FROM PRODUTOS WITH (NOLOCK)
+      WHERE LTRIM(RTRIM(PRODUTO)) IN (${placeholders})
+    `);
+    const map = new Map<string, { grupo: string; subgrupo: string }>();
+    for (const row of result.recordset) {
+      if (row.produto) map.set(row.produto.trim(), { grupo: row.grupo ?? '', subgrupo: row.subgrupo ?? '' });
+    }
+    return map;
+  });
+}
+
+/**
  * Combinações (categoria × subgrupo × grade × coleção) presentes NO ESTOQUE da
  * filial — fonte dos selects da Estoque Consulta.
  *

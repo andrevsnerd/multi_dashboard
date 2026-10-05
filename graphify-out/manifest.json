@@ -1645,8 +1645,8 @@
     "semantic_hash": "f9f455e79710f72c6b9952301879ebc6"
   },
   "components/stock/CompraSalvaDetalhePage.tsx": {
-    "mtime": 1789064083.965789,
-    "ast_hash": "1884a1e0cb17d9dc4ecc0a360594e61a",
+    "mtime": 1791214141.5872798,
+    "ast_hash": "856d835080f109d7d6f48abf32125dff",
     "semantic_hash": ""
   },
   "components/stock/ComprasSalvasListPanel.tsx": {
@@ -2435,8 +2435,8 @@
     "semantic_hash": "8c1d93a8e7b6ea254bb47828f9553e06"
   },
   "lib/repositories/controleEstoque.ts": {
-    "mtime": 1790785575.551728,
-    "ast_hash": "fdc399d818e31faad99c3e3de771352e",
+    "mtime": 1791214064.6308258,
+    "ast_hash": "e768ae6ce4dbe120dd01311c6024bd51",
     "semantic_hash": ""
   },
   "lib/repositories/controleMovimento.ts": {
@@ -4682,6 +4682,16 @@
   "lib/utils/trava-inventario-store.ts": {
     "mtime": 1791204265.8413744,
     "ast_hash": "d711d9a95cd5163be15192b06f43d957",
+    "semantic_hash": ""
+  },
+  "app/api/controle-estoque/metragem-produtos/route.ts": {
+    "mtime": 1791214065.8073711,
+    "ast_hash": "9b938ed7b6e0f6fb77171504fce73826",
+    "semantic_hash": ""
+  },
+  "lib/config/metragem-produto.ts": {
+    "mtime": 1791214045.6346564,
+    "ast_hash": "09024d4f0fbd2c5628a0a878a0632028",
     "semantic_hash": ""
   }
 }

@@ -57,6 +57,7 @@ import CompraIdealCell from "@/components/shared/CompraIdealCell";
 import { useCatracaDataCompra, type CatracaFreeze } from "@/lib/client/use-catraca-data-compra";
 import { useAuth } from "@/components/auth/AuthContext";
 import { canSeeCusto } from "@/lib/auth/permissions";
+import { temRegrasMetragem, type MetragemProduto } from "@/lib/config/metragem-produto";
 
 import styles from "./ListaCompraSugeridaPage.module.css";
 
@@ -100,6 +101,10 @@ function fmt(n: number) {
 
 function fmtBRL(n: number) {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+}
+
+function fmtMetros(n: number) {
+  return `${n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m`;
 }
 
 function fmtBRL2(n: number) {
@@ -797,6 +802,33 @@ export default function CompraSalvaDetalhePage({
     : `/${companySlug}/controle-estoque/projecao/lista-compra?tab=compras-salvas`;
   const [doc, setDoc] = useState<CompraSalva | null>(null);
   const [items, setItems] = useState<CompraSalvaItemRow[]>([]);
+  // Metragem de tecido por peça, por produto (regra em lib/config/metragem-produto.ts).
+  const mostraMetragem = temRegrasMetragem(companyKey);
+  const [metragemByProduto, setMetragemByProduto] = useState<Record<string, MetragemProduto>>({});
+  const metragemProdutosKey = useMemo(
+    () => [...new Set(items.map((i) => (i.produto ?? "").trim()).filter(Boolean))].sort().join("|"),
+    [items]
+  );
+  useEffect(() => {
+    if (!mostraMetragem || !metragemProdutosKey) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/controle-estoque/metragem-produtos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ company: companyKey, produtos: metragemProdutosKey.split("|") }),
+        });
+        const json = (await res.json()) as { data?: Record<string, MetragemProduto> };
+        if (!cancelled && res.ok) setMetragemByProduto(json.data ?? {});
+      } catch {
+        // sem metragem: a coluna mostra "—"
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [companyKey, mostraMetragem, metragemProdutosKey]);
   const [titleEdit, setTitleEdit] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1367,9 +1399,12 @@ export default function CompraSalvaDetalhePage({
           }
         : sugestaoBase;
       const qtdSugerida = sugestaoAtual.qty;
-      return { it, match, live, estoque, custoUnit, custoTotal, qtdSugerida, sugestaoAtual, effectiveQtdManual, atacado, qtdParaLojas };
+      const metragem = metragemByProduto[produto] ?? null;
+      // Metragem necessária = peças da compra × metros por peça (ATACADO incluso: é pano do mesmo jeito).
+      const metragemTotal = metragem ? effectiveQtdManual * metragem.metrosPorPeca : null;
+      return { it, match, live, estoque, custoUnit, custoTotal, qtdSugerida, sugestaoAtual, effectiveQtdManual, atacado, qtdParaLojas, metragem, metragemTotal };
     });
-  }, [items, listaRows, expandirPorCor, liveMetrics, manualDistribuicao, manualDistTamanho, manualState, manualTotalByItemKey, manualDistTamanhoTotalByItemKey, atacadoQtd, comprasTransitoIndex, companyKey, catraca.reconcile]);
+  }, [items, listaRows, expandirPorCor, liveMetrics, manualDistribuicao, manualDistTamanho, manualState, manualTotalByItemKey, manualDistTamanhoTotalByItemKey, atacadoQtd, comprasTransitoIndex, companyKey, catraca.reconcile, metragemByProduto]);
 
   // Catraca: junta gravações pendentes e persiste.
   const catracaFreezes = useMemo<CatracaFreeze[]>(() => {
@@ -1397,7 +1432,9 @@ export default function CompraSalvaDetalhePage({
     // Usa qtdSugerida quando disponível, incorporando a diferença no total
     const totalQtdManual = rowsComputed.reduce((s, r) => s + r.effectiveQtdManual, 0);
     const totalCusto = rowsComputed.reduce((s, r) => s + (r.custoTotal ?? 0), 0);
-    return { totalItens, totalQtdManual, totalCusto };
+    const totalMetragem = rowsComputed.reduce((s, r) => s + (r.metragemTotal ?? 0), 0);
+    const itensComMetragem = rowsComputed.filter((r) => r.metragem).length;
+    return { totalItens, totalQtdManual, totalCusto, totalMetragem, itensComMetragem };
   }, [rowsComputed]);
 
   const existingItemKeys = useMemo(() => new Set(items.map((item) => item.itemKey)), [items]);
@@ -1715,6 +1752,8 @@ export default function CompraSalvaDetalhePage({
     qtd: number;
     destino: string;
     estoque: number | null;
+    metrosPorPeca: number | null;
+    metragemTotal: number | null;
     custoUnit: number | null;
     custoTotal: number | null;
   };
@@ -1722,7 +1761,7 @@ export default function CompraSalvaDetalhePage({
   const buildExportRows = (): CompraSalvaExportRow[] => {
     const fmt2 = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
 
-    return rowsComputed.flatMap(({ it, match, estoque, custoUnit, custoTotal, effectiveQtdManual, atacado, qtdParaLojas }) => {
+    return rowsComputed.flatMap(({ it, match, estoque, custoUnit, custoTotal, effectiveQtdManual, atacado, qtdParaLojas, metragem, metragemTotal }) => {
       const produtoK = it.produto.trim();
       const corK = expandirPorCor ? ((it.corProduto ?? "").trim() || undefined) : undefined;
       const vendasKey = `${produtoK}||${corK ?? ""}`;
@@ -1778,6 +1817,8 @@ export default function CompraSalvaDetalhePage({
         qtd: effectiveQtdManual,
         destino,
         estoque: estoque ?? 0,
+        metrosPorPeca: metragem?.metrosPorPeca ?? null,
+        metragemTotal,
         custoUnit: custoUnit ?? 0,
         custoTotal: custoTotal ?? 0,
       };
@@ -1804,6 +1845,9 @@ export default function CompraSalvaDetalhePage({
             qtd: linha.qtd,
             destino: linha.partes.map((p) => `${p.label}: ${fmt2(p.qtd)}`).join(" · "),
             estoque: estoqueFashion,
+            // Metragem fica só na linha do item, igual ao custo: somar a coluna não conta o pano duas vezes.
+            metrosPorPeca: null,
+            metragemTotal: null,
             custoUnit: null,
             custoTotal: null,
           };
@@ -1827,6 +1871,12 @@ export default function CompraSalvaDetalhePage({
       QTD_MANUAL: r.qtd,
       DESTINO: r.destino,
       ESTOQUE_ATUAL: r.tipo === "tamanho" ? "" : (r.estoque ?? 0),
+      ...(mostraMetragem
+        ? {
+            METRAGEM_POR_PECA_M: r.metrosPorPeca ?? "",
+            METRAGEM_TOTAL_M: r.metragemTotal != null ? Math.round(r.metragemTotal * 100) / 100 : "",
+          }
+        : {}),
       ...(podeVerCusto
         ? {
             CUSTO_UNIT: r.tipo === "tamanho" ? "" : (r.custoUnit ?? 0),
@@ -1840,6 +1890,9 @@ export default function CompraSalvaDetalhePage({
       { METRICA: "Empresa", VALOR: companyKey },
       { METRICA: "Itens", VALOR: totals.totalItens },
       { METRICA: "Total Qtd Manual", VALOR: totals.totalQtdManual },
+      ...(mostraMetragem
+        ? [{ METRICA: "Metragem necessária (m)", VALOR: Math.round(totals.totalMetragem * 100) / 100 }]
+        : []),
       ...(podeVerCusto ? [{ METRICA: "Custo Total", VALOR: totals.totalCusto }] : []),
     ];
 
@@ -1881,6 +1934,7 @@ export default function CompraSalvaDetalhePage({
         expandirPorCor ? "Por cor" : "Por produto",
         `${totals.totalItens} item(ns)`,
         `${fmt(totals.totalQtdManual)} peça(s)`,
+        ...(mostraMetragem ? [`Metragem ${fmtMetros(totals.totalMetragem)}`] : []),
         ...(podeVerCusto ? [`Custo total ${fmtBRL(totals.totalCusto)}`] : []),
       ].join("  ·  ");
 
@@ -1898,6 +1952,7 @@ export default function CompraSalvaDetalhePage({
         "Qtd",
         "Destino (loja: qtd)",
         "Estoque",
+        ...(mostraMetragem ? ["Metragem"] : []),
         ...(podeVerCusto ? ["Custo un.", "Custo total"] : []),
       ]];
 
@@ -1924,6 +1979,12 @@ export default function CompraSalvaDetalhePage({
           fmt(r.qtd),
           r.destino || "—",
           r.estoque != null ? fmt(r.estoque) : "—",
+          ...(mostraMetragem
+            ? [isTamanho ? "" : (r.metragemTotal != null && r.metrosPorPeca != null
+                ? `${fmtMetros(r.metragemTotal)}
+${fmtMetros(r.metrosPorPeca)}/peça`
+                : "—")]
+            : []),
           ...(podeVerCusto
             ? [
                 isTamanho ? "" : (r.custoUnit && r.custoUnit > 0 ? fmtBRL2(r.custoUnit) : "—"),
@@ -1941,6 +2002,7 @@ export default function CompraSalvaDetalhePage({
         fmt(totals.totalQtdManual),
         `${totals.totalItens} item(ns)`,
         "",
+        ...(mostraMetragem ? [fmtMetros(totals.totalMetragem)] : []),
         ...(podeVerCusto ? ["", fmtBRL(totals.totalCusto)] : []),
       ]];
 
@@ -1953,9 +2015,11 @@ export default function CompraSalvaDetalhePage({
         5: { halign: "left" }, // Destino: leva toda a largura que sobra da página
         6: { cellWidth: 15, halign: "right" },
       };
+      let nextCol = 7;
+      if (mostraMetragem) columnStyles[nextCol++] = { cellWidth: 20, halign: "right" };
       if (podeVerCusto) {
-        columnStyles[7] = { cellWidth: 17, halign: "right" };
-        columnStyles[8] = { cellWidth: 20, halign: "right" };
+        columnStyles[nextCol++] = { cellWidth: 17, halign: "right" };
+        columnStyles[nextCol++] = { cellWidth: 20, halign: "right" };
       }
 
       autoTable(pdf, {
@@ -2350,6 +2414,18 @@ export default function CompraSalvaDetalhePage({
                 <span className={styles.summaryLabel}>Total Qtd</span>
                 <span className={styles.summaryValue}>{fmt(totals.totalQtdManual)}</span>
               </div>
+              {mostraMetragem && (
+                <>
+                  <div className={styles.summaryDivider} />
+                  <div
+                    className={styles.summaryItem}
+                    title={`Soma de Qtd × metros por peça dos ${totals.itensComMetragem} item(ns) com metragem cadastrada. Itens sem metragem não entram.`}
+                  >
+                    <span className={styles.summaryLabel}>Metragem necessária</span>
+                    <span className={styles.summaryValue}>{fmtMetros(totals.totalMetragem)}</span>
+                  </div>
+                </>
+              )}
               {podeVerCusto && (
                 <>
                   <div className={styles.summaryDivider} />
@@ -2483,13 +2559,14 @@ export default function CompraSalvaDetalhePage({
                     <th className={styles.right}>Qtd</th>
                     <th>Destino</th>
                     <th className={styles.right}>Estoque</th>
+                    {mostraMetragem && <th className={styles.right}>Metragem</th>}
                     {podeVerCusto && <th className={styles.right}>Custo Unit.</th>}
                     {podeVerCusto && <th className={styles.right}>Custo Total</th>}
                     <th style={{ width: 60 }} />
                   </tr>
                 </thead>
                 <tbody>
-                  {rowsComputed.map(({ it, match, live, estoque, custoUnit, custoTotal, qtdSugerida, sugestaoAtual, effectiveQtdManual, atacado, qtdParaLojas }) => {
+                  {rowsComputed.map(({ it, match, live, estoque, custoUnit, custoTotal, qtdSugerida, sugestaoAtual, effectiveQtdManual, atacado, qtdParaLojas, metragem, metragemTotal }) => {
                     const itemManualState = manualState[it.itemKey] ?? "auto";
                     const isEditing = itemManualState === "editing";
                     const isConfirmed = itemManualState === "confirmed";
@@ -2829,6 +2906,21 @@ export default function CompraSalvaDetalhePage({
                         >
                           {estoque != null ? fmt(estoque) : "—"}
                         </td>
+                        {mostraMetragem && (
+                          <td
+                            className={`${styles.right} ${metragem ? styles.qtdSugerida : styles.qtdSugeridaZero}`}
+                            title={metragem ? `${metragem.regraLabel}: ${fmtMetros(metragem.metrosPorPeca)} por peça` : "Sem metragem cadastrada para este produto"}
+                          >
+                            {metragem && metragemTotal != null ? (
+                              <>
+                                {fmtMetros(metragemTotal)}
+                                <div style={{ fontSize: 11, fontWeight: 400, opacity: 0.7 }}>
+                                  {fmtMetros(metragem.metrosPorPeca)}/peça
+                                </div>
+                              </>
+                            ) : "—"}
+                          </td>
+                        )}
                         {podeVerCusto && (
                           <td className={`${styles.right} ${custoUnit > 0 ? styles.qtdSugerida : styles.qtdSugeridaZero}`}>
                             {custoUnit > 0 ? fmtBRL2(custoUnit) : "—"}
@@ -2952,6 +3044,7 @@ export default function CompraSalvaDetalhePage({
                             >
                               <span className={styles.tamanhoQtd}>{fmt(estoqueFashion)}</span>
                             </td>
+                            {mostraMetragem && <td className={styles.right} />}
                             {podeVerCusto && <td className={styles.right} />}
                             {podeVerCusto && <td className={styles.right} />}
                             <td />
