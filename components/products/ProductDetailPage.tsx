@@ -738,7 +738,7 @@ export default function ProductDetailPage({
                   <option value="">Todas as cores</option>
                   {(data.availableColors ?? []).map(({ code, displayName }) => (
                     <option key={code || "sem-cor"} value={code || NO_COLOR_VALUE}>
-                      {code ? displayName : `${displayName} (sem codigo)`}
+                      {code ? `${displayName} (${code})` : `${displayName} (sem codigo)`}
                     </option>
                   ))}
                 </select>
