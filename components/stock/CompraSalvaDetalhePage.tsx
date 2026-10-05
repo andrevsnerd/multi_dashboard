@@ -1896,9 +1896,32 @@ export default function CompraSalvaDetalhePage({
       ...(podeVerCusto ? [{ METRICA: "Custo Total", VALOR: totals.totalCusto }] : []),
     ];
 
+    const wsCompra = XLSX.utils.json_to_sheet(rowExcel);
+    if (rowExcel.length > 0) {
+      // Linha TOTAL no fim, com fórmula (o valor já vai calculado para abrir certo em
+      // qualquer leitor). Qtd soma só as linhas de item — as de TAMANHO são quebra delas;
+      // metragem e custo ficam vazios nas linhas de tamanho, então SUM direto basta.
+      const headers = Object.keys(rowExcel[0]);
+      const primeira = 2;
+      const ultima = rowExcel.length + 1;
+      const linhaTotal = ultima + 1;
+      const colDe = (k: string) => XLSX.utils.encode_col(headers.indexOf(k));
+      const faixa = (k: string) => `${colDe(k)}${primeira}:${colDe(k)}${ultima}`;
+      const put = (k: string, cell: XLSX.CellObject) => {
+        if (headers.indexOf(k) >= 0) wsCompra[`${colDe(k)}${linhaTotal}`] = cell;
+      };
+      put("PRODUTO", { t: "s", v: "TOTAL" });
+      put("QTD_MANUAL", { t: "n", v: totals.totalQtdManual, f: `SUMIF(${faixa("TAMANHO")},"",${faixa("QTD_MANUAL")})` });
+      put("METRAGEM_TOTAL_M", { t: "n", v: Math.round(totals.totalMetragem * 100) / 100, f: `SUM(${faixa("METRAGEM_TOTAL_M")})`, z: "0.00" });
+      put("CUSTO_TOTAL", { t: "n", v: totals.totalCusto, f: `SUM(${faixa("CUSTO_TOTAL")})` });
+      const ref = XLSX.utils.decode_range(wsCompra["!ref"] ?? "A1");
+      ref.e.r = linhaTotal - 1;
+      wsCompra["!ref"] = XLSX.utils.encode_range(ref);
+    }
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(kpis), "KPIs");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rowExcel), "Compra salva");
+    XLSX.utils.book_append_sheet(wb, wsCompra, "Compra salva");
 
     XLSX.writeFile(wb, `${exportFileName()}.xlsx`);
   };
@@ -3055,6 +3078,27 @@ ${fmtMetros(r.metrosPorPeca)}/peça`
                     );
                   })}
                 </tbody>
+                {/* Total da compra — fica grudado no rodapé enquanto a tabela rola. Qtd e
+                    metragem somam só as linhas de item (as de tamanho já estão dentro delas). */}
+                <tfoot>
+                  <tr className={styles.compraTotalRow}>
+                    <td>TOTAL · {totals.totalItens} item(ns)</td>
+                    <td className={styles.right}>{fmt(totals.totalQtdManual)}</td>
+                    <td />
+                    <td />
+                    {mostraMetragem && (
+                      <td
+                        className={styles.right}
+                        title={`Soma da metragem dos ${totals.itensComMetragem} item(ns) com metragem cadastrada`}
+                      >
+                        {fmtMetros(totals.totalMetragem)}
+                      </td>
+                    )}
+                    {podeVerCusto && <td />}
+                    {podeVerCusto && <td className={styles.right}>{fmtBRL(totals.totalCusto)}</td>}
+                    <td />
+                  </tr>
+                </tfoot>
               </table>
             </div>
           )}

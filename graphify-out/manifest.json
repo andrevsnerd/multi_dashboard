@@ -1645,8 +1645,8 @@
     "semantic_hash": "f9f455e79710f72c6b9952301879ebc6"
   },
   "components/stock/CompraSalvaDetalhePage.tsx": {
-    "mtime": 1791214141.5872798,
-    "ast_hash": "856d835080f109d7d6f48abf32125dff",
+    "mtime": 1791218020.134758,
+    "ast_hash": "02a86bfae2b0836eec300f6cfeec8ab9",
     "semantic_hash": ""
   },
   "components/stock/ComprasSalvasListPanel.tsx": {

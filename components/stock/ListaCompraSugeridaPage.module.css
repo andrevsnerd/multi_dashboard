@@ -614,6 +614,26 @@
   font-weight: 700;
 }
 
+/* Total da Compra Salva: rodapé da tabela, grudado embaixo enquanto rola. */
+.compraTotalRow td {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  background: var(--s-50);
+  border-top: 2px solid var(--b-200);
+  box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.06);
+  padding: 12px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--t-700);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.compraTotalRow td.right {
+  text-align: right;
+}
+
 /* ── ABC Modo Toggle Bar ── */
 .modoBar {
   display: flex;

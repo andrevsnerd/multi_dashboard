@@ -512,5 +512,7 @@
   "510": "page.tsx",
   "511": "page.tsx",
   "512": "page.tsx",
-  "513": "executeQueryWithParams"
+  "513": "executeQueryWithParams",
+  "514": "exportRelatorioAbasXlsx.ts",
+  "515": "MapaClientesPage.tsx"
 }
