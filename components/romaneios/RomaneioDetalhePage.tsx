@@ -107,7 +107,13 @@ async function executarEntradaEstoqueLote(
   itens: Array<{ produto: string; corProduto: string | null; quantidade: number }>,
   responsavel: string,
   romaneioReferencia: { romaneio: string; filialOrigem: string; dataRomaneio: string }
-): Promise<{ ok: boolean; romaneio?: string; error?: string }> {
+): Promise<{
+  ok: boolean;
+  romaneio?: string;
+  error?: string;
+  /** A saída já tinha dado entrada (trava de duplicata do servidor). */
+  entradaExistente?: { romaneio: string; completa: boolean };
+}> {
   const res = await fetch("/api/saidas-entradas-produtos/executar", {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-auth-username": username },
@@ -123,8 +129,11 @@ async function executarEntradaEstoqueLote(
     }),
   });
   if (!res.ok) {
-    const errJson = await res.json().catch(() => ({})) as { error?: string };
-    return { ok: false, error: errJson.error };
+    const errJson = await res.json().catch(() => ({})) as {
+      error?: string;
+      entradaExistente?: { romaneio: string; completa: boolean };
+    };
+    return { ok: false, error: errJson.error, entradaExistente: errJson.entradaExistente };
   }
   const json = await res.json().catch(() => ({})) as { romaneio?: string };
   return { ok: true, romaneio: json.romaneio };
@@ -549,6 +558,7 @@ export default function RomaneioDetalhePage({
     setErroConfirmacao(null);
     setDevolucoesOrigem([]);
     let romaneioEntradaGerado = "";
+    const avisos: string[] = [];
 
     try {
       if (isTransito) {
@@ -588,18 +598,27 @@ export default function RomaneioDetalhePage({
           responsavelPadrao || "",
           { romaneio: romaneioId, filialOrigem, dataRomaneio: dataEmissaoProp }
         );
-        if (!result.ok) {
+        if (!result.ok && result.entradaExistente?.completa) {
+          // A entrada já tinha sido gravada (a resposta da 1ª tentativa se perdeu):
+          // não grava de novo, só termina a confirmação apontando para ela.
+          romaneioEntradaGerado = result.entradaExistente.romaneio;
+          setRomaneioGerado(romaneioEntradaGerado);
+          avisos.push(
+            `Esta saída já tinha dado entrada (romaneio ${romaneioEntradaGerado}) — nada foi lançado de novo, só concluída a confirmação.`
+          );
+        } else if (!result.ok) {
           setErroConfirmacao(result.error ? `Erro ao registrar entrada de estoque: ${result.error}` : "Erro ao registrar entrada de estoque. Tente novamente.");
           return;
+        } else {
+          if (result.romaneio) setRomaneioGerado(result.romaneio);
+          romaneioEntradaGerado = result.romaneio ?? "";
         }
-        if (result.romaneio) setRomaneioGerado(result.romaneio);
-        romaneioEntradaGerado = result.romaneio ?? "";
       }
 
       // Marca confirmação no romaneio para cada item. Numa SAÍDA vão junto a
       // filial de origem e o romaneio de entrada: é o que faz o servidor
       // devolver à loja a peça que não chegou e guardar o vínculo saída→entrada.
-      const devolucoes: string[] = [];
+      const devolucoes: string[] = [...avisos];
       for (const item of itensParaConfirmar) {
         const res = await postConfirmacao(
           user.username, companySlug, romaneioId, filialRef,

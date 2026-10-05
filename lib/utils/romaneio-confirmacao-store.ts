@@ -300,6 +300,48 @@ export async function getConfirmacaoItem(
 }
 
 /**
+ * Para cada romaneio de ENTRADA informado, as saídas que ele confirmou. É o que a
+ * trava de entrada duplicada usa para não confundir a entrada de OUTRA saída (com
+ * os mesmos itens) com uma repetição desta.
+ */
+export async function getSaidasDasEntradas(
+  companyKey: string,
+  romaneiosEntrada: string[]
+): Promise<Map<string, Set<string>>> {
+  const c = (companyKey || "").trim().toLowerCase();
+  const alvo = [...new Set(romaneiosEntrada.map((r) => (r || "").trim()).filter(Boolean))];
+  const mapa = new Map<string, Set<string>>();
+  if (alvo.length === 0) return mapa;
+
+  const acumular = (entrada: string, saida: string) => {
+    const e = (entrada || "").trim();
+    if (!e) return;
+    if (!mapa.has(e)) mapa.set(e, new Set());
+    mapa.get(e)!.add((saida || "").trim());
+  };
+
+  if (!hasPostgres()) {
+    const set = new Set(alvo);
+    for (const rec of readFile()) {
+      if (rec.company_key.toLowerCase() !== c) continue;
+      if (set.has((rec.romaneio_entrada ?? "").trim())) acumular(rec.romaneio_entrada ?? "", rec.romaneio_id);
+    }
+    return mapa;
+  }
+
+  const sql = getNeonSql();
+  await ensureTable(sql);
+
+  const rows = await sql`
+    SELECT DISTINCT romaneio_entrada, romaneio_id
+    FROM romaneio_item_confirmado
+    WHERE company_key = ${c} AND romaneio_entrada = ANY(${alvo})
+  `;
+  for (const row of rows) acumular(row.romaneio_entrada, row.romaneio_id);
+  return mapa;
+}
+
+/**
  * Por romaneio: quanta peça foi confirmada e em quantas linhas, para UMA filial
  * de destino. Uma consulta agregada para a lista inteira — a tela Defeitos mostra
  * centenas de romaneios e uma leitura por romaneio faria centenas de idas ao Neon.

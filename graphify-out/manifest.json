@@ -965,8 +965,8 @@
     "semantic_hash": ""
   },
   "app/api/saidas-entradas-produtos/executar/route.ts": {
-    "mtime": 1791204265.821412,
-    "ast_hash": "2def7034f68de8cf68c9fdd1030111ac",
+    "mtime": 1791226043.8402982,
+    "ast_hash": "7d854a2c672805b7e110741012153123",
     "semantic_hash": ""
   },
   "app/api/saidas-entradas-produtos/historico/route.ts": {
@@ -1600,8 +1600,8 @@
     "semantic_hash": "c1db24d3ffabe5b57c07dc935de08446"
   },
   "components/romaneios/RomaneioDetalhePage.tsx": {
-    "mtime": 1791204265.8328028,
-    "ast_hash": "0c8e0931e4df77a789832ab0d0bf2dbf",
+    "mtime": 1791226064.9736767,
+    "ast_hash": "a0e51497d9bc4c011ef442dd36cc3e55",
     "semantic_hash": ""
   },
   "components/romaneios/RomaneiosDuplicadosPanel.tsx": {
@@ -2925,8 +2925,8 @@
     "semantic_hash": "8574a22068d81c11c33afb088ddecd70"
   },
   "lib/utils/romaneio-confirmacao-store.ts": {
-    "mtime": 1790192980.7390053,
-    "ast_hash": "a2dd629064b1605e3ec348f8ac1de0e3",
+    "mtime": 1791225974.8528614,
+    "ast_hash": "8ea040679a1f8a6fa5a8384cb702b43f",
     "semantic_hash": ""
   },
   "lib/utils/romaneios-date.ts": {
@@ -4590,8 +4590,8 @@
     "semantic_hash": ""
   },
   "components/defeitos/DefeitosPage.tsx": {
-    "mtime": 1791204265.822904,
-    "ast_hash": "f2ec88d3364c1a958b35641c39774d2d",
+    "mtime": 1791226076.3804522,
+    "ast_hash": "8e392e4b20f617491a0e273c60dc961e",
     "semantic_hash": ""
   },
   "lib/repositories/defeitos.ts": {
@@ -4717,6 +4717,11 @@
   "components/cadastro/FichaProdutoEditor.tsx": {
     "mtime": 1791220695.696205,
     "ast_hash": "faeef934f3fead745754c4ed2459286a",
+    "semantic_hash": ""
+  },
+  "lib/server/trava-entrada-duplicada.ts": {
+    "mtime": 1791226119.6416588,
+    "ast_hash": "cb69f4ddba90c9db72c1a8d58ed9f504",
     "semantic_hash": ""
   }
 }

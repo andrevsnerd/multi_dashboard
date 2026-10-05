@@ -457,20 +457,31 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
         }),
       });
       const jsonEntrada = await resEntrada.json().catch(() => ({}));
-      if (!resEntrada.ok) {
+      // Trava de duplicata: a entrada já existia (a resposta da 1ª tentativa se
+      // perdeu) e cobre tudo → não grava de novo, só termina a confirmação.
+      const entradaExistente: { romaneio: string; completa: boolean } | undefined =
+        jsonEntrada?.entradaExistente;
+      const reaproveitada = !resEntrada.ok && !!entradaExistente?.completa;
+      if (!resEntrada.ok && !reaproveitada) {
         throw new Error(
           jsonEntrada?.error
             ? `Erro ao dar entrada em ${defeitoFilial}: ${jsonEntrada.error}`
             : `Erro ao dar entrada em ${defeitoFilial}.`
         );
       }
-      const romaneioEntrada: string = jsonEntrada?.romaneio ?? "";
+      const romaneioEntrada: string = reaproveitada
+        ? entradaExistente!.romaneio
+        : jsonEntrada?.romaneio ?? "";
 
       // 2) Marca a confirmação de cada item. `filialOrigem` só vai no item
       //    divergente: é ele que dispara a devolução no servidor, e mandar em
       //    todos faria uma consulta extra por item sem precisar.
       const mensagens: string[] = [];
-      if (romaneioEntrada) {
+      if (reaproveitada) {
+        mensagens.push(
+          `Este romaneio já tinha dado entrada em ${defeitoFilial} (romaneio ${romaneioEntrada}) — nada foi lançado de novo, só concluída a confirmação.`
+        );
+      } else if (romaneioEntrada) {
         mensagens.push(`Entrada registrada em ${defeitoFilial} — romaneio ${romaneioEntrada}.`);
       }
 

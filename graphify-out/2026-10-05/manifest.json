@@ -695,8 +695,8 @@
     "semantic_hash": "46a07d2e6577a3e46cb6adcc5fda6699"
   },
   "app/api/extrato-produto/route.ts": {
-    "mtime": 1788968357.8558617,
-    "ast_hash": "bded699f51a3fb3cda93effe0fc24e30",
+    "mtime": 1791224430.4254212,
+    "ast_hash": "b404be36975e8459fe0d0cf5864330fa",
     "semantic_hash": ""
   },
   "app/api/faturamento/detalhe/route.ts": {
@@ -1340,8 +1340,8 @@
     "semantic_hash": "1f13894059c7c73365fb5303040f3f5a"
   },
   "components/extrato-produto/ExtratoProdutoPage.tsx": {
-    "mtime": 1791204265.822904,
-    "ast_hash": "e812b3fa78b7dfc330b2c1783538f50f",
+    "mtime": 1791224445.5577123,
+    "ast_hash": "0a52b341c04d7275fe5eff550a1968a3",
     "semantic_hash": ""
   },
   "components/faturamento/FaturamentoPage.tsx": {

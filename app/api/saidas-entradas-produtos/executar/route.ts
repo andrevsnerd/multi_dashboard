@@ -18,6 +18,11 @@ import {
   podeIgnorarTravaDefeito,
 } from '@/lib/server/trava-defeito';
 import { mensagemTravaInventario, verificarTravaInventario } from '@/lib/server/trava-inventario';
+import {
+  buscarEntradaJaFeita,
+  mensagemEntradaDuplicada,
+  observacaoComReferencia,
+} from '@/lib/server/trava-entrada-duplicada';
 import { getActiveFilial } from '@/lib/config/company';
 import { resolveCompanyDynamic } from '@/lib/config/company-server';
 import type { CompanyConfig } from '@/lib/config/company';
@@ -65,6 +70,13 @@ interface SaidaEntradaRequest {
    */
   romaneioReferencia?: { romaneio: string; filialOrigem: string; dataRomaneio?: string } | null;
 }
+
+/**
+ * Entradas de saída em andamento neste processo (filial|saída|origem). Segura o
+ * duplo clique / duas abas enquanto a 1ª ainda grava — a trava do banco só vê a
+ * entrada depois que ela existe.
+ */
+const entradasEmAndamento = new Set<string>();
 
 function isTransferenciaEntreLojas(tipoRomaneio: string): boolean {
   const normalized = (tipoRomaneio || '')
@@ -308,18 +320,70 @@ export async function POST(request: Request) {
       companyKey?.trim().toLowerCase() === 'nerd' &&
       normalizeFilialKey(tipoRomaneio) === 'NERD PRODUCAO';
 
-    const pool = shouldUseProxy() ? new ProxyPool() : await getConnectionPool();
-    const result = tipoOperacao === 'saida'
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ? await executeSaidaLote(pool, { itens, filial: filialTrim, filialDestino: filialDestinoTrim, tipoRomaneio, responsavel: responsavelFinal, observacao } as any)
-      : await executeEntradaLote(pool, {
+    // TRAVA DE ENTRADA DUPLICADA — a mesma saída não entra duas vezes no destino.
+    // Ver lib/server/trava-entrada-duplicada.ts.
+    const ref = tipoOperacao === 'entrada' ? body.romaneioReferencia ?? null : null;
+    const chaveAndamento = ref?.romaneio
+      ? `${normalizeFilialKey(filialTrim)}|${ref.romaneio.trim()}|${normalizeFilialKey(ref.filialOrigem)}`
+      : null;
+    if (chaveAndamento) {
+      if (entradasEmAndamento.has(chaveAndamento)) {
+        return NextResponse.json(
+          {
+            error: `A entrada da saída ${ref!.romaneio.trim()} já está sendo gravada. Aguarde e atualize a tela antes de tentar de novo.`,
+            code: 'ENTRADA_EM_ANDAMENTO',
+          },
+          { status: 409 }
+        );
+      }
+      let jaFeita = null;
+      try {
+        jaFeita = await buscarEntradaJaFeita({
+          companyKey: companyKey ?? '',
+          filialDestino: filialTrim,
+          romaneioSaida: ref!.romaneio,
+          filialOrigem: ref!.filialOrigem,
+          dataRomaneio: ref!.dataRomaneio,
           itens,
-          filial: filialTrim,
-          tipoRomaneio,
-          responsavel: responsavelFinal,
-          observacao,
-          gravarTipoRomaneio: gravarTipoNerdProducao,
         });
+      } catch (travaError) {
+        // Fail-open, como as outras travas: indisponibilidade não pode impedir a entrada.
+        console.error('Erro ao verificar entrada duplicada', travaError);
+      }
+      if (jaFeita) {
+        return NextResponse.json(
+          {
+            error: mensagemEntradaDuplicada(jaFeita, ref!.romaneio.trim()),
+            code: 'ENTRADA_DUPLICADA',
+            entradaExistente: jaFeita,
+          },
+          { status: 409 }
+        );
+      }
+    }
+
+    const pool = shouldUseProxy() ? new ProxyPool() : await getConnectionPool();
+    if (chaveAndamento) entradasEmAndamento.add(chaveAndamento);
+    let result;
+    try {
+      result = tipoOperacao === 'saida'
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ? await executeSaidaLote(pool, { itens, filial: filialTrim, filialDestino: filialDestinoTrim, tipoRomaneio, responsavel: responsavelFinal, observacao } as any)
+        : await executeEntradaLote(pool, {
+            itens,
+            filial: filialTrim,
+            tipoRomaneio,
+            responsavel: responsavelFinal,
+            // Entrada de uma saída leva o vínculo no OBS: é a prova que a trava
+            // de duplicata procura (o Linx não liga a entrada avulsa à saída).
+            observacao: ref?.romaneio
+              ? observacaoComReferencia(observacao, ref.romaneio, ref.filialOrigem)
+              : observacao,
+            gravarTipoRomaneio: gravarTipoNerdProducao,
+          });
+    } finally {
+      if (chaveAndamento) entradasEmAndamento.delete(chaveAndamento);
+    }
 
     if (tipoOperacao === 'saida' && companyKey && filialDestinoTrim && result.romaneio) {
       try {
