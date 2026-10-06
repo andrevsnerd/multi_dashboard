@@ -29,8 +29,7 @@ import type { RequestLike } from "@/lib/db/proxy";
 import { fetchProductsWithDetails } from "@/lib/repositories/products";
 import { fetchVendedoresList } from "@/lib/repositories/vendedores-v2";
 import { canonicalKey } from "@/lib/reports/keys";
-import { isCompraTransitoDateActive } from "@/lib/utils/compra-transito-status";
-import { listComprasTransitoFull } from "@/lib/utils/compra-transito-store";
+import { listComprasTransitoPendentes } from "@/lib/server/compra-transito-reconciliacao";
 import { listProdutosDescontinuados } from "@/lib/utils/produto-descontinuado-store";
 import { buildDescontinuadoKeySet, isProdutoDescontinuado } from "@/lib/utils/produtos-descontinuados";
 import { shiftRangeByMonths, toUtcStartOfDay, type NormalizedRange } from "@/lib/utils/date";
@@ -347,11 +346,9 @@ async function loadTransitoLookup(
   };
 
   try {
-    const compras = await listComprasTransitoFull(company).catch(() => []);
-    const today = new Date();
+    const compras = await listComprasTransitoPendentes(company).catch(() => []);
     for (const c of compras) {
       for (const it of c.items ?? []) {
-        if (!isCompraTransitoDateActive(it.dataRecebimento, today)) continue;
         const qtd = Math.max(0, Math.round(Number(it.quantidade ?? 0)));
         const data = (it.dataRecebimento ?? "").slice(0, 10) || null;
         const cor = it.corProduto ?? null;
@@ -1114,11 +1111,9 @@ async function buildCompraTransitIndex(
 ): Promise<Map<string, CompraTransitoIndexEntry[]>> {
   const idx = new Map<string, CompraTransitoIndexEntry[]>();
   if (!company) return idx;
-  const compras = await listComprasTransitoFull(company).catch(() => []);
-  const today = new Date();
+  const compras = await listComprasTransitoPendentes(company).catch(() => []);
   for (const c of compras) {
     for (const it of c.items ?? []) {
-      if (!isCompraTransitoDateActive(it.dataRecebimento, today)) continue;
       const entry: CompraTransitoIndexEntry = {
         itemKey: it.itemKey ?? "",
         produto: it.produto,

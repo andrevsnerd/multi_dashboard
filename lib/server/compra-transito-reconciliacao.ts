@@ -14,6 +14,7 @@ import {
   type ItemReconciliacao,
 } from "@/lib/utils/compra-transito-reconciliacao";
 import { listComprasTransitoFull } from "@/lib/utils/compra-transito-store";
+import { isCompraTransitoDateActive } from "@/lib/utils/compra-transito-status";
 
 /**
  * Reconcilia TODAS as compras confirmadas de uma empresa contra as entradas reais
@@ -108,4 +109,68 @@ export function buildReconciliacaoResposta(
     itens,
     resumo: { totalItens, recebidos, parciais, atrasados, emTransito, statusGeral },
   };
+}
+
+/** Reconciliação em andamento por empresa — chamadas paralelas compartilham a mesma consulta. */
+const pendentesEmAndamento = new Map<string, Promise<CompraTransito[]>>();
+
+/**
+ * Compras em trânsito com o que AINDA FALTA CHEGAR, item a item — a fonte única do
+ * trânsito para todas as telas (Compras Salvas, Curva ABC, Lista Loja, Projeção,
+ * Loja Raio X, relatórios).
+ *
+ * Antes cada tela decidia pela DATA PREVISTA (`dataRecebimento >= hoje`): no dia
+ * seguinte ao previsto o item sumia de todo lugar, mesmo sem ter chegado nada — e
+ * a tela de Compras em Trânsito, que reconcilia contra as entradas reais, mostrava
+ * esse mesmo item como "atrasado". Regra do dono: atrasado continua em trânsito.
+ *
+ * Aqui vale a reconciliação (a mesma da tela): `quantidade` passa a ser o `faltou`
+ * (pedido − recebido na matriz). Item recebido por completo sai; parcial conta só o
+ * restante; atrasado conta inteiro. A data prevista é mantida — se já passou, quem
+ * consome trata como "chega agora".
+ *
+ * Se o Linx falhar, cai na regra antiga por data (com log), para o trânsito não
+ * zerar inteiro em todas as telas.
+ */
+export async function listComprasTransitoPendentes(companyKey: string): Promise<CompraTransito[]> {
+  const emAndamento = pendentesEmAndamento.get(companyKey);
+  if (emAndamento) return emAndamento;
+
+  const promise = calcularPendentes(companyKey).finally(() => {
+    pendentesEmAndamento.delete(companyKey);
+  });
+  pendentesEmAndamento.set(companyKey, promise);
+  return promise;
+}
+
+async function calcularPendentes(companyKey: string): Promise<CompraTransito[]> {
+  try {
+    const { confirmed, recMap } = await reconcileCompanyCompras(companyKey as CompanyKey);
+    const out: CompraTransito[] = [];
+    for (const compra of confirmed) {
+      const itensRec = recMap.get(compra.id);
+      const items = compra.items.flatMap((item) => {
+        const pedido = Math.max(0, Math.round(Number(item.quantidade ?? 0)));
+        const faltou = itensRec?.get(item.itemKey)?.faltou ?? pedido;
+        if (faltou <= 0) return [];
+        return [{ ...item, quantidade: faltou, status: "em_transito" as const }];
+      });
+      if (items.length > 0) out.push({ ...compra, status: "em_transito", items });
+    }
+    return out;
+  } catch (error) {
+    console.error(
+      "[compra-transito] Reconciliação falhou; trânsito cai na regra por data prevista:",
+      error
+    );
+    const all = await listComprasTransitoFull(companyKey);
+    const today = new Date();
+    return all
+      .filter((c) => c.status !== "rascunho")
+      .map((c) => ({
+        ...c,
+        items: c.items.filter((it) => isCompraTransitoDateActive(it.dataRecebimento, today)),
+      }))
+      .filter((c) => c.items.length > 0);
+  }
 }

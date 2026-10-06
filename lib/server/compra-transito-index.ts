@@ -10,8 +10,7 @@
 
 import { canonicalKey } from "@/lib/reports/keys";
 import { getMappedColorDescription } from "@/lib/utils/colorMapping";
-import { listComprasTransitoFull } from "@/lib/utils/compra-transito-store";
-import { isCompraTransitoDateActive } from "@/lib/utils/compra-transito-status";
+import { listComprasTransitoPendentes } from "@/lib/server/compra-transito-reconciliacao";
 import type { CompraTransitoIndexEntry } from "@/lib/client/compras-transito";
 
 export type { CompraTransitoIndexEntry };
@@ -46,11 +45,9 @@ export async function buildCompraTransitoServerIndex(
 ): Promise<CompraTransitoServerIndex> {
   const idx: CompraTransitoServerIndex = new Map();
   if (!company) return idx;
-  const compras = await listComprasTransitoFull(company).catch(() => []);
-  const today = new Date();
+  const compras = await listComprasTransitoPendentes(company).catch(() => []);
   for (const c of compras) {
     for (const it of c.items ?? []) {
-      if (!isCompraTransitoDateActive(it.dataRecebimento, today)) continue;
       const entry: CompraTransitoIndexEntry = {
         itemKey: it.itemKey ?? "",
         produto: it.produto,
@@ -107,15 +104,13 @@ export async function listTransitoAtivoPorItem(
 ): Promise<Map<string, TransitoItemAgregado>> {
   const out = new Map<string, TransitoItemAgregado>();
   if (!company) return out;
-  const compras = await listComprasTransitoFull(company).catch(() => []);
+  const compras = await listComprasTransitoPendentes(company).catch(() => []);
   const excluir = new Set(
     (opcoes?.excluirCompraSalvaIds ?? []).map((id) => String(id ?? '').trim()).filter(Boolean)
   );
-  const today = new Date();
   for (const c of compras) {
     if (excluir.size > 0 && c.compraSalvaId && excluir.has(String(c.compraSalvaId).trim())) continue;
     for (const it of c.items ?? []) {
-      if (!isCompraTransitoDateActive(it.dataRecebimento, today)) continue;
       const produto = String(it.produto ?? "").trim();
       if (!produto) continue;
       const quantidade = Number(it.quantidade ?? 0) || 0;

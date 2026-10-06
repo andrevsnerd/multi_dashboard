@@ -3,14 +3,21 @@ import 'server-only';
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
+import type { CompanyKey } from '@/lib/config/company';
+import { reconcileCompanyCompras } from '@/lib/server/compra-transito-reconciliacao';
 import { listComprasTransitoFull } from '@/lib/utils/compra-transito-store';
 import { empresaSchema, texto } from '@/lib/mcp/shared';
 
 const STATUS_LABEL: Record<string, string> = {
   rascunho: 'rascunho',
   em_transito: 'em trânsito',
+  atrasado: 'atrasado (em trânsito)',
+  parcial: 'parcial (resto em trânsito)',
   recebido: 'recebido',
 };
+
+/** Status que ainda contam como trânsito: atrasado e parcial continuam a caminho. */
+const AINDA_EM_TRANSITO = new Set(['em_transito', 'atrasado', 'parcial']);
 
 /**
  * Tool `compras_transito`: compras em trânsito (o que foi comprado, quanto,
@@ -25,25 +32,33 @@ export function registerComprasTools(server: McpServer) {
       description:
         'Compras em trânsito de uma empresa: itens comprados com quantidade, custo e previsão de chegada (dataRecebimento). ' +
         'Responde "esse produto foi comprado / está chegando / quando chega". Filtre por `produto` (código) e/ou `status` ' +
-        '(em_transito | recebido | rascunho). Fonte: cadastro de compras em trânsito do dashboard (não é pedido do ERP).',
+        '(em_transito | recebido | rascunho). O status é o REAL, reconciliado contra as entradas na matriz: item atrasado ' +
+        '(previsão vencida, nada chegou) e parcial (chegou parte) continuam em trânsito, e `faltaChegar` diz quanto. ' +
+        'Fonte: cadastro de compras em trânsito do dashboard (não é pedido do ERP).',
       inputSchema: {
         empresa: empresaSchema,
         produto: z.string().optional().describe('Código do produto para filtrar (opcional).'),
         status: z
           .enum(['em_transito', 'recebido', 'rascunho'])
           .optional()
-          .describe('Filtra pelo status do item.'),
+          .describe('Filtra pelo status do item. em_transito inclui atrasados e parciais (tudo que ainda falta chegar).'),
       },
     },
     async ({ empresa, produto, status }) => {
       const compras = await listComprasTransitoFull(empresa);
+      // Mesma reconciliação da tela Compras em Trânsito; sem ela (Linx fora), cai no status por data.
+      const recMap = await reconcileCompanyCompras(empresa as CompanyKey)
+        .then((r) => r.recMap)
+        .catch(() => null);
       const alvoProduto = produto ? produto.trim().replace(/\s+/g, '').toUpperCase() : null;
 
       const itens: Array<Record<string, unknown>> = [];
       for (const compra of compras) {
         for (const item of compra.items ?? []) {
           if (alvoProduto && item.produto.trim().replace(/\s+/g, '').toUpperCase() !== alvoProduto) continue;
-          if (status && item.status !== status) continue;
+          const rec = compra.status === 'rascunho' ? undefined : recMap?.get(compra.id)?.get(item.itemKey);
+          const statusReal: string = compra.status === 'rascunho' ? 'rascunho' : (rec?.statusReal ?? item.status);
+          if (status === 'em_transito' ? !AINDA_EM_TRANSITO.has(statusReal) : status && statusReal !== status) continue;
           itens.push({
             compra: compra.title,
             produto: item.produto,
@@ -54,7 +69,8 @@ export function registerComprasTools(server: McpServer) {
             custoUnitario: item.custoUnitario ?? null,
             valorTotal: item.custoUnitario != null ? item.custoUnitario * item.quantidade : null,
             chegadaPrevista: item.dataRecebimento,
-            status: STATUS_LABEL[item.status] ?? item.status,
+            faltaChegar: rec ? rec.faltou : null,
+            status: STATUS_LABEL[statusReal] ?? statusReal,
           });
         }
       }

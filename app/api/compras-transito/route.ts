@@ -12,6 +12,7 @@ import {
   type GastoSyncResultado,
 } from "@/lib/server/compra-transito-gasto";
 import { applyAutoRecebimento } from "@/lib/server/compra-transito-recebimento";
+import { listComprasTransitoPendentes } from "@/lib/server/compra-transito-reconciliacao";
 
 function formatDefaultTitle() {
   const now = new Date();
@@ -27,13 +28,17 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const companyKey = searchParams.get("company") ?? "";
   const includeItems = searchParams.get("includeItems") === "1";
+  // pendentes=1: só o que ainda falta chegar (reconciliado), para as telas que somam trânsito.
+  const pendentes = searchParams.get("pendentes") === "1";
 
   if (!companyKey) {
     return NextResponse.json({ error: "company é obrigatório" }, { status: 400 });
   }
 
   try {
-    const data = includeItems
+    const data = pendentes
+      ? await listComprasTransitoPendentes(companyKey)
+      : includeItems
       ? await listComprasTransitoFull(companyKey)
       : await listComprasTransito(companyKey);
     return NextResponse.json({ data });

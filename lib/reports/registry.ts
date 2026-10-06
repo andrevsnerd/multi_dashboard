@@ -41,6 +41,11 @@ import {
   custosDefeitosMeta,
   CUSTOS_DEFEITOS_ID,
 } from "./custos-defeitos";
+import {
+  buildEstoqueInventarioPresets,
+  estoqueInventarioMeta,
+  ESTOQUE_INVENTARIO_ID,
+} from "./estoque-inventario";
 import { buildTicketsPresets, ticketsMeta, TICKETS_ID } from "./tickets";
 import {
   buildVendasPorPrecoPresets,
@@ -69,6 +74,7 @@ export const REPORT_TYPES: ReportTypeMeta[] = [
   vendasPorPrecoMeta,
   projecaoVendasMeta,
   custosDefeitosMeta,
+  estoqueInventarioMeta,
 ];
 
 export function getReportMeta(id: string): ReportTypeMeta | undefined {
@@ -106,6 +112,9 @@ export function getDefaultPresets(id: string, companyKey: CompanyKey): ReportPre
   }
   if (id === CUSTOS_DEFEITOS_ID) {
     return buildCustosDefeitosPresets();
+  }
+  if (id === ESTOQUE_INVENTARIO_ID) {
+    return buildEstoqueInventarioPresets();
   }
   if (id === TICKETS_ID) {
     return buildTicketsPresets();

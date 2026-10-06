@@ -19,8 +19,7 @@ import { getControleEstoqueMetricasItens } from "@/lib/server/controle-estoque-m
 import { buildControleEstoqueItemKey } from "@/lib/utils/controle-estoque-metricas";
 import { calcCompraIdealFromResumo } from "@/lib/utils/compra-ideal";
 import { ensureCompraCicloRuntime } from "@/lib/config/compra-ciclo-store";
-import { listComprasTransitoFull } from "@/lib/utils/compra-transito-store";
-import { isCompraTransitoDateActive } from "@/lib/utils/compra-transito-status";
+import { listComprasTransitoPendentes } from "@/lib/server/compra-transito-reconciliacao";
 import type { CompraTransitoIndexEntry } from "@/lib/client/compras-transito";
 import type {
   ReportColumnDef,
@@ -39,11 +38,9 @@ async function buildTransitIndex(
 ): Promise<Map<string, CompraTransitoIndexEntry[]>> {
   const idx = new Map<string, CompraTransitoIndexEntry[]>();
   if (!company) return idx;
-  const compras = await listComprasTransitoFull(company).catch(() => []);
-  const today = new Date();
+  const compras = await listComprasTransitoPendentes(company).catch(() => []);
   for (const c of compras) {
     for (const it of c.items ?? []) {
-      if (!isCompraTransitoDateActive(it.dataRecebimento, today)) continue;
       const k = canonicalKey(it.produto, it.corProduto ?? null);
       const arr = idx.get(k) ?? [];
       arr.push({

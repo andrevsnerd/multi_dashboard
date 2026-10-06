@@ -35,6 +35,8 @@ import {
   PROJECAO_VENDAS_ID,
 } from "@/lib/reports/projecao-vendas";
 import { CUSTOS_DEFEITOS_ID } from "@/lib/reports/custos-defeitos";
+import { ESTOQUE_INVENTARIO_ID } from "@/lib/reports/estoque-inventario";
+import EstoqueInventarioPanel from "@/components/relatorios/EstoqueInventarioPanel";
 import { exportProjecaoVendasXlsx } from "@/lib/utils/exportProjecaoVendasXlsx";
 import { exportCustosDefeitosXlsx } from "@/lib/utils/exportCustosDefeitosXlsx";
 import { exportTicketsXlsx } from "@/lib/utils/exportTicketsXlsx";
@@ -201,6 +203,8 @@ export default function GeradorRelatoriosPage({
    * linha, repetição = quantidade). A tela troca o painel de filtros pelo campo da lista.
    */
   const isCustosDefeitos = reportTypeId === CUSTOS_DEFEITOS_ID;
+  /** Estoque inventário: só escolhe lojas e baixa o arquivo — sem filtros, colunas nem tabela. */
+  const isInventario = reportTypeId === ESTOQUE_INVENTARIO_ID;
 
   // Filtros
   const [range, setRange] = useState<DateRangeValue>(initialRange);
@@ -1385,6 +1389,11 @@ export default function GeradorRelatoriosPage({
         {meta?.description && <p className={styles.hint}>{meta.description}</p>}
       </section>
 
+      {/* Estoque inventário: painel próprio (escolhe lojas e baixa o arquivo pronto). */}
+      {isInventario && <EstoqueInventarioPanel companyKey={companyKey} />}
+
+      {!isInventario && (
+      <>
       {/* Custos de defeitos: a lista colada é a entrada da análise (substitui os filtros).
           Uma peça por linha — o mesmo código repetido N vezes vira quantidade N. */}
       {isCustosDefeitos && (
@@ -2071,6 +2080,8 @@ export default function GeradorRelatoriosPage({
             </tbody>
           </table>
         </div>
+      )}
+      </>
       )}
     </div>
   );

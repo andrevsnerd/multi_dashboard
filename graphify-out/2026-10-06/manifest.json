@@ -485,8 +485,8 @@
     "semantic_hash": "d49f2273e7d8c35208a05b59ff588a00"
   },
   "app/api/compras-transito/route.ts": {
-    "mtime": 1791291101.661374,
-    "ast_hash": "d7e9528c7dc37777940db7eb0dee1967",
+    "mtime": 1788264818.1163743,
+    "ast_hash": "35dfebb6c3115be50df16843867a3773",
     "semantic_hash": ""
   },
   "app/api/controle-estoque/compra-data-fixa/route.ts": {
@@ -2095,9 +2095,9 @@
     "semantic_hash": "69fa99743f3988b30f78882057f6b512"
   },
   "lib/client/compras-transito.ts": {
-    "mtime": 1791291101.667961,
-    "ast_hash": "f73fa2eac7dddd2ecac1f5c1a63afc82",
-    "semantic_hash": ""
+    "mtime": 1782492654.829713,
+    "ast_hash": "a8a3fa8a83b33dfe7330dc277d171b41",
+    "semantic_hash": "a8a3fa8a83b33dfe7330dc277d171b41"
   },
   "lib/client/controle-estoque-metricas.ts": {
     "mtime": 1780073682.823993,
@@ -2205,9 +2205,9 @@
     "semantic_hash": "fc0127cb75c6243b7888355028b7de56"
   },
   "lib/mcp/tools/compras.ts": {
-    "mtime": 1791291193.0613134,
-    "ast_hash": "8ac36a8af292b447483506665cb53250",
-    "semantic_hash": ""
+    "mtime": 1780586962.2948122,
+    "ast_hash": "1b352868c4d08b27ae943e25923782f0",
+    "semantic_hash": "1b352868c4d08b27ae943e25923782f0"
   },
   "lib/mcp/tools/curva.ts": {
     "mtime": 1780928252.547423,
@@ -2565,8 +2565,8 @@
     "semantic_hash": "234df7ca790fa285814435a673e30214"
   },
   "lib/repositories/reportVendas.ts": {
-    "mtime": 1791291089.7988594,
-    "ast_hash": "ffc642f3fdb50b7109df7f661ecfe749",
+    "mtime": 1788964892.4744272,
+    "ast_hash": "1dbb6194f03bc6445bc6390bbb5c77b5",
     "semantic_hash": ""
   },
   "lib/repositories/reportVendasHistorico.ts": {
@@ -2615,9 +2615,9 @@
     "semantic_hash": ""
   },
   "lib/server/compra-transito-reconciliacao.ts": {
-    "mtime": 1791291067.913632,
-    "ast_hash": "7805c7a63a90391ef9bbb1b651555d8e",
-    "semantic_hash": ""
+    "mtime": 1781719292.553023,
+    "ast_hash": "4fddeea5cf87b20828fbd4600d554e84",
+    "semantic_hash": "4fddeea5cf87b20828fbd4600d554e84"
   },
   "lib/server/controle-estoque-metricas.ts": {
     "mtime": 1782848686.6150796,
@@ -3445,8 +3445,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/lojaRaioX.ts": {
-    "mtime": 1791291089.7988594,
-    "ast_hash": "1a6624b57becd950b40a2d4c94b06719",
+    "mtime": 1788964892.4688096,
+    "ast_hash": "c23590be7ae09591daf97781f9ed18d3",
     "semantic_hash": ""
   },
   "lib/utils/exportLojaRaioXXlsx.ts": {
@@ -4530,8 +4530,8 @@
     "semantic_hash": ""
   },
   "lib/server/compra-transito-index.ts": {
-    "mtime": 1791291089.795322,
-    "ast_hash": "57b21d92ab530c8d6a1f77862485edab",
+    "mtime": 1789151324.2988913,
+    "ast_hash": "93502607e2236dff9fa725c4c12286a2",
     "semantic_hash": ""
   },
   "lib/utils/projecao-sazonal.ts": {
