@@ -494,12 +494,7 @@
   "492": "metragem-produto.ts",
   "493": "compra-transito-analytics.ts",
   "494": "route.ts",
-  "497": "ColecaoDetalhePanel.tsx",
-  "509": "page.tsx",
-  "512": "page.tsx",
-  "516": "page.tsx",
-  "517": "page.tsx",
-  "518": "page.tsx",
-  "523": "page.tsx",
-  "525": "page.tsx"
+  "495": "discovery.ts",
+  "496": "executeQueryWithParams",
+  "497": "ColecaoDetalhePanel.tsx"
 }

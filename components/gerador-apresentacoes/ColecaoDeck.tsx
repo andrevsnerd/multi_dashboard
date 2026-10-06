@@ -98,7 +98,12 @@ export default function ColecaoDeck({
   const lines = titleLines(displayTitleRaw);
   const displayName = displayTitleRaw.replace(/\r?\n/g, " ").trim();
   const eyebrowName = displayName.toUpperCase();
-  const footerText = `${displayName} · ${report.period.short}`;
+  // Recorte por cadastro (ex.: "Subgrupo: CETIM DE SEDA") vai no rodapé de todo
+  // slide: o PDF circula solto e não pode parecer a coleção inteira.
+  const recorte = report.collection.recorte;
+  const footerText = recorte
+    ? `${displayName} · ${recorte} · ${report.period.short}`
+    : `${displayName} · ${report.period.short}`;
 
   // Páginas da tabela de produtos. `productsPerSlide` vem do payload (o repo é
   // server/mssql, o deck não pode importar a constante). Sempre ≥ 1 página, para
@@ -145,6 +150,12 @@ export default function ColecaoDeck({
           <div className={styles.meta}>
             <b>Coleção:</b> {report.collection.fullName}
             <br />
+            {recorte && (
+              <>
+                <b>Recorte:</b> {recorte}
+                <br />
+              </>
+            )}
             <b>Rede:</b> SCARF·ME · {report.kpis.canaisAtivos} canais ativos
             <br />
             <b>Faturamento:</b> {fmtCurrency2(report.kpis.faturamento)}

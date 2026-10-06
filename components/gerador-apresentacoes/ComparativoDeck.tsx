@@ -105,6 +105,7 @@ function Cover({ payload, logoDataUrl }: { payload: ComparativoColecoesPayload; 
         <Txt x={0.72} y={2.95} w={9.6} size={46} color="FFFFFF" bold serif lineH={1.05}>{`Performance por\nColeção · ${payload.period.label}`}</Txt>
         <Txt x={0.78} y={5.0} w={7.4} size={13} color="B8BCC8" lineH={1.25}>
           {payload.totals.colecoes} coleções em análise · venda líquida, ticket, margem e ritmo de geração de receita para decisão de renovação.
+          {payload.recorte ? ` Recorte: ${payload.recorte}.` : ""}
         </Txt>
         {stats.map((st, i) => (
           <div key={st.l}>

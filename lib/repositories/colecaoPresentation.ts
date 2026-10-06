@@ -7,11 +7,16 @@ import {
 } from "@/lib/config/company";
 import { resolveCompanyLive, liveNameForIncoming } from "@/lib/server/company-live";
 import { withRequest } from "@/lib/db/connection";
+import type { RequestLike } from "@/lib/db/proxy";
 import { canonicalKey } from "@/lib/reports/keys";
 import { normalizeRangeForQuery } from "@/lib/utils/date";
 import { fetchProductsWithDetails } from "@/lib/repositories/products";
 import { fetchProdutoQtdePorFilial } from "@/lib/repositories/performance";
 import { fetchTicketItens } from "@/lib/repositories/reportTickets";
+import {
+  describeItemFilters,
+  type PresentationItemFilters,
+} from "@/lib/presentations/item-filters";
 
 /**
  * Monta o payload do deck "Relatório Completo de Coleção" do Gerador de
@@ -56,6 +61,12 @@ export interface ColecaoPresentationParams {
   filial?: string | null;
   colecoes?: string[];
   range?: { start?: string; end?: string };
+  /**
+   * Recorte da coleção pelo cadastro (grupo/subgrupo/linha/grade), ex.: só o
+   * subgrupo CETIM DE SEDA da ESSENTIALS. Vale para o deck INTEIRO (KPIs, produtos,
+   * lojas, destaque e a prévia de vendas): é repassado à `fetchProductsWithDetails`.
+   */
+  filtros?: PresentationItemFilters | null;
   /** Descrição da coleção (label do multiselect) para o título/capa. */
   collectionLabel?: string;
   /** Conjunto de produtos em destaque (slide extra opcional). */
@@ -182,7 +193,8 @@ export interface PresentationDestaquePayload {
 }
 
 export interface ColecaoPresentationPayload {
-  collection: { code: string; fullName: string };
+  /** `recorte` = texto dos filtros de item ("Subgrupo: CETIM DE SEDA"); null = coleção inteira. */
+  collection: { code: string; fullName: string; recorte: string | null };
   period: { start: string; end: string; label: string; short: string };
   kpis: {
     faturamento: number;
@@ -318,6 +330,49 @@ async function fetchNetworkStock(productIds: string[]): Promise<Map<string, numb
   return stock;
 }
 
+/**
+ * Recorte de item (`PresentationItemFilters`) como `AND p.X IN (...)` sobre PRODUTOS
+ * `p` — usado só nas consultas de CADASTRO deste módulo (reconhecimento do destaque).
+ * Venda nunca passa por aqui: vai pela `fetchProductsWithDetails` com os mesmos filtros.
+ */
+function itemFilterSql(
+  request: sql.Request | RequestLike,
+  filtros: PresentationItemFilters | null | undefined,
+  prefix: string
+): string {
+  const cols: Array<[string[] | undefined, string, string]> = [
+    [filtros?.grupos, "Gr", "p.GRUPO_PRODUTO"],
+    [filtros?.subgrupos, "Sg", "p.SUBGRUPO_PRODUTO"],
+    [filtros?.linhas, "Ln", "p.LINHA"],
+    [filtros?.grades, "Gd", "CONVERT(VARCHAR, p.GRADE)"],
+  ];
+  return cols
+    .map(([values, tag, col]) => {
+      const list = (values ?? []).map((v) => v.trim().toUpperCase()).filter(Boolean);
+      if (list.length === 0) return "";
+      list.forEach((v, i) => request.input(`${prefix}${tag}${i}`, sql.VarChar, v));
+      const ph = list.map((_, i) => `@${prefix}${tag}${i}`).join(", ");
+      return `AND UPPER(LTRIM(RTRIM(ISNULL(${col}, '')))) IN (${ph})`;
+    })
+    .filter(Boolean)
+    .join(" ");
+}
+
+/** A linha (de ticket) passa no recorte de item? Mesma regra do `itemFilterSql`. */
+function rowMatchesItemFilters(
+  row: { grupo: string; subgrupo: string; linha: string; grade: string },
+  filtros: PresentationItemFilters | null | undefined
+): boolean {
+  const ok = (list: string[] | undefined, value: string) =>
+    !list || list.length === 0 || list.includes((value ?? "").trim().toUpperCase());
+  return (
+    ok(filtros?.grupos, row.grupo) &&
+    ok(filtros?.subgrupos, row.subgrupo) &&
+    ok(filtros?.linhas, row.linha) &&
+    ok(filtros?.grades, row.grade)
+  );
+}
+
 export interface ColecaoProdutoMatch {
   productId: string;
   nome: string;
@@ -339,9 +394,11 @@ export interface ColecaoProdutoMatch {
 export async function fetchProdutosDaColecaoPorNome({
   colecoes,
   termo,
+  filtros,
 }: {
   colecoes?: string[];
   termo?: string;
+  filtros?: PresentationItemFilters | null;
 }): Promise<ColecaoProdutoMatch[]> {
   const term = (termo ?? "").trim();
   const codes = Array.from(
@@ -353,6 +410,7 @@ export async function fetchProdutosDaColecaoPorNome({
     request.input("destaqueTermo", sql.VarChar, `%${term}%`);
     codes.forEach((c, i) => request.input(`destaqueCol${i}`, sql.VarChar, c));
     const placeholders = codes.map((_, i) => `@destaqueCol${i}`).join(", ");
+    const recorte = itemFilterSql(request, filtros, "destaqueIt");
 
     const res = await request.query<{ PRODUTO: string; NOME: string }>(`
       SELECT DISTINCT
@@ -361,6 +419,7 @@ export async function fetchProdutosDaColecaoPorNome({
       FROM PRODUTOS p WITH (NOLOCK)
       WHERE p.DESC_PRODUTO LIKE @destaqueTermo
         AND UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) IN (${placeholders})
+        ${recorte}
       ORDER BY NOME
     `);
 
@@ -388,7 +447,8 @@ export async function fetchVendasDaColecao({
   filial,
   colecoes,
   range,
-}: Pick<ColecaoPresentationParams, "company" | "filial" | "colecoes" | "range">): Promise<
+  filtros,
+}: Pick<ColecaoPresentationParams, "company" | "filial" | "colecoes" | "range" | "filtros">): Promise<
   VendaColecaoRow[]
 > {
   const codes = new Set((colecoes ?? []).map((c) => c.trim().toUpperCase()).filter(Boolean));
@@ -401,12 +461,19 @@ export async function fetchVendasDaColecao({
       start: range?.start,
       end: range?.end,
       colecoes: Array.from(codes),
+      grupos: filtros?.grupos,
+      subgrupos: filtros?.subgrupos,
+      linhas: filtros?.linhas,
+      grades: filtros?.grades,
     }),
     resolveCompanyLive(company),
   ]);
 
+  // O filtro da análise escolhe o TICKET inteiro; aqui ficam só os itens da coleção
+  // E do recorte (ex.: só o CETIM DE SEDA de um ticket que levou outras peças).
   const daColecao = rows
     .filter((r) => codes.has(r.colecao.trim().toUpperCase()))
+    .filter((r) => rowMatchesItemFilters(r, filtros))
     .filter((r) => r.qtde !== 0 || r.valorItem !== 0);
 
   const barras = await fetchBarrasPorVariacao(daColecao.map((r) => r.produto));
@@ -625,6 +692,7 @@ export async function fetchColecaoPresentation({
   filial,
   colecoes,
   range,
+  filtros,
   collectionLabel,
   destaque,
   todosProdutos = false,
@@ -644,11 +712,16 @@ export async function fetchColecaoPresentation({
       company,
       filial: filial ?? null,
       colecoes,
+      // Recorte da coleção pelo cadastro — mesmos filtros do Gerador de Relatórios.
+      grupos: filtros?.grupos ?? null,
+      subgrupos: filtros?.subgrupos ?? null,
+      linhas: filtros?.linhas ?? null,
+      grades: filtros?.grades ?? null,
       range: rangeInput,
       groupByColor: true,
     }),
     excluirKeys.size > 0
-      ? fetchVendasDaColecao({ company, filial, colecoes, range })
+      ? fetchVendasDaColecao({ company, filial, colecoes, range, filtros })
       : Promise.resolve([] as VendaColecaoRow[]),
   ]);
   const vendasExcluidas = vendasDaColecao.filter((v) => excluirKeys.has(v.key));
@@ -736,7 +809,7 @@ export async function fetchColecaoPresentation({
   );
   let destaqueIds = new Set<string>(destaqueIdsManuais);
   if (destaqueIds.size === 0 && destaqueTermo.length >= DESTAQUE_MIN_TERM) {
-    const matches = await fetchProdutosDaColecaoPorNome({ colecoes, termo: destaqueTermo });
+    const matches = await fetchProdutosDaColecaoPorNome({ colecoes, termo: destaqueTermo, filtros });
     destaqueIds = new Set(matches.map((m) => m.productId));
   }
   const destaqueRows =
@@ -1048,7 +1121,7 @@ export async function fetchColecaoPresentation({
   const fullName = collectionLabel?.trim() || code;
 
   return {
-    collection: { code, fullName },
+    collection: { code, fullName, recorte: describeItemFilters(filtros) },
     period: { start: startLabelIso, end: endLabelIso, label: periodLabel, short: periodShort },
     kpis: {
       faturamento: totalRevenue,

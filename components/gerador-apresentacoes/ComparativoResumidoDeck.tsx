@@ -117,6 +117,7 @@ function Cover({ payload, logoDataUrl }: { payload: ComparativoResumidoPayload; 
         <p className={styles.coverLead}>
           {payload.totals.colecoes} coleções lado a lado — venda líquida, quantidade vendida, peças (SKUs)
           cadastradas e a evolução mensal de cada uma.
+          {payload.recorte ? ` Recorte: ${payload.recorte}.` : ""}
         </p>
         <div className={styles.coverStats}>
           {stats.map((st) => (
@@ -155,7 +156,9 @@ export default function ComparativoResumidoDeck({
               <div>
                 <div className={styles.eyebrow}>COMPARATIVO RESUMIDO</div>
                 <div className={styles.title}>Coleções em resumo</div>
-                <div className={styles.period}>{payload.period.label}</div>
+                <div className={styles.period}>
+                  {payload.recorte ? `${payload.period.label} · ${payload.recorte}` : payload.period.label}
+                </div>
               </div>
               <div className={styles.headerLogo}>
                 {logoDataUrl ? (

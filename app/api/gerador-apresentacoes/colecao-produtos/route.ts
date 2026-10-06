@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { itemFiltersFromSearchParams } from "@/lib/presentations/item-filters";
 
 import { fetchProdutosDaColecaoPorNome } from "@/lib/repositories/colecaoPresentation";
 
@@ -24,7 +25,11 @@ export async function GET(request: Request) {
   }
 
   try {
-    const data = await fetchProdutosDaColecaoPorNome({ colecoes, termo });
+    const data = await fetchProdutosDaColecaoPorNome({
+      colecoes,
+      termo,
+      filtros: itemFiltersFromSearchParams(searchParams),
+    });
     return NextResponse.json({ data }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     console.error("Erro ao reconhecer produtos da coleção", error);

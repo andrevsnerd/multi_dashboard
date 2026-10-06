@@ -13,6 +13,7 @@ import { normalizeRangeForQuery } from "@/lib/utils/date";
 import { canonicalKey } from "@/lib/reports/keys";
 import { fetchProductsWithDetails } from "@/lib/repositories/products";
 import { fetchProdutoQtdePorFilial } from "@/lib/repositories/performance";
+import type { PresentationItemFilters } from "@/lib/presentations/item-filters";
 
 /**
  * Relatório de Coleção (Relatório Claude + comparativos entre coleções).
@@ -34,6 +35,12 @@ export interface CollectionReportQueryParams {
   };
   filial?: string | null;
   colecoes?: string[] | null;
+  /**
+   * Recorte da coleção por atributo do cadastro (grupo/subgrupo/linha/grade) — ex.:
+   * só o subgrupo CETIM DE SEDA. Vai direto para `fetchProductsWithDetails`; nas
+   * consultas próprias deste módulo vira o mesmo `AND p.X IN (...)` sobre PRODUTOS.
+   */
+  filtros?: PresentationItemFilters | null;
 }
 
 export interface CollectionReportDetailRow {
@@ -225,6 +232,35 @@ function prepColecaoFilter(
     `AND UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) IN (${ph})`;
 }
 
+/**
+ * Recorte por atributo do cadastro (`PresentationItemFilters`) sobre PRODUTOS `p`,
+ * mesma semântica dos filtros de `fetchProductsWithDetails` para a ScarfMe (que
+ * casam por `p.GRUPO_PRODUTO`/`p.SUBGRUPO_PRODUTO`/`p.LINHA`/`p.GRADE`). Registra os
+ * @params UMA vez por request — o trecho pode se repetir em várias CTEs da mesma query.
+ */
+function prepItemFilter(
+  request: sql.Request | RequestLike,
+  filtros: PresentationItemFilters | null | undefined,
+  prefix: string
+): string {
+  const cols: Array<[string[] | undefined, string, string]> = [
+    [filtros?.grupos, "Gr", "p.GRUPO_PRODUTO"],
+    [filtros?.subgrupos, "Sg", "p.SUBGRUPO_PRODUTO"],
+    [filtros?.linhas, "Ln", "p.LINHA"],
+    [filtros?.grades, "Gd", "CONVERT(VARCHAR, p.GRADE)"],
+  ];
+  return cols
+    .map(([values, tag, col]) => {
+      const list = (values ?? []).map((v) => v.trim().toUpperCase()).filter(Boolean);
+      if (list.length === 0) return "";
+      list.forEach((v, i) => request.input(`${prefix}${tag}${i}`, sql.VarChar, v));
+      const ph = list.map((_, i) => `@${prefix}${tag}${i}`).join(", ");
+      return `AND UPPER(LTRIM(RTRIM(ISNULL(${col}, '')))) IN (${ph})`;
+    })
+    .filter(Boolean)
+    .join(" ");
+}
+
 function buildEcommerceCollectionFilter(
   request: sql.Request | RequestLike,
   colecoes: string[],
@@ -282,7 +318,8 @@ function resolveFilialScope(
 async function fetchColecaoDetectedRange(
   company: string | undefined,
   filial: string | null | undefined,
-  colecoes: string[]
+  colecoes: string[],
+  filtros?: PresentationItemFilters | null
 ): Promise<{ start: Date | null; end: Date | null }> {
   let detectedStart: Date | null = null;
   let detectedEnd: Date | null = null;
@@ -305,6 +342,7 @@ async function fetchColecaoDetectedRange(
       const salesFilial = filial && filial !== VAREJO_VALUE ? filial : VAREJO_VALUE;
       const filialFilter = await buildSalesFilialFilter(request, company, salesFilial, "dateSales", "f");
       const colecao = prepColecaoFilter(request, colecoes, "dateSalesCol");
+      const itemFilter = prepItemFilter(request, filtros, "dateSalesIt");
       const res = await request.query<{ startDate: Date | null; endDate: Date | null }>(`
         SELECT MIN(vp.DATA_VENDA) AS startDate, MAX(vp.DATA_VENDA) AS endDate
         FROM LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
@@ -315,6 +353,7 @@ async function fetchColecaoDetectedRange(
         WHERE ISNULL(vp.QTDE_CANCELADA, 0) = 0
           ${filialFilter}
           ${colecao("vp")}
+          ${itemFilter}
       `);
       const row = res.recordset[0];
       detectedStart = earlier(detectedStart, toDate(row?.startDate));
@@ -325,6 +364,7 @@ async function fetchColecaoDetectedRange(
       const ecommerceFilial = filial && isEcommerceFilial(company, filial) ? filial : null;
       const filialFilter = await buildEcommerceFilialFilter(request, company, ecommerceFilial, "dateEcom");
       const colecao = buildEcommerceCollectionFilter(request, colecoes, "dateEcom");
+      const itemFilter = prepItemFilter(request, filtros, "dateEcomIt");
       const res = await request.query<{ startDate: Date | null; endDate: Date | null }>(`
         SELECT MIN(f.EMISSAO) AS startDate, MAX(f.EMISSAO) AS endDate
         FROM FATURAMENTO f WITH (NOLOCK)
@@ -336,6 +376,7 @@ async function fetchColecaoDetectedRange(
           AND fp.QTDE > 0
           ${filialFilter}
           ${colecao}
+          ${itemFilter}
       `);
       const row = res.recordset[0];
       detectedStart = earlier(detectedStart, toDate(row?.startDate));
@@ -360,6 +401,7 @@ export async function fetchCollectionReport({
   range,
   filial,
   colecoes,
+  filtros,
 }: CollectionReportQueryParams = {}): Promise<CollectionReportResponse> {
   const emptySummary = {
     totalRevenue: 0,
@@ -381,6 +423,13 @@ export async function fetchCollectionReport({
   const rangeInput = { start: range?.start, end: range?.end };
   const normRange = normalizeRangeForQuery(rangeInput);
   const normalizedCollections = normalizeCollectionValues(colecoes);
+  // Recorte por cadastro: mesmos parâmetros que o Gerador de Relatórios passa.
+  const itemFilterParams = {
+    grupos: filtros?.grupos ?? null,
+    subgrupos: filtros?.subgrupos ?? null,
+    linhas: filtros?.linhas ?? null,
+    grades: filtros?.grades ?? null,
+  };
 
   const isNetworkScope = filial == null; // rede inteira = varejo + e-commerce
   const specific =
@@ -398,6 +447,7 @@ export async function fetchCollectionReport({
       company,
       filial: filial ?? null,
       colecoes: normalizedCollections,
+      ...itemFilterParams,
       range: rangeInput,
       groupByColor: true,
     }),
@@ -408,11 +458,12 @@ export async function fetchCollectionReport({
           company,
           filial: VAREJO_VALUE,
           colecoes: normalizedCollections,
+          ...itemFilterParams,
           range: rangeInput,
           groupByColor: true,
         })
       : Promise.resolve(null),
-    fetchColecaoDetectedRange(company, filial ?? null, normalizedCollections),
+    fetchColecaoDetectedRange(company, filial ?? null, normalizedCollections, filtros),
   ]);
 
   const retailRevByKey = new Map<string, number>();
@@ -797,6 +848,7 @@ export async function fetchCollectionComparativeExtras({
   range,
   filial,
   colecoes,
+  filtros,
 }: CollectionReportQueryParams = {}): Promise<CollectionComparativeExtras> {
   const empty: CollectionComparativeExtras = { monthly: [], grossSales: 0, discountSales: 0 };
   if (company !== "scarfme") return empty;
@@ -823,6 +875,7 @@ export async function fetchCollectionComparativeExtras({
       const salesFilial = filial && filial !== VAREJO_VALUE ? filial : VAREJO_VALUE;
       const filialFilter = await buildSalesFilialFilter(request, company, salesFilial, "extrasSales", "f");
       const colecao = prepColecaoFilter(request, normalizedCollections, "extrasSalesCol");
+      const itemFilter = prepItemFilter(request, filtros, "extrasSalesIt");
       // CTE validada "com trocas" (espelha fetchProdutoQtdePorFilial), agregada por mês.
       // gross/desconto vêm da base física (antes de troca); net abate trocas.
       const result = await request.query<{ y: number; m: number; net: number; gross: number; disc: number }>(`
@@ -840,6 +893,7 @@ export async function fetchCollectionComparativeExtras({
             AND ISNULL(vp.QTDE_CANCELADA, 0) = 0
             ${filialFilter}
             ${colecao("vp")}
+            ${itemFilter}
         ),
         trocas_item AS (
           SELECT
@@ -855,6 +909,7 @@ export async function fetchCollectionComparativeExtras({
             AND v.DATA_VENDA >= @startDate AND v.DATA_VENDA < @endDate
             ${filialFilter}
             ${colecao("vt")}
+            ${itemFilter}
           GROUP BY vt.TICKET, vt.CODIGO_FILIAL, vt.PRODUTO, ISNULL(vt.COR_PRODUTO, ''), vt.TAMANHO
         ),
         TrocasPuras AS (
@@ -877,6 +932,7 @@ export async function fetchCollectionComparativeExtras({
             )
             ${filialFilter}
             ${colecao("vt")}
+            ${itemFilter}
         ),
         VendasComNumero AS (
           SELECT
@@ -924,6 +980,7 @@ export async function fetchCollectionComparativeExtras({
       const ecommerceFilial = filial && isEcommerceFilial(company, filial) ? filial : null;
       const filialFilter = await buildEcommerceFilialFilter(request, company, ecommerceFilial, "extrasEcom");
       const collectionFilter = buildEcommerceCollectionFilter(request, normalizedCollections, "extrasEcom");
+      const itemFilter = prepItemFilter(request, filtros, "extrasEcomIt");
       const result = await request.query<{ y: number; m: number; net: number }>(`
         SELECT
           YEAR(f.EMISSAO) AS y,
@@ -942,6 +999,7 @@ export async function fetchCollectionComparativeExtras({
           AND fp.QTDE > 0
           ${filialFilter}
           ${collectionFilter}
+          ${itemFilter}
         GROUP BY YEAR(f.EMISSAO), MONTH(f.EMISSAO)
       `);
       for (const row of result.recordset) {

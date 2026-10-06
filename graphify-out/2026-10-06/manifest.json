@@ -485,8 +485,8 @@
     "semantic_hash": "d49f2273e7d8c35208a05b59ff588a00"
   },
   "app/api/compras-transito/route.ts": {
-    "mtime": 1788264818.1163743,
-    "ast_hash": "35dfebb6c3115be50df16843867a3773",
+    "mtime": 1791291101.661374,
+    "ast_hash": "d7e9528c7dc37777940db7eb0dee1967",
     "semantic_hash": ""
   },
   "app/api/controle-estoque/compra-data-fixa/route.ts": {
@@ -735,19 +735,19 @@
     "semantic_hash": ""
   },
   "app/api/gerador-apresentacoes/colecao/route.ts": {
-    "mtime": 1791207713.1794043,
-    "ast_hash": "c7686115dfe91a30d20d1d9411308a8a",
+    "mtime": 1791294502.4895892,
+    "ast_hash": "e02938501a0e5099aa76b6c9a063495a",
     "semantic_hash": ""
   },
   "app/api/gerador-apresentacoes/comparativo-resumido/route.ts": {
-    "mtime": 1783337742.4821498,
-    "ast_hash": "ca9d7d7066aed6449efc77b71aa863da",
-    "semantic_hash": "ca9d7d7066aed6449efc77b71aa863da"
+    "mtime": 1791294502.4929695,
+    "ast_hash": "01ec6f305368a4c2cad32554325d3361",
+    "semantic_hash": ""
   },
   "app/api/gerador-apresentacoes/comparativo/route.ts": {
-    "mtime": 1785790640.6946461,
-    "ast_hash": "71e7a214ab7b67ef7513b14c345f1e18",
-    "semantic_hash": "71e7a214ab7b67ef7513b14c345f1e18"
+    "mtime": 1791294502.4895892,
+    "ast_hash": "16096d391d5f6de260c046d11a4a07bb",
+    "semantic_hash": ""
   },
   "app/api/goals/route.ts": {
     "mtime": 1783538365.8995342,
@@ -1380,23 +1380,23 @@
     "semantic_hash": "2d8c2c39521fd4c7f45fc1f5b0999cbb"
   },
   "components/gerador-apresentacoes/ColecaoDeck.tsx": {
-    "mtime": 1785864158.6497352,
-    "ast_hash": "115b238a91ce8c438c58b713bbcce564",
+    "mtime": 1791294608.0543232,
+    "ast_hash": "660aafeecbeca62dc043e7bc85f416ea",
     "semantic_hash": ""
   },
   "components/gerador-apresentacoes/ComparativoDeck.tsx": {
-    "mtime": 1785790773.5629601,
-    "ast_hash": "265615e36d807efd0b21c417c04d7ddd",
+    "mtime": 1791294608.0543232,
+    "ast_hash": "599fbd695cf73341aad8b78ddbdf4af8",
     "semantic_hash": ""
   },
   "components/gerador-apresentacoes/ComparativoResumidoDeck.tsx": {
-    "mtime": 1783339949.2628472,
-    "ast_hash": "81de06575d7fc50b8d2bd841c11e519d",
-    "semantic_hash": "81de06575d7fc50b8d2bd841c11e519d"
+    "mtime": 1791294608.0627604,
+    "ast_hash": "577e3672d3c12f1fc1cabaed2834450c",
+    "semantic_hash": ""
   },
   "components/gerador-apresentacoes/GeradorApresentacoesPage.tsx": {
-    "mtime": 1791207845.4829085,
-    "ast_hash": "6a8b89ade9f49a5654bdc692203ba8eb",
+    "mtime": 1791294589.2373886,
+    "ast_hash": "b06b1cfcd5b9a825a9cde9a47cc68c7a",
     "semantic_hash": ""
   },
   "components/historico-transferencias/HistoricoTransferenciasPage.tsx": {
@@ -2095,9 +2095,9 @@
     "semantic_hash": "69fa99743f3988b30f78882057f6b512"
   },
   "lib/client/compras-transito.ts": {
-    "mtime": 1782492654.829713,
-    "ast_hash": "a8a3fa8a83b33dfe7330dc277d171b41",
-    "semantic_hash": "a8a3fa8a83b33dfe7330dc277d171b41"
+    "mtime": 1791291101.667961,
+    "ast_hash": "f73fa2eac7dddd2ecac1f5c1a63afc82",
+    "semantic_hash": ""
   },
   "lib/client/controle-estoque-metricas.ts": {
     "mtime": 1780073682.823993,
@@ -2205,9 +2205,9 @@
     "semantic_hash": "fc0127cb75c6243b7888355028b7de56"
   },
   "lib/mcp/tools/compras.ts": {
-    "mtime": 1780586962.2948122,
-    "ast_hash": "1b352868c4d08b27ae943e25923782f0",
-    "semantic_hash": "1b352868c4d08b27ae943e25923782f0"
+    "mtime": 1791291193.0613134,
+    "ast_hash": "8ac36a8af292b447483506665cb53250",
+    "semantic_hash": ""
   },
   "lib/mcp/tools/curva.ts": {
     "mtime": 1780928252.547423,
@@ -2300,8 +2300,8 @@
     "semantic_hash": ""
   },
   "lib/presentations/registry.ts": {
-    "mtime": 1787761011.041247,
-    "ast_hash": "044f84b63f7c7a6de72fc5bb58c898c0",
+    "mtime": 1791294546.7575483,
+    "ast_hash": "4d3b774725b7b5c480a72b8ef3abeefe",
     "semantic_hash": ""
   },
   "lib/reports/clientes-filial.ts": {
@@ -2410,24 +2410,24 @@
     "semantic_hash": ""
   },
   "lib/repositories/colecaoPresentation.ts": {
-    "mtime": 1791208718.9406044,
-    "ast_hash": "2450f0eda70eb231d00fb095cabb43be",
+    "mtime": 1791294453.9338574,
+    "ast_hash": "07148214c032f4c16844a4d069e0d817",
     "semantic_hash": ""
   },
   "lib/repositories/collectionReport.ts": {
-    "mtime": 1784209826.604455,
-    "ast_hash": "21ca3c3d6984f71240f54b0453dd463b",
+    "mtime": 1791294414.6072981,
+    "ast_hash": "cb6bf9ec55b8a7c6acf8c8a4eb309506",
     "semantic_hash": ""
   },
   "lib/repositories/comparativoColecoes.ts": {
-    "mtime": 1785790552.8560297,
-    "ast_hash": "e19f34dce9a6c15c2233369b8f168514",
+    "mtime": 1791294486.310362,
+    "ast_hash": "88a53a25b8a21d7ed6a91b2826b5991d",
     "semantic_hash": ""
   },
   "lib/repositories/comparativoResumido.ts": {
-    "mtime": 1783337729.333831,
-    "ast_hash": "d922ef7e6de4c89c25f7ac4d3a11ffa7",
-    "semantic_hash": "d922ef7e6de4c89c25f7ac4d3a11ffa7"
+    "mtime": 1791294486.3119178,
+    "ast_hash": "ba55d30a50c3b7f8065b421f4daacd08",
+    "semantic_hash": ""
   },
   "lib/repositories/comprasTransitoReconciliacao.ts": {
     "mtime": 1781283961.5591154,
@@ -2565,8 +2565,8 @@
     "semantic_hash": "234df7ca790fa285814435a673e30214"
   },
   "lib/repositories/reportVendas.ts": {
-    "mtime": 1788964892.4744272,
-    "ast_hash": "1dbb6194f03bc6445bc6390bbb5c77b5",
+    "mtime": 1791291089.7988594,
+    "ast_hash": "ffc642f3fdb50b7109df7f661ecfe749",
     "semantic_hash": ""
   },
   "lib/repositories/reportVendasHistorico.ts": {
@@ -2615,9 +2615,9 @@
     "semantic_hash": ""
   },
   "lib/server/compra-transito-reconciliacao.ts": {
-    "mtime": 1781719292.553023,
-    "ast_hash": "4fddeea5cf87b20828fbd4600d554e84",
-    "semantic_hash": "4fddeea5cf87b20828fbd4600d554e84"
+    "mtime": 1791291067.913632,
+    "ast_hash": "7805c7a63a90391ef9bbb1b651555d8e",
+    "semantic_hash": ""
   },
   "lib/server/controle-estoque-metricas.ts": {
     "mtime": 1782848686.6150796,
@@ -3445,8 +3445,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/lojaRaioX.ts": {
-    "mtime": 1788964892.4688096,
-    "ast_hash": "c23590be7ae09591daf97781f9ed18d3",
+    "mtime": 1791291089.7988594,
+    "ast_hash": "1a6624b57becd950b40a2d4c94b06719",
     "semantic_hash": ""
   },
   "lib/utils/exportLojaRaioXXlsx.ts": {
@@ -3900,8 +3900,8 @@
     "semantic_hash": ""
   },
   "app/api/gerador-apresentacoes/colecao-produtos/route.ts": {
-    "mtime": 1785862246.7298992,
-    "ast_hash": "f60dcb024f7d1f18144da989332fbaa0",
+    "mtime": 1791294502.4956868,
+    "ast_hash": "45b1ed85443cc0b13c265daf602d7210",
     "semantic_hash": ""
   },
   "app/api/gerador-apresentacoes/top-produtos/route.ts": {
@@ -4530,8 +4530,8 @@
     "semantic_hash": ""
   },
   "lib/server/compra-transito-index.ts": {
-    "mtime": 1789151324.2988913,
-    "ast_hash": "93502607e2236dff9fa725c4c12286a2",
+    "mtime": 1791291089.795322,
+    "ast_hash": "57b21d92ab530c8d6a1f77862485edab",
     "semantic_hash": ""
   },
   "lib/utils/projecao-sazonal.ts": {
@@ -4655,8 +4655,8 @@
     "semantic_hash": ""
   },
   "app/api/gerador-apresentacoes/colecao-vendas/route.ts": {
-    "mtime": 1791207712.8563774,
-    "ast_hash": "e4ba6920b2582162f61092b4e5b87d3f",
+    "mtime": 1791294502.4929695,
+    "ast_hash": "6052126b6ed6c7b524bb0342e044d13e",
     "semantic_hash": ""
   },
   "app/api/romaneios/trava-inventario/route.ts": {
@@ -4665,8 +4665,8 @@
     "semantic_hash": ""
   },
   "components/gerador-apresentacoes/ColecaoExclusaoVendas.tsx": {
-    "mtime": 1791208771.7035134,
-    "ast_hash": "2149baab9121c999866e54cc33561072",
+    "mtime": 1791294546.7591655,
+    "ast_hash": "f13776f317bf97cdeccf5309079812ed",
     "semantic_hash": ""
   },
   "components/romaneios/TravaInventarioPanel.tsx": {
@@ -4742,6 +4742,11 @@
   "lib/repositories/reportEstoqueInventario.ts": {
     "mtime": 1791290413.4802887,
     "ast_hash": "3bd287196fa91273e16043e56ea49d12",
+    "semantic_hash": ""
+  },
+  "lib/presentations/item-filters.ts": {
+    "mtime": 1791294353.1251423,
+    "ast_hash": "1368223042616bf22f06a55c01aaf52e",
     "semantic_hash": ""
   }
 }

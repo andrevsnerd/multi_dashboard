@@ -17,6 +17,14 @@ import {
 } from "@/lib/presentations/palettes";
 import { presentationBrandName } from "@/lib/presentations/brand";
 import {
+  ITEM_FILTER_KEYS,
+  appendItemFilters,
+  describeItemFilters,
+  hasItemFilters,
+  type ItemFilterKey,
+  type PresentationItemFilters,
+} from "@/lib/presentations/item-filters";
+import {
   COLECAO_COMPLETA_ID,
   COMPARATIVO_COLECOES_ID,
   COMPARATIVO_RESUMIDO_ID,
@@ -43,6 +51,17 @@ interface ProductPick {
   id: string;
   name: string;
 }
+
+/** Recorte da coleção pelo cadastro: um multiselect por dimensão. */
+const ITEM_FILTER_UI: Array<{ key: ItemFilterKey; label: string; path: string }> = [
+  { key: "grupos", label: "Grupo", path: "grupos" },
+  { key: "subgrupos", label: "Subgrupo", path: "subgrupos" },
+  { key: "linhas", label: "Linha", path: "linhas" },
+  { key: "grades", label: "Grade", path: "grades" },
+];
+
+type ItemFilterState = Record<ItemFilterKey, string[]>;
+const EMPTY_ITEM_FILTERS: ItemFilterState = { grupos: [], subgrupos: [], linhas: [], grades: [] };
 
 interface GeradorApresentacoesPageProps {
   companyKey: CompanyKey;
@@ -101,6 +120,8 @@ export default function GeradorApresentacoesPage({
   const isResumido = presentationTypeId === COMPARATIVO_RESUMIDO_ID;
   // Tipos multi-coleção usam uma foto (recorte) por coleção selecionada.
   const isMultiCover = isComparativo || isResumido;
+  // Os 3 decks de coleção aceitam o recorte por grupo/subgrupo/linha/grade.
+  const isColecaoFamily = isColecaoType || isComparativo || isResumido;
 
   // Filtros
   const [range, setRange] = useState<DateRangeValue>(initialRange);
@@ -113,10 +134,28 @@ export default function GeradorApresentacoesPage({
   // Coleções; qualquer outro id = escolha manual do usuário.
   const [paletteId, setPaletteId] = useState<string>(DECK_PALETTE_AUTO);
 
+  // ---- Recorte da coleção pelo cadastro (grupo/subgrupo/linha/grade) ----
+  // Ex.: coleção ESSENTIALS, só o subgrupo CETIM DE SEDA. Vale para o deck inteiro
+  // (o backend repassa às funções canônicas de venda) e para as prévias.
+  const [itemFiltros, setItemFiltros] = useState<ItemFilterState>(EMPTY_ITEM_FILTERS);
+  const [itemOpts, setItemOpts] = useState<ItemFilterState>(EMPTY_ITEM_FILTERS);
+  const filtrosPayload = useMemo<PresentationItemFilters>(() => {
+    const out: PresentationItemFilters = {};
+    for (const k of ITEM_FILTER_KEYS) if (itemFiltros[k].length > 0) out[k] = itemFiltros[k];
+    return out;
+  }, [itemFiltros]);
+  const itemFiltrosKey = JSON.stringify(filtrosPayload);
+  const recorteLabel = describeItemFilters(filtrosPayload);
+  const setItemFiltro = useCallback((key: ItemFilterKey, values: string[]) => {
+    setItemFiltros((prev) => ({ ...prev, [key]: values }));
+  }, []);
+
   // ---- Tabela de produtos do tipo #1 ----
   // Ambos vêm do backend (as linhas mudam), então trocá-los exige gerar de novo —
   // diferente da paleta, que re-tinge o deck na hora.
-  const [todosProdutos, setTodosProdutos] = useState(false);
+  // "Todos os produtos" vem LIGADO por padrão (pedido do dono, 06/10/2026); desmarcar
+  // volta ao top 12 + "Outros".
+  const [todosProdutos, setTodosProdutos] = useState(true);
   const [produtoTotal, setProdutoTotal] = useState(false);
 
   // ---- Destaque opcional (Relatório Completo de Coleção) ----
@@ -294,10 +333,60 @@ export default function GeradorApresentacoesPage({
     void loadColecoes();
   }, [loadColecoes]);
 
+  const colecoesKey = colecoes.join("|");
+
+  // ---- opções do recorte: vêm das vendas do período DA(S) COLEÇÃO(ÕES) selecionada(s) ----
+  // Filtros cruzados: cada dimensão é medida com as OUTRAS selecionadas, nunca com
+  // ela mesma (senão o select travaria no valor já escolhido).
+  useEffect(() => {
+    if (!isColecaoFamily || colecoes.length === 0) {
+      setItemOpts(EMPTY_ITEM_FILTERS);
+      return;
+    }
+    let cancelled = false;
+    const t = setTimeout(() => {
+      for (const dim of ITEM_FILTER_UI) {
+        const params = new URLSearchParams({ company: companyKey, start: startStr, end: endStr });
+        if (filial) params.set("filial", filial);
+        colecoes.forEach((c) => params.append("colecoes", c));
+        for (const other of ITEM_FILTER_KEYS) {
+          if (other === dim.key) continue;
+          itemFiltros[other].forEach((v) => params.append(other, v));
+        }
+        fetch(`/api/products/${dim.path}?${params}`, { cache: "no-store" })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((json: { data?: string[] } | null) => {
+            if (cancelled) return;
+            const list = Array.isArray(json?.data) ? json.data : [];
+            setItemOpts((prev) => ({ ...prev, [dim.key]: list }));
+          })
+          .catch(() => {
+            if (!cancelled) setItemOpts((prev) => ({ ...prev, [dim.key]: [] }));
+          });
+      }
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+    // colecoesKey / itemFiltrosKey = dependências estáveis dos arrays.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isColecaoFamily, companyKey, filial, startStr, endStr, colecoesKey, itemFiltrosKey]);
+
+  // Valor já marcado continua visível no select mesmo se sumir das opções (ex.:
+  // trocou a coleção) — senão não daria para desmarcá-lo.
+  const itemOptionsFor = useCallback(
+    (key: ItemFilterKey): string[] => {
+      const opts = itemOpts[key];
+      const extras = itemFiltros[key].filter((v) => !opts.includes(v));
+      return extras.length > 0 ? [...opts, ...extras] : opts;
+    },
+    [itemOpts, itemFiltros]
+  );
+
   // ---- destaque: reconhecimento dos produtos DENTRO da coleção selecionada ----
   // Mesmo endpoint/função que o deck usa para montar o slide, então a prévia
   // abaixo é exatamente o conjunto que vai entrar na apresentação.
-  const colecoesKey = colecoes.join("|");
   useEffect(() => {
     if (!isColecaoType) return;
     const termo = destaqueTermo.trim();
@@ -311,6 +400,7 @@ export default function GeradorApresentacoesPage({
     const t = setTimeout(() => {
       const params = new URLSearchParams({ company: companyKey, termo });
       colecoes.forEach((c) => params.append("colecao", c));
+      appendItemFilters(params, filtrosPayload);
       fetch(`/api/gerador-apresentacoes/colecao-produtos?${params}`, { cache: "no-store" })
         .then((r) => (r.ok ? r.json() : null))
         .then((json: { data?: Array<{ productId: string; nome: string }> } | null) => {
@@ -332,12 +422,12 @@ export default function GeradorApresentacoesPage({
     };
     // colecoesKey entra como dependência estável (o array muda de identidade a cada render).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isColecaoType, companyKey, destaqueTermo, colecoesKey, colecoes.length]);
+  }, [isColecaoType, companyKey, destaqueTermo, colecoesKey, colecoes.length, itemFiltrosKey]);
 
-  // Trocar o termo (ou a coleção) recomeça com todos os reconhecidos marcados.
+  // Trocar o termo (ou a coleção/recorte) recomeça com todos os reconhecidos marcados.
   useEffect(() => {
     setDestaqueOff([]);
-  }, [destaqueTermo, colecoesKey]);
+  }, [destaqueTermo, colecoesKey, itemFiltrosKey]);
 
   const destaqueSelecionados = useMemo(
     () => destaqueMatches.filter((m) => !destaqueOff.includes(m.id)),
@@ -747,6 +837,7 @@ export default function GeradorApresentacoesPage({
             filial,
             range: { start: startStr, end: endStr },
             colecoes: colecoes.map((code) => ({ code, label: labelForCode(code) })),
+            filtros: filtrosPayload,
           }),
         });
         const json = (await res.json()) as { data?: ComparativoColecoesPayload; error?: string };
@@ -788,6 +879,7 @@ export default function GeradorApresentacoesPage({
             filial,
             range: { start: startStr, end: endStr },
             colecoes: colecoes.map((code) => ({ code, label: labelForCode(code) })),
+            filtros: filtrosPayload,
           }),
         });
         const json = (await res.json()) as { data?: ComparativoResumidoPayload; error?: string };
@@ -832,6 +924,7 @@ export default function GeradorApresentacoesPage({
           company: companyKey,
           filial,
           colecoes,
+          filtros: filtrosPayload,
           collectionLabel: singleColecaoLabel || undefined,
           range: { start: startStr, end: endStr },
           todosProdutos,
@@ -857,7 +950,7 @@ export default function GeradorApresentacoesPage({
       // avisa em vez de sumir com o destaque silenciosamente.
       if (pedeDestaque && json.data && !json.data.destaque) {
         setError(
-          `Nenhum dos produtos de “${termoDestaque}” teve venda na coleção nesse período — o slide de destaque não entrou no deck.`
+          `Nenhum dos produtos de “${termoDestaque}” teve venda na coleção${hasItemFilters(filtrosPayload) ? " (com o recorte escolhido)" : ""} nesse período — o slide de destaque não entrou no deck.`
         );
       } else if (json.data?.exclusoes && json.data.exclusoes.naoEncontradas > 0) {
         // A venda mudou no Linx entre a prévia e a geração (ex.: ticket cancelado).
@@ -898,6 +991,7 @@ export default function GeradorApresentacoesPage({
     endStr,
     presentationTypeId,
     labelForCode,
+    filtrosPayload,
   ]);
 
   // ---- export PDF (mesmo pipeline do Relatório Claude) ----
@@ -1091,6 +1185,13 @@ export default function GeradorApresentacoesPage({
       {/* Filtros */}
       <section className={styles.panel}>
         <h2 className={styles.panelTitle}>Filtros</h2>
+        {isColecaoFamily && (
+          <p className={styles.hint}>
+            {recorteLabel
+              ? `Recorte ativo — ${recorteLabel}. O deck inteiro (números, produtos, lojas${isColecaoType ? ", destaque e lista de vendas" : ""}) considera só esses itens da coleção.`
+              : "Grupo, subgrupo, linha e grade são opcionais e recortam a coleção (ex.: só o subgrupo CETIM DE SEDA). Vazio = coleção inteira."}
+          </p>
+        )}
         <div className={styles.filtersGrid}>
           {!isGiro && meta?.supportedFilters.includes("colecao") && (
             <div className={styles.field}>
@@ -1125,6 +1226,21 @@ export default function GeradorApresentacoesPage({
           {meta?.supportedFilters.includes("filial") && (
             <FilialFilter companyKey={companyKey} value={filial} onChange={setFilial} module="sales" />
           )}
+          {isColecaoFamily &&
+            ITEM_FILTER_UI.map((dim) => {
+              const options = itemOptionsFor(dim.key);
+              // Sem opção e sem nada marcado (ex.: coleção ainda não escolhida) não há o que recortar.
+              if (options.length === 0) return null;
+              return (
+                <MultiSelectFilter
+                  key={dim.key}
+                  label={`${dim.label} (opcional)`}
+                  value={itemFiltros[dim.key]}
+                  options={options}
+                  onChange={(values) => setItemFiltro(dim.key, values)}
+                />
+              );
+            })}
           {isGiro && companyKey === "nerd" && optGrupos.length > 0 && (
             <MultiSelectFilter label="Grupo" value={giroGrupos} options={optGrupos} onChange={setGiroGrupos} />
           )}
@@ -1361,6 +1477,7 @@ export default function GeradorApresentacoesPage({
             companyKey={companyKey}
             filial={filial}
             colecoes={colecoes}
+            filtros={filtrosPayload}
             start={startStr}
             end={endStr}
             excluidas={excluirVendas}

@@ -13,6 +13,7 @@ export type PresentationFilterKey =
   | "subgrupo"
   | "grade"
   | "grupo"
+  | "linha"
   | "produto";
 
 export interface PresentationTypeMeta {
@@ -49,7 +50,9 @@ export const PRESENTATION_TYPES: PresentationTypeMeta[] = [
       "performance por produto, vendas por canal/loja e conclusão. Opcionalmente " +
       "destaca um conjunto de produtos da coleção (ex.: “Dracena”) num slide extra. " +
       "Exporta em PDF.",
-    supportedFilters: ["colecao", "periodo", "filial"],
+    // grupo/subgrupo/linha/grade = recorte da coleção pelo cadastro (ex.: só o
+    // subgrupo CETIM DE SEDA), ver lib/presentations/item-filters.ts.
+    supportedFilters: ["colecao", "periodo", "filial", "grupo", "subgrupo", "linha", "grade"],
     requiresCover: true,
     singleCollection: true,
     companies: ["scarfme"],
@@ -61,7 +64,9 @@ export const PRESENTATION_TYPES: PresentationTypeMeta[] = [
       "Compara várias coleções (uma por slide, com paleta própria): venda líquida, " +
       "ticket médio, markup, desconto, evolução mensal e um slide final de decisão " +
       "de renovação. Escolha 2 ou mais coleções. Exporta em PDF.",
-    supportedFilters: ["colecao", "periodo", "filial"],
+    // grupo/subgrupo/linha/grade = recorte da coleção pelo cadastro (ex.: só o
+    // subgrupo CETIM DE SEDA), ver lib/presentations/item-filters.ts.
+    supportedFilters: ["colecao", "periodo", "filial", "grupo", "subgrupo", "linha", "grade"],
     requiresCover: true,
     singleCollection: false,
     companies: ["scarfme"],
@@ -73,7 +78,9 @@ export const PRESENTATION_TYPES: PresentationTypeMeta[] = [
       "Versão enxuta do comparativo: uma carta compacta por coleção (uma abaixo da " +
       "outra) com foto, venda líquida, quantidade vendida, peças (SKUs) e a evolução " +
       "mensal. Escolha as coleções, envie a foto de cada uma. Exporta em PDF.",
-    supportedFilters: ["colecao", "periodo", "filial"],
+    // grupo/subgrupo/linha/grade = recorte da coleção pelo cadastro (ex.: só o
+    // subgrupo CETIM DE SEDA), ver lib/presentations/item-filters.ts.
+    supportedFilters: ["colecao", "periodo", "filial", "grupo", "subgrupo", "linha", "grade"],
     requiresCover: true,
     singleCollection: false,
     companies: ["scarfme"],

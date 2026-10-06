@@ -7,6 +7,10 @@ import {
 import { fetchSalesTotals } from "@/lib/services/salesTotals";
 import { normalizeRangeForQuery } from "@/lib/utils/date";
 import { paletteForIndex, type CollectionPalette } from "@/lib/presentations/palettes";
+import {
+  describeItemFilters,
+  type PresentationItemFilters,
+} from "@/lib/presentations/item-filters";
 
 /**
  * Dados do "Relatório Comparativo entre Coleções". Uma entrada por coleção +
@@ -99,6 +103,8 @@ export interface ComparativoColecaoSlide {
 
 export interface ComparativoColecoesPayload {
   period: { start: string; end: string; label: string; statLabel: string };
+  /** Texto dos filtros de item ("Subgrupo: CETIM DE SEDA"); null = coleções inteiras. */
+  recorte: string | null;
   totals: {
     vendaLiquida: number;
     margemBruta: number;
@@ -113,6 +119,8 @@ export interface ComparativoColecoesParams {
   range?: { start?: string; end?: string };
   /** Lista de coleções: { code, label } (label = descrição para o título). */
   colecoes: Array<{ code: string; label?: string }>;
+  /** Recorte de TODAS as coleções pelo cadastro (grupo/subgrupo/linha/grade). */
+  filtros?: PresentationItemFilters | null;
 }
 
 const MESES_CURTOS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
@@ -174,7 +182,7 @@ async function buildOneCollection(
   col: { code: string; label?: string },
   index: number
 ): Promise<ComparativoColecaoSlide> {
-  const { company, filial, range } = params;
+  const { company, filial, range, filtros } = params;
   const palette = paletteForIndex(index);
   const norm = normalizeRangeForQuery({ start: range?.start, end: range?.end });
 
@@ -188,15 +196,21 @@ async function buildOneCollection(
       company,
       filial,
       colecoes: [col.code],
+      filtros,
       collectionLabel: col.label,
       range: { start: range?.start, end: range?.end },
     }),
-    fetchCollectionComparativeExtras({ company, filial, range, colecoes: [col.code] }),
+    fetchCollectionComparativeExtras({ company, filial, range, colecoes: [col.code], filtros }),
     fetchSalesTotals({
       company,
       range: norm,
       filial: filial ?? null,
       colecoes: [col.code],
+      // `linhas` só vale p/ NERD (legado) — a linha da ScarfMe vai em `linhasCadastro`.
+      grupos: filtros?.grupos ?? null,
+      subgrupos: filtros?.subgrupos ?? null,
+      linhasCadastro: filtros?.linhas ?? null,
+      grades: filtros?.grades ?? null,
     }),
   ]);
 
@@ -336,6 +350,7 @@ export async function fetchComparativoColecoes(
   if (company !== "scarfme" || colecoes.length === 0) {
     return {
       period: { start: range?.start ?? "", end: range?.end ?? "", label: "", statLabel: "" },
+      recorte: describeItemFilters(params.filtros),
       totals: { vendaLiquida: 0, margemBruta: 0, colecoes: 0 },
       slides: [],
     };
@@ -371,6 +386,7 @@ export async function fetchComparativoColecoes(
 
   return {
     period: { start: startIso, end: endIso, label, statLabel },
+    recorte: describeItemFilters(params.filtros),
     totals: { vendaLiquida, margemBruta, colecoes: slides.length },
     slides,
   };

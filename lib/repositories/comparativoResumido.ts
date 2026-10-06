@@ -6,6 +6,10 @@ import {
   fetchCollectionComparativeExtras,
 } from "@/lib/repositories/collectionReport";
 import { paletteForIndex, type CollectionPalette } from "@/lib/presentations/palettes";
+import {
+  describeItemFilters,
+  type PresentationItemFilters,
+} from "@/lib/presentations/item-filters";
 
 /**
  * Dados do "Comparativo Resumido entre Coleções" — versão enxuta do comparativo
@@ -38,6 +42,8 @@ export interface ResumoColecaoCard {
 
 export interface ComparativoResumidoPayload {
   period: { start: string; end: string; label: string; statLabel: string };
+  /** Texto dos filtros de item ("Subgrupo: CETIM DE SEDA"); null = coleções inteiras. */
+  recorte: string | null;
   totals: { vendaLiquida: number; qtde: number; skus: number; colecoes: number };
   cards: ResumoColecaoCard[];
 }
@@ -47,6 +53,8 @@ export interface ComparativoResumidoParams {
   filial?: string | null;
   range?: { start?: string; end?: string };
   colecoes: Array<{ code: string; label?: string }>;
+  /** Recorte de TODAS as coleções pelo cadastro (grupo/subgrupo/linha/grade). */
+  filtros?: PresentationItemFilters | null;
 }
 
 const MESES_CURTOS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
@@ -79,7 +87,10 @@ async function mapPool<T, R>(items: T[], limit: number, worker: (item: T, index:
  * PRODUTOS.COLECAO). Cor canônica via TRY_CONVERT(INT) colapsa '06' == '6' para
  * não contar a mesma variação duas vezes. Espelha o Painel de Coleções.
  */
-async function fetchSkusCadastradosPorCodigo(codes: string[]): Promise<Map<string, number>> {
+async function fetchSkusCadastradosPorCodigo(
+  codes: string[],
+  filtros?: PresentationItemFilters | null
+): Promise<Map<string, number>> {
   const out = new Map<string, number>();
   const normalized = Array.from(new Set(codes.map((c) => c.trim().toUpperCase()).filter(Boolean)));
   if (normalized.length === 0) return out;
@@ -87,6 +98,23 @@ async function fetchSkusCadastradosPorCodigo(codes: string[]): Promise<Map<strin
   return withRequest(async (req) => {
     normalized.forEach((code, idx) => req.input(`col${idx}`, sql.VarChar, code));
     const placeholders = normalized.map((_, idx) => `@col${idx}`).join(", ");
+    // Recorte de item: o catálogo também só conta as peças do recorte.
+    const recorte = (
+      [
+        [filtros?.grupos, "Gr", "p.GRUPO_PRODUTO"],
+        [filtros?.subgrupos, "Sg", "p.SUBGRUPO_PRODUTO"],
+        [filtros?.linhas, "Ln", "p.LINHA"],
+        [filtros?.grades, "Gd", "CONVERT(VARCHAR, p.GRADE)"],
+      ] as Array<[string[] | undefined, string, string]>
+    )
+      .map(([values, tag, col]) => {
+        const list = values ?? [];
+        if (list.length === 0) return "";
+        list.forEach((v, i) => req.input(`it${tag}${i}`, sql.VarChar, v));
+        return `AND UPPER(LTRIM(RTRIM(ISNULL(${col}, '')))) IN (${list.map((_, i) => `@it${tag}${i}`).join(", ")})`;
+      })
+      .filter(Boolean)
+      .join(" ");
 
     const corCanonica = `
       CASE
@@ -106,6 +134,7 @@ async function fetchSkusCadastradosPorCodigo(codes: string[]): Promise<Map<strin
        WHERE UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) IN (${placeholders})
          AND pb.COR_PRODUTO IS NOT NULL
          AND LTRIM(RTRIM(CAST(pb.COR_PRODUTO AS VARCHAR(20)))) <> ''
+         ${recorte}
        GROUP BY UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, ''))))`
     );
 
@@ -121,11 +150,11 @@ async function buildOneCard(
   col: { code: string; label?: string },
   skus: number
 ): Promise<Omit<ResumoColecaoCard, "palette">> {
-  const { company, filial, range } = params;
+  const { company, filial, range, filtros } = params;
 
   const [report, extras] = await Promise.all([
-    fetchCollectionReport({ company, filial, range, colecoes: [col.code] }),
-    fetchCollectionComparativeExtras({ company, filial, range, colecoes: [col.code] }),
+    fetchCollectionReport({ company, filial, range, colecoes: [col.code], filtros }),
+    fetchCollectionComparativeExtras({ company, filial, range, colecoes: [col.code], filtros }),
   ]);
 
   const vl = report.summary.totalRevenue;
@@ -168,12 +197,16 @@ export async function fetchComparativoResumido(
   if (company !== "scarfme" || colecoes.length === 0) {
     return {
       period: { start: range?.start ?? "", end: range?.end ?? "", label: "", statLabel: "" },
+      recorte: describeItemFilters(params.filtros),
       totals: { vendaLiquida: 0, qtde: 0, skus: 0, colecoes: 0 },
       cards: [],
     };
   }
 
-  const skusByCode = await fetchSkusCadastradosPorCodigo(colecoes.map((c) => c.code));
+  const skusByCode = await fetchSkusCadastradosPorCodigo(
+    colecoes.map((c) => c.code),
+    params.filtros
+  );
 
   const built = await mapPool(colecoes, 4, (col) =>
     buildOneCard(params, col, skusByCode.get(col.code.trim().toUpperCase()) ?? 0)
@@ -202,6 +235,7 @@ export async function fetchComparativoResumido(
 
   return {
     period: { start: startIso, end: endIso, label, statLabel },
+    recorte: describeItemFilters(params.filtros),
     totals: { vendaLiquida, qtde, skus, colecoes: cards.length },
     cards,
   };

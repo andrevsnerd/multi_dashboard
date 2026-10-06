@@ -2,6 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import {
+  appendItemFilters,
+  type PresentationItemFilters,
+} from "@/lib/presentations/item-filters";
+
 import type { VendaColecaoRow } from "@/lib/repositories/colecaoPresentation";
 
 import styles from "./ColecaoExclusaoVendas.module.css";
@@ -22,6 +27,8 @@ interface ColecaoExclusaoVendasProps {
   companyKey: string;
   filial: string | null;
   colecoes: string[];
+  /** Recorte da coleção pelo cadastro — a lista mostra só as vendas do recorte. */
+  filtros?: PresentationItemFilters;
   start: string;
   end: string;
   excluidas: string[];
@@ -193,6 +200,7 @@ export default function ColecaoExclusaoVendas({
   companyKey,
   filial,
   colecoes,
+  filtros,
   start,
   end,
   excluidas,
@@ -206,9 +214,10 @@ export default function ColecaoExclusaoVendas({
   const [texto, setTexto] = useState("");
   const [resultadoLista, setResultadoLista] = useState<ResultadoLista | null>(null);
 
-  // Escopo mudou (coleção, período, filial) → a lista e as marcações não valem mais:
-  // a chave de cada venda depende da loja e do dia.
-  const escopoKey = `${companyKey}|${filial ?? ""}|${colecoes.join(",")}|${start}|${end}`;
+  // Escopo mudou (coleção, recorte, período, filial) → a lista e as marcações não
+  // valem mais: a chave de cada venda depende da loja e do dia.
+  const filtrosKey = JSON.stringify(filtros ?? {});
+  const escopoKey = `${companyKey}|${filial ?? ""}|${colecoes.join(",")}|${filtrosKey}|${start}|${end}`;
   useEffect(() => {
     setVendas(null);
     setErro(null);
@@ -225,6 +234,7 @@ export default function ColecaoExclusaoVendas({
       const params = new URLSearchParams({ company: companyKey, start, end });
       if (filial) params.set("filial", filial);
       colecoes.forEach((c) => params.append("colecao", c));
+      appendItemFilters(params, filtros);
       const res = await fetch(`/api/gerador-apresentacoes/colecao-vendas?${params}`, {
         cache: "no-store",
       });
@@ -237,7 +247,7 @@ export default function ColecaoExclusaoVendas({
     } finally {
       setLoading(false);
     }
-  }, [companyKey, filial, colecoes, start, end]);
+  }, [companyKey, filial, colecoes, filtros, start, end]);
 
   const marcadasSet = useMemo(() => new Set(excluidas), [excluidas]);
 

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { itemFiltersFromSearchParams } from "@/lib/presentations/item-filters";
 
 import { fetchVendasDaColecao } from "@/lib/repositories/colecaoPresentation";
 
@@ -35,6 +36,7 @@ export async function GET(request: Request) {
       filial: filial || null,
       colecoes,
       range: { start, end },
+      filtros: itemFiltersFromSearchParams(searchParams),
     });
     return NextResponse.json({ data }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {

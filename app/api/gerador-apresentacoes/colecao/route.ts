@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { normalizeItemFilters } from "@/lib/presentations/item-filters";
 
 import { fetchColecaoPresentation } from "@/lib/repositories/colecaoPresentation";
 
@@ -10,6 +11,8 @@ type RequestBody = {
   colecoes?: string[];
   collectionLabel?: string;
   range?: { start?: string; end?: string };
+  /** Recorte da coleção pelo cadastro: { grupos, subgrupos, linhas, grades }. */
+  filtros?: unknown;
   /** Conjunto de produtos em destaque (slide extra opcional). */
   destaque?: { termo?: string; nome?: string; produtoIds?: string[] };
   /** Lista TODAS as linhas de produto (deck pagina) em vez do top 12 + "Outros". */
@@ -51,6 +54,7 @@ export async function POST(request: Request) {
       colecoes,
       collectionLabel: body.collectionLabel,
       range: { start: body.range.start, end: body.range.end },
+      filtros: normalizeItemFilters(body.filtros),
       destaque: body.destaque,
       todosProdutos: body.todosProdutos === true,
       produtoTotal: body.produtoTotal === true,

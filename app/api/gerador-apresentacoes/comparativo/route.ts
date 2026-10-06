@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { normalizeItemFilters } from "@/lib/presentations/item-filters";
 
 import { fetchComparativoColecoes } from "@/lib/repositories/comparativoColecoes";
 
@@ -9,6 +10,8 @@ type RequestBody = {
   filial?: string | null;
   range?: { start?: string; end?: string };
   colecoes?: Array<{ code?: string; label?: string }>;
+  /** Recorte da coleção pelo cadastro: { grupos, subgrupos, linhas, grades }. */
+  filtros?: unknown;
 };
 
 export async function POST(request: Request) {
@@ -44,6 +47,7 @@ export async function POST(request: Request) {
       filial: body.filial ?? null,
       range: { start: body.range.start, end: body.range.end },
       colecoes,
+      filtros: normalizeItemFilters(body.filtros),
     });
     return NextResponse.json({ data }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
