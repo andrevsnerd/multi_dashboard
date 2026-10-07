@@ -7,6 +7,7 @@ type PagePermissionDefinition = {
 
 export const PAGE_PERMISSION_DEFINITIONS = [
   { key: "dashboard", label: "Dashboard", routeSegments: ["dashboard"] },
+  { key: "planejamento-receita", label: "Planejamento de Receita", routeSegments: ["planejamento-receita"] },
   { key: "produtos", label: "Produtos por Venda", routeSegments: ["produtos"] },
   { key: "produto-agrupado", label: "Produto Agrupado", routeSegments: ["produto-agrupado"] },
   { key: "produto-descontinuado", label: "Produto Descontinuado", routeSegments: ["produto-descontinuado"] },

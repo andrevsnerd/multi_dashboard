@@ -395,9 +395,9 @@
     "semantic_hash": "be6dcf060458a662526cacf73fe769dc"
   },
   "app/api/ajuste-estoque/detalhe/route.ts": {
-    "mtime": 1791380394.6110559,
-    "ast_hash": "744e321ce0ae9491ded63c3be2908443",
-    "semantic_hash": ""
+    "mtime": 1782413334.8626046,
+    "ast_hash": "c891be8b860861739fa7d510c6bf4b0d",
+    "semantic_hash": "c891be8b860861739fa7d510c6bf4b0d"
   },
   "app/api/ajuste-estoque/estornar/route.ts": {
     "mtime": 1785427762.7611852,
@@ -405,8 +405,8 @@
     "semantic_hash": ""
   },
   "app/api/ajuste-estoque/executar/route.ts": {
-    "mtime": 1791380407.823286,
-    "ast_hash": "0cf09d12e4e1022d1a91a4a41524c7ad",
+    "mtime": 1785427762.7611852,
+    "ast_hash": "51a874b42486b8285ee9f935929810ae",
     "semantic_hash": ""
   },
   "app/api/ajuste-estoque/filiais/route.ts": {
@@ -1230,8 +1230,8 @@
     "semantic_hash": "e449c381872599286ae61c72a1af8112"
   },
   "components/ajuste-estoque/AjusteEstoquePage.tsx": {
-    "mtime": 1791380480.0957816,
-    "ast_hash": "7353ece3671aab69610bf9460d904c85",
+    "mtime": 1791204265.822904,
+    "ast_hash": "d9f31cd822c99282e8a219d6b5e19584",
     "semantic_hash": ""
   },
   "components/auth/AuthContext.tsx": {
@@ -2385,8 +2385,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/ajusteEstoque.ts": {
-    "mtime": 1791380393.4907548,
-    "ast_hash": "5ed95de9e20bf763a71c61b783b30e99",
+    "mtime": 1787592659.5681036,
+    "ast_hash": "30495bf984a256ef6d1b4c52ec3aec1b",
     "semantic_hash": ""
   },
   "lib/repositories/claudeReport.ts": {
@@ -4812,11 +4812,6 @@
   "lib/utils/planejamento-receita-store.ts": {
     "mtime": 1791376473.8579955,
     "ast_hash": "01ca8a47b8645050c1df1651d6e63527",
-    "semantic_hash": ""
-  },
-  "lib/utils/ajuste-estoque-kpis-store.ts": {
-    "mtime": 1791380367.0432184,
-    "ast_hash": "be7110ff610993bb73b40e9ff373dc7c",
     "semantic_hash": ""
   }
 }

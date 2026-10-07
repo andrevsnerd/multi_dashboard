@@ -7,6 +7,7 @@ import { isReadOnlyRole } from '@/lib/auth/permissions';
 import { resolverNomeFilial } from '@/lib/repositories/ajusteEstoque';
 import { executarAjusteContagem, type AjusteContagemItem } from '@/lib/ajuste-estoque-executor';
 import { resolveResponsavelLinx } from '@/lib/server/responsavel-linx';
+import { salvarKpisAjuste } from '@/lib/utils/ajuste-estoque-kpis-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,6 +18,15 @@ interface ExecutarRequest {
   dataContagem: string; // 'YYYY-MM-DD'
   obs?: string | null;
   itens: AjusteContagemItem[];
+  /** KPIs do "Calcular diferenças" — guardados para rever o ajuste depois. */
+  resumo?: {
+    itens: number;
+    saldoFinalTotal: number;
+    itensSaldoNegativo: number;
+    naoEncontrados: number;
+    ambiguos: number;
+    invalidas: number;
+  } | null;
 }
 
 function isValidDate(s: string): boolean {
@@ -44,7 +54,7 @@ export async function POST(request: Request) {
     }
 
     const body = (await request.json()) as ExecutarRequest;
-    const { filialCod, modo, nomeContagem, dataContagem, obs, itens } = body;
+    const { filialCod, modo, nomeContagem, dataContagem, obs, itens, resumo } = body;
 
     if (!filialCod || (modo !== 'zerar' && modo !== 'inventario')) {
       return NextResponse.json({ error: 'Parâmetros inválidos.' }, { status: 400 });
@@ -80,6 +90,23 @@ export async function POST(request: Request) {
       obs: obs ?? null,
       itens,
     });
+
+    // Best-effort: o ajuste já está no Linx; falhar aqui só tira os quadros do histórico.
+    if (resumo) {
+      const n = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+      await salvarKpisAjuste({
+        nomeContagem: resultado.nomeContagem,
+        filialNome,
+        modo,
+        itens: n(resumo.itens),
+        saldoFinalTotal: n(resumo.saldoFinalTotal),
+        itensSaldoNegativo: n(resumo.itensSaldoNegativo),
+        naoEncontrados: n(resumo.naoEncontrados),
+        ambiguos: n(resumo.ambiguos),
+        invalidas: n(resumo.invalidas),
+        criadoEm: new Date().toISOString(),
+      }).catch((err) => console.error('[ajuste-estoque/executar] snapshot KPIs', err));
+    }
 
     return NextResponse.json(resultado);
   } catch (error) {

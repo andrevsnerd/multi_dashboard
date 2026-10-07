@@ -323,6 +323,16 @@
   background: var(--s-50);
   padding: 10px 16px;
 }
+/* KPIs de um ajuste recente (mesmos quadros do preview) */
+.detalheKpis {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.detalheKpis .totalBox:not(.totalBoxDestaque) {
+  background: var(--ae-card);
+}
 .detalheTable {
   width: 100%;
   border-collapse: collapse;

@@ -214,6 +214,55 @@ export async function detalharAjuste(nomeContagem: string): Promise<AjusteDetalh
   }));
 }
 
+export interface ContagemFisicaResumo {
+  itens: number;
+  saldoAtualTotal: number;
+  saldoFinalTotal: number;
+  itensSaldoNegativo: number;
+}
+
+/** Filial gravada no cabeçalho da contagem (ESTOQUE_PROD_CONTAGEM). */
+export async function filialDaContagem(nomeContagem: string): Promise<string | null> {
+  const nomeEsc = esc(nomeContagem.trim());
+  const rows = await query<{ FILIAL: string }>(`
+    SELECT TOP 1 RTRIM(FILIAL) AS FILIAL FROM ESTOQUE_PROD_CONTAGEM WITH (NOLOCK)
+    WHERE RTRIM(LTRIM(NOME_CONTAGEM)) = '${nomeEsc}'
+  `);
+  return rows[0]?.FILIAL?.trim() ?? null;
+}
+
+/**
+ * Contagem física de um inventário feito pela tela nativa do Linx
+ * (ESTOQUE_PROD_CTG_ITENS: SALDO_CONTAGEM = o que o sistema dizia, QTDE_CONTAGEM
+ * = o que foi contado). Ajustes feitos pelo dashboard não gravam essa tabela —
+ * aí devolve null.
+ */
+export async function resumirContagemFisica(
+  nomeContagem: string
+): Promise<ContagemFisicaResumo | null> {
+  const nomeEsc = esc(nomeContagem.trim());
+  const rows = await query<{ ITENS: number; SALDO: number; CONTAGEM: number; NEG: number }>(`
+    SELECT COUNT(*) AS ITENS, ISNULL(SUM(S), 0) AS SALDO, ISNULL(SUM(Q), 0) AS CONTAGEM,
+           ISNULL(SUM(CASE WHEN S < 0 THEN 1 ELSE 0 END), 0) AS NEG
+    FROM (
+      SELECT PRODUTO, COR_PRODUTO,
+             SUM(ISNULL(SALDO_CONTAGEM, 0)) AS S, SUM(ISNULL(QTDE_CONTAGEM, 0)) AS Q
+      FROM ESTOQUE_PROD_CTG_ITENS WITH (NOLOCK)
+      WHERE RTRIM(LTRIM(NOME_CONTAGEM)) = '${nomeEsc}'
+      GROUP BY PRODUTO, COR_PRODUTO
+    ) t
+  `);
+  const r = rows[0];
+  const itens = Number(r?.ITENS) || 0;
+  if (itens === 0) return null;
+  return {
+    itens,
+    saldoAtualTotal: Number(r.SALDO) || 0,
+    saldoFinalTotal: Number(r.CONTAGEM) || 0,
+    itensSaldoNegativo: Number(r.NEG) || 0,
+  };
+}
+
 /** Resolve o nome EXATO da filial (FILIAIS.FILIAL) a partir do COD_FILIAL. */
 export async function resolverNomeFilial(cod: string): Promise<string | null> {
   const codEsc = esc(cod.trim());

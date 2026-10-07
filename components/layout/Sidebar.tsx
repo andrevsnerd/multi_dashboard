@@ -179,6 +179,8 @@ export default function Sidebar({ companyName }: SidebarProps) {
     basePath && basePath !== "/" ? `${basePath}/compra-ciclo` : "/compra-ciclo";
   const mapaClientesHref =
     basePath && basePath !== "/" ? `${basePath}/mapa-clientes` : "/mapa-clientes";
+  const planejamentoReceitaHref =
+    basePath && basePath !== "/" ? `${basePath}/planejamento-receita` : "/planejamento-receita";
   const sincronizacaoHref =
     basePath && basePath !== "/" ? `${basePath}/sincronizacao` : "/sincronizacao";
 
@@ -253,6 +255,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
   ];
 
   const dashboardBlockedSegments = [
+    "/planejamento-receita",
     "/estoque-por-filial",
     "/controle-estoque",
     "/estoque-consulta",
@@ -319,6 +322,19 @@ export default function Sidebar({ companyName }: SidebarProps) {
             currentPathname === basePath &&
             !dashboardBlockedSegments.some((segment) => currentPathname.includes(segment)),
         },
+        // Orçado da planilha do financeiro: por enquanto só a Scarf Me tem.
+        ...(isScarfme
+          ? [
+              {
+                key: "planejamento-receita",
+                label: "Planejamento de Receita",
+                href: planejamentoReceitaHref,
+                permission: "planejamento-receita" as const,
+                isActive: (currentPathname: string | null) =>
+                  matchesSegment(currentPathname, "/planejamento-receita", planejamentoReceitaHref),
+              },
+            ]
+          : []),
       ],
     },
     {

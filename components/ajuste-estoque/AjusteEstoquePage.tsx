@@ -63,7 +63,132 @@ interface AjusteDetalheItem {
   qtde: number;
 }
 
+/** KPIs de um ajuste já feito (ver /api/ajuste-estoque/detalhe). null = não guardado. */
+interface AjusteKpis {
+  fonte: "snapshot" | "contagem" | "ajuste";
+  modo: Modo | null;
+  totais: {
+    itens: number | null;
+    comDiferenca: number;
+    positivos: number;
+    negativos: number;
+    somaDelta: number;
+    saldoAtualTotal: number | null;
+    saldoFinalTotal: number | null;
+    itensSaldoNegativo: number | null;
+  };
+  naoEncontrados: number;
+  ambiguos: number;
+  invalidas: number;
+}
+
+interface AjusteDetalhe {
+  itens: AjusteDetalheItem[];
+  kpis: AjusteKpis | null;
+}
+
 type Modo = "inventario" | "zerar";
+
+type TotaisKpi = {
+  [K in keyof PreviewResposta["totais"]]: PreviewResposta["totais"][K] | null;
+};
+
+function fmtKpi(v: number | null): string {
+  return v == null ? "—" : v.toLocaleString("pt-BR");
+}
+
+/** Quadros de KPIs do "Calcular diferenças" — também usados ao rever um ajuste recente. */
+function TotaisBar({ totais }: { totais: TotaisKpi }) {
+  const semDado = "Não guardado para este ajuste";
+  const somaDelta = totais.somaDelta ?? 0;
+  return (
+    <div className={styles.totaisBar}>
+      <div className={`${styles.totalBox} ${styles.totalBoxDestaque}`}>
+        <span className={styles.totalLabel}>Saldo atual (total)</span>
+        <span
+          className={styles.totalValor}
+          title={totais.saldoAtualTotal == null ? semDado : undefined}
+        >
+          {fmtKpi(totais.saldoAtualTotal)}
+        </span>
+      </div>
+      <div className={`${styles.totalBox} ${styles.totalBoxDestaque}`}>
+        <span className={styles.totalLabel}>Saldo final (após ajuste)</span>
+        <span
+          className={`${styles.totalValor} ${styles.final}`}
+          title={totais.saldoFinalTotal == null ? semDado : undefined}
+        >
+          {fmtKpi(totais.saldoFinalTotal)}
+        </span>
+      </div>
+      <div className={styles.totalBox}>
+        <span className={styles.totalLabel}>Variação líquida</span>
+        <span className={`${styles.totalValor} ${somaDelta < 0 ? styles.neg : styles.pos}`}>
+          {somaDelta > 0 ? "+" : ""}
+          {fmtKpi(totais.somaDelta)}
+        </span>
+      </div>
+      <div className={styles.totalBox}>
+        <span className={styles.totalLabel}>Itens no escopo</span>
+        <span className={styles.totalValor} title={totais.itens == null ? semDado : undefined}>
+          {fmtKpi(totais.itens)}
+        </span>
+      </div>
+      <div className={styles.totalBox}>
+        <span className={styles.totalLabel}>Com diferença</span>
+        <span className={styles.totalValor}>{fmtKpi(totais.comDiferenca)}</span>
+      </div>
+      <div className={styles.totalBox}>
+        <span className={styles.totalLabel}>Entradas (+)</span>
+        <span className={`${styles.totalValor} ${styles.pos}`}>{totais.positivos ?? "—"}</span>
+      </div>
+      <div className={styles.totalBox}>
+        <span className={styles.totalLabel}>Saídas (−)</span>
+        <span className={`${styles.totalValor} ${styles.neg}`}>{totais.negativos ?? "—"}</span>
+      </div>
+    </div>
+  );
+}
+
+/** KPIs de um ajuste recente + avisos, no mesmo formato do preview. */
+function AjusteKpisResumo({ kpis }: { kpis: AjusteKpis }) {
+  const t = kpis.totais;
+  const avisos: string[] = [];
+  if (kpis.naoEncontrados > 0) avisos.push(`⚠ ${kpis.naoEncontrados} código(s) não encontrado(s)`);
+  if (kpis.ambiguos > 0) avisos.push(`⚠ ${kpis.ambiguos} código(s) ambíguo(s) (ignorado(s))`);
+  if (kpis.invalidas > 0) avisos.push(`⚠ ${kpis.invalidas} linha(s) inválida(s) no arquivo`);
+  return (
+    <div className={styles.detalheKpis}>
+      <TotaisBar totais={t} />
+      {t.itensSaldoNegativo != null && t.itensSaldoNegativo > 0 && t.saldoFinalTotal != null && (
+        <p className={styles.fileHintMuted}>
+          ℹ {t.itensSaldoNegativo} item(ns) tinham saldo negativo no escopo — por isso a variação
+          líquida ({t.somaDelta > 0 ? "+" : ""}
+          {t.somaDelta}) difere do estoque positivo da filial. Saldo final total após o ajuste:{" "}
+          <strong>{t.saldoFinalTotal.toLocaleString("pt-BR")}</strong>.
+        </p>
+      )}
+      {avisos.length > 0 && (
+        <div className={styles.avisos}>
+          {avisos.map((a) => (
+            <span key={a} className={styles.aviso}>
+              {a}
+            </span>
+          ))}
+        </div>
+      )}
+      {kpis.fonte === "ajuste" && (
+        <p className={styles.fileHintMuted}>
+          Saldos e escopo não foram guardados para este ajuste (feito antes desse registro ou
+          item a item) — o Linx só grava os itens com diferença.
+        </p>
+      )}
+      {kpis.fonte === "contagem" && (
+        <p className={styles.fileHintMuted}>Saldos lidos da contagem física registrada no Linx.</p>
+      )}
+    </div>
+  );
+}
 
 interface Props {
   companyKey: CompanyKey;
@@ -133,7 +258,7 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
   const [estornandoNome, setEstornandoNome] = useState<string | null>(null);
   const [estornoMsg, setEstornoMsg] = useState<string | null>(null);
   const [detalheAberto, setDetalheAberto] = useState<string | null>(null);
-  const [detalheCache, setDetalheCache] = useState<Record<string, AjusteDetalheItem[]>>({});
+  const [detalheCache, setDetalheCache] = useState<Record<string, AjusteDetalhe>>({});
   const [detalheCarregando, setDetalheCarregando] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -167,9 +292,12 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
       try {
         const r = await fetch(`/api/ajuste-estoque/detalhe?nome=${encodeURIComponent(nome)}`);
         const d = await r.json();
-        setDetalheCache((prev) => ({ ...prev, [nome]: Array.isArray(d?.itens) ? d.itens : [] }));
+        setDetalheCache((prev) => ({
+          ...prev,
+          [nome]: { itens: Array.isArray(d?.itens) ? d.itens : [], kpis: d?.kpis ?? null },
+        }));
       } catch {
-        setDetalheCache((prev) => ({ ...prev, [nome]: [] }));
+        setDetalheCache((prev) => ({ ...prev, [nome]: { itens: [], kpis: null } }));
       } finally {
         setDetalheCarregando(false);
       }
@@ -321,6 +449,14 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
           dataContagem,
           obs: obs.trim() || null,
           itens,
+          resumo: {
+            itens: preview.totais.itens,
+            saldoFinalTotal: preview.totais.saldoFinalTotal,
+            itensSaldoNegativo: preview.totais.itensSaldoNegativo,
+            naoEncontrados: preview.naoEncontrados.length,
+            ambiguos: preview.ambiguos.length,
+            invalidas: preview.invalidas.length,
+          },
         }),
       });
       const data = await resp.json();
@@ -571,47 +707,7 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
       {/* ── Preview ── */}
       {preview && (
         <section className={styles.card}>
-          <div className={styles.totaisBar}>
-            <div className={`${styles.totalBox} ${styles.totalBoxDestaque}`}>
-              <span className={styles.totalLabel}>Saldo atual (total)</span>
-              <span className={styles.totalValor}>
-                {preview.totais.saldoAtualTotal.toLocaleString("pt-BR")}
-              </span>
-            </div>
-            <div className={`${styles.totalBox} ${styles.totalBoxDestaque}`}>
-              <span className={styles.totalLabel}>Saldo final (após ajuste)</span>
-              <span className={`${styles.totalValor} ${styles.final}`}>
-                {preview.totais.saldoFinalTotal.toLocaleString("pt-BR")}
-              </span>
-            </div>
-            <div className={styles.totalBox}>
-              <span className={styles.totalLabel}>Variação líquida</span>
-              <span
-                className={`${styles.totalValor} ${
-                  preview.totais.somaDelta < 0 ? styles.neg : styles.pos
-                }`}
-              >
-                {preview.totais.somaDelta > 0 ? "+" : ""}
-                {preview.totais.somaDelta.toLocaleString("pt-BR")}
-              </span>
-            </div>
-            <div className={styles.totalBox}>
-              <span className={styles.totalLabel}>Itens no escopo</span>
-              <span className={styles.totalValor}>{preview.totais.itens.toLocaleString("pt-BR")}</span>
-            </div>
-            <div className={styles.totalBox}>
-              <span className={styles.totalLabel}>Com diferença</span>
-              <span className={styles.totalValor}>{preview.totais.comDiferenca.toLocaleString("pt-BR")}</span>
-            </div>
-            <div className={styles.totalBox}>
-              <span className={styles.totalLabel}>Entradas (+)</span>
-              <span className={`${styles.totalValor} ${styles.pos}`}>{preview.totais.positivos}</span>
-            </div>
-            <div className={styles.totalBox}>
-              <span className={styles.totalLabel}>Saídas (−)</span>
-              <span className={`${styles.totalValor} ${styles.neg}`}>{preview.totais.negativos}</span>
-            </div>
-          </div>
+          <TotaisBar totais={preview.totais} />
 
           {preview.totais.itensSaldoNegativo > 0 && (
             <p className={styles.fileHintMuted}>
@@ -773,6 +869,10 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
                           {detalheCarregando && !detalheCache[r.nome] ? (
                             <span className={styles.fileHintMuted}>Carregando itens…</span>
                           ) : (
+                            <>
+                            {detalheCache[r.nome]?.kpis && (
+                              <AjusteKpisResumo kpis={detalheCache[r.nome].kpis as AjusteKpis} />
+                            )}
                             <table className={styles.detalheTable}>
                               <thead>
                                 <tr>
@@ -783,7 +883,7 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
                                 </tr>
                               </thead>
                               <tbody>
-                                {(detalheCache[r.nome] ?? []).map((it, idx) => (
+                                {(detalheCache[r.nome]?.itens ?? []).map((it, idx) => (
                                   <tr key={`${it.produto}|${it.cor}|${idx}`}>
                                     <td className={styles.mono}>{it.produto}</td>
                                     <td>{it.descProduto}</td>
@@ -794,7 +894,7 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
                                     </td>
                                   </tr>
                                 ))}
-                                {(detalheCache[r.nome]?.length ?? 0) === 0 && !detalheCarregando && (
+                                {(detalheCache[r.nome]?.itens.length ?? 0) === 0 && !detalheCarregando && (
                                   <tr>
                                     <td colSpan={4} className={styles.fileHintMuted}>
                                       Nenhum item encontrado.
@@ -803,6 +903,7 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
                                 )}
                               </tbody>
                             </table>
+                            </>
                           )}
                         </td>
                       </tr>
