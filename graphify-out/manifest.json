@@ -1645,8 +1645,8 @@
     "semantic_hash": "f9f455e79710f72c6b9952301879ebc6"
   },
   "components/stock/CompraSalvaDetalhePage.tsx": {
-    "mtime": 1791218020.134758,
-    "ast_hash": "02a86bfae2b0836eec300f6cfeec8ab9",
+    "mtime": 1791397340.7417839,
+    "ast_hash": "0cc7fdb8043b58da60791a3ea4764664",
     "semantic_hash": ""
   },
   "components/stock/ComprasSalvasListPanel.tsx": {
@@ -2435,8 +2435,8 @@
     "semantic_hash": "8c1d93a8e7b6ea254bb47828f9553e06"
   },
   "lib/repositories/controleEstoque.ts": {
-    "mtime": 1791214064.6308258,
-    "ast_hash": "e768ae6ce4dbe120dd01311c6024bd51",
+    "mtime": 1791397330.0524905,
+    "ast_hash": "f0a1e4ef7c9c899e9a67cb1b3d45f3a5",
     "semantic_hash": ""
   },
   "lib/repositories/controleMovimento.ts": {
@@ -4685,13 +4685,13 @@
     "semantic_hash": ""
   },
   "app/api/controle-estoque/metragem-produtos/route.ts": {
-    "mtime": 1791214065.8073711,
-    "ast_hash": "9b938ed7b6e0f6fb77171504fce73826",
+    "mtime": 1791397419.2759361,
+    "ast_hash": "9499276b3c3797f648e056c36052cac7",
     "semantic_hash": ""
   },
   "lib/config/metragem-produto.ts": {
-    "mtime": 1791214045.6346564,
-    "ast_hash": "09024d4f0fbd2c5628a0a878a0632028",
+    "mtime": 1791398046.0389824,
+    "ast_hash": "b8a2945913bb20565ebbfb22721c85b7",
     "semantic_hash": ""
   },
   "app/(companies)/[company]/editar-produto/page.tsx": {

@@ -104,7 +104,7 @@ function fmtBRL(n: number) {
 }
 
 function fmtMetros(n: number) {
-  return `${n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m`;
+  return `${n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 3 })} m`;
 }
 
 function fmtBRL2(n: number) {
@@ -1874,7 +1874,7 @@ export default function CompraSalvaDetalhePage({
       ...(mostraMetragem
         ? {
             METRAGEM_POR_PECA_M: r.metrosPorPeca ?? "",
-            METRAGEM_TOTAL_M: r.metragemTotal != null ? Math.round(r.metragemTotal * 100) / 100 : "",
+            METRAGEM_TOTAL_M: r.metragemTotal != null ? Math.round(r.metragemTotal * 1000) / 1000 : "",
           }
         : {}),
       ...(podeVerCusto
@@ -1891,7 +1891,7 @@ export default function CompraSalvaDetalhePage({
       { METRICA: "Itens", VALOR: totals.totalItens },
       { METRICA: "Total Qtd Manual", VALOR: totals.totalQtdManual },
       ...(mostraMetragem
-        ? [{ METRICA: "Metragem necessária (m)", VALOR: Math.round(totals.totalMetragem * 100) / 100 }]
+        ? [{ METRICA: "Metragem necessária (m)", VALOR: Math.round(totals.totalMetragem * 1000) / 1000 }]
         : []),
       ...(podeVerCusto ? [{ METRICA: "Custo Total", VALOR: totals.totalCusto }] : []),
     ];
@@ -1912,7 +1912,7 @@ export default function CompraSalvaDetalhePage({
       };
       put("PRODUTO", { t: "s", v: "TOTAL" });
       put("QTD_MANUAL", { t: "n", v: totals.totalQtdManual, f: `SUMIF(${faixa("TAMANHO")},"",${faixa("QTD_MANUAL")})` });
-      put("METRAGEM_TOTAL_M", { t: "n", v: Math.round(totals.totalMetragem * 100) / 100, f: `SUM(${faixa("METRAGEM_TOTAL_M")})`, z: "0.00" });
+      put("METRAGEM_TOTAL_M", { t: "n", v: Math.round(totals.totalMetragem * 1000) / 1000, f: `SUM(${faixa("METRAGEM_TOTAL_M")})`, z: "0.00#" });
       put("CUSTO_TOTAL", { t: "n", v: totals.totalCusto, f: `SUM(${faixa("CUSTO_TOTAL")})` });
       const ref = XLSX.utils.decode_range(wsCompra["!ref"] ?? "A1");
       ref.e.r = linhaTotal - 1;

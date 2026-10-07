@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { resolveMetragemProduto, temRegrasMetragem, type MetragemProduto } from "@/lib/config/metragem-produto";
-import { fetchGrupoSubgrupoPorProdutos } from "@/lib/repositories/controleEstoque";
+import { fetchClassificacaoMetragemPorProdutos } from "@/lib/repositories/controleEstoque";
 
 /**
  * Metragem de tecido por peça dos produtos pedidos. Só volta quem casa uma regra de
@@ -25,9 +25,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ data });
     }
 
-    const grupos = await fetchGrupoSubgrupoPorProdutos(produtos);
-    for (const [produto, { grupo, subgrupo }] of grupos) {
-      const metragem = resolveMetragemProduto(companyKey, grupo, subgrupo);
+    const cadastro = await fetchClassificacaoMetragemPorProdutos(produtos);
+    for (const [produto, classificacao] of cadastro) {
+      const metragem = resolveMetragemProduto(companyKey, classificacao);
       if (metragem) data[produto] = metragem;
     }
     return NextResponse.json({ data });

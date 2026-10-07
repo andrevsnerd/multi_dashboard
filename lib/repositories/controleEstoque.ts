@@ -8974,27 +8974,41 @@ export async function fetchCustosPorProdutos(
 }
 
 /**
- * GRUPO_PRODUTO / SUBGRUPO_PRODUTO do cadastro, por produto — base da metragem por peça
+ * LINHA / GRUPO / SUBGRUPO / GRADE do cadastro, por produto — base da metragem por peça
  * (ver lib/config/metragem-produto.ts).
  */
-export async function fetchGrupoSubgrupoPorProdutos(
+export async function fetchClassificacaoMetragemPorProdutos(
   produtos: string[]
-): Promise<Map<string, { grupo: string; subgrupo: string }>> {
+): Promise<Map<string, { linha: string; grupo: string; subgrupo: string; grade: string }>> {
   const normed = [...new Set(produtos.map((p) => p.trim()).filter(Boolean))];
   if (normed.length === 0) return new Map();
   return withRequest(async (request) => {
     normed.forEach((p, i) => request.input(`gp${i}`, sql.VarChar, p));
     const placeholders = normed.map((_, i) => `@gp${i}`).join(', ');
-    const result = await request.query<{ produto: string; grupo: string | null; subgrupo: string | null }>(`
+    const result = await request.query<{
+      produto: string;
+      linha: string | null;
+      grupo: string | null;
+      subgrupo: string | null;
+      grade: string | null;
+    }>(`
       SELECT LTRIM(RTRIM(PRODUTO)) AS produto,
+             LTRIM(RTRIM(LINHA)) AS linha,
              LTRIM(RTRIM(GRUPO_PRODUTO)) AS grupo,
-             LTRIM(RTRIM(SUBGRUPO_PRODUTO)) AS subgrupo
+             LTRIM(RTRIM(SUBGRUPO_PRODUTO)) AS subgrupo,
+             LTRIM(RTRIM(CONVERT(VARCHAR(40), GRADE))) AS grade
       FROM PRODUTOS WITH (NOLOCK)
       WHERE LTRIM(RTRIM(PRODUTO)) IN (${placeholders})
     `);
-    const map = new Map<string, { grupo: string; subgrupo: string }>();
+    const map = new Map<string, { linha: string; grupo: string; subgrupo: string; grade: string }>();
     for (const row of result.recordset) {
-      if (row.produto) map.set(row.produto.trim(), { grupo: row.grupo ?? '', subgrupo: row.subgrupo ?? '' });
+      if (!row.produto) continue;
+      map.set(row.produto.trim(), {
+        linha: row.linha ?? '',
+        grupo: row.grupo ?? '',
+        subgrupo: row.subgrupo ?? '',
+        grade: row.grade ?? '',
+      });
     }
     return map;
   });
