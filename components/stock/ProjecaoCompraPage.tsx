@@ -8,9 +8,7 @@ import { canSeeCusto } from "@/lib/auth/permissions";
 import ProjecaoEmbalagensPanel, {
   type PedidoEmbalagens,
 } from "@/components/stock/ProjecaoEmbalagensPanel";
-import ProjecaoAviamentosPanel, {
-  type PedidoAviamentos,
-} from "@/components/stock/ProjecaoAviamentosPanel";
+import ProjecaoAviamentosPanel from "@/components/stock/ProjecaoAviamentosPanel";
 import ProjecaoComoFunciona from "@/components/stock/ProjecaoComoFunciona";
 import ProjecaoItensMensais, {
   type ItemCompra,
@@ -1252,8 +1250,6 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
     // Embalagem tem consulta própria (a lista é fixa e cada linha tem a sua série):
     // quem busca é o painel da aba.
     if (pedido.metrica === "embalagens") return;
-    // Aviamento também: lista fixa, consulta no painel da aba.
-    if (pedido.metrica === "aviamentos") return;
     const recortes =
       pedido.produtos.length + DIM_KEYS.reduce((soma, dim) => soma + pedido.dims[dim].length, 0);
     if (recortes > MAX_RECORTES) {
@@ -1925,13 +1921,11 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
     pedido && pedido.metrica === "embalagens"
       ? { dataBase: pedido.dataBase, filial: pedido.filial }
       : null;
-  /** Aba Aviamentos AO VIVO / APLICADA — mesmo papel das duas de Embalagens acima. */
+  /**
+   * Aba Aviamentos. Não projeta venda nem depende de "Gerar": a base é o trânsito da
+   * empresa inteira, então o painel carrega sozinho e a aba vale assim que é escolhida.
+   */
   const ehAviamentos = metrica === "aviamentos";
-  const ehAviamentosAplicada = metricaAplicada === "aviamentos";
-  const pedidoAviamentos: PedidoAviamentos | null =
-    pedido && pedido.metrica === "aviamentos"
-      ? { dataBase: pedido.dataBase, filial: pedido.filial }
-      : null;
   const unidadeLabel = ehTickets ? "tickets" : "un";
   /**
    * Custo é informação restrita (gerente e supervisor nunca veem) — ver
@@ -1945,19 +1939,16 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
       {/* ── Título + escopo ──────────────────────────────────────────────── */}
       <div className={styles.titleBar}>
         <h1 className={styles.title}>Projeção Compra</h1>
-        {gerado && ehEmbalagensAplicada && (
+        {gerado && !ehAviamentos && ehEmbalagensAplicada && (
           <span className={styles.scopeText}>
             {filialAplicadaLabel ? `${filialAplicadaLabel} · ` : "Rede inteira · "}
             embalagens ScarfMe
           </span>
         )}
-        {gerado && ehAviamentosAplicada && (
-          <span className={styles.scopeText}>
-            {filialAplicadaLabel ? `${filialAplicadaLabel} · ` : "Rede inteira · "}
-            aviamentos ScarfMe
-          </span>
+        {ehAviamentos && (
+          <span className={styles.scopeText}>aviamentos ScarfMe · compras em trânsito</span>
         )}
-        {gerado && !ehEmbalagensAplicada && !ehAviamentosAplicada && (
+        {gerado && !ehAviamentos && !ehEmbalagensAplicada && (
           <span className={styles.scopeText}>
             {soUm ? (
               <>
@@ -2014,7 +2005,10 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
               </div>
             </div>
             {/* Filial: o mesmo controle das outras telas (grupos canônicos, VAREJO,
-                E-commerce). Recorta o universo de lojas, não o cadastro de produtos. */}
+                E-commerce). Recorta o universo de lojas, não o cadastro de produtos. Aviamentos
+                não usa filial, data nem regra: a base é o trânsito da empresa inteira. */}
+            {!ehAviamentos && (
+            <>
             <FilialFilter
               companyKey={companyKey}
               value={filial}
@@ -2040,6 +2034,8 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
                 onChange={(e) => e.target.value && setVenderAte(e.target.value)}
               />
             </label>
+            </>
+            )}
             {metrica === "produtos" && (
             <label className={styles.field}>
               <span className={styles.fieldLabel}>
@@ -2089,13 +2085,15 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
               />
             </label>
             )}
+            {!ehAviamentos && (
             <div className={styles.field}>
               <span className={styles.fieldLabel}>Horizonte</span>
               <span className={styles.pill}>{fmt(diasHorizonte)} dias</span>
             </div>
+            )}
             {/* Uma opção só não é escolha: vira rótulo. O select volta sozinho quando
                 outra régua for reativada em REGRAS (lib/utils/projecao-regras.ts). */}
-            {regrasDisponiveis.length > 1 ? (
+            {ehAviamentos ? null : regrasDisponiveis.length > 1 ? (
               <label className={styles.field}>
                 <span className={styles.fieldLabel}>Regra de cálculo</span>
                 <select
@@ -2371,6 +2369,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
           </>
           )}
 
+          {!ehAviamentos && (
           <button
             type="button"
             className={styles.btnGerar}
@@ -2386,6 +2385,7 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
           >
             {projLoading ? "Gerando…" : temEscopo ? "Gerar projeção" : "Gerar total da rede"}
           </button>
+          )}
         </div>
       </div>
 
@@ -2408,21 +2408,17 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
         coberturaGrupo={cobertura.grupo}
       />
 
-      {ehEmbalagensAplicada ? (
+      {ehAviamentos ? (
+        <ProjecaoAviamentosPanel
+          companyKey={companyKey}
+          username={user?.username ?? ""}
+          onLoadingChange={setProjLoading}
+        />
+      ) : ehEmbalagensAplicada ? (
         <ProjecaoEmbalagensPanel
           companyKey={companyKey}
           username={user?.username ?? ""}
           pedido={pedidoEmbalagens}
-          dataBase={dataBase}
-          diasHorizonte={diasHorizonte}
-          regra={regra}
-          onLoadingChange={setProjLoading}
-        />
-      ) : ehAviamentosAplicada ? (
-        <ProjecaoAviamentosPanel
-          companyKey={companyKey}
-          username={user?.username ?? ""}
-          pedido={pedidoAviamentos}
           dataBase={dataBase}
           diasHorizonte={diasHorizonte}
           regra={regra}

@@ -4395,8 +4395,8 @@
     "semantic_hash": ""
   },
   "components/stock/ProjecaoCompraPage.tsx": {
-    "mtime": 1791481145.804237,
-    "ast_hash": "4a4122b1a3b5abd197a4db108f1cd806",
+    "mtime": 1791482767.0328612,
+    "ast_hash": "885ded2fc8d95f55b312c7b8bab64c0e",
     "semantic_hash": ""
   },
   "lib/config/saida-estoque-negativo.ts": {
@@ -4820,23 +4820,23 @@
     "semantic_hash": ""
   },
   "app/api/projecao-aviamentos/route.ts": {
-    "mtime": 1791480791.424274,
-    "ast_hash": "23f83fd12c991804f0c4307b3a238b23",
+    "mtime": 1791482679.070868,
+    "ast_hash": "47bd1208d7bbf3c230c720d11b69b5f5",
     "semantic_hash": ""
   },
   "components/stock/ProjecaoAviamentosPanel.tsx": {
-    "mtime": 1791480889.5506344,
-    "ast_hash": "b1206109199131fd5c3ab9070fbeb1fc",
+    "mtime": 1791485099.8465788,
+    "ast_hash": "461347401e44af44377f77451d226dd8",
     "semantic_hash": ""
   },
   "lib/config/aviamentos.ts": {
-    "mtime": 1791480768.4709954,
-    "ast_hash": "1d47085348b5a6d944daf31faa537e23",
+    "mtime": 1791485120.214087,
+    "ast_hash": "4717a7458d4521d69b04c3b77f057a83",
     "semantic_hash": ""
   },
   "lib/repositories/projecaoAviamentos.ts": {
-    "mtime": 1791480842.9472837,
-    "ast_hash": "5d06750e9069dca69425e44458c185f4",
+    "mtime": 1791485099.8465788,
+    "ast_hash": "e5462dc959af1d9d9ddb746d7e0d457d",
     "semantic_hash": ""
   },
   "lib/utils/aviamentos-estoque-store.ts": {

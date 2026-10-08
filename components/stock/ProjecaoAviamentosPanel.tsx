@@ -2,138 +2,69 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import {
-  indiceDoModo,
-  montarPerfil,
-  projetarHorizonte,
-  projetarMesCheio,
-  type CriterioMes,
-  type MesSerie,
-  type ModoProjecao,
-} from "@/lib/utils/projecao-realista";
-import {
-  CRITERIO_TEXTO,
-  REGRAS_CURVA,
-  REGRA_LABEL,
-  type RegraProjecao,
-} from "@/lib/utils/projecao-regras";
 import type { CompanyKey } from "@/lib/config/company";
 
 import styles from "./ProjecaoCompraPage.module.css";
 
 /**
- * Aba "Aviamentos" da Projeção Compra — cópia da aba Embalagens
- * ([ProjecaoEmbalagensPanel.tsx](@/components/stock/ProjecaoEmbalagensPanel)).
+ * Aba "Aviamentos" da Projeção Compra.
  *
- * A lista é FIXA (os aviamentos do grupo AVIAMENTOS do cadastro) e cada linha tem a sua
- * própria série, porque cada um tem a sua regra de consumo — ver
- * [aviamentos.ts](@/lib/config/aviamentos).
+ * A base é o que foi COMPRADO e ainda não chegou (Compras em trânsito, já reconciliadas
+ * contra as entradas reais): cada peça a caminho vai precisar dos seus aviamentos, conforme
+ * a regra de cada um em [aviamentos.ts](@/lib/config/aviamentos). Só os aviamentos gastos na
+ * venda (etiqueta presente, remetente, caixa de presente) somam a venda dos próximos 90 dias,
+ * pelo ritmo dos últimos 90.
  *
- * MESES EM COLUNAS: mês fechado mostra o realizado, mês futuro mostra a projeção, com o
- * mesmo motor das outras abas (curva do ano anterior × índice YoY, ou ritmo de janela).
+ * A tabela tem só o estoque e o quanto precisamos: necessidade das peças em trânsito menos
+ * o estoque digitado.
  *
  * O estoque é digitado: começa no provisório (10 de cada) e, assim que alguém altera a
- * célula, GRAVA SOZINHO (sem botão) e passa a valer o número digitado.
- *
- * Duas coisas seguram isso de pé, e as duas já quebraram antes:
+ * célula, GRAVA SOZINHO (sem botão) e passa a valer o número digitado. Mesmo mecanismo da
+ * aba Embalagens:
  *
  *   1. Enquanto o campo está sendo digitado, quem manda é o RASCUNHO (texto). Se o valor
  *      exibido fosse sempre o número já normalizado, apagar o campo viraria 0 na hora e o
  *      cursor ficaria preso.
  *   2. Uma nova consulta NÃO apaga o que foi digitado. O que está na fila de gravação vence
- *      o que veio do servidor até a gravação confirmar — senão gerar a projeção de novo
- *      devolve a célula ao número antigo.
+ *      o que veio do servidor até a gravação confirmar.
  */
 
-interface AviamentoSerie {
+interface AviamentoNecessidade {
   id: string;
   nome: string;
   nota?: string;
   temRegra: boolean;
-  janelas: Record<string, number>;
-  mensal: MesSerie[];
+  necessidadeCompras: number;
+  necessidadeVenda: number;
+  necessidade: number;
 }
 
 interface Resposta {
-  dataBase: string;
-  itens: AviamentoSerie[];
+  itens: AviamentoNecessidade[];
+  resumo: {
+    compras: number;
+    pecas: number;
+    pecasDaMarca: number;
+    venda: { tickets: number; pecasFashion: number; janelaDias: number; horizonteDias: number };
+  };
   estoque: Record<string, number>;
   error?: string;
 }
 
-const MES_NOME = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
-
 function fmt(n: number): string {
   return n.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
-}
-function fmtPct(v: number | null, dec = 1): string {
-  if (v == null || !Number.isFinite(v)) return "—";
-  const sinal = v > 0 ? "+" : "";
-  return `${sinal}${(v * 100).toLocaleString("pt-BR", { minimumFractionDigits: dec, maximumFractionDigits: dec })}%`;
-}
-function diasNoMes(ano: number, mes: number): number {
-  return new Date(Date.UTC(ano, mes, 0)).getUTCDate();
-}
-
-/** O que dispara a consulta: a tela só busca quando o usuário manda gerar. */
-export interface PedidoAviamentos {
-  dataBase: string;
-  filial: string | null;
 }
 
 interface Props {
   companyKey: CompanyKey;
   username: string;
-  pedido: PedidoAviamentos | null;
-  /** Data base e horizonte AO VIVO: mudar "Vender até" ou a regra recalcula sem nova consulta. */
-  dataBase: string;
-  diasHorizonte: number;
-  regra: RegraProjecao;
   /** Avisa a tela-mãe que a consulta está em andamento (o "calculando" é de lá). */
   onLoadingChange?: (carregando: boolean) => void;
 }
 
-/** Uma célula de mês da linha. */
-interface MesCelula {
-  /** 'yyyy-MM' */
-  mes: string;
-  /** Valor que a célula mostra: realizado no mês fechado, projeção no resto. */
-  valor: number | null;
-  /** O que entra no total do ano (no mês em curso é o mês cheio, não o parcial). */
-  valorAno: number;
-  qtdeAnoAnterior: number;
-  parcial: boolean;
-  futuro: boolean;
-  criterio: CriterioMes | null;
-}
-
-/** Uma linha da tabela, com a série do ano e a projeção já resolvidas. */
-interface LinhaAviamento {
-  item: AviamentoSerie;
-  /** false = aviamento sem regra: a linha existe mas não projeta. */
-  temRegra: boolean;
-  /** Nada fechou no ano ainda (data base em janeiro): a curva não tem de onde sair. */
-  disponivel: boolean;
-  estoque: number;
-  meses: MesCelula[];
-  totalAno: number;
-  totalAnoAnterior: number;
-  /** Consumo projetado entre a data base e "Vender até". */
-  necessidade: number;
-  ritmoDia: number;
-  sugestao: number;
-}
-
-export default function ProjecaoAviamentosPanel({
-  companyKey,
-  username,
-  pedido,
-  dataBase,
-  diasHorizonte,
-  regra,
-  onLoadingChange,
-}: Props) {
-  const [itens, setItens] = useState<AviamentoSerie[]>([]);
+export default function ProjecaoAviamentosPanel({ companyKey, username, onLoadingChange }: Props) {
+  const [itens, setItens] = useState<AviamentoNecessidade[]>([]);
+  const [resumo, setResumo] = useState<Resposta["resumo"] | null>(null);
   const [estoqueSalvo, setEstoqueSalvo] = useState<Record<string, number>>({});
   /** Edições ainda não confirmadas pelo servidor (id → unidades). Vencem o que veio do GET. */
   const [estoqueEditado, setEstoqueEditado] = useState<Record<string, number>>({});
@@ -143,35 +74,33 @@ export default function ProjecaoAviamentosPanel({
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
-  const [expandida, setExpandida] = useState<string | null>(null);
+  /** Muda a cada "Atualizar": é o que dispara a consulta de novo. */
+  const [versao, setVersao] = useState(0);
 
-  // ── Consulta: só quando o pedido muda (gerar projeção) ──
+  // ── Consulta: ao abrir a aba e a cada "Atualizar" ──
   useEffect(() => {
-    if (!pedido) return;
-    const params = new URLSearchParams({ company: companyKey, base: pedido.dataBase });
-    if (pedido.filial) params.set("filial", pedido.filial);
-
     let cancelado = false;
     setCarregando(true);
     onLoadingChange?.(true);
     setErro(null);
+    const params = new URLSearchParams({ company: companyKey });
     fetch(`/api/projecao-aviamentos?${params.toString()}`, { cache: "no-store" })
       .then(async (r) => {
         const json = (await r.json()) as Resposta;
-        if (!r.ok) throw new Error(json?.error || "Erro ao calcular a projeção de aviamentos");
+        if (!r.ok) throw new Error(json?.error || "Erro ao calcular a necessidade de aviamentos");
         return json;
       })
       .then((json) => {
         if (cancelado) return;
         setItens(Array.isArray(json.itens) ? json.itens : []);
-        // O que está na fila de gravação continua valendo: gerar a projeção de novo não pode
-        // devolver a célula ao número antigo.
+        setResumo(json.resumo ?? null);
         setEstoqueSalvo(json.estoque ?? {});
       })
       .catch((e: Error) => {
         if (cancelado) return;
         setItens([]);
-        setErro(e.message || "Erro ao calcular a projeção de aviamentos");
+        setResumo(null);
+        setErro(e.message || "Erro ao calcular a necessidade de aviamentos");
       })
       .finally(() => {
         if (cancelado) return;
@@ -180,108 +109,39 @@ export default function ProjecaoAviamentosPanel({
       });
     return () => {
       cancelado = true;
+      // A consulta abandonada não pode deixar o "calculando" da tela-mãe aceso.
+      onLoadingChange?.(false);
     };
     // `onLoadingChange` fica fora de propósito: é um callback recriado a cada render da
     // tela-mãe e entraria em laço de carga — ver [[efeito-fetch-strictmode-guard]].
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [companyKey, pedido]);
+  }, [companyKey, versao]);
 
-  const modoCurva: ModoProjecao | null = REGRAS_CURVA[regra] ?? null;
-  const anoBase = Number(dataBase.slice(0, 4));
   const estoqueAtual = useMemo(
     () => ({ ...estoqueSalvo, ...estoqueEditado }),
     [estoqueSalvo, estoqueEditado]
   );
 
-  // ── Projeção linha a linha ──
-  const linhas: LinhaAviamento[] = useMemo(() => {
-    return itens.map((item) => {
-      const perfil = montarPerfil(item.mensal);
-      const indice = modoCurva ? indiceDoModo(perfil, modoCurva) : perfil.indice;
-      const estoque = Math.max(0, Number(estoqueAtual[item.id] ?? 0) || 0);
-
-      const curva = modoCurva !== null;
-      // Regra de janela: o ritmo medido nos últimos N dias, esticado.
-      const diasRegra = curva ? diasHorizonte : Number(regra);
-      const consumoJanela = Number(item.janelas?.[String(diasRegra)] ?? 0) || 0;
-      const disponivel =
-        item.temRegra && (curva ? perfil.ultimoMesReal >= 1 && diasHorizonte > 0 : true);
-
-      const necessidade = !disponivel
-        ? 0
-        : curva
-        ? projetarHorizonte(item.mensal, perfil, modoCurva, indice, dataBase, diasHorizonte)
-        : diasRegra > 0
-        ? (consumoJanela / diasRegra) * diasHorizonte
-        : 0;
-      const ritmoDia = curva
-        ? diasHorizonte > 0
-          ? necessidade / diasHorizonte
-          : 0
-        : diasRegra > 0
-        ? consumoJanela / diasRegra
-        : 0;
-
-      // Série do ano: mês fechado é o realizado, mês futuro é a projeção, mês em curso
-      // mostra o mês CHEIO projetado (comparar meio mês com um mês inteiro não diz nada).
-      const meses: MesCelula[] = item.mensal.map((m) => {
-        const mesNum = Number(m.mes.slice(5, 7));
-        let projetado: number | null = null;
-        let criterio: CriterioMes | null = null;
-        if (!item.temRegra) {
-          projetado = null;
-        } else if (modoCurva) {
-          const r = projetarMesCheio(perfil, mesNum, modoCurva);
-          projetado = perfil.ultimoMesReal >= 1 ? r.valor : null;
-          criterio = r.criterio;
-        } else {
-          projetado = ritmoDia * diasNoMes(anoBase, mesNum);
-        }
-        const valorAno = m.futuro
-          ? projetado ?? 0
-          : m.parcial
-          ? Math.max(m.qtde, projetado ?? 0)
-          : m.qtde;
+  const linhas = useMemo(
+    () =>
+      itens.map((item) => {
+        const estoque = Math.max(0, Number(estoqueAtual[item.id] ?? 0) || 0);
         return {
-          mes: m.mes,
-          valor: m.futuro ? projetado : m.parcial ? valorAno : m.qtde,
-          valorAno,
-          qtdeAnoAnterior: m.qtdeAnoAnterior,
-          parcial: m.parcial,
-          futuro: m.futuro,
-          criterio,
+          item,
+          estoque,
+          precisamos: item.temRegra ? Math.max(0, Math.ceil(item.necessidade - estoque)) : 0,
         };
-      });
-
-      return {
-        item,
-        temRegra: item.temRegra,
-        disponivel,
-        estoque,
-        meses,
-        totalAno: meses.reduce((s, m) => s + m.valorAno, 0),
-        totalAnoAnterior: meses.reduce((s, m) => s + m.qtdeAnoAnterior, 0),
-        necessidade,
-        ritmoDia,
-        sugestao: disponivel ? Math.max(0, Math.ceil(necessidade - estoque)) : 0,
-      };
-    });
-  }, [itens, modoCurva, regra, dataBase, diasHorizonte, estoqueAtual, anoBase]);
+      }),
+    [itens, estoqueAtual]
+  );
 
   const totais = useMemo(() => {
-    const comRegra = linhas.filter((l) => l.temRegra);
+    const comRegra = linhas.filter((l) => l.item.temRegra);
     return {
-      linhas: comRegra.length,
       semRegra: linhas.length - comRegra.length,
-      aComprar: comRegra.reduce((s, l) => s + l.sugestao, 0),
-      itensAComprar: comRegra.filter((l) => l.sugestao > 0).length,
-      consumo: comRegra.reduce((s, l) => s + l.necessidade, 0),
-      estoque: comRegra.reduce((s, l) => s + l.estoque, 0),
-      /** Total do ano somando todos os aviamentos, por mês (o rodapé da tabela). */
-      porMes: Array.from({ length: 12 }, (_, i) =>
-        comRegra.reduce((s, l) => s + (l.meses[i]?.valorAno ?? 0), 0)
-      ),
-      totalAno: comRegra.reduce((s, l) => s + l.totalAno, 0),
+      precisamos: comRegra.reduce((s, l) => s + l.precisamos, 0),
+      itensAComprar: comRegra.filter((l) => l.precisamos > 0).length,
+      linhas: comRegra.length,
     };
   }, [linhas]);
 
@@ -356,20 +216,6 @@ export default function ProjecaoAviamentosPanel({
     };
   }, [gravarFila]);
 
-  const linhaExpandida = linhas.find((l) => l.item.id === expandida) ?? null;
-
-  if (!pedido) {
-    return (
-      <div className={styles.emptyPanel}>
-        <div className={styles.emptyTitle}>Gere a projeção</div>
-        <div className={styles.emptyText}>
-          Escolha a data base e o horizonte e clique em <strong>Gerar projeção</strong>. A lista de
-          aviamentos é fixa — cada linha vem da sua regra de consumo.
-        </div>
-      </div>
-    );
-  }
-
   return (
     <>
       {erro && <div className={styles.erro}>{erro}</div>}
@@ -377,28 +223,32 @@ export default function ProjecaoAviamentosPanel({
       {/* ── KPIs ─────────────────────────────────────────────────────────── */}
       <div className={styles.kpiStrip}>
         <div className={styles.kpi}>
-          <span className={styles.kpiLabel}>Unidades a comprar</span>
-          <span className={styles.kpiValue}>{fmt(totais.aComprar)}</span>
+          <span className={styles.kpiLabel}>Precisamos comprar</span>
+          <span className={styles.kpiValue}>{fmt(totais.precisamos)}</span>
           <span className={styles.kpiHint}>
             {fmt(totais.itensAComprar)} de {fmt(totais.linhas)} aviamentos
           </span>
         </div>
         <div className={styles.kpi}>
-          <span className={styles.kpiLabel}>Consumo projetado</span>
-          <span className={styles.kpiValue}>{fmt(Math.round(totais.consumo))}</span>
-          <span className={styles.kpiHint}>no horizonte de {fmt(diasHorizonte)} dias</span>
+          <span className={styles.kpiLabel}>Peças em trânsito</span>
+          <span className={styles.kpiValue}>{resumo ? fmt(resumo.pecasDaMarca) : "—"}</span>
+          <span className={styles.kpiHint}>
+            {resumo
+              ? `${fmt(resumo.compras)} ${resumo.compras === 1 ? "compra" : "compras"} ainda não chegaram`
+              : "compradas e ainda não chegaram"}
+          </span>
         </div>
         <div className={styles.kpi}>
-          <span className={styles.kpiLabel}>Estoque informado</span>
-          <span className={styles.kpiValue}>{fmt(totais.estoque)}</span>
-          <span className={styles.kpiHint}>contagem digitada, não o Linx</span>
+          <span className={styles.kpiLabel}>Vendas projetadas</span>
+          <span className={styles.kpiValue}>{resumo ? fmt(resumo.venda.tickets) : "—"}</span>
+          <span className={styles.kpiHint}>
+            {resumo
+              ? `próximos ${fmt(resumo.venda.horizonteDias)} dias · ritmo dos últimos ${fmt(
+                  resumo.venda.janelaDias
+                )}`
+              : "para presente, remetente e caixa de presente"}
+          </span>
         </div>
-        <div className={styles.kpi}>
-          <span className={styles.kpiLabel}>Consumo {anoBase}</span>
-          <span className={styles.kpiValue}>{fmt(Math.round(totais.totalAno))}</span>
-          <span className={styles.kpiHint}>ano fechado: realizado + projetado</span>
-        </div>
-        {/* Só aparece se algum aviamento estiver sem regra (`regra: null` em aviamentos.ts). */}
         {totais.semRegra > 0 && (
           <div className={styles.kpi}>
             <span className={styles.kpiLabel}>Sem regra</span>
@@ -408,70 +258,50 @@ export default function ProjecaoAviamentosPanel({
         )}
       </div>
 
-      {/* ── Aviamento × mês ──────────────────────────────────────────────── */}
+      {/* ── Aviamento × estoque × necessidade ───────────────────────────── */}
       <div className={styles.card}>
         <div className={styles.cardHead}>
-          <span className={styles.cardTitle}>
-            Aviamentos por mês · {anoBase} · {REGRA_LABEL[regra]}
-          </span>
-          <div className={styles.legend}>
-            <span className={styles.legendItem}>
-              <span className={`${styles.dot} ${styles.dotReal}`} />
-              realizado
-            </span>
-            <span className={styles.legendItem}>
-              <span className={`${styles.dot} ${styles.dotParcial}`} />
-              mês em curso
-            </span>
-            <span className={styles.legendItem}>
-              <span className={`${styles.dot} ${styles.dotProj}`} />
-              projetado
-            </span>
-          </div>
+          <span className={styles.cardTitle}>Aviamentos · compras em trânsito</span>
           <div className={styles.embActions}>
             <span className={styles.embAviso}>
               {salvando ? "Salvando…" : aviso || "O estoque grava sozinho ao ser alterado."}
             </span>
+            <button
+              type="button"
+              className={styles.btnGerar}
+              onClick={() => setVersao((v) => v + 1)}
+              disabled={carregando}
+            >
+              {carregando ? "Atualizando…" : "Atualizar"}
+            </button>
           </div>
         </div>
-        <div className={`${styles.tableScroll} ${styles.tableScrollFixo}`}>
-          <table
-            className={`${styles.table} ${styles.mensalTable} ${styles.embTable} ${styles.tabelaFixa}`}
-          >
+        <div className={styles.tableScroll}>
+          <table className={`${styles.table} ${styles.embTable}`}>
             <thead>
               <tr>
-                <th className={`${styles.thLeft} ${styles.stickyCol}`}>Aviamento</th>
+                <th className={styles.thLeft}>Aviamento</th>
                 <th>Estoque</th>
-                {MES_NOME.map((nome) => (
-                  <th key={nome}>{nome}</th>
-                ))}
-                <th className={styles.colTotal}>Total {anoBase}</th>
-                <th>Comprar</th>
+                <th>Precisamos</th>
               </tr>
             </thead>
             <tbody>
               {linhas.length === 0 ? (
                 <tr>
-                  <td className={`${styles.tdLeft} ${styles.stickyCol}`} colSpan={16}>
+                  <td className={styles.tdLeft} colSpan={3}>
                     <span className={styles.muted}>
-                      {carregando ? "Carregando…" : "Sem dados para o escopo."}
+                      {carregando ? "Carregando…" : "Sem dados."}
                     </span>
                   </td>
                 </tr>
               ) : (
                 linhas.map((l) => {
                   const editado = estoqueEditado[l.item.id] != null;
-                  const ativa = expandida === l.item.id;
                   return (
-                    <tr
-                      key={l.item.id}
-                      className={ativa ? styles.embRowAtiva : undefined}
-                      onClick={() => setExpandida(ativa ? null : l.item.id)}
-                      title={l.item.nota ?? ""}
-                    >
-                      <td className={`${styles.tdLeft} ${styles.stickyCol}`}>
+                    <tr key={l.item.id} title={l.item.nota ?? ""}>
+                      <td className={styles.tdLeft}>
                         {l.item.nome}
-                        {!l.temRegra && <span className={styles.embSemRegra}>sem regra</span>}
+                        {!l.item.temRegra && <span className={styles.embSemRegra}>sem regra</span>}
                       </td>
                       <td className={styles.num}>
                         <input
@@ -481,7 +311,6 @@ export default function ProjecaoAviamentosPanel({
                           }`}
                           value={rascunho[l.item.id] ?? String(l.estoque)}
                           min={0}
-                          onClick={(e) => e.stopPropagation()}
                           onChange={(e) => {
                             const texto = e.target.value;
                             setAviso(null);
@@ -504,154 +333,32 @@ export default function ProjecaoAviamentosPanel({
                           }}
                         />
                       </td>
-                      {l.meses.map((m) => (
-                        <td
-                          key={m.mes}
-                          className={`${styles.num} ${styles.cellMes} ${
-                            m.futuro ? styles.cellProj : m.parcial ? styles.cellParcial : ""
-                          }`}
-                          title={
-                            m.futuro || m.parcial
-                              ? `${REGRA_LABEL[regra]}${
-                                  m.criterio ? ` · ${CRITERIO_TEXTO[m.criterio]}` : ""
-                                }${
-                                  m.parcial
-                                    ? ` · já consumiu ${fmt(
-                                        l.item.mensal.find((s) => s.mes === m.mes)?.qtde ?? 0
-                                      )} até a data base`
-                                    : ""
-                                }`
-                              : `Realizado · ${anoBase - 1}: ${fmt(m.qtdeAnoAnterior)}`
-                          }
-                        >
-                          <span className={styles.cellQtd}>
-                            {m.valor == null ? "—" : fmt(Math.round(m.valor))}
-                          </span>
-                          {(m.parcial || m.futuro) && l.temRegra && (
-                            <span className={styles.cellFlag}>proj.</span>
-                          )}
-                        </td>
-                      ))}
-                      <td className={`${styles.num} ${styles.colTotal}`}>
-                        <span className={styles.cellQtd}>
-                          {l.temRegra ? fmt(Math.round(l.totalAno)) : "—"}
-                        </span>
-                      </td>
-                      <td className={`${styles.num} ${l.sugestao > 0 ? styles.embComprar : ""}`}>
-                        {l.disponivel ? fmt(l.sugestao) : "—"}
+                      <td
+                        className={`${styles.num} ${l.precisamos > 0 ? styles.embComprar : ""}`}
+                        title={
+                          l.item.temRegra
+                            ? [
+                                l.item.necessidadeCompras > 0 &&
+                                  `Peças em trânsito: ${fmt(l.item.necessidadeCompras)}`,
+                                l.item.necessidadeVenda > 0 &&
+                                  `Venda dos próximos 90 dias: ${fmt(l.item.necessidadeVenda)}`,
+                                `Necessário: ${fmt(l.item.necessidade)} · estoque ${fmt(l.estoque)}`,
+                              ]
+                                .filter(Boolean)
+                                .join("\n")
+                            : ""
+                        }
+                      >
+                        {l.item.temRegra ? fmt(l.precisamos) : "—"}
                       </td>
                     </tr>
                   );
                 })
               )}
             </tbody>
-            {linhas.length > 0 && (
-              <tfoot>
-                <tr>
-                  <td className={`${styles.tdLeft} ${styles.stickyCol}`}>Total</td>
-                  <td className={styles.num}>{fmt(totais.estoque)}</td>
-                  {totais.porMes.map((valor, i) => (
-                    <td key={MES_NOME[i]} className={`${styles.num} ${styles.cellMes}`}>
-                      <span className={styles.cellQtd}>{fmt(Math.round(valor))}</span>
-                    </td>
-                  ))}
-                  <td className={`${styles.num} ${styles.colTotal}`}>
-                    <span className={styles.cellQtd}>{fmt(Math.round(totais.totalAno))}</span>
-                  </td>
-                  <td className={styles.num}>{fmt(totais.aComprar)}</td>
-                </tr>
-              </tfoot>
-            )}
           </table>
         </div>
       </div>
-
-      {/* ── Comparação com o ano anterior, do aviamento escolhido ────────── */}
-      {linhaExpandida && <ComparativoAno linha={linhaExpandida} anoBase={anoBase} />}
     </>
-  );
-}
-
-/** O ano do aviamento escolhido contra o mesmo mês do ano anterior. */
-function ComparativoAno({ linha, anoBase }: { linha: LinhaAviamento; anoBase: number }) {
-  const variacao =
-    linha.totalAnoAnterior > 0 ? linha.totalAno / linha.totalAnoAnterior - 1 : null;
-
-  return (
-    <div className={styles.card}>
-      <div className={styles.cardHead}>
-        <span className={styles.cardTitle}>
-          {linha.item.nome} · {anoBase} contra {anoBase - 1}
-        </span>
-        {linha.item.nota && <span className={styles.embAviso}>{linha.item.nota}</span>}
-      </div>
-      <div className={styles.tableScroll}>
-        <table className={`${styles.table} ${styles.mensalTable} ${styles.tabelaFixa}`}>
-          <thead>
-            <tr>
-              <th className={`${styles.thLeft} ${styles.stickyCol}`}>Série</th>
-              {linha.meses.map((m) => (
-                <th key={m.mes}>{MES_NOME[Number(m.mes.slice(5, 7)) - 1]}</th>
-              ))}
-              <th className={styles.colTotal}>Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td className={`${styles.tdLeft} ${styles.stickyCol}`}>{anoBase}</td>
-              {linha.meses.map((m) => {
-                const pct =
-                  m.qtdeAnoAnterior > 0 && m.valor != null ? m.valor / m.qtdeAnoAnterior - 1 : null;
-                return (
-                  <td
-                    key={m.mes}
-                    className={`${styles.num} ${styles.cellMes} ${
-                      m.futuro ? styles.cellProj : m.parcial ? styles.cellParcial : ""
-                    }`}
-                  >
-                    <span className={styles.cellQtd}>
-                      {m.valor == null ? "—" : fmt(Math.round(m.valor))}
-                    </span>
-                    {/* Sem venda no mesmo mês do ano anterior não há comparação: célula
-                        vazia, em vez de um "—" que chama atenção sem dizer nada. */}
-                    {pct == null ? (
-                      <span className={styles.cellPct} aria-hidden="true" />
-                    ) : (
-                      <span
-                        className={`${styles.cellPct} ${pct >= 0 ? styles.varUp : styles.varDown}`}
-                      >
-                        {fmtPct(pct)}
-                      </span>
-                    )}
-                    {(m.parcial || m.futuro) && <span className={styles.cellFlag}>proj.</span>}
-                  </td>
-                );
-              })}
-              <td className={`${styles.num} ${styles.colTotal}`}>
-                <span className={styles.cellQtd}>{fmt(Math.round(linha.totalAno))}</span>
-                <span
-                  className={`${styles.cellPct} ${
-                    variacao == null ? styles.muted : variacao >= 0 ? styles.varUp : styles.varDown
-                  }`}
-                >
-                  {fmtPct(variacao)}
-                </span>
-              </td>
-            </tr>
-            <tr>
-              <td className={`${styles.tdLeft} ${styles.stickyCol}`}>{anoBase - 1}</td>
-              {linha.meses.map((m) => (
-                <td key={m.mes} className={`${styles.num} ${styles.cellMes}`}>
-                  <span className={styles.cellQtd}>{fmt(m.qtdeAnoAnterior)}</span>
-                </td>
-              ))}
-              <td className={`${styles.num} ${styles.colTotal}`}>
-                <span className={styles.cellQtd}>{fmt(linha.totalAnoAnterior)}</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
   );
 }
