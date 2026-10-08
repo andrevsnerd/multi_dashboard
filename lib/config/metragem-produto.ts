@@ -23,6 +23,7 @@
  *     130X200 viscose (panneaux)     (138) → 2,15 m
  *     Fora (outra LINHA): PRIVATE LABEL, DESCONTINUADO.
  *   08/10/2026 — 70X70 cetim de poliéster (93 na linha LENÇOS) → 0,37 m
+ *   08/10/2026 — 130X200 georgete de poliéster (panneaux, 100 na linha LENÇOS) → 2,07 m
  *     O cetim aparece com e sem "DE" no subgrupo ("CETIM POLIESTER") — as duas grafias entram.
  */
 
@@ -111,6 +112,12 @@ export const METRAGEM_REGRAS: Partial<Record<CompanyKey, MetragemRegra[]>> = {
       label: "Panneaux 130x200 viscose",
       metrosPorPeca: 2.15,
       criterios: lencos("130X200", ["VISCOSE"]),
+    },
+    {
+      id: "panneaux-130x200-georgete-poliester",
+      label: "Panneaux 130x200 georgete de poliéster",
+      metrosPorPeca: 2.07,
+      criterios: lencos("130X200", ["GEORGETE DE POLIESTER"]),
     },
   ],
 };
