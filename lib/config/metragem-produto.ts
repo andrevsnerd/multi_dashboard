@@ -22,6 +22,7 @@
  *     45X210 mousseline de poliéster (354) → 1,075 m
  *     130X200 viscose (panneaux)     (138) → 2,15 m
  *     Fora (outra LINHA): PRIVATE LABEL, DESCONTINUADO.
+ *   08/10/2026 — 70X70 cetim de poliéster (93 na linha LENÇOS) → 0,37 m
  *     O cetim aparece com e sem "DE" no subgrupo ("CETIM POLIESTER") — as duas grafias entram.
  */
 
@@ -86,6 +87,12 @@ export const METRAGEM_REGRAS: Partial<Record<CompanyKey, MetragemRegra[]>> = {
       label: "Lenço 90x90 cetim de poliéster",
       metrosPorPeca: 0.95,
       criterios: lencos("90X90", CETIM_POLIESTER),
+    },
+    {
+      id: "lenco-70x70-cetim-poliester",
+      label: "Lenço 70x70 cetim de poliéster",
+      metrosPorPeca: 0.37,
+      criterios: lencos("70X70", CETIM_POLIESTER),
     },
     {
       id: "lenco-50x50-cetim-poliester",

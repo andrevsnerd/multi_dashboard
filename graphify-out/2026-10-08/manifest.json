@@ -4690,8 +4690,8 @@
     "semantic_hash": ""
   },
   "lib/config/metragem-produto.ts": {
-    "mtime": 1791455685.4617262,
-    "ast_hash": "706e852674801955ed34fe4e3d9a196f",
+    "mtime": 1791398046.0389824,
+    "ast_hash": "b8a2945913bb20565ebbfb22721c85b7",
     "semantic_hash": ""
   },
   "app/(companies)/[company]/editar-produto/page.tsx": {
