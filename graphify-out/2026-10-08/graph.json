@@ -1617,7 +1617,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_companies_company_controle_giro_page",
-      "community": 3,
+      "community": 101,
       "norm_label": "page.tsx"
     },
     {
@@ -1627,7 +1627,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "app_companies_company_controle_giro_page_companypageprops",
-      "community": 3,
+      "community": 101,
       "norm_label": "companypageprops"
     },
     {
@@ -1637,7 +1637,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "app_companies_company_controle_giro_page_controlegiropageroute",
-      "community": 3,
+      "community": 101,
       "norm_label": "controlegiropageroute()"
     },
     {
@@ -1647,7 +1647,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_companies_company_controle_movimento_page",
-      "community": 101,
+      "community": 3,
       "norm_label": "page.tsx"
     },
     {
@@ -1657,7 +1657,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "app_companies_company_controle_movimento_page_companypageprops",
-      "community": 101,
+      "community": 3,
       "norm_label": "companypageprops"
     },
     {
@@ -1667,7 +1667,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "app_companies_company_controle_movimento_page_controlemovimentopageroute",
-      "community": 101,
+      "community": 3,
       "norm_label": "controlemovimentopageroute()"
     },
     {
@@ -4827,7 +4827,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_cadastro_dimensoes_route",
-      "community": 539,
+      "community": 48,
       "norm_label": "route.ts"
     },
     {
@@ -4837,7 +4837,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "app_api_cadastro_dimensoes_route_lista",
-      "community": 539,
+      "community": 48,
       "norm_label": "lista()"
     },
     {
@@ -4847,7 +4847,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "app_api_cadastro_dimensoes_route_get",
-      "community": 539,
+      "community": 48,
       "norm_label": "get()"
     },
     {
@@ -4857,7 +4857,7 @@
       "source_location": "L61",
       "_origin": "ast",
       "id": "app_api_cadastro_dimensoes_route_body",
-      "community": 539,
+      "community": 48,
       "norm_label": "body"
     },
     {
@@ -4867,7 +4867,7 @@
       "source_location": "L88",
       "_origin": "ast",
       "id": "app_api_cadastro_dimensoes_route_post",
-      "community": 539,
+      "community": 48,
       "norm_label": "post()"
     },
     {
@@ -5737,7 +5737,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_controle_estoque_lista_compra_sugerida_route",
-      "community": 494,
+      "community": 37,
       "norm_label": "route.ts"
     },
     {
@@ -5747,7 +5747,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "app_api_controle_estoque_lista_compra_sugerida_route_listacompraresponsedata",
-      "community": 494,
+      "community": 37,
       "norm_label": "listacompraresponsedata"
     },
     {
@@ -5757,7 +5757,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "app_api_controle_estoque_lista_compra_sugerida_route_cacheentry",
-      "community": 494,
+      "community": 37,
       "norm_label": "cacheentry"
     },
     {
@@ -5767,7 +5767,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "app_api_controle_estoque_lista_compra_sugerida_route_responsecache",
-      "community": 494,
+      "community": 37,
       "norm_label": "responsecache"
     },
     {
@@ -5777,7 +5777,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "app_api_controle_estoque_lista_compra_sugerida_route_inflightrequests",
-      "community": 494,
+      "community": 37,
       "norm_label": "inflightrequests"
     },
     {
@@ -5787,7 +5787,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "app_api_controle_estoque_lista_compra_sugerida_route_normalizesearchparams",
-      "community": 494,
+      "community": 37,
       "norm_label": "normalizesearchparams()"
     },
     {
@@ -5797,7 +5797,7 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "app_api_controle_estoque_lista_compra_sugerida_route_getcachedresponse",
-      "community": 494,
+      "community": 37,
       "norm_label": "getcachedresponse()"
     },
     {
@@ -5807,7 +5807,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "app_api_controle_estoque_lista_compra_sugerida_route_setcachedresponse",
-      "community": 494,
+      "community": 37,
       "norm_label": "setcachedresponse()"
     },
     {
@@ -5817,7 +5817,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "app_api_controle_estoque_lista_compra_sugerida_route_get",
-      "community": 494,
+      "community": 37,
       "norm_label": "get()"
     },
     {
@@ -9347,7 +9347,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_produto_giro_performance_route",
-      "community": 100,
+      "community": 29,
       "norm_label": "route.ts"
     },
     {
@@ -9357,7 +9357,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "app_api_produto_giro_performance_route_meses_abrev",
-      "community": 100,
+      "community": 29,
       "norm_label": "meses_abrev"
     },
     {
@@ -9367,7 +9367,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "app_api_produto_giro_performance_route_segundadasemana",
-      "community": 100,
+      "community": 29,
       "norm_label": "segundadasemana()"
     },
     {
@@ -9377,7 +9377,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "app_api_produto_giro_performance_route_iniciododia",
-      "community": 100,
+      "community": 29,
       "norm_label": "iniciododia()"
     },
     {
@@ -9387,7 +9387,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "app_api_produto_giro_performance_route_bucket",
-      "community": 100,
+      "community": 29,
       "norm_label": "bucket"
     },
     {
@@ -9397,7 +9397,7 @@
       "source_location": "L42",
       "_origin": "ast",
       "id": "app_api_produto_giro_performance_route_get",
-      "community": 100,
+      "community": 29,
       "norm_label": "get()"
     },
     {
@@ -9687,7 +9687,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_projecao_compra_route",
-      "community": 100,
+      "community": 29,
       "norm_label": "route.ts"
     },
     {
@@ -9697,7 +9697,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "app_api_projecao_compra_route_windows",
-      "community": 100,
+      "community": 29,
       "norm_label": "windows"
     },
     {
@@ -9707,7 +9707,7 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "app_api_projecao_compra_route_matriz_filiais",
-      "community": 100,
+      "community": 29,
       "norm_label": "matriz_filiais"
     },
     {
@@ -9717,7 +9717,7 @@
       "source_location": "L46",
       "_origin": "ast",
       "id": "app_api_projecao_compra_route_adddaysymd",
-      "community": 100,
+      "community": 29,
       "norm_label": "adddaysymd()"
     },
     {
@@ -9727,7 +9727,7 @@
       "source_location": "L56",
       "_origin": "ast",
       "id": "app_api_projecao_compra_route_pad2",
-      "community": 100,
+      "community": 29,
       "norm_label": "pad2()"
     },
     {
@@ -9737,7 +9737,7 @@
       "source_location": "L61",
       "_origin": "ast",
       "id": "app_api_projecao_compra_route_lastdayofmonth",
-      "community": 100,
+      "community": 29,
       "norm_label": "lastdayofmonth()"
     },
     {
@@ -9747,7 +9747,7 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "app_api_projecao_compra_route_maplimit",
-      "community": 100,
+      "community": 29,
       "norm_label": "maplimit()"
     },
     {
@@ -9757,7 +9757,7 @@
       "source_location": "L83",
       "_origin": "ast",
       "id": "app_api_projecao_compra_route_ornull",
-      "community": 100,
+      "community": 29,
       "norm_label": "ornull()"
     },
     {
@@ -9767,7 +9767,7 @@
       "source_location": "L87",
       "_origin": "ast",
       "id": "app_api_projecao_compra_route_isvalidymd",
-      "community": 100,
+      "community": 29,
       "norm_label": "isvalidymd()"
     },
     {
@@ -9777,7 +9777,7 @@
       "source_location": "L95",
       "_origin": "ast",
       "id": "app_api_projecao_compra_route_get",
-      "community": 100,
+      "community": 29,
       "norm_label": "get()"
     },
     {
@@ -9887,7 +9887,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_relatorios_custos_defeitos_route",
-      "community": 475,
+      "community": 231,
       "norm_label": "route.ts"
     },
     {
@@ -9897,7 +9897,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "app_api_relatorios_custos_defeitos_route_post",
-      "community": 475,
+      "community": 231,
       "norm_label": "post()"
     },
     {
@@ -38359,7 +38359,7 @@
       "source_location": "L65",
       "_origin": "ast",
       "id": "lib_config_cadastro_nomes_sensiveis_avisosnomesensivel",
-      "community": 539,
+      "community": 48,
       "norm_label": "avisosnomesensivel()"
     },
     {
@@ -38729,7 +38729,7 @@
       "source_location": "L189",
       "_origin": "ast",
       "id": "lib_config_compra_ciclo_store_ensurecompracicloruntime",
-      "community": 100,
+      "community": 29,
       "norm_label": "ensurecompracicloruntime()"
     },
     {
@@ -39926,7 +39926,7 @@
       "label": "MetragemCriterio",
       "file_type": "code",
       "source_file": "lib/config/metragem-produto.ts",
-      "source_location": "L31",
+      "source_location": "L32",
       "_origin": "ast",
       "id": "lib_config_metragem_produto_metragemcriterio",
       "community": 505,
@@ -39936,7 +39936,7 @@
       "label": "MetragemRegra",
       "file_type": "code",
       "source_file": "lib/config/metragem-produto.ts",
-      "source_location": "L38",
+      "source_location": "L39",
       "_origin": "ast",
       "id": "lib_config_metragem_produto_metragemregra",
       "community": 505,
@@ -39946,7 +39946,7 @@
       "label": "MetragemClassificacao",
       "file_type": "code",
       "source_file": "lib/config/metragem-produto.ts",
-      "source_location": "L46",
+      "source_location": "L47",
       "_origin": "ast",
       "id": "lib_config_metragem_produto_metragemclassificacao",
       "community": 505,
@@ -39956,7 +39956,7 @@
       "label": "CETIM_POLIESTER",
       "file_type": "code",
       "source_file": "lib/config/metragem-produto.ts",
-      "source_location": "L53",
+      "source_location": "L54",
       "_origin": "ast",
       "id": "lib_config_metragem_produto_cetim_poliester",
       "community": 505,
@@ -39966,7 +39966,7 @@
       "label": "LINHAS_LENCO",
       "file_type": "code",
       "source_file": "lib/config/metragem-produto.ts",
-      "source_location": "L56",
+      "source_location": "L57",
       "_origin": "ast",
       "id": "lib_config_metragem_produto_linhas_lenco",
       "community": 505,
@@ -39976,7 +39976,7 @@
       "label": "lencos()",
       "file_type": "code",
       "source_file": "lib/config/metragem-produto.ts",
-      "source_location": "L58",
+      "source_location": "L59",
       "_origin": "ast",
       "id": "lib_config_metragem_produto_lencos",
       "community": 505,
@@ -39986,7 +39986,7 @@
       "label": "METRAGEM_REGRAS",
       "file_type": "code",
       "source_file": "lib/config/metragem-produto.ts",
-      "source_location": "L61",
+      "source_location": "L62",
       "_origin": "ast",
       "id": "lib_config_metragem_produto_metragem_regras",
       "community": 505,
@@ -39996,7 +39996,7 @@
       "label": "MetragemProduto",
       "file_type": "code",
       "source_file": "lib/config/metragem-produto.ts",
-      "source_location": "L118",
+      "source_location": "L125",
       "_origin": "ast",
       "id": "lib_config_metragem_produto_metragemproduto",
       "community": 505,
@@ -40006,7 +40006,7 @@
       "label": "norm()",
       "file_type": "code",
       "source_file": "lib/config/metragem-produto.ts",
-      "source_location": "L124",
+      "source_location": "L131",
       "_origin": "ast",
       "id": "lib_config_metragem_produto_norm",
       "community": 505,
@@ -40016,7 +40016,7 @@
       "label": "normGrade()",
       "file_type": "code",
       "source_file": "lib/config/metragem-produto.ts",
-      "source_location": "L133",
+      "source_location": "L140",
       "_origin": "ast",
       "id": "lib_config_metragem_produto_normgrade",
       "community": 505,
@@ -40026,7 +40026,7 @@
       "label": "casaCriterio()",
       "file_type": "code",
       "source_file": "lib/config/metragem-produto.ts",
-      "source_location": "L137",
+      "source_location": "L144",
       "_origin": "ast",
       "id": "lib_config_metragem_produto_casacriterio",
       "community": 505,
@@ -40036,7 +40036,7 @@
       "label": "temRegrasMetragem()",
       "file_type": "code",
       "source_file": "lib/config/metragem-produto.ts",
-      "source_location": "L152",
+      "source_location": "L159",
       "_origin": "ast",
       "id": "lib_config_metragem_produto_temregrasmetragem",
       "community": 505,
@@ -40046,7 +40046,7 @@
       "label": "resolveMetragemProduto()",
       "file_type": "code",
       "source_file": "lib/config/metragem-produto.ts",
-      "source_location": "L156",
+      "source_location": "L163",
       "_origin": "ast",
       "id": "lib_config_metragem_produto_resolvemetragemproduto",
       "community": 505,
@@ -43869,7 +43869,7 @@
       "source_location": "L57",
       "_origin": "ast",
       "id": "lib_reports_keys_encoderowmembros",
-      "community": 231,
+      "community": 449,
       "norm_label": "encoderowmembros()"
     },
     {
@@ -44129,7 +44129,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "lib_reports_registry_server_reportruncontext",
-      "community": 231,
+      "community": 449,
       "norm_label": "reportruncontext"
     },
     {
@@ -44419,7 +44419,7 @@
       "source_location": "L223",
       "_origin": "ast",
       "id": "lib_reports_types_reportresult",
-      "community": 302,
+      "community": 231,
       "norm_label": "reportresult"
     },
     {
@@ -45269,7 +45269,7 @@
       "source_location": "L237",
       "_origin": "ast",
       "id": "lib_repositories_cadastro_parsedimensaotipo",
-      "community": 539,
+      "community": 48,
       "norm_label": "parsedimensaotipo()"
     },
     {
@@ -45329,7 +45329,7 @@
       "source_location": "L292",
       "_origin": "ast",
       "id": "lib_repositories_cadastro_inprodutos",
-      "community": 48,
+      "community": 84,
       "norm_label": "inprodutos()"
     },
     {
@@ -45339,7 +45339,7 @@
       "source_location": "L301",
       "_origin": "ast",
       "id": "lib_repositories_cadastro_filtroempresa",
-      "community": 48,
+      "community": 84,
       "norm_label": "filtroempresa()"
     },
     {
@@ -45349,7 +45349,7 @@
       "source_location": "L314",
       "_origin": "ast",
       "id": "lib_repositories_cadastro_filtrolista",
-      "community": 48,
+      "community": 84,
       "norm_label": "filtrolista()"
     },
     {
@@ -45409,7 +45409,7 @@
       "source_location": "L586",
       "_origin": "ast",
       "id": "lib_repositories_cadastro_fetchgruposparaselecao",
-      "community": 539,
+      "community": 48,
       "norm_label": "fetchgruposparaselecao()"
     },
     {
@@ -45439,7 +45439,7 @@
       "source_location": "L648",
       "_origin": "ast",
       "id": "lib_repositories_cadastro_avaliarimpactodimensao",
-      "community": 539,
+      "community": 48,
       "norm_label": "avaliarimpactodimensao()"
     },
     {
@@ -45449,7 +45449,7 @@
       "source_location": "L770",
       "_origin": "ast",
       "id": "lib_repositories_cadastro_sugerircodigodimensao",
-      "community": 539,
+      "community": 48,
       "norm_label": "sugerircodigodimensao()"
     },
     {
@@ -45529,7 +45529,7 @@
       "source_location": "L903",
       "_origin": "ast",
       "id": "lib_repositories_cadastro_gravarhistorico",
-      "community": 539,
+      "community": 48,
       "norm_label": "gravarhistorico()"
     },
     {
@@ -45559,7 +45559,7 @@
       "source_location": "L1042",
       "_origin": "ast",
       "id": "lib_repositories_cadastro_novoloteid",
-      "community": 539,
+      "community": 48,
       "norm_label": "novoloteid()"
     },
     {
@@ -45579,7 +45579,7 @@
       "source_location": "L1059",
       "_origin": "ast",
       "id": "lib_repositories_cadastro_registrarhistoricocadastro",
-      "community": 539,
+      "community": 48,
       "norm_label": "registrarhistoricocadastro()"
     },
     {
@@ -45599,7 +45599,7 @@
       "source_location": "L1112",
       "_origin": "ast",
       "id": "lib_repositories_cadastro_renomeardimensao",
-      "community": 539,
+      "community": 48,
       "norm_label": "renomeardimensao()"
     },
     {
@@ -45619,7 +45619,7 @@
       "source_location": "L1329",
       "_origin": "ast",
       "id": "lib_repositories_cadastro_alternarinativodimensao",
-      "community": 539,
+      "community": 48,
       "norm_label": "alternarinativodimensao()"
     },
     {
@@ -45629,7 +45629,7 @@
       "source_location": "L1488",
       "_origin": "ast",
       "id": "lib_repositories_cadastro_criardimensao",
-      "community": 539,
+      "community": 48,
       "norm_label": "criardimensao()"
     },
     {
@@ -45739,7 +45739,7 @@
       "source_location": "L1742",
       "_origin": "ast",
       "id": "lib_repositories_cadastro_resolvercodigosoubarras",
-      "community": 48,
+      "community": 84,
       "norm_label": "resolvercodigosoubarras()"
     },
     {
@@ -45749,7 +45749,7 @@
       "source_location": "L1795",
       "_origin": "ast",
       "id": "lib_repositories_cadastro_selectcampos",
-      "community": 48,
+      "community": 84,
       "norm_label": "selectcampos()"
     },
     {
@@ -45779,7 +45779,7 @@
       "source_location": "L1835",
       "_origin": "ast",
       "id": "lib_repositories_cadastro_fetchprodutoscadastro",
-      "community": 48,
+      "community": 84,
       "norm_label": "fetchprodutoscadastro()"
     },
     {
@@ -50679,7 +50679,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_girocache",
-      "community": 449,
+      "community": 28,
       "norm_label": "girocache.ts"
     },
     {
@@ -50689,7 +50689,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "lib_repositories_girocache_girocacheentry",
-      "community": 449,
+      "community": 28,
       "norm_label": "girocacheentry"
     },
     {
@@ -50699,7 +50699,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "lib_repositories_girocache_cache",
-      "community": 449,
+      "community": 28,
       "norm_label": "cache"
     },
     {
@@ -50709,7 +50709,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "lib_repositories_girocache_cachekey",
-      "community": 449,
+      "community": 28,
       "norm_label": "cachekey()"
     },
     {
@@ -50719,7 +50719,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "lib_repositories_girocache_getgirocache",
-      "community": 449,
+      "community": 28,
       "norm_label": "getgirocache()"
     },
     {
@@ -50729,7 +50729,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "lib_repositories_girocache_setgirocache",
-      "community": 449,
+      "community": 28,
       "norm_label": "setgirocache()"
     },
     {
@@ -52699,7 +52699,7 @@
       "source_location": "L430",
       "_origin": "ast",
       "id": "lib_repositories_productdetail_resolvebarcode",
-      "community": 49,
+      "community": 20,
       "norm_label": "resolvebarcode()"
     },
     {
@@ -53279,7 +53279,7 @@
       "source_location": "L2730",
       "_origin": "ast",
       "id": "lib_repositories_products_fetchmenorcodigobarra",
-      "community": 475,
+      "community": 231,
       "norm_label": "fetchmenorcodigobarra()"
     },
     {
@@ -54769,7 +54769,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "lib_repositories_projecaosazonalcategoria_valordadim",
-      "community": 100,
+      "community": 29,
       "norm_label": "valordadim()"
     },
     {
@@ -54779,7 +54779,7 @@
       "source_location": "L64",
       "_origin": "ast",
       "id": "lib_repositories_projecaosazonalcategoria_escolherdimcategoria",
-      "community": 100,
+      "community": 29,
       "norm_label": "escolherdimcategoria()"
     },
     {
@@ -54859,7 +54859,7 @@
       "source_location": "L161",
       "_origin": "ast",
       "id": "lib_repositories_projecaosazonalcategoria_fetchcurvassazonaiscategoria",
-      "community": 100,
+      "community": 29,
       "norm_label": "fetchcurvassazonaiscategoria()"
     },
     {
@@ -55199,7 +55199,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_reportcomprasugeridaabc",
-      "community": 231,
+      "community": 449,
       "norm_label": "reportcomprasugeridaabc.ts"
     },
     {
@@ -55209,7 +55209,7 @@
       "source_location": "L78",
       "_origin": "ast",
       "id": "lib_repositories_reportcomprasugeridaabc_matriz_by_company",
-      "community": 231,
+      "community": 449,
       "norm_label": "matriz_by_company"
     },
     {
@@ -55219,7 +55219,7 @@
       "source_location": "L83",
       "_origin": "ast",
       "id": "lib_repositories_reportcomprasugeridaabc_mapwithconcurrency",
-      "community": 231,
+      "community": 449,
       "norm_label": "mapwithconcurrency()"
     },
     {
@@ -55229,7 +55229,7 @@
       "source_location": "L105",
       "_origin": "ast",
       "id": "lib_repositories_reportcomprasugeridaabc_up",
-      "community": 231,
+      "community": 449,
       "norm_label": "up()"
     },
     {
@@ -55239,7 +55239,7 @@
       "source_location": "L109",
       "_origin": "ast",
       "id": "lib_repositories_reportcomprasugeridaabc_normalizeset",
-      "community": 231,
+      "community": 449,
       "norm_label": "normalizeset()"
     },
     {
@@ -55249,7 +55249,7 @@
       "source_location": "L115",
       "_origin": "ast",
       "id": "lib_repositories_reportcomprasugeridaabc_joindistinct",
-      "community": 231,
+      "community": 449,
       "norm_label": "joindistinct()"
     },
     {
@@ -55259,7 +55259,7 @@
       "source_location": "L121",
       "_origin": "ast",
       "id": "lib_repositories_reportcomprasugeridaabc_round2",
-      "community": 231,
+      "community": 449,
       "norm_label": "round2()"
     },
     {
@@ -55269,7 +55269,7 @@
       "source_location": "L126",
       "_origin": "ast",
       "id": "lib_repositories_reportcomprasugeridaabc_roundint",
-      "community": 231,
+      "community": 449,
       "norm_label": "roundint()"
     },
     {
@@ -55279,7 +55279,7 @@
       "source_location": "L135",
       "_origin": "ast",
       "id": "lib_repositories_reportcomprasugeridaabc_mergetransferlensentries",
-      "community": 231,
+      "community": 449,
       "norm_label": "mergetransferlensentries()"
     },
     {
@@ -55289,7 +55289,7 @@
       "source_location": "L194",
       "_origin": "ast",
       "id": "lib_repositories_reportcomprasugeridaabc_fetchcomprasugeridaabc",
-      "community": 231,
+      "community": 449,
       "norm_label": "fetchcomprasugeridaabc()"
     },
     {
@@ -55299,7 +55299,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_reportcustosdefeitos",
-      "community": 475,
+      "community": 231,
       "norm_label": "reportcustosdefeitos.ts"
     },
     {
@@ -55309,7 +55309,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "lib_repositories_reportcustosdefeitos_custosdefeitosinput",
-      "community": 475,
+      "community": 231,
       "norm_label": "custosdefeitosinput"
     },
     {
@@ -55319,7 +55319,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "lib_repositories_reportcustosdefeitos_acumulado",
-      "community": 475,
+      "community": 231,
       "norm_label": "acumulado"
     },
     {
@@ -55329,7 +55329,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "lib_repositories_reportcustosdefeitos_fetchcustosdefeitos",
-      "community": 475,
+      "community": 231,
       "norm_label": "fetchcustosdefeitos()"
     },
     {
@@ -55339,7 +55339,7 @@
       "source_location": "L160",
       "_origin": "ast",
       "id": "lib_repositories_reportcustosdefeitos_buildsummary",
-      "community": 475,
+      "community": 231,
       "norm_label": "buildsummary()"
     },
     {
@@ -56009,7 +56009,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_reportvendas",
-      "community": 100,
+      "community": 29,
       "norm_label": "reportvendas.ts"
     },
     {
@@ -56019,7 +56019,7 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "lib_repositories_reportvendas_buildtransitindex",
-      "community": 100,
+      "community": 29,
       "norm_label": "buildtransitindex()"
     },
     {
@@ -56029,7 +56029,7 @@
       "source_location": "L72",
       "_origin": "ast",
       "id": "lib_repositories_reportvendas_up",
-      "community": 100,
+      "community": 29,
       "norm_label": "up()"
     },
     {
@@ -56039,7 +56039,7 @@
       "source_location": "L77",
       "_origin": "ast",
       "id": "lib_repositories_reportvendas_normalizeset",
-      "community": 100,
+      "community": 29,
       "norm_label": "normalizeset()"
     },
     {
@@ -56049,7 +56049,7 @@
       "source_location": "L82",
       "_origin": "ast",
       "id": "lib_repositories_reportvendas_round2",
-      "community": 100,
+      "community": 29,
       "norm_label": "round2()"
     },
     {
@@ -56059,7 +56059,7 @@
       "source_location": "L87",
       "_origin": "ast",
       "id": "lib_repositories_reportvendas_roundint",
-      "community": 100,
+      "community": 29,
       "norm_label": "roundint()"
     },
     {
@@ -56069,7 +56069,7 @@
       "source_location": "L101",
       "_origin": "ast",
       "id": "lib_repositories_reportvendas_fetchvendasfaturamento",
-      "community": 100,
+      "community": 29,
       "norm_label": "fetchvendasfaturamento()"
     },
     {
@@ -57669,7 +57669,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_server_compra_transito_index",
-      "community": 231,
+      "community": 449,
       "norm_label": "compra-transito-index.ts"
     },
     {
@@ -57679,7 +57679,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "lib_server_compra_transito_index_compratransitoserverindex",
-      "community": 231,
+      "community": 449,
       "norm_label": "compratransitoserverindex"
     },
     {
@@ -57689,7 +57689,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "lib_server_compra_transito_index_transitdesckey",
-      "community": 231,
+      "community": 449,
       "norm_label": "transitdesckey()"
     },
     {
@@ -57699,7 +57699,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "lib_server_compra_transito_index_buildcompratransitoserverindex",
-      "community": 231,
+      "community": 449,
       "norm_label": "buildcompratransitoserverindex()"
     },
     {
@@ -57709,7 +57709,7 @@
       "source_location": "L70",
       "_origin": "ast",
       "id": "lib_server_compra_transito_index_transitoitemagregado",
-      "community": 231,
+      "community": 449,
       "norm_label": "transitoitemagregado"
     },
     {
@@ -57719,7 +57719,7 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "lib_server_compra_transito_index_listtransitoativoporitem",
-      "community": 100,
+      "community": 29,
       "norm_label": "listtransitoativoporitem()"
     },
     {
@@ -57729,7 +57729,7 @@
       "source_location": "L147",
       "_origin": "ast",
       "id": "lib_server_compra_transito_index_transitodoitem",
-      "community": 231,
+      "community": 449,
       "norm_label": "transitodoitem()"
     },
     {
@@ -57739,7 +57739,7 @@
       "source_location": "L160",
       "_origin": "ast",
       "id": "lib_server_compra_transito_index_quantidadeemtransito",
-      "community": 231,
+      "community": 449,
       "norm_label": "quantidadeemtransito()"
     },
     {
@@ -57849,7 +57849,7 @@
       "source_location": "L135",
       "_origin": "ast",
       "id": "lib_server_compra_transito_reconciliacao_listcomprastransitopendentes",
-      "community": 100,
+      "community": 29,
       "norm_label": "listcomprastransitopendentes()"
     },
     {
@@ -58879,7 +58879,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_services_salestotals",
-      "community": 100,
+      "community": 29,
       "norm_label": "salestotals.ts"
     },
     {
@@ -58889,7 +58889,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "lib_services_salestotals_salestotalsparams",
-      "community": 100,
+      "community": 29,
       "norm_label": "salestotalsparams"
     },
     {
@@ -58899,7 +58899,7 @@
       "source_location": "L63",
       "_origin": "ast",
       "id": "lib_services_salestotals_buildinlistclause",
-      "community": 100,
+      "community": 29,
       "norm_label": "buildinlistclause()"
     },
     {
@@ -58909,7 +58909,7 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "lib_services_salestotals_salestotals",
-      "community": 100,
+      "community": 29,
       "norm_label": "salestotals"
     },
     {
@@ -58919,7 +58919,7 @@
       "source_location": "L86",
       "_origin": "ast",
       "id": "lib_services_salestotals_empty",
-      "community": 100,
+      "community": 29,
       "norm_label": "empty"
     },
     {
@@ -58929,7 +58929,7 @@
       "source_location": "L96",
       "_origin": "ast",
       "id": "lib_services_salestotals_buildfilialclause",
-      "community": 100,
+      "community": 29,
       "norm_label": "buildfilialclause()"
     },
     {
@@ -58939,7 +58939,7 @@
       "source_location": "L152",
       "_origin": "ast",
       "id": "lib_services_salestotals_buildlinhaclause",
-      "community": 100,
+      "community": 29,
       "norm_label": "buildlinhaclause()"
     },
     {
@@ -58949,7 +58949,7 @@
       "source_location": "L191",
       "_origin": "ast",
       "id": "lib_services_salestotals_fetchsalestotals",
-      "community": 100,
+      "community": 29,
       "norm_label": "fetchsalestotals()"
     },
     {
@@ -59829,7 +59829,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "lib_utils_colormapping_getcolordescription",
-      "community": 49,
+      "community": 20,
       "norm_label": "getcolordescription()"
     },
     {
@@ -62599,7 +62599,7 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "lib_utils_date_normalizedrange",
-      "community": 100,
+      "community": 29,
       "norm_label": "normalizedrange"
     },
     {
@@ -62669,7 +62669,7 @@
       "source_location": "L84",
       "_origin": "ast",
       "id": "lib_utils_date_toutcstartofday",
-      "community": 171,
+      "community": 100,
       "norm_label": "toutcstartofday()"
     },
     {
@@ -62679,7 +62679,7 @@
       "source_location": "L92",
       "_origin": "ast",
       "id": "lib_utils_date_toutcexclusiveend",
-      "community": 171,
+      "community": 100,
       "norm_label": "toutcexclusiveend()"
     },
     {
@@ -65369,7 +65369,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "lib_utils_exportrelatorioxlsx_buildoutcols",
-      "community": 121,
+      "community": 33,
       "norm_label": "buildoutcols()"
     },
     {
@@ -65639,7 +65639,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_utils_exportvendasporprecoxlsx",
-      "community": 29,
+      "community": 33,
       "norm_label": "exportvendasporprecoxlsx.ts"
     },
     {
@@ -65649,7 +65649,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "lib_utils_exportvendasporprecoxlsx_exceljscell",
-      "community": 29,
+      "community": 33,
       "norm_label": "exceljscell"
     },
     {
@@ -65659,7 +65659,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "lib_utils_exportvendasporprecoxlsx_text_keys",
-      "community": 29,
+      "community": 33,
       "norm_label": "text_keys"
     },
     {
@@ -65669,7 +65669,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "lib_utils_exportvendasporprecoxlsx_sum_keys",
-      "community": 29,
+      "community": 33,
       "norm_label": "sum_keys"
     },
     {
@@ -65679,7 +65679,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "lib_utils_exportvendasporprecoxlsx_colletter",
-      "community": 29,
+      "community": 33,
       "norm_label": "colletter()"
     },
     {
@@ -65689,7 +65689,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "lib_utils_exportvendasporprecoxlsx_numfmtfor",
-      "community": 29,
+      "community": 33,
       "norm_label": "numfmtfor()"
     },
     {
@@ -65699,7 +65699,7 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "lib_utils_exportvendasporprecoxlsx_widthfor",
-      "community": 29,
+      "community": 33,
       "norm_label": "widthfor()"
     },
     {
@@ -65709,7 +65709,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "lib_utils_exportvendasporprecoxlsx_brl",
-      "community": 29,
+      "community": 33,
       "norm_label": "brl()"
     },
     {
@@ -65719,7 +65719,7 @@
       "source_location": "L60",
       "_origin": "ast",
       "id": "lib_utils_exportvendasporprecoxlsx_exportvendasporprecoxlsx",
-      "community": 29,
+      "community": 33,
       "norm_label": "exportvendasporprecoxlsx()"
     },
     {
@@ -68919,7 +68919,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_utils_reportfilename",
-      "community": 29,
+      "community": 33,
       "norm_label": "reportfilename.ts"
     },
     {
@@ -68929,7 +68929,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "lib_utils_reportfilename_meses",
-      "community": 29,
+      "community": 33,
       "norm_label": "meses"
     },
     {
@@ -68939,7 +68939,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "lib_utils_reportfilename_slugfilenamepart",
-      "community": 29,
+      "community": 33,
       "norm_label": "slugfilenamepart()"
     },
     {
@@ -68949,7 +68949,7 @@
       "source_location": "L47",
       "_origin": "ast",
       "id": "lib_utils_reportfilename_slugfilialpart",
-      "community": 29,
+      "community": 33,
       "norm_label": "slugfilialpart()"
     },
     {
@@ -68959,7 +68959,7 @@
       "source_location": "L70",
       "_origin": "ast",
       "id": "lib_utils_reportfilename_isprimeirodia",
-      "community": 29,
+      "community": 33,
       "norm_label": "isprimeirodia()"
     },
     {
@@ -68969,7 +68969,7 @@
       "source_location": "L74",
       "_origin": "ast",
       "id": "lib_utils_reportfilename_isultimodia",
-      "community": 29,
+      "community": 33,
       "norm_label": "isultimodia()"
     },
     {
@@ -68979,7 +68979,7 @@
       "source_location": "L79",
       "_origin": "ast",
       "id": "lib_utils_reportfilename_mestoken",
-      "community": 29,
+      "community": 33,
       "norm_label": "mestoken()"
     },
     {
@@ -68989,7 +68989,7 @@
       "source_location": "L85",
       "_origin": "ast",
       "id": "lib_utils_reportfilename_formatperiodoarquivo",
-      "community": 29,
+      "community": 33,
       "norm_label": "formatperiodoarquivo()"
     },
     {
@@ -68999,7 +68999,7 @@
       "source_location": "L104",
       "_origin": "ast",
       "id": "lib_utils_reportfilename_formatdataarquivo",
-      "community": 29,
+      "community": 33,
       "norm_label": "formatdataarquivo()"
     },
     {
@@ -69009,7 +69009,7 @@
       "source_location": "L108",
       "_origin": "ast",
       "id": "lib_utils_reportfilename_reportfilenameparts",
-      "community": 29,
+      "community": 33,
       "norm_label": "reportfilenameparts"
     },
     {
@@ -69019,7 +69019,7 @@
       "source_location": "L122",
       "_origin": "ast",
       "id": "lib_utils_reportfilename_buildreportfilename",
-      "community": 29,
+      "community": 33,
       "norm_label": "buildreportfilename()"
     },
     {
@@ -202310,7 +202310,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "lib/config/metragem-produto.ts",
-      "source_location": "L29",
+      "source_location": "L30",
       "weight": 1.0,
       "source": "lib_config_metragem_produto",
       "target": "lib_config_company",
@@ -203289,7 +203289,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "lib/config/metragem-produto.ts",
-      "source_location": "L29",
+      "source_location": "L30",
       "weight": 1.0,
       "source": "lib_config_metragem_produto",
       "target": "lib_config_company_companykey",
@@ -210185,7 +210185,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/config/metragem-produto.ts",
-      "source_location": "L137",
+      "source_location": "L144",
       "weight": 1.0,
       "source": "lib_config_metragem_produto",
       "target": "lib_config_metragem_produto_casacriterio",
@@ -210195,7 +210195,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/config/metragem-produto.ts",
-      "source_location": "L53",
+      "source_location": "L54",
       "weight": 1.0,
       "source": "lib_config_metragem_produto",
       "target": "lib_config_metragem_produto_cetim_poliester",
@@ -210205,7 +210205,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/config/metragem-produto.ts",
-      "source_location": "L58",
+      "source_location": "L59",
       "weight": 1.0,
       "source": "lib_config_metragem_produto",
       "target": "lib_config_metragem_produto_lencos",
@@ -210215,7 +210215,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/config/metragem-produto.ts",
-      "source_location": "L56",
+      "source_location": "L57",
       "weight": 1.0,
       "source": "lib_config_metragem_produto",
       "target": "lib_config_metragem_produto_linhas_lenco",
@@ -210225,7 +210225,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/config/metragem-produto.ts",
-      "source_location": "L61",
+      "source_location": "L62",
       "weight": 1.0,
       "source": "lib_config_metragem_produto",
       "target": "lib_config_metragem_produto_metragem_regras",
@@ -210235,7 +210235,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/config/metragem-produto.ts",
-      "source_location": "L46",
+      "source_location": "L47",
       "weight": 1.0,
       "source": "lib_config_metragem_produto",
       "target": "lib_config_metragem_produto_metragemclassificacao",
@@ -210245,7 +210245,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/config/metragem-produto.ts",
-      "source_location": "L31",
+      "source_location": "L32",
       "weight": 1.0,
       "source": "lib_config_metragem_produto",
       "target": "lib_config_metragem_produto_metragemcriterio",
@@ -210255,7 +210255,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/config/metragem-produto.ts",
-      "source_location": "L118",
+      "source_location": "L125",
       "weight": 1.0,
       "source": "lib_config_metragem_produto",
       "target": "lib_config_metragem_produto_metragemproduto",
@@ -210265,7 +210265,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/config/metragem-produto.ts",
-      "source_location": "L38",
+      "source_location": "L39",
       "weight": 1.0,
       "source": "lib_config_metragem_produto",
       "target": "lib_config_metragem_produto_metragemregra",
@@ -210275,7 +210275,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/config/metragem-produto.ts",
-      "source_location": "L124",
+      "source_location": "L131",
       "weight": 1.0,
       "source": "lib_config_metragem_produto",
       "target": "lib_config_metragem_produto_norm",
@@ -210285,7 +210285,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/config/metragem-produto.ts",
-      "source_location": "L133",
+      "source_location": "L140",
       "weight": 1.0,
       "source": "lib_config_metragem_produto",
       "target": "lib_config_metragem_produto_normgrade",
@@ -210295,7 +210295,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/config/metragem-produto.ts",
-      "source_location": "L156",
+      "source_location": "L163",
       "weight": 1.0,
       "source": "lib_config_metragem_produto",
       "target": "lib_config_metragem_produto_resolvemetragemproduto",
@@ -210305,7 +210305,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/config/metragem-produto.ts",
-      "source_location": "L152",
+      "source_location": "L159",
       "weight": 1.0,
       "source": "lib_config_metragem_produto",
       "target": "lib_config_metragem_produto_temregrasmetragem",
@@ -210317,7 +210317,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/config/metragem-produto.ts",
-      "source_location": "L59",
+      "source_location": "L60",
       "weight": 1.0,
       "source": "lib_config_metragem_produto_lencos",
       "target": "lib_config_metragem_produto_linhas_lenco"
@@ -210327,7 +210327,7 @@
       "context": "collection",
       "confidence": "INFERRED",
       "source_file": "lib/config/metragem-produto.ts",
-      "source_location": "L139",
+      "source_location": "L146",
       "weight": 1.0,
       "source": "lib_config_metragem_produto_casacriterio",
       "target": "lib_config_metragem_produto_norm",
@@ -210338,7 +210338,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/config/metragem-produto.ts",
-      "source_location": "L134",
+      "source_location": "L141",
       "weight": 1.0,
       "source": "lib_config_metragem_produto_normgrade",
       "target": "lib_config_metragem_produto_norm",
@@ -210349,7 +210349,7 @@
       "context": "collection",
       "confidence": "INFERRED",
       "source_file": "lib/config/metragem-produto.ts",
-      "source_location": "L142",
+      "source_location": "L149",
       "weight": 1.0,
       "source": "lib_config_metragem_produto_casacriterio",
       "target": "lib_config_metragem_produto_normgrade",
@@ -210360,7 +210360,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/config/metragem-produto.ts",
-      "source_location": "L162",
+      "source_location": "L169",
       "weight": 1.0,
       "source": "lib_config_metragem_produto_resolvemetragemproduto",
       "target": "lib_config_metragem_produto_casacriterio",
@@ -310874,5 +310874,5 @@
       "source_file": "tmp_scarfme_poliester_pages.txt"
     }
   ],
-  "built_at_commit": "3fd50fef8eb96ca5a3b2d16aa1f8e639430f6082"
+  "built_at_commit": "f8b2e9b5f831745972793f7f4ab6906172f561e7"
 }

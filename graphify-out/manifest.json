@@ -4395,8 +4395,8 @@
     "semantic_hash": ""
   },
   "components/stock/ProjecaoCompraPage.tsx": {
-    "mtime": 1789580894.138053,
-    "ast_hash": "2380c7f294e5264f162d94d2fe999a83",
+    "mtime": 1791481145.804237,
+    "ast_hash": "4a4122b1a3b5abd197a4db108f1cd806",
     "semantic_hash": ""
   },
   "lib/config/saida-estoque-negativo.ts": {
@@ -4480,7 +4480,7 @@
     "semantic_hash": ""
   },
   "app/api/projecao-embalagens/route.ts": {
-    "mtime": 1789157679.9086993,
+    "mtime": 1791480745.588877,
     "ast_hash": "22879262d8cf07db7b2a6ec8f5a227b7",
     "semantic_hash": ""
   },
@@ -4490,7 +4490,7 @@
     "semantic_hash": ""
   },
   "components/stock/ProjecaoEmbalagensPanel.tsx": {
-    "mtime": 1789651789.8069506,
+    "mtime": 1791480745.5918374,
     "ast_hash": "d6374e9e62cd205f2253d938aa2ee43e",
     "semantic_hash": ""
   },
@@ -4500,18 +4500,18 @@
     "semantic_hash": ""
   },
   "lib/config/embalagens.ts": {
-    "mtime": 1789651052.4358325,
+    "mtime": 1791480745.7324607,
     "ast_hash": "a0e5aefdbea52395a7e49d1cd09ff213",
     "semantic_hash": ""
   },
   "lib/repositories/projecaoEmbalagens.ts": {
-    "mtime": 1789157679.905066,
+    "mtime": 1791480745.7341032,
     "ast_hash": "4ff365548fa0ae6e0f5e5d9ed837bf30",
     "semantic_hash": ""
   },
   "lib/utils/embalagens-estoque-store.ts": {
-    "mtime": 1789651901.6356204,
-    "ast_hash": "de9f8e5510defc95fe81c8594a5a1c49",
+    "mtime": 1791480745.7363598,
+    "ast_hash": "f37e5f11e8b44eef67e83e35a2f7830f",
     "semantic_hash": ""
   },
   "lib/utils/projecao-realista.ts": {
@@ -4817,6 +4817,31 @@
   "lib/utils/ajuste-estoque-kpis-store.ts": {
     "mtime": 1791380367.0432184,
     "ast_hash": "be7110ff610993bb73b40e9ff373dc7c",
+    "semantic_hash": ""
+  },
+  "app/api/projecao-aviamentos/route.ts": {
+    "mtime": 1791480791.424274,
+    "ast_hash": "23f83fd12c991804f0c4307b3a238b23",
+    "semantic_hash": ""
+  },
+  "components/stock/ProjecaoAviamentosPanel.tsx": {
+    "mtime": 1791480889.5506344,
+    "ast_hash": "b1206109199131fd5c3ab9070fbeb1fc",
+    "semantic_hash": ""
+  },
+  "lib/config/aviamentos.ts": {
+    "mtime": 1791480768.4709954,
+    "ast_hash": "1d47085348b5a6d944daf31faa537e23",
+    "semantic_hash": ""
+  },
+  "lib/repositories/projecaoAviamentos.ts": {
+    "mtime": 1791480842.9472837,
+    "ast_hash": "5d06750e9069dca69425e44458c185f4",
+    "semantic_hash": ""
+  },
+  "lib/utils/aviamentos-estoque-store.ts": {
+    "mtime": 1791480783.296668,
+    "ast_hash": "de1593d42a241c4830371fa3c56bb81a",
     "semantic_hash": ""
   }
 }
