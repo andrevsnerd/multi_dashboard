@@ -177,6 +177,8 @@ export default function Sidebar({ companyName }: SidebarProps) {
     basePath && basePath !== "/" ? `${basePath}/gastos-compra` : "/gastos-compra";
   const compraCicloHref =
     basePath && basePath !== "/" ? `${basePath}/compra-ciclo` : "/compra-ciclo";
+  const embalagensAviamentosHref =
+    basePath && basePath !== "/" ? `${basePath}/embalagens-aviamentos` : "/embalagens-aviamentos";
   const mapaClientesHref =
     basePath && basePath !== "/" ? `${basePath}/mapa-clientes` : "/mapa-clientes";
   const planejamentoReceitaHref =
@@ -280,6 +282,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     "/compras-salvas",
     "/gastos-compra",
     "/compra-ciclo",
+    "/embalagens-aviamentos",
     "/produtos",
     "/produtos-recentes",
     "/produto-agrupado",
@@ -595,6 +598,19 @@ export default function Sidebar({ companyName }: SidebarProps) {
           isActive: (currentPathname) =>
             matchesSegment(currentPathname, "/compra-ciclo", compraCicloHref),
         },
+        // Estoque digitado de embalagens e aviamentos — os itens são os da Scarf Me.
+        ...(isScarfme
+          ? [
+              {
+                key: "embalagens-aviamentos",
+                label: "Embalagens e Aviamentos",
+                href: embalagensAviamentosHref,
+                permission: "embalagens-aviamentos" as const,
+                isActive: (currentPathname: string | null) =>
+                  matchesSegment(currentPathname, "/embalagens-aviamentos", embalagensAviamentosHref),
+              },
+            ]
+          : []),
       ],
     },
     {

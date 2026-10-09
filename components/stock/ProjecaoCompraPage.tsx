@@ -2411,13 +2411,11 @@ export default function ProjecaoCompraPage({ companyKey }: Props) {
       {ehAviamentos ? (
         <ProjecaoAviamentosPanel
           companyKey={companyKey}
-          username={user?.username ?? ""}
           onLoadingChange={setProjLoading}
         />
       ) : ehEmbalagensAplicada ? (
         <ProjecaoEmbalagensPanel
           companyKey={companyKey}
-          username={user?.username ?? ""}
           pedido={pedidoEmbalagens}
           dataBase={dataBase}
           diasHorizonte={diasHorizonte}

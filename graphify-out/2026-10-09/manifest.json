@@ -4850,18 +4850,18 @@
     "semantic_hash": ""
   },
   "app/api/embalagens-aviamentos/route.ts": {
-    "mtime": 1791557971.4125803,
-    "ast_hash": "6a44a96053584f29b68764cb5ee91c67",
+    "mtime": 1791557263.0119193,
+    "ast_hash": "5381b6d9a59bb0b18060f291fee5d450",
     "semantic_hash": ""
   },
   "components/insumos/EmbalagensAviamentosPage.tsx": {
-    "mtime": 1791557971.4150524,
-    "ast_hash": "b83655dc174e8f13f5428ac497ba8d62",
+    "mtime": 1791557328.949689,
+    "ast_hash": "c0976b6ec072f2945502be3383a963d4",
     "semantic_hash": ""
   },
   "lib/utils/insumos-estoque-store.ts": {
-    "mtime": 1791557971.4084775,
-    "ast_hash": "0027639adba45e7bc74e80c37a6ef51d",
+    "mtime": 1791557232.3989732,
+    "ast_hash": "b6d0f39535e380b16776ff2b97152103",
     "semantic_hash": ""
   }
 }
