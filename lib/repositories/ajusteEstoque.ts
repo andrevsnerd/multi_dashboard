@@ -273,6 +273,29 @@ export async function resolverNomeFilial(cod: string): Promise<string | null> {
   return rows[0]?.NOME?.trim() ?? null;
 }
 
+/**
+ * Quantidade por tamanho: posição da grade no Linx (1..48 = ES1..ES48 / A1..A48)
+ * → quantidade. Esparso: só as posições diferentes de zero.
+ */
+export type QtdPorTamanho = Record<string, number>;
+
+const ES_COLS = Array.from({ length: 48 }, (_, i) => `ep.ES${i + 1}`).join(', ');
+
+function tamanhosDaLinha(row: Record<string, unknown>): QtdPorTamanho {
+  const out: QtdPorTamanho = {};
+  for (let i = 1; i <= 48; i++) {
+    const v = Number(row[`ES${i}`]) || 0;
+    if (v !== 0) out[String(i)] = v;
+  }
+  return out;
+}
+
+function mesmosTamanhos(a: QtdPorTamanho, b: QtdPorTamanho): boolean {
+  const chaves = new Set([...Object.keys(a), ...Object.keys(b)]);
+  for (const k of chaves) if ((a[k] ?? 0) !== (b[k] ?? 0)) return false;
+  return true;
+}
+
 export interface SaldoItem {
   produto: string;
   cor: string;
@@ -280,6 +303,8 @@ export interface SaldoItem {
   descCor: string;
   codigoBarra: string | null;
   estoque: number;
+  /** Saldo por tamanho (ES1..ES48). */
+  tamanhos: QtdPorTamanho;
 }
 
 /** Saldo atual da filial (itens com estoque ≠ 0 por padrão). */
@@ -296,10 +321,11 @@ export async function trazerSaldo(
     DESC_PRODUTO: string;
     DESC_COR: string;
     CODIGO_BARRA: string | null;
+    [es: string]: unknown;
   }>(`
     SELECT RTRIM(ep.PRODUTO) AS PRODUTO,
            RTRIM(ISNULL(ep.COR_PRODUTO, '')) AS COR,
-           ep.ESTOQUE AS ESTOQUE,
+           ep.ESTOQUE AS ESTOQUE, ${ES_COLS},
            RTRIM(ISNULL(p.DESC_PRODUTO, '')) AS DESC_PRODUTO,
            RTRIM(ISNULL(cb.DESC_COR, '')) AS DESC_COR,
            bc.CODIGO_BARRA AS CODIGO_BARRA
@@ -327,6 +353,7 @@ export async function trazerSaldo(
     descCor: r.DESC_COR?.trim() ?? '',
     codigoBarra: r.CODIGO_BARRA?.toString().trim() ?? null,
     estoque: Number(r.ESTOQUE) || 0,
+    tamanhos: tamanhosDaLinha(r),
   }));
 }
 
@@ -367,11 +394,17 @@ export interface ContagemItem {
   produto: string;
   cor: string;
   qtdContada: number;
+  /**
+   * Contagem por tamanho, vinda do TAMANHO do código de barra. null quando algum
+   * código do item não tem tamanho válido — aí o executor distribui pelo saldo.
+   */
+  tamanhos: QtdPorTamanho | null;
 }
 
 /**
- * Resolve códigos de barra do arquivo → produto+cor (PRODUTOS_BARRA) e agrega
- * a quantidade contada por (produto, cor). Retorna também o que não casou.
+ * Resolve códigos de barra do arquivo → produto+cor+tamanho (PRODUTOS_BARRA) e
+ * agrega a quantidade contada por (produto, cor), guardando a quebra por tamanho.
+ * Retorna também o que não casou.
  */
 export async function resolverContagemPorCodigoBarra(
   linhas: LinhaArquivo[]
@@ -379,6 +412,18 @@ export async function resolverContagemPorCodigoBarra(
   const naoEncontrados: string[] = [];
   const ambiguos: string[] = [];
   const porProdutoCor = new Map<string, number>();
+  const porTamanho = new Map<string, QtdPorTamanho | null>();
+  const somar = (key: string, tamanho: unknown, qtd: number) => {
+    porProdutoCor.set(key, (porProdutoCor.get(key) ?? 0) + qtd);
+    const t = Number(tamanho);
+    const atual = porTamanho.has(key) ? porTamanho.get(key)! : {};
+    if (atual === null || !Number.isInteger(t) || t < 1 || t > 48) {
+      porTamanho.set(key, null);
+      return;
+    }
+    atual[String(t)] = (atual[String(t)] ?? 0) + qtd;
+    porTamanho.set(key, atual);
+  };
   const qtdPorCodigo = new Map(linhas.map((l) => [l.codigo, l.qtd]));
   const codigos = [...qtdPorCodigo.keys()];
   const resolvidos = new Set<string>();
@@ -387,15 +432,16 @@ export async function resolverContagemPorCodigoBarra(
   for (let i = 0; i < codigos.length; i += 500) {
     const chunk = codigos.slice(i, i + 500);
     const inList = chunk.map((c) => `'${esc(c)}'`).join(',');
-    const rows = await query<{ CB: string; PRODUTO: string; COR: string; N: number }>(`
+    const rows = await query<{ CB: string; PRODUTO: string; COR: string; TAMANHO: number | null; N: number }>(`
       SELECT LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100)))) AS CB,
              RTRIM(pb.PRODUTO) AS PRODUTO,
              RTRIM(ISNULL(pb.COR_PRODUTO, '')) AS COR,
+             pb.TAMANHO AS TAMANHO,
              COUNT(*) OVER (PARTITION BY LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100))))) AS N
       FROM PRODUTOS_BARRA pb WITH (NOLOCK)
       WHERE LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100)))) IN (${inList})
     `);
-    const byCb = new Map<string, { produto: string; cor: string; n: number }>();
+    const byCb = new Map<string, { produto: string; cor: string; tamanho: number | null; n: number }>();
     for (const r of rows) {
       const cb = r.CB?.trim();
       if (!cb) continue;
@@ -404,7 +450,12 @@ export async function resolverContagemPorCodigoBarra(
       if (prev && (prev.produto !== r.PRODUTO?.trim() || prev.cor !== r.COR?.trim())) {
         prev.n = 2;
       } else if (!prev) {
-        byCb.set(cb, { produto: r.PRODUTO?.trim() ?? '', cor: r.COR?.trim() ?? '', n: Number(r.N) || 1 });
+        byCb.set(cb, {
+          produto: r.PRODUTO?.trim() ?? '',
+          cor: r.COR?.trim() ?? '',
+          tamanho: r.TAMANHO,
+          n: Number(r.N) || 1,
+        });
       }
     }
     for (const cb of chunk) {
@@ -415,8 +466,7 @@ export async function resolverContagemPorCodigoBarra(
         resolvidos.add(cb);
         continue;
       }
-      const key = `${hit.produto}|${hit.cor}`;
-      porProdutoCor.set(key, (porProdutoCor.get(key) ?? 0) + (qtdPorCodigo.get(cb) ?? 0));
+      somar(`${hit.produto}|${hit.cor}`, hit.tamanho, qtdPorCodigo.get(cb) ?? 0);
       resolvidos.add(cb);
     }
   }
@@ -433,19 +483,20 @@ export async function resolverContagemPorCodigoBarra(
       chunk.forEach((c) => naoEncontrados.push(c));
       continue;
     }
-    const rows = await query<{ CBNUM: string; PRODUTO: string; COR: string }>(`
+    const rows = await query<{ CBNUM: string; PRODUTO: string; COR: string; TAMANHO: number | null }>(`
       SELECT CAST(TRY_CONVERT(BIGINT, LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100))))) AS VARCHAR(100)) AS CBNUM,
              RTRIM(pb.PRODUTO) AS PRODUTO,
-             RTRIM(ISNULL(pb.COR_PRODUTO, '')) AS COR
+             RTRIM(ISNULL(pb.COR_PRODUTO, '')) AS COR,
+             pb.TAMANHO AS TAMANHO
       FROM PRODUTOS_BARRA pb WITH (NOLOCK)
       WHERE TRY_CONVERT(BIGINT, LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100))))) IN (${inList.join(',')})
     `);
-    const byNum = new Map<string, { produto: string; cor: string }[]>();
+    const byNum = new Map<string, { produto: string; cor: string; tamanho: number | null }[]>();
     for (const r of rows) {
       const k = String(r.CBNUM ?? '').trim();
       if (!k) continue;
       const arr = byNum.get(k) ?? [];
-      arr.push({ produto: r.PRODUTO?.trim() ?? '', cor: r.COR?.trim() ?? '' });
+      arr.push({ produto: r.PRODUTO?.trim() ?? '', cor: r.COR?.trim() ?? '', tamanho: r.TAMANHO });
       byNum.set(k, arr);
     }
     for (const c of chunk) {
@@ -460,14 +511,15 @@ export async function resolverContagemPorCodigoBarra(
         ambiguos.push(c);
         continue;
       }
-      const key = [...distinct][0];
-      porProdutoCor.set(key, (porProdutoCor.get(key) ?? 0) + (qtdPorCodigo.get(c) ?? 0));
+      // Mesmo produto×cor em tamanhos diferentes não dá para separar: sem tamanho.
+      const tamanhosDistintos = new Set(hits.map((h) => h.tamanho));
+      somar([...distinct][0], tamanhosDistintos.size === 1 ? hits[0].tamanho : null, qtdPorCodigo.get(c) ?? 0);
     }
   }
 
   const itens: ContagemItem[] = [...porProdutoCor.entries()].map(([key, qtd]) => {
     const [produto, cor] = key.split('|');
-    return { produto, cor, qtdContada: qtd };
+    return { produto, cor, qtdContada: qtd, tamanhos: porTamanho.get(key) ?? null };
   });
   return { itens, naoEncontrados, ambiguos };
 }
@@ -481,6 +533,15 @@ export interface DiferencaLinha {
   saldo: number;
   contagem: number;
   delta: number;
+  /** Saldo atual por tamanho. */
+  saldoTamanhos: QtdPorTamanho;
+  /**
+   * Contagem por tamanho (alvo). {} = tudo zero (zerar / não contado). null =
+   * tamanho desconhecido: o executor mantém a distribuição atual do saldo.
+   */
+  contagemTamanhos: QtdPorTamanho | null;
+  /** Total bate, mas a quebra por tamanho difere — também precisa de ajuste. */
+  ajustaTamanho: boolean;
 }
 
 export interface DiferencasResultado {
@@ -526,6 +587,7 @@ export async function calcularDiferencas(opts: {
   let ambiguos: string[] = [];
   let invalidas: string[] = [];
   const contagemMap = new Map<string, number>();
+  const contagemTamanhosMap = new Map<string, QtdPorTamanho | null>();
 
   if (modo === 'inventario') {
     const parsed = parseArquivoContagem(opts.arquivoTexto ?? '');
@@ -535,6 +597,7 @@ export async function calcularDiferencas(opts: {
     ambiguos = resolvido.ambiguos;
     for (const it of resolvido.itens) {
       contagemMap.set(`${it.produto}|${it.cor}`, it.qtdContada);
+      contagemTamanhosMap.set(`${it.produto}|${it.cor}`, it.tamanhos);
     }
   }
 
@@ -555,6 +618,12 @@ export async function calcularDiferencas(opts: {
     const saldoQtd = s?.estoque ?? 0;
     const contagem = modo === 'zerar' ? 0 : contagemMap.get(chave) ?? 0;
     const delta = contagem - saldoQtd;
+    const saldoTamanhos = s?.tamanhos ?? {};
+    // Zerado ou não contado: alvo é zero em todos os tamanhos.
+    const contagemTamanhos =
+      modo === 'zerar' || !contagemTamanhosMap.has(chave) ? {} : contagemTamanhosMap.get(chave) ?? null;
+    const ajustaTamanho =
+      delta === 0 && contagemTamanhos !== null && !mesmosTamanhos(saldoTamanhos, contagemTamanhos);
     if (!s) semDescricao.push(produto);
     linhas.push({
       produto,
@@ -565,6 +634,9 @@ export async function calcularDiferencas(opts: {
       saldo: saldoQtd,
       contagem,
       delta,
+      saldoTamanhos,
+      contagemTamanhos,
+      ajustaTamanho,
     });
   }
 
@@ -590,7 +662,7 @@ export async function calcularDiferencas(opts: {
     return a.produto.localeCompare(b.produto);
   });
 
-  const comDiferenca = linhas.filter((l) => l.delta !== 0);
+  const comDiferenca = linhas.filter((l) => l.delta !== 0 || l.ajustaTamanho);
   const totais = {
     itens: linhas.length,
     comDiferenca: comDiferenca.length,

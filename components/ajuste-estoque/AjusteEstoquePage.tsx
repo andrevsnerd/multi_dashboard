@@ -27,6 +27,10 @@ interface DiferencaLinha {
   saldo: number;
   contagem: number;
   delta: number;
+  /** Contagem por tamanho (posição da grade → qtd); null = tamanho desconhecido. */
+  contagemTamanhos: Record<string, number> | null;
+  /** Total bate, mas a quebra por tamanho difere. */
+  ajustaTamanho: boolean;
 }
 
 interface PreviewResposta {
@@ -424,7 +428,7 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
   }, [filialCod, modo, arquivoTexto, zerarNaoContados]);
 
   const linhasComDiferenca = useMemo(
-    () => (preview ? preview.linhas.filter((l) => l.delta !== 0) : []),
+    () => (preview ? preview.linhas.filter((l) => l.delta !== 0 || l.ajustaTamanho) : []),
     [preview]
   );
   const linhasExibidas = mostrarTodos ? preview?.linhas ?? [] : linhasComDiferenca;
@@ -438,6 +442,7 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
         produto: l.produto,
         cor: l.cor,
         contagem: l.contagem,
+        tamanhos: l.contagemTamanhos,
       }));
       const resp = await fetch("/api/ajuste-estoque/executar", {
         method: "POST",
@@ -770,7 +775,10 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
               </thead>
               <tbody>
                 {linhasExibidas.slice(0, 1000).map((l) => (
-                  <tr key={`${l.produto}|${l.cor}`} className={l.delta !== 0 ? styles.rowDiff : ""}>
+                  <tr
+                    key={`${l.produto}|${l.cor}`}
+                    className={l.delta !== 0 || l.ajustaTamanho ? styles.rowDiff : ""}
+                  >
                     <td className={styles.mono}>{l.produto}</td>
                     <td>{l.descProduto}</td>
                     <td>{l.descCor || l.cor}</td>
@@ -780,8 +788,14 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
                         l.delta < 0 ? styles.neg : l.delta > 0 ? styles.pos : ""
                       }`}
                     >
-                      {l.delta > 0 ? "+" : ""}
-                      {l.delta}
+                      {l.ajustaTamanho ? (
+                        <span title="O total bate, mas a quantidade por tamanho muda">tamanhos</span>
+                      ) : (
+                        <>
+                          {l.delta > 0 ? "+" : ""}
+                          {l.delta}
+                        </>
+                      )}
                     </td>
                     <td className={`${styles.num} ${styles.final}`}>{l.contagem}</td>
                   </tr>

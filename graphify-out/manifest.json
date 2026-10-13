@@ -1230,8 +1230,8 @@
     "semantic_hash": "e449c381872599286ae61c72a1af8112"
   },
   "components/ajuste-estoque/AjusteEstoquePage.tsx": {
-    "mtime": 1791380480.0957816,
-    "ast_hash": "7353ece3671aab69610bf9460d904c85",
+    "mtime": 1791891344.4471366,
+    "ast_hash": "87849f531e4fb0c5b5d3c5c09dd8d120",
     "semantic_hash": ""
   },
   "components/auth/AuthContext.tsx": {
@@ -2065,8 +2065,8 @@
     "semantic_hash": "0306a3bc3c2fe7eadc98b00facd6f686"
   },
   "lib/ajuste-estoque-executor.ts": {
-    "mtime": 1785413093.874055,
-    "ast_hash": "633114272658c1d2ff33a7ca6ed73a00",
+    "mtime": 1791891328.3664865,
+    "ast_hash": "e57eacdaa5c53950b201bc0c4a10cfef",
     "semantic_hash": ""
   },
   "lib/auth/permission-normalizer.ts": {
@@ -2385,8 +2385,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/ajusteEstoque.ts": {
-    "mtime": 1791380393.4907548,
-    "ast_hash": "5ed95de9e20bf763a71c61b783b30e99",
+    "mtime": 1791891200.0511441,
+    "ast_hash": "e1940c3ab70b281e4cea25cf67b205be",
     "semantic_hash": ""
   },
   "lib/repositories/claudeReport.ts": {

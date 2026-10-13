@@ -12,10 +12,19 @@
  * O "desfazer" (estorno) cria uma nova contagem com os deltas invertidos — nada é
  * apagado do Linx; original e estorno ficam ambos no histórico.
  *
- * Ver memória: ajuste-estoque-mecanismo-trigger.
+ * Grade: o delta é calculado POR TAMANHO (A1..A48 contra ES1..ES48). Jogar o delta
+ * inteiro no tamanho base deixava ESx negativo em item P/M/G, e o LXU_ESTOQUE_PRODUTOS
+ * recusa estoque negativo em QUALQUER tamanho nas filiais sem PERMITE_EST_NEGATIVO
+ * (caso SCARF ME - MATRIZ, 13/10/2026: inventário quebrou no meio).
+ *
+ * Gravação: tudo-ou-nada. Cabendo numa requisição (o normal), header + itens vão
+ * numa transação. Quando o lote passa do limite do proxy, vai em partes e, se uma
+ * falhar, a contagem é excluída — o LXD_ESTOQUE_PROD_CONTAGEM desfaz o estoque dos
+ * itens que já tinham entrado (uma vez só: o LXD dos itens, em cascata, já não acha
+ * o header).
+ *
+ * Ver memórias: ajuste-estoque-mecanismo-trigger, ajuste-inventario-grade-e-gravacao-parcial.
  */
-
-import sql from 'mssql';
 
 export interface AjusteContagemItem {
   /** Código do produto (PRODUTOS.PRODUTO). */
@@ -24,6 +33,12 @@ export interface AjusteContagemItem {
   cor: string;
   /** Quantidade contada (alvo). O delta é recalculado contra o saldo atual. */
   contagem: number;
+  /**
+   * Contagem por tamanho (posição da grade 1..48 → qtd), quando se sabe o tamanho
+   * (arquivo de inventário). A soma tem que bater com `contagem`. Ausente/null:
+   * mantém a distribuição atual do saldo e acerta só a diferença.
+   */
+  tamanhos?: Record<string, number> | null;
 }
 
 export interface AjusteContagemParams {
@@ -61,6 +76,11 @@ export interface EstornoResult {
 type PoolLike = { request: () => any };
 
 const NOME_MAX = 25;
+const TAMANHOS = 48;
+/** Teto de texto SQL por requisição — o proxy (express.json) recusa corpo > 100 KB. */
+const LOTE_MAX_CHARS = 60_000;
+/** Limite do SQL Server de linhas por INSERT ... VALUES. */
+const LINHAS_POR_INSERT = 900;
 
 function escapeLike(value: string): string {
   return value.replace(/'/g, "''");
@@ -69,9 +89,11 @@ function escapeLike(value: string): string {
 interface ItemDelta {
   produto: string;
   cor: string;
-  delta: number;
-  slot: number; // 1..48 (TAMANHO_BASE; UNICO => 1)
+  /** Delta por tamanho: índice 0..47 = A1..A48. */
+  deltas: number[];
 }
+
+const soma = (v: number[]) => v.reduce((s, x) => s + x, 0);
 
 /** TAMANHO_BASE (slot da grade) por produto; default 1 (tamanho único). */
 async function carregarSlots(pool: PoolLike, produtos: string[]): Promise<Map<string, number>> {
@@ -88,44 +110,135 @@ async function carregarSlots(pool: PoolLike, produtos: string[]): Promise<Map<st
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const r of res.recordset as any[]) {
       const n = parseInt(r.TB, 10);
-      slotByProduto.set(r.PRODUTO, n >= 1 && n <= 48 ? n : 1);
+      slotByProduto.set(r.PRODUTO, n >= 1 && n <= TAMANHOS ? n : 1);
     }
   }
   return slotByProduto;
 }
 
-/** Saldo atual + slot por (produto,cor) para a filial. */
-async function carregarSaldoESlots(
+interface SaldoAtual {
+  estoque: number;
+  /** ES1..ES48 (índice 0..47). */
+  es: number[];
+  slot: number;
+}
+
+/** Saldo atual (total + por tamanho) e slot base por (produto,cor) na filial. */
+async function carregarSaldos(
   pool: PoolLike,
   filialNome: string,
-  produtosCores: Array<{ produto: string; cor: string }>
-): Promise<Map<string, { estoque: number; slot: number }>> {
-  const map = new Map<string, { estoque: number; slot: number }>();
-  if (produtosCores.length === 0) return map;
+  produtos: string[]
+): Promise<{ saldos: Map<string, SaldoAtual>; slots: Map<string, number> }> {
+  const saldos = new Map<string, SaldoAtual>();
+  const unicos = [...new Set(produtos.map((p) => p.trim()))];
+  const esCols = Array.from({ length: TAMANHOS }, (_, i) => `ES${i + 1}`).join(', ');
+  for (let i = 0; i < unicos.length; i += 800) {
+    const inList = unicos
+      .slice(i, i + 800)
+      .map((p) => `'${escapeLike(p)}'`)
+      .join(',');
+    const req = pool.request();
+    req.input('filial', filialNome);
+    const res = await req.query(`
+      SELECT RTRIM(LTRIM(PRODUTO)) AS PRODUTO,
+             RTRIM(LTRIM(ISNULL(COR_PRODUTO,''))) AS COR,
+             ESTOQUE, ${esCols}
+      FROM ESTOQUE_PRODUTOS WITH (NOLOCK)
+      WHERE RTRIM(LTRIM(FILIAL)) = RTRIM(LTRIM(@filial))
+        AND RTRIM(LTRIM(PRODUTO)) IN (${inList})
+    `);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const r of res.recordset as any[]) {
+      saldos.set(`${r.PRODUTO}|${r.COR}`, {
+        estoque: Number(r.ESTOQUE) || 0,
+        es: Array.from({ length: TAMANHOS }, (_, k) => Number(r[`ES${k + 1}`]) || 0),
+        slot: 1,
+      });
+    }
+  }
+  const slots = await carregarSlots(pool, unicos);
+  return { saldos, slots };
+}
 
-  const reqSaldo = pool.request();
-  reqSaldo.input('filial', filialNome);
-  const saldoRes = await reqSaldo.query(`
-    SELECT RTRIM(LTRIM(PRODUTO)) AS PRODUTO,
-           RTRIM(LTRIM(ISNULL(COR_PRODUTO,''))) AS COR,
-           ESTOQUE
-    FROM ESTOQUE_PRODUTOS WITH (NOLOCK)
-    WHERE RTRIM(LTRIM(FILIAL)) = RTRIM(LTRIM(@filial))
-  `);
-  const saldoByKey = new Map<string, number>();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  for (const r of saldoRes.recordset as any[]) {
-    saldoByKey.set(`${r.PRODUTO}|${r.COR}`, Number(r.ESTOQUE) || 0);
+/**
+ * Quanto cada tamanho deve ter depois do ajuste.
+ *  - Com `tamanhos` (somando `contagem`): é o alvo, tamanho a tamanho.
+ *  - Contagem 0: zero em todos os tamanhos.
+ *  - Só o total: mantém a distribuição atual (sem negativos) e acerta a diferença —
+ *    sobra entra no tamanho base; falta sai do base e depois dos maiores.
+ * Para contagem ≥ 0 nenhum tamanho fica negativo.
+ */
+export function alvoPorTamanho(
+  atual: number[],
+  contagem: number,
+  slotBase: number,
+  tamanhos?: Record<string, number> | null
+): number[] {
+  const base = slotBase - 1;
+  const alvo = Array<number>(TAMANHOS).fill(0);
+
+  if (tamanhos) {
+    let valido = true;
+    for (const [k, v] of Object.entries(tamanhos)) {
+      const i = Number(k);
+      if (!Number.isInteger(i) || i < 1 || i > TAMANHOS) {
+        valido = false;
+        break;
+      }
+      alvo[i - 1] += Math.trunc(Number(v) || 0);
+    }
+    if (valido && soma(alvo) === contagem) return alvo;
+    alvo.fill(0);
   }
 
-  const slots = await carregarSlots(pool, produtosCores.map((p) => p.produto));
-  for (const pc of produtosCores) {
-    const produto = pc.produto.trim();
-    const cor = (pc.cor ?? '').trim();
-    const key = `${produto}|${cor}`;
-    map.set(key, { estoque: saldoByKey.get(key) ?? 0, slot: slots.get(produto) ?? 1 });
+  if (contagem <= 0) {
+    alvo[base] = contagem; // 0 = zera tudo; negativo não deveria chegar aqui
+    return alvo;
   }
-  return map;
+
+  for (let i = 0; i < TAMANHOS; i++) alvo[i] = Math.max(0, atual[i] ?? 0);
+  let diferenca = contagem - soma(alvo);
+  if (diferenca > 0) {
+    alvo[base] += diferenca;
+  } else if (diferenca < 0) {
+    const ordem = [
+      base,
+      ...alvo
+        .map((v, i) => ({ v, i }))
+        .filter(({ i }) => i !== base)
+        .sort((a, b) => b.v - a.v)
+        .map(({ i }) => i),
+    ];
+    for (const i of ordem) {
+      if (diferenca === 0) break;
+      const tira = Math.min(alvo[i], -diferenca);
+      alvo[i] -= tira;
+      diferenca += tira;
+    }
+  }
+  return alvo;
+}
+
+/** Produto×cor que não existem em PRODUTO_CORES (o trigger recusaria a contagem inteira). */
+async function semCadastroDeCor(
+  pool: PoolLike,
+  itens: Array<{ produto: string; cor: string }>
+): Promise<string[]> {
+  const existentes = new Set<string>();
+  const produtos = [...new Set(itens.map((i) => i.produto))];
+  for (let i = 0; i < produtos.length; i += 800) {
+    const inList = produtos
+      .slice(i, i + 800)
+      .map((p) => `'${escapeLike(p)}'`)
+      .join(',');
+    const res = await pool.request().query(`
+      SELECT RTRIM(LTRIM(PRODUTO)) AS PRODUTO, RTRIM(LTRIM(COR_PRODUTO)) AS COR
+      FROM PRODUTO_CORES WITH (NOLOCK) WHERE RTRIM(LTRIM(PRODUTO)) IN (${inList})
+    `);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const r of res.recordset as any[]) existentes.add(`${r.PRODUTO}|${r.COR}`);
+  }
+  return itens.filter((i) => !existentes.has(`${i.produto}|${i.cor}`)).map((i) => `${i.produto} cor ${i.cor || '(vazia)'}`);
 }
 
 async function nomeJaExiste(pool: PoolLike, nome: string): Promise<boolean> {
@@ -161,9 +274,32 @@ export async function encontrarNomeContagemLivre(pool: PoolLike, base: string): 
 }
 
 /**
- * Insere a contagem (header + itens com deltas já calculados). A trigger
- * LXI_ESTOQUE_PROD_CTG_AJUSTE aplica o estoque a cada INSERT (soma A1..A48 →
- * ESTOQUE/ESx). QTDE_AJUSTE guarda o delta; A{slot} dirige o movimento.
+ * Erro do Linx em linguagem de gente. O trigger faz raiserror + rollback: o driver
+ * entrega "The transaction ended in the trigger" e o motivo vem junto (via proxy,
+ * concatenado com " | "; direto, em precedingErrors).
+ */
+function erroDoLinx(error: unknown, desfeito: boolean): Error {
+  const principal = error instanceof Error ? error.message : String(error);
+  // Sem resposta (timeout/conexão): não dá para afirmar se gravou — a mensagem do
+  // proxy já manda conferir antes de repetir.
+  if (/pode ter sido aplicada|Erro de conexão|Timeout ao conectar/i.test(principal)) {
+    return error instanceof Error ? error : new Error(principal);
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const anteriores: string[] = ((error as any)?.precedingErrors ?? []).map((e: any) => String(e?.message ?? ''));
+  const partes = [...principal.split(' | '), ...anteriores]
+    .map((p) => p.replace(/^Erro do banco \(via proxy\):\s*/, '').trim())
+    .filter((p) => p && !/transaction ended in the trigger|batch has been aborted/i.test(p));
+  const motivo = partes.length > 0 ? [...new Set(partes)].join(' | ') : 'o Linx recusou a gravação (trigger).';
+  return new Error(
+    `${desfeito ? 'Nada foi gravado' : 'ATENÇÃO: a gravação falhou e não foi possível desfazer — confira a contagem no Linx'}. Motivo: ${motivo}`
+  );
+}
+
+/**
+ * Insere a contagem (header + itens com deltas por tamanho) tudo-ou-nada. A trigger
+ * LXI_ESTOQUE_PROD_CTG_AJUSTE aplica o estoque a cada INSERT (A1..A48 → ESTOQUE/ESx).
+ * QTDE_AJUSTE guarda o delta total = soma dos Ax.
  */
 async function aplicarContagem(
   pool: PoolLike,
@@ -192,57 +328,116 @@ async function aplicarContagem(
     throw new Error(`Já existe uma contagem com a descrição "${nomeContagem}". Escolha outra.`);
   }
 
+  const semCor = await semCadastroDeCor(pool, deltas);
+  if (semCor.length > 0) {
+    throw new Error(
+      `Nada foi gravado: ${semCor.length} item(ns) sem a cor cadastrada no produto (PRODUTO_CORES): ${semCor
+        .slice(0, 10)
+        .join(', ')}${semCor.length > 10 ? '…' : ''}`
+    );
+  }
+
   // Header (FILIAL deve existir em FILIAIS — FK via trigger).
-  const reqHeader = pool.request();
-  reqHeader.input('nome', nomeContagem);
-  reqHeader.input('filial', filialNome);
-  reqHeader.input('emissao', emissao);
-  reqHeader.input('responsavel', responsavel);
-  reqHeader.input('obs', obs);
-  await reqHeader.query(`
+  const header = `
     INSERT INTO ESTOQUE_PROD_CONTAGEM (
       NOME_CONTAGEM, FILIAL, EMISSAO, RESPONSAVEL, ESTOQUE_AJUSTADO,
       DATA_AJUSTE, TIPO, SALDO_ARMAZENADO, CONTAGEM_POR_AREA_FECHADA, OBS
     ) VALUES (
       @nome, @filial, @emissao, @responsavel, 1,
       @emissao, 'C', 1, 0, @obs
-    )
-  `);
+    );`;
 
-  // Itens — multi-row INSERT por (chunk, slot). Header sem itens (se falhar) é inofensivo.
-  const somaDelta = deltas.reduce((s, d) => s + d.delta, 0);
-  const CHUNK = 300; // < limite de 2100 parâmetros (3/linha + @nome)
-  for (let i = 0; i < deltas.length; i += CHUNK) {
-    const chunk = deltas.slice(i, i + CHUNK);
-    const bySlot = new Map<number, ItemDelta[]>();
-    for (const d of chunk) {
-      const arr = bySlot.get(d.slot) ?? [];
-      arr.push(d);
-      bySlot.set(d.slot, arr);
-    }
-    for (const [slot, rows] of bySlot) {
-      const reqSlot = pool.request();
-      reqSlot.input('nome', nomeContagem);
-      const tuples: string[] = [];
-      rows.forEach((d, idx) => {
-        reqSlot.input(`p${idx}`, d.produto);
-        reqSlot.input(`c${idx}`, d.cor ? d.cor : '');
-        reqSlot.input(`q${idx}`, sql.Int, d.delta);
-        tuples.push(`(@nome, @p${idx}, @c${idx}, @q${idx}, @q${idx})`);
-      });
-      await reqSlot.query(`
-        INSERT INTO ESTOQUE_PROD_CTG_AJUSTE (NOME_CONTAGEM, PRODUTO, COR_PRODUTO, QTDE_AJUSTE, A${slot})
-        VALUES ${tuples.join(',')}
-      `);
+  // Itens: um INSERT por conjunto de tamanhos usados (a imensa maioria é só A1),
+  // só com as colunas necessárias — mantém o texto pequeno para o proxy.
+  const porColunas = new Map<string, { slots: number[]; linhas: string[] }>();
+  for (const d of deltas) {
+    const slots = d.deltas.map((v, i) => (v !== 0 ? i + 1 : 0)).filter(Boolean);
+    const chave = slots.join(',');
+    const grupo = porColunas.get(chave) ?? { slots, linhas: [] };
+    grupo.linhas.push(
+      `(@nome,'${escapeLike(d.produto)}','${escapeLike(d.cor)}',${soma(d.deltas)},${slots
+        .map((s) => d.deltas[s - 1])
+        .join(',')})`
+    );
+    porColunas.set(chave, grupo);
+  }
+  const insertsItens: string[] = [];
+  for (const { slots, linhas } of porColunas.values()) {
+    const cols = slots.map((s) => `A${s}`).join(', ');
+    for (let i = 0; i < linhas.length; i += LINHAS_POR_INSERT) {
+      // Linhas por statement limitadas também pelo tamanho do lote.
+      let fatia: string[] = [];
+      let tamanho = 0;
+      for (const linha of linhas.slice(i, i + LINHAS_POR_INSERT)) {
+        if (tamanho + linha.length > LOTE_MAX_CHARS - 500 && fatia.length > 0) {
+          insertsItens.push(`INSERT INTO ESTOQUE_PROD_CTG_AJUSTE (NOME_CONTAGEM, PRODUTO, COR_PRODUTO, QTDE_AJUSTE, ${cols}) VALUES ${fatia.join(',')};`);
+          fatia = [];
+          tamanho = 0;
+        }
+        fatia.push(linha);
+        tamanho += linha.length + 1;
+      }
+      if (fatia.length > 0) {
+        insertsItens.push(`INSERT INTO ESTOQUE_PROD_CTG_AJUSTE (NOME_CONTAGEM, PRODUTO, COR_PRODUTO, QTDE_AJUSTE, ${cols}) VALUES ${fatia.join(',')};`);
+      }
     }
   }
 
-  return { itensAjustados: deltas.length, somaDelta };
+  // Empacota os statements em lotes que caibam numa requisição.
+  const lotes: string[][] = [[header]];
+  let tamanhoLote = header.length;
+  for (const stmt of insertsItens) {
+    if (tamanhoLote + stmt.length > LOTE_MAX_CHARS) {
+      lotes.push([]);
+      tamanhoLote = 0;
+    }
+    lotes[lotes.length - 1].push(stmt);
+    tamanhoLote += stmt.length;
+  }
+
+  const rodar = async (texto: string) => {
+    const req = pool.request();
+    req.input('nome', nomeContagem);
+    req.input('filial', filialNome);
+    req.input('emissao', emissao);
+    req.input('responsavel', responsavel);
+    req.input('obs', obs);
+    return req.query(texto);
+  };
+
+  if (lotes.length === 1) {
+    // Caso normal: uma transação só — o trigger que recusar desfaz tudo.
+    try {
+      await rodar(`SET XACT_ABORT ON;\nBEGIN TRANSACTION;\n${lotes[0].join('\n')}\nCOMMIT TRANSACTION;`);
+    } catch (error) {
+      throw erroDoLinx(error, true);
+    }
+  } else {
+    for (const lote of lotes) {
+      try {
+        await rodar(lote.join('\n'));
+      } catch (error) {
+        // Desfaz o que entrou: excluir o header estorna os itens (LXD) e os apaga.
+        let desfeito = false;
+        try {
+          if (await nomeJaExiste(pool, nomeContagem)) {
+            await rodar('DELETE FROM ESTOQUE_PROD_CONTAGEM WHERE NOME_CONTAGEM = @nome;');
+          }
+          desfeito = !(await nomeJaExiste(pool, nomeContagem));
+        } catch (errDesfazer) {
+          console.error('[ajuste-estoque] falha ao desfazer contagem parcial', nomeContagem, errDesfazer);
+        }
+        throw erroDoLinx(error, desfeito);
+      }
+    }
+  }
+
+  return { itensAjustados: deltas.length, somaDelta: deltas.reduce((s, d) => s + soma(d.deltas), 0) };
 }
 
 /**
- * Executa o ajuste: recalcula o delta contra o saldo ATUAL (corrida-seguro):
- * delta = contagem - saldoAtual; depois cria a contagem (a trigger aplica o estoque).
+ * Executa o ajuste: recalcula o delta contra o saldo ATUAL (corrida-seguro), tamanho
+ * por tamanho; depois cria a contagem (a trigger aplica o estoque).
  */
 export async function executarAjusteContagem(
   pool: PoolLike,
@@ -255,10 +450,10 @@ export async function executarAjusteContagem(
     throw new Error('Nenhum item para ajustar.');
   }
 
-  const saldoMap = await carregarSaldoESlots(
+  const { saldos, slots } = await carregarSaldos(
     pool,
     filialNome,
-    params.itens.map((it) => ({ produto: it.produto, cor: it.cor }))
+    params.itens.map((it) => it.produto)
   );
 
   const deltas: ItemDelta[] = [];
@@ -266,15 +461,19 @@ export async function executarAjusteContagem(
   for (const it of params.itens) {
     const produto = it.produto.trim();
     const cor = (it.cor ?? '').trim();
-    const info = saldoMap.get(`${produto}|${cor}`);
-    const saldoAtual = info?.estoque ?? 0;
-    const slot = info?.slot ?? 1;
-    const delta = Math.trunc(it.contagem) - saldoAtual;
-    if (delta === 0) {
+    const saldo = saldos.get(`${produto}|${cor}`);
+    const slot = slots.get(produto) ?? 1;
+    const atual = saldo?.es ?? Array<number>(TAMANHOS).fill(0);
+    const contagem = Math.trunc(it.contagem);
+    const alvo = alvoPorTamanho(atual, contagem, slot, it.tamanhos);
+    const porTamanho = alvo.map((v, i) => v - atual[i]);
+    // Linha com ESTOQUE ≠ soma dos ESx: o total manda (é o que todo mundo lê).
+    porTamanho[slot - 1] += soma(atual) - (saldo?.estoque ?? 0);
+    if (porTamanho.every((v) => v === 0)) {
       semDiferenca += 1;
       continue;
     }
-    deltas.push({ produto, cor, delta, slot });
+    deltas.push({ produto, cor, deltas: porTamanho });
   }
 
   if (deltas.length === 0) {
@@ -294,8 +493,8 @@ export async function executarAjusteContagem(
 }
 
 /**
- * Desfaz (estorna) uma contagem: lê os deltas originais e cria uma nova contagem
- * com os deltas invertidos. Nada é apagado — original e estorno ficam no histórico.
+ * Desfaz (estorna) uma contagem: lê os deltas originais (por tamanho) e cria uma nova
+ * contagem com eles invertidos. Nada é apagado — original e estorno ficam no histórico.
  */
 export async function estornarContagem(
   pool: PoolLike,
@@ -316,30 +515,24 @@ export async function estornarContagem(
   const filialNome = hRes.recordset[0]?.FILIAL?.trim();
   if (!filialNome) throw new Error(`Contagem "${nomeOriginal}" não encontrada.`);
 
-  // Itens originais (deltas a inverter).
+  // Itens originais (deltas por tamanho a inverter).
+  const aCols = Array.from({ length: TAMANHOS }, (_, i) => `ISNULL(A${i + 1},0) AS A${i + 1}`).join(', ');
   const reqI = pool.request();
   reqI.input('nome', nomeOriginal);
   const iRes = await reqI.query(`
-    SELECT RTRIM(PRODUTO) AS PRODUTO, RTRIM(ISNULL(COR_PRODUTO,'')) AS COR, ISNULL(QTDE_AJUSTE,0) AS Q
+    SELECT RTRIM(PRODUTO) AS PRODUTO, RTRIM(ISNULL(COR_PRODUTO,'')) AS COR, ${aCols}
     FROM ESTOQUE_PROD_CTG_AJUSTE WITH (NOLOCK)
-    WHERE RTRIM(LTRIM(NOME_CONTAGEM)) = RTRIM(LTRIM(@nome)) AND ISNULL(QTDE_AJUSTE,0) <> 0
+    WHERE RTRIM(LTRIM(NOME_CONTAGEM)) = RTRIM(LTRIM(@nome))
   `);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const orig = iRes.recordset as any[];
-  if (orig.length === 0) throw new Error('A contagem não tem itens para estornar.');
-
-  const slots = await carregarSlots(pool, orig.map((r) => String(r.PRODUTO).trim()));
-  const deltas: ItemDelta[] = orig
-    .map((r) => {
-      const produto = String(r.PRODUTO).trim();
-      return {
-        produto,
-        cor: String(r.COR ?? '').trim(),
-        delta: -(Number(r.Q) || 0),
-        slot: slots.get(produto) ?? 1,
-      };
-    })
-    .filter((d) => d.delta !== 0);
+  const deltas: ItemDelta[] = (iRes.recordset as any[])
+    .map((r) => ({
+      produto: String(r.PRODUTO).trim(),
+      cor: String(r.COR ?? '').trim(),
+      deltas: Array.from({ length: TAMANHOS }, (_, i) => -(Number(r[`A${i + 1}`]) || 0)),
+    }))
+    .filter((d) => d.deltas.some((v) => v !== 0));
+  if (deltas.length === 0) throw new Error('A contagem não tem itens para estornar.');
 
   const { itensAjustados, somaDelta } = await aplicarContagem(pool, {
     filialNome,
