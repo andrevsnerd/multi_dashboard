@@ -183,6 +183,8 @@ export default function Sidebar({ companyName }: SidebarProps) {
     basePath && basePath !== "/" ? `${basePath}/mapa-clientes` : "/mapa-clientes";
   const planejamentoReceitaHref =
     basePath && basePath !== "/" ? `${basePath}/planejamento-receita` : "/planejamento-receita";
+  const controleFinanceiroHref =
+    basePath && basePath !== "/" ? `${basePath}/controle-financeiro` : "/controle-financeiro";
   const sincronizacaoHref =
     basePath && basePath !== "/" ? `${basePath}/sincronizacao` : "/sincronizacao";
 
@@ -258,6 +260,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
 
   const dashboardBlockedSegments = [
     "/planejamento-receita",
+    "/controle-financeiro",
     "/estoque-por-filial",
     "/controle-estoque",
     "/estoque-consulta",
@@ -335,6 +338,15 @@ export default function Sidebar({ companyName }: SidebarProps) {
                 permission: "planejamento-receita" as const,
                 isActive: (currentPathname: string | null) =>
                   matchesSegment(currentPathname, "/planejamento-receita", planejamentoReceitaHref),
+              },
+              // Base da planilha "Controle Financeiro - Scarf Me" (DRE, lançamentos, caixa).
+              {
+                key: "controle-financeiro",
+                label: "Controle Financeiro",
+                href: controleFinanceiroHref,
+                permission: "controle-financeiro" as const,
+                isActive: (currentPathname: string | null) =>
+                  matchesSegment(currentPathname, "/controle-financeiro", controleFinanceiroHref),
               },
             ]
           : []),

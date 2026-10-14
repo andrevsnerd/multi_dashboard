@@ -242,6 +242,9 @@ export const ROLE_RESTRICTED_PERMISSIONS: Partial<Record<PermissionKey, RoleKey[
   // veem custo). Restringir a admin+diretor tornava a permissao inutil: as duas
   // ja tem acesso total, e o checkbox sumia para a unica funcao que precisa dele.
   "gastos-compra": ["admin", "diretor", "logistica"],
+  // Controle Financeiro: folha, fornecedores, impostos e resultado da empresa inteira.
+  // So admin e diretor (que ja tem acesso total); importar a planilha e so do admin.
+  "controle-financeiro": ["admin", "diretor"],
   // Ciclo de Compra define cobertura e lead time da rede: mexer ali muda a quantidade
   // sugerida e a data de compra de TODA loja. Politica de reposicao, nao operacao de loja —
   // mesmo conjunto restrito, com diretor entrando somente-leitura.

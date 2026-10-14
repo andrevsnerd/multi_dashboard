@@ -510,7 +510,10 @@
   "508": "exportToPDF.ts",
   "509": "ajuste-estoque-kpis-store.ts",
   "510": "relatorios.ts",
+  "511": "page.tsx",
+  "512": "page.tsx",
+  "513": "page.tsx",
+  "514": "FinanceiroSemBancoError",
   "515": "jspdf",
-  "519": "page.tsx",
   "532": "page.tsx"
 }

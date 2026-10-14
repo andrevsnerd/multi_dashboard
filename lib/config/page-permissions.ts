@@ -8,6 +8,7 @@ type PagePermissionDefinition = {
 export const PAGE_PERMISSION_DEFINITIONS = [
   { key: "dashboard", label: "Dashboard", routeSegments: ["dashboard"] },
   { key: "planejamento-receita", label: "Planejamento de Receita", routeSegments: ["planejamento-receita"] },
+  { key: "controle-financeiro", label: "Controle Financeiro", routeSegments: ["controle-financeiro"] },
   { key: "produtos", label: "Produtos por Venda", routeSegments: ["produtos"] },
   { key: "produto-agrupado", label: "Produto Agrupado", routeSegments: ["produto-agrupado"] },
   { key: "produto-descontinuado", label: "Produto Descontinuado", routeSegments: ["produto-descontinuado"] },
