@@ -930,13 +930,13 @@
     "semantic_hash": "3136877746d42feabbd7abeab02e36c2"
   },
   "app/api/romaneio-confirmar-entrada/route.ts": {
-    "mtime": 1792001718.6135664,
-    "ast_hash": "72883e50ad6b16859320a77481ac20ae",
+    "mtime": 1792003142.5715582,
+    "ast_hash": "b3982689de7eecee454b0aa10c6023da",
     "semantic_hash": ""
   },
   "app/api/romaneios/editar-qtd/route.ts": {
-    "mtime": 1791995109.4270186,
-    "ast_hash": "3d80fb5d081c640e8ad1121141e05a15",
+    "mtime": 1792003218.2908084,
+    "ast_hash": "3cf02a5666cda0fef09ba437e1e8f6d3",
     "semantic_hash": ""
   },
   "app/api/romaneios/entradas/route.ts": {
@@ -965,8 +965,8 @@
     "semantic_hash": ""
   },
   "app/api/saidas-entradas-produtos/executar/route.ts": {
-    "mtime": 1791997751.3459587,
-    "ast_hash": "ed4fb0738fe37fe3cf1f9092ae68d073",
+    "mtime": 1792003034.6308928,
+    "ast_hash": "91dce1775efe03b9831df288b42b048a",
     "semantic_hash": ""
   },
   "app/api/saidas-entradas-produtos/historico/route.ts": {
@@ -1285,8 +1285,8 @@
     "semantic_hash": ""
   },
   "components/controle-transferencias/ControleTransferenciasTable.tsx": {
-    "mtime": 1791998911.090314,
-    "ast_hash": "cd3f2df21a2d78f420e877ef1a989e06",
+    "mtime": 1792003063.225086,
+    "ast_hash": "8e4fd69ca8b510c4f46087ff694667d5",
     "semantic_hash": ""
   },
   "components/controle-transferencias/RealizadasPanel.tsx": {
@@ -1600,8 +1600,8 @@
     "semantic_hash": "c1db24d3ffabe5b57c07dc935de08446"
   },
   "components/romaneios/RomaneioDetalhePage.tsx": {
-    "mtime": 1792001839.2741067,
-    "ast_hash": "344fd9826aaf794d4fb8d91e60b4bbf9",
+    "mtime": 1792003063.2113323,
+    "ast_hash": "f3b5d15dda6b5071251de89a8dd2ca39",
     "semantic_hash": ""
   },
   "components/romaneios/RomaneiosDuplicadosPanel.tsx": {
@@ -1620,8 +1620,8 @@
     "semantic_hash": ""
   },
   "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx": {
-    "mtime": 1791998404.3076305,
-    "ast_hash": "406423e8e90cd4cb222f93be3b83d00b",
+    "mtime": 1792003063.2315438,
+    "ast_hash": "0d17a7d991bcd5abfb64fd69a173c104",
     "semantic_hash": ""
   },
   "components/shared/CompraIdealCell.tsx": {
@@ -4365,8 +4365,8 @@
     "semantic_hash": ""
   },
   "app/api/saidas-entradas-produtos/entrada-editar/route.ts": {
-    "mtime": 1791998004.8600907,
-    "ast_hash": "575cc6833bf5ce0d8f337c6a39ac1cc9",
+    "mtime": 1792003185.7829607,
+    "ast_hash": "48dafa76b212b9f23226ea708df6dee2",
     "semantic_hash": ""
   },
   "app/api/controle-estoque/filtro-opcoes/route.ts": {
@@ -4410,8 +4410,8 @@
     "semantic_hash": ""
   },
   "app/api/saidas-entradas-produtos/saida-editar/route.ts": {
-    "mtime": 1791998018.3257613,
-    "ast_hash": "cf53c2071ec2dceb80f4ddd9d52920d6",
+    "mtime": 1792003185.7772305,
+    "ast_hash": "0a8f3879f6a4e245e18f704141417873",
     "semantic_hash": ""
   },
   "lib/reports/tickets.ts": {
@@ -4575,8 +4575,8 @@
     "semantic_hash": ""
   },
   "app/api/defeitos/item/route.ts": {
-    "mtime": 1792000300.3008795,
-    "ast_hash": "a8f34224d9c441cddbf04d591f2bd1d2",
+    "mtime": 1792003232.4124782,
+    "ast_hash": "cc11bdebf7128c6990a9909722f94ffe",
     "semantic_hash": ""
   },
   "app/api/defeitos/itens/route.ts": {
@@ -4590,8 +4590,8 @@
     "semantic_hash": ""
   },
   "components/defeitos/DefeitosPage.tsx": {
-    "mtime": 1792001863.9147859,
-    "ast_hash": "f961cc9531327dbfd6019d2dd96c38d4",
+    "mtime": 1792003063.2113323,
+    "ast_hash": "049cddc0d97e731c961346034c3c0d70",
     "semantic_hash": ""
   },
   "lib/repositories/defeitos.ts": {
@@ -5022,6 +5022,26 @@
   "lib/server/grade-produto.ts": {
     "mtime": 1791997723.8776326,
     "ast_hash": "681ac88f6f563094a3dba625d5e2f161",
+    "semantic_hash": ""
+  },
+  "lib/server/conferencia-divergencias.ts": {
+    "mtime": 1792003276.214526,
+    "ast_hash": "33570e7c4f7667c1555d9d46fa74f74f",
+    "semantic_hash": ""
+  },
+  "lib/server/obs-operacao.ts": {
+    "mtime": 1792003299.075053,
+    "ast_hash": "67b52c55a269af22c0c301d8545b2d25",
+    "semantic_hash": ""
+  },
+  "lib/utils/conferencia-divergencia-calculo.ts": {
+    "mtime": 1792002844.8144598,
+    "ast_hash": "b2a76fa96a79ffa17a3da778f717255a",
+    "semantic_hash": ""
+  },
+  "lib/utils/obs-operacao-texto.ts": {
+    "mtime": 1792003299.075053,
+    "ast_hash": "2536feb89cd419bb6ab450f38a353221",
     "semantic_hash": ""
   }
 }

@@ -542,6 +542,7 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
           ),
           tipoRomaneio: "TRANSFERENCIA ENTRE LOJAS",
           observacao: `DEFEITO ROMANEIO ${selecionado.romaneio} - ${selecionado.filialOrigem}`,
+          origemTela: "Defeitos",
           // Trava de inventário do destino (lib/server/trava-inventario.ts).
           romaneioReferencia: {
             romaneio: selecionado.romaneio,

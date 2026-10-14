@@ -6,6 +6,7 @@ import { inserirAjuste } from '@/lib/repositories/ajuste-historico';
 import { resolveResponsavelLinx } from '@/lib/server/responsavel-linx';
 import { mensagemTravaEstoqueNegativo, verificarSaldoSaida } from '@/lib/server/trava-estoque-negativo';
 import { executeItemQtdeSet } from '@/lib/saida-entrada-executor';
+import { agoraBrasil, anotarObsRomaneio } from '@/lib/server/obs-operacao';
 
 async function podeEditarQtdRomaneio(username: string | null): Promise<boolean> {
   if (!username) return false;
@@ -116,6 +117,15 @@ export async function PUT(request: NextRequest) {
     // Saída: delta>0 = mais saiu (estoque -), delta<0 = menos saiu (estoque +) → qtdeAjuste = -delta
     // Entrada: delta>0 = mais chegou (estoque +), delta<0 = menos chegou (estoque -) → qtdeAjuste = delta
     if (resultado.delta !== 0) {
+      // Documenta no OBS do romaneio (aparece no Extrato) — ver lib/server/obs-operacao.ts.
+      await anotarObsRomaneio({
+        tipo,
+        romaneio,
+        filial: resultado.filial,
+        linha:
+          `QTDE CORRIGIDA VIA DASHBOARD (Romaneios) | ${produto}${cor ? ` cor ${cor}` : ''}: ` +
+          `${resultado.qtdeAnterior} -> ${resultado.qtdeNova} | POR: ${username} | ${agoraBrasil()}`,
+      });
       const qtdeAjuste = tipo === 'saida' ? -resultado.delta : resultado.delta;
       inserirAjuste({
         filial: resultado.filial,

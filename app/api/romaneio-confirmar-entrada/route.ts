@@ -11,7 +11,8 @@ import {
   desconfirmarItem,
 } from "@/lib/utils/romaneio-confirmacao-store";
 import { encontrarNomeContagemLivre, executarAjusteContagem } from "@/lib/ajuste-estoque-executor";
-import { carregarGradeDaSaida, carregarGrades, chaveSku } from "@/lib/server/grade-produto";
+import { registrarDivergenciasNaOrigem } from "@/lib/server/conferencia-divergencias";
+import { agoraBrasil, anotarObsRomaneio } from "@/lib/server/obs-operacao";
 
 /** `{ "2": 1, "3": 2 }` → `{ 2: 1, 3: 2 }`; inválido/vazio → null. */
 function normalizarTamanhos(raw: unknown): Record<number, number> | null {
@@ -333,21 +334,38 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Nenhum item com quantidade para confirmar." }, { status: 400 });
       }
 
+      // Divergência (faltou / tamanho trocado) vira romaneio NOVO na origem — a
+      // saída original fica intacta. Antes das confirmações: se o Linx recusar,
+      // nada é confirmado e o operador repete (idempotente por item).
       const filialOrigem = (body.filialOrigem ?? "").trim();
-      const origens: string[] = [];
-      for (const it of itens) {
-        if (!filialOrigem || !it.divergente) continue;
-        const origem = await corrigirSaidaNaConferencia({
-          romaneioId,
-          filialOrigem,
-          produto: it.produto,
-          corProduto: it.corProduto,
-          qtdeConfirmada: it.qtdeConfirmada,
-          tamanhosConfirmados: it.tamanhosConfirmados,
-          filialDestino: fd,
-          username,
-        });
-        if (origem?.detalhe) origens.push(origem.detalhe);
+      let origens: string[] = [];
+      let divergencia: Awaited<ReturnType<typeof registrarDivergenciasNaOrigem>> | null = null;
+      const divergentes = itens.filter((it) => it.divergente);
+      if (filialOrigem && divergentes.length > 0) {
+        try {
+          divergencia = await registrarDivergenciasNaOrigem({
+            romaneioSaida: romaneioId,
+            filialOrigem,
+            filialDestino: fd,
+            itens: divergentes.map((it) => ({
+              produto: it.produto,
+              corProduto: it.corProduto,
+              qtdeConfirmada: it.qtdeConfirmada,
+              tamanhosConfirmados: normalizarTamanhos(it.tamanhosConfirmados),
+            })),
+            username,
+          });
+          origens = divergencia.mensagens;
+        } catch (e) {
+          return NextResponse.json(
+            {
+              error: `Nada foi confirmado: não deu para registrar na origem as peças que não chegaram (${
+                e instanceof Error ? e.message : "erro no Linx"
+              }). Tente de novo.`,
+            },
+            { status: 409 }
+          );
+        }
       }
 
       await confirmarItensLote(
@@ -358,6 +376,25 @@ export async function POST(request: Request) {
         username,
         (body.romaneioEntrada ?? "").trim()
       );
+
+      // Documenta a conferência no romaneio conferido (a saída na origem; numa
+      // confirmação de trânsito sem origem, o próprio romaneio no destino).
+      const pecas = itens.reduce((s, it) => s + it.qtdeConfirmada, 0);
+      const romEnt = (body.romaneioEntrada ?? "").trim();
+      const partesDiv = [
+        divergencia?.romaneioDevolucao ? `nao recebidos voltaram no romaneio ${divergencia.romaneioDevolucao}` : "",
+        divergencia?.romaneioTroca ? `tamanho trocado no romaneio ${divergencia.romaneioTroca}` : "",
+      ].filter(Boolean);
+      await anotarObsRomaneio({
+        tipo: filialOrigem ? "saida" : "entrada",
+        romaneio: romaneioId,
+        filial: filialOrigem || fd,
+        linha:
+          `CONFERIDO EM ${fd} | ${itens.length} produto(s), ${pecas} peca(s)` +
+          `${romEnt ? ` | entrada ${romEnt}` : ""}` +
+          `${divergentes.length > 0 ? ` | ${divergentes.length} com divergencia${partesDiv.length ? `: ${partesDiv.join("; ")}` : ""}` : ""}` +
+          ` | POR: ${username} | ${agoraBrasil()}`,
+      });
 
       return NextResponse.json({ success: true, acao, confirmados: itens.length, origens });
     }
@@ -404,6 +441,18 @@ export async function POST(request: Request) {
       }
 
       await desconfirmarItem(companyKey, romaneioId, filialDestinoAtiva, produto, corProduto ?? "");
+
+      // Documenta no romaneio de entrada (quando há vínculo) que a confirmação caiu.
+      if (qtdeConfirmada > 0 && confirmacao?.romaneioEntrada) {
+        await anotarObsRomaneio({
+          tipo: "entrada",
+          romaneio: confirmacao.romaneioEntrada,
+          filial: fd,
+          linha:
+            `CONFIRMACAO DESFEITA (saida ${romaneioId}) | ${produto}${corProduto ? ` cor ${corProduto}` : ""}: ` +
+            `${qtdeConfirmada} peca(s) retiradas do estoque | POR: ${username} | ${agoraBrasil()}`,
+        });
+      }
       return NextResponse.json({ success: true, acao, destino });
     } else {
       // CONFERIU MENOS DO QUE SAIU → a peça que não chegou volta para a loja.
@@ -417,20 +466,37 @@ export async function POST(request: Request) {
       // entrada/nota de transferência, porque lá o outro lado é amarrado pelo
       // ERP e a diferença é assunto de conferência, não de correção. Por isso a
       // falha aqui NÃO derruba a confirmação — ela só volta descrita na resposta.
+      // Mesma regra do lote: divergência vira romaneio novo na origem.
       const filialOrigem = (body.filialOrigem ?? "").trim();
-      const origem =
-        filialOrigem && qtdeConfirmada > 0
-          ? await corrigirSaidaNaConferencia({
-              romaneioId,
-              filialOrigem,
-              produto,
-              corProduto: corProduto ?? "",
-              qtdeConfirmada,
-              tamanhosConfirmados: body.tamanhosConfirmados,
-              filialDestino: fd,
-              username,
-            })
-          : null;
+      let origem: { corrigido: boolean; detalhe: string } | null = null;
+      if (filialOrigem && qtdeConfirmada > 0) {
+        try {
+          const r = await registrarDivergenciasNaOrigem({
+            romaneioSaida: romaneioId,
+            filialOrigem,
+            filialDestino: fd,
+            itens: [
+              {
+                produto,
+                corProduto: corProduto ?? "",
+                qtdeConfirmada,
+                tamanhosConfirmados: normalizarTamanhos(body.tamanhosConfirmados),
+              },
+            ],
+            username,
+          });
+          if (r.mensagens.length > 0) origem = { corrigido: true, detalhe: r.mensagens.join(" ") };
+        } catch (e) {
+          return NextResponse.json(
+            {
+              error: `Nada foi confirmado: não deu para registrar na origem a peça que não chegou (${
+                e instanceof Error ? e.message : "erro no Linx"
+              }). Tente de novo.`,
+            },
+            { status: 409 }
+          );
+        }
+      }
 
       await confirmarItem(
         companyKey,
@@ -451,124 +517,4 @@ export async function POST(request: Request) {
     console.error("POST romaneio-confirmar-entrada:", err);
     return NextResponse.json({ error: err.message || "Erro interno" }, { status: 500 });
   }
-}
-
-/**
- * CONFERIU MENOS DO QUE SAIU (ou em outro tamanho) → a saída passa a valer o que
- * chegou e o trigger do Linx devolve a diferença à loja de origem.
- *
- * Só vale para saída AVULSA (o executor recusa romaneio pareado). A falha aqui
- * NÃO derruba a confirmação — volta descrita para a tela. Idempotente: a
- * quantidade é absoluta, então repetir não mexe no estoque de novo.
- */
-async function corrigirSaidaNaConferencia(p: {
-  romaneioId: string;
-  filialOrigem: string;
-  produto: string;
-  corProduto: string;
-  qtdeConfirmada: number;
-  tamanhosConfirmados?: unknown;
-  filialDestino: string;
-  username: string;
-}): Promise<{ corrigido: boolean; detalhe: string } | null> {
-  const { romaneioId, filialOrigem, produto, corProduto, qtdeConfirmada, username } = p;
-  const fd = p.filialDestino;
-  let origem: { corrigido: boolean; detalhe: string } | null = null;
-  {
-        try {
-          const qtdeSaida = await withRequest(async (req) => {
-            req.input("romaneio", sql.VarChar, romaneioId.trim());
-            req.input("filial", sql.VarChar, filialOrigem);
-            req.input("produto", sql.VarChar, produto.trim());
-            req.input("cor", sql.VarChar, (corProduto ?? "").trim());
-            const r = await req.query<{ qtde: number | null }>(`
-              SELECT TOP 1 ISNULL(i.QTDE, 0) AS qtde
-                FROM ESTOQUE_PROD1_SAI i WITH (NOLOCK)
-               WHERE LTRIM(RTRIM(i.ROMANEIO_PRODUTO)) = @romaneio
-                 AND LTRIM(RTRIM(i.FILIAL)) = LTRIM(RTRIM(@filial))
-                 AND LTRIM(RTRIM(i.PRODUTO)) = @produto
-                 AND (
-                   ISNULL(LTRIM(RTRIM(CAST(i.COR_PRODUTO AS VARCHAR(20)))), '') = @cor
-                   OR TRY_CONVERT(INT, i.COR_PRODUTO) = TRY_CONVERT(INT, @cor)
-                 )
-            `);
-            return Number(r.recordset[0]?.qtde ?? 0);
-          });
-
-          // Peça P/M/G conferida tamanho a tamanho: a saída passa a valer o que
-          // chegou em CADA tamanho (inclusive saída antiga que foi toda no P e
-          // chegou em M). Só quando não chegou mais do que saiu.
-          const tamanhosConf = normalizarTamanhos(p.tamanhosConfirmados);
-          const gradeSaida = tamanhosConf
-            ? (await carregarGradeDaSaida(romaneioId, filialOrigem, [produto])).get(chaveSku(produto, corProduto))
-            : undefined;
-          const tamanhoDifere =
-            !!tamanhosConf && !!gradeSaida && gradeSaida.some((q, i) => q !== (tamanhosConf[i + 1] ?? 0));
-
-          if (tamanhosConf && tamanhoDifere && qtdeConfirmada <= qtdeSaida) {
-            const pool = shouldUseProxy() ? new ProxyPool() : await getConnectionPool();
-            const res = await executeItemQtdeSet(pool, {
-              tipo: "saida",
-              romaneio: romaneioId,
-              filial: filialOrigem,
-              produto,
-              corProduto: corProduto ?? "",
-              tamanhos: tamanhosConf,
-            });
-            const rotulos = (await carregarGrades([produto])).get(produto.trim())?.tamanhos ?? [];
-            const descrever = (porTam: (i: number) => number) =>
-              rotulos.map((t) => `${t.label}:${porTam(t.ordinal)}`).filter((s) => !s.endsWith(":0")).join(" ") || "0";
-            origem = {
-              corrigido: true,
-              detalhe:
-                `Saída ${romaneioId} acertada por tamanho em ${res.filial}: ` +
-                `${descrever((o) => gradeSaida![o - 1] ?? 0)} → ${descrever((o) => tamanhosConf[o] ?? 0)}.`,
-            };
-            inserirAjuste({
-              filial: res.filial,
-              itens: [{ produto, cor: (corProduto ?? "").trim(), qtde: -res.delta }],
-              romaneioRef: romaneioId,
-              tipoAjuste: "CORRECAO_CONFERENCIA_SAIDA",
-              responsavel: await resolveResponsavelLinx(username),
-              obs: `Conferência de ${fd} por tamanho: ${res.qtdeAnterior} → ${res.qtdeNova}`,
-            }).catch((e) =>
-              console.error("[ajuste-historico] Falha ao registrar auditoria:", e)
-            );
-          } else if (!tamanhosConf && qtdeSaida > qtdeConfirmada) {
-            const pool = shouldUseProxy() ? new ProxyPool() : await getConnectionPool();
-            const res = await executeItemQtdeSet(pool, {
-              tipo: "saida",
-              romaneio: romaneioId,
-              filial: filialOrigem,
-              produto,
-              corProduto: corProduto ?? "",
-              qtdeNova: qtdeConfirmada,
-            });
-            const devolvido = -res.delta;
-            origem = {
-              corrigido: true,
-              detalhe: `${devolvido} peça(s) devolvida(s) ao estoque de ${res.filial}: a saída ${romaneioId} passou de ${res.qtdeAnterior} para ${qtdeConfirmada}.`,
-            };
-            inserirAjuste({
-              filial: res.filial,
-              itens: [{ produto, cor: (corProduto ?? "").trim(), qtde: devolvido }],
-              romaneioRef: romaneioId,
-              tipoAjuste: "CORRECAO_CONFERENCIA_SAIDA",
-              responsavel: await resolveResponsavelLinx(username),
-              obs: `Conferência de ${fd}: ${res.qtdeAnterior} → ${qtdeConfirmada}`,
-            }).catch((e) =>
-              console.error("[ajuste-historico] Falha ao registrar auditoria:", e)
-            );
-          }
-        } catch (e) {
-          origem = {
-            corrigido: false,
-            detalhe:
-              e instanceof Error
-                ? `O item foi confirmado, mas a saída não pôde ser corrigida: ${e.message}`
-                : "O item foi confirmado, mas a saída não pôde ser corrigida.",
-          };
-        }
-  }
-  return origem;
 }

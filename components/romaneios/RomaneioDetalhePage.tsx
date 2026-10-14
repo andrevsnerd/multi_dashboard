@@ -182,6 +182,7 @@ async function executarEntradaEstoqueLote(
       responsavel: responsavel || "LOGISTICA",
       observacao: null,
       romaneioReferencia,
+      origemTela: "Romaneios (confirmacao)",
     }),
   });
   if (!res.ok) {
@@ -1065,6 +1066,8 @@ export default function RomaneioDetalhePage({
           ),
           tipoRomaneio: "TRANSFERENCIA ENTRE LOJAS",
           responsavel: responsavelPadrao || "",
+          observacao: `REENVIO DO ROMANEIO DE ENTRADA ${romaneioId} (${filialDestino})`,
+          origemTela: "Romaneios (dar saida)",
         }),
       });
       const json = (await res.json()) as { success?: boolean; romaneio?: string; error?: string };

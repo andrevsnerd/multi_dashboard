@@ -19,6 +19,7 @@ import {
 } from '@/lib/server/trava-defeito';
 import { mensagemTravaInventario, verificarTravaInventario } from '@/lib/server/trava-inventario';
 import { mensagemTravaEstoqueNegativo, verificarSaldoSaida } from '@/lib/server/trava-estoque-negativo';
+import { montarObsOperacao } from '@/lib/server/obs-operacao';
 import {
   carregarGrades,
   preencherTamanhosPelaSaida,
@@ -78,6 +79,8 @@ interface SaidaEntradaRequest {
    * vem, a trava de inventário do destino é conferida antes de gerar a entrada.
    */
   romaneioReferencia?: { romaneio: string; filialOrigem: string; dataRomaneio?: string } | null;
+  /** Tela que fez a operação — vai no OBS do romaneio (ver lib/server/obs-operacao.ts). */
+  origemTela?: string | null;
 }
 
 /**
@@ -398,13 +401,37 @@ export async function POST(request: Request) {
       }
     }
 
+    // OBS documentado (lib/server/obs-operacao.ts): de onde, para onde, quanto,
+    // tela, quem e quando — é o que aparece no Extrato de Produto. O texto do
+    // operador vem primeiro.
+    const tela =
+      (body.origemTela || '').trim() ||
+      (ref?.romaneio
+        ? 'Romaneios (confirmacao)'
+        : registrarTransferenciaPendente
+          ? 'Controle de Transferencias'
+          : 'Saidas e Entradas');
+    const obsDocumentada = montarObsOperacao({
+      operacao: tipoOperacao,
+      tipoRomaneio,
+      filial: filialTrim,
+      filialDestino: filialDestinoTrim,
+      origem: ref?.filialOrigem ?? null,
+      romaneioSaida: ref?.romaneio ?? null,
+      itens: itensGravar,
+      tela,
+      usuario: username,
+      responsavelLinx: responsavelFinal,
+      obsUsuario: observacao,
+    });
+
     const pool = shouldUseProxy() ? new ProxyPool() : await getConnectionPool();
     if (chaveAndamento) entradasEmAndamento.add(chaveAndamento);
     let result;
     try {
       result = tipoOperacao === 'saida'
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ? await executeSaidaLote(pool, { itens: itensGravar, filial: filialTrim, filialDestino: filialDestinoTrim, tipoRomaneio, responsavel: responsavelFinal, observacao } as any)
+        ? await executeSaidaLote(pool, { itens: itensGravar, filial: filialTrim, filialDestino: filialDestinoTrim, tipoRomaneio, responsavel: responsavelFinal, observacao: obsDocumentada } as any)
         : await executeEntradaLote(pool, {
             itens: itensGravar,
             filial: filialTrim,
@@ -413,8 +440,8 @@ export async function POST(request: Request) {
             // Entrada de uma saída leva o vínculo no OBS: é a prova que a trava
             // de duplicata procura (o Linx não liga a entrada avulsa à saída).
             observacao: ref?.romaneio
-              ? observacaoComReferencia(observacao, ref.romaneio, ref.filialOrigem)
-              : observacao,
+              ? observacaoComReferencia(obsDocumentada, ref.romaneio, ref.filialOrigem)
+              : obsDocumentada,
             gravarTipoRomaneio: gravarTipoNerdProducao,
           });
     } finally {

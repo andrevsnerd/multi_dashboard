@@ -545,6 +545,7 @@ async function executarOperacaoLote(
       responsavel,
       observacao: observacao || null,
       companyKey,
+      origemTela: "Saidas e Entradas",
     }),
   });
 

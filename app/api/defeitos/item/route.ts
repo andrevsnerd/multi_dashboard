@@ -20,6 +20,7 @@ import {
 } from '@/lib/ajuste-estoque-executor';
 import { executeItemQtdeSet, executeSaidaAppend } from '@/lib/saida-entrada-executor';
 import { mensagemTravaEstoqueNegativo, verificarSaldoSaida } from '@/lib/server/trava-estoque-negativo';
+import { agoraBrasil, anotarObsRomaneio, descreverItens } from '@/lib/server/obs-operacao';
 import {
   carregarEstoquePorTamanho,
   carregarGradeDaSaida,
@@ -290,6 +291,14 @@ export async function PUT(request: NextRequest) {
         responsavel,
         obs: `Defeito: ${saida.qtdeAnterior} → ${qtdeNova} no romaneio ${romaneio}`,
       }).catch((err) => console.error('[ajuste-historico] Falha ao registrar auditoria:', err));
+      await anotarObsRomaneio({
+        tipo: 'saida',
+        romaneio,
+        filial: saida.filial,
+        linha:
+          `QTDE CORRIGIDA VIA DASHBOARD (Defeitos) | ${produto}${cor ? ` cor ${cor}` : ''}: ` +
+          `${saida.qtdeAnterior} -> ${saida.qtdeNova} | POR: ${username} | ${agoraBrasil()}`,
+      });
     }
 
     // 2) DESTINO — só quando a peça já foi conferida na filial de defeito.
@@ -332,6 +341,14 @@ export async function PUT(request: NextRequest) {
             responsavel,
             obs: `Defeito: entrada corrigida de ${entrada.qtdeAnterior} para ${entrada.qtdeNova} (saída ${romaneio})`,
           }).catch((err) => console.error('[ajuste-historico] Falha ao registrar auditoria:', err));
+          await anotarObsRomaneio({
+            tipo: 'entrada',
+            romaneio: confirmacao.romaneioEntrada,
+            filial: defeitoFilial,
+            linha:
+              `QTDE CORRIGIDA VIA DASHBOARD (Defeitos, saida ${romaneio}) | ${produto}${cor ? ` cor ${cor}` : ''}: ` +
+              `${entrada.qtdeAnterior} -> ${entrada.qtdeNova} | POR: ${username} | ${agoraBrasil()}`,
+          });
         } else if (deltaDestino !== 0 || mudouTamanho) {
           // Confirmação antiga: o romaneio de entrada não foi registrado na época e
           // o Linx não guarda o vínculo. Corrige o saldo por contagem, que é o
@@ -515,6 +532,16 @@ export async function POST(request: NextRequest) {
       romaneio,
       filial: filialOrigem,
       itens: itensGravar,
+    });
+
+    // Documenta no OBS do romaneio (aparece no Extrato) — ver lib/server/obs-operacao.ts.
+    await anotarObsRomaneio({
+      tipo: 'saida',
+      romaneio,
+      filial: resultado.filial,
+      linha:
+        `+ ITENS ACRESCENTADOS VIA DASHBOARD (Defeitos) | ${descreverItens(itensGravar, (produto: string, t: number) => grades.get(produto.trim())?.exigeTamanho ? grades.get(produto.trim())!.tamanhos.find((g) => g.ordinal === t)?.label ?? null : null)}` +
+        ` | POR: ${username} | ${agoraBrasil()}`,
     });
 
     inserirAjuste({

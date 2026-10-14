@@ -804,6 +804,7 @@ export default function ControleTransferenciasTable({
           itens: itensPayload,
           tipoRomaneio: "TRANSFERENCIA ENTRE LOJAS",
           observacao: null,
+          origemTela: "Controle de Transferencias",
           companyKey,
           registrarTransferenciaPendente: { items: metadataItems },
         }),

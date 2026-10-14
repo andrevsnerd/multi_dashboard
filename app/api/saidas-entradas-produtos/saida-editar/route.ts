@@ -9,6 +9,7 @@ import { canEditarRomaneioSaida } from '@/lib/auth/permissions';
 import { resolveResponsavelLinx } from '@/lib/server/responsavel-linx';
 import { inserirAjuste } from '@/lib/repositories/ajuste-historico';
 import { carregarGrades, tamanhoEfetivo, validarTamanhos } from '@/lib/server/grade-produto';
+import { agoraBrasil, anotarObsRomaneio, descreverItens } from '@/lib/server/obs-operacao';
 import { mensagemTravaEstoqueNegativo, verificarSaldoSaida } from '@/lib/server/trava-estoque-negativo';
 import { getConfirmados } from '@/lib/utils/romaneio-confirmacao-store';
 import {
@@ -348,6 +349,16 @@ export async function POST(request: NextRequest) {
 
     const pool = shouldUseProxy() ? new ProxyPool() : await getConnectionPool();
     const resultado = await executeSaidaAppend(pool, { romaneio, filial, itens: itensGravar });
+
+    // Documenta no OBS do romaneio (aparece no Extrato) — ver lib/server/obs-operacao.ts.
+    await anotarObsRomaneio({
+      tipo: 'saida',
+      romaneio,
+      filial: resultado.filial,
+      linha:
+        `+ ITENS ACRESCENTADOS VIA DASHBOARD (Saidas e Entradas - edicao) | ${descreverItens(itensGravar, (produto: string, t: number) => grades.get(produto.trim())?.exigeTamanho ? grades.get(produto.trim())!.tamanhos.find((g) => g.ordinal === t)?.label ?? null : null)}` +
+        ` | POR: ${username} | ${agoraBrasil()}`,
+    });
 
     // Auditoria (não bloqueante): quem acrescentou o quê, depois do romaneio pronto.
     inserirAjuste({
