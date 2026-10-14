@@ -189,7 +189,8 @@ export interface AbaResposta {
   aba: AbaInfo | null;
   total: number;
   soma: number;
-  itens: { id: number; linha: number; c: Record<string, unknown>; x: Record<string, unknown> }[];
+  /** c = como está na planilha; n = forma normalizada dos textos (descrição, cliente…). */
+  itens: { id: number; linha: number; c: Record<string, unknown>; n?: Record<string, string>; x: Record<string, unknown> }[];
   serie: { mes: string; soma: number; n: number; extras: Record<string, number> }[];
 }
 

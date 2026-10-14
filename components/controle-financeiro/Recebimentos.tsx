@@ -236,8 +236,10 @@ function Atacado({ companyKey, aba }: { companyKey: string; aba: AbaInfo }) {
                 <tr key={i.id}>
                   <td className={styles.nowrap}>{dataBr(String(i.c.data_caixa ?? ""))}</td>
                   <td className={styles.nowrap}>{dataBr(String(i.c.data_competencia ?? ""))}</td>
-                  <td>{String(i.c.cliente ?? "")}</td>
-                  <td>{String(i.c.descricao ?? "")}</td>
+                  <td title={i.n?.cliente && i.n.cliente !== i.c.cliente ? `Na planilha: ${String(i.c.cliente)}` : undefined}>
+                    {String(i.n?.cliente ?? i.c.cliente ?? "")}
+                  </td>
+                  <td>{String(i.n?.descricao ?? i.c.descricao ?? "")}</td>
                   {obs.map((c) => (
                     <td key={c.chave}>{i.x[c.chave] == null ? "" : String(i.x[c.chave])}</td>
                   ))}

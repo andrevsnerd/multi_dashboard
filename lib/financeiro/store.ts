@@ -24,6 +24,14 @@
 import { getNeonSql, hasPostgres } from "@/lib/db/neon";
 
 import {
+  type CampoNormalizado,
+  type Dicionario,
+  type RegraNormalizacao,
+  CAMPOS_NORMALIZADOS,
+  montarDicionario,
+  normalizarTexto,
+} from "./normalizacao";
+import {
   type AbaMeta,
   type Campo,
   type RegistroFin,
@@ -200,6 +208,36 @@ async function runMigrations(): Promise<void> {
       `CREATE INDEX IF NOT EXISTS financeiro_alteracoes_imp_idx ON financeiro_alteracoes (importacao_id, aba, acao)`
     )
   );
+  // Forma normalizada dos textos (só leitura/agrupamento; o cru continua intacto).
+  for (const campo of CAMPOS_NORMALIZADOS) {
+    await ddl(() => sql.query(`ALTER TABLE financeiro_registros ADD COLUMN IF NOT EXISTS ${campo}_fmt TEXT`));
+  }
+  await ddl(() =>
+    sql.query(
+      `CREATE INDEX IF NOT EXISTS financeiro_registros_classif_fmt_idx
+         ON financeiro_registros (empresa, tipo, classificacao_fmt, mes_competencia)`
+    )
+  );
+  await ddl(() =>
+    sql.query(`
+      CREATE TABLE IF NOT EXISTS financeiro_normalizacao (
+        id BIGSERIAL PRIMARY KEY,
+        empresa TEXT NOT NULL,
+        tipo TEXT NOT NULL,
+        campo TEXT,
+        de TEXT NOT NULL,
+        para TEXT NOT NULL,
+        status TEXT NOT NULL,
+        criado_por TEXT,
+        criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )`)
+  );
+  await ddl(() =>
+    sql.query(
+      `CREATE UNIQUE INDEX IF NOT EXISTS financeiro_normalizacao_uk
+         ON financeiro_normalizacao (empresa, tipo, COALESCE(campo, ''), de)`
+    )
+  );
   await ddl(() =>
     sql.query(`
       CREATE TABLE IF NOT EXISTS financeiro_abas (
@@ -223,6 +261,37 @@ async function runMigrations(): Promise<void> {
       )`)
   );
 }
+
+/* ------------------------------------------------------- normalização */
+
+export { sqlOuErro };
+
+/** Regras aprovadas/rejeitadas na tela (as embutidas ficam em normalizacao.ts). */
+export async function carregarRegras(
+  empresa: string
+): Promise<(RegraNormalizacao & { id: number; status: string; criadoPor: string | null; criadoEm: string })[]> {
+  await ensureTables();
+  const sql = sqlOuErro();
+  const rows = await sql`SELECT * FROM financeiro_normalizacao WHERE empresa = ${empresa} ORDER BY criado_em DESC`;
+  return rows.map((r) => ({
+    id: Number(r.id),
+    tipo: r.tipo as RegraNormalizacao["tipo"],
+    campo: (r.campo as CampoNormalizado) ?? null,
+    de: String(r.de),
+    para: String(r.para),
+    status: String(r.status),
+    criadoPor: (r.criado_por as string) ?? null,
+    criadoEm: iso(r.criado_em)!,
+  }));
+}
+
+export async function carregarDicionario(empresa: string): Promise<Dicionario> {
+  const regras = await carregarRegras(empresa);
+  return montarDicionario(regras.filter((r) => r.status === "aprovada"));
+}
+
+/** Coluna de leitura: forma normalizada, ou o cru enquanto não foi normalizado. */
+const fmt = (campo: CampoNormalizado) => `COALESCE(${campo}_fmt, ${campo})`;
 
 /* ------------------------------------------------------- tipos públicos */
 
@@ -827,22 +896,28 @@ export interface FiltroLancamentos {
   porPagina: number;
 }
 
-function whereLancamentos(empresa: string, f: FiltroLancamentos) {
+/**
+ * Filtros de texto comparam pela forma NORMALIZADA: "Oscar Freire", "OSCAR FREIRE" e
+ * "oscar freire" são a mesma loja. O valor do filtro passa pelo mesmo normalizador
+ * (aceita tanto a opção da lista quanto um rótulo da DRE, ex.: "Folha - VAREJO").
+ */
+function whereLancamentos(empresa: string, f: FiltroLancamentos, dic: Dicionario) {
   const params: unknown[] = [empresa];
   const conds = ["empresa = $1", "tipo = 'lancamento'"];
   const add = (sqlFrag: (p: string) => string, v: unknown) => {
     params.push(v);
     conds.push(sqlFrag(`$${params.length}`));
   };
+  const norm = (vals: string[], campo: CampoNormalizado) =>
+    vals.map((v) => normalizarTexto(v, campo, dic) ?? v);
   const colData = f.data === "caixa" ? "data_caixa" : "data_competencia";
   if (f.abas?.length) add((p) => `aba = ANY(${p}::text[])`, f.abas);
   if (f.classificacoes?.length)
-    add((p) => `lower(btrim(classificacao)) = ANY(${p}::text[])`, f.classificacoes.map((c) => c.trim().toLowerCase()));
-  if (f.matrizes?.length)
-    add((p) => `upper(btrim(matriz)) = ANY(${p}::text[])`, f.matrizes.map((c) => c.trim().toUpperCase()));
-  if (f.lojas?.length) add((p) => `lower(btrim(loja)) = ANY(${p}::text[])`, f.lojas.map((c) => c.trim().toLowerCase()));
+    add((p) => `${fmt("classificacao")} = ANY(${p}::text[])`, norm(f.classificacoes, "classificacao"));
+  if (f.matrizes?.length) add((p) => `${fmt("matriz")} = ANY(${p}::text[])`, norm(f.matrizes, "matriz"));
+  if (f.lojas?.length) add((p) => `${fmt("loja")} = ANY(${p}::text[])`, norm(f.lojas, "loja"));
   if (f.status) add((p) => `upper(btrim(status)) = ${p}`, f.status.toUpperCase());
-  if (f.formaPgto) add((p) => `lower(btrim(forma_pgto)) = ${p}`, f.formaPgto.trim().toLowerCase());
+  if (f.formaPgto) add((p) => `${fmt("forma_pgto")} = ${p}`, norm([f.formaPgto], "forma_pgto")[0]);
   if (f.de) add((p) => `${colData} >= ${p}::date`, f.de);
   if (f.ate) add((p) => `${colData} <= ${p}::date`, f.ate);
   if (f.mesCompetencia) add((p) => `mes_competencia = ${p}::date`, f.mesCompetencia);
@@ -851,7 +926,8 @@ function whereLancamentos(empresa: string, f: FiltroLancamentos) {
   if (f.q?.trim()) {
     add(
       (p) =>
-        `(descricao ILIKE ${p} OR loja ILIKE ${p} OR classificacao ILIKE ${p} OR colecao ILIKE ${p}
+        `(descricao ILIKE ${p} OR descricao_fmt ILIKE ${p} OR loja ILIKE ${p} OR loja_fmt ILIKE ${p}
+          OR classificacao ILIKE ${p} OR colecao ILIKE ${p} OR colecao_fmt ILIKE ${p}
           OR conta_contabil ILIKE ${p} OR extras::text ILIKE ${p})`,
       `%${f.q.trim()}%`
     );
@@ -878,12 +954,15 @@ export interface LancamentoRow {
   contaContabil: string | null;
   colecao: string | null;
   extras: Record<string, unknown>;
+  /** Texto como está na planilha, quando a forma normalizada é diferente. */
+  original: Partial<Record<"descricao" | "classificacao" | "loja" | "matriz" | "formaPgto" | "colecao", string>>;
 }
 
 export async function consultarLancamentos(empresa: string, f: FiltroLancamentos) {
   await ensureTables();
   const sql = sqlOuErro();
-  const { where, params, colData } = whereLancamentos(empresa, f);
+  const dic = await carregarDicionario(empresa);
+  const { where, params, colData } = whereLancamentos(empresa, f, dic);
   const mesCol = colData === "data_caixa" ? "mes_caixa" : "mes_competencia";
   const ordem = {
     data_desc: `${colData} DESC NULLS LAST, id DESC`,
@@ -903,7 +982,8 @@ export async function consultarLancamentos(empresa: string, f: FiltroLancamentos
     ),
     sql.query(
       `SELECT id, aba, linha, data_competencia, data_caixa, mes_competencia, mes_caixa, valor, descricao, matriz,
-              loja, classificacao, forma_pgto, status, banco, conta_contabil, colecao, extras
+              loja, classificacao, forma_pgto, status, banco, conta_contabil, colecao, extras,
+              descricao_fmt, matriz_fmt, loja_fmt, classificacao_fmt, forma_pgto_fmt, colecao_fmt
        FROM financeiro_registros WHERE ${where} ORDER BY ${ordem}
        LIMIT ${f.porPagina} OFFSET ${(f.pagina - 1) * f.porPagina}`,
       params
@@ -914,8 +994,7 @@ export async function consultarLancamentos(empresa: string, f: FiltroLancamentos
       params
     ),
     sql.query(
-      `SELECT lower(btrim(classificacao)) AS chave, mode() WITHIN GROUP (ORDER BY btrim(classificacao)) AS rotulo,
-              sum(valor) AS soma, count(*)::int AS n
+      `SELECT ${fmt("classificacao")} AS chave, ${fmt("classificacao")} AS rotulo, sum(valor) AS soma, count(*)::int AS n
        FROM financeiro_registros WHERE ${where} GROUP BY 1 ORDER BY sum(valor) ASC NULLS LAST LIMIT 60`,
       params
     ),
@@ -932,8 +1011,15 @@ export async function consultarLancamentos(empresa: string, f: FiltroLancamentos
     saidas: Number(t.saidas),
     entradas: Number(t.entradas),
     pendente: Number(t.pendente),
-    itens: (rows as Record<string, unknown>[]).map(
-      (r): LancamentoRow => ({
+    itens: (rows as Record<string, unknown>[]).map((r): LancamentoRow => {
+      const original: LancamentoRow["original"] = {};
+      const ler = (campo: CampoNormalizado, chave: keyof LancamentoRow["original"]) => {
+        const cru = (r[campo] as string) ?? null;
+        const n = (r[`${campo}_fmt`] as string) ?? cru;
+        if (cru != null && n !== cru) original[chave] = cru;
+        return n;
+      };
+      return {
         id: Number(r.id),
         aba: String(r.aba),
         linha: Number(r.linha),
@@ -942,18 +1028,19 @@ export async function consultarLancamentos(empresa: string, f: FiltroLancamentos
         mesCompetencia: dia(r.mes_competencia),
         mesCaixa: dia(r.mes_caixa),
         valor: num(r.valor),
-        descricao: (r.descricao as string) ?? null,
-        matriz: (r.matriz as string) ?? null,
-        loja: (r.loja as string) ?? null,
-        classificacao: (r.classificacao as string) ?? null,
-        formaPgto: (r.forma_pgto as string) ?? null,
+        descricao: ler("descricao", "descricao"),
+        matriz: ler("matriz", "matriz"),
+        loja: ler("loja", "loja"),
+        classificacao: ler("classificacao", "classificacao"),
+        formaPgto: ler("forma_pgto", "formaPgto"),
         status: (r.status as string) ?? null,
         banco: (r.banco as string) ?? null,
         contaContabil: (r.conta_contabil as string) ?? null,
-        colecao: (r.colecao as string) ?? null,
+        colecao: ler("colecao", "colecao"),
         extras: (r.extras as Record<string, unknown>) ?? {},
-      })
-    ),
+        original,
+      };
+    }),
     porMes: (porMes as Record<string, unknown>[]).map((m) => ({
       mes: dia(m.mes)!,
       soma: Number(m.soma ?? 0),
@@ -976,10 +1063,10 @@ export async function consultarLancamentos(empresa: string, f: FiltroLancamentos
 export async function opcoesLancamentos(empresa: string) {
   await ensureTables();
   const sql = sqlOuErro();
-  const agrupar = (col: string, normaliza: string) =>
+  // Opções pela forma normalizada: uma entrada por loja/classificação, não uma por grafia.
+  const agrupar = (col: string) =>
     sql.query(
-      `SELECT ${normaliza}(btrim(${col})) AS chave, mode() WITHIN GROUP (ORDER BY btrim(${col})) AS rotulo,
-              count(*)::int AS n
+      `SELECT ${col} AS chave, ${col} AS rotulo, count(*)::int AS n
        FROM financeiro_registros
        WHERE empresa = $1 AND tipo = 'lancamento' AND ${col} IS NOT NULL AND btrim(${col}) <> ''
        GROUP BY 1 ORDER BY 3 DESC`,
@@ -988,11 +1075,11 @@ export async function opcoesLancamentos(empresa: string) {
   const [abas, classif, matrizes, lojas, status, formas, datas] = await Promise.all([
     sql`SELECT aba, count(*)::int AS n FROM financeiro_registros
         WHERE empresa = ${empresa} AND tipo = 'lancamento' GROUP BY aba ORDER BY 2 DESC`,
-    agrupar("classificacao", "lower"),
-    agrupar("matriz", "upper"),
-    agrupar("loja", "lower"),
-    agrupar("status", "upper"),
-    agrupar("forma_pgto", "lower"),
+    agrupar(fmt("classificacao")),
+    agrupar(fmt("matriz")),
+    agrupar(fmt("loja")),
+    agrupar("upper(btrim(status))"),
+    agrupar(fmt("forma_pgto")),
     sql`SELECT min(data_competencia) AS min, max(data_competencia) AS max FROM financeiro_registros
         WHERE empresa = ${empresa} AND tipo = 'lancamento' AND data_competencia >= '2000-01-01'`,
   ]);
@@ -1070,7 +1157,8 @@ export async function consultarAba(empresa: string, f: FiltroAba) {
       params
     ),
     sql.query(
-      `SELECT id, linha, ${COLS_TIPADAS.join(", ")}, extras FROM financeiro_registros WHERE ${where}
+      `SELECT id, linha, ${COLS_TIPADAS.join(", ")}, extras, ${CAMPOS_NORMALIZADOS.map((c) => `${c}_fmt`).join(", ")}
+       FROM financeiro_registros WHERE ${where}
        ORDER BY ${ordem} LIMIT ${f.porPagina} OFFSET ${(f.pagina - 1) * f.porPagina}`,
       params
     ),
@@ -1094,7 +1182,13 @@ export async function consultarAba(empresa: string, f: FiltroAba) {
         const v = r[col];
         c[col] = (CAMPOS_DATA as readonly string[]).includes(col) ? dia(v) : col === "valor" ? num(v) : v ?? null;
       }
-      return { id: Number(r.id), linha: Number(r.linha), c, x: (r.extras as Record<string, unknown>) ?? {} };
+      // `n`: forma normalizada dos textos (a tela "Planilha" mostra `c`, como está no arquivo).
+      const n: Record<string, string> = {};
+      for (const campo of CAMPOS_NORMALIZADOS) {
+        const v = r[`${campo}_fmt`];
+        if (typeof v === "string") n[campo] = v;
+      }
+      return { id: Number(r.id), linha: Number(r.linha), c, n, x: (r.extras as Record<string, unknown>) ?? {} };
     }),
     serie: (serie as Record<string, unknown>[]).map((m) => ({
       mes: dia(m.mes)!,

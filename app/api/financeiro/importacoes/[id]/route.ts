@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { autorizarFinanceiro } from "@/lib/auth/controle-financeiro-guard";
 import { empresaDaUrl, inteiro, respostaErro, semEmpresa } from "@/lib/financeiro/api";
+import { renormalizar } from "@/lib/financeiro/normalizacao-store";
 import type { RegistroFin } from "@/lib/financeiro/planilha";
 import {
   aplicarImportacao,
@@ -63,7 +64,10 @@ export async function POST(request: Request, { params }: Ctx) {
       return NextResponse.json({ resumo: await analisarImportacao(empresa, id) });
     }
     if (body.acao === "aplicar") {
-      return NextResponse.json({ resumo: await aplicarImportacao(empresa, id, autorizado.auth.username) });
+      const resumo = await aplicarImportacao(empresa, id, autorizado.auth.username);
+      // Registros novos/alterados ganham a forma normalizada dos textos.
+      await renormalizar(empresa);
+      return NextResponse.json({ resumo });
     }
     return NextResponse.json({ error: "Ação inválida." }, { status: 400 });
   } catch (erro) {

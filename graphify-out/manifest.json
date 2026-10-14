@@ -4880,8 +4880,8 @@
     "semantic_hash": ""
   },
   "app/api/financeiro/importacoes/[id]/route.ts": {
-    "mtime": 1791979067.970651,
-    "ast_hash": "d13bb1ea2ca3289f9297c9bb76a359ae",
+    "mtime": 1791984648.483591,
+    "ast_hash": "c22fd34d45e63af20fe779ca6bf1769a",
     "semantic_hash": ""
   },
   "app/api/financeiro/importacoes/route.ts": {
@@ -4905,8 +4905,8 @@
     "semantic_hash": ""
   },
   "components/controle-financeiro/ControleFinanceiroPage.tsx": {
-    "mtime": 1791981528.5056398,
-    "ast_hash": "b3a79208a8ef229d44035c63f8cef4d4",
+    "mtime": 1791984867.5768163,
+    "ast_hash": "260c43d3e0bed8cedd772d713677ee5e",
     "semantic_hash": ""
   },
   "components/controle-financeiro/Dre.tsx": {
@@ -4930,8 +4930,8 @@
     "semantic_hash": ""
   },
   "components/controle-financeiro/Lancamentos.tsx": {
-    "mtime": 1791981126.2285502,
-    "ast_hash": "4eba7dc22a577d552f3993a03d5e3488",
+    "mtime": 1791985011.6174529,
+    "ast_hash": "e82d90be298fbcda69c3060a0f40b7e4",
     "semantic_hash": ""
   },
   "components/controle-financeiro/Planilha.tsx": {
@@ -4940,8 +4940,8 @@
     "semantic_hash": ""
   },
   "components/controle-financeiro/Recebimentos.tsx": {
-    "mtime": 1791980966.7693143,
-    "ast_hash": "06651bb1bab6a144282461816dd6b961",
+    "mtime": 1791984867.5816164,
+    "ast_hash": "5b3f96f3aae78b1cf481f1ed0fbfb4b8",
     "semantic_hash": ""
   },
   "components/controle-financeiro/UploadModal.tsx": {
@@ -4960,8 +4960,8 @@
     "semantic_hash": ""
   },
   "components/controle-financeiro/shared.ts": {
-    "mtime": 1791980796.2281442,
-    "ast_hash": "8f619ec6e51a9de96de5748296d2b67f",
+    "mtime": 1791984867.5768163,
+    "ast_hash": "f9d0b3159a7119120b256f84c8661c5d",
     "semantic_hash": ""
   },
   "lib/auth/controle-financeiro-guard.ts": {
@@ -4985,8 +4985,28 @@
     "semantic_hash": ""
   },
   "lib/financeiro/store.ts": {
-    "mtime": 1791980337.6859405,
-    "ast_hash": "1a3f27a2c0c9b37e6aac198ae49fe91f",
+    "mtime": 1791984587.1780386,
+    "ast_hash": "cfa8ea22af15e25d298e1151b9574257",
+    "semantic_hash": ""
+  },
+  "app/api/financeiro/normalizacao/route.ts": {
+    "mtime": 1791984646.3028226,
+    "ast_hash": "fbbf8e87bcbf0c4db8155f5426376522",
+    "semantic_hash": ""
+  },
+  "components/controle-financeiro/Normalizacao.tsx": {
+    "mtime": 1791985190.4514222,
+    "ast_hash": "6c09c1d554c31edd09d01c9ac2ec9e2c",
+    "semantic_hash": ""
+  },
+  "lib/financeiro/normalizacao-store.ts": {
+    "mtime": 1791984777.319337,
+    "ast_hash": "4bb5c487ad072361a9ce8f1f72a25ddd",
+    "semantic_hash": ""
+  },
+  "lib/financeiro/normalizacao.ts": {
+    "mtime": 1791984475.638334,
+    "ast_hash": "f755175502161b3764b8c84ef357f02a",
     "semantic_hash": ""
   }
 }

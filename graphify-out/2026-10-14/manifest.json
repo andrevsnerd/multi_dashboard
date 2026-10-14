@@ -325,8 +325,8 @@
     "semantic_hash": "cf2bef2b79543108e9513318bfc96dd6"
   },
   "app/admin/page.tsx": {
-    "mtime": 1791557347.6688108,
-    "ast_hash": "3d0e24fe710af55fbaed9bd179a8189b",
+    "mtime": 1791978964.007804,
+    "ast_hash": "7322150c05104d7e06aacfbe22801147",
     "semantic_hash": ""
   },
   "app/admin/transferencia-permissoes/page.tsx": {
@@ -1430,8 +1430,8 @@
     "semantic_hash": "7a672d31b6ac254cb25f6a420501049d"
   },
   "components/layout/Sidebar.tsx": {
-    "mtime": 1791557354.5991704,
-    "ast_hash": "823d37bac1c5076621a14fa4e38ed669",
+    "mtime": 1791978964.067393,
+    "ast_hash": "f9c70ba02beb57acb8dc50562479fe8f",
     "semantic_hash": ""
   },
   "components/layout/SidebarContext.tsx": {
@@ -2075,8 +2075,8 @@
     "semantic_hash": ""
   },
   "lib/auth/permissions.ts": {
-    "mtime": 1790877190.8028018,
-    "ast_hash": "6e23d0fc821e24b04f48b787fa9a5a7b",
+    "mtime": 1791978964.007289,
+    "ast_hash": "bcf71b08fdcbb67acc6a6512f9c5f33d",
     "semantic_hash": ""
   },
   "lib/auth/users-store-neon.ts": {
@@ -2155,8 +2155,8 @@
     "semantic_hash": "29590f1b0f773ebbcd60e9dc314eec58"
   },
   "lib/config/page-permissions.ts": {
-    "mtime": 1791557347.6688108,
-    "ast_hash": "51a8367b26d7e2ca9f8c18583aebf893",
+    "mtime": 1791978964.0025413,
+    "ast_hash": "5cd04425d2c1754452de7f48e6158b73",
     "semantic_hash": ""
   },
   "lib/constants/columns.ts": {
@@ -4862,6 +4862,131 @@
   "lib/utils/insumos-estoque-store.ts": {
     "mtime": 1791557971.4084775,
     "ast_hash": "0027639adba45e7bc74e80c37a6ef51d",
+    "semantic_hash": ""
+  },
+  "app/(companies)/[company]/controle-financeiro/page.tsx": {
+    "mtime": 1791981717.016853,
+    "ast_hash": "0c878f11d7a253d06b1ff74583b33cb1",
+    "semantic_hash": ""
+  },
+  "app/api/financeiro/aba/route.ts": {
+    "mtime": 1791979065.7328374,
+    "ast_hash": "21ce2d9f0842eb9cc9d19bd31635d806",
+    "semantic_hash": ""
+  },
+  "app/api/financeiro/dre/route.ts": {
+    "mtime": 1791979063.5342555,
+    "ast_hash": "c9699243aa71c5d659eca4be82275a80",
+    "semantic_hash": ""
+  },
+  "app/api/financeiro/importacoes/[id]/route.ts": {
+    "mtime": 1791979067.970651,
+    "ast_hash": "d13bb1ea2ca3289f9297c9bb76a359ae",
+    "semantic_hash": ""
+  },
+  "app/api/financeiro/importacoes/route.ts": {
+    "mtime": 1791979066.8704824,
+    "ast_hash": "73e986dfa68c4dcebf44717f1e4a97d9",
+    "semantic_hash": ""
+  },
+  "app/api/financeiro/lancamentos/route.ts": {
+    "mtime": 1791979064.6327267,
+    "ast_hash": "9e6e987248cd3e7b5e9031f60ae5b16e",
+    "semantic_hash": ""
+  },
+  "app/api/financeiro/route.ts": {
+    "mtime": 1791979062.442873,
+    "ast_hash": "3889c41bc00827b0d5f6a93731ae109e",
+    "semantic_hash": ""
+  },
+  "components/controle-financeiro/Budget.tsx": {
+    "mtime": 1791981001.7975123,
+    "ast_hash": "7bcd83e20c4c4483a97e67e28d60b8b2",
+    "semantic_hash": ""
+  },
+  "components/controle-financeiro/ControleFinanceiroPage.tsx": {
+    "mtime": 1791981528.5056398,
+    "ast_hash": "b3a79208a8ef229d44035c63f8cef4d4",
+    "semantic_hash": ""
+  },
+  "components/controle-financeiro/Dre.tsx": {
+    "mtime": 1791981528.5056398,
+    "ast_hash": "e25c73e0bad0598097d54740067cb34f",
+    "semantic_hash": ""
+  },
+  "components/controle-financeiro/FluxoCaixa.tsx": {
+    "mtime": 1791980926.325651,
+    "ast_hash": "9cd1f0c9e3b63708b3c31199e61864a0",
+    "semantic_hash": ""
+  },
+  "components/controle-financeiro/Graficos.tsx": {
+    "mtime": 1791981528.502623,
+    "ast_hash": "219ec1108cf75b4af4d9e67cdcf3a71d",
+    "semantic_hash": ""
+  },
+  "components/controle-financeiro/Importacoes.tsx": {
+    "mtime": 1791981038.555982,
+    "ast_hash": "1d1682351dc5ba29f9570f9861469660",
+    "semantic_hash": ""
+  },
+  "components/controle-financeiro/Lancamentos.tsx": {
+    "mtime": 1791981126.2285502,
+    "ast_hash": "4eba7dc22a577d552f3993a03d5e3488",
+    "semantic_hash": ""
+  },
+  "components/controle-financeiro/Planilha.tsx": {
+    "mtime": 1791981852.903649,
+    "ast_hash": "dc92d5c15d8a1b3bd61f7b30a71afc77",
+    "semantic_hash": ""
+  },
+  "components/controle-financeiro/Recebimentos.tsx": {
+    "mtime": 1791980966.7693143,
+    "ast_hash": "06651bb1bab6a144282461816dd6b961",
+    "semantic_hash": ""
+  },
+  "components/controle-financeiro/UploadModal.tsx": {
+    "mtime": 1791981082.0824716,
+    "ast_hash": "5e90e28ce27e0c5f54d7dc30c5e5270e",
+    "semantic_hash": ""
+  },
+  "components/controle-financeiro/VisaoGeral.tsx": {
+    "mtime": 1791981324.5877652,
+    "ast_hash": "96065a8b171341fccf8c67bf0d55065b",
+    "semantic_hash": ""
+  },
+  "components/controle-financeiro/dre-util.ts": {
+    "mtime": 1791980755.5155876,
+    "ast_hash": "de5410659f593cacd15af44149a84372",
+    "semantic_hash": ""
+  },
+  "components/controle-financeiro/shared.ts": {
+    "mtime": 1791980796.2281442,
+    "ast_hash": "8f619ec6e51a9de96de5748296d2b67f",
+    "semantic_hash": ""
+  },
+  "lib/auth/controle-financeiro-guard.ts": {
+    "mtime": 1791978952.9350784,
+    "ast_hash": "ece220197bb50152c02bf9803543bd2d",
+    "semantic_hash": ""
+  },
+  "lib/financeiro/api.ts": {
+    "mtime": 1791979061.3409734,
+    "ast_hash": "ada1a4ac7e467230fa4cc0fdfd18e2f2",
+    "semantic_hash": ""
+  },
+  "lib/financeiro/ler-planilha.ts": {
+    "mtime": 1791981324.5877652,
+    "ast_hash": "cfc73487d3c72ec598a11932eef609b6",
+    "semantic_hash": ""
+  },
+  "lib/financeiro/planilha.ts": {
+    "mtime": 1791978605.2997215,
+    "ast_hash": "a72c7b8bcfd035f07958ac379b23c176",
+    "semantic_hash": ""
+  },
+  "lib/financeiro/store.ts": {
+    "mtime": 1791980337.6859405,
+    "ast_hash": "1a3f27a2c0c9b37e6aac198ae49fe91f",
     "semantic_hash": ""
   }
 }

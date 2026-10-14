@@ -2,6 +2,8 @@
 
 import { Fragment, useEffect, useMemo, useState } from "react";
 
+import { normalizarTexto } from "@/lib/financeiro/normalizacao";
+
 import { BarrasHorizontais, GraficoBarrasMensal } from "./Graficos";
 import {
   type FiltroInicialLancamentos,
@@ -51,6 +53,8 @@ interface Lancamento {
   contaContabil: string | null;
   colecao: string | null;
   extras: Record<string, unknown>;
+  /** Como está na planilha, quando a forma normalizada é diferente. */
+  original: Partial<Record<"descricao" | "classificacao" | "loja" | "matriz" | "formaPgto" | "colecao", string>>;
 }
 
 interface Resposta {
@@ -82,6 +86,18 @@ interface Filtros {
 }
 
 const POR_PAGINA = 100;
+
+const ROTULO_ORIGINAL: Record<string, string> = {
+  descricao: "descrição",
+  classificacao: "classificação",
+  loja: "loja",
+  matriz: "matriz",
+  formaPgto: "forma de pgto",
+  colecao: "coleção",
+};
+
+/** Rótulo cru vindo da DRE ("Folha - VAREJO") → a forma normalizada usada nas opções. */
+const normalizarClassificacao = (v?: string) => (v ? (normalizarTexto(v, "classificacao") ?? v) : "");
 
 function filtrosPadrao(ano: number): Filtros {
   return {
@@ -133,7 +149,7 @@ export default function Lancamentos({
   const [opcoes, setOpcoes] = useState<Opcoes | null>(null);
   const [f, setF] = useState<Filtros>(() =>
     inicial
-      ? { ...filtrosPadrao(anoPadrao), classificacao: inicial.classificacao ?? "", mes: inicial.mes ?? "" }
+      ? { ...filtrosPadrao(anoPadrao), classificacao: normalizarClassificacao(inicial.classificacao), mes: inicial.mes ?? "" }
       : filtrosPadrao(anoPadrao)
   );
   const [busca, setBusca] = useState("");
@@ -147,7 +163,7 @@ export default function Lancamentos({
   // Drill-down vindo da DRE: classificação × mês de competência.
   useEffect(() => {
     if (!inicial) return;
-    setF({ ...filtrosPadrao(anoPadrao), classificacao: inicial.classificacao ?? "", mes: inicial.mes ?? "" });
+    setF({ ...filtrosPadrao(anoPadrao), classificacao: normalizarClassificacao(inicial.classificacao), mes: inicial.mes ?? "" });
     setBusca("");
     setPagina(1);
     onDrillAplicado();
@@ -441,7 +457,9 @@ export default function Lancamentos({
                         <td className={styles.nowrap}>{dataBr(l.dataCompetencia)}</td>
                         <td className={styles.nowrap}>{dataBr(l.dataCaixa)}</td>
                         <td className={styles.nowrap}>{l.aba}</td>
-                        <td className={styles.desc}>{l.descricao}</td>
+                        <td className={styles.desc} title={l.original.descricao ? `Na planilha: ${l.original.descricao}` : undefined}>
+                          {l.descricao}
+                        </td>
                         <td>{l.classificacao}</td>
                         <td>{l.matriz}</td>
                         <td>{l.loja}</td>
@@ -466,6 +484,12 @@ export default function Lancamentos({
                         <tr className={styles.extraRow}>
                           <td colSpan={9}>
                             <div className={styles.extras}>
+                              {Object.entries(l.original).map(([k, v]) => (
+                                <div key={`o-${k}`}>
+                                  <span>Na planilha ({ROTULO_ORIGINAL[k] ?? k})</span>
+                                  {v}
+                                </div>
+                              ))}
                               <div>
                                 <span>Linha na planilha</span>
                                 {l.aba} · {l.linha}
