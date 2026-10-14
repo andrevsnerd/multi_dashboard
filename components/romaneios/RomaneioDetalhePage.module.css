@@ -1175,3 +1175,18 @@
 :global(:root[data-theme="dark"]) .confirmarTudoBtn:hover:not(:disabled) {
   background: #ddd6fe;
 }
+
+/* Peça P/M/G — conferência tamanho a tamanho (uma linha por tamanho). */
+.qtdeTamRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.qtdeTamLabel {
+  min-width: 26px;
+  font-weight: 700;
+  font-size: 13px;
+  text-align: right;
+  margin-right: 2px;
+}

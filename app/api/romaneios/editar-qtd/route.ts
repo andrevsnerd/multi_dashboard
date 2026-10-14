@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withRequest } from '@/lib/db/connection';
+import { getConnectionPool } from '@/lib/db/connection';
+import { shouldUseProxy, ProxyPool } from '@/lib/db/proxy';
 import { findUserByUsername } from '@/lib/auth/users-store';
 import { inserirAjuste } from '@/lib/repositories/ajuste-historico';
 import { resolveResponsavelLinx } from '@/lib/server/responsavel-linx';
-import sql from 'mssql';
+import { mensagemTravaEstoqueNegativo, verificarSaldoSaida } from '@/lib/server/trava-estoque-negativo';
+import { executeItemQtdeSet } from '@/lib/saida-entrada-executor';
 
 async function podeEditarQtdRomaneio(username: string | null): Promise<boolean> {
   if (!username) return false;
@@ -11,12 +13,26 @@ async function podeEditarQtdRomaneio(username: string | null): Promise<boolean> 
   return user?.role === 'admin' || user?.role === 'logistica';
 }
 
+function lit(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
 /**
  * PUT /api/romaneios/editar-qtd
- * Edita a quantidade de um item do romaneio e ajusta o estoque correspondente.
- * Permitido para: admin e logistica.
- * - Entrada: ajusta estoque do destino (+ diff)
- * - Saída:   ajusta estoque da origem  (- diff)
+ * Corrige a quantidade de um item do romaneio. Permitido para: admin e logistica.
+ *
+ * Quem grava é `executeItemQtdeSet`: QTDE e a coluna de grade (SA_n / EN_n) no
+ * MESMO UPDATE, por delta, e o trigger do Linx move ESTOQUE e ES1..ES48 juntos.
+ *
+ * NUNCA voltar a fazer `SET QTDE = …` + `UPDATE ESTOQUE_PRODUTOS SET ESTOQUE = …`
+ * na mão: foi o que esta rota fez até 14/10/2026. O trigger não enxerga QTDE,
+ * então o total do estoque era acertado à mão e a grade ficava para trás —
+ * ESTOQUE ≠ soma(ES) (ex.: saída 033072, N5.10.0015 K9 na NERD com total 0 e
+ * tamanho −2) e o romaneio com QTDE ≠ SA_n, que a exclusão reverte errado.
+ *
+ * Só romaneio AVULSO: saída/entrada amarrada a transferência (LOJA_SAIDAS_PRODUTO /
+ * LOJA_ENTRADAS_PRODUTO, que têm triggers de estoque próprios) é assunto de
+ * conferência, não de correção por aqui.
  */
 export async function PUT(request: NextRequest) {
   try {
@@ -49,109 +65,74 @@ export async function PUT(request: NextRequest) {
     }
 
     const cor = (corProduto ?? '').toString().trim();
+    const filial = (tipo === 'saida' ? filialOrigem : filialDestino ?? '').toString().trim();
+    if (!filial) {
+      return NextResponse.json({ error: 'Filial do romaneio não informada.' }, { status: 400 });
+    }
 
-    await withRequest(async (req) => {
-      req.input('romaneio', sql.VarChar, romaneio);
-      req.input('produto', sql.VarChar, produto);
-      req.input('cor', sql.VarChar, cor);
-      req.input('qtdeNova', sql.Int, qtdeNova);
-      req.input('diff', sql.Int, diff); // positivo = aumento, negativo = redução
+    const pool = shouldUseProxy() ? new ProxyPool() : await getConnectionPool();
 
-      if (tipo === 'saida') {
-        req.input('filialOrigem', sql.VarChar, (filialOrigem ?? '').toString().trim());
-
-        // Atualiza quantidade em ESTOQUE_PROD1_SAI
-        await req.query(`
-          UPDATE ESTOQUE_PROD1_SAI
-          SET QTDE = @qtdeNova
-          WHERE ROMANEIO_PRODUTO = @romaneio
-            AND LTRIM(RTRIM(FILIAL)) = LTRIM(RTRIM(@filialOrigem))
-            AND PRODUTO = @produto
-            AND ISNULL(COR_PRODUTO, '') = @cor
-        `);
-
-        // Atualiza quantidade em LOJA_SAIDAS_PRODUTO
-        await req.query(`
-          UPDATE LOJA_SAIDAS_PRODUTO
-          SET QTDE_SAIDA = @qtdeNova
-          WHERE ROMANEIO_PRODUTO = @romaneio
-            AND LTRIM(RTRIM(FILIAL)) = LTRIM(RTRIM(@filialOrigem))
-            AND PRODUTO = @produto
-            AND ISNULL(COR_PRODUTO, '') = @cor
-        `);
-
-        // Ajusta estoque da ORIGEM
-        // diff > 0 → mais saiu → estoque diminui
-        // diff < 0 → menos saiu → estoque aumenta (devolução)
-        await req.query(`
-          UPDATE ep
-          SET ep.ESTOQUE = ep.ESTOQUE - @diff
-          FROM ESTOQUE_PRODUTOS ep
-          INNER JOIN FILIAIS f WITH (NOLOCK) ON LTRIM(RTRIM(ep.FILIAL)) = LTRIM(RTRIM(f.FILIAL))
-          WHERE ep.PRODUTO = @produto
-            AND ISNULL(ep.COR_PRODUTO, '') = @cor
-            AND (LTRIM(RTRIM(f.COD_FILIAL)) = LTRIM(RTRIM(@filialOrigem))
-                 OR LTRIM(RTRIM(f.FILIAL)) = LTRIM(RTRIM(@filialOrigem)))
-        `);
-      } else {
-        // entrada
-        req.input('filialDestino', sql.VarChar, (filialDestino ?? '').toString().trim());
-
-        // Atualiza quantidade em ESTOQUE_PROD1_ENT
-        await req.query(`
-          UPDATE ESTOQUE_PROD1_ENT
-          SET QTDE = @qtdeNova
-          WHERE ROMANEIO_PRODUTO = @romaneio
-            AND LTRIM(RTRIM(FILIAL)) = LTRIM(RTRIM(@filialDestino))
-            AND PRODUTO = @produto
-            AND ISNULL(COR_PRODUTO, '') = @cor
-        `);
-
-        // Atualiza quantidade em LOJA_ENTRADAS_PRODUTO
-        await req.query(`
-          UPDATE LOJA_ENTRADAS_PRODUTO
-          SET QTDE_ENTRADA = @qtdeNova
-          WHERE ROMANEIO_PRODUTO = @romaneio
-            AND LTRIM(RTRIM(FILIAL)) = LTRIM(RTRIM(@filialDestino))
-            AND PRODUTO = @produto
-            AND ISNULL(COR_PRODUTO, '') = @cor
-        `);
-
-        // Ajusta estoque do DESTINO
-        // diff > 0 → mais chegou → estoque aumenta
-        // diff < 0 → menos chegou → estoque diminui
-        await req.query(`
-          UPDATE ep
-          SET ep.ESTOQUE = ep.ESTOQUE + @diff
-          FROM ESTOQUE_PRODUTOS ep
-          INNER JOIN FILIAIS f WITH (NOLOCK) ON LTRIM(RTRIM(ep.FILIAL)) = LTRIM(RTRIM(f.FILIAL))
-          WHERE ep.PRODUTO = @produto
-            AND ISNULL(ep.COR_PRODUTO, '') = @cor
-            AND (LTRIM(RTRIM(f.COD_FILIAL)) = LTRIM(RTRIM(@filialDestino))
-                 OR LTRIM(RTRIM(f.FILIAL)) = LTRIM(RTRIM(@filialDestino)))
-        `);
+    // Entrada amarrada a transferência: a saída já trava sozinha no executor.
+    if (tipo === 'entrada') {
+      const res = await pool.request().query(`
+        SELECT COUNT(*) AS TOTAL
+        FROM LOJA_ENTRADAS_PRODUTO lep WITH (NOLOCK)
+        JOIN FILIAIS f WITH (NOLOCK) ON f.FILIAL = lep.FILIAL
+        WHERE LTRIM(RTRIM(lep.ROMANEIO_PRODUTO)) = ${lit(String(romaneio).trim())}
+          AND (f.COD_FILIAL = ${lit(filial)} OR f.FILIAL = ${lit(filial)})
+      `);
+      if (Number(res.recordset[0]?.TOTAL) > 0) {
+        return NextResponse.json(
+          {
+            error: `Romaneio ${romaneio} é entrada de transferência (tem itens de loja amarrados) — a quantidade se acerta pela conferência, não por aqui.`,
+          },
+          { status: 409 }
+        );
       }
-    });
+    }
+
+    // Saída maior que antes tira mais estoque: mesma trava de saldo das Saídas.
+    if (tipo === 'saida' && diff > 0) {
+      const travaSaldo = await verificarSaldoSaida(filial, [{ produto, corProduto: cor, quantidade: diff }]);
+      if (travaSaldo) {
+        return NextResponse.json(
+          { error: mensagemTravaEstoqueNegativo(travaSaldo), travaEstoqueNegativo: travaSaldo },
+          { status: 409 }
+        );
+      }
+    }
+
+    let resultado;
+    try {
+      resultado = await executeItemQtdeSet(pool, { tipo, romaneio, filial, produto, corProduto: cor, qtdeNova });
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : 'Erro ao editar quantidade' },
+        { status: 409 }
+      );
+    }
 
     // Registra auditoria no histórico de ajustes (não-bloqueante)
-    const filialAjuste = tipo === 'saida'
-      ? (filialOrigem ?? '').toString().trim()
-      : (filialDestino ?? '').toString().trim();
-    // Saída: diff>0 = mais saiu (estoque -), diff<0 = menos saiu (estoque +) → qtdeAjuste = -diff
-    // Entrada: diff>0 = mais chegou (estoque +), diff<0 = menos chegou (estoque -) → qtdeAjuste = diff
-    const qtdeAjuste = tipo === 'saida' ? -diff : diff;
-    inserirAjuste({
-      filial: filialAjuste,
-      itens: [{ produto, cor, qtde: qtdeAjuste }],
-      romaneioRef: romaneio,
-      tipoAjuste: tipo === 'saida' ? 'EDICAO_ROMANEIO_SAIDA' : 'EDICAO_ROMANEIO_ENTRADA',
-      responsavel: await resolveResponsavelLinx(username),
-      obs: `Qtde ${tipo} ajustada: ${qtdeAtual} → ${qtdeNova}`,
-    }).catch((err) => console.error('[ajuste-historico] Falha ao registrar auditoria:', err));
+    // Saída: delta>0 = mais saiu (estoque -), delta<0 = menos saiu (estoque +) → qtdeAjuste = -delta
+    // Entrada: delta>0 = mais chegou (estoque +), delta<0 = menos chegou (estoque -) → qtdeAjuste = delta
+    if (resultado.delta !== 0) {
+      const qtdeAjuste = tipo === 'saida' ? -resultado.delta : resultado.delta;
+      inserirAjuste({
+        filial: resultado.filial,
+        itens: [{ produto, cor, qtde: qtdeAjuste }],
+        romaneioRef: romaneio,
+        tipoAjuste: tipo === 'saida' ? 'EDICAO_ROMANEIO_SAIDA' : 'EDICAO_ROMANEIO_ENTRADA',
+        responsavel: await resolveResponsavelLinx(username),
+        obs: `Qtde ${tipo} ajustada: ${resultado.qtdeAnterior} → ${resultado.qtdeNova}`,
+      }).catch((err) => console.error('[ajuste-historico] Falha ao registrar auditoria:', err));
+    }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, message: resultado.message });
   } catch (error) {
     console.error('Erro ao editar quantidade do romaneio', error);
-    return NextResponse.json({ error: 'Erro ao editar quantidade' }, { status: 500 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Erro ao editar quantidade' },
+      { status: 500 }
+    );
   }
 }

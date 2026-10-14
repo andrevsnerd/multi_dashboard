@@ -35,6 +35,13 @@ interface Produto {
   }>;
 }
 
+/** Um tamanho da grade (posição 1..48) com o saldo dele na filial da operação. */
+interface TamanhoOpcao {
+  ordinal: number;
+  label: string;
+  estoque: number;
+}
+
 interface ProdutoSelecionado {
   produto: string;
   descProduto: string;
@@ -43,8 +50,27 @@ interface ProdutoSelecionado {
   descCor: string;
   filial: string;
   nomeFilial: string;
+  /** Saldo na filial — do TAMANHO escolhido, em peça P/M/G. */
   estoque: number;
   quantidade: number;
+  /**
+   * Grade da peça. `undefined` = ainda não consultada; `[]` = não exige tamanho
+   * (tamanho único, lenço, eletrônico); lista = peça P/M/G, tamanho OBRIGATÓRIO.
+   */
+  tamanhos?: TamanhoOpcao[];
+  /** Posição da grade escolhida (peça P/M/G). Cada tamanho é uma linha da lista. */
+  tamanho?: number | null;
+  tamanhoLabel?: string | null;
+}
+
+/** Linha = produto × cor × tamanho: o mesmo item em P e em M são duas linhas. */
+function chaveLinha(p: { produto: string; corProduto: string | null; tamanho?: number | null }): string {
+  return `${p.produto}|${p.corProduto ?? ""}|${p.tamanho ?? ""}`;
+}
+
+/** Peça P/M/G ainda sem tamanho escolhido — bloqueia o registro. */
+function faltaTamanho(p: ProdutoSelecionado): boolean {
+  return Boolean(p.tamanhos && p.tamanhos.length > 0 && !p.tamanho);
 }
 
 interface TransferenciaLog {
@@ -69,6 +95,11 @@ interface BipeItem {
   grade: string | null;
   estoque: number;
   filial: string;
+  /** Tamanho do código de barras (posição da grade), quando ele é de um tamanho só. */
+  tamanho?: number | null;
+  /** Peça P/M/G: tamanho obrigatório. */
+  exigeTamanho?: boolean;
+  tamanhos?: TamanhoOpcao[];
 }
 
 type BipeStatus = "ok" | "sem_estoque" | "ambiguo" | "nao_encontrado";
@@ -101,6 +132,8 @@ interface RascunhoResumo {
     descCor: string;
     quantidade: number;
     estoque: number;
+    tamanho?: number | null;
+    tamanhoLabel?: string | null;
   }>;
   createdAt: string;
   updatedAt: string;
@@ -435,6 +468,32 @@ async function searchProdutos(
   return json.data || [];
 }
 
+/**
+ * Grade (P/M/G) de cada produto×cor com o saldo de cada tamanho na filial.
+ * Ver /api/saidas-entradas-produtos/tamanhos.
+ */
+async function fetchTamanhos(
+  companyKey: string,
+  filial: string,
+  itens: Array<{ produto: string; corProduto: string | null }>
+): Promise<Map<string, TamanhoOpcao[]>> {
+  const params = new URLSearchParams({
+    company: companyKey,
+    filial,
+    itens: itens.map((it) => `${it.produto}|${it.corProduto ?? ""}`).join(";"),
+  });
+  const response = await fetch(`/api/saidas-entradas-produtos/tamanhos?${params.toString()}`, {
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error("Erro ao consultar os tamanhos");
+  const json = (await response.json()) as {
+    data: Array<{ produto: string; cor: string; exigeTamanho: boolean; tamanhos: TamanhoOpcao[] }>;
+  };
+  const mapa = new Map<string, TamanhoOpcao[]>();
+  for (const d of json.data ?? []) mapa.set(`${d.produto}|${d.cor}`, d.exigeTamanho ? d.tamanhos : []);
+  return mapa;
+}
+
 async function fetchTiposRomaneio(): Promise<string[]> {
   const response = await fetch("/api/transferencia-produtos/tipos-romaneio", {
     cache: "no-store",
@@ -463,7 +522,7 @@ async function fetchResponsaveis(): Promise<Array<{ responsavel: string; qtd: nu
 
 async function executarOperacaoLote(
   tipoOperacao: TipoOperacao,
-  itens: Array<{ produto: string; corProduto: string | null; quantidade: number }>,
+  itens: Array<{ produto: string; corProduto: string | null; quantidade: number; tamanho?: number | null }>,
   filial: string,
   tipoRomaneio: string,
   responsavel: string,
@@ -719,7 +778,7 @@ async function salvarItensNoRomaneio(
   tipo: TipoOperacao,
   romaneio: string,
   filial: string,
-  itens: Array<{ produto: string; corProduto: string | null; quantidade: number }>,
+  itens: Array<{ produto: string; corProduto: string | null; quantidade: number; tamanho?: number | null }>,
   username: string,
   companyKey: string
 ): Promise<{ romaneio: string; qtdeAdicionada: number; message: string }> {
@@ -1516,6 +1575,8 @@ export default function SaidasEntradasProdutosPage({
         descCor: escolhido.descCor,
         codigoBarra: escolhido.codigoBarra ?? null,
         estoque: estoqueFilial ? estoqueFilial.estoque : atual.estoque,
+        // Outra cor, outro saldo por tamanho: a grade é reconsultada.
+        tamanhos: undefined,
       };
       return next;
     });
@@ -1539,6 +1600,8 @@ export default function SaidasEntradasProdutosPage({
         descCor: escolhido.descCor,
         codigoBarra: escolhido.codigoBarra ?? null,
         estoque: estoqueFilial ? estoqueFilial.estoque : atual.estoque,
+        // Outra cor, outro saldo por tamanho: a grade é reconsultada.
+        tamanhos: undefined,
       };
       return next;
     });
@@ -1559,11 +1622,14 @@ export default function SaidasEntradasProdutosPage({
     if (!novoItem) return;
 
     setProdutosSelecionadosModal((prev) => {
+      // Peça P/M/G já com tamanho escolhido não recebe a soma: o item novo abre
+      // outra linha, onde o operador escolhe o tamanho dele.
       const idx = prev.findIndex(
         (p) =>
           p.produto === novoItem.produto &&
           p.corProduto === novoItem.corProduto &&
-          p.filial === novoItem.filial
+          p.filial === novoItem.filial &&
+          !p.tamanho
       );
       if (idx === -1) {
         mostrarNotificacao(`${novoItem.descProduto} adicionado`);
@@ -1592,11 +1658,14 @@ export default function SaidasEntradasProdutosPage({
     if (!novoItem) return;
 
     setProdutosSelecionadosModal((prev) => {
+      // Peça P/M/G já com tamanho escolhido não recebe a soma: o item novo abre
+      // outra linha, onde o operador escolhe o tamanho dele.
       const idx = prev.findIndex(
         (p) =>
           p.produto === novoItem.produto &&
           p.corProduto === novoItem.corProduto &&
-          p.filial === novoItem.filial
+          p.filial === novoItem.filial &&
+          !p.tamanho
       );
       if (idx === -1) {
         mostrarNotificacao(`${novoItem.descProduto} adicionado`);
@@ -1699,22 +1768,31 @@ export default function SaidasEntradasProdutosPage({
       return;
     }
 
+    // Peça P/M/G: o código de barras é de UM tamanho — a peça entra nele, com o
+    // saldo daquele tamanho. Código sem tamanho definido entra sem tamanho e o
+    // operador escolhe na linha (o registro não sai sem ele).
+    const grade = item.exigeTamanho ? item.tamanhos ?? [] : [];
+    const tamanhoBipado = grade.length > 0 ? grade.find((t) => t.ordinal === item.tamanho) ?? null : null;
+    const estoqueBipado = tamanhoBipado ? tamanhoBipado.estoque : item.estoque;
+
     const corTxt = textoCorProduto(item.descCor, item.corProduto);
-    const rotulo = corTxt ? `${item.descProduto} · ${corTxt}` : item.descProduto;
-    const chave = `${item.produto}|${item.corProduto ?? ""}`;
+    const rotuloBase = corTxt ? `${item.descProduto} · ${corTxt}` : item.descProduto;
+    const rotulo = tamanhoBipado ? `${rotuloBase} · ${tamanhoBipado.label}` : rotuloBase;
+    const chave = chaveLinha({ produto: item.produto, corProduto: item.corProduto, tamanho: tamanhoBipado?.ordinal ?? null });
     const atual = produtosSelecionadosRef.current;
     const idx = atual.findIndex(
       (p) =>
         p.produto === item.produto &&
         (p.corProduto ?? "") === (item.corProduto ?? "") &&
-        p.filial === filialSelecionada.codFilial
+        p.filial === filialSelecionada.codFilial &&
+        (p.tamanho ?? null) === (tamanhoBipado?.ordinal ?? null)
     );
 
     let proximo: ProdutoSelecionado[];
     let quantidade: number;
 
     if (idx === -1) {
-      if (tipoOperacao === "saida" && !saidaPodeEstourarEstoque && item.estoque <= 0) {
+      if (tipoOperacao === "saida" && !saidaPodeEstourarEstoque && estoqueBipado <= 0) {
         registrarBipe(false, "Sem estoque", `${rotulo} não tem saldo em ${filialOptionLabel(filialSelecionada)}.`);
         return;
       }
@@ -1729,20 +1807,23 @@ export default function SaidasEntradasProdutosPage({
           descCor: item.descCor,
           filial: filialSelecionada.codFilial,
           nomeFilial: filialOptionLabel(filialSelecionada),
-          estoque: item.estoque,
+          estoque: estoqueBipado,
           quantidade: 1,
+          tamanhos: grade,
+          tamanho: tamanhoBipado?.ordinal ?? null,
+          tamanhoLabel: tamanhoBipado?.label ?? null,
         },
       ];
     } else {
       const linha = atual[idx];
-      if (tipoOperacao === "saida" && !saidaPodeEstourarEstoque && linha.quantidade >= item.estoque) {
-        registrarBipe(false, "Quantidade máxima", `${rotulo} já está com o estoque todo (${item.estoque}).`);
+      if (tipoOperacao === "saida" && !saidaPodeEstourarEstoque && linha.quantidade >= estoqueBipado) {
+        registrarBipe(false, "Quantidade máxima", `${rotulo} já está com o estoque todo (${estoqueBipado}).`);
         return;
       }
       quantidade = linha.quantidade + 1;
       proximo = [...atual];
       // Reaproveita o saldo recém-consultado: entre um bipe e outro o estoque pode ter mudado.
-      proximo[idx] = { ...linha, quantidade, estoque: item.estoque };
+      proximo[idx] = { ...linha, quantidade, estoque: estoqueBipado, tamanhos: grade };
     }
 
     produtosSelecionadosRef.current = proximo;
@@ -1751,7 +1832,8 @@ export default function SaidasEntradasProdutosPage({
     registrarBipe(
       true,
       rotulo,
-      `${item.produto}${item.codigoBarra ? ` · ${item.codigoBarra}` : ""} · qtd ${quantidade}`
+      `${item.produto}${item.codigoBarra ? ` · ${item.codigoBarra}` : ""} · qtd ${quantidade}` +
+        (grade.length > 0 && !tamanhoBipado ? " · escolha o tamanho na lista" : "")
     );
   }, [filialSelecionada, tipoOperacao, saidaPodeEstourarEstoque, filialOptionLabel, registrarBipe, destacarItem]);
 
@@ -1880,6 +1962,106 @@ export default function SaidasEntradasProdutosPage({
     setProdutosSelecionadosModal(prev => prev.filter((_, i) => i !== index));
   }, []);
 
+  // ── TAMANHO (peça P/M/G) ────────────────────────────────────────────────────
+  // Toda linha precisa saber a grade do produto: peça P/M/G exige o tamanho, e
+  // a saída é travada pelo saldo DAQUELE tamanho. Linha nova sem grade (modal,
+  // rascunho, edição de romaneio, troca de cor) é consultada aqui; a bipagem já
+  // traz a grade junto.
+  const gradeEmVooRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!filialSelecionada) return;
+    const filialCod = filialSelecionada.codFilial;
+    const pendentes = produtosSelecionados.filter(
+      (p) => p.tamanhos === undefined && !gradeEmVooRef.current.has(`${filialCod}|${p.produto}|${p.corProduto ?? ""}`)
+    );
+    if (pendentes.length === 0) return;
+    const chaves = [...new Set(pendentes.map((p) => `${filialCod}|${p.produto}|${p.corProduto ?? ""}`))];
+    chaves.forEach((k) => gradeEmVooRef.current.add(k));
+    const unicos = [...new Map(pendentes.map((p) => [`${p.produto}|${p.corProduto ?? ""}`, p])).values()];
+
+    fetchTamanhos(companyKey, filialCod, unicos)
+      .then((mapa) => {
+        setProdutosSelecionados((prev) => {
+          const next = prev.map((p) => {
+            if (p.tamanhos !== undefined || p.filial !== filialCod) return p;
+            const grade = mapa.get(`${p.produto}|${p.corProduto ?? ""}`);
+            if (!grade) return p;
+            if (grade.length === 0) return { ...p, tamanhos: [], tamanho: null, tamanhoLabel: null };
+            const escolhido = p.tamanho ? grade.find((t) => t.ordinal === p.tamanho) : undefined;
+            return escolhido
+              ? { ...p, tamanhos: grade, tamanhoLabel: escolhido.label, estoque: escolhido.estoque }
+              : { ...p, tamanhos: grade, tamanho: null, tamanhoLabel: null };
+          });
+          produtosSelecionadosRef.current = next;
+          return next;
+        });
+      })
+      .catch(() => {
+        mostrarNotificacao("Não foi possível consultar os tamanhos. Tente adicionar o produto de novo.", "error");
+      })
+      .finally(() => {
+        chaves.forEach((k) => gradeEmVooRef.current.delete(k));
+      });
+  }, [produtosSelecionados, filialSelecionada, companyKey, mostrarNotificacao]);
+
+  /**
+   * Escolhe o tamanho de uma linha. A linha passa a valer o saldo do tamanho e,
+   * se já existe uma linha desse produto×cor no mesmo tamanho, as duas se juntam.
+   */
+  const escolherTamanho = useCallback((index: number, ordinal: number) => {
+    setProdutosSelecionados((prev) => {
+      const linha = prev[index];
+      const opcao = linha?.tamanhos?.find((t) => t.ordinal === ordinal);
+      if (!linha || !opcao) return prev;
+
+      const limitar = tipoOperacao === "saida" && !saidaPodeEstourarEstoque;
+      if (limitar && opcao.estoque <= 0) {
+        mostrarNotificacao(`Sem saldo do tamanho ${opcao.label} nesta filial.`, "error");
+        return prev;
+      }
+
+      const destino = prev.findIndex(
+        (p, i) =>
+          i !== index &&
+          p.produto === linha.produto &&
+          (p.corProduto ?? "") === (linha.corProduto ?? "") &&
+          p.filial === linha.filial &&
+          p.tamanho === ordinal
+      );
+
+      let next: ProdutoSelecionado[];
+      if (destino !== -1) {
+        const somada = prev[destino].quantidade + linha.quantidade;
+        const quantidade = limitar ? Math.min(somada, opcao.estoque) : somada;
+        if (quantidade < somada) {
+          mostrarNotificacao(`Quantidade ajustada ao saldo do tamanho ${opcao.label} (${opcao.estoque}).`, "error");
+        }
+        next = prev
+          .map((p, i) => (i === destino ? { ...p, quantidade, estoque: opcao.estoque } : p))
+          .filter((_, i) => i !== index);
+      } else {
+        const quantidade = limitar ? Math.min(linha.quantidade, opcao.estoque) : linha.quantidade;
+        if (quantidade < linha.quantidade) {
+          mostrarNotificacao(`Quantidade ajustada ao saldo do tamanho ${opcao.label} (${opcao.estoque}).`, "error");
+        }
+        next = [...prev];
+        next[index] = { ...linha, tamanho: ordinal, tamanhoLabel: opcao.label, estoque: opcao.estoque, quantidade };
+      }
+      produtosSelecionadosRef.current = next;
+      return next;
+    });
+  }, [tipoOperacao, saidaPodeEstourarEstoque, mostrarNotificacao]);
+
+  /** Mensagem de bloqueio quando alguma peça P/M/G está sem tamanho (ou a grade ainda não carregou). */
+  const pendenciaTamanho = useCallback((lista: ProdutoSelecionado[]): string | null => {
+    const carregando = lista.filter((p) => p.tamanhos === undefined);
+    if (carregando.length > 0) return "Aguarde: consultando os tamanhos dos produtos da lista.";
+    const sem = lista.filter(faltaTamanho);
+    if (sem.length === 0) return null;
+    const nomes = [...new Set(sem.map((p) => p.descProduto || p.produto))].slice(0, 5).join(", ");
+    return `Escolha o tamanho (P/M/G) de: ${nomes}${sem.length > 5 ? "…" : ""}.`;
+  }, []);
+
   const executarLote = useCallback(async (produtos: ProdutoSelecionado[], observacao: string) => {
     if (produtos.length === 0 || processandoOperacao || !filialSelecionada) return;
 
@@ -1889,6 +2071,7 @@ export default function SaidasEntradasProdutosPage({
         produto: p.produto,
         corProduto: p.corProduto,
         quantidade: p.quantidade,
+        tamanho: p.tamanho ?? null,
       }));
 
       // A UI mostra o label lógico da loja/grupo, mas a operação sempre segue
@@ -2060,6 +2243,7 @@ export default function SaidasEntradasProdutosPage({
           produto: p.produto,
           corProduto: p.corProduto,
           quantidade: p.quantidade,
+          tamanho: p.tamanho ?? null,
         })),
         user.username,
         companyKey
@@ -2262,6 +2446,12 @@ export default function SaidasEntradasProdutosPage({
       mostrarNotificacao("Adicione pelo menos um produto", "error");
       return;
     }
+    // Peça P/M/G sem tamanho não sai: o tamanho é obrigatório (o servidor também recusa).
+    const pendencia = pendenciaTamanho(produtosSelecionados);
+    if (pendencia) {
+      mostrarNotificacao(pendencia, "error");
+      return;
+    }
     // Editando romaneio: não há destino nem trava de defeito a checar — os itens
     // vão para um romaneio que já existe (o cabeçalho não é reescrito).
     if (romaneioEditando) {
@@ -2284,7 +2474,7 @@ export default function SaidasEntradasProdutosPage({
       }
     }
     setMostrarConfirmacaoRegistro(true);
-  }, [filialSelecionada, produtosSelecionados.length, tipoOperacao, filiaisDestinoVisiveis.length, filialDestinoSaida, tipoRomaneioSelecionado, travaDefeitoAtiva, defeitoDoDia, romaneioEditando, mostrarNotificacao]);
+  }, [filialSelecionada, produtosSelecionados, pendenciaTamanho, tipoOperacao, filiaisDestinoVisiveis.length, filialDestinoSaida, tipoRomaneioSelecionado, travaDefeitoAtiva, defeitoDoDia, romaneioEditando, mostrarNotificacao]);
 
   const confirmarRegistro = useCallback(() => {
     setMostrarConfirmacaoRegistro(false);
@@ -2440,6 +2630,8 @@ export default function SaidasEntradasProdutosPage({
         descCor: p.descCor,
         quantidade: p.quantidade,
         estoque: p.estoque,
+        tamanho: p.tamanho ?? null,
+        tamanhoLabel: p.tamanhoLabel ?? null,
       })),
     });
 
@@ -2527,6 +2719,9 @@ export default function SaidasEntradasProdutosPage({
       nomeFilial: filialOptionLabel(filial),
       estoque: item.estoque,
       quantidade: item.quantidade,
+      // A grade (e o saldo de cada tamanho) é reconsultada ao entrar na lista.
+      tamanho: item.tamanho ?? null,
+      tamanhoLabel: item.tamanhoLabel ?? null,
     }));
     produtosSelecionadosRef.current = itens;
     setProdutosSelecionados(itens);
@@ -2560,6 +2755,8 @@ export default function SaidasEntradasProdutosPage({
           descCor: item.descCor,
           quantidade: item.quantidade,
           estoque: item.estoque,
+          tamanho: item.tamanho ?? null,
+          tamanhoLabel: item.tamanhoLabel ?? null,
         })),
       });
       try {
@@ -3366,12 +3563,13 @@ export default function SaidasEntradasProdutosPage({
                 <div className={styles.produtosList}>
                   {produtosSelecionados.map((produto, index) => {
                     const corTxt = textoCorProduto(produto.descCor, produto.corProduto);
-                    const chaveItem = `${produto.produto}|${produto.corProduto ?? ""}`;
+                    const chaveItem = chaveLinha(produto);
                     const destacado = itemDestacado === chaveItem;
+                    const semTamanho = faltaTamanho(produto);
                     return (
                     <div
                       key={index}
-                      className={`${styles.produtoItem} ${destacado ? styles.produtoItemBipado : ""}`}
+                      className={`${styles.produtoItem} ${destacado ? styles.produtoItemBipado : ""} ${semTamanho ? styles.produtoItemSemTamanho : ""}`}
                       ref={(el) => {
                         // Traz a linha recém-bipada para a vista (a lista rola).
                         if (!destacado || !el) return;
@@ -3387,6 +3585,31 @@ export default function SaidasEntradasProdutosPage({
                           {corTxt ? ` · ${corTxt}` : ""}
                           {produto.codigoBarra && ` · ${produto.codigoBarra}`}
                         </div>
+                        {/* Peça P/M/G: tamanho obrigatório — cada tamanho é uma linha. */}
+                        {produto.tamanhos && produto.tamanhos.length > 0 && (
+                          <div className={styles.tamanhoRow} role="group" aria-label="Tamanho">
+                            <span className={semTamanho ? styles.tamanhoLabelFaltando : styles.tamanhoLabel}>
+                              {semTamanho ? "Escolha o tamanho:" : "Tamanho:"}
+                            </span>
+                            {produto.tamanhos.map((t) => {
+                              const ativo = produto.tamanho === t.ordinal;
+                              const semSaldo = tipoOperacao === "saida" && !saidaPodeEstourarEstoque && t.estoque <= 0;
+                              return (
+                                <button
+                                  key={t.ordinal}
+                                  type="button"
+                                  className={`${styles.tamanhoChip} ${ativo ? styles.tamanhoChipAtivo : ""}`}
+                                  onClick={() => escolherTamanho(index, t.ordinal)}
+                                  disabled={isBusy || (semSaldo && !ativo)}
+                                  title={`${t.label} — saldo ${t.estoque}`}
+                                >
+                                  {t.label}
+                                  <span className={styles.tamanhoChipSaldo}>{t.estoque}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                       <div className={styles.produtoControls}>
                         <div className={styles.qtyControl}>

@@ -38,6 +38,10 @@ export interface RascunhoItem {
   quantidade: number;
   /** Saldo na filial no momento em que o item entrou na lista (só informativo). */
   estoque: number;
+  /** Peça P/M/G: posição da grade escolhida (null = ainda não escolhida). */
+  tamanho?: number | null;
+  /** Rótulo do tamanho (P/M/G…), só para exibir. */
+  tamanhoLabel?: string | null;
 }
 
 export interface SaidaEntradaRascunho {
@@ -114,6 +118,8 @@ function sanitizeItens(itens: unknown): RascunhoItem[] {
         descCor: norm(item.descCor),
         quantidade: Math.max(1, Math.trunc(Number(item.quantidade) || 1)),
         estoque: Math.trunc(Number(item.estoque) || 0),
+        tamanho: Number.isInteger(Number(item.tamanho)) && Number(item.tamanho) > 0 ? Number(item.tamanho) : null,
+        tamanhoLabel: norm(item.tamanhoLabel) || null,
       };
     })
     .filter((item) => item.produto.length > 0);

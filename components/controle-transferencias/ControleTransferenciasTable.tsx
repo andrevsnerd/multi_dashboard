@@ -603,6 +603,73 @@ export default function ControleTransferenciasTable({
   const [transferError, setTransferError] = useState<string | null>(null);
   const [transferSuccess, setTransferSuccess] = useState<string | null>(null);
 
+  // Peça P/M/G: tamanho obrigatório. Ao abrir o modal, a grade de cada item é
+  // consultada NA ORIGEM (saldo por tamanho) e o operador distribui a
+  // quantidade tamanho a tamanho. Chave = getTransferItemKey(item).
+  // `undefined` no mapa = carregando; `[]` = não exige tamanho.
+  const [gradeTransfer, setGradeTransfer] = useState<
+    Map<string, Array<{ ordinal: number; label: string; estoque: number }> | undefined>
+  >(new Map());
+  const [qtdTamTransfer, setQtdTamTransfer] = useState<Map<string, Record<number, number>>>(new Map());
+
+  useEffect(() => {
+    if (!transferTarget) {
+      setGradeTransfer(new Map());
+      setQtdTamTransfer(new Map());
+      return;
+    }
+    let cancelado = false;
+    const chaves = transferTarget.items.map(({ item }) => getTransferItemKey(item));
+    setGradeTransfer(new Map(chaves.map((k) => [k, undefined])));
+    setQtdTamTransfer(new Map());
+    const params = new URLSearchParams({
+      company: companyKey,
+      filial: transferTarget.origemCanonico,
+      itens: transferTarget.items
+        .map(({ item }) => `${item.produto}|${item.itemOriginal.codigoCor ?? ""}`)
+        .join(";"),
+    });
+    fetch(`/api/saidas-entradas-produtos/tamanhos?${params.toString()}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("tamanhos"))))
+      .then((json: { data: Array<{ produto: string; cor: string; exigeTamanho: boolean; tamanhos: Array<{ ordinal: number; label: string; estoque: number }> }> }) => {
+        if (cancelado) return;
+        const porSku = new Map(json.data.map((d) => [`${d.produto}|${d.cor}`, d.exigeTamanho ? d.tamanhos : []]));
+        setGradeTransfer(
+          new Map(
+            transferTarget.items.map(({ item }) => [
+              getTransferItemKey(item),
+              porSku.get(`${item.produto}|${item.itemOriginal.codigoCor ?? ""}`) ?? [],
+            ])
+          )
+        );
+      })
+      .catch(() => {
+        if (!cancelado) setTransferError("Não foi possível consultar os tamanhos. Feche e abra a transferência de novo.");
+      });
+    return () => {
+      cancelado = true;
+    };
+    // getTransferItemKey é estável (função de módulo/props); a grade só muda com o alvo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transferTarget, companyKey]);
+
+  /** Peça P/M/G sem distribuição por tamanho (ou grade carregando) bloqueia o envio. */
+  const pendenciaTamanhoTransfer = useMemo(() => {
+    if (!transferTarget) return null;
+    for (const { item } of transferTarget.items) {
+      const k = getTransferItemKey(item);
+      const grade = gradeTransfer.get(k);
+      if (grade === undefined) return "Consultando os tamanhos das peças…";
+      if (grade.length > 0) {
+        const soma = Object.values(qtdTamTransfer.get(k) ?? {}).reduce((s, v) => s + v, 0);
+        if (soma <= 0) return `Distribua por tamanho (P/M/G) a quantidade de ${item.descricao || item.produto}.`;
+        const estourou = grade.find((t) => (qtdTamTransfer.get(k)?.[t.ordinal] ?? 0) > t.estoque);
+        if (estourou) return `${item.descricao || item.produto}: o tamanho ${estourou.label} só tem ${estourou.estoque} na origem.`;
+      }
+    }
+    return null;
+  }, [transferTarget, gradeTransfer, qtdTamTransfer]);
+
   // Seleção em lote: chave estável do item. Sem `originGroup` separado porque a
   // chave já contém origem+destino, então não há colisão entre grupos.
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
@@ -681,19 +748,38 @@ export default function ControleTransferenciasTable({
       setTransferError("Nenhum item com quantidade válida para transferir.");
       return;
     }
+    if (pendenciaTamanhoTransfer) {
+      setTransferError(pendenciaTamanhoTransfer);
+      return;
+    }
 
     setTransferSubmitting(true);
     setTransferError(null);
     setTransferSuccess(null);
 
     try {
-      const itensPayload = itensValidos.map(({ item, quantidade }) => ({
-        produto: item.produto,
-        corProduto: item.itemOriginal.codigoCor ?? null,
-        quantidade,
-      }));
+      // Peça P/M/G vai uma linha por tamanho (tamanho obrigatório no servidor).
+      const quantidadeEfetiva = (item: TransferItem, quantidade: number) => {
+        const grade = gradeTransfer.get(getTransferItemKey(item));
+        if (!grade || grade.length === 0) return quantidade;
+        return Object.values(qtdTamTransfer.get(getTransferItemKey(item)) ?? {}).reduce((s, v) => s + v, 0);
+      };
+      const itensPayload = itensValidos.flatMap(({ item, quantidade }) => {
+        const grade = gradeTransfer.get(getTransferItemKey(item));
+        if (grade && grade.length > 0) {
+          return Object.entries(qtdTamTransfer.get(getTransferItemKey(item)) ?? {})
+            .filter(([, q]) => q > 0)
+            .map(([t, q]) => ({
+              produto: item.produto,
+              corProduto: item.itemOriginal.codigoCor ?? null,
+              quantidade: q,
+              tamanho: Number(t),
+            }));
+        }
+        return [{ produto: item.produto, corProduto: item.itemOriginal.codigoCor ?? null, quantidade }];
+      });
 
-      const metadataItems = itensValidos.map(({ item, quantidade }) => ({
+      const metadataItems = itensValidos.map(({ item, quantidade: qtdSugerida }) => ({ item, quantidade: quantidadeEfetiva(item, qtdSugerida) })).map(({ item, quantidade }) => ({
         produto: item.produto,
         corCodigo: item.itemOriginal.codigoCor ?? null,
         corDescricao: item.cor ?? null,
@@ -742,7 +828,7 @@ export default function ControleTransferenciasTable({
         return next;
       });
 
-      const totalQtd = itensValidos.reduce((s, x) => s + x.quantidade, 0);
+      const totalQtd = itensPayload.reduce((s, x) => s + x.quantidade, 0);
       const totalItens = itensValidos.length;
       setTransferSuccess(
         json.romaneio
@@ -1322,14 +1408,30 @@ export default function ControleTransferenciasTable({
         origemLabel={transferTarget?.origemLabel ?? ""}
         destinoLabel={transferTarget?.destinoLabel ?? ""}
         items={
-          transferTarget?.items.map(({ item, quantidade }) => ({
-            codigo: item.codigo,
-            descricao: item.descricao,
-            cor: item.cor,
-            codigoBarra: item.codigoBarra,
-            quantidade,
-          })) ?? []
+          transferTarget?.items.map(({ item, quantidade }) => {
+            const k = getTransferItemKey(item);
+            const grade = gradeTransfer.get(k);
+            const porTamanho = qtdTamTransfer.get(k) ?? {};
+            const fashion = Boolean(grade && grade.length > 0);
+            return {
+              codigo: item.codigo,
+              descricao: item.descricao,
+              cor: item.cor,
+              codigoBarra: item.codigoBarra,
+              // Peça P/M/G: vale a soma distribuída nos tamanhos.
+              quantidade: fashion ? Object.values(porTamanho).reduce((s, v) => s + v, 0) : quantidade,
+              tamanhos: grade,
+              porTamanho,
+            };
+          }) ?? []
         }
+        pendencia={pendenciaTamanhoTransfer}
+        onChangeTamanho={(idx, ordinal, qtd) => {
+          const alvo = transferTarget?.items[idx];
+          if (!alvo) return;
+          const k = getTransferItemKey(alvo.item);
+          setQtdTamTransfer((prev) => new Map(prev).set(k, { ...(prev.get(k) ?? {}), [ordinal]: qtd }));
+        }}
         submitting={transferSubmitting}
         error={transferError}
         success={transferSuccess}

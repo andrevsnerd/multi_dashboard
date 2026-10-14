@@ -20,6 +20,12 @@ import {
 import { mensagemTravaInventario, verificarTravaInventario } from '@/lib/server/trava-inventario';
 import { mensagemTravaEstoqueNegativo, verificarSaldoSaida } from '@/lib/server/trava-estoque-negativo';
 import {
+  carregarGrades,
+  preencherTamanhosPelaSaida,
+  tamanhoEfetivo,
+  validarTamanhos,
+} from '@/lib/server/grade-produto';
+import {
   buscarEntradaJaFeita,
   mensagemEntradaDuplicada,
   observacaoComReferencia,
@@ -32,6 +38,8 @@ interface ItemOperacao {
   produto: string;
   corProduto: string | null;
   quantidade: number;
+  /** Posição da grade (1..48). Obrigatório em peça P/M/G (ver lib/server/grade-produto.ts). */
+  tamanho?: number | null;
 }
 
 /**
@@ -363,10 +371,25 @@ export async function POST(request: Request) {
       }
     }
 
+    // TAMANHO — peça P/M/G exige o tamanho; ele vai para a coluna certa da grade
+    // (SA_n / EN_n) em vez de tudo cair no tamanho base (P). Entrada que confirma
+    // uma saída e veio sem tamanho copia o da própria saída quando não há dúvida.
+    // Ver lib/server/grade-produto.ts.
+    const grades = await carregarGrades(itens.map((it) => it.produto));
+    let itensComTamanho: ItemOperacao[] = itens;
+    if (tipoOperacao === 'entrada' && ref?.romaneio && ref.filialOrigem) {
+      itensComTamanho = await preencherTamanhosPelaSaida(itens, grades, ref.romaneio, ref.filialOrigem);
+    }
+    const erroTamanho = validarTamanhos(itensComTamanho, grades);
+    if (erroTamanho) {
+      return NextResponse.json({ error: erroTamanho, code: 'TAMANHO_OBRIGATORIO' }, { status: 400 });
+    }
+    const itensGravar = itensComTamanho.map((it) => ({ ...it, tamanho: tamanhoEfetivo(it, grades) }));
+
     // TRAVA DE ESTOQUE NEGATIVO — filial com PERMITE_EST_NEGATIVO = 0 no Linx
     // (ex.: NERD matriz) não sai além do saldo. Ver lib/server/trava-estoque-negativo.ts.
     if (tipoOperacao === 'saida') {
-      const travaSaldo = await verificarSaldoSaida(filialTrim, itens);
+      const travaSaldo = await verificarSaldoSaida(filialTrim, itensGravar);
       if (travaSaldo) {
         return NextResponse.json(
           { error: mensagemTravaEstoqueNegativo(travaSaldo), travaEstoqueNegativo: travaSaldo },
@@ -381,9 +404,9 @@ export async function POST(request: Request) {
     try {
       result = tipoOperacao === 'saida'
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ? await executeSaidaLote(pool, { itens, filial: filialTrim, filialDestino: filialDestinoTrim, tipoRomaneio, responsavel: responsavelFinal, observacao } as any)
+        ? await executeSaidaLote(pool, { itens: itensGravar, filial: filialTrim, filialDestino: filialDestinoTrim, tipoRomaneio, responsavel: responsavelFinal, observacao } as any)
         : await executeEntradaLote(pool, {
-            itens,
+            itens: itensGravar,
             filial: filialTrim,
             tipoRomaneio,
             responsavel: responsavelFinal,

@@ -299,25 +299,11 @@ async function reverterEExcluirSaida(romaneio: string, filial: string): Promise<
     req.input('romaneio', sql.VarChar, romaneio);
     req.input('filial', sql.VarChar, filial);
 
-    // 1) Devolve o estoque à origem (+qtde) — igual ao modo=retornar da lixeira.
-    await req.query(`
-      UPDATE ep
-      SET ep.ESTOQUE = ep.ESTOQUE + agg.QTDE
-      FROM ESTOQUE_PRODUTOS ep
-      INNER JOIN FILIAIS f WITH (NOLOCK)
-        ON LTRIM(RTRIM(ep.FILIAL)) = LTRIM(RTRIM(f.FILIAL))
-      INNER JOIN (
-        SELECT PRODUTO, ISNULL(COR_PRODUTO, '') AS COR, SUM(ISNULL(QTDE, 0)) AS QTDE
-        FROM ESTOQUE_PROD1_SAI WITH (NOLOCK)
-        WHERE ROMANEIO_PRODUTO = @romaneio AND LTRIM(RTRIM(FILIAL)) = LTRIM(RTRIM(@filial))
-        GROUP BY PRODUTO, ISNULL(COR_PRODUTO, '')
-      ) agg
-        ON ep.PRODUTO = agg.PRODUTO AND ISNULL(ep.COR_PRODUTO, '') = agg.COR
-      WHERE (LTRIM(RTRIM(f.COD_FILIAL)) = LTRIM(RTRIM(@filial))
-             OR LTRIM(RTRIM(f.FILIAL)) = LTRIM(RTRIM(@filial)))
-    `);
-
-    // 2) Apaga os registros da saída (mesma ordem/tabelas da rota da lixeira).
+    // Apaga os registros da saída (mesma ordem/tabelas da rota da lixeira). O trigger
+    // LXD_ESTOQUE_PROD1_SAI devolve o estoque à origem sozinho (ESTOQUE e grade).
+    // Até 14/10/2026 havia aqui um `UPDATE ESTOQUE_PRODUTOS SET ESTOQUE + QTDE`
+    // antes do DELETE — devolvia em DOBRO e só no total (mesmo erro do romaneio
+    // 834279 na lixeira). Não reintroduzir.
     await req.query(`DELETE FROM ESTOQUE_PROD1_SAI WHERE ROMANEIO_PRODUTO = @romaneio AND FILIAL = @filial`);
     await req.query(`DELETE FROM LOJA_SAIDAS_PRODUTO WHERE ROMANEIO_PRODUTO = @romaneio AND FILIAL = @filial`);
     await req.query(`DELETE FROM LOJA_SAIDAS WHERE ROMANEIO_PRODUTO = @romaneio AND FILIAL = @filial`);

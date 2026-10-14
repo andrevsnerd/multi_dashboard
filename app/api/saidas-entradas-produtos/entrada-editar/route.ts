@@ -8,6 +8,7 @@ import { readOnlyBlock } from '@/lib/auth/route-guards';
 import { canEditarRomaneioEntrada } from '@/lib/auth/permissions';
 import { resolveResponsavelLinx } from '@/lib/server/responsavel-linx';
 import { inserirAjuste } from '@/lib/repositories/ajuste-historico';
+import { carregarGrades, tamanhoEfetivo, validarTamanhos } from '@/lib/server/grade-produto';
 import {
   executeEntradaAppend,
   verificarTravaMovimento,
@@ -41,7 +42,7 @@ interface ItemEntrada {
 interface EditarEntradaRequest {
   romaneio: string;
   filial: string;
-  itens: Array<{ produto: string; corProduto: string | null; quantidade: number }>;
+  itens: Array<{ produto: string; corProduto: string | null; quantidade: number; tamanho?: number | null }>;
   companyKey?: string;
 }
 
@@ -283,8 +284,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // TAMANHO — peça P/M/G exige o tamanho, que vai na coluna certa da grade.
+    // Ver lib/server/grade-produto.ts.
+    const grades = await carregarGrades(itens.map((it) => it.produto));
+    const erroTamanho = validarTamanhos(itens, grades);
+    if (erroTamanho) {
+      return NextResponse.json({ error: erroTamanho, code: 'TAMANHO_OBRIGATORIO' }, { status: 400 });
+    }
+    const itensGravar = itens.map((it) => ({ ...it, tamanho: tamanhoEfetivo(it, grades) }));
+
     const pool = shouldUseProxy() ? new ProxyPool() : await getConnectionPool();
-    const resultado = await executeEntradaAppend(pool, { romaneio, filial, itens });
+    const resultado = await executeEntradaAppend(pool, { romaneio, filial, itens: itensGravar });
 
     // Auditoria (não bloqueante): quem acrescentou o quê, depois do romaneio pronto.
     inserirAjuste({

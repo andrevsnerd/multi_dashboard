@@ -2185,3 +2185,33 @@
 :global(:root[data-theme="dark"]) .corCodigoTooltip::after {
   border-top-color: var(--s-100);
 }
+
+/* Peça P/M/G no modal de transferência — distribuição por tamanho (obrigatória). */
+.modalTamanhos {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+.modalTamanho {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.modalTamanhoLabel {
+  font-size: 12px;
+  font-weight: 600;
+}
+.modalTamanhoLabel small {
+  font-weight: 400;
+  opacity: .7;
+}
+.modalTamanhoInput {
+  width: 56px;
+  padding: 3px 6px;
+  border: 1px solid var(--border, #d4d4d8);
+  border-radius: 6px;
+  background: var(--card, #fff);
+  color: inherit;
+}

@@ -380,8 +380,8 @@
     "semantic_hash": "be7b07d3290617da12152adbb7ac2d08"
   },
   "app/api/admin/transferencias-duplicadas/route.ts": {
-    "mtime": 1785427797.1983256,
-    "ast_hash": "37ae7cb5dd46b080e87b753eec516ab8",
+    "mtime": 1791996419.1309876,
+    "ast_hash": "0073bc5388cd603e1abe6524de3e4543",
     "semantic_hash": ""
   },
   "app/api/admin/users/[id]/route.ts": {
@@ -930,13 +930,13 @@
     "semantic_hash": "3136877746d42feabbd7abeab02e36c2"
   },
   "app/api/romaneio-confirmar-entrada/route.ts": {
-    "mtime": 1791204265.8154674,
-    "ast_hash": "cdb6488b98f1bd1684c7db7c41e2eb59",
+    "mtime": 1791996307.586301,
+    "ast_hash": "e5f4abc1069700d045421ec796cfc2ce",
     "semantic_hash": ""
   },
   "app/api/romaneios/editar-qtd/route.ts": {
-    "mtime": 1785427762.7611852,
-    "ast_hash": "980a28d85ab2e1d70c807dacf64c2daf",
+    "mtime": 1791995109.4270186,
+    "ast_hash": "3d80fb5d081c640e8ad1121141e05a15",
     "semantic_hash": ""
   },
   "app/api/romaneios/entradas/route.ts": {
@@ -965,8 +965,8 @@
     "semantic_hash": ""
   },
   "app/api/saidas-entradas-produtos/executar/route.ts": {
-    "mtime": 1791226043.8402982,
-    "ast_hash": "7d854a2c672805b7e110741012153123",
+    "mtime": 1791994086.487794,
+    "ast_hash": "4bd9c7db70078015553f558d4fd28ce6",
     "semantic_hash": ""
   },
   "app/api/saidas-entradas-produtos/historico/route.ts": {
@@ -975,8 +975,8 @@
     "semantic_hash": "051efa45712cae00f5a301e53809505f"
   },
   "app/api/saidas-entradas-produtos/log/[tipo]/[romaneio]/[filial]/route.ts": {
-    "mtime": 1785427712.958356,
-    "ast_hash": "7e8bf901b99ef7029d9a978e9a614445",
+    "mtime": 1791996442.4107258,
+    "ast_hash": "ef44fe524f7399dcfc767a034dd784e1",
     "semantic_hash": ""
   },
   "app/api/sales-summary/route.ts": {
@@ -1005,8 +1005,8 @@
     "semantic_hash": "abf83b5447e534f2ea52216e1abd4669"
   },
   "app/api/transferencia-produtos/executar/route.ts": {
-    "mtime": 1785427853.4118102,
-    "ast_hash": "a7434a9aff8fd2cb46ba8095a18436fa",
+    "mtime": 1791995134.5579143,
+    "ast_hash": "b3fd167323baef77091b779f26ac9c50",
     "semantic_hash": ""
   },
   "app/api/transferencia-produtos/filiais/route.ts": {
@@ -1430,8 +1430,8 @@
     "semantic_hash": "7a672d31b6ac254cb25f6a420501049d"
   },
   "components/layout/Sidebar.tsx": {
-    "mtime": 1791978964.067393,
-    "ast_hash": "f9c70ba02beb57acb8dc50562479fe8f",
+    "mtime": 1791995170.5916512,
+    "ast_hash": "daff8022a4d902e7cec2462b67b513f6",
     "semantic_hash": ""
   },
   "components/layout/SidebarContext.tsx": {
@@ -2595,8 +2595,8 @@
     "semantic_hash": ""
   },
   "lib/saida-entrada-executor.js": {
-    "mtime": 1790192980.738006,
-    "ast_hash": "4fb285b6fd95f3927e23188a4631b900",
+    "mtime": 1791994108.925927,
+    "ast_hash": "f4a9544c4a6b5339d81c6f3b9285f32c",
     "semantic_hash": ""
   },
   "lib/server/company-live.ts": {
@@ -3275,8 +3275,8 @@
     "semantic_hash": "13b10626efb1b650fd9a9d669d662dac"
   },
   "CLAUDE.md": {
-    "mtime": 1788969787.2195406,
-    "ast_hash": "70b74d3c8f7cd3ca7175a457d2373632",
+    "mtime": 1791995282.9016137,
+    "ast_hash": "d2c9676960b5eecbd0b6f86d977556d0",
     "semantic_hash": ""
   },
   "QUICK_START_CLOUDFLARE.md": {
@@ -4400,8 +4400,8 @@
     "semantic_hash": ""
   },
   "lib/config/saida-estoque-negativo.ts": {
-    "mtime": 1788446768.450554,
-    "ast_hash": "6fcf5da2dd246d2b33fbb9b4b2a51969",
+    "mtime": 1791994121.6107213,
+    "ast_hash": "01b38c5ef4d46a424fc7d297ef27e1d2",
     "semantic_hash": ""
   },
   "scripts/backfill-custo-entradas.mjs": {
@@ -4410,8 +4410,8 @@
     "semantic_hash": ""
   },
   "app/api/saidas-entradas-produtos/saida-editar/route.ts": {
-    "mtime": 1788897970.1168025,
-    "ast_hash": "c9c9a79fdd919feab9fdd5492f92c202",
+    "mtime": 1791994099.223271,
+    "ast_hash": "d53867821679786941ac1c5655293d11",
     "semantic_hash": ""
   },
   "lib/reports/tickets.ts": {
@@ -5007,6 +5007,11 @@
   "lib/financeiro/normalizacao.ts": {
     "mtime": 1791984475.638334,
     "ast_hash": "f755175502161b3764b8c84ef357f02a",
+    "semantic_hash": ""
+  },
+  "lib/server/trava-estoque-negativo.ts": {
+    "mtime": 1791994071.3400905,
+    "ast_hash": "80cd0271de2b5dd52656acecb5d78e88",
     "semantic_hash": ""
   }
 }

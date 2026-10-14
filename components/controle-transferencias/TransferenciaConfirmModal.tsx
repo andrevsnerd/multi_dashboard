@@ -10,6 +10,13 @@ export interface TransferenciaConfirmModalItem {
   cor: string;
   codigoBarra?: string;
   quantidade: number;
+  /**
+   * Peça P/M/G: tamanhos com o saldo de cada um na ORIGEM. Tamanho é obrigatório —
+   * a quantidade é distribuída tamanho a tamanho. `undefined` = carregando.
+   */
+  tamanhos?: Array<{ ordinal: number; label: string; estoque: number }>;
+  /** Quantidade escolhida por tamanho {posição: qtd}. */
+  porTamanho?: Record<number, number>;
 }
 
 export interface TransferenciaConfirmModalProps {
@@ -22,6 +29,10 @@ export interface TransferenciaConfirmModalProps {
   success: string | null;
   onConfirm: () => void;
   onCancel: () => void;
+  /** Peça P/M/G: altera a quantidade de um tamanho do item `idx`. */
+  onChangeTamanho?: (idx: number, ordinal: number, quantidade: number) => void;
+  /** Bloqueio vindo da tela (ex.: tamanho por distribuir, grade carregando). */
+  pendencia?: string | null;
 }
 
 export default function TransferenciaConfirmModal({
@@ -34,6 +45,8 @@ export default function TransferenciaConfirmModal({
   success,
   onConfirm,
   onCancel,
+  onChangeTamanho,
+  pendencia = null,
 }: TransferenciaConfirmModalProps) {
   useEffect(() => {
     if (!open) return;
@@ -127,6 +140,33 @@ export default function TransferenciaConfirmModal({
                     <span className={styles.modalItemQtyNumber}>{it.quantidade}</span>
                     <span className={styles.modalItemQtyUnit}>un.</span>
                   </span>
+                  {/* Peça P/M/G: distribui a quantidade por tamanho (obrigatório). */}
+                  {it.tamanhos && it.tamanhos.length > 0 && (
+                    <div className={styles.modalTamanhos}>
+                      {it.tamanhos.map((t) => {
+                        const valor = it.porTamanho?.[t.ordinal] ?? 0;
+                        return (
+                          <label key={t.ordinal} className={styles.modalTamanho} title={`Saldo na origem: ${t.estoque}`}>
+                            <span className={styles.modalTamanhoLabel}>
+                              {t.label} <small>({t.estoque})</small>
+                            </span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={t.estoque}
+                              value={valor}
+                              disabled={submitting}
+                              className={styles.modalTamanhoInput}
+                              onChange={(e) =>
+                                onChangeTamanho?.(idx, t.ordinal, Math.max(0, parseInt(e.target.value, 10) || 0))
+                              }
+                            />
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {it.tamanhos === undefined && <span className={`${styles.modalTamanhos} ${styles.modalTamanhoLabel}`}>carregando tamanhos…</span>}
                 </li>
               ))}
             </ul>
@@ -140,6 +180,7 @@ export default function TransferenciaConfirmModal({
           </div>
         </div>
 
+        {pendencia && !error ? <div className={styles.modalError}>{pendencia}</div> : null}
         {error ? <div className={styles.modalError}>{error}</div> : null}
         {success ? <div className={styles.modalSuccess}>{success}</div> : null}
 
@@ -156,7 +197,7 @@ export default function TransferenciaConfirmModal({
             type="button"
             className={styles.modalBtnPrimary}
             onClick={onConfirm}
-            disabled={submitting || totalQuantidade <= 0 || totalItens === 0}
+            disabled={submitting || totalQuantidade <= 0 || totalItens === 0 || Boolean(pendencia)}
           >
             {submitting ? (
               <>

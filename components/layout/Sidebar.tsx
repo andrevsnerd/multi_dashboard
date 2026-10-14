@@ -147,10 +147,6 @@ export default function Sidebar({ companyName }: SidebarProps) {
     basePath && basePath !== "/"
       ? `${basePath}/controle-transferencias`
       : "/controle-transferencias";
-  const transferenciaProdutosHref =
-    basePath && basePath !== "/"
-      ? `${basePath}/transferencia-produtos`
-      : "/transferencia-produtos";
   const distribuicaoMatrizHref =
     basePath && basePath !== "/"
       ? `${basePath}/distribuicao-matriz`
@@ -517,14 +513,8 @@ export default function Sidebar({ companyName }: SidebarProps) {
           isActive: (currentPathname) =>
             matchesSegment(currentPathname, "/controle-transferencias", controleTransferenciasHref),
         },
-        {
-          key: "transferencia-produtos",
-          label: "Transferência de Produtos",
-          href: transferenciaProdutosHref,
-          permission: "transferencia-produtos",
-          isActive: (currentPathname) =>
-            matchesSegment(currentPathname, "/transferencia-produtos", transferenciaProdutosHref),
-        },
+        // "Transferência de Produtos" saiu do menu em 14/10/2026: a rota foi
+        // desativada (gravava estoque sem a grade) — ver transferencia-produtos/executar.
         {
           key: "distribuicao-matriz",
           label: "Distribuição Matriz",

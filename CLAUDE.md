@@ -79,6 +79,23 @@ refletida no romaneio de entrada; somar conta a mesma peça duas vezes.
 11.374/11.378 SKUs (99,96%), NERD MORUMBI RDRRRJ 5.872/5.872 (100%). Se a taxa cair, a
 fórmula foi quebrada.
 
+## ⛔ REGRA OBRIGATÓRIA — ESTOQUE SE MOVE PELO TRIGGER, NUNCA NA MÃO
+
+**Nunca `UPDATE ESTOQUE_PRODUTOS SET ESTOQUE = …`** e **nunca `SET QTDE = …` sozinho** em
+`ESTOQUE_PROD1_SAI`/`ESTOQUE_PROD1_ENT`. O trigger do Linx só move estoque pela coluna de grade
+(`SA_n`/`EN_n`) e move `ESTOQUE` e `ES1..ES48` juntos. Mexer só no total deixa `ESTOQUE ≠ soma(ES)`;
+mexer só em `QTDE` deixa o romaneio mentindo e a exclusão dele reverte errado.
+
+- Item novo: `INSERT` com `QTDE` **e** `SA_n`/`EN_n` (tamanho base) — ver `executeSaidaLote`/`executeEntradaLote`.
+- Corrigir quantidade: `executeItemQtdeSet` (QTDE + grade no mesmo UPDATE, por delta).
+- Ajustar saldo: contagem (`executarAjusteContagem`), que o trigger aplica por tamanho.
+
+Foi o que fizeram o antigo `romaneios/editar-qtd` e o `transfer-executor` (rota desativada em
+14/10/2026): 977 linhas com total ≠ grade em 15 filiais. Desde 14/10/2026 a NERD matriz tem
+`FILIAIS.PERMITE_EST_NEGATIVO = 0` — o Linx recusa qualquer tamanho negativo, então grade
+desalinhada agora **trava operação**. Saídas conferem saldo antes de gravar:
+[lib/server/trava-estoque-negativo.ts](lib/server/trava-estoque-negativo.ts).
+
 ## graphify
 
 This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.

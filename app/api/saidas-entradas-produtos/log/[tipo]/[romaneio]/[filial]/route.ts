@@ -79,53 +79,91 @@ async function lerItensComEstoque(
   });
 }
 
+interface GradeItemRomaneio {
+  produto: string;
+  cor: string;
+  /** SUM(SA_n) / SUM(EN_n) do romaneio, índice 0..47 = tamanho 1..48. */
+  porTamanho: number[];
+}
+
 /**
- * Repõe em ESTOQUE_PRODUTOS.ESTOQUE o que os triggers do Linx acabaram de mexer.
+ * Grade (SA_n / EN_n) de cada item do romaneio, lida ANTES dos deletes. É
+ * exatamente o que o trigger LXD reverte — a QTDE não entra na conta dele (e há
+ * romaneio antigo com QTDE ≠ soma da grade).
+ */
+async function lerGradeDoRomaneio(
+  tipo: 'saida' | 'entrada',
+  romaneio: string,
+  filial: string
+): Promise<GradeItemRomaneio[]> {
+  const tabela = tipo === 'saida' ? 'ESTOQUE_PROD1_SAI' : 'ESTOQUE_PROD1_ENT';
+  const prefixo = tipo === 'saida' ? 'SA_' : 'EN_';
+  const somas = Array.from({ length: 48 }, (_, i) => `SUM(ISNULL(i.${prefixo}${i + 1}, 0)) AS T${i + 1}`).join(', ');
+  return withRequest(async (req) => {
+    req.input('romaneio', sql.VarChar, romaneio);
+    req.input('filial', sql.VarChar, filial);
+    const result = await req.query<Record<string, unknown>>(`
+      SELECT i.PRODUTO, ISNULL(i.COR_PRODUTO, '') AS COR, ${somas}
+      FROM ${tabela} i WITH (NOLOCK)
+      WHERE i.ROMANEIO_PRODUTO = @romaneio
+        AND LTRIM(RTRIM(i.FILIAL)) = LTRIM(RTRIM(@filial))
+      GROUP BY i.PRODUTO, ISNULL(i.COR_PRODUTO, '')
+    `);
+    return result.recordset.map((row) => ({
+      produto: String(row.PRODUTO ?? '').trim(),
+      cor: String(row.COR ?? '').trim(),
+      porTamanho: Array.from({ length: 48 }, (_, i) => Math.trunc(Number(row[`T${i + 1}`]) || 0)),
+    }));
+  });
+}
+
+/**
+ * Desfaz em ESTOQUE_PRODUTOS a reversão que os triggers do Linx acabaram de aplicar.
  *
  * Ao deletar os itens de um romaneio, os triggers LXD_ESTOQUE_PROD1_ENT/SAI já
- * revertem o estoque sozinhos (`SUM(EN_n)/SUM(SA_n) * -1`). Quem quer o estoque
- * INALTERADO (modo=apenas) precisa desfazer essa reversão — é isso que esta função
- * faz, aplicando o efeito OPOSTO ao do trigger.
+ * revertem o estoque sozinhos — no ESTOQUE **e** em cada ESn, pela grade do item
+ * (`SUM(EN_n)/SUM(SA_n) * -1`). Quem quer o estoque INALTERADO (modo=apenas)
+ * precisa desfazer essa reversão, aplicando o efeito OPOSTO nas MESMAS colunas.
  *
- * Toca só a coluna ESTOQUE porque as colunas de grade (ES1..ES48) o trigger já
- * deixou certas; mexer nelas aqui reintroduziria divergência entre saldo e grade.
+ * Até 14/10/2026 esta função desfazia só o ESTOQUE (pela QTDE): o total voltava e a
+ * grade ficava revertida — ESTOQUE ≠ soma(ES) a cada exclusão "sem alterar estoque".
  *
  * @param sinal o mesmo sinal da reversão (+1 saída, -1 entrada). A compensação usa
  *              o operador contrário.
  */
 async function compensarReversaoDeEstoque(
-  itens: PreviewItem[],
+  itens: GradeItemRomaneio[],
   filial: string,
   sinal: 1 | -1
 ): Promise<void> {
-  const comQtde = itens.filter((i) => i.qtde !== 0);
-  if (comQtde.length === 0) return;
-
-  const escape = (v: string) => v.replace(/'/g, "''");
-  const values = comQtde
-    .map((i) => `('${escape(i.produto)}','${escape(i.cor)}',${Math.trunc(i.qtde)})`)
-    .join(',');
-
   // Operador embutido, contrário ao da reversão do trigger — não vem de input do usuário.
   const op = sinal === 1 ? '-' : '+';
+  const escape = (v: string) => v.replace(/'/g, "''");
+
+  const updates = itens
+    .map((item) => {
+      const total = item.porTamanho.reduce((s, v) => s + v, 0);
+      const colunas = item.porTamanho
+        .map((v, i) => (v !== 0 ? `ep.ES${i + 1} = ISNULL(ep.ES${i + 1}, 0) ${op} ${v}` : null))
+        .filter(Boolean);
+      if (total === 0 && colunas.length === 0) return null;
+      return `
+        UPDATE ep
+        SET ep.ESTOQUE = ep.ESTOQUE ${op} ${total}${colunas.length ? `, ${colunas.join(', ')}` : ''}
+        FROM ESTOQUE_PRODUTOS ep
+        INNER JOIN FILIAIS f WITH (NOLOCK)
+          ON LTRIM(RTRIM(ep.FILIAL)) = LTRIM(RTRIM(f.FILIAL))
+        WHERE ep.PRODUTO = '${escape(item.produto)}'
+          AND ISNULL(ep.COR_PRODUTO, '') = '${escape(item.cor)}'
+          AND (LTRIM(RTRIM(f.COD_FILIAL)) = LTRIM(RTRIM(@filial))
+               OR LTRIM(RTRIM(f.FILIAL)) = LTRIM(RTRIM(@filial)));`;
+    })
+    .filter(Boolean);
+  if (updates.length === 0) return;
 
   await withRequest(async (req) => {
     req.input('filial', sql.VarChar, filial);
-    await req.query(`
-      ;WITH agg(PRODUTO, COR, QTDE) AS (
-        SELECT * FROM (VALUES ${values}) v(PRODUTO, COR, QTDE)
-      )
-      UPDATE ep
-      SET ep.ESTOQUE = ep.ESTOQUE ${op} agg.QTDE
-      FROM ESTOQUE_PRODUTOS ep
-      INNER JOIN FILIAIS f WITH (NOLOCK)
-        ON LTRIM(RTRIM(ep.FILIAL)) = LTRIM(RTRIM(f.FILIAL))
-      INNER JOIN agg
-        ON ep.PRODUTO = agg.PRODUTO
-       AND ISNULL(ep.COR_PRODUTO, '') = agg.COR
-      WHERE (LTRIM(RTRIM(f.COD_FILIAL)) = LTRIM(RTRIM(@filial))
-             OR LTRIM(RTRIM(f.FILIAL)) = LTRIM(RTRIM(@filial)))
-    `);
+    await req.query(updates.join('\n'));
   });
 }
 
@@ -341,6 +379,7 @@ export async function DELETE(
     // entrada: itens entraram no destino → o trigger remove (-).
     const sinal: 1 | -1 = tipo === 'saida' ? 1 : -1;
     const itensDoRomaneio = await lerItensComEstoque(tipo, romaneio, filial, sinal);
+    const gradeDoRomaneio = modo === 'apenas' ? await lerGradeDoRomaneio(tipo, romaneio, filial) : [];
 
     await withRequest(async (req) => {
       req.input('romaneio', sql.VarChar, romaneio);
@@ -397,7 +436,7 @@ export async function DELETE(
     // ficar exatamente como estava. Feito DEPOIS dos deletes — é o trigger deles que
     // move o estoque.
     if (modo === 'apenas') {
-      await compensarReversaoDeEstoque(itensDoRomaneio, filial, sinal);
+      await compensarReversaoDeEstoque(gradeDoRomaneio, filial, sinal);
     }
 
     // Auditoria (não-bloqueante) — é o ÚNICO rastro que sobra de um romaneio excluído:

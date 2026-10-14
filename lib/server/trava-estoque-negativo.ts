@@ -1,4 +1,5 @@
 import { query } from '@/lib/db/connection';
+import { carregarEstoquePorTamanho, carregarGrades, chaveSku } from '@/lib/server/grade-produto';
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -19,20 +20,25 @@ import { query } from '@/lib/db/connection';
  * A filial é lida do cadastro (não há lista fixa aqui): ligar/desligar o
  * parâmetro no Linx liga/desliga esta trava junto.
  *
- * Saldo disponível = menor entre ESTOQUE e o ES do TAMANHO_BASE, porque a saída
- * do dashboard sempre baixa na coluna do tamanho base (SA_n) e o trigger confere
- * as duas. Item sem linha em ESTOQUE_PRODUTOS tem saldo 0.
+ * Conferência por TAMANHO, como o trigger: a saída baixa a coluna do tamanho
+ * (o informado na peça P/M/G, ou o TAMANHO_BASE), então precisa caber no ESn
+ * daquele tamanho E o total precisa caber no ESTOQUE. Item sem linha em
+ * ESTOQUE_PRODUTOS tem saldo 0.
  */
 
 export interface ItemSaidaSaldo {
   produto: string;
   corProduto?: string | null;
   quantidade: number;
+  /** Posição da grade; sem ele, o TAMANHO_BASE do produto. */
+  tamanho?: number | null;
 }
 
 export interface FaltaSaldo {
   produto: string;
   cor: string;
+  /** Rótulo do tamanho (P/M/G…) quando a falta é de um tamanho; vazio = total. */
+  tamanho: string;
   pedido: number;
   disponivel: number;
 }
@@ -67,40 +73,52 @@ export async function verificarSaldoSaida(
   if (!row || row.PERMITE === null || Number(row.PERMITE) === 1 || row.PERMITE === true) return null;
   const filialNome = row.FILIAL;
 
-  // Soma por produto×cor: o mesmo SKU pode vir em mais de uma linha.
-  const pedido = new Map<string, FaltaSaldo>();
+  const produtos = [...new Set(itens.map((it) => (it.produto || '').trim()).filter(Boolean))];
+  const [grades, saldos] = await Promise.all([
+    carregarGrades(produtos),
+    carregarEstoquePorTamanho(filialNome, produtos),
+  ]);
+
+  // Pedido por SKU (total) e por SKU×tamanho — o mesmo SKU pode vir em várias linhas.
+  const total = new Map<string, { produto: string; cor: string; pedido: number }>();
+  const porTamanho = new Map<string, { produto: string; cor: string; tamanho: number; pedido: number }>();
   for (const it of itens) {
     const produto = (it.produto || '').trim();
     const cor = (it.corProduto ?? '').toString().trim();
     const qtd = Math.floor(Number(it.quantidade) || 0);
     if (!produto || qtd <= 0) continue;
-    const key = `${produto}|${cor}`;
-    const atual = pedido.get(key) ?? { produto, cor, pedido: 0, disponivel: 0 };
-    atual.pedido += qtd;
-    pedido.set(key, atual);
+    const grade = grades.get(produto);
+    const t = Number(it.tamanho);
+    const tamanho = Number.isInteger(t) && t >= 1 && t <= 48 ? t : grade?.tamanhoBase ?? 1;
+    const sku = chaveSku(produto, cor);
+    const tot = total.get(sku) ?? { produto, cor, pedido: 0 };
+    tot.pedido += qtd;
+    total.set(sku, tot);
+    const kt = `${sku}#${tamanho}`;
+    const pt = porTamanho.get(kt) ?? { produto, cor, tamanho, pedido: 0 };
+    pt.pedido += qtd;
+    porTamanho.set(kt, pt);
   }
-  if (pedido.size === 0) return null;
-
-  const produtos = [...new Set([...pedido.values()].map((p) => p.produto))];
-  const esCase = Array.from({ length: 48 }, (_, i) => `WHEN ${i + 1} THEN e.ES${i + 1}`).join(' ');
-  const saldos = await query<{ PRODUTO: string; COR: string; ESTOQUE: number; ES_BASE: number }>(`
-    SELECT RTRIM(e.PRODUTO) AS PRODUTO, RTRIM(ISNULL(e.COR_PRODUTO,'')) AS COR,
-           ISNULL(e.ESTOQUE,0) AS ESTOQUE,
-           ISNULL(CASE ISNULL(p.TAMANHO_BASE,1) ${esCase} ELSE e.ES1 END, 0) AS ES_BASE
-    FROM ESTOQUE_PRODUTOS e WITH (NOLOCK)
-    LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = e.PRODUTO
-    WHERE e.FILIAL = ${lit(filialNome)}
-      AND e.PRODUTO IN (${produtos.map(lit).join(',')})
-  `);
-  const saldoPorSku = new Map<string, number>();
-  for (const s of saldos) {
-    saldoPorSku.set(`${s.PRODUTO}|${s.COR}`, Math.min(Number(s.ESTOQUE) || 0, Number(s.ES_BASE) || 0));
-  }
+  if (total.size === 0) return null;
 
   const faltas: FaltaSaldo[] = [];
-  for (const [key, p] of pedido) {
-    const disponivel = saldoPorSku.get(key) ?? 0;
-    if (p.pedido > disponivel) faltas.push({ ...p, disponivel });
+  for (const [kt, p] of porTamanho) {
+    const saldo = saldos.get(kt.split('#')[0]);
+    const disponivel = saldo?.es[p.tamanho - 1] ?? 0;
+    if (p.pedido > disponivel) {
+      const grade = grades.get(p.produto);
+      const rotulo = grade?.exigeTamanho
+        ? grade.tamanhos.find((g) => g.ordinal === p.tamanho)?.label ?? String(p.tamanho)
+        : '';
+      faltas.push({ produto: p.produto, cor: p.cor, tamanho: rotulo, pedido: p.pedido, disponivel });
+    }
+  }
+  for (const [sku, p] of total) {
+    const disponivel = saldos.get(sku)?.estoque ?? 0;
+    const jaListado = faltas.some((f) => chaveSku(f.produto, f.cor) === sku);
+    if (p.pedido > disponivel && !jaListado) {
+      faltas.push({ produto: p.produto, cor: p.cor, tamanho: '', pedido: p.pedido, disponivel });
+    }
   }
   return faltas.length > 0 ? { filial: filialNome, faltas } : null;
 }
@@ -108,7 +126,11 @@ export async function verificarSaldoSaida(
 export function mensagemTravaEstoqueNegativo(trava: TravaEstoqueNegativo): string {
   const lista = trava.faltas
     .slice(0, 10)
-    .map((f) => `${f.produto}${f.cor ? ` cor ${f.cor}` : ''} (pedido ${f.pedido}, saldo ${Math.max(0, f.disponivel)})`)
+    .map(
+      (f) =>
+        `${f.produto}${f.cor ? ` cor ${f.cor}` : ''}${f.tamanho ? ` tam. ${f.tamanho}` : ''} ` +
+        `(pedido ${f.pedido}, saldo ${Math.max(0, f.disponivel)})`
+    )
     .join('; ');
   const resto = trava.faltas.length > 10 ? ` e mais ${trava.faltas.length - 10} item(ns)` : '';
   return (

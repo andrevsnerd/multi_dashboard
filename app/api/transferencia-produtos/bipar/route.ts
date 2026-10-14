@@ -5,6 +5,7 @@ import { withRequest } from '@/lib/db/connection';
 import { getActiveFilial } from '@/lib/config/company';
 import { resolveCompanyDynamic } from '@/lib/config/company-server';
 import { getMappedColorDescription } from '@/lib/utils/colorMapping';
+import { carregarEstoquePorTamanho, carregarGrades, chaveSku } from '@/lib/server/grade-produto';
 
 export const maxDuration = 30;
 
@@ -17,9 +18,11 @@ export const maxDuration = 30;
  * mas lento demais quando o operador está bipando peça atrás de peça. Aqui a
  * consulta já devolve produto + cor + descrição + saldo NA FILIAL da operação.
  *
- * A operação (romaneio) é por produto × cor — o TAMANHO do código de barras não
- * entra. Por isso o desempate de ambiguidade é feito sobre produto+cor: dois
- * tamanhos do mesmo produto/cor com o mesmo código NÃO são ambíguos.
+ * O desempate de ambiguidade é feito sobre produto+cor: dois tamanhos do mesmo
+ * produto/cor com o mesmo código NÃO são ambíguos. Mas o código de barras de uma
+ * peça P/M/G é de UM tamanho (PRODUTOS_BARRA.TAMANHO = posição da grade): ele
+ * volta em `tamanho` e a tela já lança a peça no tamanho certo (desde 14/10/2026 o
+ * tamanho é obrigatório em peça P/M/G). Código sem tamanho único → `tamanho: null`.
  *
  * GET /api/transferencia-produtos/bipar?codigoBarras=044428&filial=NERD%20TIJUCA&company=nerd
  *
@@ -52,9 +55,11 @@ export async function GET(request: Request) {
 
       const query = `
         ;WITH barras AS (
-          SELECT DISTINCT
+          SELECT
             RTRIM(LTRIM(CAST(pb.PRODUTO AS VARCHAR(50))))     AS PRODUTO,
-            RTRIM(LTRIM(CAST(pb.COR_PRODUTO AS VARCHAR(20)))) AS COR_PRODUTO
+            RTRIM(LTRIM(CAST(pb.COR_PRODUTO AS VARCHAR(20)))) AS COR_PRODUTO,
+            MIN(TRY_CONVERT(INT, pb.TAMANHO))                 AS TAM_MIN,
+            MAX(TRY_CONVERT(INT, pb.TAMANHO))                 AS TAM_MAX
           FROM PRODUTOS_BARRA pb WITH (NOLOCK)
           WHERE LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100)))) = LTRIM(RTRIM(@codigoBarras))
              OR (
@@ -63,6 +68,9 @@ export async function GET(request: Request) {
                AND TRY_CONVERT(BIGINT, LTRIM(RTRIM(CAST(pb.CODIGO_BARRA AS VARCHAR(100)))))
                    = TRY_CONVERT(BIGINT, LTRIM(RTRIM(@codigoBarras)))
              )
+          GROUP BY
+            RTRIM(LTRIM(CAST(pb.PRODUTO AS VARCHAR(50)))),
+            RTRIM(LTRIM(CAST(pb.COR_PRODUTO AS VARCHAR(20))))
         )
         SELECT TOP 20
           b.PRODUTO,
@@ -70,7 +78,8 @@ export async function GET(request: Request) {
           ISNULL(p.DESC_PRODUTO, '')                        AS DESC_PRODUTO,
           ISNULL(c.DESC_COR, '')                            AS DESC_COR,
           ISNULL(est.ESTOQUE, 0)                            AS ESTOQUE,
-          ISNULL(CONVERT(VARCHAR(50), p.GRADE), '')         AS GRADE
+          ISNULL(CONVERT(VARCHAR(50), p.GRADE), '')         AS GRADE,
+          CASE WHEN b.TAM_MIN = b.TAM_MAX THEN b.TAM_MIN END AS TAMANHO
         FROM barras b
         LEFT JOIN PRODUTOS p WITH (NOLOCK)
           ON RTRIM(LTRIM(CAST(p.PRODUTO AS VARCHAR(50)))) = b.PRODUTO
@@ -107,10 +116,19 @@ export async function GET(request: Request) {
         DESC_COR: string | null;
         ESTOQUE: number | null;
         GRADE: string | null;
+        TAMANHO: number | null;
       }>(query);
 
       return result.recordset;
     });
+
+    // Peça P/M/G: a grade com o saldo de cada tamanho vai junto, para a tela
+    // lançar no tamanho certo e travar a saída pelo saldo DAQUELE tamanho.
+    const produtosAchados = linhas.map((row) => row.PRODUTO?.toString().trim() || '');
+    const [grades, saldosTam] = await Promise.all([
+      carregarGrades(produtosAchados),
+      carregarEstoquePorTamanho(filial, produtosAchados),
+    ]);
 
     const opcoes = linhas.map((row) => {
       const cor = row.COR_PRODUTO?.toString().trim() || '';
@@ -124,6 +142,14 @@ export async function GET(request: Request) {
         descCor: descCorBanco || getMappedColorDescription(cor || undefined),
         codigoBarra: codigoBarras,
         grade: row.GRADE?.toString().trim() || null,
+        tamanho: Number.isInteger(Number(row.TAMANHO)) && Number(row.TAMANHO) > 0 ? Number(row.TAMANHO) : null,
+        exigeTamanho: Boolean(grades.get(row.PRODUTO?.toString().trim() || '')?.exigeTamanho),
+        tamanhos: (() => {
+          const g = grades.get(row.PRODUTO?.toString().trim() || '');
+          if (!g?.exigeTamanho) return [];
+          const saldo = saldosTam.get(chaveSku(row.PRODUTO?.toString().trim() || '', cor));
+          return g.tamanhos.map((t) => ({ ...t, estoque: saldo?.es[t.ordinal - 1] ?? 0 }));
+        })(),
         estoque: Number(row.ESTOQUE ?? 0) || 0,
         filial,
       };

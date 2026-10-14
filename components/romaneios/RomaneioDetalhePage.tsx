@@ -71,6 +71,8 @@ async function postConfirmacao(
     romaneioEntrada?: string;
     /** Data de emissão do romaneio — a trava de inventário compara com ela. */
     dataRomaneio?: string;
+    /** Peça P/M/G: o que chegou em cada tamanho {posição: qtd}. */
+    tamanhosConfirmados?: Record<number, number>;
   }
 ): Promise<{ ok: boolean; error?: string; origem?: { corrigido: boolean; detalhe: string } | null }> {
   const res = await fetch("/api/romaneio-confirmar-entrada", {
@@ -87,6 +89,7 @@ async function postConfirmacao(
       filialOrigem: extra?.filialOrigem,
       romaneioEntrada: extra?.romaneioEntrada,
       dataRomaneio: extra?.dataRomaneio,
+      tamanhosConfirmados: extra?.tamanhosConfirmados,
     }),
   });
   if (!res.ok) {
@@ -104,7 +107,7 @@ async function executarEntradaEstoqueLote(
   username: string,
   companyKey: string,
   filialCod: string,
-  itens: Array<{ produto: string; corProduto: string | null; quantidade: number }>,
+  itens: Array<{ produto: string; corProduto: string | null; quantidade: number; tamanho?: number | null }>,
   responsavel: string,
   romaneioReferencia: { romaneio: string; filialOrigem: string; dataRomaneio: string }
 ): Promise<{
@@ -184,6 +187,11 @@ async function fetchTravaInventario(
 
 // ---------- tipos ----------
 
+/** Peça P/M/G: conferência tamanho a tamanho. */
+function conferePorTamanho(item: RomaneioDetalheItem): boolean {
+  return Boolean(item.exigeTamanho && item.tamanhos && item.tamanhos.length > 0);
+}
+
 /** "P:1 M:3 G:2" — só os tamanhos que foram no romaneio. */
 function formatTamanhos(tamanhos: RomaneioDetalheItem["tamanhos"]): string {
   return (tamanhos ?? [])
@@ -204,7 +212,9 @@ export interface RomaneioDetalheItem {
   grade: string;
   qtde: number;
   /** Qtd do romaneio por tamanho (P/M/G...); vazio em produto de tamanho único. */
-  tamanhos?: Array<{ label: string; qtde: number }>;
+  tamanhos?: Array<{ ordinal: number; label: string; qtde: number }>;
+  /** Peça P/M/G: a conferência é tamanho a tamanho (o que chegou em cada um). */
+  exigeTamanho?: boolean;
   estoqueOrigem: number;
   estoqueDestino: number;
   filialOrigem?: string;
@@ -445,6 +455,36 @@ export default function RomaneioDetalhePage({
     });
   }, []);
 
+  // Peça P/M/G: o que chegou em cada tamanho. Começa com o que foi ENVIADO em
+  // cada tamanho; o total de `quantidades` acompanha a soma.
+  // Map: "produto|cor" → { posição: qtd }
+  const [quantidadesTam, setQuantidadesTam] = useState<Map<string, Record<number, number>>>(new Map());
+  useEffect(() => {
+    if (itens.length === 0) return;
+    setQuantidadesTam((prev) => {
+      const next = new Map(prev);
+      for (const item of itens) {
+        if (!conferePorTamanho(item)) continue;
+        const chave = `${item.produto}|${item.corProduto ?? ""}`;
+        if (!next.has(chave)) {
+          next.set(chave, Object.fromEntries(item.tamanhos!.map((t) => [t.ordinal, t.qtde])));
+        }
+      }
+      return next;
+    });
+  }, [itens]);
+
+  const updateQuantidadeTam = useCallback((chave: string, ordinal: number, valor: number) => {
+    setQuantidadesTam((prev) => {
+      const next = new Map(prev);
+      const porTam = { ...(next.get(chave) ?? {}), [ordinal]: Math.max(0, valor) };
+      next.set(chave, porTam);
+      const total = Object.values(porTam).reduce((s, v) => s + v, 0);
+      setQuantidades((q) => new Map(q).set(chave, total));
+      return next;
+    });
+  }, []);
+
   // --- load destino ---
   const loadDestino = useCallback(() => {
     if (!isSaida) return;
@@ -537,17 +577,27 @@ export default function RomaneioDetalhePage({
     const itensParaConfirmar = itens
       .map((item) => {
         const chave = `${item.produto}|${item.corProduto ?? ""}`;
-        const qtde = quantidades.get(chave) ?? item.qtde;
+        // Peça P/M/G numa SAÍDA do dashboard: confere tamanho a tamanho. A entrada
+        // nasce no tamanho que chegou, e a saída é acertada se o tamanho diferir.
+        const porTamanho = isSaida && conferePorTamanho(item) ? quantidadesTam.get(chave) ?? null : null;
+        const qtde = porTamanho
+          ? Object.values(porTamanho).reduce((s, v) => s + v, 0)
+          : quantidades.get(chave) ?? item.qtde;
+        const tamanhoDivergente = porTamanho
+          ? item.tamanhos!.some((t) => (porTamanho[t.ordinal] ?? 0) !== t.qtde)
+          : false;
         return {
           produto: item.produto,
           corProduto: item.corProduto,
           quantidade: qtde,
           chave,
-          // Conferiu menos do que o romaneio diz → a diferença tem que voltar
-          // para a loja. Marcado aqui para que só estes itens paguem a consulta
-          // extra no servidor: numa conferência normal (tudo integral) ninguém
-          // paga nada, e um romaneio de 600 itens não vira 600 idas ao banco.
-          divergente: qtde < item.qtde,
+          porTamanho,
+          // Conferiu menos do que o romaneio diz (ou noutro tamanho) → a saída é
+          // acertada e a diferença volta para a loja. Marcado aqui para que só
+          // estes itens paguem a consulta extra no servidor: numa conferência
+          // normal (tudo integral) ninguém paga nada, e um romaneio de 600 itens
+          // não vira 600 idas ao banco.
+          divergente: qtde < item.qtde || (tamanhoDivergente && qtde <= item.qtde),
         };
       })
       .filter((i) => i.quantidade > 0);
@@ -590,11 +640,14 @@ export default function RomaneioDetalhePage({
           user.username,
           companySlug,
           destinoSelected,
-          itensParaConfirmar.map((i) => ({
-            produto: i.produto,
-            corProduto: i.corProduto,
-            quantidade: i.quantidade,
-          })),
+          // Peça P/M/G entra no tamanho que chegou (uma linha por tamanho).
+          itensParaConfirmar.flatMap((i) =>
+            i.porTamanho
+              ? Object.entries(i.porTamanho)
+                  .filter(([, q]) => q > 0)
+                  .map(([t, q]) => ({ produto: i.produto, corProduto: i.corProduto, quantidade: q, tamanho: Number(t) }))
+              : [{ produto: i.produto, corProduto: i.corProduto, quantidade: i.quantidade }]
+          ),
           responsavelPadrao || "",
           { romaneio: romaneioId, filialOrigem, dataRomaneio: dataEmissaoProp }
         );
@@ -631,6 +684,7 @@ export default function RomaneioDetalhePage({
                 filialOrigem: item.divergente ? filialOrigem : undefined,
                 romaneioEntrada: romaneioEntradaGerado,
                 dataRomaneio: dataEmissaoProp,
+                tamanhosConfirmados: item.porTamanho ?? undefined,
               }
             : { dataRomaneio: dataEmissaoProp }
         );
@@ -657,7 +711,7 @@ export default function RomaneioDetalhePage({
     } finally {
       setConfirmandoTudo(false);
     }
-  }, [user?.username, isSaida, itens, quantidades, isTransito, romaneioId, filialDestino, filialOrigem, companySlug, destinoSelected, responsavelPadrao, tipo, dataEmissaoProp]);
+  }, [user?.username, isSaida, itens, quantidades, quantidadesTam, isTransito, romaneioId, filialDestino, filialOrigem, companySlug, destinoSelected, responsavelPadrao, tipo, dataEmissaoProp]);
 
   // Desconfirma item individualmente (sem reverter estoque)
   const handleDesconfirmar = useCallback(async (produto: string, corProduto: string | null) => {
@@ -935,11 +989,14 @@ export default function RomaneioDetalhePage({
           companyKey: companySlug,
           filial: filialDestino,
           filialDestino: darSaidaDestino,
-          itens: itens.map((item) => ({
-            produto: item.produto,
-            corProduto: item.corProduto,
-            quantidade: item.qtde,
-          })),
+          // Peça P/M/G sai nos mesmos tamanhos em que entrou (tamanho obrigatório).
+          itens: itens.flatMap((item) =>
+            conferePorTamanho(item)
+              ? item.tamanhos!
+                  .filter((t) => t.qtde > 0)
+                  .map((t) => ({ produto: item.produto, corProduto: item.corProduto, quantidade: t.qtde, tamanho: t.ordinal }))
+              : [{ produto: item.produto, corProduto: item.corProduto, quantidade: item.qtde }]
+          ),
           tipoRomaneio: "TRANSFERENCIA ENTRE LOJAS",
           responsavel: responsavelPadrao || "",
         }),
@@ -1641,6 +1698,48 @@ export default function RomaneioDetalhePage({
                         </div>
                       ) : travaInventario ? (
                         <span className={styles.travaInventarioCell}>🔒 não confirmado</span>
+                      ) : isSaida && conferePorTamanho(item) ? (
+                        /* Peça P/M/G: informa o que chegou em CADA tamanho. */
+                        <div className={styles.qtdeInputWrap}>
+                          {item.tamanhos!.map((t) => {
+                            const porTam = quantidadesTam.get(chave) ?? {};
+                            const valor = porTam[t.ordinal] ?? t.qtde;
+                            return (
+                              <div key={t.ordinal} className={styles.qtdeTamRow}>
+                                <span className={styles.qtdeTamLabel} title={`Enviado: ${t.qtde}`}>
+                                  {t.label}
+                                </span>
+                                <button
+                                  type="button"
+                                  className={styles.qtdeSpinBtn}
+                                  onClick={() => updateQuantidadeTam(chave, t.ordinal, valor - 1)}
+                                >−</button>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  className={styles.qtdeInput}
+                                  value={valor}
+                                  onChange={(e) => updateQuantidadeTam(chave, t.ordinal, parseInt(e.target.value, 10) || 0)}
+                                />
+                                <button
+                                  type="button"
+                                  className={styles.qtdeSpinBtn}
+                                  onClick={() => updateQuantidadeTam(chave, t.ordinal, valor + 1)}
+                                >+</button>
+                              </div>
+                            );
+                          })}
+                          {temDivergenciaInput && qtdeAtual > 0 && (
+                            <div className={styles.divergenciaAviso}>
+                              {qtdeAtual < item.qtde
+                                ? `⚠ Faltam ${item.qtde - qtdeAtual} un. (romaneio: ${item.qtde})`
+                                : `⚠ Excesso de ${qtdeAtual - item.qtde} un. (romaneio: ${item.qtde})`}
+                            </div>
+                          )}
+                          {qtdeAtual === 0 && (
+                            <div className={styles.divergenciaAviso}>⚠ Item será ignorado</div>
+                          )}
+                        </div>
                       ) : (
                         <div className={styles.qtdeInputWrap}>
                           <div className={styles.qtdeInputRow}>

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { withRequest } from '@/lib/db/connection';
 import sql from 'mssql';
 
-import { MAX_TAMANHOS_GRADE, type TamanhoGrade } from '@/lib/utils/grade-tamanhos';
+import { gradeEhFashion, MAX_TAMANHOS_GRADE, type TamanhoGrade } from '@/lib/utils/grade-tamanhos';
 
 /**
  * Colunas posicionais da grade apelidadas T1..T48. Cada tabela usa um prefixo:
@@ -31,7 +31,9 @@ interface LogDetalheItem {
    * Quantidade do romaneio por tamanho da grade (P/M/G...), na ordem da grade. Vazio em
    * produto de tamanho único — lenço, eletrônico — que segue mostrando só o total.
    */
-  tamanhos: Array<{ label: string; qtde: number }>;
+  tamanhos: Array<{ ordinal: number; label: string; qtde: number }>;
+  /** Peça P/M/G (gradeEhFashion): a confirmação é por tamanho. */
+  exigeTamanho: boolean;
   estoqueOrigem: number;
   estoqueDestino: number;
   filialOrigem?: string;
@@ -382,9 +384,11 @@ export async function GET(request: Request) {
         grade: row.GRADE?.toString().trim() ?? '',
         qtde: Number(row.QTDE) || 0,
         tamanhos: (tamanhosPorGrade.get(row.GRADE?.toString().trim() ?? '') ?? []).map((t) => ({
+          ordinal: t.ordinal,
           label: t.label,
           qtde: Number(row[`T${t.ordinal}`]) || 0,
         })),
+        exigeTamanho: gradeEhFashion(tamanhosPorGrade.get(row.GRADE?.toString().trim() ?? '') ?? []),
         estoqueOrigem,
         estoqueDestino,
         filialOrigem: nomeOrigem,

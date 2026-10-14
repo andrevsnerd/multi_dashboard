@@ -5,9 +5,24 @@ import { getPermissaoByUsername } from "@/lib/utils/transferencia-permissoes-sto
 import { operaNaFilial } from "@/lib/utils/transferencia-permissoes-filiais";
 import {
   getConfirmados,
+  getConfirmacaoItem,
   confirmarItem,
   desconfirmarItem,
 } from "@/lib/utils/romaneio-confirmacao-store";
+import { encontrarNomeContagemLivre, executarAjusteContagem } from "@/lib/ajuste-estoque-executor";
+import { carregarGradeDaSaida, carregarGrades, chaveSku } from "@/lib/server/grade-produto";
+
+/** `{ "2": 1, "3": 2 }` → `{ 2: 1, 3: 2 }`; inválido/vazio → null. */
+function normalizarTamanhos(raw: unknown): Record<number, number> | null {
+  if (!raw || typeof raw !== "object") return null;
+  const out: Record<number, number> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    const t = Number(k);
+    const q = Math.floor(Number(v));
+    if (Number.isInteger(t) && t >= 1 && t <= 48 && Number.isFinite(q) && q >= 0) out[t] = q;
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
 import { withRequest, getConnectionPool } from "@/lib/db/connection";
 import sql from "mssql";
 import { getActiveFilial } from "@/lib/config/company";
@@ -17,6 +32,122 @@ import { resolveResponsavelLinx } from "@/lib/server/responsavel-linx";
 import { inserirAjuste } from "@/lib/repositories/ajuste-historico";
 import { executeItemQtdeSet } from "@/lib/saida-entrada-executor";
 import { mensagemTravaInventario, verificarTravaInventario } from "@/lib/server/trava-inventario";
+
+/**
+ * Tira do destino a quantidade que tinha sido confirmada (desconfirmar).
+ *
+ *  - Com o romaneio de entrada vinculado à confirmação: reduz o item nesse
+ *    romaneio (`executeItemQtdeSet` — QTDE + EN_n juntos, o trigger tira do
+ *    ESTOQUE e da grade).
+ *  - Confirmação antiga, sem vínculo: ajuste por contagem até o saldo menos o
+ *    confirmado, nunca abaixo de zero (regra da casa).
+ *
+ * Lança erro se o Linx recusar; devolve a descrição do que foi feito.
+ */
+async function reverterEntradaNoDestino(p: {
+  filialDestino: string;
+  produto: string;
+  cor: string;
+  qtdeConfirmada: number;
+  romaneioEntrada: string;
+  romaneioSaida: string;
+  responsavel: string;
+}): Promise<string> {
+  const pool = shouldUseProxy() ? new ProxyPool() : await getConnectionPool();
+
+  const filialNome = await withRequest(async (req) => {
+    req.input("filial", sql.VarChar, p.filialDestino);
+    const r = await req.query<{ FILIAL: string }>(`
+      SELECT TOP 1 RTRIM(FILIAL) AS FILIAL FROM FILIAIS WITH (NOLOCK)
+       WHERE LTRIM(RTRIM(COD_FILIAL)) = LTRIM(RTRIM(@filial)) OR LTRIM(RTRIM(FILIAL)) = LTRIM(RTRIM(@filial))
+    `);
+    return r.recordset[0]?.FILIAL?.trim() || p.filialDestino;
+  });
+
+  if (p.romaneioEntrada) {
+    const qtdeNaEntrada = await withRequest(async (req) => {
+      req.input("romaneio", sql.VarChar, p.romaneioEntrada);
+      req.input("filial", sql.VarChar, filialNome);
+      req.input("produto", sql.VarChar, p.produto);
+      req.input("cor", sql.VarChar, p.cor);
+      const r = await req.query<{ qtde: number }>(`
+        SELECT TOP 1 ISNULL(i.QTDE, 0) AS qtde
+          FROM ESTOQUE_PROD1_ENT i WITH (NOLOCK)
+         WHERE LTRIM(RTRIM(i.ROMANEIO_PRODUTO)) = @romaneio
+           AND LTRIM(RTRIM(i.FILIAL)) = LTRIM(RTRIM(@filial))
+           AND LTRIM(RTRIM(i.PRODUTO)) = @produto
+           AND (
+             ISNULL(LTRIM(RTRIM(CAST(i.COR_PRODUTO AS VARCHAR(20)))), '') = @cor
+             OR TRY_CONVERT(INT, i.COR_PRODUTO) = TRY_CONVERT(INT, @cor)
+           )
+      `);
+      return r.recordset.length > 0 ? Number(r.recordset[0].qtde) || 0 : null;
+    });
+    if (qtdeNaEntrada === null) {
+      throw new Error(
+        `${p.produto}${p.cor ? ` cor ${p.cor}` : ""} não está no romaneio de entrada ${p.romaneioEntrada} de ${filialNome}.`
+      );
+    }
+
+    const res = await executeItemQtdeSet(pool, {
+      tipo: "entrada",
+      romaneio: p.romaneioEntrada,
+      filial: filialNome,
+      produto: p.produto,
+      corProduto: p.cor,
+      qtdeNova: Math.max(0, qtdeNaEntrada - p.qtdeConfirmada),
+    });
+    if (res.delta !== 0) {
+      inserirAjuste({
+        filial: res.filial,
+        itens: [{ produto: p.produto, cor: p.cor, qtde: res.delta }],
+        romaneioRef: p.romaneioEntrada,
+        tipoAjuste: "DESCONFIRMACAO_ENTRADA",
+        responsavel: p.responsavel,
+        obs: `Desconfirmação da saída ${p.romaneioSaida}: entrada ${res.qtdeAnterior} → ${res.qtdeNova}`,
+      }).catch((e) => console.error("[ajuste-historico] Falha ao registrar auditoria:", e));
+    }
+    return `Entrada ${p.romaneioEntrada} em ${res.filial}: ${res.qtdeAnterior} → ${res.qtdeNova}.`;
+  }
+
+  const estoqueAtual = await withRequest(async (req) => {
+    req.input("filial", sql.VarChar, filialNome);
+    req.input("produto", sql.VarChar, p.produto);
+    req.input("cor", sql.VarChar, p.cor);
+    const r = await req.query<{ estoque: number }>(`
+      SELECT TOP 1 ISNULL(ESTOQUE, 0) AS estoque
+        FROM ESTOQUE_PRODUTOS WITH (NOLOCK)
+       WHERE LTRIM(RTRIM(FILIAL)) = LTRIM(RTRIM(@filial))
+         AND LTRIM(RTRIM(PRODUTO)) = @produto
+         AND (
+           ISNULL(LTRIM(RTRIM(CAST(COR_PRODUTO AS VARCHAR(20)))), '') = @cor
+           OR TRY_CONVERT(INT, COR_PRODUTO) = TRY_CONVERT(INT, @cor)
+         )
+    `);
+    return Number(r.recordset[0]?.estoque ?? 0);
+  });
+  const alvo = Math.max(0, estoqueAtual - p.qtdeConfirmada);
+  if (alvo === estoqueAtual) {
+    return `${filialNome} não tem saldo de ${p.produto} para devolver (saldo ${estoqueAtual}): só a confirmação foi desfeita.`;
+  }
+
+  const hoje = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }); // YYYY-MM-DD
+  const [ano, mes, dia] = hoje.split("-");
+  const poolLike = pool as unknown as { request: () => unknown };
+  const nomeContagem = await encontrarNomeContagemLivre(poolLike, `DESCONF${dia}${mes}`);
+  await executarAjusteContagem(poolLike, {
+    filialNome,
+    nomeContagem,
+    emissao: `${ano}-${mes}-${dia} 00:00:00`,
+    responsavel: p.responsavel,
+    obs: `DESCONFIRMACAO ROMANEIO ${p.romaneioSaida}`,
+    itens: [{ produto: p.produto, cor: p.cor, contagem: alvo }],
+  });
+  return (
+    `${filialNome}: ajuste de −${estoqueAtual - alvo} (contagem ${nomeContagem}) — confirmação antiga, ` +
+    "sem romaneio de entrada vinculado."
+  );
+}
 
 /**
  * GET /api/romaneio-confirmar-entrada?company=X&romaneio=Y&filialDestino=Z
@@ -103,6 +234,8 @@ export async function POST(request: Request) {
       romaneioEntrada?: string;
       /** Data de emissão do romaneio (a que a tela mostra) — usada pela trava de inventário. */
       dataRomaneio?: string;
+      /** Peça P/M/G: o que chegou em cada tamanho {posição: qtd}. */
+      tamanhosConfirmados?: Record<string, number> | null;
     };
 
     const { companyKey, romaneioId, filialDestino, produto, corProduto, qtdeConfirmada = 0, acao } = body;
@@ -167,35 +300,48 @@ export async function POST(request: Request) {
     }
 
     if (acao === "desconfirmar") {
-      // Busca a qtde confirmada antes de deletar para reverter o estoque
-      const confirmadosMap = await getConfirmados(companyKey, romaneioId, filialDestinoAtiva);
-      const chave = `${produto}|${(corProduto ?? "").trim()}`;
-      const qtdeConfirmada = confirmadosMap.get(chave) ?? 0;
+      // DESCONFIRMAR = a peça não entrou no destino. Reverte o estoque do destino
+      // ANTES de apagar a confirmação: se o Linx recusar (trava de ajuste, saldo
+      // que não pode ficar negativo), nada muda e o operador vê o motivo — apagar
+      // a confirmação sem reverter faria uma nova confirmação dar entrada em dobro.
+      //
+      // Nunca `UPDATE ESTOQUE_PRODUTOS SET ESTOQUE = …` (era o que esta rota fazia
+      // até 14/10/2026): mexe só no total, a grade ES1..ES48 fica para trás e a
+      // entrada continua no Linx. Mesmo padrão da correção de destino da tela
+      // Defeitos (app/api/defeitos/item).
+      const confirmacao = await getConfirmacaoItem(
+        companyKey,
+        romaneioId,
+        filialDestinoAtiva,
+        produto,
+        corProduto ?? ""
+      );
+      const qtdeConfirmada = confirmacao?.qtdeConfirmada ?? 0;
+      let destino: string | null = null;
+
+      if (qtdeConfirmada > 0) {
+        try {
+          destino = await reverterEntradaNoDestino({
+            filialDestino: (filialDestinoAtiva || "").trim(),
+            produto: (produto || "").trim(),
+            cor: (corProduto ?? "").trim(),
+            qtdeConfirmada,
+            romaneioEntrada: confirmacao?.romaneioEntrada ?? "",
+            romaneioSaida: romaneioId,
+            responsavel: await resolveResponsavelLinx(username),
+          });
+        } catch (e) {
+          return NextResponse.json(
+            {
+              error: `A confirmação não foi desfeita: ${e instanceof Error ? e.message : "o estoque do destino não pôde ser revertido."}`,
+            },
+            { status: 409 }
+          );
+        }
+      }
 
       await desconfirmarItem(companyKey, romaneioId, filialDestinoAtiva, produto, corProduto ?? "");
-
-      // Reverte o estoque do destino se havia quantidade confirmada
-      if (qtdeConfirmada > 0) {
-        const fd = (filialDestinoAtiva || "").trim();
-        const p = (produto || "").trim();
-        const cor = (corProduto ?? "").trim();
-        await withRequest(async (req) => {
-          req.input("qtde", sql.Int, qtdeConfirmada);
-          req.input("produto", sql.VarChar, p);
-          req.input("cor", sql.VarChar, cor);
-          req.input("filialDestino", sql.VarChar, fd);
-          await req.query(`
-            UPDATE ep
-            SET ep.ESTOQUE = ep.ESTOQUE - @qtde
-            FROM ESTOQUE_PRODUTOS ep
-            INNER JOIN FILIAIS f WITH (NOLOCK) ON LTRIM(RTRIM(ep.FILIAL)) = LTRIM(RTRIM(f.FILIAL))
-            WHERE ep.PRODUTO = @produto
-              AND ISNULL(ep.COR_PRODUTO, '') = @cor
-              AND (LTRIM(RTRIM(f.COD_FILIAL)) = LTRIM(RTRIM(@filialDestino))
-                   OR LTRIM(RTRIM(f.FILIAL)) = LTRIM(RTRIM(@filialDestino)))
-          `);
-        });
-      }
+      return NextResponse.json({ success: true, acao, destino });
     } else {
       // CONFERIU MENOS DO QUE SAIU → a peça que não chegou volta para a loja.
       //
@@ -232,7 +378,46 @@ export async function POST(request: Request) {
             return Number(r.recordset[0]?.qtde ?? 0);
           });
 
-          if (qtdeSaida > qtdeConfirmada) {
+          // Peça P/M/G conferida tamanho a tamanho: a saída passa a valer o que
+          // chegou em CADA tamanho (inclusive saída antiga que foi toda no P e
+          // chegou em M). Só quando não chegou mais do que saiu.
+          const tamanhosConf = normalizarTamanhos(body.tamanhosConfirmados);
+          const gradeSaida = tamanhosConf
+            ? (await carregarGradeDaSaida(romaneioId, filialOrigem, [produto])).get(chaveSku(produto, corProduto))
+            : undefined;
+          const tamanhoDifere =
+            !!tamanhosConf && !!gradeSaida && gradeSaida.some((q, i) => q !== (tamanhosConf[i + 1] ?? 0));
+
+          if (tamanhosConf && tamanhoDifere && qtdeConfirmada <= qtdeSaida) {
+            const pool = shouldUseProxy() ? new ProxyPool() : await getConnectionPool();
+            const res = await executeItemQtdeSet(pool, {
+              tipo: "saida",
+              romaneio: romaneioId,
+              filial: filialOrigem,
+              produto,
+              corProduto: corProduto ?? "",
+              tamanhos: tamanhosConf,
+            });
+            const rotulos = (await carregarGrades([produto])).get(produto.trim())?.tamanhos ?? [];
+            const descrever = (porTam: (i: number) => number) =>
+              rotulos.map((t) => `${t.label}:${porTam(t.ordinal)}`).filter((s) => !s.endsWith(":0")).join(" ") || "0";
+            origem = {
+              corrigido: true,
+              detalhe:
+                `Saída ${romaneioId} acertada por tamanho em ${res.filial}: ` +
+                `${descrever((o) => gradeSaida![o - 1] ?? 0)} → ${descrever((o) => tamanhosConf[o] ?? 0)}.`,
+            };
+            inserirAjuste({
+              filial: res.filial,
+              itens: [{ produto, cor: (corProduto ?? "").trim(), qtde: -res.delta }],
+              romaneioRef: romaneioId,
+              tipoAjuste: "CORRECAO_CONFERENCIA_SAIDA",
+              responsavel: await resolveResponsavelLinx(username),
+              obs: `Conferência de ${fd} por tamanho: ${res.qtdeAnterior} → ${res.qtdeNova}`,
+            }).catch((e) =>
+              console.error("[ajuste-historico] Falha ao registrar auditoria:", e)
+            );
+          } else if (!tamanhosConf && qtdeSaida > qtdeConfirmada) {
             const pool = shouldUseProxy() ? new ProxyPool() : await getConnectionPool();
             const res = await executeItemQtdeSet(pool, {
               tipo: "saida",

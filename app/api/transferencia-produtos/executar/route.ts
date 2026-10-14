@@ -11,6 +11,9 @@ import { getPermissaoByUsername } from '@/lib/utils/transferencia-permissoes-sto
 import { resolveResponsavelLinx } from '@/lib/server/responsavel-linx';
 import { mensagemTravaEstoqueNegativo, verificarSaldoSaida } from '@/lib/server/trava-estoque-negativo';
 
+/** Ver o bloco no início do POST. */
+const TRANSFERENCIA_LEGADA_DESATIVADA = true;
+
 interface TransferenciaRequest {
   produto: string;
   corProduto: string | null;
@@ -56,6 +59,23 @@ export async function POST(request: Request) {
     const username = request.headers.get('x-auth-username')?.trim();
     const readOnly = await readOnlyBlock(username);
     if (readOnly) return readOnly;
+    // DESATIVADA em 14/10/2026. `executeTransfer` grava os itens SEM a coluna de
+    // grade (SA_n/EN_n) e acerta `ESTOQUE_PRODUTOS.ESTOQUE` com UPDATE na mão: o
+    // total anda e ES1..ES48 não — ESTOQUE ≠ soma(ES) em centenas de linhas
+    // (fev–abr/2026) e romaneio que a exclusão não reverte. Sem uso desde 09/04/2026;
+    // transferência se faz pela tela Saídas/Entradas (executor por trigger). Só
+    // reativar depois de o executor gravar pela grade e deixar o trigger mover o estoque.
+    if (TRANSFERENCIA_LEGADA_DESATIVADA) {
+      return NextResponse.json(
+        {
+          error:
+            'Esta tela de transferência foi desativada porque gravava o estoque de forma inconsistente. ' +
+            'Use a tela Saídas/Entradas de Produtos para transferir.',
+        },
+        { status: 410 }
+      );
+    }
+
     const body = (await request.json()) as TransferenciaRequest;
     const {
       produto,
