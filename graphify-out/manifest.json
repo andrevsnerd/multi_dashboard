@@ -965,8 +965,8 @@
     "semantic_hash": ""
   },
   "app/api/saidas-entradas-produtos/executar/route.ts": {
-    "mtime": 1791226043.8402982,
-    "ast_hash": "7d854a2c672805b7e110741012153123",
+    "mtime": 1791994086.487794,
+    "ast_hash": "4bd9c7db70078015553f558d4fd28ce6",
     "semantic_hash": ""
   },
   "app/api/saidas-entradas-produtos/historico/route.ts": {
@@ -1005,8 +1005,8 @@
     "semantic_hash": "abf83b5447e534f2ea52216e1abd4669"
   },
   "app/api/transferencia-produtos/executar/route.ts": {
-    "mtime": 1785427853.4118102,
-    "ast_hash": "a7434a9aff8fd2cb46ba8095a18436fa",
+    "mtime": 1791994097.0316844,
+    "ast_hash": "a049a9a7333f9e9ebe0584c94dac1d19",
     "semantic_hash": ""
   },
   "app/api/transferencia-produtos/filiais/route.ts": {
@@ -2595,8 +2595,8 @@
     "semantic_hash": ""
   },
   "lib/saida-entrada-executor.js": {
-    "mtime": 1790192980.738006,
-    "ast_hash": "4fb285b6fd95f3927e23188a4631b900",
+    "mtime": 1791994108.925927,
+    "ast_hash": "f4a9544c4a6b5339d81c6f3b9285f32c",
     "semantic_hash": ""
   },
   "lib/server/company-live.ts": {
@@ -4400,8 +4400,8 @@
     "semantic_hash": ""
   },
   "lib/config/saida-estoque-negativo.ts": {
-    "mtime": 1788446768.450554,
-    "ast_hash": "6fcf5da2dd246d2b33fbb9b4b2a51969",
+    "mtime": 1791994121.6107213,
+    "ast_hash": "01b38c5ef4d46a424fc7d297ef27e1d2",
     "semantic_hash": ""
   },
   "scripts/backfill-custo-entradas.mjs": {
@@ -4410,8 +4410,8 @@
     "semantic_hash": ""
   },
   "app/api/saidas-entradas-produtos/saida-editar/route.ts": {
-    "mtime": 1788897970.1168025,
-    "ast_hash": "c9c9a79fdd919feab9fdd5492f92c202",
+    "mtime": 1791994099.223271,
+    "ast_hash": "d53867821679786941ac1c5655293d11",
     "semantic_hash": ""
   },
   "lib/reports/tickets.ts": {
@@ -5007,6 +5007,11 @@
   "lib/financeiro/normalizacao.ts": {
     "mtime": 1791984475.638334,
     "ast_hash": "f755175502161b3764b8c84ef357f02a",
+    "semantic_hash": ""
+  },
+  "lib/server/trava-estoque-negativo.ts": {
+    "mtime": 1791994071.3400905,
+    "ast_hash": "80cd0271de2b5dd52656acecb5d78e88",
     "semantic_hash": ""
   }
 }

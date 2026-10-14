@@ -18,6 +18,7 @@ import {
   podeIgnorarTravaDefeito,
 } from '@/lib/server/trava-defeito';
 import { mensagemTravaInventario, verificarTravaInventario } from '@/lib/server/trava-inventario';
+import { mensagemTravaEstoqueNegativo, verificarSaldoSaida } from '@/lib/server/trava-estoque-negativo';
 import {
   buscarEntradaJaFeita,
   mensagemEntradaDuplicada,
@@ -357,6 +358,18 @@ export async function POST(request: Request) {
             code: 'ENTRADA_DUPLICADA',
             entradaExistente: jaFeita,
           },
+          { status: 409 }
+        );
+      }
+    }
+
+    // TRAVA DE ESTOQUE NEGATIVO — filial com PERMITE_EST_NEGATIVO = 0 no Linx
+    // (ex.: NERD matriz) não sai além do saldo. Ver lib/server/trava-estoque-negativo.ts.
+    if (tipoOperacao === 'saida') {
+      const travaSaldo = await verificarSaldoSaida(filialTrim, itens);
+      if (travaSaldo) {
+        return NextResponse.json(
+          { error: mensagemTravaEstoqueNegativo(travaSaldo), travaEstoqueNegativo: travaSaldo },
           { status: 409 }
         );
       }

@@ -8,28 +8,25 @@
  * tem estoque. Isso vale para toda loja — saldo negativo em loja é ruptura /
  * erro de inventário, e deixar sair mais fundo esconde o problema.
  *
- * A NERD MATRIZ é o único ponto onde isso atrapalha: ela é depósito, então o
- * saldo dela fica negativo por atraso de lançamento de entrada, e a peça que
- * precisa sair para a loja está fisicamente lá. Nessas condições a trava
- * bloqueia uma operação real, então a MATRIZ (e só ela) sai no negativo.
+ * HISTÓRICO: de 03/09 a 14/10/2026 a NERD MATRIZ ficou liberada aqui (saldo
+ * negativo "por atraso de lançamento de entrada"). Revogado a pedido do dono em
+ * 14/10/2026: a matriz acumulou 636 peças negativas (ex.: saída 032435, troca
+ * Uniq, 38 peças com 11 em estoque). A matriz foi zerada e o Linx passou a
+ * recusar negativo nela (FILIAIS.PERMITE_EST_NEGATIVO = 0) — liberar aqui de
+ * novo só faria a gravação falhar no trigger. Não reativar.
  *
- * Nada de servidor muda: `/api/saidas-entradas-produtos/executar` nunca
- * conferiu saldo — quem trava é a tela. Este módulo é a fonte única de "quem
- * pode", para a exceção não se espalhar em condições soltas pelo componente.
+ * O servidor também confere o saldo antes de gravar, pela mesma regra do Linx:
+ * `lib/server/trava-estoque-negativo.ts`. Este módulo é só a trava da tela.
  *
- * NÃO afeta: entrada (que já aceita saldo zero/negativo), transferências de
- * outras telas, ou qualquer outra filial.
+ * NÃO afeta: entrada (que já aceita saldo zero/negativo).
  */
 
 /**
  * Nomes que identificam a filial liberada, por empresa. Vale tanto o FILIAL do
- * Linx (`NERD`, id 000069) quanto o rótulo do registry (`MATRIZ`) — a tela
- * compara todos os apelidos da filial selecionada, e a lista dupla evita que
- * um rename no ERP derrube a exceção.
+ * Linx quanto o rótulo do registry — a tela compara todos os apelidos da filial
+ * selecionada. Vazio: nenhuma filial sai no negativo.
  */
-const FILIAIS_SAIDA_NEGATIVA_POR_EMPRESA: Record<string, string[]> = {
-  nerd: ['NERD', 'MATRIZ'],
-};
+const FILIAIS_SAIDA_NEGATIVA_POR_EMPRESA: Record<string, string[]> = {};
 
 /** Compara nomes de filial tolerando caixa e espaços duplicados (ver Galeão RJ). */
 function normalizeNome(value: string | null | undefined): string {

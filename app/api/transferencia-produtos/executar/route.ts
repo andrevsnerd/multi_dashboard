@@ -9,6 +9,7 @@ import { shouldUseProxy, forwardTransferToProxy } from '@/lib/db/proxy';
 import { executeTransfer } from '@/lib/transfer-executor';
 import { getPermissaoByUsername } from '@/lib/utils/transferencia-permissoes-store';
 import { resolveResponsavelLinx } from '@/lib/server/responsavel-linx';
+import { mensagemTravaEstoqueNegativo, verificarSaldoSaida } from '@/lib/server/trava-estoque-negativo';
 
 interface TransferenciaRequest {
   produto: string;
@@ -122,6 +123,16 @@ export async function POST(request: Request) {
           );
         }
       }
+    }
+
+    // TRAVA DE ESTOQUE NEGATIVO — origem com PERMITE_EST_NEGATIVO = 0 no Linx
+    // (ex.: NERD matriz) não transfere além do saldo. Ver lib/server/trava-estoque-negativo.ts.
+    const travaSaldo = await verificarSaldoSaida(fo, [{ produto, corProduto, quantidade: qtdeSaida }]);
+    if (travaSaldo) {
+      return NextResponse.json(
+        { error: mensagemTravaEstoqueNegativo(travaSaldo), travaEstoqueNegativo: travaSaldo },
+        { status: 409 }
+      );
     }
 
     if (shouldUseProxy()) {

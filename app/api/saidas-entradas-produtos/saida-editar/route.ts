@@ -8,6 +8,7 @@ import { readOnlyBlock } from '@/lib/auth/route-guards';
 import { canEditarRomaneioSaida } from '@/lib/auth/permissions';
 import { resolveResponsavelLinx } from '@/lib/server/responsavel-linx';
 import { inserirAjuste } from '@/lib/repositories/ajuste-historico';
+import { mensagemTravaEstoqueNegativo, verificarSaldoSaida } from '@/lib/server/trava-estoque-negativo';
 import { getConfirmados } from '@/lib/utils/romaneio-confirmacao-store';
 import {
   executeSaidaAppend,
@@ -323,6 +324,16 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
+    }
+
+    // TRAVA DE ESTOQUE NEGATIVO — acrescentar item tira estoque na hora; filial com
+    // PERMITE_EST_NEGATIVO = 0 não passa do saldo. Ver lib/server/trava-estoque-negativo.ts.
+    const travaSaldo = await verificarSaldoSaida(filial, itens);
+    if (travaSaldo) {
+      return NextResponse.json(
+        { error: mensagemTravaEstoqueNegativo(travaSaldo), travaEstoqueNegativo: travaSaldo },
+        { status: 409 }
+      );
     }
 
     const pool = shouldUseProxy() ? new ProxyPool() : await getConnectionPool();
