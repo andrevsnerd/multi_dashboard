@@ -7,7 +7,6 @@ import Dre from "./Dre";
 import FluxoCaixa from "./FluxoCaixa";
 import Importacoes from "./Importacoes";
 import Lancamentos from "./Lancamentos";
-import Normalizacao from "./Normalizacao";
 import Planilha from "./Planilha";
 import Recebimentos from "./Recebimentos";
 import UploadModal from "./UploadModal";
@@ -31,7 +30,6 @@ type Aba =
   | "recebimentos"
   | "budget"
   | "planilha"
-  | "normalizacao"
   | "importacoes";
 
 const ABAS: { key: Aba; label: string }[] = [
@@ -42,7 +40,6 @@ const ABAS: { key: Aba; label: string }[] = [
   { key: "recebimentos", label: "Recebimentos" },
   { key: "budget", label: "Budget" },
   { key: "planilha", label: "Planilha (todas as abas)" },
-  { key: "normalizacao", label: "Normalização" },
   { key: "importacoes", label: "Importações" },
 ];
 
@@ -191,7 +188,6 @@ export default function ControleFinanceiroPage({ companyKey, companyName }: Prop
                 <div className={styles.aviso}>A planilha não trouxe a aba de budget.</div>
               ))}
             {aba === "planilha" && <Planilha companyKey={companyKey} abas={meta.abas} />}
-            {aba === "normalizacao" && <Normalizacao companyKey={companyKey} onMudou={() => undefined} />}
             {aba === "importacoes" && <Importacoes companyKey={companyKey} versao={versao} />}
           </div>
         </>

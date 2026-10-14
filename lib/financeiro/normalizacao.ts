@@ -59,7 +59,8 @@ const SIGLAS = new Set(
     "nf nfe nfs nfse cnpj cpf cnh rg adm rh ti vr vt va plr pj clt mei ecad pcmso aso cipa epi sesmt nr " +
     "spc ted doc pix sms uv led tv dvd usb pc cd ia epp cmv dre crc oab cef bb " +
     "drr fsz rsr jjj rjr fff lll jrr frs msc fffr ffffr csm jk gru lon vff mbm ppi " +
-    "sp rj bh mg rs pr sc ba pe df mt ms rn pb ro rr cbmerj mac gb nv rk pct ok ir cs nk masp"
+    "sp rj bh mg rs pr sc ba pe df mt ms rn pb ro rr cbmerj mac gb nv rk pct ok ir cs nk masp " +
+    "dp ppra crm tfe sat rais rrt pf ups ean wgsn bndes"
   ).split(" ")
 );
 
@@ -217,7 +218,10 @@ const CORRECOES: Record<string, string> = Object.fromEntries(
     "envelpe:envelope alimetacao:alimentação alavara:alvará extornado:estornado extorno:estorno " +
     "inernacional:internacional tinhimento:tingimento photorrom:photoroom cotratual:contratual acustia:acústica " +
     "inverntario:inventário indevda:indevida peclas:peças quisosques:quiosques notnook:notebook notbook:notebook " +
-    "consccerto:conserto conscerto:conserto manequin:manequim manequins:manequins"
+    "consccerto:conserto conscerto:conserto manequin:manequim manequins:manequins " +
+    "bonnus:bônus bonus:bônus desinger:designer compplemnto:complemento gsp:gps pcmo:pcmso agual:água " +
+    "servilcos:serviços paracela:parcela depostitante:depositante bnds:bndes titulos:títulos titulo:título " +
+    "condiconado:condicionado"
   )
     .split(" ")
     .map((p) => p.split(":") as [string, string])
@@ -324,19 +328,69 @@ function formatarPalavra(
   if (UNIDADES.has(chave)) return lower;
   const corrigida = dic.palavras.get(chave) ?? ACENTOS[chave] ?? lower;
   if (GRAFIAS[chaveTexto(corrigida)]) return GRAFIAS[chaveTexto(corrigida)];
+  if (SIGLAS.has(chaveTexto(corrigida))) return corrigida.toLocaleUpperCase("pt-BR"); // "gsp" → "GPS"
   // "Com." (comércio) é abreviação, não o conectivo "com".
   if (!primeira && !abreviada && CONECTIVOS.has(chave)) return corrigida;
   return capitalizar(corrigida);
 }
 
+const LETRA = "A-Za-zÀ-ÖØ-öø-ÿ";
+
+/** Abreviações que só têm um significado (o ponto final da abreviação some junto). */
+const EXPANSOES: Record<string, string> = {
+  pgto: "pagamento",
+  pagto: "pagamento",
+  pagamto: "pagamento",
+  adto: "adiantamento",
+  fds: "fim de semana",
+};
+
+/**
+ * Abreviações que dependem da aba: na Funcionários "VR" é vale-refeição; em Outros
+ * também é nome de empresa ("VR Sistem Sat"), então lá fica como está.
+ */
+const EXPANSOES_POR_ABA: Record<string, Record<string, string>> = {
+  funcionarios: { vr: "vale refeição", vt: "vale transporte", va: "vale alimentação" },
+};
+
+function expandir(s: string, mapa: Record<string, string>): string {
+  const chaves = Object.keys(mapa);
+  if (!chaves.length) return s;
+  const re = new RegExp(`(?<![${LETRA}])(${chaves.join("|")})(?![${LETRA}])\\.?`, "gi");
+  return s.replace(re, (_m, p: string) => mapa[p.toLowerCase()]);
+}
+
+const MESES_NOME =
+  "Janeiro|Fevereiro|Março|Abril|Maio|Junho|Julho|Agosto|Setembro|Outubro|Novembro|Dezembro|" +
+  "Jan|Fev|Mar|Abr|Mai|Jun|Jul|Ago|Set|Out|Nov|Dez";
+const ORDINAL_FEMININO: Record<string, string> = { primeira: "1ª", segunda: "2ª", terceira: "3ª", quarta: "4ª", quinta: "5ª" };
+
+/** Regras de frase aplicadas depois da formatação das palavras. */
+function ajustarFrases(s: string): string {
+  return (
+    s
+      // Barra entre palavras sempre com espaço: "PIS/COFINS", "PIS /COFINS" → "PIS / COFINS".
+      // Não mexe em "S/Folha" (uma letra), "1/2" nem "Mai/21".
+      .replace(new RegExp(`([${LETRA}]{2,})\\s*/\\s*(?=[${LETRA}]{2})`, "g"), "$1 / ")
+      // Ordinal de palavra feminina: "2º Parcela" → "2ª Parcela"; "Segunda Parcela" → "2ª Parcela".
+      .replace(/(\d+)\s*[º°]\s*(?=(?:Parcelas?|Quinzena|Semana|Via|Vez)\b)/g, "$1ª ")
+      .replace(/\b(Primeira|Segunda|Terceira|Quarta|Quinta)\s+(?=Parcela\b)/g, (_m, o: string) => `${ORDINAL_FEMININO[o.toLowerCase()]} `)
+      // "13º 2ª Parcela" é o 13º salário.
+      .replace(/\b13º\s+(?=\d+ª\s+Parcela\b)/g, "13º Salário ")
+      // "VR Mês de Março" → "VR Março" (mantém "do Mês de Março").
+      .replace(new RegExp(`(?<!\\b(?:[Dd]o|[Nn]o|[Dd]este)\\s)Mês de\\s+(?=(?:${MESES_NOME})\\b)`, "g"), "")
+  );
+}
+
 /**
  * Forma de leitura de um texto da planilha. Determinística: o mesmo texto cru com
- * o mesmo dicionário dá sempre o mesmo resultado.
+ * o mesmo dicionário (e a mesma aba) dá sempre o mesmo resultado.
  */
 export function normalizarTexto(
   valor: string | null | undefined,
   campo: CampoNormalizado,
-  dic: Dicionario = DICIONARIO_PADRAO
+  dic: Dicionario = DICIONARIO_PADRAO,
+  contexto: { aba?: string | null } = {}
 ): string | null {
   if (valor == null) return null;
   let s = String(valor).normalize("NFC").replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
@@ -356,6 +410,11 @@ export function normalizarTexto(
     .replace(/\s+[-–—]\s*|\s*[-–—]\s+/g, " - ") // separador com espaço de um lado só
     .trim();
 
+  if (campo === "descricao") {
+    s = expandir(s, EXPANSOES);
+    s = expandir(s, EXPANSOES_POR_ABA[chaveTexto(contexto.aba ?? "")] ?? {});
+  }
+
   let primeira = true;
   s = s.replace(PALAVRA, (palavra, pos: number) => {
     // Conta como início se for o começo do texto ou vier depois de " - " / "(" / "/".
@@ -374,6 +433,7 @@ export function normalizarTexto(
       return `${esp}${inicio ? "À" : "à"} Vista`;
     })
     .replace(/\be-commerce\b/gi, "E-commerce");
+  s = ajustarFrases(s);
 
   // Unificação de valor também depois da formatação (ex.: "Higienoplis" já corrigido).
   return dic.valores.get(campo)?.get(chaveTexto(s)) ?? s;

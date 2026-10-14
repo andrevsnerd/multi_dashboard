@@ -30,24 +30,27 @@ export async function renormalizar(empresa: string, dic?: Dicionario): Promise<R
   const alterados: Record<string, number> = {};
 
   for (const campo of CAMPOS_NORMALIZADOS) {
+    // Descrição depende da aba ("VR" só vira vale-refeição na Funcionários).
+    const porAba = campo === "descricao";
     const rows = await sql.query(
-      `SELECT ${campo} AS v, ${campo}_fmt AS f FROM financeiro_registros
-       WHERE empresa = $1 AND ${campo} IS NOT NULL GROUP BY 1, 2`,
+      `SELECT ${porAba ? "aba" : "NULL::text"} AS a, ${campo} AS v, ${campo}_fmt AS f FROM financeiro_registros
+       WHERE empresa = $1 AND ${campo} IS NOT NULL GROUP BY 1, 2, 3`,
       [empresa]
     );
-    const mudar = new Map<string, string | null>();
-    for (const r of rows as { v: string; f: string | null }[]) {
-      const n = normalizarTexto(r.v, campo, d);
-      if (n !== r.f) mudar.set(r.v, n);
+    const mudar = new Map<string, { a: string | null; v: string; n: string | null }>();
+    for (const r of rows as { a: string | null; v: string; f: string | null }[]) {
+      const n = normalizarTexto(r.v, campo, d, { aba: r.a });
+      if (n !== r.f) mudar.set(`${r.a}\u0000${r.v}`, { a: r.a, v: r.v, n });
     }
-    const lista = [...mudar.entries()].map(([v, n]) => ({ v, n }));
+    const lista = [...mudar.values()];
     let total = 0;
     for (let i = 0; i < lista.length; i += LOTE_UPDATE) {
       const lote = lista.slice(i, i + LOTE_UPDATE);
       const res = await sql.query(
-        `WITH m AS (SELECT * FROM jsonb_to_recordset($2::jsonb) AS m(v text, n text))
+        `WITH m AS (SELECT * FROM jsonb_to_recordset($2::jsonb) AS m(a text, v text, n text))
          UPDATE financeiro_registros r SET ${campo}_fmt = m.n
-         FROM m WHERE r.empresa = $1 AND r.${campo} = m.v AND r.${campo}_fmt IS DISTINCT FROM m.n
+         FROM m WHERE r.empresa = $1 AND r.${campo} = m.v AND (m.a IS NULL OR r.aba = m.a)
+           AND r.${campo}_fmt IS DISTINCT FROM m.n
          RETURNING 1`,
         [empresa, JSON.stringify(lote)]
       );
