@@ -65,25 +65,62 @@ function writeFile(records: ConfirmacaoItem[]) {
 }
 
 // ---------- Neon ----------
+/**
+ * Garante a tabela — sem DDL no caminho normal.
+ *
+ * Até 14/10/2026 toda instância nova (serverless) rodava CREATE TABLE IF NOT
+ * EXISTS + dois ALTER TABLE ADD COLUMN IF NOT EXISTS antes da 1ª gravação. O
+ * ALTER pega lock exclusivo na tabela MESMO quando a coluna já existe, e DDL
+ * concorrente pode falhar com 23505 (ver memória ensure-table-ddl-corrida): a
+ * confirmação daquele item caía, e como a tela confirmava item a item sem olhar
+ * a resposta, sobravam itens "sem confirmar" no meio do romaneio (033462).
+ *
+ * Agora: uma leitura barata em information_schema; DDL só se faltar algo, com a
+ * promessa memoizada por processo e corrida de DDL tolerada.
+ */
+let tablePromise: Promise<void> | null = null;
 async function ensureTable(sql: ReturnType<typeof getNeonSql>) {
   if (tableChecked) return;
-  await sql`
-    CREATE TABLE IF NOT EXISTS romaneio_item_confirmado (
-      company_key    TEXT NOT NULL,
-      romaneio_id    TEXT NOT NULL,
-      filial_destino TEXT NOT NULL,
-      produto        TEXT NOT NULL,
-      cor_produto    TEXT NOT NULL DEFAULT '',
-      qtde_confirmada INTEGER NOT NULL DEFAULT 0,
-      confirmed_at   TIMESTAMPTZ DEFAULT NOW(),
-      confirmed_by   TEXT NOT NULL DEFAULT '',
-      PRIMARY KEY (company_key, romaneio_id, filial_destino, produto, cor_produto)
-    )
-  `;
-  // Garante coluna nova em tabelas já existentes
-  await sql`ALTER TABLE romaneio_item_confirmado ADD COLUMN IF NOT EXISTS qtde_confirmada INTEGER NOT NULL DEFAULT 0`;
-  await sql`ALTER TABLE romaneio_item_confirmado ADD COLUMN IF NOT EXISTS romaneio_entrada TEXT NOT NULL DEFAULT ''`;
-  tableChecked = true;
+  if (!tablePromise) {
+    tablePromise = (async () => {
+      const cols = (await sql`
+        SELECT column_name FROM information_schema.columns WHERE table_name = 'romaneio_item_confirmado'
+      `) as Array<{ column_name: string }>;
+      const tem = new Set(cols.map((c) => c.column_name));
+      try {
+        if (tem.size === 0) {
+          await sql`
+            CREATE TABLE IF NOT EXISTS romaneio_item_confirmado (
+              company_key    TEXT NOT NULL,
+              romaneio_id    TEXT NOT NULL,
+              filial_destino TEXT NOT NULL,
+              produto        TEXT NOT NULL,
+              cor_produto    TEXT NOT NULL DEFAULT '',
+              qtde_confirmada INTEGER NOT NULL DEFAULT 0,
+              confirmed_at   TIMESTAMPTZ DEFAULT NOW(),
+              confirmed_by   TEXT NOT NULL DEFAULT '',
+              PRIMARY KEY (company_key, romaneio_id, filial_destino, produto, cor_produto)
+            )
+          `;
+        }
+        if (!tem.has("qtde_confirmada")) {
+          await sql`ALTER TABLE romaneio_item_confirmado ADD COLUMN IF NOT EXISTS qtde_confirmada INTEGER NOT NULL DEFAULT 0`;
+        }
+        if (!tem.has("romaneio_entrada")) {
+          await sql`ALTER TABLE romaneio_item_confirmado ADD COLUMN IF NOT EXISTS romaneio_entrada TEXT NOT NULL DEFAULT ''`;
+        }
+      } catch (e) {
+        // Outra instância criou ao mesmo tempo: a tabela/coluna existe, segue.
+        const code = (e as { code?: string })?.code ?? "";
+        if (!["23505", "42P07", "42701"].includes(code)) throw e;
+      }
+      tableChecked = true;
+    })().catch((e) => {
+      tablePromise = null;
+      throw e;
+    });
+  }
+  return tablePromise;
 }
 
 /**
@@ -246,6 +283,62 @@ export async function confirmarItem(
       confirmed_at = NOW(),
       confirmed_by = ${by},
       romaneio_entrada = COALESCE(NULLIF(${romEnt}, ''), romaneio_item_confirmado.romaneio_entrada)
+  `;
+}
+
+/**
+ * Confirma VÁRIOS itens do mesmo romaneio num único INSERT — entram todos ou
+ * nenhum. É o "Confirmar tudo" das telas Romaneios e Defeitos: gravar item a
+ * item deixava itens sem confirmação quando uma das N requisições falhava.
+ * Mesma regra do `confirmarItem` para o romaneio de entrada (vazio não apaga).
+ */
+export async function confirmarItensLote(
+  companyKey: string,
+  romaneioId: string,
+  filialDestino: string,
+  itens: Array<{ produto: string; corProduto: string; qtdeConfirmada: number }>,
+  confirmedBy: string,
+  romaneioEntrada?: string
+): Promise<void> {
+  if (itens.length === 0) return;
+  const c = (companyKey || "").trim().toLowerCase();
+  const r = (romaneioId || "").trim();
+  const fd = (filialDestino || "").trim();
+  const by = (confirmedBy || "").trim();
+  const romEnt = (romaneioEntrada || "").trim();
+
+  // Mesmo produto×cor repetido no lote: vale a última quantidade (a PK não aceita duas no mesmo INSERT).
+  const unicos = new Map<string, { produto: string; cor: string; qtde: number }>();
+  for (const it of itens) {
+    const produto = (it.produto || "").trim();
+    const cor = (it.corProduto || "").trim();
+    if (!produto) continue;
+    unicos.set(`${produto}|${cor}`, { produto, cor, qtde: Math.max(0, Math.round(it.qtdeConfirmada)) });
+  }
+  const lista = [...unicos.values()];
+
+  if (!hasPostgres()) {
+    for (const it of lista) await confirmarItem(c, r, fd, it.produto, it.cor, it.qtde, by, romEnt);
+    return;
+  }
+
+  const sql = getNeonSql();
+  await ensureTable(sql);
+
+  const produtos = lista.map((it) => it.produto);
+  const cores = lista.map((it) => it.cor);
+  const qtdes = lista.map((it) => it.qtde);
+  await sql`
+    INSERT INTO romaneio_item_confirmado AS t
+      (company_key, romaneio_id, filial_destino, produto, cor_produto, qtde_confirmada, confirmed_at, confirmed_by, romaneio_entrada)
+    SELECT ${c}, ${r}, ${fd}, u.produto, u.cor, u.qtde, NOW(), ${by}, ${romEnt}
+      FROM UNNEST(${produtos}::text[], ${cores}::text[], ${qtdes}::int[]) AS u(produto, cor, qtde)
+    ON CONFLICT (company_key, romaneio_id, filial_destino, produto, cor_produto)
+    DO UPDATE SET
+      qtde_confirmada = EXCLUDED.qtde_confirmada,
+      confirmed_at = NOW(),
+      confirmed_by = EXCLUDED.confirmed_by,
+      romaneio_entrada = COALESCE(NULLIF(EXCLUDED.romaneio_entrada, ''), t.romaneio_entrada)
   `;
 }
 

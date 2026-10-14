@@ -579,35 +579,38 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
         mensagens.push(`Entrada registrada em ${defeitoFilial} — romaneio ${romaneioEntrada}.`);
       }
 
-      for (const item of paraConfirmar) {
-        const res = await fetch("/api/romaneio-confirmar-entrada", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-auth-username": username },
-          body: JSON.stringify({
-            companyKey,
-            romaneioId: selecionado.romaneio,
-            filialDestino: defeitoFilial,
+      // Todas as confirmações numa chamada só — o servidor grava num único
+      // INSERT (entram todas ou nenhuma). Item a item, a requisição que falhava
+      // deixava o item sem confirmação no meio do romaneio.
+      const resLote = await fetch("/api/romaneio-confirmar-entrada", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-auth-username": username },
+        body: JSON.stringify({
+          companyKey,
+          romaneioId: selecionado.romaneio,
+          filialDestino: defeitoFilial,
+          acao: "confirmar-lote",
+          filialOrigem: selecionado.filialOrigem,
+          romaneioEntrada,
+          dataRomaneio: selecionado.emissao ?? "",
+          itens: paraConfirmar.map((item) => ({
             produto: item.produto,
             corProduto: item.corProduto,
             qtdeConfirmada: item.quantidade,
-            acao: "confirmar",
-            filialOrigem: item.divergente ? selecionado.filialOrigem : undefined,
-            romaneioEntrada,
-            dataRomaneio: selecionado.emissao ?? "",
             tamanhosConfirmados: item.grade ?? undefined,
-          }),
-        });
-        const json = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          mensagens.push(
-            `${item.produto}: entrada feita, mas a confirmação não foi gravada${
-              json?.error ? ` (${json.error})` : ""
-            }.`
-          );
-        } else if (json?.origem?.detalhe) {
-          mensagens.push(json.origem.detalhe as string);
-        }
+            divergente: item.divergente,
+          })),
+        }),
+      }).catch(() => null);
+      const jsonLote = resLote ? await resLote.json().catch(() => ({})) : {};
+      if (!resLote?.ok) {
+        throw new Error(
+          `Entrada feita, mas as confirmações não foram gravadas${
+            jsonLote?.error ? ` (${jsonLote.error})` : ""
+          }. Clique em Confirmar de novo — a entrada já feita é reaproveitada, nada entra em dobro.`
+        );
       }
+      for (const detalhe of (jsonLote?.origens as string[] | undefined) ?? []) mensagens.push(detalhe);
 
       setMsgConfirmacao(mensagens);
       await carregarItens(selecionado);

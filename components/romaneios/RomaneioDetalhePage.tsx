@@ -51,6 +51,23 @@ async function fetchConfirmados(
   return new Map(Object.entries(json.data || {}));
 }
 
+/** Igual a `fetchConfirmados`, mas `null` quando a consulta falha (≠ "nada confirmado"). */
+async function fetchConfirmadosOuNull(
+  companyKey: string,
+  romaneioId: string,
+  filialDestino: string
+): Promise<Map<string, number> | null> {
+  try {
+    const params = new URLSearchParams({ company: companyKey, romaneio: romaneioId, filialDestino });
+    const res = await fetch(`/api/romaneio-confirmar-entrada?${params.toString()}`, { cache: "no-store" });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { data: Record<string, number> };
+    return new Map(Object.entries(json.data || {}));
+  } catch {
+    return null;
+  }
+}
+
 /**
  * `filialOrigem` e `romaneioEntrada` são opcionais de propósito: só a conferência
  * de uma SAÍDA tem os dois. Quando vão, o servidor devolve à loja de origem a
@@ -100,6 +117,42 @@ async function postConfirmacao(
     origem?: { corrigido: boolean; detalhe: string } | null;
   };
   return { ok: true, origem: json.origem ?? null };
+}
+
+/**
+ * Confirma TODOS os itens numa chamada só (`acao: "confirmar-lote"`). O servidor
+ * acerta as saídas divergentes e grava todas as confirmações num único INSERT.
+ */
+async function postConfirmacaoLote(
+  username: string,
+  companyKey: string,
+  romaneioId: string,
+  filialDestino: string,
+  dados: {
+    itens: Array<{
+      produto: string;
+      corProduto: string;
+      qtdeConfirmada: number;
+      tamanhosConfirmados?: Record<number, number>;
+      divergente?: boolean;
+    }>;
+    filialOrigem?: string;
+    romaneioEntrada?: string;
+    dataRomaneio?: string;
+  }
+): Promise<{ ok: boolean; error?: string; origens: string[] }> {
+  try {
+    const res = await fetch("/api/romaneio-confirmar-entrada", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-auth-username": username },
+      body: JSON.stringify({ companyKey, romaneioId, filialDestino, acao: "confirmar-lote", ...dados }),
+    });
+    const json = (await res.json().catch(() => ({}))) as { error?: string; origens?: string[] };
+    if (!res.ok) return { ok: false, error: json.error || "Erro ao gravar as confirmações.", origens: [] };
+    return { ok: true, origens: json.origens ?? [] };
+  } catch {
+    return { ok: false, error: "Sem resposta do servidor ao gravar as confirmações.", origens: [] };
+  }
 }
 
 /** Registra entrada de estoque em lote (todos os itens no mesmo romaneio). */
@@ -671,35 +724,48 @@ export default function RomaneioDetalhePage({
       // Marca confirmação no romaneio para cada item. Numa SAÍDA vão junto a
       // filial de origem e o romaneio de entrada: é o que faz o servidor
       // devolver à loja a peça que não chegou e guardar o vínculo saída→entrada.
+      // TODAS as confirmações numa chamada só (o servidor grava num único INSERT:
+      // entram todas ou nenhuma). Antes era uma requisição por item sem olhar a
+      // resposta — a que falhava deixava o item "sem confirmar" no meio do
+      // romaneio enquanto a tela pintava tudo de verde (romaneio 033462).
+      // `divergente` só no item que conferiu diferente: é ele que dispara o
+      // acerto da saída no servidor.
       const devolucoes: string[] = [...avisos];
-      for (const item of itensParaConfirmar) {
-        const res = await postConfirmacao(
-          user.username, companySlug, romaneioId, filialRef,
-          item.produto, item.corProduto ?? "", item.quantidade, "confirmar",
-          isSaida
-            ? {
-                // `filialOrigem` só vai no item divergente: é ele que dispara a
-                // devolução de estoque no servidor (que confere a quantidade real
-                // antes de mexer em qualquer coisa).
-                filialOrigem: item.divergente ? filialOrigem : undefined,
-                romaneioEntrada: romaneioEntradaGerado,
-                dataRomaneio: dataEmissaoProp,
-                tamanhosConfirmados: item.porTamanho ?? undefined,
-              }
-            : { dataRomaneio: dataEmissaoProp }
-        );
-        if (res.origem?.detalhe) devolucoes.push(res.origem.detalhe);
-      }
-      setDevolucoesOrigem(devolucoes);
-
-      // Atualiza estado local
-      setConfirmados((prev) => {
-        const next = new Map(prev);
-        for (const item of itensParaConfirmar) {
-          next.set(item.chave, item.quantidade);
-        }
-        return next;
+      const lote = await postConfirmacaoLote(user.username, companySlug, romaneioId, filialRef, {
+        itens: itensParaConfirmar.map((item) => ({
+          produto: item.produto,
+          corProduto: item.corProduto ?? "",
+          qtdeConfirmada: item.quantidade,
+          tamanhosConfirmados: isSaida ? item.porTamanho ?? undefined : undefined,
+          divergente: isSaida && item.divergente,
+        })),
+        filialOrigem: isSaida ? filialOrigem : undefined,
+        romaneioEntrada: isSaida ? romaneioEntradaGerado : undefined,
+        dataRomaneio: dataEmissaoProp,
       });
+      devolucoes.push(...lote.origens);
+
+      // A verdade é o que ficou gravado: relê do servidor em vez de supor. Se a
+      // releitura falhar, vale o resultado do lote (tudo gravado ou nada).
+      const relidos = await fetchConfirmadosOuNull(companySlug, romaneioId, filialRef);
+      const gravados =
+        relidos ??
+        (lote.ok
+          ? new Map([...confirmados, ...itensParaConfirmar.map((i) => [i.chave, i.quantidade] as const)])
+          : new Map(confirmados));
+      setConfirmados(gravados);
+      const faltando = itensParaConfirmar.filter((item) => !gravados.has(item.chave));
+      setDevolucoesOrigem(devolucoes);
+      if (!lote.ok || faltando.length > 0) {
+        const nomes = faltando.slice(0, 8).map((i) => i.produto).join(", ");
+        setErroConfirmacao(
+          `${lote.error ? `${lote.error} ` : ""}` +
+            (faltando.length > 0
+              ? `${faltando.length} item(ns) não foram confirmados${nomes ? ` (${nomes}${faltando.length > 8 ? "…" : ""})` : ""}. ` +
+                "Clique em Confirmar de novo — a entrada já feita é reaproveitada, nada entra em dobro."
+              : "")
+        );
+      }
 
       // Rebusca os itens para refletir o estoque atualizado após a entrada
       const fd = isSaida ? destinoSelected : filialDestino;
@@ -711,7 +777,7 @@ export default function RomaneioDetalhePage({
     } finally {
       setConfirmandoTudo(false);
     }
-  }, [user?.username, isSaida, itens, quantidades, quantidadesTam, isTransito, romaneioId, filialDestino, filialOrigem, companySlug, destinoSelected, responsavelPadrao, tipo, dataEmissaoProp]);
+  }, [user?.username, isSaida, itens, confirmados, quantidades, quantidadesTam, isTransito, romaneioId, filialDestino, filialOrigem, companySlug, destinoSelected, responsavelPadrao, tipo, dataEmissaoProp]);
 
   // Desconfirma item individualmente (sem reverter estoque)
   const handleDesconfirmar = useCallback(async (produto: string, corProduto: string | null) => {

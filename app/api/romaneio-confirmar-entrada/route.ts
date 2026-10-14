@@ -7,6 +7,7 @@ import {
   getConfirmados,
   getConfirmacaoItem,
   confirmarItem,
+  confirmarItensLote,
   desconfirmarItem,
 } from "@/lib/utils/romaneio-confirmacao-store";
 import { encontrarNomeContagemLivre, executarAjusteContagem } from "@/lib/ajuste-estoque-executor";
@@ -220,7 +221,16 @@ export async function POST(request: Request) {
       produto: string;
       corProduto: string;
       qtdeConfirmada?: number;
-      acao: "confirmar" | "desconfirmar";
+      acao: "confirmar" | "desconfirmar" | "confirmar-lote";
+      /** `confirmar-lote`: todos os itens do romaneio numa chamada só. */
+      itens?: Array<{
+        produto: string;
+        corProduto?: string | null;
+        qtdeConfirmada: number;
+        tamanhosConfirmados?: Record<string, number> | null;
+        /** Conferiu diferente do romaneio (menos ou outro tamanho) → acerta a saída. */
+        divergente?: boolean;
+      }>;
       /**
        * Filial de ORIGEM do romaneio de saída. Quando vem, confirmar menos do
        * que saiu devolve a diferença ao estoque dela (ver o bloco de correção).
@@ -242,7 +252,7 @@ export async function POST(request: Request) {
     const companyConfig = await resolveCompanyDynamic(companyKey);
     const filialDestinoAtiva = getActiveFilial(companyConfig, filialDestino);
 
-    if (!companyKey || !romaneioId || !filialDestino || !produto) {
+    if (!companyKey || !romaneioId || !filialDestino || (!produto && acao !== "confirmar-lote")) {
       return NextResponse.json(
         { error: "Campos obrigatórios: companyKey, romaneioId, filialDestino, produto" },
         { status: 400 }
@@ -297,6 +307,59 @@ export async function POST(request: Request) {
         { error: mensagemTravaInventario(trava), travaInventario: trava },
         { status: 409 }
       );
+    }
+
+    if (acao === "confirmar-lote") {
+      // CONFIRMAR TUDO numa chamada só. Antes a tela mandava UMA requisição por
+      // item, em sequência, e não olhava a resposta: a que falhava (instância
+      // fria, DDL do ensureTable travando a tabela, rede) deixava o item sem
+      // confirmação enquanto a tela pintava tudo de verde — romaneio 033462, com
+      // a entrada inteira lançada e itens "sem confirmar" no meio.
+      //
+      // Agora: acertos de saída (só dos divergentes) primeiro, e depois TODAS as
+      // confirmações num único INSERT — entram todas ou nenhuma. Repetir é
+      // seguro: o acerto é por quantidade absoluta e a entrada já feita é
+      // reaproveitada pela trava de duplicata.
+      const itens = (body.itens ?? [])
+        .map((it) => ({
+          produto: (it.produto || "").trim(),
+          corProduto: (it.corProduto ?? "").toString().trim(),
+          qtdeConfirmada: Math.floor(Number(it.qtdeConfirmada) || 0),
+          tamanhosConfirmados: it.tamanhosConfirmados ?? null,
+          divergente: Boolean(it.divergente),
+        }))
+        .filter((it) => it.produto && it.qtdeConfirmada > 0);
+      if (itens.length === 0) {
+        return NextResponse.json({ error: "Nenhum item com quantidade para confirmar." }, { status: 400 });
+      }
+
+      const filialOrigem = (body.filialOrigem ?? "").trim();
+      const origens: string[] = [];
+      for (const it of itens) {
+        if (!filialOrigem || !it.divergente) continue;
+        const origem = await corrigirSaidaNaConferencia({
+          romaneioId,
+          filialOrigem,
+          produto: it.produto,
+          corProduto: it.corProduto,
+          qtdeConfirmada: it.qtdeConfirmada,
+          tamanhosConfirmados: it.tamanhosConfirmados,
+          filialDestino: fd,
+          username,
+        });
+        if (origem?.detalhe) origens.push(origem.detalhe);
+      }
+
+      await confirmarItensLote(
+        companyKey,
+        romaneioId,
+        filialDestinoAtiva,
+        itens.map((it) => ({ produto: it.produto, corProduto: it.corProduto, qtdeConfirmada: it.qtdeConfirmada })),
+        username,
+        (body.romaneioEntrada ?? "").trim()
+      );
+
+      return NextResponse.json({ success: true, acao, confirmados: itens.length, origens });
     }
 
     if (acao === "desconfirmar") {
@@ -354,10 +417,64 @@ export async function POST(request: Request) {
       // entrada/nota de transferência, porque lá o outro lado é amarrado pelo
       // ERP e a diferença é assunto de conferência, não de correção. Por isso a
       // falha aqui NÃO derruba a confirmação — ela só volta descrita na resposta.
-      let origem: { corrigido: boolean; detalhe: string } | null = null;
       const filialOrigem = (body.filialOrigem ?? "").trim();
+      const origem =
+        filialOrigem && qtdeConfirmada > 0
+          ? await corrigirSaidaNaConferencia({
+              romaneioId,
+              filialOrigem,
+              produto,
+              corProduto: corProduto ?? "",
+              qtdeConfirmada,
+              tamanhosConfirmados: body.tamanhosConfirmados,
+              filialDestino: fd,
+              username,
+            })
+          : null;
 
-      if (filialOrigem && qtdeConfirmada > 0) {
+      await confirmarItem(
+        companyKey,
+        romaneioId,
+        filialDestinoAtiva,
+        produto,
+        corProduto ?? "",
+        qtdeConfirmada,
+        username,
+        (body.romaneioEntrada ?? "").trim()
+      );
+
+      return NextResponse.json({ success: true, acao, origem });
+    }
+
+    return NextResponse.json({ success: true, acao });
+  } catch (err: any) {
+    console.error("POST romaneio-confirmar-entrada:", err);
+    return NextResponse.json({ error: err.message || "Erro interno" }, { status: 500 });
+  }
+}
+
+/**
+ * CONFERIU MENOS DO QUE SAIU (ou em outro tamanho) → a saída passa a valer o que
+ * chegou e o trigger do Linx devolve a diferença à loja de origem.
+ *
+ * Só vale para saída AVULSA (o executor recusa romaneio pareado). A falha aqui
+ * NÃO derruba a confirmação — volta descrita para a tela. Idempotente: a
+ * quantidade é absoluta, então repetir não mexe no estoque de novo.
+ */
+async function corrigirSaidaNaConferencia(p: {
+  romaneioId: string;
+  filialOrigem: string;
+  produto: string;
+  corProduto: string;
+  qtdeConfirmada: number;
+  tamanhosConfirmados?: unknown;
+  filialDestino: string;
+  username: string;
+}): Promise<{ corrigido: boolean; detalhe: string } | null> {
+  const { romaneioId, filialOrigem, produto, corProduto, qtdeConfirmada, username } = p;
+  const fd = p.filialDestino;
+  let origem: { corrigido: boolean; detalhe: string } | null = null;
+  {
         try {
           const qtdeSaida = await withRequest(async (req) => {
             req.input("romaneio", sql.VarChar, romaneioId.trim());
@@ -381,7 +498,7 @@ export async function POST(request: Request) {
           // Peça P/M/G conferida tamanho a tamanho: a saída passa a valer o que
           // chegou em CADA tamanho (inclusive saída antiga que foi toda no P e
           // chegou em M). Só quando não chegou mais do que saiu.
-          const tamanhosConf = normalizarTamanhos(body.tamanhosConfirmados);
+          const tamanhosConf = normalizarTamanhos(p.tamanhosConfirmados);
           const gradeSaida = tamanhosConf
             ? (await carregarGradeDaSaida(romaneioId, filialOrigem, [produto])).get(chaveSku(produto, corProduto))
             : undefined;
@@ -452,25 +569,6 @@ export async function POST(request: Request) {
                 : "O item foi confirmado, mas a saída não pôde ser corrigida.",
           };
         }
-      }
-
-      await confirmarItem(
-        companyKey,
-        romaneioId,
-        filialDestinoAtiva,
-        produto,
-        corProduto ?? "",
-        qtdeConfirmada,
-        username,
-        (body.romaneioEntrada ?? "").trim()
-      );
-
-      return NextResponse.json({ success: true, acao, origem });
-    }
-
-    return NextResponse.json({ success: true, acao });
-  } catch (err: any) {
-    console.error("POST romaneio-confirmar-entrada:", err);
-    return NextResponse.json({ error: err.message || "Erro interno" }, { status: 500 });
   }
+  return origem;
 }
