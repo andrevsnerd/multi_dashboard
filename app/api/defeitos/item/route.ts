@@ -19,6 +19,27 @@ import {
   encontrarNomeContagemLivre,
 } from '@/lib/ajuste-estoque-executor';
 import { executeItemQtdeSet, executeSaidaAppend } from '@/lib/saida-entrada-executor';
+import { mensagemTravaEstoqueNegativo, verificarSaldoSaida } from '@/lib/server/trava-estoque-negativo';
+import {
+  carregarEstoquePorTamanho,
+  carregarGradeDaSaida,
+  carregarGrades,
+  chaveSku,
+  tamanhoEfetivo,
+  validarTamanhos,
+} from '@/lib/server/grade-produto';
+
+/** `{ "2": 1 }` → `{ 2: 1 }`; inválido/vazio → null. */
+function normalizarTamanhos(raw: unknown): Record<number, number> | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const out: Record<number, number> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    const t = Number(k);
+    const q = Math.floor(Number(v));
+    if (Number.isInteger(t) && t >= 1 && t <= 48 && Number.isFinite(q) && q >= 0) out[t] = q;
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -32,13 +53,15 @@ interface CorrigirItemRequest {
   corProduto?: string | null;
   /** Quantidade real da peça neste romaneio. 0 = não veio nada. */
   qtdeNova: number;
+  /** Peça P/M/G: quantidade real em cada tamanho {posição: qtd} — manda no lugar de qtdeNova. */
+  tamanhos?: Record<string, number> | null;
 }
 
 interface AcrescentarItemRequest {
   company: string;
   romaneio: string;
   filialOrigem: string;
-  itens: Array<{ produto: string; corProduto?: string | null; quantidade: number }>;
+  itens: Array<{ produto: string; corProduto?: string | null; quantidade: number; tamanho?: number | null }>;
 }
 
 function normaliza(v: string | null | undefined): string {
@@ -193,7 +216,11 @@ export async function PUT(request: NextRequest) {
     const filialOrigem = (body?.filialOrigem ?? '').trim();
     const produto = (body?.produto ?? '').trim();
     const cor = (body?.corProduto ?? '').toString().trim();
-    const qtdeNova = Number(body?.qtdeNova);
+    // Peça P/M/G corrige tamanho a tamanho; o total é a soma.
+    const tamanhos = normalizarTamanhos(body?.tamanhos);
+    const qtdeNova = tamanhos
+      ? Object.values(tamanhos).reduce((acc, v) => acc + v, 0)
+      : Number(body?.qtdeNova);
 
     if (!companyKey || !romaneio || !filialOrigem || !produto) {
       return NextResponse.json(
@@ -232,7 +259,13 @@ export async function PUT(request: NextRequest) {
     const pool = shouldUseProxy() ? new ProxyPool() : await getConnectionPool();
     const responsavel = await resolveResponsavelLinx(username);
 
-    // 1) ORIGEM — a saída passa a valer a quantidade real.
+    // Grade da saída ANTES da correção: é ela que diz quanto de cada tamanho já
+    // tinha entrado no destino (a entrada espelha a saída).
+    const gradeAntes = tamanhos
+      ? (await carregarGradeDaSaida(romaneio, filialOrigem, [produto])).get(chaveSku(produto, cor)) ?? null
+      : null;
+
+    // 1) ORIGEM — a saída passa a valer a quantidade real (por tamanho na peça P/M/G).
     const saida = await executeItemQtdeSet(pool, {
       tipo: 'saida',
       romaneio,
@@ -240,6 +273,7 @@ export async function PUT(request: NextRequest) {
       produto,
       corProduto: cor,
       qtdeNova,
+      tamanhos: tamanhos ?? undefined,
     });
 
     // Saída já estava na quantidade pedida — mas NÃO se sai daqui ainda. Se uma
@@ -272,8 +306,11 @@ export async function PUT(request: NextRequest) {
     try {
       if (confirmacao) {
         const deltaDestino = qtdeNova - confirmacao.qtdeConfirmada;
+        // Mesmo total em outro tamanho (P → M) também muda o destino.
+        const mudouTamanho =
+          !!tamanhos && !!gradeAntes && gradeAntes.some((q, i) => q !== (tamanhos[i + 1] ?? 0));
 
-        if (deltaDestino !== 0 && confirmacao.romaneioEntrada) {
+        if ((deltaDestino !== 0 || mudouTamanho) && confirmacao.romaneioEntrada) {
           const entrada = await executeItemQtdeSet(pool, {
             tipo: 'entrada',
             romaneio: confirmacao.romaneioEntrada,
@@ -281,6 +318,7 @@ export async function PUT(request: NextRequest) {
             produto,
             corProduto: cor,
             qtdeNova,
+            tamanhos: tamanhos ?? undefined,
           });
           destino = {
             modo: 'entrada',
@@ -294,19 +332,31 @@ export async function PUT(request: NextRequest) {
             responsavel,
             obs: `Defeito: entrada corrigida de ${entrada.qtdeAnterior} para ${entrada.qtdeNova} (saída ${romaneio})`,
           }).catch((err) => console.error('[ajuste-historico] Falha ao registrar auditoria:', err));
-        } else if (deltaDestino !== 0) {
+        } else if (deltaDestino !== 0 || mudouTamanho) {
           // Confirmação antiga: o romaneio de entrada não foi registrado na época e
           // o Linx não guarda o vínculo. Corrige o saldo por contagem, que é o
           // mecanismo próprio para "o saldo de lá está errado".
           const poolLike = pool as unknown as { request: () => unknown };
           const estoqueAtual = await lerEstoqueNoDefeito(defeitoFilial, produto, cor);
-          const alvo = Math.max(0, estoqueAtual + deltaDestino);
+          // Peça P/M/G: alvo tamanho a tamanho = saldo do tamanho + (novo − antigo).
+          let alvoPorTamanho: Record<string, number> | null = null;
+          if (tamanhos && gradeAntes) {
+            const es = (await carregarEstoquePorTamanho(defeitoFilial, [produto])).get(chaveSku(produto, cor))?.es ?? [];
+            alvoPorTamanho = {};
+            for (let i = 0; i < 48; i += 1) {
+              const alvoTam = Math.max(0, (es[i] ?? 0) + ((tamanhos[i + 1] ?? 0) - (gradeAntes[i] ?? 0)));
+              if (alvoTam > 0) alvoPorTamanho[String(i + 1)] = alvoTam;
+            }
+          }
+          const alvo = alvoPorTamanho
+            ? Object.values(alvoPorTamanho).reduce((acc, v) => acc + v, 0)
+            : Math.max(0, estoqueAtual + deltaDestino);
 
           // O saldo da filial de defeito não tem a peça para devolver (já saiu de
           // lá, ou nunca entrou). Abaixar para negativo é proibido pela regra da
           // casa, e um ajuste de delta 0 seria recusado pelo executor com uma
           // mensagem que não explica nada — então o caso é dito por extenso.
-          if (alvo === estoqueAtual) {
+          if (alvo === estoqueAtual && !alvoPorTamanho) {
             throw new Error(
               `o saldo de ${produto}${cor ? ` cor ${cor}` : ''} em ${defeitoFilial} é ${estoqueAtual} ` +
                 `e não absorve ${deltaDestino} — a peça já saiu de lá ou nunca entrou.`
@@ -324,7 +374,7 @@ export async function PUT(request: NextRequest) {
             emissao: `${hoje.getFullYear()}-${mm}-${dd} 00:00:00`,
             responsavel,
             obs: `CORRECAO DEFEITO ROMANEIO ${romaneio}`,
-            itens: [{ produto, cor, contagem: alvo }],
+            itens: [{ produto, cor, contagem: alvo, tamanhos: alvoPorTamanho }],
           });
 
           destino = {
@@ -412,6 +462,7 @@ export async function POST(request: NextRequest) {
       produto: (item?.produto ?? '').trim(),
       corProduto: (item?.corProduto ?? '').toString().trim(),
       quantidade: Math.floor(Number(item?.quantidade)),
+      tamanho: Number.isInteger(Number(item?.tamanho)) && Number(item?.tamanho) > 0 ? Number(item?.tamanho) : null,
     }));
 
     if (!companyKey || !romaneio || !filialOrigem || itens.length === 0) {
@@ -442,11 +493,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // TAMANHO — peça P/M/G exige o tamanho (vem do código de barras bipado).
+    const grades = await carregarGrades(itens.map((it) => it.produto));
+    const erroTamanho = validarTamanhos(itens, grades);
+    if (erroTamanho) {
+      return NextResponse.json({ error: erroTamanho, code: 'TAMANHO_OBRIGATORIO' }, { status: 400 });
+    }
+    const itensGravar = itens.map((it) => ({ ...it, tamanho: tamanhoEfetivo(it, grades) }));
+
+    // Acrescentar tira estoque da loja na hora: filial travada no Linx não passa do saldo.
+    const travaSaldo = await verificarSaldoSaida(filialOrigem, itensGravar);
+    if (travaSaldo) {
+      return NextResponse.json(
+        { error: mensagemTravaEstoqueNegativo(travaSaldo), travaEstoqueNegativo: travaSaldo },
+        { status: 409 }
+      );
+    }
+
     const pool = shouldUseProxy() ? new ProxyPool() : await getConnectionPool();
     const resultado = await executeSaidaAppend(pool, {
       romaneio,
       filial: filialOrigem,
-      itens,
+      itens: itensGravar,
     });
 
     inserirAjuste({

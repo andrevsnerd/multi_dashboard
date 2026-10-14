@@ -930,8 +930,8 @@
     "semantic_hash": "3136877746d42feabbd7abeab02e36c2"
   },
   "app/api/romaneio-confirmar-entrada/route.ts": {
-    "mtime": 1791996307.586301,
-    "ast_hash": "e5f4abc1069700d045421ec796cfc2ce",
+    "mtime": 1791998668.3214712,
+    "ast_hash": "f81133e2205e8d1c31ba05430ec5c6ae",
     "semantic_hash": ""
   },
   "app/api/romaneios/editar-qtd/route.ts": {
@@ -965,8 +965,8 @@
     "semantic_hash": ""
   },
   "app/api/saidas-entradas-produtos/executar/route.ts": {
-    "mtime": 1791994086.487794,
-    "ast_hash": "4bd9c7db70078015553f558d4fd28ce6",
+    "mtime": 1791997751.3459587,
+    "ast_hash": "ed4fb0738fe37fe3cf1f9092ae68d073",
     "semantic_hash": ""
   },
   "app/api/saidas-entradas-produtos/historico/route.ts": {
@@ -1020,8 +1020,8 @@
     "semantic_hash": "6be9e0704a0dc0e8bd1622d08ead7b12"
   },
   "app/api/transferencia-produtos/log-detalhes/route.ts": {
-    "mtime": 1790619548.156881,
-    "ast_hash": "502c6a4158a0019aa006d27bfb1f7712",
+    "mtime": 1791998513.3307967,
+    "ast_hash": "010988f4f14e5870ec9a126083577141",
     "semantic_hash": ""
   },
   "app/api/transferencia-produtos/log-saidas/route.ts": {
@@ -1285,8 +1285,8 @@
     "semantic_hash": ""
   },
   "components/controle-transferencias/ControleTransferenciasTable.tsx": {
-    "mtime": 1788369683.7373984,
-    "ast_hash": "60419b88fe499bf27ba39d3fc29810b5",
+    "mtime": 1791998911.090314,
+    "ast_hash": "cd3f2df21a2d78f420e877ef1a989e06",
     "semantic_hash": ""
   },
   "components/controle-transferencias/RealizadasPanel.tsx": {
@@ -1295,9 +1295,9 @@
     "semantic_hash": "b948990f48c2dec2fa1b806ef5dd6461"
   },
   "components/controle-transferencias/TransferenciaConfirmModal.tsx": {
-    "mtime": 1780073682.6824787,
-    "ast_hash": "eac28e6d11c983cf08d0602ab390dc5a",
-    "semantic_hash": "eac28e6d11c983cf08d0602ab390dc5a"
+    "mtime": 1791998889.6289406,
+    "ast_hash": "7d4d2a8670220abcd2f55b98240de8f8",
+    "semantic_hash": ""
   },
   "components/controle-transferencias/exportToPDF.ts": {
     "mtime": 1783529591.599146,
@@ -1600,8 +1600,8 @@
     "semantic_hash": "c1db24d3ffabe5b57c07dc935de08446"
   },
   "components/romaneios/RomaneioDetalhePage.tsx": {
-    "mtime": 1791226064.9736767,
-    "ast_hash": "a0e51497d9bc4c011ef442dd36cc3e55",
+    "mtime": 1791998619.6095128,
+    "ast_hash": "c9aade4cec6704ec7e1b4ed2f5da6b75",
     "semantic_hash": ""
   },
   "components/romaneios/RomaneiosDuplicadosPanel.tsx": {
@@ -1620,8 +1620,8 @@
     "semantic_hash": ""
   },
   "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx": {
-    "mtime": 1788448971.3690128,
-    "ast_hash": "2166ec2d99eda0228b46f3b453502ee2",
+    "mtime": 1791998404.3076305,
+    "ast_hash": "406423e8e90cd4cb222f93be3b83d00b",
     "semantic_hash": ""
   },
   "components/shared/CompraIdealCell.tsx": {
@@ -2595,8 +2595,8 @@
     "semantic_hash": ""
   },
   "lib/saida-entrada-executor.js": {
-    "mtime": 1791994108.925927,
-    "ast_hash": "f4a9544c4a6b5339d81c6f3b9285f32c",
+    "mtime": 1791997655.626531,
+    "ast_hash": "6279a1962ce58b8e2476b4a379a46768",
     "semantic_hash": ""
   },
   "lib/server/company-live.ts": {
@@ -4200,8 +4200,8 @@
     "semantic_hash": ""
   },
   "app/api/transferencia-produtos/bipar/route.ts": {
-    "mtime": 1787831899.4084187,
-    "ast_hash": "7ec847b151c6b9a17264c7b6b41cb54e",
+    "mtime": 1791998151.5619197,
+    "ast_hash": "b3f36a9e0a7ca5c4ea653b08574a38c1",
     "semantic_hash": ""
   },
   "components/compras/GastosCompraDrawer.tsx": {
@@ -4275,8 +4275,8 @@
     "semantic_hash": ""
   },
   "lib/utils/saida-entrada-draft-store.ts": {
-    "mtime": 1788353861.3740816,
-    "ast_hash": "5a97482f64c1914a2dc06222756c8582",
+    "mtime": 1791998181.0648625,
+    "ast_hash": "6f048808fc94f0782f678e821d08719e",
     "semantic_hash": ""
   },
   "app/api/relatorios/stream/route.ts": {
@@ -4365,8 +4365,8 @@
     "semantic_hash": ""
   },
   "app/api/saidas-entradas-produtos/entrada-editar/route.ts": {
-    "mtime": 1788897963.85367,
-    "ast_hash": "7cee4e0fe494964c04658c882524cc9b",
+    "mtime": 1791998004.8600907,
+    "ast_hash": "575cc6833bf5ce0d8f337c6a39ac1cc9",
     "semantic_hash": ""
   },
   "app/api/controle-estoque/filtro-opcoes/route.ts": {
@@ -4410,8 +4410,8 @@
     "semantic_hash": ""
   },
   "app/api/saidas-entradas-produtos/saida-editar/route.ts": {
-    "mtime": 1791994099.223271,
-    "ast_hash": "d53867821679786941ac1c5655293d11",
+    "mtime": 1791998018.3257613,
+    "ast_hash": "cf53c2071ec2dceb80f4ddd9d52920d6",
     "semantic_hash": ""
   },
   "lib/reports/tickets.ts": {
@@ -5010,8 +5010,18 @@
     "semantic_hash": ""
   },
   "lib/server/trava-estoque-negativo.ts": {
-    "mtime": 1791994071.3400905,
-    "ast_hash": "80cd0271de2b5dd52656acecb5d78e88",
+    "mtime": 1791997696.1714542,
+    "ast_hash": "574182ae3b273b056dac652342ac8e1e",
+    "semantic_hash": ""
+  },
+  "app/api/saidas-entradas-produtos/tamanhos/route.ts": {
+    "mtime": 1791998063.407823,
+    "ast_hash": "dc7c5adc3f5bd05ed00b5b3c29c055c4",
+    "semantic_hash": ""
+  },
+  "lib/server/grade-produto.ts": {
+    "mtime": 1791997723.8776326,
+    "ast_hash": "681ac88f6f563094a3dba625d5e2f161",
     "semantic_hash": ""
   }
 }

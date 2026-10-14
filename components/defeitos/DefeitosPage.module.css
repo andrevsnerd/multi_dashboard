@@ -818,3 +818,22 @@
   border: 1px solid var(--b-gray200);
   border-radius: 8px;
 }
+
+/* Peça P/M/G — corrigir e confirmar tamanho a tamanho. */
+.tamanhosStepper {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tamanhoStepRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.tamanhoStepLabel {
+  min-width: 24px;
+  font-weight: 700;
+  font-size: 13px;
+  text-align: right;
+  margin-right: 2px;
+}

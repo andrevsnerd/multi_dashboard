@@ -3760,8 +3760,8 @@
     "semantic_hash": ""
   },
   "lib/server/vm-movimento.ts": {
-    "mtime": 1785427896.5928836,
-    "ast_hash": "7a5f0f7970c66768733444dd338a831c",
+    "mtime": 1792000168.4101648,
+    "ast_hash": "7f727e0e09d1fa50fedc08d666460f68",
     "semantic_hash": ""
   },
   "lib/utils/vm-store.ts": {
@@ -4575,8 +4575,8 @@
     "semantic_hash": ""
   },
   "app/api/defeitos/item/route.ts": {
-    "mtime": 1790193488.2175012,
-    "ast_hash": "811c2ba48523aaec378c32744a1e2a0f",
+    "mtime": 1792000300.3008795,
+    "ast_hash": "a8f34224d9c441cddbf04d591f2bd1d2",
     "semantic_hash": ""
   },
   "app/api/defeitos/itens/route.ts": {
@@ -4590,13 +4590,13 @@
     "semantic_hash": ""
   },
   "components/defeitos/DefeitosPage.tsx": {
-    "mtime": 1791226076.3804522,
-    "ast_hash": "8e392e4b20f617491a0e273c60dc961e",
+    "mtime": 1792000424.467735,
+    "ast_hash": "4026b55c1a74d477394241dd30f30484",
     "semantic_hash": ""
   },
   "lib/repositories/defeitos.ts": {
-    "mtime": 1790194218.168437,
-    "ast_hash": "04b8b913cde2b74d48a5db224664b91b",
+    "mtime": 1792000244.5984817,
+    "ast_hash": "bd22b7a6bb61091dfba7e0d262400e74",
     "semantic_hash": ""
   },
   "lib/utils/romaneio-agrupamento.ts": {

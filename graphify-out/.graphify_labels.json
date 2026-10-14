@@ -538,5 +538,8 @@
   "536": "ProductPerformanceTable.tsx",
   "537": "saida-estoque-negativo.ts",
   "538": "fetchRomaneioParaEdicao",
-  "539": "formatLogDate"
+  "539": "formatLogDate",
+  "540": "EstoqueInventarioPanel.tsx",
+  "541": "fix-tipos-romaneio-acento.mjs",
+  "542": "page.tsx"
 }

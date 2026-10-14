@@ -40,6 +40,10 @@ interface DefeitoItem {
   romaneioEntrada: string;
   custoUnitario: number;
   estoqueOrigem: number;
+  /** Peça P/M/G: confirmação e correção tamanho a tamanho. */
+  exigeTamanho?: boolean;
+  /** Quantidade do romaneio em cada tamanho (só peça P/M/G). */
+  tamanhos?: Array<{ ordinal: number; label: string; qtde: number }>;
 }
 
 interface EntradaItem {
@@ -131,6 +135,67 @@ function statusDoRomaneio(r: DefeitoRomaneio): {
 const chaveDoItem = (item: { produto: string; corProduto: string }) =>
   `${item.produto}|${item.corProduto}`;
 
+/** Peça P/M/G: confirmação e correção são tamanho a tamanho. */
+const porTamanho = (item: DefeitoItem) => Boolean(item.exigeTamanho && item.tamanhos?.length);
+
+/** Quanto o romaneio tem em cada tamanho, como `{posição: qtd}`. */
+const gradeDoItem = (item: DefeitoItem): Record<number, number> =>
+  Object.fromEntries((item.tamanhos ?? []).map((t) => [t.ordinal, t.qtde]));
+
+const somaGrade = (g: Record<number, number>) => Object.values(g).reduce((s, v) => s + v, 0);
+
+/** Um stepper por tamanho (P, M, G…) — usado na correção e na confirmação. */
+function TamanhosStepper({
+  item,
+  valores,
+  disabled,
+  onChange,
+}: {
+  item: DefeitoItem;
+  valores: Record<number, number>;
+  disabled: boolean;
+  onChange: (ordinal: number, valor: number) => void;
+}) {
+  return (
+    <div className={styles.tamanhosStepper}>
+      {(item.tamanhos ?? []).map((t) => {
+        const valor = valores[t.ordinal] ?? 0;
+        return (
+          <div key={t.ordinal} className={styles.tamanhoStepRow}>
+            <span className={styles.tamanhoStepLabel} title={`No romaneio: ${t.qtde}`}>
+              {t.label}
+            </span>
+            <button
+              type="button"
+              className={styles.stepBtn}
+              disabled={disabled || valor <= 0}
+              onClick={() => onChange(t.ordinal, valor - 1)}
+            >
+              −
+            </button>
+            <input
+              className={styles.stepInput}
+              type="number"
+              min={0}
+              value={valor}
+              disabled={disabled}
+              onChange={(e) => onChange(t.ordinal, Math.max(0, parseInt(e.target.value, 10) || 0))}
+            />
+            <button
+              type="button"
+              className={styles.stepBtn}
+              disabled={disabled}
+              onClick={() => onChange(t.ordinal, valor + 1)}
+            >
+              +
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ───────────────────────────── componente ─────────────────────────────
 
 interface DefeitosPageProps {
@@ -164,6 +229,10 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
   const [correcoes, setCorrecoes] = useState<Map<string, number>>(new Map());
   /** Quantidade a CONFIRMAR na chegada, por item. */
   const [quantidades, setQuantidades] = useState<Map<string, number>>(new Map());
+  /** Peça P/M/G: correção do romaneio por tamanho {posição: qtd}, por item. */
+  const [correcoesTam, setCorrecoesTam] = useState<Map<string, Record<number, number>>>(new Map());
+  /** Peça P/M/G: o que chegou em cada tamanho {posição: qtd}, por item. */
+  const [quantidadesTam, setQuantidadesTam] = useState<Map<string, Record<number, number>>>(new Map());
   const [salvandoChave, setSalvandoChave] = useState<string | null>(null);
   const [avisos, setAvisos] = useState<Map<string, string>>(new Map());
   /** Itens em que a origem foi corrigida mas o destino não — aviso de risco. */
@@ -255,9 +324,11 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
         setItens(lista);
         setPodeCorrigir(Boolean(json.podeCorrigir));
         setCorrecoes(new Map());
+        setCorrecoesTam(new Map());
         // A quantidade a confirmar nasce igual à do romaneio: o caso comum é
         // chegar tudo, e quem divergir mexe só na linha que divergiu.
         setQuantidades(new Map(lista.map((i) => [chaveDoItem(i), i.qtde])));
+        setQuantidadesTam(new Map(lista.filter(porTamanho).map((i) => [chaveDoItem(i), gradeDoItem(i)])));
       } catch (e) {
         setErroItens(e instanceof Error ? e.message : "Erro ao carregar itens");
         setItens([]);
@@ -299,6 +370,8 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
     setItens([]);
     setCorrecoes(new Map());
     setQuantidades(new Map());
+    setCorrecoesTam(new Map());
+    setQuantidadesTam(new Map());
     setAvisos(new Map());
     setFalhasDestino(new Set());
     setCodigoBarras("");
@@ -341,8 +414,16 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
     async (item: DefeitoItem, forcar = false) => {
       if (!selecionado || !username) return;
       const chave = chaveDoItem(item);
-      const qtdeNova = correcoes.get(chave) ?? (forcar ? item.qtde : undefined);
-      if (qtdeNova === undefined || (qtdeNova === item.qtde && !forcar)) return;
+      // Peça P/M/G corrige tamanho a tamanho (o total é a soma).
+      const tamanhos = porTamanho(item)
+        ? correcoesTam.get(chave) ?? (forcar ? gradeDoItem(item) : undefined)
+        : undefined;
+      const qtdeNova = tamanhos
+        ? somaGrade(tamanhos)
+        : correcoes.get(chave) ?? (forcar ? item.qtde : undefined);
+      const mudouTamanho =
+        !!tamanhos && (item.tamanhos ?? []).some((t) => (tamanhos[t.ordinal] ?? 0) !== t.qtde);
+      if (qtdeNova === undefined || (qtdeNova === item.qtde && !mudouTamanho && !forcar)) return;
 
       setSalvandoChave(chave);
       setAvisos((prev) => {
@@ -362,6 +443,7 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
             produto: item.produto,
             corProduto: item.corProduto,
             qtdeNova,
+            tamanhos: tamanhos ?? undefined,
           }),
         });
         const json = await res.json();
@@ -396,6 +478,7 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
       selecionado,
       username,
       correcoes,
+      correcoesTam,
       companyKey,
       carregarItens,
       carregarRomaneios,
@@ -416,12 +499,20 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
       .filter((i) => i.qtdeConfirmada === null)
       .map((item) => {
         const chave = chaveDoItem(item);
+        // Peça P/M/G: o que chegou em cada tamanho — a entrada nasce nesses
+        // tamanhos e a saída é acertada se o tamanho diferir.
+        const grade = porTamanho(item) ? quantidadesTam.get(chave) ?? gradeDoItem(item) : null;
+        const quantidade = grade ? somaGrade(grade) : quantidades.get(chave) ?? item.qtde;
+        const tamanhoDiverge =
+          !!grade && (item.tamanhos ?? []).some((t) => (grade[t.ordinal] ?? 0) !== t.qtde);
         return {
           produto: item.produto,
           corProduto: item.corProduto,
-          quantidade: quantidades.get(chave) ?? item.qtde,
+          quantidade,
           qtdeRomaneio: item.qtde,
           chave,
+          grade,
+          divergente: quantidade < item.qtde || (tamanhoDiverge && quantidade <= item.qtde),
         };
       })
       .filter((i) => i.quantidade > 0);
@@ -441,11 +532,14 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
           tipoOperacao: "entrada",
           companyKey,
           filial: defeitoFilial,
-          itens: paraConfirmar.map((i) => ({
-            produto: i.produto,
-            corProduto: i.corProduto,
-            quantidade: i.quantidade,
-          })),
+          // Peça P/M/G entra no tamanho que chegou (uma linha por tamanho).
+          itens: paraConfirmar.flatMap((i) =>
+            i.grade
+              ? Object.entries(i.grade)
+                  .filter(([, q]) => q > 0)
+                  .map(([t, q]) => ({ produto: i.produto, corProduto: i.corProduto, quantidade: q, tamanho: Number(t) }))
+              : [{ produto: i.produto, corProduto: i.corProduto, quantidade: i.quantidade }]
+          ),
           tipoRomaneio: "TRANSFERENCIA ENTRE LOJAS",
           observacao: `DEFEITO ROMANEIO ${selecionado.romaneio} - ${selecionado.filialOrigem}`,
           // Trava de inventário do destino (lib/server/trava-inventario.ts).
@@ -497,10 +591,10 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
             corProduto: item.corProduto,
             qtdeConfirmada: item.quantidade,
             acao: "confirmar",
-            filialOrigem:
-              item.quantidade < item.qtdeRomaneio ? selecionado.filialOrigem : undefined,
+            filialOrigem: item.divergente ? selecionado.filialOrigem : undefined,
             romaneioEntrada,
             dataRomaneio: selecionado.emissao ?? "",
+            tamanhosConfirmados: item.grade ?? undefined,
           }),
         });
         const json = await res.json().catch(() => ({}));
@@ -530,6 +624,7 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
     defeitoFilial,
     itens,
     quantidades,
+    quantidadesTam,
     companyKey,
     carregarItens,
     carregarRomaneios,
@@ -587,14 +682,23 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
     setAdicionando(true);
     setErroItens(null);
     try {
-      const params = new URLSearchParams({ codigoBarras: codigo, company: companyKey });
-      const resBusca = await fetch(
-        `/api/transferencia-produtos/produto-por-codigo-barras?${params.toString()}`,
-        { cache: "no-store", headers: { "x-auth-username": username } }
-      );
+      // Mesma consulta da bipagem de Saídas/Entradas: devolve produto × cor e,
+      // na peça P/M/G, o TAMANHO do código de barras (obrigatório no servidor).
+      const params = new URLSearchParams({
+        codigoBarras: codigo,
+        company: companyKey,
+        filial: selecionado.filialOrigem,
+      });
+      const resBusca = await fetch(`/api/transferencia-produtos/bipar?${params.toString()}`, {
+        cache: "no-store",
+        headers: { "x-auth-username": username },
+      });
       const jsonBusca = await resBusca.json().catch(() => ({}));
-      const achado = jsonBusca?.data as
-        | { produto: string; corProduto: string | null }
+      if (jsonBusca?.status === "ambiguo") {
+        throw new Error(`O código ${codigo} está em mais de um produto/cor — use o código de barras do item.`);
+      }
+      const achado = jsonBusca?.item as
+        | { produto: string; corProduto: string | null; tamanho?: number | null; exigeTamanho?: boolean }
         | undefined;
       if (!resBusca.ok || !achado?.produto) {
         throw new Error(`Código ${codigo} não encontrado no cadastro.`);
@@ -608,7 +712,12 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
           romaneio: selecionado.romaneio,
           filialOrigem: selecionado.filialOrigem,
           itens: [
-            { produto: achado.produto, corProduto: achado.corProduto ?? "", quantidade: 1 },
+            {
+              produto: achado.produto,
+              corProduto: achado.corProduto ?? "",
+              quantidade: 1,
+              tamanho: achado.exigeTamanho ? achado.tamanho ?? null : null,
+            },
           ],
         }),
       });
@@ -694,7 +803,11 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
   const podeConfirmarAgora =
     podeCorrigir &&
     !confirmando &&
-    naoConfirmados.some((i) => (quantidades.get(chaveDoItem(i)) ?? i.qtde) > 0);
+    naoConfirmados.some((i) => {
+      const k = chaveDoItem(i);
+      const grade = porTamanho(i) ? quantidadesTam.get(k) ?? gradeDoItem(i) : null;
+      return (grade ? somaGrade(grade) : quantidades.get(k) ?? i.qtde) > 0;
+    });
 
   // ───────────────────────── export XLSX ─────────────────────────
 
@@ -1088,12 +1201,18 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
                         const qtdeConf = item.qtdeConfirmada ?? 0;
                         const divergenteConf = confirmado && qtdeConf !== item.qtde;
 
-                        const correcao = correcoes.get(chave) ?? item.qtde;
-                        const mudouCorrecao = correcao !== item.qtde;
+                        // Peça P/M/G: corrigir e confirmar são tamanho a tamanho.
+                        const pmg = porTamanho(item);
+                        const correcaoTam = pmg ? correcoesTam.get(chave) ?? gradeDoItem(item) : null;
+                        const correcao = correcaoTam ? somaGrade(correcaoTam) : correcoes.get(chave) ?? item.qtde;
+                        const mudouCorrecao = correcaoTam
+                          ? (item.tamanhos ?? []).some((t) => (correcaoTam[t.ordinal] ?? 0) !== t.qtde)
+                          : correcao !== item.qtde;
                         const salvando = salvandoChave === chave;
                         const aviso = avisos.get(chave);
 
-                        const qtdeAConfirmar = quantidades.get(chave) ?? item.qtde;
+                        const confirmarTam = pmg ? quantidadesTam.get(chave) ?? gradeDoItem(item) : null;
+                        const qtdeAConfirmar = confirmarTam ? somaGrade(confirmarTam) : quantidades.get(chave) ?? item.qtde;
                         const divergenteInput = qtdeAConfirmar !== item.qtde;
 
                         return (
@@ -1113,7 +1232,18 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
                             {/* Qtd do romaneio + correção (mexe nos dois estoques) */}
                             <td className={styles.num}>
                               <div className={styles.correcaoCell}>
-                                {podeCorrigir ? (
+                                {podeCorrigir && correcaoTam ? (
+                                  <TamanhosStepper
+                                    item={item}
+                                    valores={correcaoTam}
+                                    disabled={salvando}
+                                    onChange={(ordinal, valor) =>
+                                      setCorrecoesTam((prev) =>
+                                        new Map(prev).set(chave, { ...correcaoTam, [ordinal]: valor })
+                                      )
+                                    }
+                                  />
+                                ) : podeCorrigir ? (
                                   <div className={styles.stepper}>
                                     <button
                                       type="button"
@@ -1230,6 +1360,29 @@ export default function DefeitosPage({ companyKey, companyName }: DefeitosPagePr
                                 </div>
                               ) : !podeCorrigir ? (
                                 <span className={styles.naoConfirmado}>não confirmado</span>
+                              ) : confirmarTam ? (
+                                <div className={styles.qtdeInputWrap}>
+                                  <TamanhosStepper
+                                    item={item}
+                                    valores={confirmarTam}
+                                    disabled={confirmando}
+                                    onChange={(ordinal, valor) =>
+                                      setQuantidadesTam((prev) =>
+                                        new Map(prev).set(chave, { ...confirmarTam, [ordinal]: valor })
+                                      )
+                                    }
+                                  />
+                                  {divergenteInput && qtdeAConfirmar > 0 && (
+                                    <div className={styles.divergenciaAviso}>
+                                      {qtdeAConfirmar < item.qtde
+                                        ? `⚠ Faltam ${item.qtde - qtdeAConfirmar} un. — voltam para a loja`
+                                        : `⚠ Excesso de ${qtdeAConfirmar - item.qtde} un. (romaneio: ${item.qtde})`}
+                                    </div>
+                                  )}
+                                  {qtdeAConfirmar === 0 && (
+                                    <div className={styles.divergenciaAviso}>⚠ Item não será confirmado</div>
+                                  )}
+                                </div>
                               ) : (
                                 <div className={styles.qtdeInputWrap}>
                                   <div className={styles.qtdeInputRow}>

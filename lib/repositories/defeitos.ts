@@ -30,6 +30,7 @@
 import sql from 'mssql';
 
 import { withRequest } from '@/lib/db/connection';
+import { carregarGradeDaSaida, carregarGrades, chaveSku } from '@/lib/server/grade-produto';
 import {
   getConfirmacoesPorPeriodo,
   getConfirmadoAgregadoPorRomaneio,
@@ -219,6 +220,10 @@ export interface DefeitoRomaneioItem {
   custoUnitario: number;
   /** Estoque atual do item na loja de ORIGEM — o que sobra se a peça voltar. */
   estoqueOrigem: number;
+  /** Peça P/M/G: confirmação e correção são tamanho a tamanho. */
+  exigeTamanho: boolean;
+  /** Quantidade do romaneio em cada tamanho (só peça P/M/G; vazio no resto). */
+  tamanhos: Array<{ ordinal: number; label: string; qtde: number }>;
 }
 
 /**
@@ -315,9 +320,23 @@ export async function fetchDefeitoRomaneioItens(params: {
     confirmadosNorm.set(chaveItem(produto, cor), valor);
   }
 
+  // Peça P/M/G: quanto saiu em cada tamanho (SA_n da própria saída).
+  const produtos = itens.map((i) => i.produto);
+  const [grades, gradeSaida] = await Promise.all([
+    carregarGrades(produtos),
+    carregarGradeDaSaida(romaneio, filialOrigem, produtos),
+  ]);
+
   return itens.map((item) => {
     const conf = confirmadosNorm.get(chaveItem(item.produto, item.corProduto));
+    const grade = grades.get(item.produto);
+    const sa = gradeSaida.get(chaveSku(item.produto, item.corProduto));
+    const exigeTamanho = Boolean(grade?.exigeTamanho);
     return {
+      exigeTamanho,
+      tamanhos: exigeTamanho
+        ? grade!.tamanhos.map((t) => ({ ...t, qtde: sa?.[t.ordinal - 1] ?? 0 }))
+        : [],
       produto: item.produto,
       corProduto: item.corProduto,
       descProduto: item.descProduto,

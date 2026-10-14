@@ -6,6 +6,7 @@ import { shouldUseProxy, ProxyPool } from "@/lib/db/proxy";
 import { resolverNomeFilial } from "@/lib/repositories/ajusteEstoque";
 import { resolveResponsavelLinx } from "@/lib/server/responsavel-linx";
 import { executeSaidaLote, executeEntradaLote } from "@/lib/saida-entrada-executor";
+import { carregarGrades } from "@/lib/server/grade-produto";
 import type { CompanyKey } from "@/lib/config/company";
 import {
   addVmItems,
@@ -306,6 +307,18 @@ export async function executarMovimentoVm(
   usuario: string
 ): Promise<VmMovimentoResultado> {
   const preview = await montarPreviewVm(pedido);
+
+  // Peça P/M/G exige o tamanho (lib/server/grade-produto.ts) e o VM marca 1 peça
+  // por produto×cor, sem tamanho. Hoje o VM só existe na NERD (sem P/M/G); se um
+  // dia abrir para a ScarfMe, a peça P/M/G é barrada aqui em vez de ir para o
+  // tamanho base (P) sem ninguém ver.
+  const grades = await carregarGrades(preview.linhas.map((l) => l.produto));
+  for (const linha of preview.linhas) {
+    if (!linha.bloqueio && grades.get(linha.produto.trim())?.exigeTamanho) {
+      linha.bloqueio = "Peça com tamanho (P/M/G): o VM não escolhe tamanho. Use a tela Saídas/Entradas.";
+    }
+  }
+
   const pool = shouldUseProxy() ? new ProxyPool() : await getConnectionPool();
 
   // Responsável do romaneio: o usuário do LINX atrelado ao login, mesma regra de
