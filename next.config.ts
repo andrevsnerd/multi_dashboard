@@ -22,6 +22,16 @@ const nextConfig: NextConfig = {
       "relatorios/**",
       "proxy-server/**",
       "vm-setup/**",
+      // Pastas de trabalho/ferramentas que nunca são lidas em runtime. graphify-out
+      // (~380 MB) entrou inteiro em /api/embalagens-aviamentos e derrubou todo
+      // deploy de 09/10 a 15/10/2026 (limite de 250 MB por função).
+      "graphify-out/**",
+      "scripts/**",
+      "tmp/**",
+      "multi-dashboard/**",
+      "aws-setup/**",
+      "**/*.log",
+      "**/*.txt",
       "**/*.py",
       "*.xlsx",
       "*.csv",

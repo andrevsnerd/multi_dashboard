@@ -44,9 +44,16 @@ export type EstoqueInsumos = Record<string, number>;
 /** Linha das tabelas de estoque que guarda o Corporativo. */
 const CHAVE_CORPORATIVO = "corporativo";
 
+// Caminhos LITERAIS, um por arquivo. Escolher o caminho por chave dinâmica
+// (`ARQUIVOS[tipo]`) fazia o rastreio de arquivos do build não saber o que seria
+// lido e empacotar o projeto inteiro na função (/api/embalagens-aviamentos com
+// 385 MB, graphify-out incluído) — limite da Vercel é 250 MB; todo deploy de
+// 09/10 a 15/10/2026 falhou por isso.
+const ARQUIVO_EMBALAGENS = path.join(process.cwd(), "data", "embalagens-estoque.json");
+const ARQUIVO_AVIAMENTOS = path.join(process.cwd(), "data", "aviamentos-estoque.json");
 const ARQUIVOS: Record<TipoInsumo, string> = {
-  embalagens: path.join(process.cwd(), "data", "embalagens-estoque.json"),
-  aviamentos: path.join(process.cwd(), "data", "aviamentos-estoque.json"),
+  embalagens: ARQUIVO_EMBALAGENS,
+  aviamentos: ARQUIVO_AVIAMENTOS,
 };
 
 /**
