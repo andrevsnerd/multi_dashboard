@@ -1620,8 +1620,8 @@
     "semantic_hash": ""
   },
   "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx": {
-    "mtime": 1792003063.2315438,
-    "ast_hash": "0d17a7d991bcd5abfb64fd69a173c104",
+    "mtime": 1792071033.4183939,
+    "ast_hash": "58930cdda47f7f8bb2c1563ee1685d4b",
     "semantic_hash": ""
   },
   "components/shared/CompraIdealCell.tsx": {
@@ -2595,8 +2595,8 @@
     "semantic_hash": ""
   },
   "lib/saida-entrada-executor.js": {
-    "mtime": 1791997655.626531,
-    "ast_hash": "6279a1962ce58b8e2476b4a379a46768",
+    "mtime": 1792070816.7587898,
+    "ast_hash": "445347a15517833e7ba99a2f6ef6e7f9",
     "semantic_hash": ""
   },
   "lib/server/company-live.ts": {
@@ -4905,8 +4905,8 @@
     "semantic_hash": ""
   },
   "components/controle-financeiro/ControleFinanceiroPage.tsx": {
-    "mtime": 1791984867.5768163,
-    "ast_hash": "260c43d3e0bed8cedd772d713677ee5e",
+    "mtime": 1792006391.0931923,
+    "ast_hash": "96e25c68c43602b0927feb5da3d2866e",
     "semantic_hash": ""
   },
   "components/controle-financeiro/Dre.tsx": {
@@ -4994,19 +4994,14 @@
     "ast_hash": "fbbf8e87bcbf0c4db8155f5426376522",
     "semantic_hash": ""
   },
-  "components/controle-financeiro/Normalizacao.tsx": {
-    "mtime": 1791985190.4514222,
-    "ast_hash": "6c09c1d554c31edd09d01c9ac2ec9e2c",
-    "semantic_hash": ""
-  },
   "lib/financeiro/normalizacao-store.ts": {
-    "mtime": 1791984777.319337,
-    "ast_hash": "4bb5c487ad072361a9ce8f1f72a25ddd",
+    "mtime": 1792006624.089599,
+    "ast_hash": "7c5ed35604a45b1155ec3de3eb254f94",
     "semantic_hash": ""
   },
   "lib/financeiro/normalizacao.ts": {
-    "mtime": 1791984475.638334,
-    "ast_hash": "f755175502161b3764b8c84ef357f02a",
+    "mtime": 1792006611.4054973,
+    "ast_hash": "014e462366a2b213535549e95ad4c670",
     "semantic_hash": ""
   },
   "lib/server/trava-estoque-negativo.ts": {
@@ -5015,8 +5010,8 @@
     "semantic_hash": ""
   },
   "app/api/saidas-entradas-produtos/tamanhos/route.ts": {
-    "mtime": 1791998063.407823,
-    "ast_hash": "dc7c5adc3f5bd05ed00b5b3c29c055c4",
+    "mtime": 1792070858.0472095,
+    "ast_hash": "6c8a20310c82553ccd0511d41f427114",
     "semantic_hash": ""
   },
   "lib/server/grade-produto.ts": {

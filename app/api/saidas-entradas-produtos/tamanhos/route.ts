@@ -42,9 +42,15 @@ export async function GET(request: Request) {
       const grade = grades.get(it.produto);
       const saldo = saldos.get(chaveSku(it.produto, it.cor));
       const exigeTamanho = Boolean(grade?.exigeTamanho);
+      // Saldo que uma saída pode usar sem o Linx recusar: o menor entre o total e
+      // o tamanho base (peça sem grade sai no base). Peça P/M/G usa o do tamanho.
+      const tb = grade?.tamanhoBase ?? 1;
+      const disponivel = saldo ? Math.min(saldo.estoque, saldo.es[tb - 1] ?? 0) : 0;
       return {
         produto: it.produto,
         cor: it.cor,
+        estoque: saldo?.estoque ?? 0,
+        disponivel,
         exigeTamanho,
         tamanhos: exigeTamanho
           ? grade!.tamanhos.map((t) => ({ ...t, estoque: saldo?.es[t.ordinal - 1] ?? 0 }))

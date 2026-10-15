@@ -494,6 +494,35 @@ async function fetchTamanhos(
   return mapa;
 }
 
+/**
+ * Saldo ATUAL de cada produto×cor na filial (mesma rota dos tamanhos). Usado para
+ * reconferir a lista antes de registrar: rascunho e lista montados minutos ou
+ * dias antes carregam o saldo daquela hora.
+ */
+async function fetchSaldosAtuais(
+  companyKey: string,
+  filial: string,
+  itens: Array<{ produto: string; corProduto: string | null }>
+): Promise<Map<string, { disponivel: number; tamanhos: TamanhoOpcao[] }>> {
+  const params = new URLSearchParams({
+    company: companyKey,
+    filial,
+    itens: itens.map((it) => `${it.produto}|${it.corProduto ?? ""}`).join(";"),
+  });
+  const response = await fetch(`/api/saidas-entradas-produtos/tamanhos?${params.toString()}`, {
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error("Erro ao consultar o saldo atual");
+  const json = (await response.json()) as {
+    data: Array<{ produto: string; cor: string; disponivel?: number; exigeTamanho: boolean; tamanhos: TamanhoOpcao[] }>;
+  };
+  const mapa = new Map<string, { disponivel: number; tamanhos: TamanhoOpcao[] }>();
+  for (const d of json.data ?? []) {
+    mapa.set(`${d.produto}|${d.cor}`, { disponivel: Number(d.disponivel) || 0, tamanhos: d.exigeTamanho ? d.tamanhos : [] });
+  }
+  return mapa;
+}
+
 async function fetchTiposRomaneio(): Promise<string[]> {
   const response = await fetch("/api/transferencia-produtos/tipos-romaneio", {
     cache: "no-store",
@@ -550,8 +579,14 @@ async function executarOperacaoLote(
   });
 
   if (!response.ok) {
-    const error = (await response.json()) as { error: string };
-    throw new Error(error.error || "Erro ao executar operação");
+    const error = (await response.json().catch(() => ({}))) as {
+      error?: string;
+      travaEstoqueNegativo?: { faltas: Array<{ produto: string; cor: string; tamanho: string; disponivel: number }> };
+    };
+    // Recusa por saldo vem com a lista dos itens: a tela marca as linhas.
+    throw Object.assign(new Error(error.error || "Erro ao executar operação"), {
+      faltas: error.travaEstoqueNegativo?.faltas ?? null,
+    });
   }
 
   const json = (await response.json()) as {
@@ -876,6 +911,9 @@ export default function SaidasEntradasProdutosPage({
   const [bipesEmVoo, setBipesEmVoo] = useState(0);
   const [ultimoBipe, setUltimoBipe] = useState<{ ok: boolean; titulo: string; detalhe: string } | null>(null);
   const [itemDestacado, setItemDestacado] = useState<string | null>(null);
+  /** Linhas (chaveLinha) sem saldo suficiente na última conferência — ficam em vermelho. */
+  const [semSaldoChaves, setSemSaldoChaves] = useState<Set<string>>(new Set());
+  const [conferindoSaldo, setConferindoSaldo] = useState(false);
   const [bipeAmbiguo, setBipeAmbiguo] = useState<{ codigo: string; opcoes: BipeItem[] } | null>(null);
   const [somBipeLigado, setSomBipeLigado] = useState(true);
   const bipeInputRef = useRef<HTMLInputElement | null>(null);
@@ -1524,6 +1562,17 @@ export default function SaidasEntradasProdutosPage({
       return null;
     }
 
+    // Saída: item sem saldo nem entra na lista. Antes entrava com estoque 0 e o
+    // Linx recusava no meio da gravação (romaneio 033717, 15/10/2026).
+    if (tipoOperacao === "saida" && !saidaPodeEstourarEstoque && estoque.estoque <= 0) {
+      mostrarNotificacao(
+        `SEM ESTOQUE: ${produto.descProduto || produto.produto}${produto.descCor ? ` (${produto.descCor})` : ""} ` +
+          `está com saldo ${estoque.estoque} em ${filialOptionLabel(filialSelecionada)} e não pode sair.`,
+        "error"
+      );
+      return null;
+    }
+
     return {
       produto: produto.produto,
       descProduto: produto.descProduto,
@@ -1535,7 +1584,7 @@ export default function SaidasEntradasProdutosPage({
       estoque: estoque.estoque,
       quantidade: 1,
     };
-  }, [filialSelecionada, mostrarNotificacao, tipoOperacao, filialOptionLabel]);
+  }, [filialSelecionada, mostrarNotificacao, tipoOperacao, filialOptionLabel, saidaPodeEstourarEstoque]);
 
   const ensureColorOptionsLoaded = useCallback(async (produtoSku: string) => {
     const sku = (produtoSku || "").trim();
@@ -1794,7 +1843,11 @@ export default function SaidasEntradasProdutosPage({
 
     if (idx === -1) {
       if (tipoOperacao === "saida" && !saidaPodeEstourarEstoque && estoqueBipado <= 0) {
-        registrarBipe(false, "Sem estoque", `${rotulo} não tem saldo em ${filialOptionLabel(filialSelecionada)}.`);
+        registrarBipe(
+          false,
+          "SEM ESTOQUE — a peça NÃO entrou na lista",
+          `${rotulo} está com saldo ${estoqueBipado} em ${filialOptionLabel(filialSelecionada)} e não pode sair.`
+        );
         return;
       }
       quantidade = 1;
@@ -2053,6 +2106,40 @@ export default function SaidasEntradasProdutosPage({
     });
   }, [tipoOperacao, saidaPodeEstourarEstoque, mostrarNotificacao]);
 
+  /** Linha sem saldo para a quantidade pedida (na última conferência). */
+  const linhaSemSaldo = useCallback(
+    (p: ProdutoSelecionado) => semSaldoChaves.has(chaveLinha(p)) && p.quantidade > p.estoque,
+    [semSaldoChaves]
+  );
+
+  /**
+   * "Ajustar ao saldo": tira da lista o que está sem saldo e reduz à quantidade
+   * disponível o que tem menos do que o pedido. Só mexe nas linhas marcadas.
+   */
+  const ajustarAoSaldo = useCallback(() => {
+    setProdutosSelecionados((prev) => {
+      const removidos: string[] = [];
+      const next = prev
+        .map((p) => {
+          if (!(semSaldoChaves.has(chaveLinha(p)) && p.quantidade > p.estoque)) return p;
+          if (p.estoque <= 0) {
+            removidos.push(p.descProduto || p.produto);
+            return null;
+          }
+          return { ...p, quantidade: p.estoque };
+        })
+        .filter((p): p is ProdutoSelecionado => p !== null);
+      produtosSelecionadosRef.current = next;
+      mostrarNotificacao(
+        removidos.length > 0
+          ? `Lista ajustada ao saldo: ${removidos.length} item(ns) sem estoque removido(s).`
+          : "Lista ajustada ao saldo disponível."
+      );
+      return next;
+    });
+    setSemSaldoChaves(new Set());
+  }, [semSaldoChaves, mostrarNotificacao]);
+
   /** Mensagem de bloqueio quando alguma peça P/M/G está sem tamanho (ou a grade ainda não carregou). */
   const pendenciaTamanho = useCallback((lista: ProdutoSelecionado[]): string | null => {
     const carregando = lista.filter((p) => p.tamanhos === undefined);
@@ -2131,7 +2218,28 @@ export default function SaidasEntradasProdutosPage({
 
       const label = tipoOperacao === "saida" ? "Saída" : "Entrada";
       mostrarNotificacao(`${label} registrada com sucesso! Romaneio: ${resultado.romaneio}`);
+      setSemSaldoChaves(new Set());
     } catch (error: any) {
+      // Recusa por saldo: marca em vermelho as linhas dos itens recusados (com o
+      // saldo que o servidor achou) para o operador ajustar e registrar de novo.
+      const faltas = (error?.faltas ?? null) as Array<{ produto: string; cor: string; disponivel: number }> | null;
+      if (faltas && faltas.length > 0) {
+        const norm = (c: string | null | undefined) => {
+          const t = (c ?? "").trim();
+          return /^\d+$/.test(t) ? String(Number(t)) : t;
+        };
+        const recusado = (p: ProdutoSelecionado) =>
+          faltas.find((f) => f.produto.trim() === p.produto.trim() && norm(f.cor) === norm(p.corProduto));
+        setProdutosSelecionados((prev) => {
+          const next = prev.map((p) => {
+            const f = recusado(p);
+            return f && !p.tamanho ? { ...p, estoque: Math.max(0, f.disponivel) } : p;
+          });
+          produtosSelecionadosRef.current = next;
+          return next;
+        });
+        setSemSaldoChaves(new Set(produtos.filter((p) => recusado(p)).map(chaveLinha)));
+      }
       mostrarNotificacao(error.message || "Erro ao processar operação", "error");
     } finally {
       setProcessandoOperacao(false);
@@ -2438,7 +2546,7 @@ export default function SaidasEntradasProdutosPage({
     }
   }, [logEditando, tipoOperacao, user?.username, mostrarNotificacao, fecharModalEdicao]);
 
-  const abrirConfirmacaoRegistro = useCallback(() => {
+  const abrirConfirmacaoRegistro = useCallback(async () => {
     if (!filialSelecionada) {
       mostrarNotificacao("Selecione uma filial", "error");
       return;
@@ -2452,6 +2560,47 @@ export default function SaidasEntradasProdutosPage({
     if (pendencia) {
       mostrarNotificacao(pendencia, "error");
       return;
+    }
+
+    // SAÍDA: reconfere o saldo de TODA a lista agora. A lista (ou o rascunho
+    // retomado) guarda o saldo da hora em que o item entrou; se outra saída,
+    // venda ou defeito levou a peça, o Linx recusaria no meio da gravação.
+    // Item sem saldo fica vermelho e o registro não sai até ser removido/ajustado.
+    if (tipoOperacao === "saida" && !saidaPodeEstourarEstoque) {
+      setConferindoSaldo(true);
+      try {
+        const saldos = await fetchSaldosAtuais(companyKey, filialSelecionada.codFilial, produtosSelecionados);
+        const atualizados = produtosSelecionados.map((p) => {
+          const s = saldos.get(`${p.produto}|${p.corProduto ?? ""}`);
+          if (!s) return { ...p, estoque: 0 };
+          const doTamanho = p.tamanho ? s.tamanhos.find((t) => t.ordinal === p.tamanho) : undefined;
+          return {
+            ...p,
+            estoque: doTamanho ? doTamanho.estoque : s.disponivel,
+            tamanhos: s.tamanhos.length > 0 ? s.tamanhos : p.tamanhos,
+          };
+        });
+        produtosSelecionadosRef.current = atualizados;
+        setProdutosSelecionados(atualizados);
+        const sem = atualizados.filter((p) => p.quantidade > p.estoque);
+        setSemSaldoChaves(new Set(sem.map(chaveLinha)));
+        if (sem.length > 0) {
+          const nomes = sem
+            .slice(0, 5)
+            .map((p) => `${p.descProduto || p.produto}${p.tamanhoLabel ? ` ${p.tamanhoLabel}` : ""} (saldo ${Math.max(0, p.estoque)})`)
+            .join(", ");
+          mostrarNotificacao(
+            `SEM SALDO para ${sem.length} item(ns): ${nomes}${sem.length > 5 ? "…" : ""}. ` +
+              `Eles estão em vermelho — use "Ajustar ao saldo" ou remova antes de registrar.`,
+            "error"
+          );
+          return;
+        }
+      } catch {
+        // Sem a conferência da tela, o servidor ainda confere antes de gravar.
+      } finally {
+        setConferindoSaldo(false);
+      }
     }
     // Editando romaneio: não há destino nem trava de defeito a checar — os itens
     // vão para um romaneio que já existe (o cabeçalho não é reescrito).
@@ -2475,7 +2624,7 @@ export default function SaidasEntradasProdutosPage({
       }
     }
     setMostrarConfirmacaoRegistro(true);
-  }, [filialSelecionada, produtosSelecionados, pendenciaTamanho, tipoOperacao, filiaisDestinoVisiveis.length, filialDestinoSaida, tipoRomaneioSelecionado, travaDefeitoAtiva, defeitoDoDia, romaneioEditando, mostrarNotificacao]);
+  }, [filialSelecionada, produtosSelecionados, pendenciaTamanho, tipoOperacao, saidaPodeEstourarEstoque, companyKey, filiaisDestinoVisiveis.length, filialDestinoSaida, tipoRomaneioSelecionado, travaDefeitoAtiva, defeitoDoDia, romaneioEditando, mostrarNotificacao]);
 
   const confirmarRegistro = useCallback(() => {
     setMostrarConfirmacaoRegistro(false);
@@ -2869,7 +3018,7 @@ export default function SaidasEntradasProdutosPage({
     );
   }
 
-  const isBusy = processandoOperacao;
+  const isBusy = processandoOperacao || conferindoSaldo;
   const historicoCompletoHref = `/${companyKey}/saidas-entradas-produtos/historico?tipo=${tipoOperacao}&filial=${encodeURIComponent(
     filialSelecionada?.codFilial || ""
   )}`;
@@ -3567,10 +3716,11 @@ export default function SaidasEntradasProdutosPage({
                     const chaveItem = chaveLinha(produto);
                     const destacado = itemDestacado === chaveItem;
                     const semTamanho = faltaTamanho(produto);
+                    const semSaldo = linhaSemSaldo(produto);
                     return (
                     <div
                       key={index}
-                      className={`${styles.produtoItem} ${destacado ? styles.produtoItemBipado : ""} ${semTamanho ? styles.produtoItemSemTamanho : ""}`}
+                      className={`${styles.produtoItem} ${destacado ? styles.produtoItemBipado : ""} ${semTamanho || semSaldo ? styles.produtoItemSemTamanho : ""}`}
                       ref={(el) => {
                         // Traz a linha recém-bipada para a vista (a lista rola).
                         if (!destacado || !el) return;
@@ -3634,6 +3784,11 @@ export default function SaidasEntradasProdutosPage({
                           >+</button>
                         </div>
                         <div className={styles.stockPill}>{produto.quantidade}/{produto.estoque}</div>
+                        {semSaldo && (
+                          <div className={styles.semSaldoTag} title="Saldo atual menor que a quantidade da lista">
+                            SEM SALDO ({Math.max(0, produto.estoque)})
+                          </div>
+                        )}
                         <button className={styles.removeBtn} onClick={() => removerProduto(index)} title="Remover">🗑</button>
                       </div>
                     </div>
@@ -3656,6 +3811,17 @@ export default function SaidasEntradasProdutosPage({
                   </span>
                   Adicionar Produto
                 </button>
+                {produtosSelecionados.some(linhaSemSaldo) && (
+                  <button
+                    type="button"
+                    className={styles.ajustarSaldoBtn}
+                    onClick={ajustarAoSaldo}
+                    disabled={isBusy}
+                    title="Remove os itens sem estoque e reduz os demais ao saldo disponível"
+                  >
+                    Ajustar ao saldo ({produtosSelecionados.filter(linhaSemSaldo).length})
+                  </button>
+                )}
                 {produtosSelecionados.length > 0 && (
                   <button
                     type="button"
@@ -3723,7 +3889,7 @@ export default function SaidasEntradasProdutosPage({
                 </div>
                 <button
                   className={`${styles.submitBtn} ${isBusy || travaDefeitoAtiva || !filialSelecionada || produtosSelecionados.length === 0 ? "" : tipoOperacao === "saida" ? styles.submitBtnSaida : styles.submitBtnEntrada}`}
-                  onClick={abrirConfirmacaoRegistro}
+                  onClick={() => void abrirConfirmacaoRegistro()}
                   disabled={!filialSelecionada || produtosSelecionados.length === 0 || isBusy || travaDefeitoAtiva || checandoDefeitoDoDia}
                   title={travaDefeitoAtiva && defeitoDoDia ? defeitoDoDia.mensagem : undefined}
                 >
@@ -3744,7 +3910,9 @@ export default function SaidasEntradasProdutosPage({
                       />
                     </svg>
                   </span>
-                  {isBusy
+                  {conferindoSaldo
+                    ? "⏳ Conferindo saldo…"
+                    : isBusy
                     ? "⏳ Processando…"
                     : romaneioEditando
                       ? `Salvar no romaneio #${romaneioEditando.romaneio}`
