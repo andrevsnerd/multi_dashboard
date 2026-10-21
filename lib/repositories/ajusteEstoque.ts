@@ -141,7 +141,7 @@ export interface AjusteRecente {
   soma: number;
 }
 
-/** Lista os 10 ajustes mais recentes do responsável (para "desfazer"/consultar). Exclui estornos. */
+/** Lista os 30 ajustes mais recentes do responsável (para "desfazer"/consultar). Exclui estornos. */
 export async function listarAjustesRecentes(responsavel: string): Promise<AjusteRecente[]> {
   const respEsc = esc(responsavel.trim());
   const rows = await query<{
@@ -151,7 +151,7 @@ export async function listarAjustesRecentes(responsavel: string): Promise<Ajuste
     ITENS: number;
     SOMA: number;
   }>(`
-    SELECT TOP 10 RTRIM(c.NOME_CONTAGEM) AS NOME, RTRIM(c.FILIAL) AS FILIAL, c.EMISSAO,
+    SELECT TOP 30 RTRIM(c.NOME_CONTAGEM) AS NOME, RTRIM(c.FILIAL) AS FILIAL, c.EMISSAO,
            ISNULL(s.ITENS, 0) AS ITENS, ISNULL(s.SOMA, 0) AS SOMA
     FROM ESTOQUE_PROD_CONTAGEM c WITH (NOLOCK)
     LEFT JOIN (
@@ -178,6 +178,9 @@ export interface AjusteDetalheItem {
   cor: string;
   descCor: string;
   qtde: number;
+  /** Saldo logo antes/depois do ajuste (reconstruído por movimento); null = sem dado. */
+  saldoAnterior?: number | null;
+  saldoFinal?: number | null;
 }
 
 /** Itens de um ajuste (contagem) — o que foi ajustado e quanto. */
@@ -261,6 +264,238 @@ export async function resumirContagemFisica(
     saldoFinalTotal: Number(r.CONTAGEM) || 0,
     itensSaldoNegativo: Number(r.NEG) || 0,
   };
+}
+
+/** Ajustes a partir desta data têm o saldo antes/depois reconstruído por movimento. */
+export const RECONSTRUCAO_SALDO_DESDE = '2026-10-01';
+
+/** Acima disso a busca de movimentos não filtra produto (o IN ficaria grande demais). */
+const MAX_PRODUTOS_FILTRO = 400;
+
+export interface SaldoReconstruido {
+  saldoAnterior: number;
+  saldoFinal: number;
+}
+
+export interface ReconstrucaoAjuste {
+  /** Instante tomado como a hora do ajuste (ISO, relógio do Linx). */
+  momento: string;
+  /** Chave = chaveItemAjuste(produto, cor). */
+  porItem: Record<string, SaldoReconstruido>;
+}
+
+function normCor(cor: string): string {
+  const c = (cor ?? '').trim();
+  return /^\d+$/.test(c) ? String(Number(c)) : c.toUpperCase();
+}
+
+/** Produto × cor tolerante ao formato da cor ('06' = '6'). */
+export function chaveItemAjuste(produto: string, cor: string): string {
+  return `${(produto ?? '').trim().toUpperCase()}|${normCor(cor)}`;
+}
+
+/**
+ * Mesmo critério do Extrato de Produto (app/api/extrato-produto/route.ts): primeiro
+ * carimbo que caia no dia da emissão e tenha hora de verdade.
+ */
+function momentoNoDia(
+  emissao: Date | null | undefined,
+  ...candidatos: Array<Date | null | undefined>
+): string | null {
+  if (!emissao) return null;
+  const dia = new Date(emissao).toISOString().slice(0, 10);
+  for (const c of candidatos) {
+    if (!c) continue;
+    const iso = new Date(c).toISOString();
+    if (iso.slice(0, 10) === dia && iso.slice(11, 19) !== '00:00:00') return iso;
+  }
+  return null;
+}
+
+interface MovRow {
+  PRODUTO: string;
+  COR: string;
+  Q: number;
+  EMISSAO: Date;
+  M1: Date | null;
+  M2: Date | null;
+}
+
+/**
+ * Saldo de cada item ajustado logo antes e logo depois do ajuste.
+ *
+ * O Linx não guarda o saldo da hora do ajuste, então ele é rebobinado a partir do
+ * estoque atual: saldo após = ESTOQUE_PRODUTOS.ESTOQUE − tudo que mexeu no item
+ * depois do ajuste, pelas 8 fontes canônicas do CLAUDE.md (cópia das queries do
+ * Extrato de Produto, inclusive a ordem do dia pela hora real). Saldo antes =
+ * saldo após − o que o ajuste aplicou.
+ *
+ * Só para ajustes desde RECONSTRUCAO_SALDO_DESDE (null antes disso). Qualquer
+ * consulta que falhe derruba a reconstrução inteira — saldo parcial seria errado.
+ */
+export async function reconstruirSaldosAjuste(
+  nomeContagem: string
+): Promise<ReconstrucaoAjuste | null> {
+  const nomeEsc = esc(nomeContagem.trim());
+  const cab = await query<{
+    FILIAL: string;
+    COD_FILIAL: string | null;
+    EMISSAO: Date;
+    DPT: Date | null;
+    DPT_ITEM: Date | null;
+  }>(`
+    SELECT TOP 1 RTRIM(c.FILIAL) AS FILIAL, c.EMISSAO, c.DATA_PARA_TRANSFERENCIA AS DPT,
+      (SELECT MIN(a.DATA_PARA_TRANSFERENCIA) FROM ESTOQUE_PROD_CTG_AJUSTE a WITH (NOLOCK)
+        WHERE a.NOME_CONTAGEM = c.NOME_CONTAGEM) AS DPT_ITEM,
+      (SELECT TOP 1 LTRIM(RTRIM(f.COD_FILIAL)) FROM FILIAIS f WITH (NOLOCK)
+        WHERE f.FILIAL = c.FILIAL) AS COD_FILIAL
+    FROM ESTOQUE_PROD_CONTAGEM c WITH (NOLOCK)
+    WHERE RTRIM(LTRIM(c.NOME_CONTAGEM)) = '${nomeEsc}' AND c.ESTOQUE_AJUSTADO = 1
+  `);
+  const h = cab[0];
+  if (!h?.EMISSAO || !h.FILIAL) return null;
+
+  // Hora em que o trigger moveu o estoque (o dashboard grava EMISSAO à meia-noite).
+  const momento =
+    momentoNoDia(h.EMISSAO, h.DPT_ITEM, h.DPT) ??
+    (h.DPT_ITEM ? new Date(h.DPT_ITEM).toISOString() : null) ??
+    new Date(h.EMISSAO).toISOString();
+  const dia = momento.slice(0, 10);
+  if (dia < RECONSTRUCAO_SALDO_DESDE) return null;
+
+  const itens = await query<{ PRODUTO: string; COR: string; Q: number }>(`
+    SELECT RTRIM(PRODUTO) AS PRODUTO, RTRIM(ISNULL(COR_PRODUTO, '')) AS COR,
+           SUM(ISNULL(QTDE_AJUSTE, 0)) AS Q
+    FROM ESTOQUE_PROD_CTG_AJUSTE WITH (NOLOCK)
+    WHERE RTRIM(LTRIM(NOME_CONTAGEM)) = '${nomeEsc}'
+    GROUP BY RTRIM(PRODUTO), RTRIM(ISNULL(COR_PRODUTO, ''))
+  `);
+  if (itens.length === 0) return null;
+
+  const f = esc(h.FILIAL);
+  const cod = esc((h.COD_FILIAL ?? '').trim());
+  const produtos = [...new Set(itens.map((i) => i.PRODUTO.trim()))];
+  const filtroProd = (col: string) =>
+    produtos.length <= MAX_PRODUTOS_FILTRO
+      ? `AND ${col} IN (${produtos.map((p) => `'${esc(p)}'`).join(',')})`
+      : '';
+
+  const [estoque, ...fontes] = await Promise.all([
+    query<{ PRODUTO: string; COR: string; ESTOQUE: number }>(`
+      SELECT RTRIM(PRODUTO) AS PRODUTO, RTRIM(ISNULL(COR_PRODUTO, '')) AS COR, ESTOQUE
+      FROM ESTOQUE_PRODUTOS WITH (NOLOCK)
+      WHERE FILIAL = '${f}' ${filtroProd('PRODUTO')}
+    `),
+    // + ESTOQUE_PROD_ENT/ESTOQUE_PROD1_ENT
+    query<MovRow>(`
+      SELECT RTRIM(p.PRODUTO) AS PRODUTO, RTRIM(ISNULL(p.COR_PRODUTO, '')) AS COR, p.QTDE AS Q,
+             e.EMISSAO, e.DATA_DIGITACAO AS M1, e.DATA_PARA_TRANSFERENCIA AS M2
+      FROM ESTOQUE_PROD_ENT e WITH (NOLOCK)
+      JOIN ESTOQUE_PROD1_ENT p WITH (NOLOCK)
+        ON e.ROMANEIO_PRODUTO = p.ROMANEIO_PRODUTO
+        AND (p.FILIAL IS NULL OR LTRIM(RTRIM(p.FILIAL)) = '' OR p.FILIAL = e.FILIAL)
+      WHERE e.FILIAL = '${f}' AND e.EMISSAO >= '${dia}' ${filtroProd('p.PRODUTO')}
+    `),
+    // − ESTOQUE_PROD_SAI/ESTOQUE_PROD1_SAI
+    query<MovRow>(`
+      SELECT RTRIM(p.PRODUTO) AS PRODUTO, RTRIM(ISNULL(p.COR_PRODUTO, '')) AS COR, -p.QTDE AS Q,
+             s.EMISSAO, s.DATA_DIGITACAO AS M1, s.DATA_PARA_TRANSFERENCIA AS M2
+      FROM ESTOQUE_PROD_SAI s WITH (NOLOCK)
+      JOIN ESTOQUE_PROD1_SAI p WITH (NOLOCK)
+        ON s.ROMANEIO_PRODUTO = p.ROMANEIO_PRODUTO
+        AND (p.FILIAL IS NULL OR LTRIM(RTRIM(p.FILIAL)) = '' OR p.FILIAL = s.FILIAL)
+      WHERE s.FILIAL = '${f}' AND s.EMISSAO >= '${dia}' ${filtroProd('p.PRODUTO')}
+    `),
+    // + ESTOQUE_PROD_CTG_AJUSTE (outros ajustes; este fica de fora)
+    query<MovRow>(`
+      SELECT RTRIM(a.PRODUTO) AS PRODUTO, RTRIM(ISNULL(a.COR_PRODUTO, '')) AS COR,
+             a.QTDE_AJUSTE AS Q, c.EMISSAO,
+             a.DATA_PARA_TRANSFERENCIA AS M1, c.DATA_PARA_TRANSFERENCIA AS M2
+      FROM ESTOQUE_PROD_CONTAGEM c WITH (NOLOCK)
+      JOIN ESTOQUE_PROD_CTG_AJUSTE a WITH (NOLOCK) ON c.NOME_CONTAGEM = a.NOME_CONTAGEM
+      WHERE c.FILIAL = '${f}' AND c.ESTOQUE_AJUSTADO = 1 AND c.EMISSAO >= '${dia}'
+        AND RTRIM(LTRIM(c.NOME_CONTAGEM)) <> '${nomeEsc}' ${filtroProd('a.PRODUTO')}
+    `),
+    // + LOJA_ENTRADAS/LOJA_ENTRADAS_PRODUTO
+    query<MovRow>(`
+      SELECT RTRIM(lep.PRODUTO) AS PRODUTO, RTRIM(ISNULL(lep.COR_PRODUTO, '')) AS COR,
+             lep.QTDE_ENTRADA AS Q, le.EMISSAO, le.DATA_PARA_TRANSFERENCIA AS M1, NULL AS M2
+      FROM LOJA_ENTRADAS le WITH (NOLOCK)
+      JOIN LOJA_ENTRADAS_PRODUTO lep WITH (NOLOCK)
+        ON le.FILIAL = lep.FILIAL AND le.ROMANEIO_PRODUTO = lep.ROMANEIO_PRODUTO
+      WHERE le.FILIAL = '${f}' AND le.EMISSAO >= '${dia}' ${filtroProd('lep.PRODUTO')}
+    `),
+    // − LOJA_SAIDAS/LOJA_SAIDAS_PRODUTO
+    query<MovRow>(`
+      SELECT RTRIM(lsp.PRODUTO) AS PRODUTO, RTRIM(ISNULL(lsp.COR_PRODUTO, '')) AS COR,
+             -lsp.QTDE_SAIDA AS Q, ls.EMISSAO, ls.DATA_PARA_TRANSFERENCIA AS M1, NULL AS M2
+      FROM LOJA_SAIDAS ls WITH (NOLOCK)
+      JOIN LOJA_SAIDAS_PRODUTO lsp WITH (NOLOCK)
+        ON ls.FILIAL = lsp.FILIAL AND ls.ROMANEIO_PRODUTO = lsp.ROMANEIO_PRODUTO
+      WHERE ls.FILIAL = '${f}' AND ls.EMISSAO >= '${dia}' ${filtroProd('lsp.PRODUTO')}
+    `),
+    // − LOJA_VENDA_PRODUTO: QTDE, e só (nunca QTDE_CANCELADA — ver CLAUDE.md)
+    cod
+      ? query<MovRow>(`
+          SELECT RTRIM(vp.PRODUTO) AS PRODUTO, RTRIM(ISNULL(vp.COR_PRODUTO, '')) AS COR,
+                 -vp.QTDE AS Q, v.DATA_VENDA AS EMISSAO, v.DATA_DIGITACAO AS M1, NULL AS M2
+          FROM LOJA_VENDA v WITH (NOLOCK)
+          JOIN LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
+            ON v.CODIGO_FILIAL = vp.CODIGO_FILIAL AND v.TICKET = vp.TICKET
+          WHERE vp.CODIGO_FILIAL = '${cod}' AND v.DATA_VENDA >= '${dia}'
+            AND vp.QTDE > 0 AND ISNULL(vp.NAO_MOVIMENTA_ESTOQUE, 0) = 0
+            ${filtroProd('vp.PRODUTO')}
+        `)
+      : Promise.resolve([] as MovRow[]),
+    // + LOJA_VENDA_TROCA (devolução volta ao estoque)
+    cod
+      ? query<MovRow>(`
+          SELECT RTRIM(t.PRODUTO) AS PRODUTO, RTRIM(ISNULL(t.COR_PRODUTO, '')) AS COR,
+                 t.QTDE AS Q, t.DATA_VENDA AS EMISSAO, v.DATA_DIGITACAO AS M1, NULL AS M2
+          FROM LOJA_VENDA_TROCA t WITH (NOLOCK)
+          LEFT JOIN LOJA_VENDA v WITH (NOLOCK)
+            ON v.CODIGO_FILIAL = t.CODIGO_FILIAL AND v.TICKET = t.TICKET
+          WHERE t.CODIGO_FILIAL = '${cod}' AND t.DATA_VENDA >= '${dia}'
+            AND t.QTDE > 0 AND ISNULL(t.NAO_MOVIMENTA_ESTOQUE, 0) = 0
+            ${filtroProd('t.PRODUTO')}
+        `)
+      : Promise.resolve([] as MovRow[]),
+    // − FATURAMENTO/FATURAMENTO_PROD (qualquer natureza: é estoque, não dinheiro)
+    query<MovRow>(`
+      SELECT RTRIM(fp.PRODUTO) AS PRODUTO, RTRIM(ISNULL(fp.COR_PRODUTO, '')) AS COR,
+             -fp.QTDE AS Q, fa.EMISSAO, fa.DATA_HORA_EMISSAO AS M1, fa.DATA_PARA_TRANSFERENCIA AS M2
+      FROM FATURAMENTO fa WITH (NOLOCK)
+      JOIN FATURAMENTO_PROD fp WITH (NOLOCK)
+        ON fa.FILIAL = fp.FILIAL AND fa.NF_SAIDA = fp.NF_SAIDA AND fa.SERIE_NF = fp.SERIE_NF
+      WHERE fa.FILIAL = '${f}' AND fa.EMISSAO >= '${dia}'
+        AND ISNULL(fa.NOTA_CANCELADA, 0) = 0 AND fp.QTDE > 0 ${filtroProd('fp.PRODUTO')}
+    `),
+  ]);
+
+  const atual = new Map<string, number>();
+  for (const r of estoque) {
+    const k = chaveItemAjuste(r.PRODUTO, r.COR);
+    atual.set(k, (atual.get(k) ?? 0) + (Number(r.ESTOQUE) || 0));
+  }
+
+  // Movimento sem hora fica na meia-noite da emissão (mesma régua do extrato).
+  const depois = new Map<string, number>();
+  for (const rows of fontes) {
+    for (const r of rows) {
+      const quando = momentoNoDia(r.EMISSAO, r.M1, r.M2) ?? new Date(r.EMISSAO).toISOString();
+      if (quando <= momento) continue;
+      const k = chaveItemAjuste(r.PRODUTO, r.COR);
+      depois.set(k, (depois.get(k) ?? 0) + (Number(r.Q) || 0));
+    }
+  }
+
+  const porItem: Record<string, SaldoReconstruido> = {};
+  for (const it of itens) {
+    const k = chaveItemAjuste(it.PRODUTO, it.COR);
+    const saldoFinal = (atual.get(k) ?? 0) - (depois.get(k) ?? 0);
+    porItem[k] = { saldoFinal, saldoAnterior: saldoFinal - (Number(it.Q) || 0) };
+  }
+  return { momento, porItem };
 }
 
 /** Resolve o nome EXATO da filial (FILIAIS.FILIAL) a partir do COD_FILIAL. */

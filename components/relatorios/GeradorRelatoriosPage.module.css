@@ -536,6 +536,59 @@
   background: var(--s-50);
 }
 
+/* ── Ranking de vendedores: lista dos produtos filtrados ── */
+.rankProdWrap {
+  overflow-x: auto;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.rankProdTable {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+
+.rankProdTable th {
+  position: sticky;
+  top: 0;
+  background: var(--s-50);
+  text-align: left;
+  padding: 8px 10px;
+  font-weight: 600;
+  color: var(--t-700);
+  border-bottom: 1px solid var(--b-200);
+  white-space: nowrap;
+}
+
+.rankProdTable td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--s-100);
+  color: var(--t-900);
+}
+
+.rankProdTable th.rankProdNum,
+.rankProdTable td.rankProdNum {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.rankProdPos {
+  width: 40px;
+  color: var(--t-500);
+  font-variant-numeric: tabular-nums;
+}
+
+.rankProdStrong {
+  font-weight: 700;
+}
+
+.rankProdCode {
+  font-size: 11px;
+  color: var(--t-400);
+}
+
 /* ── Progresso de análise demorada (compra sugerida por loja, via stream) ── */
 .progressWrap {
   margin-top: 4px;

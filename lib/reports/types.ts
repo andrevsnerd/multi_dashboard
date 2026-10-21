@@ -233,4 +233,10 @@ export interface ReportResult {
    * por filial). O front mescla estas ao catálogo e as anexa às colunas habilitadas.
    */
   dynamicColumns?: ReportColumnDef[];
+  /**
+   * Tabelas auxiliares da análise, fora da tabela principal (ex.: no Ranking de vendedores,
+   * a lista dos produtos filtrados e o cruzamento vendedor × produto). A tela e o export
+   * dedicado da análise leem pela chave; as demais análises não mandam.
+   */
+  sideTables?: Record<string, ReportRow[]>;
 }

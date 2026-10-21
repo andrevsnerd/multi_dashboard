@@ -65,11 +65,14 @@ interface AjusteDetalheItem {
   cor: string;
   descCor: string;
   qtde: number;
+  /** Saldo logo antes/depois do ajuste (reconstruído por movimento); null = sem dado. */
+  saldoAnterior?: number | null;
+  saldoFinal?: number | null;
 }
 
 /** KPIs de um ajuste já feito (ver /api/ajuste-estoque/detalhe). null = não guardado. */
 interface AjusteKpis {
-  fonte: "snapshot" | "contagem" | "ajuste";
+  fonte: "snapshot" | "contagem" | "movimento" | "ajuste";
   modo: Modo | null;
   totais: {
     itens: number | null;
@@ -101,14 +104,19 @@ function fmtKpi(v: number | null): string {
   return v == null ? "—" : v.toLocaleString("pt-BR");
 }
 
-/** Quadros de KPIs do "Calcular diferenças" — também usados ao rever um ajuste recente. */
-function TotaisBar({ totais }: { totais: TotaisKpi }) {
+/**
+ * Quadros de KPIs do "Calcular diferenças" — também usados ao rever um ajuste recente
+ * (`historico`: o "atual" de lá é o saldo de antes do ajuste).
+ */
+function TotaisBar({ totais, historico = false }: { totais: TotaisKpi; historico?: boolean }) {
   const semDado = "Não guardado para este ajuste";
   const somaDelta = totais.somaDelta ?? 0;
   return (
     <div className={styles.totaisBar}>
       <div className={`${styles.totalBox} ${styles.totalBoxDestaque}`}>
-        <span className={styles.totalLabel}>Saldo atual (total)</span>
+        <span className={styles.totalLabel}>
+          {historico ? "Saldo anterior" : "Saldo atual (total)"}
+        </span>
         <span
           className={styles.totalValor}
           title={totais.saldoAtualTotal == null ? semDado : undefined}
@@ -117,7 +125,9 @@ function TotaisBar({ totais }: { totais: TotaisKpi }) {
         </span>
       </div>
       <div className={`${styles.totalBox} ${styles.totalBoxDestaque}`}>
-        <span className={styles.totalLabel}>Saldo final (após ajuste)</span>
+        <span className={styles.totalLabel}>
+          {historico ? "Saldo final após ajuste" : "Saldo final (após ajuste)"}
+        </span>
         <span
           className={`${styles.totalValor} ${styles.final}`}
           title={totais.saldoFinalTotal == null ? semDado : undefined}
@@ -163,8 +173,9 @@ function AjusteKpisResumo({ kpis }: { kpis: AjusteKpis }) {
   if (kpis.invalidas > 0) avisos.push(`⚠ ${kpis.invalidas} linha(s) inválida(s) no arquivo`);
   return (
     <div className={styles.detalheKpis}>
-      <TotaisBar totais={t} />
-      {t.itensSaldoNegativo != null && t.itensSaldoNegativo > 0 && t.saldoFinalTotal != null && (
+      <TotaisBar totais={t} historico />
+      {kpis.fonte !== "movimento" &&
+        t.itensSaldoNegativo != null && t.itensSaldoNegativo > 0 && t.saldoFinalTotal != null && (
         <p className={styles.fileHintMuted}>
           ℹ {t.itensSaldoNegativo} item(ns) tinham saldo negativo no escopo — por isso a variação
           líquida ({t.somaDelta > 0 ? "+" : ""}
@@ -184,7 +195,16 @@ function AjusteKpisResumo({ kpis }: { kpis: AjusteKpis }) {
       {kpis.fonte === "ajuste" && (
         <p className={styles.fileHintMuted}>
           Saldos e escopo não foram guardados para este ajuste (feito antes desse registro ou
-          item a item) — o Linx só grava os itens com diferença.
+          item a item) — o Linx só grava os itens com diferença. Ajustes desde outubro/2026
+          têm o saldo reconstruído pelos movimentos.
+        </p>
+      )}
+      {kpis.fonte === "movimento" && (
+        <p className={styles.fileHintMuted}>
+          Saldos reconstruídos pelos movimentos do Linx (estoque atual − o que entrou e saiu
+          depois do ajuste), somando só os itens ajustados.
+          {t.itensSaldoNegativo != null && t.itensSaldoNegativo > 0 &&
+            ` ${t.itensSaldoNegativo} item(ns) estavam com saldo negativo antes do ajuste.`}
         </p>
       )}
       {kpis.fonte === "contagem" && (
@@ -831,7 +851,7 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
         <section className={styles.card}>
           <h2 className={styles.cardTitle}>Ajustes recentes</h2>
           <p className={styles.fileHintMuted}>
-            Seus 10 últimos ajustes. Clique na descrição para ver os itens. Desfazer cria um
+            Seus 30 últimos ajustes. Clique na descrição para ver os itens. Desfazer cria um
             estorno (ajuste inverso) registrado.
           </p>
           <div className={styles.tableScroll}>
@@ -847,7 +867,9 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {recentes.map((r) => (
+                {recentes.map((r) => {
+                  const comSaldo = (detalheCache[r.nome]?.itens ?? []).some((it) => it.saldoFinal != null);
+                  return (
                   <Fragment key={r.nome}>
                     <tr>
                       <td>
@@ -893,7 +915,9 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
                                   <th>Produto</th>
                                   <th>Descrição</th>
                                   <th>Cor</th>
+                                  {comSaldo && <th className={styles.num}>Saldo anterior</th>}
                                   <th className={styles.num}>Ajuste</th>
+                                  {comSaldo && <th className={styles.num}>Saldo após</th>}
                                 </tr>
                               </thead>
                               <tbody>
@@ -902,15 +926,23 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
                                     <td className={styles.mono}>{it.produto}</td>
                                     <td>{it.descProduto}</td>
                                     <td>{it.descCor || it.cor}</td>
+                                    {comSaldo && (
+                                      <td className={styles.num}>{fmtKpi(it.saldoAnterior ?? null)}</td>
+                                    )}
                                     <td className={`${styles.num} ${it.qtde < 0 ? styles.neg : styles.pos}`}>
                                       {it.qtde > 0 ? "+" : ""}
                                       {it.qtde}
                                     </td>
+                                    {comSaldo && (
+                                      <td className={`${styles.num} ${styles.final}`}>
+                                        {fmtKpi(it.saldoFinal ?? null)}
+                                      </td>
+                                    )}
                                   </tr>
                                 ))}
                                 {(detalheCache[r.nome]?.itens.length ?? 0) === 0 && !detalheCarregando && (
                                   <tr>
-                                    <td colSpan={4} className={styles.fileHintMuted}>
+                                    <td colSpan={comSaldo ? 6 : 4} className={styles.fileHintMuted}>
                                       Nenhum item encontrado.
                                     </td>
                                   </tr>
@@ -923,7 +955,8 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
                       </tr>
                     )}
                   </Fragment>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

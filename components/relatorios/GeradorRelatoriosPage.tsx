@@ -43,6 +43,15 @@ import { exportTicketsXlsx } from "@/lib/utils/exportTicketsXlsx";
 import { TICKETS_ID } from "@/lib/reports/tickets";
 import { VENDAS_POR_PRECO_ID } from "@/lib/reports/vendas-por-preco";
 import { exportVendasPorPrecoXlsx } from "@/lib/utils/exportVendasPorPrecoXlsx";
+import {
+  RANKING_CANAL_FIELD,
+  RANKING_VENDEDORES_ID,
+  SIDE_PRODUTOS,
+  SIDE_VENDEDOR_PRODUTO,
+  VENDEDOR_OUTROS_COL,
+  VENDEDOR_PRODUTO_COL_PREFIX,
+} from "@/lib/reports/ranking-vendedores";
+import { exportRankingVendedoresXlsx } from "@/lib/utils/exportRankingVendedoresXlsx";
 import { formatData, formatDataVenda, formatDiasAcabar, formatDiasParado } from "@/lib/reports/format";
 import { getDefaultPresets, getReportMeta, REPORT_TYPES, VENDAS_FATURAMENTO_ID } from "@/lib/reports/registry";
 import { computeExtraSources, getEditorExtraColumns } from "@/lib/reports/column-sources";
@@ -305,6 +314,12 @@ export default function GeradorRelatoriosPage({
   const [generatedOnce, setGeneratedOnce] = useState(false);
   // Colunas dinâmicas (ex.: estoque por filial) devolvidas pelo backend.
   const [dynamicColumns, setDynamicColumns] = useState<ReportColumnDef[]>([]);
+  // Tabelas auxiliares da análise (ex.: Ranking de vendedores → produtos filtrados).
+  const [sideTables, setSideTables] = useState<Record<string, ReportRow[]>>({});
+  // Filtros (em texto) do último relatório gerado — vão para o cabeçalho do XLSX.
+  const [filtrosDoResultado, setFiltrosDoResultado] = useState<string[]>([]);
+  // Ranking de vendedores: lista de produtos do topo aberta por inteiro.
+  const [produtosRankingAbertos, setProdutosRankingAbertos] = useState(false);
   // Progresso de análises demoradas via streaming (ex.: compra sugerida por loja).
   const [genProgress, setGenProgress] = useState<{ done: number; total: number; phase?: string } | null>(null);
 
@@ -797,6 +812,44 @@ export default function GeradorRelatoriosPage({
     fornecedor, meta,
   ]);
 
+  // Filtros de produto em texto legível ('Busca: "alça"', "Grupo: CAPAS"…), para o cabeçalho
+  // do XLSX dizer de onde o relatório saiu. Só os filtros que a análise atual aceita.
+  const filtrosResumo = useMemo(() => {
+    const out: string[] = [];
+    const lista = (label: string, values: string[]) => {
+      if (values.length === 0) return;
+      const shown = values.slice(0, 6).join(", ");
+      out.push(`${label}: ${shown}${values.length > 6 ? ` +${values.length - 6}` : ""}`);
+    };
+    if (supports("nome")) {
+      if (produtoSelected) out.push(`Produto: ${produtoSelected.name}`);
+      else if (produtoQuery.trim().length >= 2) out.push(`Busca: "${produtoQuery.trim()}"`);
+    }
+    if (supportsProdutosMulti) {
+      lista(
+        "Produtos",
+        produtosSelecionados.map((p) => (p.corDescricao ? `${p.name} ${p.corDescricao}` : p.name))
+      );
+    }
+    if (supports("grupo")) lista("Grupo", grupos);
+    if (supports("linha")) lista("Linha", linhas);
+    if (supports("subgrupo")) lista("Subgrupo", subgrupos);
+    if (supports("grade")) lista("Grade", grades);
+    if (supports("colecao")) {
+      lista("Coleção", colecoes.map((c) => optColecoes.find((o) => o.value === c)?.label ?? c));
+    }
+    if (supports("cor")) lista("Cor", cores);
+    if (supports("tipo")) lista("Tipo", tipos);
+    if (companyKey === "nerd" && fornecedor) {
+      out.push(`Fornecedor: ${fornecedoresOpts.find((f) => f.id === fornecedor)?.nome ?? fornecedor}`);
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    meta, produtoSelected, produtoQuery, produtosSelecionados, grupos, linhas, subgrupos, grades,
+    colecoes, optColecoes, cores, tipos, companyKey, fornecedor, fornecedoresOpts,
+  ]);
+
   // Aplica o ReportResult recebido (fetch único OU stream) ao estado da página.
   const applyResult = useCallback((json: {
     rows?: ReportRow[];
@@ -804,8 +857,11 @@ export default function GeradorRelatoriosPage({
     total?: number;
     truncated?: boolean;
     dynamicColumns?: ReportColumnDef[];
+    sideTables?: Record<string, ReportRow[]>;
   }) => {
     setRows(json.rows ?? []);
+    setSideTables(json.sideTables && typeof json.sideTables === "object" ? json.sideTables : {});
+    setProdutosRankingAbertos(false);
     setSummary(Array.isArray(json.summary) ? json.summary : []);
     setTotal(json.total ?? 0);
     setTruncated(Boolean(json.truncated));
@@ -826,7 +882,9 @@ export default function GeradorRelatoriosPage({
           !c.key.startsWith(QTD_FILIAL_COL_PREFIX) &&
           !c.key.startsWith(COMPRA_FILIAL_COL_PREFIX) &&
           !c.key.startsWith(FILIAL_COMPRAS_COL_PREFIX) &&
-          !c.key.startsWith(PROJECAO_MES_COL_PREFIX)
+          !c.key.startsWith(PROJECAO_MES_COL_PREFIX) &&
+          !c.key.startsWith(VENDEDOR_PRODUTO_COL_PREFIX) &&
+          c.key !== VENDEDOR_OUTROS_COL
       );
       const existing = new Set(stripped.map((c) => c.key));
       const appended = dyn
@@ -839,6 +897,7 @@ export default function GeradorRelatoriosPage({
   const clearResultOnError = useCallback((message: string) => {
     setError(message);
     setRows([]);
+    setSideTables({});
     setSummary([]);
     setTotal(0);
     setTruncated(false);
@@ -899,6 +958,7 @@ export default function GeradorRelatoriosPage({
     setLoading(true);
     setError(null);
     setGenProgress(null);
+    setFiltrosDoResultado(filtrosResumo);
     try {
       // Custos de defeitos: não tem filtro nenhum — manda a LISTA COLADA por POST (com as
       // repetições, que são a quantidade). Uma lista de peças passa fácil de mil linhas e
@@ -981,6 +1041,7 @@ export default function GeradorRelatoriosPage({
     applyResult,
     clearResultOnError,
     generateViaStream,
+    filtrosResumo,
   ]);
 
   // ---------- ordenação client-side ----------
@@ -994,7 +1055,13 @@ export default function GeradorRelatoriosPage({
     const type = colTypeOf(effectiveCatalog,sortBy);
     const numeric = isNumericType(type);
     const dir = sortDir === "asc" ? 1 : -1;
+    // Ranking de vendedores: o e-commerce não é vendedor — fica sempre no fim, qualquer que
+    // seja a coluna ordenada.
+    const ultimo = (r: ReportRow) =>
+      reportTypeId === RANKING_VENDEDORES_ID && r[RANKING_CANAL_FIELD] === "ECOMMERCE" ? 1 : 0;
     return [...rows].sort((a, b) => {
+      const fim = ultimo(a) - ultimo(b);
+      if (fim !== 0) return fim;
       const av = a[sortBy];
       const bv = b[sortBy];
       if (numeric) {
@@ -1002,7 +1069,7 @@ export default function GeradorRelatoriosPage({
       }
       return String(av ?? "").localeCompare(String(bv ?? "")) * dir;
     });
-  }, [rows, sortBy, sortDir, effectiveCatalog]);
+  }, [rows, sortBy, sortDir, effectiveCatalog, reportTypeId]);
 
   const toggleSort = (key: string) => {
     if (sortBy === key) {
@@ -1254,6 +1321,42 @@ export default function GeradorRelatoriosPage({
           range: { startDate: range.startDate, endDate: range.endDate },
           filialLabel,
           columnTypes,
+        }
+      );
+      return;
+    }
+    // Ranking de vendedores: produtos filtrados no topo, cartões de totais, pódio e mapa de
+    // calor por produto + abas "Produtos" e "Vendedor × Produto".
+    if (reportTypeId === RANKING_VENDEDORES_ID) {
+      const hint = produtoSelected
+        ? produtoSelected.name
+        : produtoQuery.trim().length >= 2
+          ? produtoQuery.trim()
+          : produtosSelecionados.length === 1
+            ? produtosSelecionados[0]!.name
+            : produtosSelecionados.length > 1
+              ? `${produtosSelecionados.length}-itens`
+              : grupos.length === 1
+                ? grupos[0]!
+                : subgrupos.length === 1
+                  ? subgrupos[0]!
+                  : linhas.length === 1
+                    ? linhas[0]!
+                    : null;
+      void exportRankingVendedoresXlsx(
+        sortedRows,
+        enabledColumns.map((c) => ({ key: c.key, label: c.label })),
+        {
+          companyKey,
+          companyName,
+          range: { startDate: range.startDate, endDate: range.endDate },
+          filialLabel,
+          columnTypes,
+          summary,
+          produtos: sideTables[SIDE_PRODUTOS] ?? [],
+          vendedorProduto: sideTables[SIDE_VENDEDOR_PRODUTO] ?? [],
+          filtros: filtrosDoResultado,
+          fileHint: hint,
         }
       );
       return;
@@ -2021,6 +2124,74 @@ export default function GeradorRelatoriosPage({
       )}
 
       {error && <div className={styles.error}>{error}</div>}
+
+      {/* Ranking de vendedores: quais produtos entraram, do mais vendido ao menos vendido. */}
+      {reportTypeId === RANKING_VENDEDORES_ID && !loading && (sideTables[SIDE_PRODUTOS]?.length ?? 0) > 0 && (() => {
+        const produtosRk = sideTables[SIDE_PRODUTOS] ?? [];
+        const visiveis = produtosRankingAbertos ? produtosRk : produtosRk.slice(0, 10);
+        const comFiltro = filtrosDoResultado.length > 0;
+        return (
+          <section className={styles.panel}>
+            <div className={styles.panelHeaderRow}>
+              <h2 className={styles.panelTitle}>
+                {comFiltro
+                  ? produtosRk.length === 1
+                    ? "Produto filtrado"
+                    : `Produtos filtrados (${produtosRk.length.toLocaleString("pt-BR")})`
+                  : `Todos os produtos (${produtosRk.length.toLocaleString("pt-BR")} vendidos no período)`}
+              </h2>
+              {produtosRk.length > 10 && (
+                <button
+                  type="button"
+                  className={styles.btnSecondary}
+                  onClick={() => setProdutosRankingAbertos((v) => !v)}
+                >
+                  {produtosRankingAbertos ? "Mostrar só os 10 primeiros" : `Ver todos (${produtosRk.length})`}
+                </button>
+              )}
+            </div>
+            {comFiltro && <p className={styles.hint}>{filtrosDoResultado.join("  ·  ")}</p>}
+            <div className={styles.rankProdWrap}>
+              <table className={styles.rankProdTable}>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Produto</th>
+                    <th className={styles.rankProdNum}>Peças</th>
+                    <th className={styles.rankProdNum}>% peças</th>
+                    <th className={styles.rankProdNum}>Faturamento</th>
+                    <th>Vendedor destaque</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visiveis.map((p) => (
+                    <tr key={String(p.PRODUTO)}>
+                      <td className={styles.rankProdPos}>{formatCell(p.POSICAO, "int")}º</td>
+                      <td>
+                        {String(p.DESCRICAO ?? "")}{" "}
+                        <span className={styles.rankProdCode}>{String(p.PRODUTO ?? "")}</span>
+                      </td>
+                      <td className={`${styles.rankProdNum} ${styles.rankProdStrong}`}>{formatCell(p.QTDE, "int")}</td>
+                      <td className={styles.rankProdNum}>{formatCell(p.PARTICIPACAO, "percent")}</td>
+                      <td className={styles.rankProdNum}>{formatCell(p.FATURAMENTO, "currency")}</td>
+                      <td>
+                        {p.DESTAQUE ? (
+                          <>
+                            {String(p.DESTAQUE)}{" "}
+                            <span className={styles.rankProdCode}>{formatCell(p.DESTAQUE_QTDE, "int")} pç</span>
+                          </>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        );
+      })()}
 
       {/* KPIs */}
       {summary.length > 0 && (

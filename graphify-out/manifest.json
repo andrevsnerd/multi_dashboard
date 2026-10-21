@@ -395,8 +395,8 @@
     "semantic_hash": "be6dcf060458a662526cacf73fe769dc"
   },
   "app/api/ajuste-estoque/detalhe/route.ts": {
-    "mtime": 1791380394.6110559,
-    "ast_hash": "744e321ce0ae9491ded63c3be2908443",
+    "mtime": 1792609024.1294873,
+    "ast_hash": "f63f05cd8947fd9d69cce63a70bf031b",
     "semantic_hash": ""
   },
   "app/api/ajuste-estoque/estornar/route.ts": {
@@ -1230,8 +1230,8 @@
     "semantic_hash": "e449c381872599286ae61c72a1af8112"
   },
   "components/ajuste-estoque/AjusteEstoquePage.tsx": {
-    "mtime": 1791891344.4471366,
-    "ast_hash": "87849f531e4fb0c5b5d3c5c09dd8d120",
+    "mtime": 1792609059.1105325,
+    "ast_hash": "f9cbf27a02b8ea1dff910ad2cf85d340",
     "semantic_hash": ""
   },
   "components/auth/AuthContext.tsx": {
@@ -1590,8 +1590,8 @@
     "semantic_hash": "7100ad93329f4cae6f0cf2636fa8a06f"
   },
   "components/relatorios/GeradorRelatoriosPage.tsx": {
-    "mtime": 1791289718.788859,
-    "ast_hash": "2281f790f0d2698a0c713c53de156751",
+    "mtime": 1792428028.5854247,
+    "ast_hash": "d942c0f80ec4b43879be7efca005a135",
     "semantic_hash": ""
   },
   "components/romaneios/RomaneioDeleteModal.tsx": {
@@ -2355,18 +2355,18 @@
     "semantic_hash": ""
   },
   "lib/reports/registry.server.ts": {
-    "mtime": 1790692252.5698624,
-    "ast_hash": "e23b3fde75d8c79852992cfc6539f848",
+    "mtime": 1792427551.4455352,
+    "ast_hash": "e77d911bf8f14c0b7690e2b82d81c4bb",
     "semantic_hash": ""
   },
   "lib/reports/registry.ts": {
-    "mtime": 1791289695.4848557,
-    "ast_hash": "a5af7740329b5300d9a4bcb2cbff4295",
+    "mtime": 1792427551.4455352,
+    "ast_hash": "7792a266ff0cdfbea0eb737ae02d67e9",
     "semantic_hash": ""
   },
   "lib/reports/types.ts": {
-    "mtime": 1790786790.922206,
-    "ast_hash": "90b4d38dcf66ac37aca8dbcf14fd876c",
+    "mtime": 1792427456.3614626,
+    "ast_hash": "5b94d96bce7e5e3669aa61df214b4bae",
     "semantic_hash": ""
   },
   "lib/reports/vendas-faturamento.ts": {
@@ -2385,8 +2385,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/ajusteEstoque.ts": {
-    "mtime": 1791891200.0511441,
-    "ast_hash": "e1940c3ab70b281e4cea25cf67b205be",
+    "mtime": 1792609009.733059,
+    "ast_hash": "a68a7eeec67fc319752fa232ca246f64",
     "semantic_hash": ""
   },
   "lib/repositories/claudeReport.ts": {
@@ -2970,8 +2970,8 @@
     "semantic_hash": "faf4e030ab1a328553b74e366e2a81dd"
   },
   "next.config.ts": {
-    "mtime": 1788442658.3620396,
-    "ast_hash": "f2968dd5cc0c4284c42fb7c86aceb9b6",
+    "mtime": 1792071901.9235623,
+    "ast_hash": "7a51b74fe13aea0718add4181fb03c21",
     "semantic_hash": ""
   },
   "package.json": {
@@ -4860,8 +4860,8 @@
     "semantic_hash": ""
   },
   "lib/utils/insumos-estoque-store.ts": {
-    "mtime": 1791557971.4084775,
-    "ast_hash": "0027639adba45e7bc74e80c37a6ef51d",
+    "mtime": 1792071900.7794461,
+    "ast_hash": "2b387b84dc643b3e4c51c9d66aabc57c",
     "semantic_hash": ""
   },
   "app/(companies)/[company]/controle-financeiro/page.tsx": {
@@ -5037,6 +5037,21 @@
   "lib/utils/obs-operacao-texto.ts": {
     "mtime": 1792003299.075053,
     "ast_hash": "2536feb89cd419bb6ab450f38a353221",
+    "semantic_hash": ""
+  },
+  "lib/reports/ranking-vendedores.ts": {
+    "mtime": 1792427475.3864222,
+    "ast_hash": "77c8f9f58641f2f76e681a884b8d4c52",
+    "semantic_hash": ""
+  },
+  "lib/repositories/reportRankingVendedores.ts": {
+    "mtime": 1792428165.315058,
+    "ast_hash": "0f5b9043325d9bb86022092e2531a058",
+    "semantic_hash": ""
+  },
+  "lib/utils/exportRankingVendedoresXlsx.ts": {
+    "mtime": 1792427961.6086774,
+    "ast_hash": "2f3d257f92da1c1a7667fe9991a8cf28",
     "semantic_hash": ""
   }
 }

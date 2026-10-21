@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
 
 import {
+  chaveItemAjuste,
   detalharAjuste,
   filialDaContagem,
+  reconstruirSaldosAjuste,
   resumirContagemFisica,
   type AjusteDetalheItem,
+  type ReconstrucaoAjuste,
 } from '@/lib/repositories/ajusteEstoque';
 import { obterKpisAjuste } from '@/lib/utils/ajuste-estoque-kpis-store';
 
@@ -18,10 +21,12 @@ export const dynamic = 'force-dynamic';
  * ficam no Linx; vêm de:
  *   - 'snapshot': gravado pelo dashboard ao executar o ajuste;
  *   - 'contagem': contagem física nativa do Linx (CTG_ITENS), se bater com os deltas;
- *   - 'ajuste':   nenhum dos dois — esses quadros ficam vazios.
+ *   - 'movimento': rebobinado do estoque atual pelos movimentos (ajustes desde
+ *     out/2026, ver reconstruirSaldosAjuste) — só dos itens ajustados;
+ *   - 'ajuste':   nenhum dos anteriores — esses quadros ficam vazios.
  */
 interface AjusteKpis {
-  fonte: 'snapshot' | 'contagem' | 'ajuste';
+  fonte: 'snapshot' | 'contagem' | 'movimento' | 'ajuste';
   modo: 'zerar' | 'inventario' | null;
   totais: {
     itens: number | null;
@@ -40,7 +45,11 @@ interface AjusteKpis {
   invalidas: number;
 }
 
-async function montarKpis(nome: string, itens: AjusteDetalheItem[]): Promise<AjusteKpis> {
+async function montarKpis(
+  nome: string,
+  itens: AjusteDetalheItem[],
+  reconstrucao: ReconstrucaoAjuste | null
+): Promise<AjusteKpis> {
   const comDif = itens.filter((it) => it.qtde !== 0);
   const somaDelta = comDif.reduce((s, it) => s + it.qtde, 0);
   const kpis: AjusteKpis = {
@@ -98,6 +107,14 @@ async function montarKpis(nome: string, itens: AjusteDetalheItem[]): Promise<Aju
     kpis.totais.saldoAtualTotal = fisica.saldoAtualTotal;
     kpis.totais.saldoFinalTotal = fisica.saldoFinalTotal;
     kpis.totais.itensSaldoNegativo = fisica.itensSaldoNegativo;
+    return kpis;
+  }
+
+  if (reconstrucao && itens.length > 0 && itens.every((it) => it.saldoFinal != null)) {
+    kpis.fonte = 'movimento';
+    kpis.totais.saldoAtualTotal = itens.reduce((s, it) => s + (it.saldoAnterior ?? 0), 0);
+    kpis.totais.saldoFinalTotal = itens.reduce((s, it) => s + (it.saldoFinal ?? 0), 0);
+    kpis.totais.itensSaldoNegativo = itens.filter((it) => (it.saldoAnterior ?? 0) < 0).length;
   }
   return kpis;
 }
@@ -109,9 +126,19 @@ export async function GET(request: Request) {
     if (!nome) {
       return NextResponse.json({ error: 'Informe a contagem.' }, { status: 400 });
     }
-    const itens = await detalharAjuste(nome);
-    const kpis = await montarKpis(nome, itens);
-    return NextResponse.json({ nome, itens, kpis });
+    const [itensBase, reconstrucao] = await Promise.all([
+      detalharAjuste(nome),
+      reconstruirSaldosAjuste(nome).catch((err) => {
+        console.error('[ajuste-estoque/detalhe] reconstrução de saldo', err);
+        return null;
+      }),
+    ]);
+    const itens = itensBase.map((it) => {
+      const saldo = reconstrucao?.porItem[chaveItemAjuste(it.produto, it.cor)];
+      return { ...it, saldoAnterior: saldo?.saldoAnterior ?? null, saldoFinal: saldo?.saldoFinal ?? null };
+    });
+    const kpis = await montarKpis(nome, itens, reconstrucao);
+    return NextResponse.json({ nome, itens, kpis, momentoAjuste: reconstrucao?.momento ?? null });
   } catch (error) {
     console.error('[ajuste-estoque/detalhe] erro', error);
     return NextResponse.json({ error: 'Erro ao carregar detalhe.' }, { status: 500 });
