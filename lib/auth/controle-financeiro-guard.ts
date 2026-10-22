@@ -8,10 +8,11 @@ import type { RoleKey, UserSession } from "@/types/auth";
  * Guarda do Controle Financeiro.
  *
  * Ler exige a página liberada (folha, fornecedor, impostos e resultado da empresa).
- * IMPORTAR uma planilha nova substitui a base inteira, então fica só com o admin —
- * mesmo quem tem a página marcada só consulta.
+ * IMPORTAR uma planilha nova substitui a base inteira, então fica com o admin e a função
+ * financeiro (quem mantém a planilha) — os demais com a página marcada só consultam.
+ * É exceção ao somente-leitura da função financeiro, que vale no resto do sistema.
  */
-export const FINANCEIRO_IMPORT_ROLES: RoleKey[] = ["admin"];
+export const FINANCEIRO_IMPORT_ROLES: RoleKey[] = ["admin", "financeiro"];
 
 export interface FinanceiroAuth {
   username: string;
