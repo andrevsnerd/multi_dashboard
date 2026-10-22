@@ -2740,8 +2740,8 @@
     "semantic_hash": "ebd8b8cd063c337f8da6d6750e234647"
   },
   "lib/utils/destino-romaneio-store.ts": {
-    "mtime": 1784199350.5356915,
-    "ast_hash": "0b965a6bc87cc1d835920c3e951c0280",
+    "mtime": 1792689892.5933657,
+    "ast_hash": "0cf35c5aaaed4b309d53befcaafdb105",
     "semantic_hash": ""
   },
   "lib/utils/exportClientes.ts": {
@@ -4575,8 +4575,8 @@
     "semantic_hash": ""
   },
   "app/api/defeitos/item/route.ts": {
-    "mtime": 1792003232.4124782,
-    "ast_hash": "cc11bdebf7128c6990a9909722f94ffe",
+    "mtime": 1792689943.743746,
+    "ast_hash": "404ad4e1685fe80864668b1bb9236dbd",
     "semantic_hash": ""
   },
   "app/api/defeitos/itens/route.ts": {
@@ -4595,8 +4595,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/defeitos.ts": {
-    "mtime": 1792000244.5984817,
-    "ast_hash": "bd22b7a6bb61091dfba7e0d262400e74",
+    "mtime": 1792689932.745507,
+    "ast_hash": "0abfcf58bb3282aa6503d2944d9ab1b5",
     "semantic_hash": ""
   },
   "lib/utils/romaneio-agrupamento.ts": {
@@ -4965,8 +4965,8 @@
     "semantic_hash": ""
   },
   "lib/auth/controle-financeiro-guard.ts": {
-    "mtime": 1792679310.921224,
-    "ast_hash": "ece220197bb50152c02bf9803543bd2d",
+    "mtime": 1792683355.427439,
+    "ast_hash": "ff0ac2a7a5b7d935c849063aff76c783",
     "semantic_hash": ""
   },
   "lib/financeiro/api.ts": {

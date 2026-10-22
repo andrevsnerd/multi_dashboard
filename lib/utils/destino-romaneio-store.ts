@@ -153,6 +153,62 @@ export async function getAllDestinosByCompany(
 }
 
 /**
+ * Romaneios de saída da empresa cujo destino salvo é `filialDestino`.
+ *
+ * Usado pela tela Defeitos: uma saída comum (ex.: TRANSFERENCIA) cujo destino foi
+ * trocado para a filial de defeito na tela do romaneio não tem nada no Linx que a
+ * identifique como defeito — o destino só existe aqui.
+ *
+ * `since` (opcional) limita aos destinos gravados a partir da data: um destino é
+ * sempre gravado depois da emissão, então filtrar por `updated_at >= início da
+ * janela` não perde romaneio emitido dentro dela.
+ */
+export async function getRomaneiosPorDestino(
+  companyKey: string,
+  filialDestino: string,
+  since?: Date
+): Promise<Array<{ romaneioId: string; filialOrigem: string }>> {
+  const c = (companyKey || "").trim().toLowerCase();
+  const d = (filialDestino || "").trim().replace(/\s+/g, " ").toUpperCase();
+  if (!c || !d) return [];
+
+  if (!hasPostgres()) {
+    return readFile()
+      .filter(
+        (x) =>
+          x.company_key.toLowerCase() === c &&
+          (x.filial_destino || "").trim().replace(/\s+/g, " ").toUpperCase() === d
+      )
+      .map((x) => ({ romaneioId: x.romaneio_id.trim(), filialOrigem: x.filial_origem.trim() }));
+  }
+
+  const sql = getNeonSql();
+  await ensureTable(sql);
+
+  const result = since
+    ? await sql`
+        SELECT romaneio_id, filial_origem
+        FROM destino_romaneio_saida
+        WHERE company_key = ${c}
+          AND UPPER(REGEXP_REPLACE(TRIM(filial_destino), '\\s+', ' ', 'g')) = ${d}
+          AND updated_at >= ${since.toISOString()}
+      `
+    : await sql`
+        SELECT romaneio_id, filial_origem
+        FROM destino_romaneio_saida
+        WHERE company_key = ${c}
+          AND UPPER(REGEXP_REPLACE(TRIM(filial_destino), '\\s+', ' ', 'g')) = ${d}
+      `;
+
+  return result
+    .map((row) => ({
+      romaneioId: row.romaneio_id != null ? String(row.romaneio_id).trim() : "",
+      filialOrigem: row.filial_origem != null ? String(row.filial_origem).trim() : "",
+    }))
+    .filter((r) => r.romaneioId && r.filialOrigem);
+}
+
+/**
  * Salva a filial destino para este romaneio de saída.
  */
 export async function setDestinoRomaneio(

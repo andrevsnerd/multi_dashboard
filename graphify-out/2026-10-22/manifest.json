@@ -325,8 +325,8 @@
     "semantic_hash": "cf2bef2b79543108e9513318bfc96dd6"
   },
   "app/admin/page.tsx": {
-    "mtime": 1791978964.007804,
-    "ast_hash": "7322150c05104d7e06aacfbe22801147",
+    "mtime": 1792679389.7216938,
+    "ast_hash": "c96be5a8b59f7edab60b44e9cca16093",
     "semantic_hash": ""
   },
   "app/admin/transferencia-permissoes/page.tsx": {
@@ -1430,8 +1430,8 @@
     "semantic_hash": "7a672d31b6ac254cb25f6a420501049d"
   },
   "components/layout/Sidebar.tsx": {
-    "mtime": 1791995170.5916512,
-    "ast_hash": "daff8022a4d902e7cec2462b67b513f6",
+    "mtime": 1792679310.9190073,
+    "ast_hash": "cc402593eec31d94f7ab69a1c72fe0ec",
     "semantic_hash": ""
   },
   "components/layout/SidebarContext.tsx": {
@@ -2075,13 +2075,13 @@
     "semantic_hash": ""
   },
   "lib/auth/permissions.ts": {
-    "mtime": 1791978964.007289,
-    "ast_hash": "bcf71b08fdcbb67acc6a6512f9c5f33d",
+    "mtime": 1792679389.7133443,
+    "ast_hash": "6914836d7927a3fbb4c8200248d98f35",
     "semantic_hash": ""
   },
   "lib/auth/users-store-neon.ts": {
-    "mtime": 1790081298.807149,
-    "ast_hash": "15430b2dbf13ad3407855cbd0a8e2943",
+    "mtime": 1792679389.70916,
+    "ast_hash": "2e090eabeeb7b5fc44c8e6e3de0b650d",
     "semantic_hash": ""
   },
   "lib/auth/users-store.ts": {
@@ -2155,8 +2155,8 @@
     "semantic_hash": "29590f1b0f773ebbcd60e9dc314eec58"
   },
   "lib/config/page-permissions.ts": {
-    "mtime": 1791978964.0025413,
-    "ast_hash": "5cd04425d2c1754452de7f48e6158b73",
+    "mtime": 1792679310.913612,
+    "ast_hash": "42bd1a7634ec115c2c76c10ebfd72f56",
     "semantic_hash": ""
   },
   "lib/constants/columns.ts": {
@@ -2185,9 +2185,9 @@
     "semantic_hash": ""
   },
   "lib/mcp/auth.ts": {
-    "mtime": 1780584828.0837848,
-    "ast_hash": "b4a3cd23c85ded884180635dcf4ee341",
-    "semantic_hash": "b4a3cd23c85ded884180635dcf4ee341"
+    "mtime": 1792679239.9909024,
+    "ast_hash": "ebed3c3b065ac4b0008619f503eef88f",
+    "semantic_hash": ""
   },
   "lib/mcp/registry.ts": {
     "mtime": 1782933828.4934711,
@@ -3200,8 +3200,8 @@
     "semantic_hash": "2ce4be694918e7e073e9fc279ee6f7c6"
   },
   "types/auth.ts": {
-    "mtime": 1790081266.3496172,
-    "ast_hash": "c024a5ce6bcdb803d33656fddb55e5bf",
+    "mtime": 1792679389.7066343,
+    "ast_hash": "de02902689a5559f03297255fe68fc23",
     "semantic_hash": ""
   },
   "types/dashboard.ts": {
@@ -4905,8 +4905,8 @@
     "semantic_hash": ""
   },
   "components/controle-financeiro/ControleFinanceiroPage.tsx": {
-    "mtime": 1792677424.4075425,
-    "ast_hash": "e85bac2b5faaf295f2d1cb8f5f78aab4",
+    "mtime": 1792679109.033823,
+    "ast_hash": "3b9b086502e2091cf5fd85e052506593",
     "semantic_hash": ""
   },
   "components/controle-financeiro/Dre.tsx": {
@@ -4965,7 +4965,7 @@
     "semantic_hash": ""
   },
   "lib/auth/controle-financeiro-guard.ts": {
-    "mtime": 1791978952.9350784,
+    "mtime": 1792679310.921224,
     "ast_hash": "ece220197bb50152c02bf9803543bd2d",
     "semantic_hash": ""
   },
@@ -5055,13 +5055,13 @@
     "semantic_hash": ""
   },
   "app/api/financeiro/orcamento-mes/route.ts": {
-    "mtime": 1792676550.7962983,
-    "ast_hash": "c7541305fdca88ac524a8e79be561051",
+    "mtime": 1792679310.9190073,
+    "ast_hash": "36294e690f8b485909c739ebfe37a199",
     "semantic_hash": ""
   },
   "components/controle-financeiro/OrcamentoMes.tsx": {
-    "mtime": 1792678490.38607,
-    "ast_hash": "da2f85dd21fafae95d34ffb789214775",
+    "mtime": 1792679143.3581207,
+    "ast_hash": "9ba57bf28a5bb69cc6bb2e4e49872e2a",
     "semantic_hash": ""
   },
   "lib/config/orcamento-despesas.ts": {
@@ -5070,8 +5070,23 @@
     "semantic_hash": ""
   },
   "lib/financeiro/orcamento-mes.ts": {
-    "mtime": 1792677316.1612086,
-    "ast_hash": "6c696a1b65b5413c797664842dd490f5",
+    "mtime": 1792679572.8580465,
+    "ast_hash": "560f54664dd384c07e52df6da30eaa5d",
+    "semantic_hash": ""
+  },
+  "app/api/mcp-financeiro/[transport]/route.ts": {
+    "mtime": 1792679240.4792178,
+    "ast_hash": "7e627d940a5db0c070eb52f8e37ffb24",
+    "semantic_hash": ""
+  },
+  "lib/mcp/financeiro.ts": {
+    "mtime": 1792679572.855618,
+    "ast_hash": "83518dd9e067b51e98571eca5570c129",
+    "semantic_hash": ""
+  },
+  "lib/mcp/url-token.ts": {
+    "mtime": 1792679240.0310788,
+    "ast_hash": "5ee79d231063edc9cd40db1ffbeeed36",
     "semantic_hash": ""
   }
 }

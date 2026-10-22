@@ -10,7 +10,9 @@
  *  Mesmo recorte de `fetchDefeitos` em `logSaidas.ts`: `TIPO_ROMANEIO = 'DEFEITO'`
  *  OU `FILIAL_DESTINO` = a filial de defeito. O recorte por TIPO é obrigatório
  *  porque essas saídas nascem com `FILIAL_DESTINO` NULL (ver o executor: gravar
- *  o destino com `CM_OPERACAO 011` some o romaneio das telas do ERP).
+ *  o destino com `CM_OPERACAO 011` some o romaneio das telas do ERP). Entra
+ *  também a saída comum cujo destino foi trocado para a filial de defeito na tela
+ *  do romaneio — esse destino só existe no Neon (ver `condicaoSaidaDefeito`).
  *
  *  DIREITA (entradas) — o que de fato ENTROU na filial de defeito, que é outra
  *  pergunta: só conta item CONFIRMADO, e pela quantidade confirmada. A fonte é a
@@ -37,6 +39,7 @@ import {
   getConfirmadosComEntrada,
   type ConfirmacaoDetalhada,
 } from '@/lib/utils/romaneio-confirmacao-store';
+import { getRomaneiosPorDestino } from '@/lib/utils/destino-romaneio-store';
 
 /**
  * Cor do Linx normalizada para casar em JavaScript.
@@ -54,6 +57,46 @@ export function normalizarCorChave(cor: string | null | undefined): string {
 
 function chaveItem(produto: string, cor: string | null | undefined): string {
   return `${(produto || '').trim()}|${normalizarCorChave(cor)}`;
+}
+
+/** Saída redirecionada para a filial de defeito na tela do romaneio (destino no Neon). */
+export interface RomaneioRedirecionado {
+  romaneioId: string;
+  filialOrigem: string;
+}
+
+/**
+ * Condição SQL "esta saída (alias `s`) é de defeito".
+ *
+ * Três jeitos de uma saída ir para a filial de defeito:
+ *  - `TIPO_ROMANEIO = 'DEFEITO'` (saída de defeito normal, nasce sem FILIAL_DESTINO);
+ *  - `FILIAL_DESTINO` = a filial de defeito (legado);
+ *  - destino trocado para a filial de defeito na tela do romaneio — só existe no
+ *    Neon (`destino_romaneio_saida`), então entra como lista de romaneio + filial.
+ *
+ * A lista vai em literais, não em parâmetros: pode ter milhares de pares (toda
+ * saída de defeito também grava o destino lá) e o SQL Server aceita no máximo
+ * 2.100 parâmetros. Os valores são escapados.
+ */
+export function condicaoSaidaDefeito(redirecionados: RomaneioRedirecionado[] = []): string {
+  const literal = (v: string) => `'${v.replace(/'/g, "''")}'`;
+  const pares = Array.from(
+    new Set(
+      redirecionados.map(
+        (r) => `${r.romaneioId.trim()}|${r.filialOrigem.trim().toUpperCase()}`
+      )
+    )
+  );
+  const porPar = pares.length
+    ? `OR (LTRIM(RTRIM(s.ROMANEIO_PRODUTO)) + '|' + UPPER(LTRIM(RTRIM(ISNULL(s.FILIAL, ''))))) IN (${pares
+        .map(literal)
+        .join(', ')})`
+    : '';
+  return `(
+    UPPER(LTRIM(RTRIM(ISNULL(s.TIPO_ROMANEIO, '')))) = 'DEFEITO'
+    OR UPPER(LTRIM(RTRIM(ISNULL(s.FILIAL_DESTINO, '')))) = @defeitoDestino
+    ${porPar}
+  )`;
 }
 
 /** Custo de reposição do produto × cor — mesma regra do executor de entrada. */
@@ -115,6 +158,10 @@ export async function fetchDefeitoRomaneios(
   );
   const topClamp = Math.min(Math.max(limit || 500, 1), 2000);
 
+  const redirecionados = (
+    await getRomaneiosPorDestino(companyKey, defeitoFilial, range.start)
+  ).filter((r) => escopo.length === 0 || escopo.includes(r.filialOrigem.toUpperCase()));
+
   const romaneios = await withRequest(async (req) => {
     req.input('startDate', sql.DateTime, range.start);
     req.input('endDate', sql.DateTime, range.end);
@@ -166,10 +213,7 @@ export async function fetchDefeitoRomaneios(
       FROM ESTOQUE_PROD_SAI s WITH (NOLOCK)
       WHERE s.EMISSAO >= @startDate
         AND s.EMISSAO < @endDate
-        AND (
-          UPPER(LTRIM(RTRIM(ISNULL(s.TIPO_ROMANEIO, '')))) = 'DEFEITO'
-          OR UPPER(LTRIM(RTRIM(ISNULL(s.FILIAL_DESTINO, '')))) = @defeitoDestino
-        )
+        AND ${condicaoSaidaDefeito(redirecionados)}
         ${escopoFilter}
         ${searchFilter}
       ORDER BY s.EMISSAO DESC, s.ROMANEIO_PRODUTO DESC
@@ -429,6 +473,11 @@ export async function fetchDefeitoEntradas(params: {
     (filiaisOrigem || []).map((f) => (f || '').trim().toUpperCase()).filter(Boolean)
   );
   const romaneiosUnicos = Array.from(new Set(confirmacoes.map((c) => c.romaneioId).filter(Boolean)));
+  // Sem `since`: o destino pode ter sido trocado bem antes da conferência do período.
+  const romaneiosSet = new Set(romaneiosUnicos);
+  const redirecionados = (await getRomaneiosPorDestino(companyKey, defeitoFilial)).filter(
+    (r) => romaneiosSet.has(r.romaneioId)
+  );
   const produtosUnicos = Array.from(new Set(confirmacoes.map((c) => c.produto).filter(Boolean)));
 
   // 1) Romaneio → loja de origem.
@@ -453,10 +502,7 @@ export async function fetchDefeitoEntradas(params: {
          WHERE LTRIM(RTRIM(s.ROMANEIO_PRODUTO)) IN (${lote
            .map((_, idx) => `@rom${i}_${idx}`)
            .join(', ')})
-           AND (
-             UPPER(LTRIM(RTRIM(ISNULL(s.TIPO_ROMANEIO, '')))) = 'DEFEITO'
-             OR UPPER(LTRIM(RTRIM(ISNULL(s.FILIAL_DESTINO, '')))) = @defeitoDestino
-           )
+           AND ${condicaoSaidaDefeito(redirecionados)}
       `);
       for (const row of result.recordset) {
         const filial = (row.filial || '').trim();

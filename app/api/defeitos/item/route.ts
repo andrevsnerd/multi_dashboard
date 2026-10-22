@@ -8,6 +8,7 @@ import { readOnlyBlock } from '@/lib/auth/route-guards';
 import { DEFEITOS_ROLES, canCorrigirDefeito } from '@/lib/auth/permissions';
 import { getDefeitoFilial } from '@/lib/config/filiais-especiais';
 import { resolveCompanyDynamic } from '@/lib/config/company-server';
+import { getDestinoRomaneio } from '@/lib/utils/destino-romaneio-store';
 import { resolveResponsavelLinx } from '@/lib/server/responsavel-linx';
 import { inserirAjuste } from '@/lib/repositories/ajuste-historico';
 import {
@@ -144,10 +145,16 @@ async function guardar(
 
 /** O romaneio é mesmo um romaneio de defeito desta filial? */
 async function ehRomaneioDeDefeito(
+  companyKey: string,
   romaneio: string,
   filialOrigem: string,
   defeitoFilial: string
 ): Promise<boolean> {
+  // Saída comum com o destino trocado para a filial de defeito na tela do romaneio:
+  // o destino só existe no Neon, o Linx não a marca como defeito.
+  const destinoSalvo = await getDestinoRomaneio(companyKey, romaneio, filialOrigem);
+  if (destinoSalvo && normaliza(destinoSalvo) === normaliza(defeitoFilial)) return true;
+
   return withRequest(async (req) => {
     req.input('romaneio', sql.VarChar, romaneio);
     req.input('filial', sql.VarChar, filialOrigem);
@@ -240,7 +247,7 @@ export async function PUT(request: NextRequest) {
     if (!guard.ok) return guard.response;
     const { username, defeitoFilial } = guard;
 
-    if (!(await ehRomaneioDeDefeito(romaneio, filialOrigem, defeitoFilial))) {
+    if (!(await ehRomaneioDeDefeito(companyKey, romaneio, filialOrigem, defeitoFilial))) {
       return NextResponse.json(
         {
           error: `O romaneio ${romaneio} de ${filialOrigem} não é um romaneio de defeito — corrija-o na tela Romaneios.`,
@@ -501,7 +508,7 @@ export async function POST(request: NextRequest) {
     if (!guard.ok) return guard.response;
     const { username, defeitoFilial } = guard;
 
-    if (!(await ehRomaneioDeDefeito(romaneio, filialOrigem, defeitoFilial))) {
+    if (!(await ehRomaneioDeDefeito(companyKey, romaneio, filialOrigem, defeitoFilial))) {
       return NextResponse.json(
         {
           error: `O romaneio ${romaneio} de ${filialOrigem} não é um romaneio de defeito — edite-o na tela Romaneios.`,
