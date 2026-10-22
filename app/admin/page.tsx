@@ -10,7 +10,7 @@ import {
   type RoleKey,
   type PermissionKey,
 } from "@/types/auth";
-import { roleAllowsPermission } from "@/lib/auth/permissions";
+import { FINANCEIRO_PERMISSOES_PADRAO, roleAllowsPermission } from "@/lib/auth/permissions";
 import { filiaisEspeciaisOptions } from "@/lib/config/filiais-especiais";
 import styles from "./page.module.css";
 const _filialLabelOverrides: Record<string, string> = {
@@ -305,10 +305,14 @@ export default function AdminPage() {
     setClienteSearch("");
   }
 
-  /** cliente_corporativo e marketing vivem só no CORPORATIVO: a empresa é fixa. */
+  /**
+   * cliente_corporativo e marketing vivem só no CORPORATIVO: a empresa é fixa.
+   * Financeiro parte das páginas financeiras e de vendas (ajustáveis nos checkboxes).
+   */
   function handleRoleChange(role: RoleKey) {
     setFormRole(role);
     if (role === "cliente_corporativo" || role === "marketing") setFormEmpresa("corporativo");
+    if (role === "financeiro") setFormPermissions([...FINANCEIRO_PERMISSOES_PADRAO]);
   }
 
   function openAdd() {

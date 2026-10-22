@@ -1600,8 +1600,8 @@
     "semantic_hash": "c1db24d3ffabe5b57c07dc935de08446"
   },
   "components/romaneios/RomaneioDetalhePage.tsx": {
-    "mtime": 1792003063.2113323,
-    "ast_hash": "f3b5d15dda6b5071251de89a8dd2ca39",
+    "mtime": 1792678899.2856143,
+    "ast_hash": "b1b6ba48bfc5867c393caeda370cc8c4",
     "semantic_hash": ""
   },
   "components/romaneios/RomaneiosDuplicadosPanel.tsx": {
@@ -4905,8 +4905,8 @@
     "semantic_hash": ""
   },
   "components/controle-financeiro/ControleFinanceiroPage.tsx": {
-    "mtime": 1792676639.474813,
-    "ast_hash": "fe7b3089588214363c2a09cafe48058b",
+    "mtime": 1792677424.4075425,
+    "ast_hash": "e85bac2b5faaf295f2d1cb8f5f78aab4",
     "semantic_hash": ""
   },
   "components/controle-financeiro/Dre.tsx": {
@@ -5060,8 +5060,8 @@
     "semantic_hash": ""
   },
   "components/controle-financeiro/OrcamentoMes.tsx": {
-    "mtime": 1792676619.938522,
-    "ast_hash": "01a57b90bc1f4dbdff37e947c8d58f7d",
+    "mtime": 1792678490.38607,
+    "ast_hash": "da2f85dd21fafae95d34ffb789214775",
     "semantic_hash": ""
   },
   "lib/config/orcamento-despesas.ts": {
@@ -5070,8 +5070,8 @@
     "semantic_hash": ""
   },
   "lib/financeiro/orcamento-mes.ts": {
-    "mtime": 1792676549.6887677,
-    "ast_hash": "0990a3ab1849c4b37cb5ab2a8aad2240",
+    "mtime": 1792677316.1612086,
+    "ast_hash": "6c696a1b65b5413c797664842dd490f5",
     "semantic_hash": ""
   }
 }

@@ -362,6 +362,9 @@ const MATRIZ_EXCLUIDA_DESTINO: Record<string, string> = {
   scarfme: 'SCARF ME - MATRIZ',
 };
 
+/** Empresas em que qualquer saída pode ter o destino trocado para a filial de defeito. */
+const DESTINO_DEFEITO_LIBERADO = new Set(['nerd']);
+
 function cleanDestinoValue(value: string | null | undefined): string {
   const trimmed = (value || "").trim();
   if (!trimmed || trimmed === "—" || trimmed === "-" || trimmed === "\u2014") return "";
@@ -582,7 +585,11 @@ export default function RomaneioDetalhePage({
     };
 
     if (isSaida) {
-      fetchFiliais(companySlug).then(data => setFiliais(applyFilter(data)));
+      const liberaDefeito = !isDefeito && !!defeitoFilial && DESTINO_DEFEITO_LIBERADO.has(companySlug);
+      fetchFiliais(companySlug).then(data => {
+        const lista = applyFilter(data);
+        setFiliais(liberaDefeito ? [...lista, { codFilial: defeitoFilial!, filial: defeitoFilial! }] : lista);
+      });
       loadDestino();
     } else if (isEntrada) {
       // Entradas também precisam das filiais (para o modal "Dar Saída")

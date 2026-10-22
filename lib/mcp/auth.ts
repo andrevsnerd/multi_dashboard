@@ -32,3 +32,30 @@ export async function verifyMcpToken(
     scopes: ['read'],
   };
 }
+
+/**
+ * Token do MCP do FINANCEIRO (/api/mcp-financeiro/mcp), separado do MCP geral: ali saem
+ * folha, retiradas dos sócios, fornecedores e resultado, então só recebe esse token quem
+ * pode ver o Controle Financeiro. Fail-closed como o outro: sem `MCP_FINANCEIRO_TOKEN`,
+ * nada é autorizado — e o token do MCP geral NÃO abre este.
+ */
+export async function verifyMcpFinanceiroToken(
+  _req: Request,
+  bearerToken?: string
+): Promise<AuthInfo | undefined> {
+  const expected = (process.env.MCP_FINANCEIRO_TOKEN || '').trim();
+  if (!expected) {
+    console.error('[mcp-financeiro] MCP_FINANCEIRO_TOKEN não configurado — todas as requisições serão negadas.');
+    return undefined;
+  }
+
+  if (!bearerToken || bearerToken.trim() !== expected) {
+    return undefined;
+  }
+
+  return {
+    token: bearerToken,
+    clientId: 'multi-dashboard-mcp-financeiro',
+    scopes: ['read'],
+  };
+}

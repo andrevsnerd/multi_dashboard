@@ -11,7 +11,8 @@ export type RoleKey =
   | "logistica"
   | "gerente"
   | "marketing"
-  | "cliente_corporativo";
+  | "cliente_corporativo"
+  | "financeiro";
 
 /** Chaves de permissao = paginas/perfis de acesso configuraveis no painel admin. */
 export type PermissionKey = PagePermissionKey;
@@ -61,4 +62,5 @@ export const ROLE_LABELS: Record<RoleKey, string> = {
   gerente: "Gerente",
   marketing: "Marketing",
   cliente_corporativo: "Cliente Corporativo",
+  financeiro: "Financeiro",
 };

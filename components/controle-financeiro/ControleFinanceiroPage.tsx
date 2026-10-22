@@ -156,7 +156,7 @@ export default function ControleFinanceiroPage({ companyKey, companyName }: Prop
                 }}
               />
             )}
-            {aba === "orcamento" && <OrcamentoMes companyKey={companyKey} dataRef={dataRef ?? null} />}
+            {aba === "orcamento" && <OrcamentoMes companyKey={companyKey} />}
             {aba === "dre" && (
               <Dre
                 companyKey={companyKey}

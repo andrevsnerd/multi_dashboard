@@ -10,15 +10,9 @@ import styles from "./ControleFinanceiro.module.css";
 
 interface Props {
   companyKey: string;
-  /** Até quando a planilha da Débora tem lançamentos (data de atualização das abas). */
-  dataRef: string | null;
 }
 
 const pad = (n: number) => String(n).padStart(2, "0");
-const hojeLocal = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-};
 const nomeMes = (iso: string) =>
   new Date(`${iso.slice(0, 7)}-01T12:00:00Z`).toLocaleDateString("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" });
 const diaMes = (iso: string) => dataBr(iso).slice(0, 5);
@@ -47,32 +41,34 @@ function situacao(t: Totais): "estourou" | "risco" | "ok" {
  * do budget. Orçado = planilha do budget (cenário base); realizado = base do Controle
  * Financeiro pela data caixa.
  */
-export default function OrcamentoMes({ companyKey, dataRef }: Props) {
+export default function OrcamentoMes({ companyKey }: Props) {
   const api = useFinanceiroApi(companyKey);
-  // A posição padrão é o último dia com dado real (data da planilha da Débora), não
-  // hoje: entre a atualização e hoje não se sabe o que saiu do caixa.
-  const ultimaAtualizacao = dataRef ? dataRef.slice(0, 10) : hojeLocal();
-  const [posicao, setPosicao] = useState(ultimaAtualizacao);
-  const [dados, setDados] = useState<Resposta | null>(null);
+  // null = posição padrão, que o servidor resolve como a data da planilha da Débora (último
+  // dia com dado real), não hoje: entre a atualização e hoje não se sabe o que saiu do caixa.
+  const [pedida, setPedida] = useState<string | null>(null);
+  // A resposta guarda a posição pedida: "carregando" = a tela mostra outra posição.
+  const [resp, setResp] = useState<{ pedida: string | null; dados: Resposta } | null>(null);
+  const dados = resp?.dados ?? null;
   const [erro, setErro] = useState<string | null>(null);
   const [abertas, setAbertas] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    if (!api.pronto || !/^\d{4}-\d{2}-\d{2}$/.test(posicao)) return;
+    if (!api.pronto || (pedida && !/^\d{4}-\d{2}-\d{2}$/.test(pedida))) return;
     let vivo = true;
     api
-      .get<Resposta>("/orcamento-mes", { posicao })
-      .then((d) => vivo && (setDados(d), setErro(null)))
+      .get<Resposta>("/orcamento-mes", { posicao: pedida })
+      .then((d) => vivo && (setResp({ pedida, dados: d }), setErro(null)))
       .catch((e) => vivo && setErro(e instanceof Error ? e.message : "Erro ao carregar"));
     return () => {
       vivo = false;
     };
-  }, [api, posicao]);
+  }, [api, pedida]);
 
   if (erro) return <div className={`${styles.aviso} ${styles.avisoErro}`}>{erro}</div>;
-  if (!dados) return <div className={styles.aviso}>Carregando o orçamento do mês…</div>;
+  if (!resp || !dados) return <div className={styles.aviso}>Carregando o orçamento do mês…</div>;
 
-  const carregando = dados.posicao !== posicao;
+  const carregando = resp.pedida !== pedida;
+  const ultimaAtualizacao = dados.dataReferencia;
   const total = somar(dados.linhas);
   const saldo = total.orcado - total.mtd;
   const dias = dados.diasRestantes;
@@ -102,19 +98,19 @@ export default function OrcamentoMes({ companyKey, dataRef }: Props) {
           <input
             type="date"
             className={styles.input}
-            value={posicao}
-            max={ultimaAtualizacao}
-            onChange={(e) => e.target.value && setPosicao(e.target.value)}
+            value={pedida ?? dados.posicao}
+            max={ultimaAtualizacao ?? undefined}
+            onChange={(e) => e.target.value && setPedida(e.target.value)}
           />
         </label>
-        {posicao !== ultimaAtualizacao && (
-          <button type="button" className={styles.btn} onClick={() => setPosicao(ultimaAtualizacao)}>
+        {pedida != null && pedida !== ultimaAtualizacao && (
+          <button type="button" className={styles.btn} onClick={() => setPedida(null)}>
             Última atualização
           </button>
         )}
       </div>
 
-      {dataRef && (
+      {ultimaAtualizacao && (
         <div className={`${styles.aviso} ${styles.avisoInfo}`}>
           Dados reais até <b>{dataBr(ultimaAtualizacao)}</b>, a data da planilha da Débora. O MTD vai até a posição e o
           saldo por dia divide o saldo pelos dias do mês depois dela; o que saiu do caixa depois disso só aparece quando a

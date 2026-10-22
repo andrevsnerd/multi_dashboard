@@ -46,6 +46,8 @@ export interface LinhaOrcamentoMes {
 export interface OrcamentoMes {
   mes: string;
   posicao: string;
+  /** Data da planilha da Débora (C4 das abas de lançamento): último dia com dado real. */
+  dataReferencia: string | null;
   diasNoMes: number;
   /** Dias do mês depois da posição. */
   diasRestantes: number;
@@ -59,7 +61,7 @@ export interface OrcamentoMes {
 const chave = (s: string) =>
   s
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "");
 
@@ -72,10 +74,23 @@ for (const l of LINHAS_ORCAMENTO) {
 
 const centavos = (v: number) => Math.round(v * 100) / 100;
 
-export async function obterOrcamentoMes(empresa: string, posicao: string): Promise<OrcamentoMes> {
+/** Hoje no fuso de Brasília (o servidor roda em UTC). */
+const hojeBrasil = () =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+
+/** Sem `posicao`, usa a data da planilha (depois dela não há dado real); sem ela, hoje. */
+export async function obterOrcamentoMes(empresa: string, posicaoPedida?: string): Promise<OrcamentoMes> {
   if (!hasPostgres()) throw new FinanceiroSemBancoError();
   await ensureTables();
   const sql = getNeonSql();
+
+  const ref = (await sql.query(
+    `SELECT to_char(max(data_referencia), 'YYYY-MM-DD') AS d FROM financeiro_abas
+     WHERE empresa = $1 AND tipo = 'lancamento'`,
+    [empresa]
+  )) as Record<string, unknown>[];
+  const dataReferencia = (ref[0]?.d as string | null) ?? null;
+  const posicao = posicaoPedida ?? dataReferencia ?? hojeBrasil();
 
   const [ano, mes, dia] = posicao.split("-").map(Number);
   const diasNoMes = new Date(Date.UTC(ano, mes, 0)).getUTCDate();
@@ -139,6 +154,7 @@ export async function obterOrcamentoMes(empresa: string, posicao: string): Promi
   return {
     mes: inicio,
     posicao,
+    dataReferencia,
     diasNoMes,
     diasRestantes: diasNoMes - dia,
     temOrcado: idx >= 0,

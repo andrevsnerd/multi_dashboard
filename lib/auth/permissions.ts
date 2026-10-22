@@ -29,7 +29,27 @@ export function hasFullPageAccess(role: RoleKey | undefined | null): boolean {
  * Funcoes somente-leitura: veem tudo o que lhes cabe, mas nunca executam acoes
  * operacionais (transferencias, ajustes, edicao de romaneios, cadastro corporativo).
  */
-export const READ_ONLY_ROLES: RoleKey[] = ["diretor", "supervisor"];
+export const READ_ONLY_ROLES: RoleKey[] = ["diretor", "supervisor", "financeiro"];
+
+/**
+ * FINANCEIRO: funcao de consulta da area financeira (Controle Financeiro, orcado,
+ * faturamento, vendas). Somente-leitura (READ_ONLY_ROLES) e ve custo
+ * (CUSTO_VISIBLE_ROLES). Nao e acesso total: cada pagina continua dependendo da
+ * lista de permissoes do usuario — o admin parte de FINANCEIRO_PERMISSOES_PADRAO.
+ * E a unica funcao, alem de admin e diretor, que passa pela trava do Controle Financeiro.
+ */
+export const FINANCEIRO_PERMISSOES_PADRAO: PermissionKey[] = [
+  "controle-financeiro",
+  "planejamento-receita",
+  "gastos-compra",
+  "compras-transito",
+  "faturamento",
+  "dashboard",
+  "vendedores",
+  "clientes",
+  "produtos",
+  "gerador-relatorios",
+];
 
 /** True se a funcao e somente-leitura (nao pode executar acoes que gravam dados). */
 export function isReadOnlyRole(role: RoleKey | undefined | null): boolean {
@@ -208,7 +228,7 @@ export function canCorrigirDefeito(role: RoleKey | undefined | null): boolean {
  * Funcoes que podem ver o CUSTO (KPIs, colunas, valores, exports).
  * supervisor e gerente NUNCA veem custo.
  */
-export const CUSTO_VISIBLE_ROLES: RoleKey[] = ["admin", "diretor", "logistica"];
+export const CUSTO_VISIBLE_ROLES: RoleKey[] = ["admin", "diretor", "logistica", "financeiro"];
 
 /** True se o usuario pode ver informacao de custo. */
 export function canSeeCusto(user: UserSession | null): boolean {
@@ -241,10 +261,10 @@ export const ROLE_RESTRICTED_PERMISSIONS: Partial<Record<PermissionKey, RoleKey[
   // a mesma regra de CUSTO_VISIBLE_ROLES das outras (gerente e supervisor nunca
   // veem custo). Restringir a admin+diretor tornava a permissao inutil: as duas
   // ja tem acesso total, e o checkbox sumia para a unica funcao que precisa dele.
-  "gastos-compra": ["admin", "diretor", "logistica"],
+  "gastos-compra": ["admin", "diretor", "logistica", "financeiro"],
   // Controle Financeiro: folha, fornecedores, impostos e resultado da empresa inteira.
-  // So admin e diretor (que ja tem acesso total); importar a planilha e so do admin.
-  "controle-financeiro": ["admin", "diretor"],
+  // Admin, diretor e a funcao financeiro (com a pagina marcada); importar a planilha e so do admin.
+  "controle-financeiro": ["admin", "diretor", "financeiro"],
   // Ciclo de Compra define cobertura e lead time da rede: mexer ali muda a quantidade
   // sugerida e a data de compra de TODA loja. Politica de reposicao, nao operacao de loja —
   // mesmo conjunto restrito, com diretor entrando somente-leitura.
@@ -368,6 +388,8 @@ export function getFirstAllowedPath(user: UserSession | null, company: string): 
   if (company === "corporativo") return "/corporativo";
   // admin e diretor veem tudo → caem no dashboard da empresa.
   if (hasFullPageAccess(user.role)) return `/${company}`;
+  if (user.role === "financeiro" && company === "scarfme" && user.permissions.includes("controle-financeiro"))
+    return `/${company}/controle-financeiro`;
   if (user.permissions.includes("controle-transferencias")) return `/${company}/controle-transferencias`;
   if (user.permissions.includes("saidas-entradas-produtos")) return `/${company}/saidas-entradas-produtos`;
   if (user.permissions.includes("transferencia-produtos")) return `/${company}/transferencia-produtos`;

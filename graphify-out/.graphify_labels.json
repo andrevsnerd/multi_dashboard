@@ -515,11 +515,8 @@
   "513": "vendas.ts",
   "514": "discovery.ts",
   "515": "resolveFilialExata",
+  "516": "page.tsx",
   "517": "page.tsx",
-  "518": "ProdutoAgrupadoPage.tsx",
-  "519": "page.tsx",
   "520": "ProductPerformanceTable.tsx",
-  "521": "fix-tipos-romaneio-acento.mjs",
-  "522": "executeQueryWithParams",
-  "524": "page.tsx"
+  "521": "fix-tipos-romaneio-acento.mjs"
 }
