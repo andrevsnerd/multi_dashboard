@@ -1077,3 +1077,103 @@
   color: var(--t-400);
   font-weight: 400;
 }
+
+/* Orçamento do mês */
+
+.ocTable td {
+  vertical-align: middle;
+}
+
+.ocTable td:first-child {
+  min-width: 240px;
+}
+
+.ocGrupo td {
+  padding-top: 14px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--t-500);
+  background: transparent !important;
+}
+
+.ocItem td {
+  background: var(--s-100);
+  font-size: 12px;
+}
+
+.ocItem td:first-child {
+  padding-left: 34px;
+}
+
+.ocSub {
+  display: block;
+  margin-top: 1px;
+  font-size: 11px;
+  color: var(--t-400);
+  font-weight: 400;
+}
+
+.ocSeta {
+  display: inline-block;
+  width: 14px;
+  color: var(--t-400);
+}
+
+.ocBarraCol {
+  min-width: 250px;
+}
+
+.ocSituacao {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ocSituacaoTexto {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ocTrilho {
+  display: flex;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--s-100);
+}
+
+.ocTrilho > i {
+  display: block;
+  height: 100%;
+}
+
+.ocSegGasto {
+  background: var(--cf-s1);
+}
+
+.ocSegAgendado {
+  background: var(--cf-proj);
+}
+
+/* Âmbar (não o marrom de --cf-warn): tem que se separar do vermelho numa barra de 8px. */
+.ocSegRisco {
+  background: var(--cf-s4);
+}
+
+.ocSegEstouro {
+  background: var(--cf-neg);
+}
+
+.ocNota {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--t-500);
+  max-width: 900px;
+}

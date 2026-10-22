@@ -7,6 +7,7 @@ import Dre from "./Dre";
 import FluxoCaixa from "./FluxoCaixa";
 import Importacoes from "./Importacoes";
 import Lancamentos from "./Lancamentos";
+import OrcamentoMes from "./OrcamentoMes";
 import Planilha from "./Planilha";
 import Recebimentos from "./Recebimentos";
 import UploadModal from "./UploadModal";
@@ -24,6 +25,7 @@ import styles from "./ControleFinanceiro.module.css";
 
 type Aba =
   | "visao"
+  | "orcamento"
   | "dre"
   | "lancamentos"
   | "caixa"
@@ -33,6 +35,7 @@ type Aba =
   | "importacoes";
 
 const ABAS: { key: Aba; label: string }[] = [
+  { key: "orcamento", label: "Orçamento do mês" },
   { key: "visao", label: "Visão geral" },
   { key: "dre", label: "DRE" },
   { key: "lancamentos", label: "Lançamentos" },
@@ -52,7 +55,7 @@ export default function ControleFinanceiroPage({ companyKey, companyName }: Prop
   const api = useFinanceiroApi(companyKey);
   const [meta, setMeta] = useState<MetaFinanceiro | null>(null);
   const [erro, setErro] = useState<string | null>(null);
-  const [aba, setAba] = useState<Aba>("visao");
+  const [aba, setAba] = useState<Aba>("orcamento");
   const [upload, setUpload] = useState(false);
   const [versao, setVersao] = useState(0);
   const [anoDre, setAnoDre] = useState<number | null>(null);
@@ -153,6 +156,7 @@ export default function ControleFinanceiroPage({ companyKey, companyName }: Prop
                 }}
               />
             )}
+            {aba === "orcamento" && <OrcamentoMes companyKey={companyKey} dataRef={dataRef ?? null} />}
             {aba === "dre" && (
               <Dre
                 companyKey={companyKey}

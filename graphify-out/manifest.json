@@ -4905,8 +4905,8 @@
     "semantic_hash": ""
   },
   "components/controle-financeiro/ControleFinanceiroPage.tsx": {
-    "mtime": 1792006391.0931923,
-    "ast_hash": "96e25c68c43602b0927feb5da3d2866e",
+    "mtime": 1792676639.474813,
+    "ast_hash": "fe7b3089588214363c2a09cafe48058b",
     "semantic_hash": ""
   },
   "components/controle-financeiro/Dre.tsx": {
@@ -5052,6 +5052,26 @@
   "lib/utils/exportRankingVendedoresXlsx.ts": {
     "mtime": 1792427961.6086774,
     "ast_hash": "2f3d257f92da1c1a7667fe9991a8cf28",
+    "semantic_hash": ""
+  },
+  "app/api/financeiro/orcamento-mes/route.ts": {
+    "mtime": 1792676550.7962983,
+    "ast_hash": "c7541305fdca88ac524a8e79be561051",
+    "semantic_hash": ""
+  },
+  "components/controle-financeiro/OrcamentoMes.tsx": {
+    "mtime": 1792677304.2606642,
+    "ast_hash": "832227cdadbef2ec42c70d3fbbe9704e",
+    "semantic_hash": ""
+  },
+  "lib/config/orcamento-despesas.ts": {
+    "mtime": 1792676517.4480581,
+    "ast_hash": "5a2988646212cf46a132bbc8921b322d",
+    "semantic_hash": ""
+  },
+  "lib/financeiro/orcamento-mes.ts": {
+    "mtime": 1792677316.1612086,
+    "ast_hash": "6c696a1b65b5413c797664842dd490f5",
     "semantic_hash": ""
   }
 }
