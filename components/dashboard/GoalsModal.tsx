@@ -1,8 +1,15 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { resolveCompany, type CompanyKey } from "@/lib/config/company";
+import { useAuth } from "@/components/auth/AuthContext";
+import { canMutate } from "@/lib/auth/permissions";
+import {
+  getFilialGroupMembers,
+  normalizeFilialLookupKey,
+  resolveCompany,
+  type CompanyKey,
+} from "@/lib/config/company";
 
 import styles from "./GoalsModal.module.css";
 
@@ -11,45 +18,125 @@ interface GoalsModalProps {
   isOpen: boolean;
   onClose: () => void;
   monthYear: { month: number; year: number };
+  /** Chamado depois de gravar, com as metas do mês como ficaram salvas (chave = filial do banco). */
+  onSaved?: (monthYear: { month: number; year: number }, goals: GoalData) => void;
 }
 
 interface GoalData {
   [filial: string]: number;
 }
 
-async function loadGoals(companyKey: string, month: number, year: number): Promise<GoalData> {
-  try {
-    const response = await fetch(
-      `/api/goals?company=${companyKey}&month=${month}&year=${year}`,
-      { cache: "no-store" }
-    );
-    if (!response.ok) {
-      return {};
-    }
-    const json = (await response.json()) as { data: GoalData };
-    return json.data || {};
-  } catch {
-    return {};
-  }
+/**
+ * Uma linha do modal = uma loja lógica. Grupos multi-CNPJ (PAULISTA, MORUMBI 1,
+ * E-COMMERCE) viram uma linha só: a meta exibida é a SOMA dos membros — mesma régua
+ * do card de meta, que soma todos os membros do grupo.
+ */
+interface GoalRow {
+  key: string;
+  label: string;
+  members: string[];
+  isEcommerce: boolean;
 }
 
-async function saveGoals(companyKey: string, month: number, year: number, goals: GoalData): Promise<void> {
-  try {
-    await fetch("/api/goals", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        companyKey,
-        month,
-        year,
-        goals,
-      }),
+type PendingAction = { type: "close" } | { type: "month"; month: number; year: number };
+
+const ECOMMERCE_ROW_KEY = "E-COMMERCE";
+
+function buildRows(companyKey: CompanyKey): GoalRow[] {
+  const company = resolveCompany(companyKey);
+  if (!company) return [];
+  const displayNames = company.filialDisplayNames ?? {};
+  const ecommerce = company.ecommerceFilials ?? [];
+  const ecommerceSet = new Set(ecommerce.map(normalizeFilialLookupKey));
+  const seen = new Set<string>();
+  const rows: GoalRow[] = [];
+
+  for (const filial of company.filialFilters.sales) {
+    if (ecommerceSet.has(normalizeFilialLookupKey(filial))) continue;
+    if ((displayNames[filial] ?? filial) === "MATRIZ") continue;
+    const members = getFilialGroupMembers(company, filial);
+    // Grupo: a linha fica na canônica (1º membro = filial ativa); os demais somem.
+    const canonical = members[0] ?? filial;
+    const groupKey = normalizeFilialLookupKey(canonical);
+    if (seen.has(groupKey)) continue;
+    seen.add(groupKey);
+    rows.push({
+      key: canonical,
+      label: displayNames[canonical] ?? displayNames[filial] ?? filial,
+      members,
+      isEcommerce: false,
     });
-  } catch (error) {
-    console.error("Erro ao salvar metas:", error);
   }
+
+  if (ecommerce.length > 0) {
+    rows.push({
+      key: ECOMMERCE_ROW_KEY,
+      label: ecommerce.map((f) => displayNames[f]).find(Boolean) ?? "E-COMMERCE",
+      members: ecommerce,
+      isEcommerce: true,
+    });
+  }
+
+  return rows;
+}
+
+/** Valor de cada linha = soma das metas gravadas para os membros dela. */
+function rowValuesFromGoals(rows: GoalRow[], goals: GoalData): Record<string, number> {
+  const byKey = new Map<string, number>();
+  for (const [filial, value] of Object.entries(goals)) {
+    const k = normalizeFilialLookupKey(filial);
+    byKey.set(k, (byKey.get(k) ?? 0) + (Number(value) || 0));
+  }
+  const result: Record<string, number> = {};
+  for (const row of rows) {
+    result[row.key] = row.members.reduce(
+      (sum, m) => sum + (byKey.get(normalizeFilialLookupKey(m)) ?? 0),
+      0,
+    );
+  }
+  return result;
+}
+
+/** Aceita "180000", "180.000", "180.000,50", "R$ 1.500" e "1500.5". */
+function parseMoney(raw: string): number {
+  const s = raw.replace(/[R$\s]/g, "");
+  if (!s) return 0;
+  let normalized: string;
+  if (s.includes(",")) {
+    normalized = s.replace(/\./g, "").replace(",", ".");
+  } else if (/^\d{1,3}(\.\d{3})+$/.test(s)) {
+    normalized = s.replace(/\./g, "");
+  } else {
+    normalized = s;
+  }
+  const n = Number(normalized);
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : 0;
+}
+
+function formatInput(value: number): string {
+  if (!value) return "";
+  return value.toLocaleString("pt-BR", {
+    minimumFractionDigits: Number.isInteger(value) ? 0 : 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function formatCurrency(value: number): string {
+  return value.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    maximumFractionDigits: 0,
+  });
+}
+
+async function loadGoals(companyKey: string, month: number, year: number): Promise<GoalData> {
+  const response = await fetch(
+    `/api/goals?company=${companyKey}&month=${month}&year=${year}`,
+    { cache: "no-store" },
+  );
+  if (!response.ok) throw new Error("Não foi possível carregar as metas.");
+  const json = (await response.json()) as { data?: GoalData };
+  return json.data ?? {};
 }
 
 export default function GoalsModal({
@@ -57,172 +144,257 @@ export default function GoalsModal({
   isOpen,
   onClose,
   monthYear,
+  onSaved,
 }: GoalsModalProps) {
-  const company = resolveCompany(companyKey);
-  const allFiliais = company?.filialFilters.sales ?? [];
-  const displayNames = company?.filialDisplayNames ?? {};
-  const ecommerceFilials = company?.ecommerceFilials ?? [];
-  const filialGroups = company?.filialGroups ?? {};
+  const { user } = useAuth();
+  const canEdit = canMutate(user);
 
-  // Normalizar nomes para comparação (trim e uppercase)
-  const normalizedEcommerceFilials = ecommerceFilials.map(f => f.trim().toUpperCase());
+  // Derivado só de companyKey: referência estável. (Antes, `ecommerceFilials ?? []`
+  // criava um array novo a cada render na NERD — sem e-commerce — e o efeito de
+  // carga entrava em loop, apagando o que era digitado.)
+  const rows = useMemo(() => buildRows(companyKey), [companyKey]);
 
-  // Membros não-canônicos de grupos lógicos (ex.: as 3 Paulistas extras) — excluídos da lista
-  const groupNonCanonicals = useMemo(() => {
-    const set = new Set<string>();
-    for (const members of Object.values(filialGroups)) {
-      members.slice(1).forEach(m => set.add(m));
-    }
-    return set;
-  }, [filialGroups]);
-
-  // Filiais normais: sem ecommerce, sem membros não-canônicos de grupos, sem MATRIZ
-  const normalFiliais = allFiliais.filter(f => {
-    const normalizedFilial = f.trim().toUpperCase();
-    if (normalizedEcommerceFilials.includes(normalizedFilial)) return false;
-    if (groupNonCanonicals.has(f)) return false;
-    if ((displayNames[f] ?? f) === 'MATRIZ') return false;
-    return true;
-  });
-  
-  const hasEcommerce = ecommerceFilials.length > 0;
-  const ecommerceDisplayName = hasEcommerce 
-    ? (ecommerceFilials.map(f => displayNames[f]).find(name => name) || 'E-COMMERCE')
-    : null;
-
-  // Criar lista de filiais para exibição (normais + e-commerce agrupado)
-  const filiaisToDisplay = useMemo(() => {
-    const result: Array<{ key: string; displayName: string; isEcommerce: boolean }> = [];
-    
-    // Adicionar filiais normais
-    normalFiliais.forEach(filial => {
-      result.push({
-        key: filial,
-        displayName: displayNames[filial] ?? filial,
-        isEcommerce: false,
-      });
-    });
-    
-    // Adicionar e-commerce como uma única entrada (apenas se houver filiais de e-commerce)
-    if (hasEcommerce && ecommerceDisplayName) {
-      result.push({
-        key: 'E-COMMERCE',
-        displayName: ecommerceDisplayName,
-        isEcommerce: true,
-      });
-    }
-    
-    return result;
-  }, [normalFiliais, hasEcommerce, ecommerceDisplayName, displayNames]);
-
-  const [goals, setGoals] = useState<GoalData>({});
+  const [period, setPeriod] = useState(monthYear);
+  const [rawGoals, setRawGoals] = useState<GoalData>({});
+  const [saved, setSaved] = useState<Record<string, number>>({});
+  const [draft, setDraft] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [copying, setCopying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [flash, setFlash] = useState<string | null>(null);
+  const [pending, setPending] = useState<PendingAction | null>(null);
+  const firstInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Ao abrir, começa no mês do dashboard.
+  useEffect(() => {
+    if (isOpen) setPeriod({ month: monthYear.month, year: monthYear.year });
+  }, [isOpen, monthYear.month, monthYear.year]);
 
   useEffect(() => {
-    if (isOpen) {
-      setLoading(true);
-      loadGoals(companyKey, monthYear.month, monthYear.year)
-        .then((loadedGoals) => {
-          const processedGoals: GoalData = { ...loadedGoals };
+    if (!isOpen) return;
+    let active = true;
+    setLoading(true);
+    setError(null);
+    setFlash(null);
+    loadGoals(companyKey, period.month, period.year)
+      .then((goals) => {
+        if (!active) return;
+        const values = rowValuesFromGoals(rows, goals);
+        setRawGoals(goals);
+        setSaved(values);
+        setDraft(Object.fromEntries(rows.map((r) => [r.key, formatInput(values[r.key] ?? 0)])));
+      })
+      .catch((err: unknown) => {
+        if (active) setError(err instanceof Error ? err.message : "Erro ao carregar metas.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [isOpen, companyKey, period.month, period.year, rows]);
 
-          // Agregar e-commerce em uma única entrada
-          if (hasEcommerce && ecommerceFilials.length > 0) {
-            const normalizedEc = ecommerceFilials.map(f => f.trim().toUpperCase());
-            const ecommerceTotal = Object.keys(loadedGoals).reduce((sum, key) => {
-              return normalizedEc.includes(key.trim().toUpperCase()) ? sum + (loadedGoals[key] || 0) : sum;
-            }, 0);
-            Object.keys(processedGoals).forEach(key => {
-              if (normalizedEc.includes(key.trim().toUpperCase())) delete processedGoals[key];
-            });
-            processedGoals['E-COMMERCE'] = ecommerceTotal;
-          }
+  const values = useMemo(
+    () => Object.fromEntries(rows.map((r) => [r.key, parseMoney(draft[r.key] ?? "")])),
+    [rows, draft],
+  );
 
-          // Agregar membros não-canônicos de grupos lógicos (ex.: Paulista) na entrada canônica
-          for (const [canonical, members] of Object.entries(filialGroups)) {
-            const nonCanonicals = members.slice(1);
-            if (nonCanonicals.length === 0) continue;
-            const total = members.reduce((sum, m) => sum + (processedGoals[m] || 0), 0);
-            nonCanonicals.forEach(m => delete processedGoals[m]);
-            if (total > 0) processedGoals[canonical] = total;
-          }
+  const changedKeys = useMemo(
+    () => rows.filter((r) => Math.abs((values[r.key] ?? 0) - (saved[r.key] ?? 0)) >= 0.01).map((r) => r.key),
+    [rows, values, saved],
+  );
+  const isDirty = !loading && changedKeys.length > 0;
 
-          // Remover MATRIZ (sem meta)
-          Object.keys(processedGoals).forEach(key => {
-            if ((displayNames[key] ?? key) === 'MATRIZ') delete processedGoals[key];
+  const totalGeral = rows.reduce((sum, r) => sum + (values[r.key] ?? 0), 0);
+  const hasEcommerce = rows.some((r) => r.isEcommerce);
+  const totalVarejo = rows.reduce((sum, r) => (r.isEcommerce ? sum : sum + (values[r.key] ?? 0)), 0);
+
+  // Fechar a aba / recarregar com alteração pendente → aviso nativo do navegador.
+  useEffect(() => {
+    if (!isOpen || !isDirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isOpen, isDirty]);
+
+  const save = useCallback(async (): Promise<boolean> => {
+    setSaving(true);
+    setError(null);
+    try {
+      // Parte do que está gravado e troca só os membros das linhas da tela: chave
+      // que o modal não conhece (loja antiga/desativada) fica como estava.
+      const managed = new Set(rows.flatMap((r) => r.members.map(normalizeFilialLookupKey)));
+      const payload: GoalData = {};
+      for (const [filial, value] of Object.entries(rawGoals)) {
+        if (!managed.has(normalizeFilialLookupKey(filial))) payload[filial] = value;
+      }
+      for (const row of rows) {
+        const value = values[row.key] ?? 0;
+        if (value <= 0) continue;
+        if (row.isEcommerce) {
+          // E-commerce: dividido igualmente entre os CNPJs do rodízio (a soma volta ao
+          // total). Centavos que sobram ficam no primeiro, para a soma bater exata.
+          const n = row.members.length;
+          const each = Math.floor((value / n) * 100) / 100;
+          row.members.forEach((m, i) => {
+            payload[m] = i === 0 ? Math.round((value - each * (n - 1)) * 100) / 100 : each;
           });
+        } else {
+          // Grupo de loja: meta inteira na canônica; os outros membros ficam sem chave.
+          payload[row.key] = value;
+        }
+      }
 
-          setGoals(processedGoals);
-        })
-        .finally(() => {
-          setLoading(false);
-        });
-    }
-  }, [isOpen, companyKey, monthYear.month, monthYear.year, hasEcommerce, ecommerceFilials, filialGroups, displayNames]);
+      const response = await fetch("/api/goals", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(user?.username ? { "x-auth-username": user.username } : {}),
+        },
+        body: JSON.stringify({
+          companyKey,
+          month: period.month,
+          year: period.year,
+          goals: payload,
+        }),
+      });
+      if (!response.ok) {
+        const json = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(json.error ?? "Não foi possível salvar as metas.");
+      }
 
-  const handleGoalChange = async (filialKey: string, value: string) => {
-    const numValue = value === "" ? 0 : parseFloat(value) || 0;
-    const newGoals = { ...goals };
-    
-    // Se for E-COMMERCE, distribuir o valor para todas as filiais de e-commerce
-    if (filialKey === 'E-COMMERCE' && hasEcommerce) {
-      // Remover valores antigos das filiais de e-commerce
-      ecommerceFilials.forEach(filial => {
-        delete newGoals[filial];
-      });
-      
-      // Distribuir o valor igualmente entre as filiais de e-commerce
-      const valuePerFilial = ecommerceFilials.length > 0 ? numValue / ecommerceFilials.length : 0;
-      ecommerceFilials.forEach(filial => {
-        newGoals[filial] = valuePerFilial;
-      });
-      
-      // Manter a entrada agregada para exibição
-      newGoals['E-COMMERCE'] = numValue;
-    } else {
-      // Para filiais normais, apenas atualizar o valor
-      newGoals[filialKey] = numValue;
+      setRawGoals(payload);
+      setSaved({ ...values });
+      setDraft(Object.fromEntries(rows.map((r) => [r.key, formatInput(values[r.key] ?? 0)])));
+      setFlash("Metas salvas");
+      onSaved?.(period, payload);
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível salvar as metas.");
+      return false;
+    } finally {
+      setSaving(false);
     }
-    
-    setGoals(newGoals);
-    
-    // Preparar goals para salvar (sem a chave agregada E-COMMERCE)
-    const goalsToSave: GoalData = { ...newGoals };
-    delete goalsToSave['E-COMMERCE'];
-    
-    await saveGoals(companyKey, monthYear.month, monthYear.year, goalsToSave);
+  }, [rows, rawGoals, values, user?.username, companyKey, period, onSaved]);
+
+  const runAction = useCallback(
+    (action: PendingAction) => {
+      if (action.type === "close") onClose();
+      else setPeriod({ month: action.month, year: action.year });
+    },
+    [onClose],
+  );
+
+  const request = useCallback(
+    (action: PendingAction) => {
+      if (isDirty) setPending(action);
+      else runAction(action);
+    },
+    [isDirty, runAction],
+  );
+
+  const shiftMonth = (delta: number) => {
+    const d = new Date(period.year, period.month + delta, 1);
+    request({ type: "month", month: d.getMonth(), year: d.getFullYear() });
   };
 
-  const monthName = useMemo(() => {
-    const date = new Date(monthYear.year, monthYear.month, 1);
-    return date.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
-  }, [monthYear.month, monthYear.year]);
+  const copyPreviousMonth = async () => {
+    const d = new Date(period.year, period.month - 1, 1);
+    setCopying(true);
+    setError(null);
+    try {
+      const goals = await loadGoals(companyKey, d.getMonth(), d.getFullYear());
+      const prev = rowValuesFromGoals(rows, goals);
+      if (!Object.values(prev).some((v) => v > 0)) {
+        setError("O mês anterior não tem metas para copiar.");
+        return;
+      }
+      setDraft(Object.fromEntries(rows.map((r) => [r.key, formatInput(prev[r.key] ?? 0)])));
+      setFlash(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao copiar metas.");
+    } finally {
+      setCopying(false);
+    }
+  };
 
-  const totalGoal = useMemo(() => {
-    const normalizedEc = ecommerceFilials.map(f => f.trim().toUpperCase());
-    return Object.entries(goals).reduce((sum, [key, value]) => {
-      if (key === 'E-COMMERCE') return sum + value;
-      if (normalizedEc.includes(key.trim().toUpperCase())) return sum;
-      if ((displayNames[key] ?? key) === 'MATRIZ') return sum;
-      return sum + value;
-    }, 0);
-  }, [goals, ecommerceFilials, displayNames]);
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (pending) setPending(null);
+      else request({ type: "close" });
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isOpen, pending, request]);
+
+  useEffect(() => {
+    if (!flash) return;
+    const t = window.setTimeout(() => setFlash(null), 2500);
+    return () => window.clearTimeout(t);
+  }, [flash]);
+
+  useEffect(() => {
+    if (isOpen && !loading) firstInputRef.current?.focus();
+  }, [isOpen, loading]);
+
+  useEffect(() => {
+    if (!isOpen) setPending(null);
+  }, [isOpen]);
+
+  const monthName = useMemo(() => {
+    const date = new Date(period.year, period.month, 1);
+    return date.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  }, [period.month, period.year]);
 
   if (!isOpen) {
     return null;
   }
 
+  const busy = loading || saving;
+
   return (
-    <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+    <div className={styles.overlay} onClick={() => request({ type: "close" })}>
+      <div
+        className={styles.modal}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Metas do mês"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className={styles.header}>
-          <div>
-            <h2 className={styles.title}>Configuração de Metas</h2>
-            <p className={styles.monthLabel}>{monthName}</p>
+          <h2 className={styles.title}>Metas</h2>
+          <div className={styles.monthNav}>
+            <button
+              type="button"
+              className={styles.navButton}
+              onClick={() => shiftMonth(-1)}
+              disabled={busy}
+              aria-label="Mês anterior"
+            >
+              ‹
+            </button>
+            <span className={styles.monthLabel}>{monthName}</span>
+            <button
+              type="button"
+              className={styles.navButton}
+              onClick={() => shiftMonth(1)}
+              disabled={busy}
+              aria-label="Próximo mês"
+            >
+              ›
+            </button>
           </div>
           <button
             type="button"
             className={styles.closeButton}
-            onClick={onClose}
+            onClick={() => request({ type: "close" })}
             aria-label="Fechar"
           >
             ×
@@ -231,43 +403,163 @@ export default function GoalsModal({
 
         <div className={styles.content}>
           {loading ? (
-            <div className={styles.loading}>Carregando metas...</div>
+            <div className={styles.loading}>Carregando metas…</div>
           ) : (
             <div className={styles.filialList}>
-              {filiaisToDisplay.map((filial) => {
+              {rows.map((row, index) => {
+                const changed = changedKeys.includes(row.key);
                 return (
-                  <div key={filial.key} className={styles.filialItem}>
-                    <label className={styles.filialLabel}>{filial.displayName}</label>
-                    <div className={styles.inputWrapper}>
+                  <label
+                    key={row.key}
+                    className={`${styles.filialItem} ${changed ? styles.filialItemChanged : ""}`}
+                  >
+                    <span className={styles.filialLabel}>
+                      {row.label}
+                      {changed ? <span className={styles.changedDot} aria-label="alterada" /> : null}
+                    </span>
+                    <span className={styles.inputWrapper}>
                       <span className={styles.currency}>R$</span>
                       <input
-                        type="number"
+                        ref={index === 0 ? firstInputRef : undefined}
+                        type="text"
+                        inputMode="decimal"
                         className={styles.input}
-                        value={goals[filial.key] || ""}
-                        onChange={(e) => handleGoalChange(filial.key, e.target.value)}
-                        placeholder="0,00"
-                        min="0"
-                        step="0.01"
+                        value={draft[row.key] ?? ""}
+                        onChange={(e) => setDraft((d) => ({ ...d, [row.key]: e.target.value }))}
+                        onBlur={(e) =>
+                          setDraft((d) => ({ ...d, [row.key]: formatInput(parseMoney(e.target.value)) }))
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && isDirty && canEdit && !saving) void save();
+                        }}
+                        placeholder="0"
+                        disabled={!canEdit || saving}
                       />
-                    </div>
-                  </div>
+                    </span>
+                  </label>
                 );
               })}
             </div>
           )}
+        </div>
 
-          <div className={styles.totalSection}>
-            <span className={styles.totalLabel}>Meta Geral</span>
-            <span className={styles.totalValue}>
-              {totalGoal.toLocaleString("pt-BR", {
-                style: "currency",
-                currency: "BRL",
-              })}
-            </span>
+        <div className={styles.footer}>
+          <div className={styles.totals}>
+            <div className={styles.totalItem}>
+              <span className={styles.totalLabel}>Meta geral</span>
+              <span className={styles.totalValue}>{formatCurrency(totalGeral)}</span>
+            </div>
+            {hasEcommerce ? (
+              <div className={styles.totalItem}>
+                <span className={styles.totalLabel}>Só varejo</span>
+                <span className={styles.totalValueMuted}>{formatCurrency(totalVarejo)}</span>
+              </div>
+            ) : null}
+          </div>
+
+          {error ? <div className={styles.error}>{error}</div> : null}
+
+          <div className={styles.actions}>
+            {canEdit ? (
+              <button
+                type="button"
+                className={styles.linkButton}
+                onClick={() => void copyPreviousMonth()}
+                disabled={busy || copying}
+                title="Preenche com as metas do mês anterior (só grava ao clicar em Salvar)"
+              >
+                {copying ? "Copiando…" : "Copiar mês anterior"}
+              </button>
+            ) : (
+              <span className={styles.readOnlyNote}>Somente leitura</span>
+            )}
+            <div className={styles.actionsRight}>
+              {flash && !isDirty ? <span className={styles.flash}>✓ {flash}</span> : null}
+              {isDirty ? (
+                <span className={styles.dirtyNote}>
+                  {changedKeys.length} {changedKeys.length === 1 ? "alteração" : "alterações"}
+                </span>
+              ) : null}
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={() => request({ type: "close" })}
+                disabled={saving}
+              >
+                Fechar
+              </button>
+              {canEdit ? (
+                <button
+                  type="button"
+                  className={styles.primaryButton}
+                  onClick={() => void save()}
+                  disabled={!isDirty || busy}
+                >
+                  {saving ? "Salvando…" : "Salvar"}
+                </button>
+              ) : null}
+            </div>
           </div>
         </div>
+
+        {pending ? (
+          <div className={styles.confirmOverlay} onClick={() => setPending(null)}>
+            <div
+              className={styles.confirmBox}
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="goals-confirm-title"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 id="goals-confirm-title" className={styles.confirmTitle}>
+                Metas não salvas
+              </h3>
+              <p className={styles.confirmText}>
+                Você alterou {changedKeys.length}{" "}
+                {changedKeys.length === 1 ? "meta" : "metas"} de {monthName} e ainda não salvou.
+              </p>
+              {error ? <div className={styles.error}>{error}</div> : null}
+              <div className={styles.confirmActions}>
+                <button
+                  type="button"
+                  className={styles.dangerButton}
+                  onClick={() => {
+                    const action = pending;
+                    setPending(null);
+                    runAction(action);
+                  }}
+                  disabled={saving}
+                >
+                  Descartar
+                </button>
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
+                  onClick={() => setPending(null)}
+                  disabled={saving}
+                  autoFocus
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className={styles.primaryButton}
+                  onClick={async () => {
+                    const action = pending;
+                    if (await save()) {
+                      setPending(null);
+                      runAction(action);
+                    }
+                  }}
+                  disabled={saving}
+                >
+                  {saving ? "Salvando…" : "Salvar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );
 }
-

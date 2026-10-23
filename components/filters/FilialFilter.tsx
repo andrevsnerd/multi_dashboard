@@ -33,6 +33,8 @@ interface FilialFilterProps {
    */
   includeFilialDefeito?: boolean;
   showActiveGroupHint?: boolean;
+  /** Botão no mesmo tamanho do DateRangeFilter (cabeçalho do dashboard). */
+  compact?: boolean;
   companyConfigOverride?: Pick<
     CompanyConfig,
     "filialFilters" | "filialDisplayNames" | "filialGroups" | "activeFilials" | "ecommerceFilials"
@@ -49,6 +51,7 @@ export default function FilialFilter({
   hideVarejo = false,
   includeFilialDefeito = false,
   showActiveGroupHint = false,
+  compact = false,
   companyConfigOverride = null,
 }: FilialFilterProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -141,7 +144,7 @@ export default function FilialFilter({
       {label ? <span className={styles.label}>{label}</span> : null}
       <button
         type="button"
-        className={`${styles.button} ${isOpen ? styles.buttonActive : ""}`}
+        className={`${styles.button} ${compact ? styles.buttonCompact : ""} ${isOpen ? styles.buttonActive : ""}`}
         onClick={() => setIsOpen((prev) => !prev)}
       >
         <span className={styles.buttonValue}>

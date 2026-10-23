@@ -33,6 +33,24 @@
   box-shadow: 0 12px 28px rgba(14, 165, 233, 0.18);
 }
 
+/* Variante no tamanho do DateRangeFilter (opt-in via prop compact). */
+.buttonCompact {
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+  min-width: 170px;
+}
+
+.buttonCompact:hover,
+.buttonCompact.buttonActive {
+  box-shadow: 0 8px 20px rgba(14, 165, 233, 0.16);
+}
+
+.buttonCompact .valuePrimary {
+  font-size: 13px;
+}
+
 .buttonValue {
   display: flex;
   flex-direction: column;

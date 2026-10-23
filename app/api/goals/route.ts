@@ -50,13 +50,11 @@ export async function GET(request: Request) {
         tokenKey: tokenKey || null,
         hasUrl: urlKey ? !!process.env[urlKey] : false,
         hasToken: tokenKey ? !!process.env[tokenKey] : false,
-        urlValue: urlKey ? process.env[urlKey]?.substring(0, 50) + '...' : null,
       },
+      // Só presença: este endpoint é público, nunca devolver trecho de URL/token.
       allRedisKeys: redisKeys.map(k => ({
         key: k,
         hasValue: !!process.env[k],
-        valueLength: process.env[k]?.length || 0,
-        valuePreview: process.env[k]?.substring(0, 30) + '...' || null
       })),
       message: redisKeys.length === 0 
         ? '❌ Nenhuma variável de ambiente do Redis encontrada! Configure o Redis no Vercel.'
@@ -96,7 +94,10 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { companyKey, month, year, goals } = body;
 
-    if (!companyKey || month === null || month === undefined || year === null || year === undefined || !goals) {
+    if (
+      !companyKey || month === null || month === undefined || year === null || year === undefined ||
+      !goals || typeof goals !== 'object' || Array.isArray(goals)
+    ) {
       return NextResponse.json(
         { error: 'Parâmetros companyKey, month, year e goals são obrigatórios' },
         { status: 400 }
@@ -112,7 +113,14 @@ export async function POST(request: Request) {
       allGoals[companyKey][year] = {};
     }
 
-    allGoals[companyKey][year][month] = goals;
+    // Só número finito e positivo entra; o resto (vazio, NaN, negativo) é descartado.
+    const cleanGoals: Record<string, number> = {};
+    for (const [filial, value] of Object.entries(goals as Record<string, unknown>)) {
+      const n = Number(value);
+      if (filial.trim() && Number.isFinite(n) && n > 0) cleanGoals[filial] = n;
+    }
+
+    allGoals[companyKey][year][month] = cleanGoals;
 
     await writeGoals(allGoals);
 

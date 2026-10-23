@@ -6,15 +6,17 @@
 
 .headerRow {
   display: flex;
-  align-items: flex-start;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 24px;
 }
 
+/* Rótulo em cima, botão embaixo: alinhar pela base deixa período, filial,
+   Eletrônicos e METAS na mesma linha mesmo com/sem rótulo. */
 .controls {
   display: flex;
-  align-items: center;
-  gap: 24px;
+  align-items: flex-end;
+  gap: 16px;
   flex-wrap: wrap;
   flex: 1;
 }
@@ -23,11 +25,23 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  box-sizing: border-box;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--b-subtle2);
+  border-radius: 12px;
+  background: var(--s-white);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+  font-size: 13px;
   font-weight: 600;
   color: var(--t-700);
   cursor: pointer;
   user-select: none;
+  transition: border-color 0.2s ease;
+}
+
+.checkboxLabel:hover {
+  border-color: rgba(14, 165, 233, 0.4);
 }
 
 .checkboxLabel input {
@@ -230,3 +244,26 @@
 
 
 
+
+.goalsButton {
+  flex: none;
+  box-sizing: border-box;
+  height: 36px;
+  padding: 0 18px;
+  background: var(--s-white);
+  border: 1px solid var(--b-subtle2);
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--t-900);
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.goalsButton:hover {
+  border-color: rgba(14, 165, 233, 0.4);
+  box-shadow: 0 8px 20px rgba(14, 165, 233, 0.16);
+}

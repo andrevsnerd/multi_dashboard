@@ -750,8 +750,8 @@
     "semantic_hash": ""
   },
   "app/api/goals/route.ts": {
-    "mtime": 1783538365.8995342,
-    "ast_hash": "841d6f1f67ee475eb580f669e04b6883",
+    "mtime": 1792777470.0331752,
+    "ast_hash": "831ab50fec3bacb221fb4ce55815624b",
     "semantic_hash": ""
   },
   "app/api/lista-loja/[id]/route.ts": {
@@ -1305,9 +1305,9 @@
     "semantic_hash": ""
   },
   "components/dashboard/CompanyDashboard.tsx": {
-    "mtime": 1781700101.4873736,
-    "ast_hash": "9a1e4b605cf241dee57c60ac2a3f31de",
-    "semantic_hash": "9a1e4b605cf241dee57c60ac2a3f31de"
+    "mtime": 1792777455.4525602,
+    "ast_hash": "333bac7841ab6f44e6e60cf7d631afdd",
+    "semantic_hash": ""
   },
   "components/dashboard/CompanyRevenueLists.tsx": {
     "mtime": 1780073682.686467,
@@ -1325,9 +1325,9 @@
     "semantic_hash": ""
   },
   "components/dashboard/GoalsModal.tsx": {
-    "mtime": 1781101870.2926273,
-    "ast_hash": "68b4c6bc05555c57eca5c5d0d72e57e1",
-    "semantic_hash": "68b4c6bc05555c57eca5c5d0d72e57e1"
+    "mtime": 1792777402.8751469,
+    "ast_hash": "a5a51f7bd2a7ac2367a72db448550b3d",
+    "semantic_hash": ""
   },
   "components/dashboard/RevenueDashboard.tsx": {
     "mtime": 1780073682.69018,
@@ -1413,11 +1413,6 @@
     "mtime": 1783952687.7869406,
     "ast_hash": "ebe73d06169e822851e030427779b8ce",
     "semantic_hash": ""
-  },
-  "components/layout/EngineButton.tsx": {
-    "mtime": 1780073682.7025206,
-    "ast_hash": "9f667d0bd6f627d1bf8143698b1bba51",
-    "semantic_hash": "9f667d0bd6f627d1bf8143698b1bba51"
   },
   "components/layout/MainContent.tsx": {
     "mtime": 1763144153.8585725,
@@ -1820,7 +1815,7 @@
     "semantic_hash": "d751713988987e9331980363e24189ce"
   },
   "data/goals.json": {
-    "mtime": 1780073682.8023067,
+    "mtime": 1792777565.1405334,
     "ast_hash": "31660a4f5d52a2a38bd5e5b40c2967e8",
     "semantic_hash": "31660a4f5d52a2a38bd5e5b40c2967e8"
   },
@@ -5125,8 +5120,8 @@
     "semantic_hash": ""
   },
   "components/inventario/InventarioBipagemPage.tsx": {
-    "mtime": 1792769128.4402573,
-    "ast_hash": "e04a2c3479ccbf58c08f574cf798470a",
+    "mtime": 1792769391.922886,
+    "ast_hash": "a3340ce5988afd31f5ba3db6f579e0f4",
     "semantic_hash": ""
   },
   "lib/repositories/inventarioBipagem.ts": {

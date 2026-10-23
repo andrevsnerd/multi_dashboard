@@ -1,8 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/AuthContext";
-import { getFilialGroupMembers, resolveCompany, VAREJO_VALUE } from "@/lib/config/company";
+import {
+  getFilialGroupMembers,
+  normalizeFilialLookupKey,
+  resolveCompany,
+  VAREJO_VALUE,
+} from "@/lib/config/company";
 
 import DateRangeFilter, {
   type DateRangeValue,
@@ -12,7 +17,6 @@ import SummaryCards from "@/components/dashboard/SummaryCards";
 import DailyRevenueChart from "@/components/dashboard/DailyRevenueChart";
 import GoalCard from "@/components/dashboard/GoalCard";
 import GoalsModal from "@/components/dashboard/GoalsModal";
-import EngineButton from "@/components/layout/EngineButton";
 import CompanyRevenueLists from "@/components/dashboard/CompanyRevenueLists";
 import type {
   MetricSummary,
@@ -198,31 +202,15 @@ export default function CompanyDashboard({
     };
   }, [companyKey, rangeKey, retryKey, range, effectiveFilial, monthYear.month, monthYear.year, linhas]);
 
-  // Recarregar metas quando o modal fechar
-  useEffect(() => {
-    if (isGoalsModalOpen) return;
-    if (!dashboardData) return;
-    let active = true;
-    async function reloadGoals() {
-      const params = new URLSearchParams({
-        company: companyKey,
-        month: String(monthYear.month),
-        year: String(monthYear.year),
-      });
-      try {
-        const res = await fetch(`/api/goals?${params.toString()}`, { cache: "no-store" });
-        if (res.ok && active) {
-          const json = (await res.json()) as { data: Record<string, number> };
-          setDashboardData((prev) => prev ? { ...prev, goals: json.data ?? {} } : prev);
-        }
-      } catch {
-        // silencioso
-      }
-    }
-    void reloadGoals();
-    return () => { active = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isGoalsModalOpen]);
+  // Depois de salvar no modal, o card de meta já reflete o valor novo (sem recarregar
+  // o dashboard) — só se o mês salvo for o mês que o dashboard está mostrando.
+  const handleGoalsSaved = useCallback(
+    (saved: { month: number; year: number }, goals: Record<string, number>) => {
+      if (saved.month !== monthYear.month || saved.year !== monthYear.year) return;
+      setDashboardData((prev) => (prev ? { ...prev, goals } : prev));
+    },
+    [monthYear.month, monthYear.year],
+  );
 
   const summary: SalesSummary = useMemo(() => {
     if (!dashboardData) return DEFAULT_SUMMARY;
@@ -232,21 +220,42 @@ export default function CompanyDashboard({
   const companyConfig = useMemo(() => resolveCompany(companyKey), [companyKey]);
 
   const currentGoal = useMemo(() => {
-    if (!dashboardData) return 0;
+    if (!dashboardData || !companyConfig) return 0;
     const goals = dashboardData.goals;
+    // Soma as metas gravadas para um conjunto de filiais. Casa por nome normalizado
+    // (espaço duplo do Galeão etc.) e ignora chave que não é loja de vendas hoje
+    // (ex.: IBIRAPUERA desativada) — a mesma lista que a consulta de faturamento usa.
+    const sumGoals = (filiais: string[]) => {
+      const wanted = new Set(filiais.map(normalizeFilialLookupKey));
+      return Object.entries(goals).reduce(
+        (sum, [filial, value]) =>
+          wanted.has(normalizeFilialLookupKey(filial)) ? sum + (Number(value) || 0) : sum,
+        0,
+      );
+    };
     if (effectiveFilial && effectiveFilial !== VAREJO_VALUE) {
       // Meta de um grupo = soma das metas de TODOS os membros, independente de qual
       // é a canônica/ativa. Vale para grupos lógicos (ex.: PAULISTA, meta toda na
       // canônica) E para e-commerce (meta dividida entre os membros) — somar cobre
       // os dois esquemas de gravação. getFilialGroupMembers devolve [filial] quando
       // não é grupo, e qualquer grupo futuro entra aqui sem mudança.
-      const members = companyConfig
-        ? getFilialGroupMembers(companyConfig, effectiveFilial)
-        : [effectiveFilial];
-      return members.reduce((sum, member) => sum + (goals[member] ?? 0), 0);
+      return sumGoals(getFilialGroupMembers(companyConfig, effectiveFilial));
     }
-    return Object.values(goals).reduce((sum, v) => sum + (v as number), 0);
+    const salesFiliais = companyConfig.filialFilters.sales;
+    if (effectiveFilial === VAREJO_VALUE) {
+      // VAREJO = só lojas físicas: a meta do e-commerce fica fora, igual ao faturamento.
+      const ecommerce = new Set((companyConfig.ecommerceFilials ?? []).map(normalizeFilialLookupKey));
+      return sumGoals(salesFiliais.filter((f) => !ecommerce.has(normalizeFilialLookupKey(f))));
+    }
+    return sumGoals(salesFiliais);
   }, [dashboardData, effectiveFilial, companyConfig]);
+
+  const goalLabel =
+    effectiveFilial === VAREJO_VALUE
+      ? "Meta Varejo"
+      : effectiveFilial
+        ? "Meta da Filial"
+        : "Meta Geral";
 
   const monthProjection = useMemo(() => {
     if (!dashboardData) return 0;
@@ -309,6 +318,7 @@ export default function CompanyDashboard({
                 companyKey={companyKey}
                 value={selectedFilial}
                 onChange={setSelectedFilial}
+                compact
               />
             )}
             {companyKey === "nerd" && (
@@ -334,7 +344,13 @@ export default function CompanyDashboard({
               </span>
             ) : null}
           </div>
-          <EngineButton onMetasClick={() => setIsGoalsModalOpen(true)} />
+          <button
+            type="button"
+            className={styles.goalsButton}
+            onClick={() => setIsGoalsModalOpen(true)}
+          >
+            Metas
+          </button>
         </div>
 
         {loading && (
@@ -359,13 +375,13 @@ export default function CompanyDashboard({
                 currentValue={loading ? 0 : currentRevenue}
                 goal={currentGoal}
                 projection={loading ? 0 : monthProjection}
-                label={selectedFilial ? "Meta da Filial" : "Meta Geral"}
+                label={goalLabel}
               />
               <DailyRevenueChart
                 companyKey={companyKey}
                 startDate={range.startDate}
                 endDate={range.endDate}
-                filial={selectedFilial}
+                filial={effectiveFilial}
                 linhas={linhas}
                 initialData={dashboardData?.dailyRevenue}
               />
@@ -376,7 +392,7 @@ export default function CompanyDashboard({
             companyKey={companyKey}
             startDate={range.startDate}
             endDate={range.endDate}
-            filial={selectedFilial}
+            filial={effectiveFilial}
             linhas={linhas}
             filialPerformance={dashboardData?.filialPerformance ?? []}
             summaryRevenue={summary.totalRevenue}
@@ -391,6 +407,7 @@ export default function CompanyDashboard({
         isOpen={isGoalsModalOpen}
         onClose={() => setIsGoalsModalOpen(false)}
         monthYear={monthYear}
+        onSaved={handleGoalsSaved}
       />
     </>
   );
