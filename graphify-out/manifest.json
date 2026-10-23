@@ -930,8 +930,8 @@
     "semantic_hash": "3136877746d42feabbd7abeab02e36c2"
   },
   "app/api/romaneio-confirmar-entrada/route.ts": {
-    "mtime": 1792003142.5715582,
-    "ast_hash": "b3982689de7eecee454b0aa10c6023da",
+    "mtime": 1792761271.3169563,
+    "ast_hash": "9b836024d1b7a9a2a06fc395af0ca281",
     "semantic_hash": ""
   },
   "app/api/romaneios/editar-qtd/route.ts": {
@@ -940,8 +940,8 @@
     "semantic_hash": ""
   },
   "app/api/romaneios/entradas/route.ts": {
-    "mtime": 1787673179.726483,
-    "ast_hash": "b8595c54083ed90ca66e3e1b1155abe9",
+    "mtime": 1792760930.9921958,
+    "ast_hash": "4388a702d6d3cfd1ce0b19c2c7cc53fa",
     "semantic_hash": ""
   },
   "app/api/romaneios/liberar-transito/route.ts": {
@@ -955,8 +955,8 @@
     "semantic_hash": "fe3bc07ccdce7c954dc20a51b9994725"
   },
   "app/api/romaneios/saidas/route.ts": {
-    "mtime": 1787673179.726483,
-    "ast_hash": "aa63e2e2b22518d09db1d0324c366736",
+    "mtime": 1792761285.6838548,
+    "ast_hash": "01e839824cb2cef42133dcf7a82662fd",
     "semantic_hash": ""
   },
   "app/api/romaneios/transito/route.ts": {
@@ -1610,8 +1610,8 @@
     "semantic_hash": "685d5c1f8a52c86087dce25ac25d445b"
   },
   "components/romaneios/RomaneiosPage.tsx": {
-    "mtime": 1791204265.8366942,
-    "ast_hash": "8815a9089e00a21172579ecbcc5596f2",
+    "mtime": 1792761309.6481159,
+    "ast_hash": "87872a3eb6af44bc8569102fa08e1619",
     "semantic_hash": ""
   },
   "components/saidas-entradas-produtos/HistoricoSaidasEntradasPage.tsx": {
@@ -2495,8 +2495,8 @@
     "semantic_hash": "a2035ad5498c52867b04eb7e1a7878ca"
   },
   "lib/repositories/logSaidas.ts": {
-    "mtime": 1787591474.7026503,
-    "ast_hash": "92c1d92f35f25ae40ffed47c42352220",
+    "mtime": 1792761347.3380027,
+    "ast_hash": "69f23802435caf970d14ff69ca5ac312",
     "semantic_hash": ""
   },
   "lib/repositories/logTransito.ts": {
@@ -2925,7 +2925,7 @@
     "semantic_hash": "8574a22068d81c11c33afb088ddecd70"
   },
   "lib/utils/romaneio-confirmacao-store.ts": {
-    "mtime": 1792001753.214344,
+    "mtime": 1792761292.6929183,
     "ast_hash": "530e8692a0e26d5a08f10bee84d64dbb",
     "semantic_hash": ""
   },
@@ -5087,6 +5087,16 @@
   "lib/mcp/url-token.ts": {
     "mtime": 1792679240.0310788,
     "ast_hash": "5ee79d231063edc9cd40db1ffbeeed36",
+    "semantic_hash": ""
+  },
+  "lib/server/romaneio-conferencia.ts": {
+    "mtime": 1792761253.749747,
+    "ast_hash": "0a1ad269ccc701a4338b0daa85af53e6",
+    "semantic_hash": ""
+  },
+  "scripts/backfill-romaneio-conferencia.mjs": {
+    "mtime": 1792761348.4217813,
+    "ast_hash": "6b63ce6810b79950557155fc759a5dab",
     "semantic_hash": ""
   }
 }

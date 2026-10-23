@@ -243,6 +243,70 @@ export async function fetchLogSaidas(
   return saidas;
 }
 
+/**
+ * Quantidade de cada produto×cor nos romaneios de saída informados, por
+ * "romaneio|filial de origem" → "produto|cor" → qtde. É o lado Linx da
+ * conferência gravada na confirmação (lib/server/romaneio-conferencia.ts).
+ * Mesma origem das linhas do fetchLogSaidas: ESTOQUE_PROD1_SAI e, para a saída de
+ * loja sem romaneio de estoque, LOJA_SAIDAS_PRODUTO.
+ */
+export async function fetchQtdeItensSaidas(
+  romaneios: string[],
+  filiais: string[]
+): Promise<Map<string, Map<string, number>>> {
+  const roms = Array.from(new Set(romaneios.map((r) => (r || "").trim()).filter(Boolean)));
+  const fils = Array.from(new Set(filiais.map((f) => (f || "").trim().toUpperCase()).filter(Boolean)));
+  const mapa = new Map<string, Map<string, number>>();
+  if (roms.length === 0 || fils.length === 0) return mapa;
+
+  // Linhas de estoque ganham das de loja na mesma saída (nunca soma as duas).
+  const fonteDe = new Map<string, "EST" | "LOJA">();
+  const CHUNK = 500;
+  for (let i = 0; i < roms.length; i += CHUNK) {
+    const lote = roms.slice(i, i + CHUNK);
+    const rows = await withRequest(async (req) => {
+      lote.forEach((r, j) => req.input(`rom${j}`, sql.VarChar, r));
+      fils.forEach((f, j) => req.input(`fil${j}`, sql.VarChar, f));
+      const romParams = lote.map((_, j) => `@rom${j}`).join(", ");
+      const filParams = fils.map((_, j) => `@fil${j}`).join(", ");
+      const result = await req.query<{
+        FONTE: "EST" | "LOJA";
+        ROMANEIO_PRODUTO: string;
+        FILIAL: string;
+        PRODUTO: string;
+        COR_PRODUTO: string | null;
+        QTDE: number | null;
+      }>(`
+        SELECT 'EST' AS FONTE, ep.ROMANEIO_PRODUTO, ep.FILIAL, ep.PRODUTO, ep.COR_PRODUTO, SUM(ep.QTDE) AS QTDE
+        FROM ESTOQUE_PROD1_SAI ep WITH (NOLOCK)
+        WHERE ep.ROMANEIO_PRODUTO IN (${romParams})
+          AND UPPER(LTRIM(RTRIM(ISNULL(ep.FILIAL, '')))) IN (${filParams})
+        GROUP BY ep.ROMANEIO_PRODUTO, ep.FILIAL, ep.PRODUTO, ep.COR_PRODUTO
+        UNION ALL
+        SELECT 'LOJA', sp.ROMANEIO_PRODUTO, sp.FILIAL, sp.PRODUTO, sp.COR_PRODUTO, SUM(sp.QTDE_SAIDA)
+        FROM LOJA_SAIDAS_PRODUTO sp WITH (NOLOCK)
+        WHERE sp.ROMANEIO_PRODUTO IN (${romParams})
+          AND UPPER(LTRIM(RTRIM(ISNULL(sp.FILIAL, '')))) IN (${filParams})
+        GROUP BY sp.ROMANEIO_PRODUTO, sp.FILIAL, sp.PRODUTO, sp.COR_PRODUTO
+      `);
+      return result.recordset;
+    });
+
+    for (const row of rows) {
+      const chave = `${(row.ROMANEIO_PRODUTO || "").trim()}|${(row.FILIAL || "").trim().toUpperCase()}`;
+      const fonte = fonteDe.get(chave);
+      if (fonte === "EST" && row.FONTE === "LOJA") continue;
+      if (fonte === "LOJA" && row.FONTE === "EST") mapa.delete(chave);
+      fonteDe.set(chave, row.FONTE);
+      const itens = mapa.get(chave) ?? new Map<string, number>();
+      const item = `${(row.PRODUTO || "").trim()}|${(row.COR_PRODUTO || "").trim()}`;
+      itens.set(item, (itens.get(item) ?? 0) + (Number(row.QTDE) || 0));
+      mapa.set(chave, itens);
+    }
+  }
+  return mapa;
+}
+
 export interface DefeitoItem {
   produto: string;
   descricao: string;

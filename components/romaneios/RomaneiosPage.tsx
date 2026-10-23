@@ -28,6 +28,13 @@ export interface RomaneioListItem {
   destinoCodigo?: string | null;
   tipoRomaneio?: string;
   qtdConfirmados?: number;
+  /** Só quando a saída foi confirmada com alteração (gravado na confirmação). */
+  conferencia?: {
+    itensOk: number;
+    itensTotal: number;
+    pecasConfirmadas: number;
+    pecasRomaneio: number;
+  };
 }
 
 function cleanDestinoValue(value: string | null | undefined): string {
@@ -402,6 +409,7 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
 
             const podeExcluir = isAdmin && !isTransito;
             const travaInventario = getTravaInventario(rom);
+            const conferencia = rom.tipo === "saida" ? rom.conferencia : undefined;
 
             return (
               <Link
@@ -440,6 +448,14 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
                       title={`Filial considerada neste destino: ${getFilialDisplayName(filialConsideradaRaw)} · ${filialConsideradaRaw}`}
                     >
                       {filialConsideradaSigla}
+                    </span>
+                  )}
+                  {conferencia && (
+                    <span
+                      className={styles.badgeConfirmadoParcial}
+                      title={`Confirmado com alterações: ${conferencia.itensOk} de ${conferencia.itensTotal} itens bateram com o romaneio · ${conferencia.pecasConfirmadas} de ${conferencia.pecasRomaneio} peças confirmadas`}
+                    >
+                      Parcialmente confirmado {conferencia.itensOk}/{conferencia.itensTotal}
                     </span>
                   )}
                   {isTransito ? (

@@ -34,6 +34,16 @@ import { resolveResponsavelLinx } from "@/lib/server/responsavel-linx";
 import { inserirAjuste } from "@/lib/repositories/ajuste-historico";
 import { executeItemQtdeSet } from "@/lib/saida-entrada-executor";
 import { mensagemTravaInventario, verificarTravaInventario } from "@/lib/server/trava-inventario";
+import { atualizarConferenciaRomaneio } from "@/lib/server/romaneio-conferencia";
+
+/** Regrava o selo de conferência da listagem; falha aqui nunca derruba a confirmação. */
+async function regravarConferencia(p: Parameters<typeof atualizarConferenciaRomaneio>[0]) {
+  try {
+    await atualizarConferenciaRomaneio(p);
+  } catch (e) {
+    console.error("Erro ao gravar conferência do romaneio", p.romaneioId, e);
+  }
+}
 
 /**
  * Tira do destino a quantidade que tinha sido confirmada (desconfirmar).
@@ -396,6 +406,8 @@ export async function POST(request: Request) {
           ` | POR: ${username} | ${agoraBrasil()}`,
       });
 
+      await regravarConferencia({ companyKey, romaneioId, filialDestino: filialDestinoAtiva, filialOrigem });
+
       return NextResponse.json({ success: true, acao, confirmados: itens.length, origens });
     }
 
@@ -441,6 +453,12 @@ export async function POST(request: Request) {
       }
 
       await desconfirmarItem(companyKey, romaneioId, filialDestinoAtiva, produto, corProduto ?? "");
+      await regravarConferencia({
+        companyKey,
+        romaneioId,
+        filialDestino: filialDestinoAtiva,
+        filialOrigem: (body.filialOrigem ?? "").trim(),
+      });
 
       // Documenta no romaneio de entrada (quando há vínculo) que a confirmação caiu.
       if (qtdeConfirmada > 0 && confirmacao?.romaneioEntrada) {
@@ -508,6 +526,7 @@ export async function POST(request: Request) {
         username,
         (body.romaneioEntrada ?? "").trim()
       );
+      await regravarConferencia({ companyKey, romaneioId, filialDestino: filialDestinoAtiva, filialOrigem });
 
       return NextResponse.json({ success: true, acao, origem });
     }
