@@ -110,6 +110,129 @@ interface BipeResposta {
   opcoes: BipeItem[];
 }
 
+/**
+ * Bipe que NÃO entrou na lista. Fica no painel vermelho até o operador resolver
+ * (tentar de novo / escolher o produto) ou dispensar de propósito — o feedback do
+ * "último bipe" é sobrescrito pela peça seguinte, então não serve de aviso quando
+ * se bipa em quantidade. Enquanto houver ocorrência aberta, o registro não sai.
+ */
+interface BipeOcorrencia {
+  id: string;
+  codigo: string;
+  em: number;
+  tipo: "falha" | "nao_encontrado" | "sem_estoque" | "qtd_maxima" | "ambiguo" | "filial_trocada" | "interrompido";
+  titulo: string;
+  detalhe: string;
+  opcoes?: BipeItem[];
+}
+
+/**
+ * Diário da bipagem da lista atual (por escopo do rascunho). Bate o que foi LIDO
+ * com o que ENTROU: lidos = aceitos + ocorrências abertas + dispensadas + em voo.
+ * Fica no localStorage para sobreviver a um F5 no meio da conferência.
+ */
+interface BipagemDiario {
+  escopo: string | null;
+  lidos: number;
+  aceitos: number;
+  emVoo: Array<{ id: string; codigo: string; em: number }>;
+  ocorrencias: BipeOcorrencia[];
+  dispensadas: BipeOcorrencia[];
+}
+
+const BIPAGEM_VAZIA: Omit<BipagemDiario, "escopo"> = {
+  lidos: 0,
+  aceitos: 0,
+  emVoo: [],
+  ocorrencias: [],
+  dispensadas: [],
+};
+
+const BIPAGEM_STORAGE_PREFIX = "saidas-entradas:bipagem:";
+
+/** Leitor de código de barras "digita" bem mais rápido que gente: ≥ 4 teclas com ≤ 45ms entre elas. */
+const LEITOR_MIN_CHARS = 4;
+const LEITOR_GAP_MS = 45;
+
+/** Consultas de bipe simultâneas — o resto espera na fila (bipar em rajada derrubava o proxy). */
+const BIPES_EM_PARALELO = 3;
+
+function novoIdBipe(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/** Roda `fn` quando houver vaga na fila (no máximo BIPES_EM_PARALELO ao mesmo tempo, em ordem). */
+async function naFilaDeBipe<T>(fila: { ativos: number; espera: Array<() => void> }, fn: () => Promise<T>): Promise<T> {
+  if (fila.ativos >= BIPES_EM_PARALELO) await new Promise<void>((resolve) => fila.espera.push(resolve));
+  fila.ativos += 1;
+  try {
+    return await fn();
+  } finally {
+    fila.ativos -= 1;
+    fila.espera.shift()?.();
+  }
+}
+
+function carregarBipagem(escopo: string | null): BipagemDiario {
+  if (!escopo) return { escopo, ...BIPAGEM_VAZIA };
+  try {
+    const raw = window.localStorage.getItem(BIPAGEM_STORAGE_PREFIX + escopo);
+    if (!raw) return { escopo, ...BIPAGEM_VAZIA };
+    const salvo = JSON.parse(raw) as Partial<BipagemDiario>;
+    // Consulta que estava no ar quando a página caiu não tem resultado: vira
+    // ocorrência para o operador bipar de novo — nunca some calada.
+    const interrompidos: BipeOcorrencia[] = (salvo.emVoo ?? []).map((v) => ({
+      id: v.id,
+      codigo: v.codigo,
+      em: v.em,
+      tipo: "interrompido",
+      titulo: "Consulta interrompida",
+      detalhe: "A página recarregou antes da resposta. Confira se a peça está na lista ou bipe de novo.",
+    }));
+    return {
+      escopo,
+      lidos: Number(salvo.lidos) || 0,
+      aceitos: Number(salvo.aceitos) || 0,
+      emVoo: [],
+      ocorrencias: [...(salvo.ocorrencias ?? []), ...interrompidos],
+      dispensadas: salvo.dispensadas ?? [],
+    };
+  } catch {
+    return { escopo, ...BIPAGEM_VAZIA };
+  }
+}
+
+function salvarBipagem(diario: BipagemDiario) {
+  if (!diario.escopo) return;
+  try {
+    const key = BIPAGEM_STORAGE_PREFIX + diario.escopo;
+    const vazio =
+      diario.lidos === 0 && diario.emVoo.length === 0 && diario.ocorrencias.length === 0 && diario.dispensadas.length === 0;
+    if (vazio) window.localStorage.removeItem(key);
+    else window.localStorage.setItem(key, JSON.stringify(diario));
+  } catch {
+    // sem localStorage (aba privada): o diário vale só enquanto a página estiver aberta
+  }
+}
+
+/**
+ * Tira da lista o que acabou de ser gravado — e só isso. Peça bipada enquanto o
+ * romaneio gravava continua na lista (antes a lista era zerada e ela sumia).
+ */
+function descontarGravados(lista: ProdutoSelecionado[], gravados: ProdutoSelecionado[]): ProdutoSelecionado[] {
+  const restante = new Map<string, number>();
+  for (const g of gravados) restante.set(chaveLinha(g), (restante.get(chaveLinha(g)) ?? 0) + g.quantidade);
+  return lista.flatMap((p) => {
+    const k = chaveLinha(p);
+    const r = restante.get(k) ?? 0;
+    if (r <= 0) return [p];
+    const usado = Math.min(r, p.quantidade);
+    restante.set(k, r - usado);
+    const sobra = p.quantidade - usado;
+    return sobra > 0 ? [{ ...p, quantidade: sobra }] : [];
+  });
+}
+
 /** Rascunho persistido no Neon (ver `lib/utils/saida-entrada-draft-store.ts`). */
 interface RascunhoResumo {
   id: string;
@@ -660,12 +783,26 @@ async function biparCodigo(
     company: companyKey,
   });
 
-  const response = await fetch(`/api/transferencia-produtos/bipar?${params.toString()}`, {
-    cache: "no-store",
-  });
+  // A consulta é só leitura: repetir é seguro. Rede/proxy instável derrubava bipe
+  // em rajada e a peça ficava de fora — agora são 3 tentativas antes de desistir.
+  const esperas = [0, 400, 1200];
+  let response: Response | null = null;
+  let ultimoErro: unknown = null;
+  for (const espera of esperas) {
+    if (espera) await new Promise((r) => setTimeout(r, espera));
+    try {
+      response = await fetch(`/api/transferencia-produtos/bipar?${params.toString()}`, {
+        cache: "no-store",
+      });
+      if (response.ok || response.status < 500) break;
+    } catch (err) {
+      ultimoErro = err;
+      response = null;
+    }
+  }
 
-  if (!response.ok) {
-    throw new Error("Erro ao consultar o código de barras");
+  if (!response || !response.ok) {
+    throw ultimoErro instanceof Error ? ultimoErro : new Error("Erro ao consultar o código de barras");
   }
 
   const json = (await response.json()) as BipeResposta;
@@ -908,13 +1045,19 @@ export default function SaidasEntradasProdutosPage({
   // entra na lista. O campo fica sempre focado para o operador nunca precisar
   // clicar entre uma peça e outra.
   const [codigoBipado, setCodigoBipado] = useState("");
-  const [bipesEmVoo, setBipesEmVoo] = useState(0);
+  const [bipagem, setBipagem] = useState<BipagemDiario>({ escopo: null, ...BIPAGEM_VAZIA });
+  const bipesEmVoo = bipagem.emVoo.length;
+  /** Fila das consultas de bipe (ver BIPES_EM_PARALELO). */
+  const filaBipesRef = useRef<{ ativos: number; espera: Array<() => void> }>({ ativos: 0, espera: [] });
+  /** Escopo da lista (= do rascunho) no render atual — o bipe confere se ainda é o mesmo quando a consulta volta. */
+  const escopoBipeRef = useRef<string | null>(null);
+  /** Lista no momento em que o modal abriu — base para não perder o que for bipado com ele aberto. */
+  const listaAoAbrirModalRef = useRef<ProdutoSelecionado[]>([]);
   const [ultimoBipe, setUltimoBipe] = useState<{ ok: boolean; titulo: string; detalhe: string } | null>(null);
   const [itemDestacado, setItemDestacado] = useState<string | null>(null);
   /** Linhas (chaveLinha) sem saldo suficiente na última conferência — ficam em vermelho. */
   const [semSaldoChaves, setSemSaldoChaves] = useState<Set<string>>(new Set());
   const [conferindoSaldo, setConferindoSaldo] = useState(false);
-  const [bipeAmbiguo, setBipeAmbiguo] = useState<{ codigo: string; opcoes: BipeItem[] } | null>(null);
   const [somBipeLigado, setSomBipeLigado] = useState(true);
   const bipeInputRef = useRef<HTMLInputElement | null>(null);
   const destaqueTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -1358,6 +1501,7 @@ export default function SaidasEntradasProdutosPage({
   }, [tipoOperacao]);
 
   const abrirModalAdicionarProduto = useCallback(() => {
+    listaAoAbrirModalRef.current = produtosSelecionados;
     setProdutosSelecionadosModal(produtosSelecionados);
     setSearchTerm("");
     setProdutos([]);
@@ -1390,7 +1534,23 @@ export default function SaidasEntradasProdutosPage({
   }, []);
 
   const confirmarProdutosDoModal = useCallback(() => {
-    setProdutosSelecionados(produtosSelecionadosModal);
+    // O modal editou uma CÓPIA da lista. Bipe que chegou depois que ele abriu
+    // (consulta ainda no ar) não está na cópia: soma por cima, senão sumiria.
+    setProdutosSelecionados((prev) => {
+      const base = new Map<string, number>();
+      for (const p of listaAoAbrirModalRef.current) base.set(chaveLinha(p), (base.get(chaveLinha(p)) ?? 0) + p.quantidade);
+      const next = [...produtosSelecionadosModal];
+      for (const p of prev) {
+        const k = chaveLinha(p);
+        const delta = p.quantidade - (base.get(k) ?? 0);
+        if (delta <= 0) continue;
+        const i = next.findIndex((n) => chaveLinha(n) === k);
+        if (i === -1) next.push({ ...p, quantidade: delta });
+        else next[i] = { ...next[i], quantidade: next[i].quantidade + delta };
+      }
+      produtosSelecionadosRef.current = next;
+      return next;
+    });
     setModalAberto(false);
     setSearchTerm("");
     setProdutos([]);
@@ -1741,24 +1901,52 @@ export default function SaidasEntradasProdutosPage({
     setProdutosSelecionados(prev => prev.filter((_, i) => i !== index));
   }, []);
 
-  const limparProdutosSelecionados = useCallback(() => {
-    setProdutosSelecionados([]);
-  }, []);
-
   // ── BIPAGEM ────────────────────────────────────────────────────────────────
 
   /**
    * Espelho síncrono da lista. Dois bipes em sequência rápida podem cair no mesmo
    * ciclo de render: lendo `produtosSelecionados` do closure, o segundo bipe veria
-   * a lista de antes do primeiro e perderia a peça. O ref é atualizado na hora em
-   * que o item entra, então cada bipe enxerga o resultado do anterior.
+   * a lista de antes do primeiro. O ref serve para DECIDIR (saldo, quantidade); a
+   * gravação na lista é sempre por updater funcional, sobre a lista real.
    */
   const produtosSelecionadosRef = useRef<ProdutoSelecionado[]>(produtosSelecionados);
   useEffect(() => {
     produtosSelecionadosRef.current = produtosSelecionados;
   }, [produtosSelecionados]);
 
-  /** Bipe curto e agudo = entrou; grave e longo = erro. Som é conforto: falha calado. */
+  /** Zera o diário da lista (lista limpa/descartada). Grava na hora: o escopo pode trocar no mesmo clique. */
+  const zerarBipagem = useCallback(() => {
+    setBipagem((b) => {
+      const zerado: BipagemDiario = { ...b, lidos: b.emVoo.length, aceitos: 0, ocorrencias: [], dispensadas: [] };
+      salvarBipagem(zerado);
+      return zerado;
+    });
+  }, []);
+
+  const limparProdutosSelecionados = useCallback(() => {
+    setProdutosSelecionados([]);
+    zerarBipagem();
+  }, [zerarBipagem]);
+
+  /**
+   * Romaneio gravado: o diário perde o que foi para ele (leituras, aceitos e as
+   * dispensadas daquela lista). O que chegou durante a gravação continua.
+   */
+  const fecharBipagemDoRegistro = useCallback((snap: { lidos: number; aceitos: number; dispensadas: string[] }) => {
+    const ids = new Set(snap.dispensadas);
+    setBipagem((b) => {
+      const next: BipagemDiario = {
+        ...b,
+        lidos: Math.max(0, b.lidos - snap.lidos),
+        aceitos: Math.max(0, b.aceitos - snap.aceitos),
+        dispensadas: b.dispensadas.filter((d) => !ids.has(d.id)),
+      };
+      salvarBipagem(next);
+      return next;
+    });
+  }, []);
+
+  /** Bipe curto e agudo = entrou; erro = três toques graves (dá para ouvir do outro lado do estoque). */
   const tocarBipe = useCallback((ok: boolean) => {
     if (!somBipeLigado) return;
     try {
@@ -1770,17 +1958,21 @@ export default function SaidasEntradasProdutosPage({
       const ctx = audioCtxRef.current;
       if (ctx.state === "suspended") void ctx.resume();
 
-      const duracao = ok ? 0.08 : 0.3;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = ok ? "square" : "sawtooth";
-      osc.frequency.setValueAtTime(ok ? 1200 : 240, ctx.currentTime);
-      gain.gain.setValueAtTime(0.05, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duracao);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + duracao);
+      const toques = ok ? 1 : 3;
+      const duracao = ok ? 0.08 : 0.16;
+      for (let i = 0; i < toques; i++) {
+        const inicio = ctx.currentTime + i * 0.22;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = ok ? "square" : "sawtooth";
+        osc.frequency.setValueAtTime(ok ? 1200 : 240, inicio);
+        gain.gain.setValueAtTime(ok ? 0.05 : 0.07, inicio);
+        gain.gain.exponentialRampToValueAtTime(0.0001, inicio + duracao);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(inicio);
+        osc.stop(inicio + duracao);
+      }
     } catch {
       // Sem áudio (navegador bloqueou / sem gesto do usuário): segue sem som.
     }
@@ -1791,10 +1983,32 @@ export default function SaidasEntradasProdutosPage({
     requestAnimationFrame(() => bipeInputRef.current?.focus());
   }, []);
 
+  /** Idem, mas sem roubar o cursor de quem está digitando quantidade/observação/busca. */
+  const devolverFocoSeLivre = useCallback(() => {
+    requestAnimationFrame(() => {
+      const ativo = document.activeElement as HTMLElement | null;
+      const digitando =
+        !!ativo &&
+        ativo !== bipeInputRef.current &&
+        (ativo.tagName === "INPUT" || ativo.tagName === "TEXTAREA" || ativo.isContentEditable);
+      if (!digitando) bipeInputRef.current?.focus();
+    });
+  }, []);
+
   const registrarBipe = useCallback((ok: boolean, titulo: string, detalhe: string) => {
     setUltimoBipe({ ok, titulo, detalhe });
     tocarBipe(ok);
   }, [tocarBipe]);
+
+  /** Bipe que não entrou: vai para o painel (não some com o próximo bipe) e toca o alarme. */
+  const anotarOcorrencia = useCallback(
+    (oc: Omit<BipeOcorrencia, "id" | "em"> & { id?: string }) => {
+      const completa: BipeOcorrencia = { ...oc, id: oc.id ?? novoIdBipe(), em: Date.now() };
+      setBipagem((b) => ({ ...b, ocorrencias: [...b.ocorrencias.filter((o) => o.id !== completa.id), completa] }));
+      registrarBipe(false, oc.titulo, oc.detalhe);
+    },
+    [registrarBipe]
+  );
 
   /** Última linha já rolada para a vista — evita re-scroll a cada render do destaque. */
   const destaqueScrollRef = useRef<string | null>(null);
@@ -1812,10 +2026,16 @@ export default function SaidasEntradasProdutosPage({
     };
   }, []);
 
-  const adicionarItemBipado = useCallback((item: BipeItem) => {
+  /** Põe a peça na lista. Devolve false (e anota a ocorrência) quando ela NÃO entra. */
+  const adicionarItemBipado = useCallback((item: BipeItem, codigoLido: string): boolean => {
     if (!filialSelecionada) {
-      registrarBipe(false, "Selecione a filial", "A bipagem precisa saber de qual loja sai/entra a peça.");
-      return;
+      anotarOcorrencia({
+        codigo: codigoLido,
+        tipo: "filial_trocada",
+        titulo: "Selecione a filial — a peça NÃO entrou",
+        detalhe: "A bipagem precisa saber de qual loja sai/entra a peça.",
+      });
+      return false;
     }
 
     // Peça P/M/G: o código de barras é de UM tamanho — a peça entra nele, com o
@@ -1829,59 +2049,73 @@ export default function SaidasEntradasProdutosPage({
     const rotuloBase = corTxt ? `${item.descProduto} · ${corTxt}` : item.descProduto;
     const rotulo = tamanhoBipado ? `${rotuloBase} · ${tamanhoBipado.label}` : rotuloBase;
     const chave = chaveLinha({ produto: item.produto, corProduto: item.corProduto, tamanho: tamanhoBipado?.ordinal ?? null });
-    const atual = produtosSelecionadosRef.current;
-    const idx = atual.findIndex(
-      (p) =>
-        p.produto === item.produto &&
-        (p.corProduto ?? "") === (item.corProduto ?? "") &&
-        p.filial === filialSelecionada.codFilial &&
-        (p.tamanho ?? null) === (tamanhoBipado?.ordinal ?? null)
-    );
+    const filialCod = filialSelecionada.codFilial;
+    const casaLinha = (p: ProdutoSelecionado) =>
+      p.produto === item.produto &&
+      (p.corProduto ?? "") === (item.corProduto ?? "") &&
+      p.filial === filialCod &&
+      (p.tamanho ?? null) === (tamanhoBipado?.ordinal ?? null);
 
-    let proximo: ProdutoSelecionado[];
-    let quantidade: number;
+    const linhaAtual = produtosSelecionadosRef.current.find(casaLinha);
+    const limitarAoSaldo = tipoOperacao === "saida" && !saidaPodeEstourarEstoque;
 
-    if (idx === -1) {
-      if (tipoOperacao === "saida" && !saidaPodeEstourarEstoque && estoqueBipado <= 0) {
-        registrarBipe(
-          false,
-          "SEM ESTOQUE — a peça NÃO entrou na lista",
-          `${rotulo} está com saldo ${estoqueBipado} em ${filialOptionLabel(filialSelecionada)} e não pode sair.`
-        );
-        return;
-      }
-      quantidade = 1;
-      proximo = [
-        ...atual,
-        {
-          produto: item.produto,
-          descProduto: item.descProduto,
-          codigoBarra: item.codigoBarra,
-          corProduto: item.corProduto,
-          descCor: item.descCor,
-          filial: filialSelecionada.codFilial,
-          nomeFilial: filialOptionLabel(filialSelecionada),
-          estoque: estoqueBipado,
-          quantidade: 1,
-          tamanhos: grade,
-          tamanho: tamanhoBipado?.ordinal ?? null,
-          tamanhoLabel: tamanhoBipado?.label ?? null,
-        },
-      ];
-    } else {
-      const linha = atual[idx];
-      if (tipoOperacao === "saida" && !saidaPodeEstourarEstoque && linha.quantidade >= estoqueBipado) {
-        registrarBipe(false, "Quantidade máxima", `${rotulo} já está com o estoque todo (${estoqueBipado}).`);
-        return;
-      }
-      quantidade = linha.quantidade + 1;
-      proximo = [...atual];
-      // Reaproveita o saldo recém-consultado: entre um bipe e outro o estoque pode ter mudado.
-      proximo[idx] = { ...linha, quantidade, estoque: estoqueBipado, tamanhos: grade };
+    if (!linhaAtual && limitarAoSaldo && estoqueBipado <= 0) {
+      anotarOcorrencia({
+        codigo: codigoLido,
+        tipo: "sem_estoque",
+        titulo: `SEM ESTOQUE — ${rotulo}`,
+        detalhe: `Saldo ${estoqueBipado}${tamanhoBipado ? ` do tamanho ${tamanhoBipado.label}` : ""} em ${filialOptionLabel(filialSelecionada)}. A peça NÃO entrou na lista.`,
+      });
+      return false;
+    }
+    if (linhaAtual && limitarAoSaldo && linhaAtual.quantidade >= estoqueBipado) {
+      anotarOcorrencia({
+        codigo: codigoLido,
+        tipo: "qtd_maxima",
+        titulo: `SALDO ESGOTADO — ${rotulo}`,
+        detalhe: `A lista já tem ${linhaAtual.quantidade} e o saldo${tamanhoBipado ? ` do tamanho ${tamanhoBipado.label}` : ""} em ${filialOptionLabel(filialSelecionada)} é ${estoqueBipado}. Esta peça NÃO entrou.`,
+      });
+      return false;
     }
 
-    produtosSelecionadosRef.current = proximo;
-    setProdutosSelecionados(proximo);
+    const aplicar = (lista: ProdutoSelecionado[]): ProdutoSelecionado[] => {
+      const idx = lista.findIndex(casaLinha);
+      if (idx === -1) {
+        return [
+          ...lista,
+          {
+            produto: item.produto,
+            descProduto: item.descProduto,
+            codigoBarra: item.codigoBarra,
+            corProduto: item.corProduto,
+            descCor: item.descCor,
+            filial: filialCod,
+            nomeFilial: filialOptionLabel(filialSelecionada),
+            estoque: estoqueBipado,
+            quantidade: 1,
+            tamanhos: grade,
+            tamanho: tamanhoBipado?.ordinal ?? null,
+            tamanhoLabel: tamanhoBipado?.label ?? null,
+          },
+        ];
+      }
+      const next = [...lista];
+      // Reaproveita o saldo recém-consultado: entre um bipe e outro o estoque pode ter mudado.
+      next[idx] = { ...lista[idx], quantidade: lista[idx].quantidade + 1, estoque: estoqueBipado, tamanhos: grade };
+      return next;
+    };
+
+    const quantidade = (linhaAtual?.quantidade ?? 0) + 1;
+    produtosSelecionadosRef.current = aplicar(produtosSelecionadosRef.current);
+    // Updater funcional: a peça soma sobre a lista REAL do React. Gravar um array
+    // montado do ref (que o efeito acima pode ter voltado para um valor velho)
+    // apagava a peça do bipe anterior.
+    setProdutosSelecionados((prev) => {
+      const next = aplicar(prev);
+      produtosSelecionadosRef.current = next;
+      return next;
+    });
+    setBipagem((b) => ({ ...b, aceitos: b.aceitos + 1 }));
     destacarItem(chave);
     registrarBipe(
       true,
@@ -1889,9 +2123,10 @@ export default function SaidasEntradasProdutosPage({
       `${item.produto}${item.codigoBarra ? ` · ${item.codigoBarra}` : ""} · qtd ${quantidade}` +
         (grade.length > 0 && !tamanhoBipado ? " · escolha o tamanho na lista" : "")
     );
-  }, [filialSelecionada, tipoOperacao, saidaPodeEstourarEstoque, filialOptionLabel, registrarBipe, destacarItem]);
+    return true;
+  }, [filialSelecionada, tipoOperacao, saidaPodeEstourarEstoque, filialOptionLabel, registrarBipe, anotarOcorrencia, destacarItem]);
 
-  const processarBipe = useCallback(async (codigoRaw: string) => {
+  const processarBipe = useCallback(async (codigoRaw: string, opts?: { repeticao?: boolean }) => {
     const codigo = codigoRaw.trim();
     if (!codigo) return;
 
@@ -1900,46 +2135,132 @@ export default function SaidasEntradasProdutosPage({
       return;
     }
 
-    setBipeAmbiguo(null);
-    setBipesEmVoo((n) => n + 1);
+    const filialCod = filialSelecionada.codFilial;
+    const escopoNaHora = escopoBipeRef.current;
+    const id = novoIdBipe();
+    setBipagem((b) => ({
+      ...b,
+      lidos: opts?.repeticao ? b.lidos : b.lidos + 1,
+      emVoo: [...b.emVoo, { id, codigo, em: Date.now() }],
+    }));
     try {
-      const resposta = await biparCodigo(codigo, filialSelecionada.codFilial, companyKey);
+      const resposta = await naFilaDeBipe(filaBipesRef.current, () => biparCodigo(codigo, filialCod, companyKey));
+
+      // Trocou filial/operação/romaneio enquanto a consulta ia: a peça era da
+      // lista anterior. Não entra calada na lista nova — vira aviso.
+      if (escopoBipeRef.current !== escopoNaHora) {
+        anotarOcorrencia({
+          id,
+          codigo,
+          tipo: "filial_trocada",
+          titulo: "Bipe da lista anterior — NÃO entrou",
+          detalhe: `O código ${codigo} foi lido antes de trocar a filial/operação. Se a peça é desta lista, bipe de novo.`,
+        });
+        return;
+      }
 
       if (resposta.status === "ambiguo") {
-        setBipeAmbiguo({ codigo, opcoes: resposta.opcoes });
-        registrarBipe(false, "Código em mais de um produto", `Escolha qual item o código ${codigo} representa.`);
+        anotarOcorrencia({
+          id,
+          codigo,
+          tipo: "ambiguo",
+          titulo: "Código em mais de um produto — escolha",
+          detalhe: `O código ${codigo} está em ${resposta.opcoes.length} produtos. A peça só entra depois que você escolher.`,
+          opcoes: resposta.opcoes,
+        });
         return;
       }
 
       if (resposta.status === "nao_encontrado" || !resposta.item) {
-        registrarBipe(false, "Código não encontrado", `Nenhum produto cadastrado com o código ${codigo}.`);
+        anotarOcorrencia({
+          id,
+          codigo,
+          tipo: "nao_encontrado",
+          titulo: "Código não encontrado — a peça NÃO entrou",
+          detalhe: `Nenhum produto cadastrado com o código ${codigo}. Confira a etiqueta ou adicione pelo "Adicionar Produto".`,
+        });
         return;
       }
 
       // Entrada aceita saldo zerado (é justamente o que a entrada vai criar);
-      // saída não — `adicionarItemBipado` barra e avisa.
-      adicionarItemBipado(resposta.item);
+      // saída não — `adicionarItemBipado` barra e anota.
+      adicionarItemBipado(resposta.item, codigo);
     } catch {
-      registrarBipe(false, "Falha na consulta", `Não deu para consultar o código ${codigo}. Tente de novo.`);
+      anotarOcorrencia({
+        id,
+        codigo,
+        tipo: "falha",
+        titulo: "Falha na consulta — a peça NÃO entrou",
+        detalhe: `Não deu para consultar o código ${codigo} (3 tentativas). Use "Tentar de novo" ou bipe a peça outra vez.`,
+      });
     } finally {
-      setBipesEmVoo((n) => Math.max(0, n - 1));
-      focarCampoBipe();
+      setBipagem((b) => ({ ...b, emVoo: b.emVoo.filter((v) => v.id !== id) }));
+      devolverFocoSeLivre();
     }
-  }, [filialSelecionada, companyKey, registrarBipe, adicionarItemBipado, focarCampoBipe]);
+  }, [filialSelecionada, companyKey, registrarBipe, anotarOcorrencia, adicionarItemBipado, devolverFocoSeLivre]);
 
-  const submeterBipe = useCallback(() => {
-    const codigo = codigoBipado.trim();
+  /** O listener global do leitor (abaixo) é montado uma vez: chama sempre a versão atual. */
+  const processarBipeRef = useRef(processarBipe);
+  useEffect(() => {
+    processarBipeRef.current = processarBipe;
+  }, [processarBipe]);
+
+  const submeterBipe = useCallback((valor?: string) => {
+    // O valor vem do próprio campo no Enter: o estado pode estar um caractere atrás
+    // quando o leitor manda o código inteiro de uma vez.
+    const codigo = (valor ?? codigoBipado).trim();
     if (!codigo) return;
     // Limpa ANTES de consultar: o próximo bipe já pode estar chegando pelo leitor.
     setCodigoBipado("");
     void processarBipe(codigo);
   }, [codigoBipado, processarBipe]);
 
-  const escolherOpcaoAmbigua = useCallback((item: BipeItem) => {
-    setBipeAmbiguo(null);
-    adicionarItemBipado(item);
+  const tirarOcorrencia = useCallback((id: string) => {
+    setBipagem((b) => ({ ...b, ocorrencias: b.ocorrencias.filter((o) => o.id !== id) }));
+  }, []);
+
+  const tentarBipeDeNovo = useCallback((oc: BipeOcorrencia) => {
+    tirarOcorrencia(oc.id);
+    void processarBipe(oc.codigo, { repeticao: true });
+  }, [tirarOcorrencia, processarBipe]);
+
+  const escolherOpcaoAmbigua = useCallback((oc: BipeOcorrencia, item: BipeItem) => {
+    tirarOcorrencia(oc.id);
+    adicionarItemBipado(item, oc.codigo);
     focarCampoBipe();
-  }, [adicionarItemBipado, focarCampoBipe]);
+  }, [tirarOcorrencia, adicionarItemBipado, focarCampoBipe]);
+
+  /** Dispensar é decisão consciente: a peça fica registrada como "não vai neste romaneio". */
+  const dispensarOcorrencia = useCallback((id: string) => {
+    setBipagem((b) => {
+      const oc = b.ocorrencias.find((o) => o.id === id);
+      if (!oc) return b;
+      return { ...b, ocorrencias: b.ocorrencias.filter((o) => o.id !== id), dispensadas: [...b.dispensadas, oc] };
+    });
+    focarCampoBipe();
+  }, [focarCampoBipe]);
+
+  /**
+   * "Dispensar todos" pede um 2º clique (sem window.confirm: o Enter do leitor
+   * aceitaria o diálogo nativo e a peça bipada nele sumiria).
+   */
+  const [confirmandoDispensaTodas, setConfirmandoDispensaTodas] = useState(false);
+  useEffect(() => {
+    if (!confirmandoDispensaTodas) return;
+    const t = setTimeout(() => setConfirmandoDispensaTodas(false), 5000);
+    return () => clearTimeout(t);
+  }, [confirmandoDispensaTodas]);
+
+  const dispensarTodasOcorrencias = useCallback(() => {
+    if (bipagem.ocorrencias.length === 0) return;
+    if (!confirmandoDispensaTodas) {
+      setConfirmandoDispensaTodas(true);
+      return;
+    }
+    setConfirmandoDispensaTodas(false);
+    setBipagem((b) => ({ ...b, ocorrencias: [], dispensadas: [...b.dispensadas, ...b.ocorrencias] }));
+    focarCampoBipe();
+  }, [bipagem.ocorrencias.length, confirmandoDispensaTodas, focarCampoBipe]);
 
   // Preferência de som do operador (loja barulhenta / loja silenciosa).
   useEffect(() => {
@@ -1963,11 +2284,11 @@ export default function SaidasEntradasProdutosPage({
     });
   }, []);
 
-  // Troca de loja ou de tipo zera o painel de bipagem: o feedback anterior não vale mais.
+  // Troca de loja ou de tipo zera o feedback do último bipe: ele não vale mais.
+  // As ocorrências não: elas seguem o diário do escopo (ver efeito do diário).
   useEffect(() => {
     setCodigoBipado("");
     setUltimoBipe(null);
-    setBipeAmbiguo(null);
   }, [codFilialSelecionada, tipoOperacao]);
 
   /**
@@ -1980,6 +2301,87 @@ export default function SaidasEntradasProdutosPage({
     if (modalAberto || modalEdicaoAberto || mostrarConfirmacaoRegistro) return;
     focarCampoBipe();
   }, [codFilialSelecionada, modalAberto, modalEdicaoAberto, mostrarConfirmacaoRegistro, focarCampoBipe]);
+
+  const setObservacaoAtualRef = useRef(setObservacaoAtual);
+  useEffect(() => {
+    setObservacaoAtualRef.current = setObservacaoAtual;
+  }, [setObservacaoAtual]);
+
+  /**
+   * LEITOR FORA DO CAMPO. O cursor sai do campo de bipe a cada clique (lixeira,
+   * +/−, tamanho, Registrar…). Bipar nesse estado perdia a peça: os dígitos não
+   * iam para lugar nenhum e o Enter do leitor CLICAVA o botão focado — na lixeira,
+   * apagava a linha seguinte. Aqui a rajada do leitor (teclas a ≤45ms) é
+   * reconhecida em qualquer lugar da tela e vira bipe normal. Se ela caiu na
+   * quantidade ou na observação, o campo volta ao valor de antes.
+   * O modal de Adicionar Produto tem busca própria por código: lá não interfere.
+   */
+  useEffect(() => {
+    if (!codFilialSelecionada || modalAberto || modalEdicaoAberto) return;
+
+    let buffer = "";
+    let ultimaTecla = 0;
+    let inicio: { alvo: HTMLElement | null; valor: string } | null = null;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      const alvo = e.target as HTMLElement | null;
+      if (alvo === bipeInputRef.current) {
+        buffer = "";
+        return;
+      }
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key === "Shift" || e.key === "CapsLock") return;
+
+      // SELECT conta como não-editável: a busca por letra dele trocaria a filial e zeraria a lista.
+      const editavel =
+        !!alvo && (alvo.isContentEditable || alvo.tagName === "INPUT" || alvo.tagName === "TEXTAREA");
+      const agora = performance.now();
+
+      // Espaço fica de fora: é como gente aciona botão pelo teclado.
+      if (e.key.length === 1 && e.key !== " ") {
+        if (agora - ultimaTecla > LEITOR_GAP_MS || inicio?.alvo !== alvo) {
+          buffer = "";
+          inicio = {
+            alvo,
+            valor: editavel ? String((alvo as HTMLInputElement | HTMLTextAreaElement).value ?? "") : "",
+          };
+        }
+        buffer += e.key;
+        ultimaTecla = agora;
+        if (!editavel) e.preventDefault();
+        return;
+      }
+
+      const fimDeLeitura = e.key === "Enter" || e.key === "Tab";
+      if (fimDeLeitura && buffer.length >= LEITOR_MIN_CHARS && agora - ultimaTecla <= LEITOR_GAP_MS * 3) {
+        e.preventDefault();
+        e.stopPropagation();
+        const codigo = buffer;
+        buffer = "";
+        if (editavel && alvo && inicio?.alvo === alvo) {
+          const valorAntes = inicio.valor;
+          const idxQtd = alvo.dataset.leitorQtd;
+          if (idxQtd !== undefined) {
+            const idx = Number(idxQtd);
+            const qtd = Math.max(1, parseInt(valorAntes, 10) || 1);
+            setProdutosSelecionados((prev) => prev.map((p, i) => (i === idx ? { ...p, quantidade: qtd } : p)));
+          } else if (alvo.dataset.leitorObs !== undefined) {
+            setObservacaoAtualRef.current(valorAntes);
+          }
+        }
+        inicio = null;
+        void processarBipeRef.current(codigo);
+        focarCampoBipe();
+        return;
+      }
+
+      buffer = "";
+      inicio = null;
+    };
+
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [codFilialSelecionada, modalAberto, modalEdicaoAberto, focarCampoBipe]);
 
   const atualizarQuantidade = useCallback((index: number, quantidade: number) => {
     if (quantidade < 1) return;
@@ -2153,6 +2555,11 @@ export default function SaidasEntradasProdutosPage({
   const executarLote = useCallback(async (produtos: ProdutoSelecionado[], observacao: string) => {
     if (produtos.length === 0 || processandoOperacao || !filialSelecionada) return;
 
+    const snapBipagem = {
+      lidos: bipagem.lidos,
+      aceitos: bipagem.aceitos,
+      dispensadas: bipagem.dispensadas.map((d) => d.id),
+    };
     setProcessandoOperacao(true);
     try {
       const itens = produtos.map(p => ({
@@ -2206,19 +2613,33 @@ export default function SaidasEntradasProdutosPage({
         console.error("Erro ao remover rascunho após registrar romaneio", err);
       }
 
-      setProdutosSelecionados([]);
-      produtosSelecionadosRef.current = [];
+      // Tira da lista só o que foi gravado: peça bipada durante a gravação fica
+      // para o próximo romaneio (antes a lista era zerada e ela sumia calada).
+      const sobra = descontarGravados(produtosSelecionadosRef.current, produtos);
+      setProdutosSelecionados((prev) => {
+        const next = descontarGravados(prev, produtos);
+        produtosSelecionadosRef.current = next;
+        return next;
+      });
+      produtosSelecionadosRef.current = sobra;
+      fecharBipagemDoRegistro(snapBipagem);
       void fetchRascunhos(companyKey).then(setRascunhos).catch(() => undefined);
       // Reconsulta a trava de defeito: o romaneio que acabou de sair fecha o dia.
       setDefeitoRefreshKey((k) => k + 1);
 
+      const label = tipoOperacao === "saida" ? "Saída" : "Entrada";
+      const pecasSobra = sobra.reduce((s, p) => s + p.quantidade, 0);
+      mostrarNotificacao(
+        `${label} registrada com sucesso! Romaneio: ${resultado.romaneio}` +
+          (pecasSobra > 0
+            ? ` · ${pecasSobra} peça(s) bipada(s) durante a gravação ficaram na lista para o próximo romaneio.`
+            : "")
+      );
+      setSemSaldoChaves(new Set());
+
       const [novoSaidas, novoEntradas] = await Promise.all([fetchLogSaidas(), fetchLogEntradas()]);
       setLogSaidas(novoSaidas);
       setLogEntradas(novoEntradas);
-
-      const label = tipoOperacao === "saida" ? "Saída" : "Entrada";
-      mostrarNotificacao(`${label} registrada com sucesso! Romaneio: ${resultado.romaneio}`);
-      setSemSaldoChaves(new Set());
     } catch (error: any) {
       // Recusa por saldo: marca em vermelho as linhas dos itens recusados (com o
       // saldo que o servidor achou) para o operador ajustar e registrar de novo.
@@ -2244,7 +2665,7 @@ export default function SaidasEntradasProdutosPage({
     } finally {
       setProcessandoOperacao(false);
     }
-  }, [processandoOperacao, filialSelecionada, tipoOperacao, tipoRomaneioSelecionado, responsavelFinal, user?.username, filialDestinoSaida, companyKey, mostrarNotificacao]);
+  }, [processandoOperacao, filialSelecionada, tipoOperacao, tipoRomaneioSelecionado, responsavelFinal, user?.username, filialDestinoSaida, companyKey, mostrarNotificacao, bipagem, fecharBipagemDoRegistro]);
 
   /**
    * Abre um romaneio já gravado (saída OU entrada) para acrescentar itens. Traz
@@ -2331,17 +2752,24 @@ export default function SaidasEntradasProdutosPage({
   );
 
   const cancelarEdicaoRomaneio = useCallback(() => {
+    zerarBipagem();
     setRomaneioEditando(null);
     setProdutosSelecionados([]);
     produtosSelecionadosRef.current = [];
     setObservacaoAtual("");
-  }, [setObservacaoAtual]);
+  }, [setObservacaoAtual, zerarBipagem]);
 
   /** Grava os itens novos DENTRO do romaneio aberto (não cria romaneio novo). */
   const salvarItensDaEdicao = useCallback(async () => {
     if (!romaneioEditando || !user?.username) return;
     if (produtosSelecionados.length === 0 || processandoOperacao) return;
 
+    const enviados = produtosSelecionados;
+    const snapBipagem = {
+      lidos: bipagem.lidos,
+      aceitos: bipagem.aceitos,
+      dispensadas: bipagem.dispensadas.map((d) => d.id),
+    };
     setProcessandoOperacao(true);
     try {
       const resultado = await salvarItensNoRomaneio(
@@ -2381,20 +2809,56 @@ export default function SaidasEntradasProdutosPage({
         }
       }
 
-      setRomaneioEditando(null);
-      setProdutosSelecionados([]);
-      produtosSelecionadosRef.current = [];
-      setObservacaoAtual("");
+      // Só sai da lista o que foi gravado. Peça bipada durante a gravação era
+      // para ESTE romaneio: a edição continua aberta para salvá-la também.
+      const sobra = descontarGravados(produtosSelecionadosRef.current, enviados);
+      setProdutosSelecionados((prev) => {
+        const next = descontarGravados(prev, enviados);
+        produtosSelecionadosRef.current = next;
+        return next;
+      });
+      produtosSelecionadosRef.current = sobra;
+      fecharBipagemDoRegistro(snapBipagem);
+      const pecasSobra = sobra.reduce((s, p) => s + p.quantidade, 0);
+      if (pecasSobra > 0) {
+        setRomaneioEditando((atual) => {
+          if (!atual) return atual;
+          const itens = [...atual.itensExistentes];
+          for (const p of enviados) {
+            const i = itens.findIndex((it) => it.produto === p.produto && (it.corProduto ?? "") === (p.corProduto ?? ""));
+            if (i === -1) {
+              itens.push({
+                produto: p.produto,
+                corProduto: p.corProduto,
+                descProduto: p.descProduto,
+                descCor: p.descCor,
+                codigoBarra: p.codigoBarra,
+                quantidade: p.quantidade,
+                estoque: p.estoque,
+              });
+            } else {
+              itens[i] = { ...itens[i], quantidade: itens[i].quantidade + p.quantidade };
+            }
+          }
+          return { ...atual, itensExistentes: itens };
+        });
+      } else {
+        setRomaneioEditando(null);
+        setObservacaoAtual("");
+      }
       void fetchRascunhos(companyKey).then(setRascunhos).catch(() => undefined);
+
+      mostrarNotificacao(
+        (resultado.message ||
+          `Romaneio ${romaneioEditando.romaneio} atualizado com ${resultado.qtdeAdicionada} item(ns).`) +
+          (pecasSobra > 0
+            ? ` · ${pecasSobra} peça(s) bipada(s) durante a gravação continuam na lista — salve de novo para incluí-las.`
+            : "")
+      );
 
       const [novoSaidas, novoEntradas] = await Promise.all([fetchLogSaidas(), fetchLogEntradas()]);
       setLogSaidas(novoSaidas);
       setLogEntradas(novoEntradas);
-
-      mostrarNotificacao(
-        resultado.message ||
-          `Romaneio ${romaneioEditando.romaneio} atualizado com ${resultado.qtdeAdicionada} item(ns).`
-      );
     } catch (error) {
       mostrarNotificacao(
         error instanceof Error ? error.message : "Erro ao salvar os itens no romaneio",
@@ -2412,6 +2876,8 @@ export default function SaidasEntradasProdutosPage({
     companyKey,
     mostrarNotificacao,
     setObservacaoAtual,
+    bipagem,
+    fecharBipagemDoRegistro,
   ]);
 
   /**
@@ -2551,6 +3017,23 @@ export default function SaidasEntradasProdutosPage({
       mostrarNotificacao("Selecione uma filial", "error");
       return;
     }
+    // Peça bipada que ainda não voltou da consulta, ou que voltou recusada, não
+    // pode ficar de fora sem o operador saber: o registro espera/exige decisão.
+    if (bipagem.emVoo.length > 0) {
+      mostrarNotificacao(
+        `Aguarde: ${bipagem.emVoo.length} bipe(s) ainda em consulta. Registre quando o "consultando…" sumir.`,
+        "error"
+      );
+      return;
+    }
+    if (bipagem.ocorrencias.length > 0) {
+      mostrarNotificacao(
+        `${bipagem.ocorrencias.length} bipe(s) NÃO entraram na lista. Resolva ou dispense cada um no painel vermelho antes de registrar.`,
+        "error"
+      );
+      focarCampoBipe();
+      return;
+    }
     if (produtosSelecionados.length === 0) {
       mostrarNotificacao("Adicione pelo menos um produto", "error");
       return;
@@ -2580,8 +3063,17 @@ export default function SaidasEntradasProdutosPage({
             tamanhos: s.tamanhos.length > 0 ? s.tamanhos : p.tamanhos,
           };
         });
-        produtosSelecionadosRef.current = atualizados;
-        setProdutosSelecionados(atualizados);
+        // Mescla o saldo por linha em vez de trocar a lista: peça bipada enquanto a
+        // conferência ia e voltava não está em `atualizados` e não pode sumir.
+        const porChave = new Map(atualizados.map((p) => [chaveLinha(p), p]));
+        setProdutosSelecionados((prev) => {
+          const next = prev.map((p) => {
+            const a = porChave.get(chaveLinha(p));
+            return a ? { ...p, estoque: a.estoque, tamanhos: a.tamanhos } : p;
+          });
+          produtosSelecionadosRef.current = next;
+          return next;
+        });
         const sem = atualizados.filter((p) => p.quantidade > p.estoque);
         setSemSaldoChaves(new Set(sem.map(chaveLinha)));
         if (sem.length > 0) {
@@ -2624,9 +3116,12 @@ export default function SaidasEntradasProdutosPage({
       }
     }
     setMostrarConfirmacaoRegistro(true);
-  }, [filialSelecionada, produtosSelecionados, pendenciaTamanho, tipoOperacao, saidaPodeEstourarEstoque, companyKey, filiaisDestinoVisiveis.length, filialDestinoSaida, tipoRomaneioSelecionado, travaDefeitoAtiva, defeitoDoDia, romaneioEditando, mostrarNotificacao]);
+  }, [filialSelecionada, produtosSelecionados, pendenciaTamanho, tipoOperacao, saidaPodeEstourarEstoque, companyKey, filiaisDestinoVisiveis.length, filialDestinoSaida, tipoRomaneioSelecionado, travaDefeitoAtiva, defeitoDoDia, romaneioEditando, mostrarNotificacao, bipagem.emVoo.length, bipagem.ocorrencias.length, focarCampoBipe]);
 
   const confirmarRegistro = useCallback(() => {
+    // Bipe lido com o modal aberto (o leitor não para): o botão já fica travado,
+    // isto é a mesma regra para o Enter que escapar.
+    if (bipagem.emVoo.length > 0 || bipagem.ocorrencias.length > 0) return;
     setMostrarConfirmacaoRegistro(false);
     // Romaneio aberto para edição: os itens entram NELE, sem gerar romaneio novo.
     if (romaneioEditando) {
@@ -2636,7 +3131,7 @@ export default function SaidasEntradasProdutosPage({
     const obs = observacaoAtual;
     setObservacaoAtual("");
     executarLote(produtosSelecionados, obs);
-  }, [executarLote, produtosSelecionados, observacaoAtual, setObservacaoAtual, romaneioEditando, salvarItensDaEdicao]);
+  }, [executarLote, produtosSelecionados, observacaoAtual, setObservacaoAtual, romaneioEditando, salvarItensDaEdicao, bipagem.emVoo.length, bipagem.ocorrencias.length]);
 
   // Limpar produtos selecionados somente quando mudar a filial DE FATO (por codFilial real).
   // Comparar por codFilial e não por referência: o refresh em foco/visibilidade recria os
@@ -2680,6 +3175,20 @@ export default function SaidasEntradasProdutosPage({
     user?.username && filialSelecionada
       ? `${companyKey}|${user.username}|${tipoOperacao}|${filialSelecionada.codFilial}|${romaneioEmEdicao ?? ""}`
       : null;
+
+  useEffect(() => {
+    escopoBipeRef.current = escopoRascunho;
+  }, [escopoRascunho]);
+
+  // Diário da bipagem segue o escopo da lista: cada filial × operação × romaneio
+  // tem o seu, e ele volta depois de um F5 (ocorrências abertas inclusive).
+  useEffect(() => {
+    setBipagem(carregarBipagem(escopoRascunho));
+  }, [escopoRascunho]);
+
+  useEffect(() => {
+    if (bipagem.escopo === escopoRascunho) salvarBipagem(bipagem);
+  }, [bipagem, escopoRascunho]);
 
   // Restaura o rascunho do escopo atual (carga da página, troca de filial ou de tipo).
   useEffect(() => {
@@ -2728,6 +3237,9 @@ export default function SaidasEntradasProdutosPage({
             nomeFilial: filialOptionLabel(filialSelecionada),
             estoque: item.estoque,
             quantidade: item.quantidade,
+            // Sem isto o F5 devolvia a peça P/M/G sem o tamanho bipado.
+            tamanho: item.tamanho ?? null,
+            tamanhoLabel: item.tamanhoLabel ?? null,
           }));
         });
 
@@ -2970,13 +3482,14 @@ export default function SaidasEntradasProdutosPage({
         setRascunhoStatus("idle");
         produtosSelecionadosRef.current = [];
         setProdutosSelecionados([]);
+        zerarBipagem();
       }
       void carregarRascunhos();
       mostrarNotificacao("Rascunho descartado");
     } catch {
       mostrarNotificacao("Erro ao descartar o rascunho", "error");
     }
-  }, [user?.username, filialSelecionada, tipoOperacao, romaneioEditando, carregarRascunhos, mostrarNotificacao]);
+  }, [user?.username, filialSelecionada, tipoOperacao, romaneioEditando, carregarRascunhos, mostrarNotificacao, zerarBipagem]);
 
   const totalItens = produtosSelecionados.reduce((sum, p) => sum + p.quantidade, 0);
   const totalProdutos = produtosSelecionados.length;
@@ -3542,7 +4055,7 @@ export default function SaidasEntradasProdutosPage({
               {/* ── BIPAGEM ── caminho rápido: leitor manda código + Enter e a peça
                   entra na lista, sem abrir modal (igual ao campo do próprio Linx). */}
               <div
-                className={`${styles.bipeArea} ${tipoOperacao === "saida" ? styles.bipeAreaSaida : styles.bipeAreaEntrada}`}
+                className={`${styles.bipeArea} ${tipoOperacao === "saida" ? styles.bipeAreaSaida : styles.bipeAreaEntrada} ${bipagem.ocorrencias.length > 0 ? styles.bipeAreaAlerta : ""}`}
                 onClick={focarCampoBipe}
               >
                 <div className={styles.bipeRow}>
@@ -3558,9 +4071,10 @@ export default function SaidasEntradasProdutosPage({
                     value={codigoBipado}
                     onChange={(e) => setCodigoBipado(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") {
+                      // Enter, ou Tab no leitor configurado com sufixo Tab.
+                      if (e.key === "Enter" || (e.key === "Tab" && e.currentTarget.value.trim())) {
                         e.preventDefault();
-                        submeterBipe();
+                        submeterBipe(e.currentTarget.value);
                       }
                     }}
                     placeholder={
@@ -3568,18 +4082,20 @@ export default function SaidasEntradasProdutosPage({
                         ? "Bipe o código de barras (ou digite e tecle Enter)"
                         : "Selecione a filial para começar a bipar"
                     }
-                    disabled={!filialSelecionada || isBusy}
+                    // Não trava durante a gravação: campo desabilitado engole a leitura
+                    // calado. O que for bipado agora fica para depois da gravação.
+                    disabled={!filialSelecionada}
                     autoComplete="off"
                     autoCorrect="off"
                     spellCheck={false}
                     aria-label="Código de barras"
                   />
-                  {bipesEmVoo > 0 && <span className={styles.bipeLoading}>consultando…</span>}
+                  {bipesEmVoo > 0 && <span className={styles.bipeLoading}>consultando {bipesEmVoo}…</span>}
                   <button
                     type="button"
                     className={styles.bipeAddBtn}
-                    onClick={submeterBipe}
-                    disabled={!codigoBipado.trim() || !filialSelecionada || isBusy}
+                    onClick={() => submeterBipe()}
+                    disabled={!codigoBipado.trim() || !filialSelecionada}
                   >
                     Adicionar
                   </button>
@@ -3605,36 +4121,103 @@ export default function SaidasEntradasProdutosPage({
                   </div>
                 )}
 
-                {/* O mesmo código cadastrado em mais de um produto × cor: quem decide é o operador. */}
-                {bipeAmbiguo && (
-                  <div className={styles.bipeOpcoes} onClick={(e) => e.stopPropagation()}>
-                    <div className={styles.bipeOpcoesTitulo}>
-                      Código {bipeAmbiguo.codigo} está em {bipeAmbiguo.opcoes.length} produtos — escolha:
-                    </div>
-                    {bipeAmbiguo.opcoes.map((opcao) => {
-                      const corTxt = textoCorProduto(opcao.descCor, opcao.corProduto);
-                      return (
+                {/* Contagem da bipagem: o que foi LIDO tem que bater com o que ENTROU. */}
+                {(bipagem.lidos > 0 || bipagem.ocorrencias.length > 0) && (
+                  <div className={styles.bipeContador}>
+                    <span>Lidos <strong>{bipagem.lidos}</strong></span>
+                    <span className={styles.bipeContadorOk}>Entraram <strong>{bipagem.aceitos}</strong></span>
+                    {bipagem.ocorrencias.length > 0 && (
+                      <span className={styles.bipeContadorAlerta}>
+                        Não entraram <strong>{bipagem.ocorrencias.length}</strong>
+                      </span>
+                    )}
+                    {bipagem.dispensadas.length > 0 && (
+                      <span>Dispensados <strong>{bipagem.dispensadas.length}</strong></span>
+                    )}
+                    {bipesEmVoo > 0 && <span>Consultando <strong>{bipesEmVoo}</strong></span>}
+                  </div>
+                )}
+
+                {/* Bipes que NÃO entraram: ficam aqui até o operador resolver ou dispensar.
+                    O feedback de cima é do último bipe e some com o próximo — este não. */}
+                {bipagem.ocorrencias.length > 0 && (
+                  <div className={styles.bipeOcorrencias} role="alert" onClick={(e) => e.stopPropagation()}>
+                    <div className={styles.bipeOcorrenciasTopo}>
+                      <div className={styles.bipeOcorrenciasTitulo}>
+                        <strong>⚠ {bipagem.ocorrencias.length} bipe(s) NÃO entraram na lista</strong>
+                        <span>
+                          Separe estas peças e resolva cada uma. O registro fica travado até não sobrar nenhuma aqui.
+                        </span>
+                      </div>
+                      {bipagem.ocorrencias.length > 1 && (
                         <button
-                          key={`${opcao.produto}|${opcao.corProduto ?? ""}`}
                           type="button"
-                          className={styles.bipeOpcaoBtn}
-                          onClick={() => escolherOpcaoAmbigua(opcao)}
+                          className={confirmandoDispensaTodas ? styles.bipeOcorrenciaBtn : styles.bipeOcorrenciaBtnSec}
+                          onClick={dispensarTodasOcorrencias}
                         >
-                          <span className={styles.bipeOpcaoNome}>{opcao.descProduto}</span>
-                          <span className={styles.bipeOpcaoMeta}>
-                            {opcao.produto}
-                            {corTxt ? ` · ${corTxt}` : ""} · estoque {opcao.estoque}
-                          </span>
+                          {confirmandoDispensaTodas
+                            ? `Confirmar: ${bipagem.ocorrencias.length} peça(s) fora do romaneio`
+                            : "Dispensar todos"}
                         </button>
-                      );
-                    })}
-                    <button
-                      type="button"
-                      className={styles.bipeOpcaoCancelar}
-                      onClick={() => { setBipeAmbiguo(null); focarCampoBipe(); }}
-                    >
-                      Cancelar
-                    </button>
+                      )}
+                    </div>
+                    <ul className={styles.bipeOcorrenciasLista}>
+                      {bipagem.ocorrencias.map((oc) => (
+                        <li key={oc.id} className={styles.bipeOcorrencia}>
+                          <div className={styles.bipeOcorrenciaInfo}>
+                            <div className={styles.bipeOcorrenciaLinha1}>
+                              <span className={styles.bipeOcorrenciaCodigo}>{oc.codigo}</span>
+                              <strong>{oc.titulo}</strong>
+                              <span className={styles.bipeOcorrenciaHora}>
+                                {new Date(oc.em).toLocaleTimeString("pt-BR")}
+                              </span>
+                            </div>
+                            <span className={styles.bipeOcorrenciaDetalhe}>{oc.detalhe}</span>
+                            {oc.tipo === "ambiguo" && oc.opcoes && oc.opcoes.length > 0 && (
+                              <div className={styles.bipeOpcoes}>
+                                {oc.opcoes.map((opcao) => {
+                                  const corTxt = textoCorProduto(opcao.descCor, opcao.corProduto);
+                                  return (
+                                    <button
+                                      key={`${opcao.produto}|${opcao.corProduto ?? ""}`}
+                                      type="button"
+                                      className={styles.bipeOpcaoBtn}
+                                      onClick={() => escolherOpcaoAmbigua(oc, opcao)}
+                                    >
+                                      <span className={styles.bipeOpcaoNome}>{opcao.descProduto}</span>
+                                      <span className={styles.bipeOpcaoMeta}>
+                                        {opcao.produto}
+                                        {corTxt ? ` · ${corTxt}` : ""} · estoque {opcao.estoque}
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                          <div className={styles.bipeOcorrenciaAcoes}>
+                            {oc.tipo !== "ambiguo" && (
+                              <button
+                                type="button"
+                                className={styles.bipeOcorrenciaBtn}
+                                onClick={() => tentarBipeDeNovo(oc)}
+                                disabled={!filialSelecionada}
+                              >
+                                Tentar de novo
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              className={styles.bipeOcorrenciaBtnSec}
+                              onClick={() => dispensarOcorrencia(oc.id)}
+                              title="A peça NÃO vai para o romaneio"
+                            >
+                              Dispensar
+                            </button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 )}
               </div>
@@ -3710,7 +4293,14 @@ export default function SaidasEntradasProdutosPage({
                   </div>
                 </div>
               ) : (
-                <div className={styles.produtosList}>
+                <div
+                  className={styles.produtosList}
+                  onClick={(e) => {
+                    // Clique em lixeira/+/−/tamanho deixava o cursor no botão: o
+                    // próximo bipe ia para ele. Volta para o campo de bipe.
+                    if ((e.target as HTMLElement).closest("button")) focarCampoBipe();
+                  }}
+                >
                   {produtosSelecionados.map((produto, index) => {
                     const corTxt = textoCorProduto(produto.descCor, produto.corProduto);
                     const chaveItem = chaveLinha(produto);
@@ -3772,6 +4362,7 @@ export default function SaidasEntradasProdutosPage({
                           <input
                             type="number"
                             className={styles.qtyInput}
+                            data-leitor-qtd={index}
                             value={produto.quantidade}
                             onChange={(e) => atualizarQuantidade(index, parseInt(e.target.value) || 1)}
                             min={1}
@@ -3844,6 +4435,7 @@ export default function SaidasEntradasProdutosPage({
                   <div className={styles.obsLabel}>Observação (opcional)</div>
                   <textarea
                     className={styles.obsTextarea}
+                    data-leitor-obs=""
                     value={observacaoAtual}
                     onChange={(e) => setObservacaoAtual(e.target.value)}
                     placeholder="Adicione uma observação sobre esta movimentação..."
@@ -3943,9 +4535,35 @@ export default function SaidasEntradasProdutosPage({
                 {romaneioEditando
                   ? `Os ${totalProdutos} produto(s) / ${totalItens} item(ns) da lista serão somados à ${romaneioEditando.tipo === "saida" ? "saída" : "entrada"} #${romaneioEditando.romaneio} em ${filialLabel(romaneioEditando.filial)}. O estoque da filial ${romaneioEditando.tipo === "saida" ? "baixa" : "sobe"} na hora.`
                   : tipoOperacao === "saida"
-                    ? "Deseja registrar a saída dos produtos selecionados?"
-                    : "Deseja registrar a entrada dos produtos selecionados?"}
+                    ? `Deseja registrar a saída de ${totalProdutos} produto(s) / ${totalItens} peça(s)?`
+                    : `Deseja registrar a entrada de ${totalProdutos} produto(s) / ${totalItens} peça(s)?`}
               </p>
+              {bipagem.lidos > 0 && (
+                <p className={styles.confirmacaoBipagem}>
+                  Bipagem: <strong>{bipagem.lidos}</strong> leitura(s) · <strong>{bipagem.aceitos}</strong> entraram na lista
+                  {bipagem.dispensadas.length > 0 && <> · <strong>{bipagem.dispensadas.length}</strong> dispensada(s)</>}
+                </p>
+              )}
+              {bipagem.dispensadas.length > 0 && (
+                <div className={styles.confirmacaoDispensadas}>
+                  <strong>NÃO vão neste romaneio (dispensados por você):</strong>
+                  <ul>
+                    {bipagem.dispensadas.slice(0, 10).map((d) => (
+                      <li key={d.id}>
+                        {d.codigo} — {d.titulo}
+                      </li>
+                    ))}
+                    {bipagem.dispensadas.length > 10 && <li>… e mais {bipagem.dispensadas.length - 10}</li>}
+                  </ul>
+                </div>
+              )}
+              {(bipesEmVoo > 0 || bipagem.ocorrencias.length > 0) && (
+                <p className={styles.confirmacaoBloqueio}>
+                  {bipesEmVoo > 0
+                    ? `Aguarde: ${bipesEmVoo} bipe(s) ainda em consulta.`
+                    : `${bipagem.ocorrencias.length} bipe(s) NÃO entraram na lista — feche e resolva antes de confirmar.`}
+                </p>
+              )}
               {tipoOperacao === "saida" && filialDestinoSaida && (
                 <p className={styles.confirmacaoTexto} style={{ marginTop: "8px" }}>
                   Destino: <strong>{filialOptionLabel(filialDestinoSaida)}</strong>
@@ -3959,6 +4577,7 @@ export default function SaidasEntradasProdutosPage({
               <button
                 className={tipoOperacao === "saida" ? styles.btnConfirmarSaida : styles.btnConfirmarEntrada}
                 onClick={confirmarRegistro}
+                disabled={bipesEmVoo > 0 || bipagem.ocorrencias.length > 0}
               >
                 {romaneioEditando
                   ? "Adicionar ao romaneio"
