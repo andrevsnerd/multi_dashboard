@@ -49,6 +49,7 @@ export const PAGE_PERMISSION_DEFINITIONS = [
   { key: "saidas-entradas-produtos", label: "Saidas e Entradas de Produtos", routeSegments: ["saidas-entradas-produtos"] },
   { key: "extrato-produto", label: "Extrato de Produto", routeSegments: ["extrato-produto"] },
   { key: "ajuste-estoque", label: "Ajuste de Estoque", routeSegments: ["ajuste-estoque"] },
+  { key: "inventario", label: "Inventario (bipagem)", routeSegments: ["inventario"] },
   { key: "destino-romaneio", label: "Destino Romaneio" },
   { key: "lista-loja", label: "Lista Loja", routeSegments: ["lista-loja"] },
   { key: "compras-transito", label: "Compras em Transito", routeSegments: ["compras-transito"] },

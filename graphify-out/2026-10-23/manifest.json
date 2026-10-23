@@ -930,8 +930,8 @@
     "semantic_hash": "3136877746d42feabbd7abeab02e36c2"
   },
   "app/api/romaneio-confirmar-entrada/route.ts": {
-    "mtime": 1792003142.5715582,
-    "ast_hash": "b3982689de7eecee454b0aa10c6023da",
+    "mtime": 1792761271.3169563,
+    "ast_hash": "9b836024d1b7a9a2a06fc395af0ca281",
     "semantic_hash": ""
   },
   "app/api/romaneios/editar-qtd/route.ts": {
@@ -955,8 +955,8 @@
     "semantic_hash": "fe3bc07ccdce7c954dc20a51b9994725"
   },
   "app/api/romaneios/saidas/route.ts": {
-    "mtime": 1792760930.9934325,
-    "ast_hash": "1738b8adddd5a870bab8e08d92a0054b",
+    "mtime": 1792761285.6838548,
+    "ast_hash": "01e839824cb2cef42133dcf7a82662fd",
     "semantic_hash": ""
   },
   "app/api/romaneios/transito/route.ts": {
@@ -1430,8 +1430,8 @@
     "semantic_hash": "7a672d31b6ac254cb25f6a420501049d"
   },
   "components/layout/Sidebar.tsx": {
-    "mtime": 1792679310.9190073,
-    "ast_hash": "cc402593eec31d94f7ab69a1c72fe0ec",
+    "mtime": 1792768612.5024784,
+    "ast_hash": "d5c4dbd578dace98b4729a9c39f48cf9",
     "semantic_hash": ""
   },
   "components/layout/SidebarContext.tsx": {
@@ -1610,8 +1610,8 @@
     "semantic_hash": "685d5c1f8a52c86087dce25ac25d445b"
   },
   "components/romaneios/RomaneiosPage.tsx": {
-    "mtime": 1792761029.1659963,
-    "ast_hash": "642066a30f2f4cd263ec955dd38ae24f",
+    "mtime": 1792761309.6481159,
+    "ast_hash": "87872a3eb6af44bc8569102fa08e1619",
     "semantic_hash": ""
   },
   "components/saidas-entradas-produtos/HistoricoSaidasEntradasPage.tsx": {
@@ -2155,8 +2155,8 @@
     "semantic_hash": "29590f1b0f773ebbcd60e9dc314eec58"
   },
   "lib/config/page-permissions.ts": {
-    "mtime": 1792679310.913612,
-    "ast_hash": "42bd1a7634ec115c2c76c10ebfd72f56",
+    "mtime": 1792768609.0937762,
+    "ast_hash": "d76e5551fadcbcd83e06889dd8bb96de",
     "semantic_hash": ""
   },
   "lib/constants/columns.ts": {
@@ -2495,8 +2495,8 @@
     "semantic_hash": "a2035ad5498c52867b04eb7e1a7878ca"
   },
   "lib/repositories/logSaidas.ts": {
-    "mtime": 1792760984.3192067,
-    "ast_hash": "dc7490409f96ac47823d3044e0ac3133",
+    "mtime": 1792761347.3380027,
+    "ast_hash": "69f23802435caf970d14ff69ca5ac312",
     "semantic_hash": ""
   },
   "lib/repositories/logTransito.ts": {
@@ -2925,8 +2925,8 @@
     "semantic_hash": "8574a22068d81c11c33afb088ddecd70"
   },
   "lib/utils/romaneio-confirmacao-store.ts": {
-    "mtime": 1792760985.4226274,
-    "ast_hash": "9afcee84169639e45b505bfc7722b482",
+    "mtime": 1792761292.6929183,
+    "ast_hash": "530e8692a0e26d5a08f10bee84d64dbb",
     "semantic_hash": ""
   },
   "lib/utils/romaneios-date.ts": {
@@ -5089,9 +5089,54 @@
     "ast_hash": "5ee79d231063edc9cd40db1ffbeeed36",
     "semantic_hash": ""
   },
-  "app/api/romaneios/conferencia/route.ts": {
-    "mtime": 1792761003.1502397,
-    "ast_hash": "096712bbbb5d3a9b4af894a88e5b0312",
+  "lib/server/romaneio-conferencia.ts": {
+    "mtime": 1792761253.749747,
+    "ast_hash": "0a1ad269ccc701a4338b0daa85af53e6",
+    "semantic_hash": ""
+  },
+  "scripts/backfill-romaneio-conferencia.mjs": {
+    "mtime": 1792761348.4217813,
+    "ast_hash": "6b63ce6810b79950557155fc759a5dab",
+    "semantic_hash": ""
+  },
+  "app/(companies)/[company]/inventario/page.tsx": {
+    "mtime": 1792768607.942621,
+    "ast_hash": "d2e25e4e416b9b72fb01309b81b79cf8",
+    "semantic_hash": ""
+  },
+  "app/api/inventario/executar/route.ts": {
+    "mtime": 1792769094.6022763,
+    "ast_hash": "577791f57e413b2cab81e22a832fdf5d",
+    "semantic_hash": ""
+  },
+  "app/api/inventario/preview/route.ts": {
+    "mtime": 1792769092.4559937,
+    "ast_hash": "13cac4afcad4e8f3cd277ddef64e6306",
+    "semantic_hash": ""
+  },
+  "app/api/inventario/rascunhos/route.ts": {
+    "mtime": 1792768100.996265,
+    "ast_hash": "39d0ef59f8493a61f276235a64c5fe94",
+    "semantic_hash": ""
+  },
+  "app/api/inventario/saldo/route.ts": {
+    "mtime": 1792768102.0835843,
+    "ast_hash": "a988c67c64ba611348f47cfea45c0051",
+    "semantic_hash": ""
+  },
+  "components/inventario/InventarioBipagemPage.tsx": {
+    "mtime": 1792769128.4402573,
+    "ast_hash": "e04a2c3479ccbf58c08f574cf798470a",
+    "semantic_hash": ""
+  },
+  "lib/repositories/inventarioBipagem.ts": {
+    "mtime": 1792768049.569533,
+    "ast_hash": "c729b15ff1789cb535883ec287103c40",
+    "semantic_hash": ""
+  },
+  "lib/utils/inventario-draft-store.ts": {
+    "mtime": 1792768082.0709531,
+    "ast_hash": "6731317a668bcbe1e38778ab06980e1f",
     "semantic_hash": ""
   }
 }

@@ -1430,8 +1430,8 @@
     "semantic_hash": "7a672d31b6ac254cb25f6a420501049d"
   },
   "components/layout/Sidebar.tsx": {
-    "mtime": 1792679310.9190073,
-    "ast_hash": "cc402593eec31d94f7ab69a1c72fe0ec",
+    "mtime": 1792768612.5024784,
+    "ast_hash": "d5c4dbd578dace98b4729a9c39f48cf9",
     "semantic_hash": ""
   },
   "components/layout/SidebarContext.tsx": {
@@ -2155,8 +2155,8 @@
     "semantic_hash": "29590f1b0f773ebbcd60e9dc314eec58"
   },
   "lib/config/page-permissions.ts": {
-    "mtime": 1792679310.913612,
-    "ast_hash": "42bd1a7634ec115c2c76c10ebfd72f56",
+    "mtime": 1792768609.0937762,
+    "ast_hash": "d76e5551fadcbcd83e06889dd8bb96de",
     "semantic_hash": ""
   },
   "lib/constants/columns.ts": {
@@ -5097,6 +5097,46 @@
   "scripts/backfill-romaneio-conferencia.mjs": {
     "mtime": 1792761348.4217813,
     "ast_hash": "6b63ce6810b79950557155fc759a5dab",
+    "semantic_hash": ""
+  },
+  "app/(companies)/[company]/inventario/page.tsx": {
+    "mtime": 1792768607.942621,
+    "ast_hash": "d2e25e4e416b9b72fb01309b81b79cf8",
+    "semantic_hash": ""
+  },
+  "app/api/inventario/executar/route.ts": {
+    "mtime": 1792769094.6022763,
+    "ast_hash": "577791f57e413b2cab81e22a832fdf5d",
+    "semantic_hash": ""
+  },
+  "app/api/inventario/preview/route.ts": {
+    "mtime": 1792769092.4559937,
+    "ast_hash": "13cac4afcad4e8f3cd277ddef64e6306",
+    "semantic_hash": ""
+  },
+  "app/api/inventario/rascunhos/route.ts": {
+    "mtime": 1792768100.996265,
+    "ast_hash": "39d0ef59f8493a61f276235a64c5fe94",
+    "semantic_hash": ""
+  },
+  "app/api/inventario/saldo/route.ts": {
+    "mtime": 1792768102.0835843,
+    "ast_hash": "a988c67c64ba611348f47cfea45c0051",
+    "semantic_hash": ""
+  },
+  "components/inventario/InventarioBipagemPage.tsx": {
+    "mtime": 1792769391.922886,
+    "ast_hash": "a3340ce5988afd31f5ba3db6f579e0f4",
+    "semantic_hash": ""
+  },
+  "lib/repositories/inventarioBipagem.ts": {
+    "mtime": 1792768049.569533,
+    "ast_hash": "c729b15ff1789cb535883ec287103c40",
+    "semantic_hash": ""
+  },
+  "lib/utils/inventario-draft-store.ts": {
+    "mtime": 1792768082.0709531,
+    "ast_hash": "6731317a668bcbe1e38778ab06980e1f",
     "semantic_hash": ""
   }
 }

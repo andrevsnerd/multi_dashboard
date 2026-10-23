@@ -1,0 +1,486 @@
+/* Complementos da tela de Inventário. O layout (cards, bipagem, lista, modais)
+   vem do CSS da tela de Saídas/Entradas; tabelas e quadros do Ajuste de Estoque. */
+
+.nomeInput {
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.02em;
+  color: var(--text);
+  background: var(--s-50);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 10px;
+  width: 100%;
+  min-width: 0;
+}
+
+.nomeInput:focus {
+  outline: 2px solid var(--entrada-border);
+  outline-offset: 0;
+}
+
+.nomeContador {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-3);
+  margin-left: 6px;
+}
+
+.notaCompleto {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--text-2);
+}
+
+.notaCompleto strong {
+  color: var(--entrada);
+}
+
+/* ─── Tema verde ──────────────────────────────────────────────────
+   Diferencia o Inventário da tela de Entradas (azul). Os módulos reaproveitados
+   leem os tokens --entrada e --ae-blue: redefinidos aqui, só dentro desta tela. Onde o
+   módulo de Saídas/Entradas tem azul fixo, a classe extra abaixo sobrepõe. */
+.temaVerde {
+  --entrada: #16a34a;
+  --entrada-hover: #15803d;
+  --entrada-bg: #f0fdf4;
+  --entrada-border: #86efac;
+  --entrada-anel: rgba(22, 163, 74, 0.18);
+  --ae-blue: #16a34a;
+  --ae-blue-bg: #f0fdf4;
+}
+
+:global(:root[data-theme="dark"]) .temaVerde {
+  --entrada: #22c55e;
+  --entrada-hover: #16a34a;
+  --entrada-bg: rgba(34, 197, 94, 0.14);
+  --entrada-border: rgba(34, 197, 94, 0.35);
+  --entrada-anel: rgba(34, 197, 94, 0.25);
+  --ae-blue: #4ade80;
+  --ae-blue-bg: rgba(34, 197, 94, 0.14);
+}
+
+.temaVerde .headerIconVerde {
+  color: var(--entrada);
+  background: var(--entrada-bg);
+  border-color: var(--entrada-border);
+}
+
+.temaVerde .selectVerde:focus,
+.temaVerde .bipeInputVerde:focus {
+  border-color: var(--entrada);
+  box-shadow: 0 0 0 3px var(--entrada-anel);
+}
+
+.temaVerde .abaAtivaVerde {
+  border-bottom-color: var(--entrada);
+}
+
+.temaVerde .pillVerde {
+  background: var(--entrada-bg);
+  color: var(--entrada);
+}
+
+.temaVerde .retomarVerde:hover:not(:disabled) {
+  background: var(--entrada-bg);
+  border-color: var(--entrada-border);
+}
+
+.temaVerde .linkVerde {
+  color: var(--entrada);
+}
+
+.temaVerde .addVerde:hover:not(:disabled) {
+  background: var(--entrada-bg);
+  border-color: var(--entrada);
+  filter: brightness(0.97);
+}
+
+.temaVerde .submitVerde {
+  box-shadow: 0 2px 8px var(--entrada-anel);
+}
+
+.temaVerde .submitVerde:hover:not(:disabled),
+.temaVerde .confirmarVerde:hover:not(:disabled) {
+  background: var(--entrada-hover);
+}
+
+.temaVerde .boxVerde {
+  border-color: var(--entrada-border);
+}
+
+/* O módulo de Saídas tem regras do modo escuro mais específicas: repete aqui. */
+:global(:root[data-theme="dark"]) .temaVerde .headerIconVerde {
+  color: var(--entrada);
+  border-color: var(--entrada-border);
+}
+
+:global(:root[data-theme="dark"]) .temaVerde .selectVerde:focus,
+:global(:root[data-theme="dark"]) .temaVerde .bipeInputVerde:focus {
+  border-color: var(--entrada);
+  box-shadow: 0 0 0 3px var(--entrada-anel);
+}
+
+:global(:root[data-theme="dark"]) .temaVerde .abaAtivaVerde {
+  border-bottom-color: var(--entrada);
+}
+
+:global(:root[data-theme="dark"]) .temaVerde .pillVerde {
+  background: var(--entrada-bg);
+  color: var(--entrada);
+}
+
+:global(:root[data-theme="dark"]) .temaVerde .boxVerde {
+  border-color: var(--entrada-border);
+}
+
+/* Linha do histórico: "Todas as filiais" à esquerda, link à direita, sem grudar. */
+.temaVerde .histActionRow {
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px 6px;
+}
+
+/* ─── Saldo carregado ─────────────────────────────────────────── */
+.saldoInfo {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-2);
+  padding: 0 2px;
+}
+
+.saldoInfoErro {
+  color: var(--saida);
+  font-weight: 600;
+}
+
+.linkBtn {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--entrada);
+  cursor: pointer;
+}
+
+.linkBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ─── KPIs em tempo real ──────────────────────────────────────── */
+.kpiStrip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(108px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.kpiBox {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--s-50);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  min-width: 0;
+}
+
+.kpiDestaque {
+  background: var(--entrada-bg);
+  border-color: var(--entrada-border);
+}
+
+.kpiAlerta {
+  background: var(--saida-bg);
+  border-color: var(--saida-border);
+}
+
+.kpiLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kpiValor {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.pos {
+  color: #16a34a;
+}
+
+.neg {
+  color: var(--saida);
+}
+
+.final {
+  color: var(--entrada);
+}
+
+/* ─── Abas da coluna principal ────────────────────────────────── */
+.viewTabs {
+  display: flex;
+  gap: 6px;
+  margin: 12px 0 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.viewTab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 7px 12px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-2);
+  cursor: pointer;
+  margin-bottom: -1px;
+}
+
+.viewTabAtiva {
+  color: var(--entrada);
+  border-bottom-color: var(--entrada);
+}
+
+.viewTabContador {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 7px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: var(--s-100);
+  color: var(--text-2);
+}
+
+/* ─── Diferenças ──────────────────────────────────────────────── */
+.diffHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.diffToggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.diffScroll {
+  overflow: auto;
+  max-height: clamp(220px, 42vh, 520px);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+
+.diffTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.diffTable th {
+  position: sticky;
+  top: 0;
+  background: var(--s-100);
+  text-align: left;
+  padding: 8px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  z-index: 1;
+}
+
+.diffTable td {
+  padding: 7px 10px;
+  border-top: 1px solid var(--border);
+  color: var(--text);
+}
+
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
+.rowNaoBipado td {
+  color: var(--text-2);
+}
+
+.tagNaoBipado {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: var(--saida-bg);
+  color: var(--saida);
+  border: 1px solid var(--saida-border);
+}
+
+.diffVazio {
+  padding: 18px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--text-3);
+  margin: 0 0 8px;
+}
+
+.alertaZerar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 1.4;
+  background: var(--saida-bg);
+  border: 1px solid var(--saida-border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 10px 0 0;
+}
+
+.alertaZerar strong {
+  color: var(--saida);
+}
+
+/* ─── Resultado / histórico ───────────────────────────────────── */
+.resultadoBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  background: var(--entrada-bg);
+  border: 1px solid var(--entrada-border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.resultadoBanner p {
+  margin: 0;
+}
+
+.resultadoAcoes {
+  display: flex;
+  gap: 8px;
+}
+
+.btnSecundario {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.btnSecundario:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.histFiltro {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  white-space: nowrap;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.histItemBtn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.histNome {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.modalWide {
+  max-width: 880px !important;
+}
+
+.detalheScroll {
+  overflow: auto;
+  max-height: 50vh;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.confirmLinha {
+  margin: 0 0 6px;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.confirmCheck {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 14px;
+  margin-top: 12px;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.avisoLista {
+  font-size: 13px;
+  color: var(--saida);
+  font-weight: 600;
+  margin: 8px 0 0;
+}
