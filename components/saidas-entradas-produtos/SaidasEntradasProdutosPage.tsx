@@ -273,11 +273,16 @@ function defeitoFilialOption(companyKey: string): Filial | undefined {
 // Tipos de romaneio que não possuem filial destino (igual a SAÍDA MKT)
 const TIPOS_SEM_FILIAL_DESTINO = [
   'MKT', 'BRINDE', 'DOACAO', 'AJUSTE DE ESTOQUE', 'AMOSTRA', 'SOCIO', 'COMPRA FUNCIONARIO',
-  'RETIRADA FUNCIONARIO', 'RETIRADA SOCIO',
+  'RETIRADA FUNCIONARIO', 'RETIRADA SOCIO', 'FURTO',
 ];
 function isTipoSemDestino(tipo: string): boolean {
   const norm = tipo.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   return TIPOS_SEM_FILIAL_DESTINO.some(t => norm.includes(t));
+}
+
+/** Tipos que só existem como saída (não aparecem no select da entrada). */
+function isTipoSoSaida(tipo: string): boolean {
+  return normalizarTipoRomaneio(tipo) === 'FURTO';
 }
 
 function isTransferenciaEntreLojas(tipo: string): boolean {
@@ -1026,6 +1031,9 @@ export default function SaidasEntradasProdutosPage({
 
   const isEntradaNerd = tipoOperacao === "entrada" && companyKey === "nerd";
   const tiposRomaneioExibidos = useMemo(() => {
+    if (tipoOperacao === "entrada" && !isEntradaNerd) {
+      return tiposRomaneioDisponiveis.filter((tipo) => !isTipoSoSaida(tipo));
+    }
     if (!isEntradaNerd) return tiposRomaneioDisponiveis;
 
     const tipoCadastrado = tiposRomaneio.find(
@@ -1035,10 +1043,10 @@ export default function SaidasEntradasProdutosPage({
     return [
       tipoCadastrado,
       ...tiposRomaneioDisponiveis.filter(
-        (tipo) => normalizarTipoRomaneio(tipo) !== "NERD PRODUCAO"
+        (tipo) => normalizarTipoRomaneio(tipo) !== "NERD PRODUCAO" && !isTipoSoSaida(tipo)
       ),
     ];
-  }, [isEntradaNerd, tiposRomaneio, tiposRomaneioDisponiveis]);
+  }, [tipoOperacao, isEntradaNerd, tiposRomaneio, tiposRomaneioDisponiveis]);
 
   // ── BIPAGEM ────────────────────────────────────────────────────────────────
   // Fluxo alternativo ao modal: o leitor manda o código + Enter e o produto já
@@ -1474,6 +1482,11 @@ export default function SaidasEntradasProdutosPage({
         (tipo) => normalizarTipoRomaneio(tipo) === "NERD PRODUCAO"
       );
       setTipoRomaneioSelecionado(tipoCadastrado || TIPO_NERD_PRODUCAO);
+    } else if (next === "entrada") {
+      setTipoRomaneioSelecionado((atual) => {
+        if (!isTipoSoSaida(atual)) return atual;
+        return tiposRomaneioDisponiveis.find((tipo) => !isTipoSoSaida(tipo)) || "TRANSFERENCIA ENTRE LOJAS";
+      });
     } else if (next === "saida") {
       setTipoRomaneioSelecionado((atual) => {
         if (normalizarTipoRomaneio(atual) !== "NERD PRODUCAO") return atual;

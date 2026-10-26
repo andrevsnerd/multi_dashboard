@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { withRequest } from '@/lib/db/connection';
 
+/** FURTO: saída sem destino, cadastrada no Linx em 26/10/2026 para baixar peça furtada. */
+const TIPOS_SEMPRE_DISPONIVEIS = ['FURTO'];
+
 export async function GET() {
   try {
     const tipos = await withRequest(async (req) => {
@@ -45,6 +48,10 @@ export async function GET() {
       } catch (error) {
         console.error('Erro ao buscar tipos de entrada', error);
       }
+
+      // Tipos cadastrados em ESTOQUE_ROMANEIO_TIPO que precisam aparecer antes do
+      // primeiro uso (a lista acima só traz tipo que já foi gravado em algum romaneio).
+      for (const tipo of TIPOS_SEMPRE_DISPONIVEIS) tiposSet.add(tipo);
 
       // Converter para lista e ordenar conforme especificado
       const tiposLista = Array.from(tiposSet);
