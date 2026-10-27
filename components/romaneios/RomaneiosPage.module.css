@@ -61,6 +61,17 @@
   color: #fff;
 }
 
+.tabActiveDivergencias {
+  background: #d97706;
+  color: #fff;
+  border-color: #d97706;
+}
+
+.tabActiveDivergencias:hover {
+  background: #b45309;
+  color: #fff;
+}
+
 .tabActiveDuplicados {
   background: #dc2626;
   color: #fff;

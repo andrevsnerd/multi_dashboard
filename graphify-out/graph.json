@@ -15919,7 +15919,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_controle_financeiro_importacoes",
-      "community": 69,
+      "community": 109,
       "norm_label": "importacoes.tsx"
     },
     {
@@ -15929,7 +15929,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "components_controle_financeiro_importacoes_alteracao",
-      "community": 69,
+      "community": 109,
       "norm_label": "alteracao"
     },
     {
@@ -15939,7 +15939,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "components_controle_financeiro_importacoes_rotulocampo",
-      "community": 69,
+      "community": 109,
       "norm_label": "rotulocampo()"
     },
     {
@@ -15959,7 +15959,7 @@
       "source_location": "L48",
       "_origin": "ast",
       "id": "components_controle_financeiro_importacoes_tabelaresumo",
-      "community": 69,
+      "community": 109,
       "norm_label": "tabelaresumo()"
     },
     {
@@ -15969,7 +15969,7 @@
       "source_location": "L80",
       "_origin": "ast",
       "id": "components_controle_financeiro_importacoes_diferencas",
-      "community": 69,
+      "community": 109,
       "norm_label": "diferencas()"
     },
     {
@@ -15979,7 +15979,7 @@
       "source_location": "L93",
       "_origin": "ast",
       "id": "components_controle_financeiro_importacoes_status",
-      "community": 69,
+      "community": 109,
       "norm_label": "status"
     },
     {
@@ -16299,7 +16299,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_controle_financeiro_uploadmodal",
-      "community": 69,
+      "community": 109,
       "norm_label": "uploadmodal.tsx"
     },
     {
@@ -16309,7 +16309,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "components_controle_financeiro_uploadmodal_etapa",
-      "community": 69,
+      "community": 109,
       "norm_label": "etapa"
     },
     {
@@ -16319,7 +16319,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "components_controle_financeiro_uploadmodal_props",
-      "community": 69,
+      "community": 109,
       "norm_label": "props"
     },
     {
@@ -16649,7 +16649,7 @@
       "source_location": "L143",
       "_origin": "ast",
       "id": "components_controle_financeiro_shared_resumoimportacao",
-      "community": 69,
+      "community": 109,
       "norm_label": "resumoimportacao"
     },
     {
@@ -16659,7 +16659,7 @@
       "source_location": "L151",
       "_origin": "ast",
       "id": "components_controle_financeiro_shared_importacaoinfo",
-      "community": 69,
+      "community": 109,
       "norm_label": "importacaoinfo"
     },
     {
@@ -22369,7 +22369,7 @@
       "source_location": "L985",
       "_origin": "ast",
       "id": "components_lista_loja_listalojapage_aggregatevendasrowsbydisplaylabel",
-      "community": 120,
+      "community": 63,
       "norm_label": "aggregatevendasrowsbydisplaylabel()"
     },
     {
@@ -22379,7 +22379,7 @@
       "source_location": "L1011",
       "_origin": "ast",
       "id": "components_lista_loja_listalojapage_buildestoquetooltiprows",
-      "community": 120,
+      "community": 63,
       "norm_label": "buildestoquetooltiprows()"
     },
     {
@@ -41769,7 +41769,7 @@
       "source_location": "L248",
       "_origin": "ast",
       "id": "lib_config_company_getoperationalfilials",
-      "community": 120,
+      "community": 63,
       "norm_label": "getoperationalfilials()"
     },
     {
@@ -41789,7 +41789,7 @@
       "source_location": "L286",
       "_origin": "ast",
       "id": "lib_config_company_getfiliallabelfordisplay",
-      "community": 120,
+      "community": 63,
       "norm_label": "getfiliallabelfordisplay()"
     },
     {
@@ -41819,7 +41819,7 @@
       "source_location": "L363",
       "_origin": "ast",
       "id": "lib_config_company_comparefilialdisplayorder",
-      "community": 120,
+      "community": 63,
       "norm_label": "comparefilialdisplayorder()"
     },
     {
@@ -45889,7 +45889,7 @@
       "source_location": "L56",
       "_origin": "ast",
       "id": "lib_financeiro_planilha_campo",
-      "community": 69,
+      "community": 109,
       "norm_label": "campo"
     },
     {
@@ -45899,7 +45899,7 @@
       "source_location": "L58",
       "_origin": "ast",
       "id": "lib_financeiro_planilha_rotulo_campo",
-      "community": 69,
+      "community": 109,
       "norm_label": "rotulo_campo"
     },
     {
@@ -46869,7 +46869,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_mcp_tools_discovery",
-      "community": 120,
+      "community": 63,
       "norm_label": "discovery.ts"
     },
     {
@@ -46879,7 +46879,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "lib_mcp_tools_discovery_empresas",
-      "community": 120,
+      "community": 63,
       "norm_label": "empresas"
     },
     {
@@ -46889,7 +46889,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "lib_mcp_tools_discovery_empresaschema",
-      "community": 120,
+      "community": 63,
       "norm_label": "empresaschema"
     },
     {
@@ -46899,7 +46899,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "lib_mcp_tools_discovery_texto",
-      "community": 120,
+      "community": 63,
       "norm_label": "texto()"
     },
     {
@@ -46909,7 +46909,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "lib_mcp_tools_discovery_registerdiscoverytools",
-      "community": 120,
+      "community": 63,
       "norm_label": "registerdiscoverytools()"
     },
     {
@@ -47079,7 +47079,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_mcp_tools_produto",
-      "community": 20,
+      "community": 34,
       "norm_label": "produto.ts"
     },
     {
@@ -47089,7 +47089,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "lib_mcp_tools_produto_resolvecores",
-      "community": 20,
+      "community": 34,
       "norm_label": "resolvecores()"
     },
     {
@@ -47099,7 +47099,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "lib_mcp_tools_produto_registerprodutotools",
-      "community": 20,
+      "community": 34,
       "norm_label": "registerprodutotools()"
     },
     {
@@ -49419,7 +49419,7 @@
       "source_location": "L217",
       "_origin": "ast",
       "id": "lib_reports_types_reportsummarymetric",
-      "community": 120,
+      "community": 63,
       "norm_label": "reportsummarymetric"
     },
     {
@@ -56029,7 +56029,7 @@
       "source_location": "L435",
       "_origin": "ast",
       "id": "lib_repositories_inventory_filialstockbreakdown",
-      "community": 120,
+      "community": 521,
       "norm_label": "filialstockbreakdown"
     },
     {
@@ -56119,7 +56119,7 @@
       "source_location": "L65",
       "_origin": "ast",
       "id": "lib_repositories_logentradas_fetchproductentries",
-      "community": 20,
+      "community": 34,
       "norm_label": "fetchproductentries()"
     },
     {
@@ -56429,7 +56429,7 @@
       "source_location": "L214",
       "_origin": "ast",
       "id": "lib_repositories_lojaraiox_resolvefilialnames",
-      "community": 0,
+      "community": 34,
       "norm_label": "resolvefilialnames()"
     },
     {
@@ -56639,7 +56639,7 @@
       "source_location": "L752",
       "_origin": "ast",
       "id": "lib_repositories_lojaraiox_fetchdisponibilidademes",
-      "community": 0,
+      "community": 34,
       "norm_label": "fetchdisponibilidademes()"
     },
     {
@@ -57009,7 +57009,7 @@
       "source_location": "L885",
       "_origin": "ast",
       "id": "lib_repositories_performance_fetchprodutoqtdeporfilial",
-      "community": 120,
+      "community": 521,
       "norm_label": "fetchprodutoqtdeporfilial()"
     },
     {
@@ -57929,7 +57929,7 @@
       "source_location": "L430",
       "_origin": "ast",
       "id": "lib_repositories_productdetail_resolvebarcode",
-      "community": 20,
+      "community": 34,
       "norm_label": "resolvebarcode()"
     },
     {
@@ -58489,7 +58489,7 @@
       "source_location": "L2671",
       "_origin": "ast",
       "id": "lib_repositories_products_fetchprodutoscustoprecomestre",
-      "community": 33,
+      "community": 521,
       "norm_label": "fetchprodutoscustoprecomestre()"
     },
     {
@@ -60659,7 +60659,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_reportestoque",
-      "community": 120,
+      "community": 63,
       "norm_label": "reportestoque.ts"
     },
     {
@@ -60669,7 +60669,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "lib_repositories_reportestoque_excluded_filial_labels",
-      "community": 120,
+      "community": 63,
       "norm_label": "excluded_filial_labels"
     },
     {
@@ -60679,7 +60679,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "lib_repositories_reportestoque_isexcludedlabel",
-      "community": 120,
+      "community": 63,
       "norm_label": "isexcludedlabel()"
     },
     {
@@ -60689,7 +60689,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "lib_repositories_reportestoque_roundint",
-      "community": 120,
+      "community": 63,
       "norm_label": "roundint()"
     },
     {
@@ -60699,7 +60699,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "lib_repositories_reportestoque_agg",
-      "community": 120,
+      "community": 63,
       "norm_label": "agg"
     },
     {
@@ -60709,7 +60709,7 @@
       "source_location": "L54",
       "_origin": "ast",
       "id": "lib_repositories_reportestoque_fetchestoquerede",
-      "community": 120,
+      "community": 63,
       "norm_label": "fetchestoquerede()"
     },
     {
@@ -61429,7 +61429,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_reportvendas",
-      "community": 120,
+      "community": 521,
       "norm_label": "reportvendas.ts"
     },
     {
@@ -61439,7 +61439,7 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "lib_repositories_reportvendas_buildtransitindex",
-      "community": 120,
+      "community": 521,
       "norm_label": "buildtransitindex()"
     },
     {
@@ -61449,7 +61449,7 @@
       "source_location": "L72",
       "_origin": "ast",
       "id": "lib_repositories_reportvendas_up",
-      "community": 120,
+      "community": 521,
       "norm_label": "up()"
     },
     {
@@ -61459,7 +61459,7 @@
       "source_location": "L77",
       "_origin": "ast",
       "id": "lib_repositories_reportvendas_normalizeset",
-      "community": 120,
+      "community": 521,
       "norm_label": "normalizeset()"
     },
     {
@@ -61469,7 +61469,7 @@
       "source_location": "L82",
       "_origin": "ast",
       "id": "lib_repositories_reportvendas_round2",
-      "community": 120,
+      "community": 521,
       "norm_label": "round2()"
     },
     {
@@ -61479,7 +61479,7 @@
       "source_location": "L87",
       "_origin": "ast",
       "id": "lib_repositories_reportvendas_roundint",
-      "community": 120,
+      "community": 521,
       "norm_label": "roundint()"
     },
     {
@@ -61489,7 +61489,7 @@
       "source_location": "L101",
       "_origin": "ast",
       "id": "lib_repositories_reportvendas_fetchvendasfaturamento",
-      "community": 120,
+      "community": 521,
       "norm_label": "fetchvendasfaturamento()"
     },
     {
@@ -61499,7 +61499,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_reportvendashistorico",
-      "community": 521,
+      "community": 33,
       "norm_label": "reportvendashistorico.ts"
     },
     {
@@ -61509,7 +61509,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "lib_repositories_reportvendashistorico_round2",
-      "community": 521,
+      "community": 33,
       "norm_label": "round2()"
     },
     {
@@ -61519,7 +61519,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "lib_repositories_reportvendashistorico_roundint",
-      "community": 521,
+      "community": 33,
       "norm_label": "roundint()"
     },
     {
@@ -61529,7 +61529,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "lib_repositories_reportvendashistorico_toisodate",
-      "community": 521,
+      "community": 33,
       "norm_label": "toisodate()"
     },
     {
@@ -61539,7 +61539,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "lib_repositories_reportvendashistorico_prepinlist",
-      "community": 521,
+      "community": 33,
       "norm_label": "prepinlist()"
     },
     {
@@ -61549,7 +61549,7 @@
       "source_location": "L53",
       "_origin": "ast",
       "id": "lib_repositories_reportvendashistorico_rawrow",
-      "community": 521,
+      "community": 33,
       "norm_label": "rawrow"
     },
     {
@@ -61559,7 +61559,7 @@
       "source_location": "L83",
       "_origin": "ast",
       "id": "lib_repositories_reportvendashistorico_fetchvendashistorico",
-      "community": 521,
+      "community": 33,
       "norm_label": "fetchvendashistorico()"
     },
     {
@@ -64719,7 +64719,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "lib_services_salestotals_salestotalsparams",
-      "community": 46,
+      "community": 37,
       "norm_label": "salestotalsparams"
     },
     {
@@ -65769,7 +65769,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "lib_utils_colormapping_getcolordescription",
-      "community": 20,
+      "community": 92,
       "norm_label": "getcolordescription()"
     },
     {
@@ -68569,7 +68569,7 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "lib_utils_date_normalizedrange",
-      "community": 46,
+      "community": 37,
       "norm_label": "normalizedrange"
     },
     {
@@ -190820,7 +190820,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/romaneios/RomaneiosPage.tsx",
-      "source_location": "L405",
+      "source_location": "L424",
       "weight": 1.0,
       "source": "components_romaneios_romaneiospage_romaneiospage",
       "target": "components_romaneios_romaneiospage_cleandestinovalue",
@@ -190887,7 +190887,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/romaneios/RomaneiosPage.tsx",
-      "source_location": "L471",
+      "source_location": "L490",
       "weight": 1.0,
       "source": "components_romaneios_romaneiospage_romaneiospage",
       "target": "components_romaneios_travainventariopanel_fmtdia"
@@ -190898,7 +190898,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/romaneios/RomaneiosPage.tsx",
-      "source_location": "L493",
+      "source_location": "L512",
       "weight": 1.0,
       "source": "components_romaneios_romaneiospage_romaneiospage",
       "target": "lib_utils_romaneios_date_formatromaneiodatetimebrasilia"
@@ -341504,5 +341504,5 @@
       "source_file": "tmp_scarfme_poliester_pages.txt"
     }
   ],
-  "built_at_commit": "4c482903562d88828d0bd88e826896f294a65175"
+  "built_at_commit": "171219eb885e7338fc4786802a1eea960a5f1cd5"
 }

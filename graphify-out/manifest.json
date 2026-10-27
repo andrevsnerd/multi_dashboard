@@ -1605,8 +1605,8 @@
     "semantic_hash": "685d5c1f8a52c86087dce25ac25d445b"
   },
   "components/romaneios/RomaneiosPage.tsx": {
-    "mtime": 1792761309.6481159,
-    "ast_hash": "87872a3eb6af44bc8569102fa08e1619",
+    "mtime": 1793128334.4571116,
+    "ast_hash": "450b1efcbf1d7291f1ec71d36148a485",
     "semantic_hash": ""
   },
   "components/saidas-entradas-produtos/HistoricoSaidasEntradasPage.tsx": {

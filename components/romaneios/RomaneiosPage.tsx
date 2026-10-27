@@ -115,7 +115,7 @@ function diaDoRomaneio(value: string): string {
   return parsed.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
 }
 
-type TabType = "saida" | "entrada" | "transito" | "duplicados";
+type TabType = "saida" | "entrada" | "transito" | "divergencias" | "duplicados";
 
 export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
   const { user, isLoading: authLoading } = useAuth();
@@ -278,8 +278,17 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
   }, [companySlug, user?.username, authLoading]);
 
   const basePath = `/${companySlug}`;
+  // Divergências = saídas com o selo "Parcialmente confirmado" (a conferência
+  // gravada na confirmação não bateu com o romaneio). A logística resolve por ajuste.
+  const divergencias = saidas.filter((r) => !!r.conferencia);
   const romaneiosBase =
-    activeTab === "saida" ? saidas : activeTab === "entrada" ? entradas : transitos;
+    activeTab === "saida"
+      ? saidas
+      : activeTab === "entrada"
+        ? entradas
+        : activeTab === "divergencias"
+          ? divergencias
+          : transitos;
   const romaneios = (() => {
     const q = searchTerm.trim().toLowerCase();
     if (!q) return romaneiosBase;
@@ -321,6 +330,14 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
               onClick={() => setActiveTab("transito")}
             >
               Transito
+            </button>
+            <button
+              type="button"
+              className={`${styles.tab} ${activeTab === "divergencias" ? styles.tabActiveDivergencias : ""}`}
+              onClick={() => setActiveTab("divergencias")}
+              title="Saídas parcialmente confirmadas"
+            >
+              Divergências{!loading && divergencias.length > 0 ? ` (${divergencias.length})` : ""}
             </button>
             {isAdmin && (
               <button
@@ -389,7 +406,9 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
       ) : romaneios.length === 0 ? (
         <div className={styles.emptyState}>
           <div>
-            Nenhum romaneio de {activeTab === "saida" ? "saida" : activeTab === "entrada" ? "entrada" : "transito"} encontrado
+            {activeTab === "divergencias"
+              ? "Nenhum romaneio parcialmente confirmado"
+              : `Nenhum romaneio de ${activeTab === "saida" ? "saida" : activeTab === "entrada" ? "entrada" : "transito"} encontrado`}
           </div>
         </div>
       ) : (
