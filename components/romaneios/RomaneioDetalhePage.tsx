@@ -6,10 +6,12 @@ import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 
 import { useAuth } from "@/components/auth/AuthContext";
+import { isReadOnlyRole } from "@/lib/auth/permissions";
 import { getDefeitoFilial } from "@/lib/config/filiais-especiais";
 import { formatRomaneioDateTimeBrasilia } from "@/lib/utils/romaneios-date";
 import { planejarItensAgrupados } from "@/lib/utils/romaneio-agrupamento";
 import RomaneioDeleteModal from "./RomaneioDeleteModal";
+import RomaneioBipagemPanel, { type QuantidadesBipadas } from "./RomaneioBipagemPanel";
 import styles from "./RomaneioDetalhePage.module.css";
 
 // ---------- helpers de API ----------
@@ -459,6 +461,8 @@ export default function RomaneioDetalhePage({
   const [darSaidaSucesso, setDarSaidaSucesso] = useState<string | null>(null);
   const [darSaidaModalAberto, setDarSaidaModalAberto] = useState(false);
   const [confirmarTudoModalAberto, setConfirmarTudoModalAberto] = useState(false);
+  /** Conferência por bipagem (RomaneioBipagemPanel) no lugar da tabela. */
+  const [modoBipagem, setModoBipagem] = useState(false);
 
   // --- editar qtd romaneio (admin) ---
   const [editQtdModal, setEditQtdModal] = useState<{ item: RomaneioDetalheItem; novaQtd: number } | null>(null);
@@ -624,26 +628,37 @@ export default function RomaneioDetalhePage({
     return () => { cancelled = true; };
   }, [companySlug, filialDestino, destinoSelected, isSaida, dataEmissaoProp]);
 
-  // Confirmar tudo de uma vez
-  const handleConfirmarTudo = useCallback(async () => {
-    if (!user?.username) return;
+  // Confirmar tudo de uma vez. `bipadas` = conferência por bipagem: as
+  // quantidades vêm do painel. Devolve true quando tudo ficou gravado.
+  // Só existe UMA confirmação por romaneio: com algum item já confirmado, os
+  // pendentes são resolvidos pela logística por ajuste.
+  const handleConfirmarTudo = useCallback(async (bipadas?: QuantidadesBipadas): Promise<boolean> => {
+    if (!user?.username) return false;
 
     const filialRef = isSaida ? destinoSelected : filialDestino;
 
     if (isSaida && !destinoSelected) {
       setErroConfirmacao("Destino não definido. Peça ao administrador para definir a filial destino.");
-      return;
+      return false;
     }
+
+    if (itens.some((item) => confirmados.has(`${item.produto}|${item.corProduto ?? ""}`))) {
+      setErroConfirmacao("Este romaneio já foi confirmado. Os itens pendentes são resolvidos pela logística por ajuste.");
+      return false;
+    }
+
+    const qtdes = bipadas?.quantidades ?? quantidades;
+    const qtdesTam = bipadas?.quantidadesTam ?? quantidadesTam;
 
     const itensParaConfirmar = itens
       .map((item) => {
         const chave = `${item.produto}|${item.corProduto ?? ""}`;
         // Peça P/M/G numa SAÍDA do dashboard: confere tamanho a tamanho. A entrada
         // nasce no tamanho que chegou, e a saída é acertada se o tamanho diferir.
-        const porTamanho = isSaida && conferePorTamanho(item) ? quantidadesTam.get(chave) ?? null : null;
+        const porTamanho = isSaida && conferePorTamanho(item) ? qtdesTam.get(chave) ?? null : null;
         const qtde = porTamanho
           ? Object.values(porTamanho).reduce((s, v) => s + v, 0)
-          : quantidades.get(chave) ?? item.qtde;
+          : qtdes.get(chave) ?? item.qtde;
         const tamanhoDivergente = porTamanho
           ? item.tamanhos!.some((t) => (porTamanho[t.ordinal] ?? 0) !== t.qtde)
           : false;
@@ -659,11 +674,27 @@ export default function RomaneioDetalhePage({
           // normal (tudo integral) ninguém paga nada, e um romaneio de 600 itens
           // não vira 600 idas ao banco.
           divergente: qtde < item.qtde || (tamanhoDivergente && qtde <= item.qtde),
+          // Regra do dono: nunca acima do romaneio — nem no total, nem num tamanho.
+          acimaDoRomaneio:
+            qtde > item.qtde ||
+            (porTamanho !== null &&
+              Object.entries(porTamanho).some(
+                ([t, q]) => q > (item.tamanhos!.find((x) => x.ordinal === Number(t))?.qtde ?? 0)
+              )),
         };
       })
       .filter((i) => i.quantidade > 0);
 
-    if (itensParaConfirmar.length === 0) return;
+    if (itensParaConfirmar.length === 0) return false;
+
+    const acima = itensParaConfirmar.filter((i) => i.acimaDoRomaneio);
+    if (acima.length > 0) {
+      setErroConfirmacao(
+        `Não é possível confirmar acima do romaneio (${acima.slice(0, 5).map((i) => i.produto).join(", ")}). ` +
+          "Peça a mais ou de outro tamanho: avise a logística."
+      );
+      return false;
+    }
 
     setConfirmandoTudo(true);
     setErroConfirmacao(null);
@@ -675,11 +706,11 @@ export default function RomaneioDetalhePage({
       if (isTransito) {
         const possuiDivergencia = itens.some((item) => {
           const chave = `${item.produto}|${item.corProduto ?? ""}`;
-          return (quantidades.get(chave) ?? item.qtde) !== item.qtde;
+          return (qtdes.get(chave) ?? item.qtde) !== item.qtde;
         });
         if (possuiDivergencia) {
           setErroConfirmacao("Romaneios em trânsito do Linx devem ser confirmados com a quantidade integral do faturamento.");
-          return;
+          return false;
         }
 
         const result = await liberarTransitoLinx(
@@ -692,7 +723,7 @@ export default function RomaneioDetalhePage({
         );
         if (!result.ok) {
           setErroConfirmacao(result.error ?? "Erro ao liberar trânsito do Linx.");
-          return;
+          return false;
         }
         setLiberacaoTransitoMsg(`Trânsito liberado com sucesso para ${filialDestino}.`);
       } else if (isSaida) {
@@ -722,7 +753,7 @@ export default function RomaneioDetalhePage({
           );
         } else if (!result.ok) {
           setErroConfirmacao(result.error ? `Erro ao registrar entrada de estoque: ${result.error}` : "Erro ao registrar entrada de estoque. Tente novamente.");
-          return;
+          return false;
         } else {
           if (result.romaneio) setRomaneioGerado(result.romaneio);
           romaneioEntradaGerado = result.romaneio ?? "";
@@ -780,8 +811,10 @@ export default function RomaneioDetalhePage({
       fetchDetalhes(tipo, romaneioId, filialOrigem, fd).then((data) => {
         if (data.length > 0) setItens(data);
       });
+      return lote.ok && faltando.length === 0;
     } catch {
       setErroConfirmacao("Erro inesperado. Tente novamente.");
+      return false;
     } finally {
       setConfirmandoTudo(false);
     }
@@ -1038,9 +1071,15 @@ export default function RomaneioDetalhePage({
     confirmados.has(`${item.produto}|${item.corProduto ?? ""}`)
   );
 
+  // A conferência é UMA só: depois da primeira confirmação, o que ficou pendente
+  // é resolvido pela logística por ajuste — não existe segunda confirmação.
+  const confirmacaoParcial =
+    !todosConfirmados && itens.some((item) => confirmados.has(`${item.produto}|${item.corProduto ?? ""}`));
+
   const podeConfirmar =
     !!user &&
     !todosConfirmados &&
+    !confirmacaoParcial &&
     itensParaConfirmar.length > 0 &&
     !confirmandoTudo &&
     !travaInventario &&
@@ -1162,7 +1201,7 @@ export default function RomaneioDetalhePage({
             className={styles.destinoSelect}
             value={destinoSelected}
             onChange={(e) => handleDestinoChange(e.target.value)}
-            disabled={loadingDestino}
+            disabled={loadingDestino || modoBipagem}
           >
             <option value="">Nenhum destino definido</option>
             {destinoSelected && !filiais.some((f) =>
@@ -1209,6 +1248,16 @@ export default function RomaneioDetalhePage({
         </div>
       )}
 
+      {(isSaida || isTransito) && confirmacaoParcial && !travaInventario && (
+        <div className={styles.travaInventarioBanner}>
+          <strong>Parcialmente confirmado</strong>
+          <span>
+            {itens.filter((i) => confirmados.has(`${i.produto}|${i.corProduto ?? ""}`)).length} de {itens.length} itens
+            confirmados. Os pendentes não são mais confirmados por aqui — a logística resolve por ajuste.
+          </span>
+        </div>
+      )}
+
       {erroConfirmacao && (
         <div className={styles.erroConfirmacao}>{erroConfirmacao}</div>
       )}
@@ -1247,7 +1296,19 @@ export default function RomaneioDetalhePage({
       {/* Barra de ações */}
       {user && (
         <div className={styles.confirmarTudoBar}>
-          {(isSaida || isTransito) && !todosConfirmados && !travaInventario && (
+          {(isSaida || isTransito) && !todosConfirmados && !confirmacaoParcial && !travaInventario && !modoBipagem &&
+            !isReadOnlyRole(user.role) && (!isSaida || !!destinoSelected) && (
+            <button
+              type="button"
+              className={styles.bipagemBtn}
+              onClick={() => { setErroConfirmacao(null); setModoBipagem(true); }}
+              disabled={confirmandoTudo}
+              title="Bipar as peças que chegaram e confirmar no fim"
+            >
+              Conferir por bipagem
+            </button>
+          )}
+          {(isSaida || isTransito) && !todosConfirmados && !confirmacaoParcial && !travaInventario && !modoBipagem && (
             <button
               type="button"
               className={`${styles.confirmarTudoBtn} ${isTransito ? styles.confirmarTudoBtnTransit : ""}`}
@@ -1276,7 +1337,24 @@ export default function RomaneioDetalhePage({
         </div>
       )}
 
+      {modoBipagem && user && (
+        <RomaneioBipagemPanel
+          companySlug={companySlug}
+          romaneioId={romaneioId}
+          filialDestino={isSaida ? destinoSelected : filialDestino}
+          username={user.username}
+          itens={itens}
+          confirmados={confirmados}
+          conferePorTamanho={isSaida}
+          exigeIntegral={isTransito}
+          confirmando={confirmandoTudo}
+          onConfirmar={handleConfirmarTudo}
+          onSair={() => setModoBipagem(false)}
+        />
+      )}
+
       {/* Banner: romaneio de entrada gerado após Confirmar Tudo */}
+      {!modoBipagem && (
       <div className={styles.buscaSection}>
         <label htmlFor="busca-item-romaneio" className={styles.buscaLabel}>
           Buscar item
@@ -1301,6 +1379,7 @@ export default function RomaneioDetalhePage({
           )}
         </div>
       </div>
+      )}
 
       {romaneioGerado && (
         <div className={styles.romaneioGeradoBanner}>
@@ -1634,7 +1713,7 @@ export default function RomaneioDetalhePage({
         );
       })()}
 
-      {itensPlanejados.length > 0 && (
+      {!modoBipagem && itensPlanejados.length > 0 && (
         <div className={styles.tableWrap}>
           <table className={styles.table}>
           <thead>
@@ -1774,12 +1853,18 @@ export default function RomaneioDetalhePage({
                         </div>
                       ) : travaInventario ? (
                         <span className={styles.travaInventarioCell}>🔒 não confirmado</span>
+                      ) : confirmacaoParcial ? (
+                        <span className={styles.travaInventarioCell} title="Resolvido pela logística por ajuste">
+                          ⏳ pendente — ajuste
+                        </span>
                       ) : isSaida && conferePorTamanho(item) ? (
-                        /* Peça P/M/G: informa o que chegou em CADA tamanho. */
+                        /* Peça P/M/G: informa o que chegou em CADA tamanho — só os
+                           tamanhos que saíram, e nunca acima do enviado neles
+                           (tamanho trocado / peça a mais é a logística que ajusta). */
                         <div className={styles.qtdeInputWrap}>
-                          {item.tamanhos!.map((t) => {
+                          {item.tamanhos!.filter((t) => t.qtde > 0).map((t) => {
                             const porTam = quantidadesTam.get(chave) ?? {};
-                            const valor = porTam[t.ordinal] ?? t.qtde;
+                            const valor = Math.min(porTam[t.ordinal] ?? t.qtde, t.qtde);
                             return (
                               <div key={t.ordinal} className={styles.qtdeTamRow}>
                                 <span className={styles.qtdeTamLabel} title={`Enviado: ${t.qtde}`}>
@@ -1793,23 +1878,26 @@ export default function RomaneioDetalhePage({
                                 <input
                                   type="number"
                                   min={0}
+                                  max={t.qtde}
                                   className={styles.qtdeInput}
                                   value={valor}
-                                  onChange={(e) => updateQuantidadeTam(chave, t.ordinal, parseInt(e.target.value, 10) || 0)}
+                                  onChange={(e) =>
+                                    updateQuantidadeTam(chave, t.ordinal, Math.min(t.qtde, parseInt(e.target.value, 10) || 0))
+                                  }
                                 />
                                 <button
                                   type="button"
                                   className={styles.qtdeSpinBtn}
-                                  onClick={() => updateQuantidadeTam(chave, t.ordinal, valor + 1)}
+                                  disabled={valor >= t.qtde}
+                                  title={valor >= t.qtde ? "Não dá para confirmar acima do romaneio" : undefined}
+                                  onClick={() => updateQuantidadeTam(chave, t.ordinal, Math.min(t.qtde, valor + 1))}
                                 >+</button>
                               </div>
                             );
                           })}
-                          {temDivergenciaInput && qtdeAtual > 0 && (
+                          {temDivergenciaInput && qtdeAtual > 0 && qtdeAtual < item.qtde && (
                             <div className={styles.divergenciaAviso}>
-                              {qtdeAtual < item.qtde
-                                ? `⚠ Faltam ${item.qtde - qtdeAtual} un. (romaneio: ${item.qtde})`
-                                : `⚠ Excesso de ${qtdeAtual - item.qtde} un. (romaneio: ${item.qtde})`}
+                              ⚠ Faltam {item.qtde - qtdeAtual} un. (romaneio: {item.qtde})
                             </div>
                           )}
                           {qtdeAtual === 0 && (
@@ -1827,21 +1915,22 @@ export default function RomaneioDetalhePage({
                             <input
                               type="number"
                               min={0}
+                              max={item.qtde}
                               className={styles.qtdeInput}
                               value={qtdeAtual}
-                              onChange={(e) => updateQuantidade(chave, parseInt(e.target.value, 10) || 0)}
+                              onChange={(e) => updateQuantidade(chave, Math.min(item.qtde, parseInt(e.target.value, 10) || 0))}
                             />
                             <button
                               type="button"
                               className={styles.qtdeSpinBtn}
-                              onClick={() => updateQuantidade(chave, qtdeAtual + 1)}
+                              disabled={qtdeAtual >= item.qtde}
+                              title={qtdeAtual >= item.qtde ? "Não dá para confirmar acima do romaneio" : undefined}
+                              onClick={() => updateQuantidade(chave, Math.min(item.qtde, qtdeAtual + 1))}
                             >+</button>
                           </div>
-                          {temDivergenciaInput && qtdeAtual > 0 && (
+                          {temDivergenciaInput && qtdeAtual > 0 && qtdeAtual < item.qtde && (
                             <div className={styles.divergenciaAviso}>
-                              {qtdeAtual < item.qtde
-                                ? `⚠ Faltam ${item.qtde - qtdeAtual} un. (romaneio: ${item.qtde})`
-                                : `⚠ Excesso de ${qtdeAtual - item.qtde} un. (romaneio: ${item.qtde})`}
+                              ⚠ Faltam {item.qtde - qtdeAtual} un. (romaneio: {item.qtde})
                             </div>
                           )}
                           {qtdeAtual === 0 && (
@@ -1864,7 +1953,7 @@ export default function RomaneioDetalhePage({
           Nenhum item encontrado neste romaneio.
         </div>
       )}
-      {itens.length > 0 && itensPlanejados.length === 0 && (
+      {!modoBipagem && itens.length > 0 && itensPlanejados.length === 0 && (
         <div className={styles.emptyState}>
           Nenhum item encontrado para o filtro informado.
         </div>

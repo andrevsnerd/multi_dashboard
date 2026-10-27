@@ -20,6 +20,7 @@ import {
 import { mensagemTravaInventario, verificarTravaInventario } from '@/lib/server/trava-inventario';
 import { mensagemTravaEstoqueNegativo, verificarSaldoSaida } from '@/lib/server/trava-estoque-negativo';
 import { montarObsOperacao } from '@/lib/server/obs-operacao';
+import { verificarConfirmacaoDentroDoRomaneio } from '@/lib/server/trava-confirmacao-acima-romaneio';
 import {
   carregarGrades,
   preencherTamanhosPelaSaida,
@@ -388,6 +389,26 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: erroTamanho, code: 'TAMANHO_OBRIGATORIO' }, { status: 400 });
     }
     const itensGravar = itensComTamanho.map((it) => ({ ...it, tamanho: tamanhoEfetivo(it, grades) }));
+
+    // TRAVA — confirmação de saída nunca passa do romaneio (item, quantidade e
+    // tamanho). Ver lib/server/trava-confirmacao-acima-romaneio.ts.
+    if (tipoOperacao === 'entrada' && ref?.romaneio && ref.filialOrigem) {
+      let acima: string | null = null;
+      try {
+        acima = await verificarConfirmacaoDentroDoRomaneio({
+          romaneioSaida: ref.romaneio,
+          filialOrigem: ref.filialOrigem,
+          itens: itensComTamanho,
+          grades,
+        });
+      } catch (travaError) {
+        // Fail-open, como as outras travas: a tela já não deixa passar do romaneio.
+        console.error('Erro ao verificar confirmação acima do romaneio', travaError);
+      }
+      if (acima) {
+        return NextResponse.json({ error: acima, code: 'ACIMA_DO_ROMANEIO' }, { status: 409 });
+      }
+    }
 
     // TRAVA DE ESTOQUE NEGATIVO — filial com PERMITE_EST_NEGATIVO = 0 no Linx
     // (ex.: NERD matriz) não sai além do saldo. Ver lib/server/trava-estoque-negativo.ts.

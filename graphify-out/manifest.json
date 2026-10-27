@@ -965,8 +965,8 @@
     "semantic_hash": ""
   },
   "app/api/saidas-entradas-produtos/executar/route.ts": {
-    "mtime": 1792003034.6308928,
-    "ast_hash": "91dce1775efe03b9831df288b42b048a",
+    "mtime": 1793127927.5386777,
+    "ast_hash": "2b2d24d235e04a0d0f803c71b5544db6",
     "semantic_hash": ""
   },
   "app/api/saidas-entradas-produtos/historico/route.ts": {
@@ -1595,8 +1595,8 @@
     "semantic_hash": "c1db24d3ffabe5b57c07dc935de08446"
   },
   "components/romaneios/RomaneioDetalhePage.tsx": {
-    "mtime": 1792678899.2856143,
-    "ast_hash": "b1b6ba48bfc5867c393caeda370cc8c4",
+    "mtime": 1793127965.5807114,
+    "ast_hash": "5c1cb6b6ad4cc615fd969fbe9b3ea01b",
     "semantic_hash": ""
   },
   "components/romaneios/RomaneiosDuplicadosPanel.tsx": {
@@ -5132,6 +5132,31 @@
   "lib/utils/inventario-draft-store.ts": {
     "mtime": 1792768082.0709531,
     "ast_hash": "6731317a668bcbe1e38778ab06980e1f",
+    "semantic_hash": ""
+  },
+  "app/api/romaneios/bipagem/codigos/route.ts": {
+    "mtime": 1793126123.3447468,
+    "ast_hash": "767116cfa28c53a86cd72ae9cc62c08b",
+    "semantic_hash": ""
+  },
+  "app/api/romaneios/bipagem/route.ts": {
+    "mtime": 1793126122.4510238,
+    "ast_hash": "ccd17c30edab490e298ea97f17106e18",
+    "semantic_hash": ""
+  },
+  "components/romaneios/RomaneioBipagemPanel.tsx": {
+    "mtime": 1793127751.7754855,
+    "ast_hash": "28d41e76be029d9785bb8ae89324befd",
+    "semantic_hash": ""
+  },
+  "lib/utils/romaneio-bipagem-store.ts": {
+    "mtime": 1793126091.093346,
+    "ast_hash": "fc5b2acb0d829b48809c357a3db7e201",
+    "semantic_hash": ""
+  },
+  "lib/server/trava-confirmacao-acima-romaneio.ts": {
+    "mtime": 1793127916.8884459,
+    "ast_hash": "6528f81ab59a4ccec16b9d9d793ff79d",
     "semantic_hash": ""
   }
 }
