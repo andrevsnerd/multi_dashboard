@@ -56,9 +56,6 @@ export const APROVEITAMENTOS_SEMENTE: AproveitamentoItem[] = [
   { id: "50-marble-flower-off", formato: "50x50", nome: "Marble flower - off", produto: "13.46.0130", cor: "13", estoque: 100 },
   { id: "50-marble-flower-bordeaux", formato: "50x50", nome: "Marble flower - bordeaux", produto: "13.46.0130", cor: "35", estoque: 100 },
   { id: "50-flor-do-poder-roxo", formato: "50x50", nome: "Flor do poder roxo", produto: "13.46.0341", cor: "18", estoque: 20 },
-  // Caramelo não existe no 50x50 (nem cor "cerrado"): terracota é a mais próxima, provisória.
-  { id: "50-jaguatirica-caramelo", formato: "50x50", nome: "Jaguatirica caramelo", produto: "13.46.0300", cor: "71", estoque: 100,
-    nota: "Cor provisória: terracota. O 50x50 não tem caramelo cadastrado (só verde, rosa, roxo e terracota)." },
   { id: "50-empodere-se", formato: "50x50", nome: "Empodere-se", produto: "13.46.0123", cor: "107", estoque: 100 },
   { id: "50-fervo", formato: "50x50", nome: "Fervo", produto: "13.46.0346", cor: "05", estoque: 100 },
   { id: "50-verde-louro", formato: "50x50", nome: "Verde louro", produto: "13.46.0285", cor: "02", estoque: 100 },
