@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import {
+  assumirRascunho,
   buscarRascunho,
   listarRascunhos,
   rascunhoId,
@@ -18,6 +19,8 @@ import {
  * DELETE ?company=&tipoOperacao=&filial=[&romaneioEdicao=] → apaga o rascunho do usuário
  *                                            naquela filial (ou o da edição daquele romaneio)
  * DELETE ?id=…                              → apaga um rascunho específico (aba Rascunhos)
+ * POST   { acao: 'assumir', id }            → retoma um rascunho da aba, relido na hora;
+ *                                            404 se ele não existe mais (já registrado)
  */
 
 function getUsername(request: Request): string {
@@ -94,6 +97,37 @@ export async function PUT(request: Request) {
   } catch (error) {
     console.error('Erro ao salvar rascunho de saída/entrada', error);
     return NextResponse.json({ error: 'Erro ao salvar rascunho' }, { status: 500 });
+  }
+}
+
+export async function POST(request: Request) {
+  const username = getUsername(request);
+  if (!username) {
+    return NextResponse.json({ error: 'Usuário não identificado.' }, { status: 401 });
+  }
+
+  try {
+    const body = (await request.json()) as { acao?: string; id?: string };
+    const id = (body.id || '').trim();
+    if (body.acao !== 'assumir' || !id) {
+      return NextResponse.json({ error: 'Informe { acao: "assumir", id }.' }, { status: 400 });
+    }
+
+    const resultado = await assumirRascunho(id, username);
+    if (!resultado.ok) {
+      return NextResponse.json(
+        {
+          error:
+            'Este rascunho não existe mais — o romaneio já foi registrado ou outra pessoa assumiu a lista. Confira o histórico antes de montar de novo.',
+          code: 'RASCUNHO_INEXISTENTE',
+        },
+        { status: 404 }
+      );
+    }
+    return NextResponse.json({ data: resultado.rascunho, deUsuario: resultado.deUsuario });
+  } catch (error) {
+    console.error('Erro ao assumir rascunho de saída/entrada', error);
+    return NextResponse.json({ error: 'Erro ao retomar o rascunho' }, { status: 500 });
   }
 }
 

@@ -262,6 +262,28 @@ interface RascunhoResumo {
   updatedAt: string;
 }
 
+/**
+ * Entrada direta parecida com a lista (409 ENTRADA_DIRETA_REPETIDA de
+ * `/executar` — ver lib/server/trava-entrada-direta-repetida.ts).
+ */
+interface EntradaDiretaRepetida {
+  romaneio: string;
+  responsavel: string;
+  quando: string | null;
+  pecasExistente: number;
+  pecasPedido: number;
+  pecasEmComum: number;
+  /** Por linha da lista enviada (mesma ordem): peças que ainda não estão no romaneio. */
+  restante: number[];
+}
+
+/** Recusa por repetição + o que foi enviado — para a tela decidir sem perder a lista. */
+interface RepeticaoPendente {
+  repeticao: EntradaDiretaRepetida;
+  produtos: ProdutoSelecionado[];
+  observacao: string;
+}
+
 /** Estado do autosave, mostrado ao lado do título da lista. */
 type RascunhoStatus = "idle" | "salvando" | "salvo" | "erro";
 
@@ -686,7 +708,8 @@ async function executarOperacaoLote(
   username?: string,
   observacao?: string,
   filialDestino?: string | null,
-  companyKey?: string
+  companyKey?: string,
+  repeticaoConfirmada?: string | null
 ): Promise<{ success: boolean; message: string; romaneio?: string }> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (username) headers["x-auth-username"] = username;
@@ -703,17 +726,22 @@ async function executarOperacaoLote(
       observacao: observacao || null,
       companyKey,
       origemTela: "Saidas e Entradas",
+      repeticaoConfirmada: repeticaoConfirmada || null,
     }),
   });
 
   if (!response.ok) {
     const error = (await response.json().catch(() => ({}))) as {
       error?: string;
+      code?: string;
       travaEstoqueNegativo?: { faltas: Array<{ produto: string; cor: string; tamanho: string; disponivel: number }> };
+      repeticao?: EntradaDiretaRepetida;
     };
     // Recusa por saldo vem com a lista dos itens: a tela marca as linhas.
+    // Entrada repetida vem com o romaneio parecido: a tela pergunta o que fazer.
     throw Object.assign(new Error(error.error || "Erro ao executar operação"), {
       faltas: error.travaEstoqueNegativo?.faltas ?? null,
+      repeticao: error.code === "ENTRADA_DIRETA_REPETIDA" ? error.repeticao ?? null : null,
     });
   }
 
@@ -828,6 +856,30 @@ async function fetchRascunhos(companyKey: string): Promise<RascunhoResumo[]> {
 
   const json = (await response.json()) as { data: RascunhoResumo[] };
   return json.data || [];
+}
+
+/**
+ * Retoma um rascunho da aba RELENDO no servidor (lib/utils/saida-entrada-draft-store.ts
+ * → assumirRascunho). `null` = ele não existe mais: já virou romaneio ou outra
+ * pessoa assumiu. A cópia que a aba guarda nunca é usada — foi ela que, velha,
+ * virou o romaneio 836273 em cima do 836272.
+ */
+async function assumirRascunhoApi(
+  id: string,
+  username: string
+): Promise<{ rascunho: RascunhoResumo; deUsuario: string | null } | null> {
+  const response = await fetch("/api/saidas-entradas-produtos/rascunhos", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-auth-username": username },
+    body: JSON.stringify({ acao: "assumir", id }),
+  });
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    const erro = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(erro?.error || "Erro ao retomar o rascunho");
+  }
+  const json = (await response.json()) as { data: RascunhoResumo; deUsuario?: string | null };
+  return { rascunho: json.data, deUsuario: json.deUsuario ?? null };
 }
 
 async function salvarRascunhoApi(payload: string, username: string): Promise<void> {
@@ -1028,6 +1080,8 @@ export default function SaidasEntradasProdutosPage({
   // ── EDIÇÃO DE ROMANEIO — SAÍDA E ENTRADA (logística+) ──────────────────────
   const [romaneioEditando, setRomaneioEditando] = useState<RomaneioEditando | null>(null);
   const [carregandoEdicaoRomaneio, setCarregandoEdicaoRomaneio] = useState(false);
+  /** Entrada recusada por repetir um romaneio recente — aguarda a decisão do operador. */
+  const [repeticaoPendente, setRepeticaoPendente] = useState<RepeticaoPendente | null>(null);
 
   const isEntradaNerd = tipoOperacao === "entrada" && companyKey === "nerd";
   const tiposRomaneioExibidos = useMemo(() => {
@@ -2565,7 +2619,12 @@ export default function SaidasEntradasProdutosPage({
     return `Escolha o tamanho (P/M/G) de: ${nomes}${sem.length > 5 ? "…" : ""}.`;
   }, []);
 
-  const executarLote = useCallback(async (produtos: ProdutoSelecionado[], observacao: string) => {
+  const executarLote = useCallback(async (
+    produtos: ProdutoSelecionado[],
+    observacao: string,
+    /** Romaneio que a trava de repetição apontou e o operador disse ser OUTRA nota. */
+    repeticaoConfirmada?: string
+  ) => {
     if (produtos.length === 0 || processandoOperacao || !filialSelecionada) return;
 
     const snapBipagem = {
@@ -2593,7 +2652,8 @@ export default function SaidasEntradasProdutosPage({
         user?.username,
         observacao.trim() || undefined,
         filialDestinoSaida?.codFilial || null,
-        companyKey
+        companyKey,
+        repeticaoConfirmada
       );
 
       // Salvar filial destino do romaneio gerado (saída) — não aplicável para SAÍDA MKT
@@ -2654,6 +2714,14 @@ export default function SaidasEntradasProdutosPage({
       setLogSaidas(novoSaidas);
       setLogEntradas(novoEntradas);
     } catch (error: any) {
+      // Entrada que repete um romaneio recente: nada foi gravado. A lista fica e a
+      // observação (limpa ao confirmar) volta — o operador decide no aviso.
+      const repeticao = (error?.repeticao ?? null) as EntradaDiretaRepetida | null;
+      if (repeticao) {
+        setObservacaoAtual(observacao);
+        setRepeticaoPendente({ repeticao, produtos, observacao });
+        return;
+      }
       // Recusa por saldo: marca em vermelho as linhas dos itens recusados (com o
       // saldo que o servidor achou) para o operador ajustar e registrar de novo.
       const faltas = (error?.faltas ?? null) as Array<{ produto: string; cor: string; disponivel: number }> | null;
@@ -2678,7 +2746,7 @@ export default function SaidasEntradasProdutosPage({
     } finally {
       setProcessandoOperacao(false);
     }
-  }, [processandoOperacao, filialSelecionada, tipoOperacao, tipoRomaneioSelecionado, responsavelFinal, user?.username, filialDestinoSaida, companyKey, mostrarNotificacao, bipagem, fecharBipagemDoRegistro]);
+  }, [processandoOperacao, filialSelecionada, tipoOperacao, tipoRomaneioSelecionado, responsavelFinal, user?.username, filialDestinoSaida, companyKey, mostrarNotificacao, bipagem, fecharBipagemDoRegistro, setObservacaoAtual]);
 
   /**
    * Abre um romaneio já gravado (saída OU entrada) para acrescentar itens. Traz
@@ -3146,6 +3214,7 @@ export default function SaidasEntradasProdutosPage({
     executarLote(produtosSelecionados, obs);
   }, [executarLote, produtosSelecionados, observacaoAtual, setObservacaoAtual, romaneioEditando, salvarItensDaEdicao, bipagem.emVoo.length, bipagem.ocorrencias.length]);
 
+
   // Limpar produtos selecionados somente quando mudar a filial DE FATO (por codFilial real).
   // Comparar por codFilial e não por referência: o refresh em foco/visibilidade recria os
   // objetos Filial (mesma loja, nova referência) e não deve apagar a lista do usuário.
@@ -3342,17 +3411,125 @@ export default function SaidasEntradasProdutosPage({
     romaneioEmEdicao,
   ]);
 
+  // ── ENTRADA REPETIDA (409 ENTRADA_DIRETA_REPETIDA) ─────────────────────────
+  // A lista bate com uma entrada recente. Três saídas: acrescentar só o que falta
+  // NELA (o que era para ter sido feito no 836272), descartar a lista (já está
+  // toda lá) ou registrar mesmo assim, quando é outra nota.
+
+  /** Peças da lista enviada que ainda não estão no romaneio parecido. */
+  const diferencaDaRepeticao = useMemo(() => {
+    if (!repeticaoPendente) return [];
+    const { repeticao, produtos } = repeticaoPendente;
+    return produtos.flatMap((p, i) => {
+      const quantidade = repeticao.restante[i] ?? 0;
+      return quantidade > 0 ? [{ ...p, quantidade }] : [];
+    });
+  }, [repeticaoPendente]);
+
+  /** Apaga o rascunho de romaneio NOVO desta filial — a lista já está no romaneio existente. */
+  const apagarRascunhoNovo = useCallback(async (filialCod: string) => {
+    if (!user?.username) return;
+    try {
+      await removerRascunhoApi({ companyKey, tipoOperacao: "entrada", filial: filialCod }, user.username);
+    } catch (err) {
+      console.error("Erro ao remover rascunho da lista repetida", err);
+    }
+    void carregarRascunhos();
+  }, [companyKey, user?.username, carregarRascunhos]);
+
+  const acrescentarDiferencaNoRomaneio = useCallback(async () => {
+    if (!repeticaoPendente || !filialSelecionada) return;
+    const { repeticao } = repeticaoPendente;
+    const diferenca = diferencaDaRepeticao;
+    const filialCod = filialSelecionada.codFilial;
+
+    setRepeticaoPendente(null);
+    // Abre a edição ANTES de apagar o rascunho: se ela recusar (romaneio travado,
+    // sem permissão), a lista continua na tela e no rascunho, nada se perde.
+    const aberto = await abrirEdicaoRomaneio("entrada", repeticao.romaneio, filialCod);
+    if (!aberto) return;
+    await apagarRascunhoNovo(filialCod);
+
+    produtosSelecionadosRef.current = diferenca;
+    setProdutosSelecionados(diferenca);
+    const pecas = diferenca.reduce((s, p) => s + p.quantidade, 0);
+    mostrarNotificacao(
+      `Editando a entrada #${repeticao.romaneio}: a lista agora tem só o que falta nela — ${diferenca.length} produto(s) / ${pecas} peça(s). Confira e salve no romaneio.`
+    );
+  }, [repeticaoPendente, diferencaDaRepeticao, filialSelecionada, abrirEdicaoRomaneio, apagarRascunhoNovo, mostrarNotificacao]);
+
+  const descartarListaRepetida = useCallback(async () => {
+    if (!repeticaoPendente || !filialSelecionada) return;
+    const { repeticao } = repeticaoPendente;
+    setRepeticaoPendente(null);
+    rascunhoSalvoRef.current = false;
+    rascunhoPayloadRef.current = "";
+    setRascunhoStatus("idle");
+    setRascunhoRestauradoEm(null);
+    await apagarRascunhoNovo(filialSelecionada.codFilial);
+    produtosSelecionadosRef.current = [];
+    setProdutosSelecionados([]);
+    setObservacaoAtual("");
+    zerarBipagem();
+    mostrarNotificacao(`Lista descartada — tudo já estava na entrada #${repeticao.romaneio}.`);
+  }, [repeticaoPendente, filialSelecionada, apagarRascunhoNovo, setObservacaoAtual, zerarBipagem, mostrarNotificacao]);
+
+  const registrarMesmoAssim = useCallback(() => {
+    if (!repeticaoPendente) return;
+    const { repeticao, observacao } = repeticaoPendente;
+    setRepeticaoPendente(null);
+    setObservacaoAtual("");
+    executarLote(produtosSelecionados, observacao, repeticao.romaneio);
+  }, [repeticaoPendente, produtosSelecionados, setObservacaoAtual, executarLote]);
+
   /**
    * Assume um rascunho: traz tipo, filial, destino e itens para a tela.
    * Rascunho de outro usuário é transferido (o original é apagado) — a lista é da
    * LOJA, e quem entra no turno precisa continuar a conferência, não duplicá-la.
+   *
+   * Quem decide é o SERVIDOR (assumirRascunhoApi): a cópia da aba pode estar
+   * velha — o dono já registrou o romaneio — e retomá-la gerava outro romaneio
+   * com os mesmos itens (836272 × 836273).
    */
-  const retomarRascunho = useCallback(async (rascunho: RascunhoResumo) => {
-    const filial = filiaisDisponiveis.find((f) => matchesFilialOption(f, rascunho.filial));
+  const retomarRascunho = useCallback(async (resumo: RascunhoResumo) => {
+    if (!user?.username) return;
+    const filial = filiaisDisponiveis.find((f) => matchesFilialOption(f, resumo.filial));
     if (!filial) {
-      mostrarNotificacao(`Você não opera a filial ${rascunho.filialLabel}`, "error");
+      mostrarNotificacao(`Você não opera a filial ${resumo.filialLabel}`, "error");
       return;
     }
+
+    // Retomar rascunho de romaneio NOVO no meio da edição sai da edição: a lista
+    // dele vira outro romaneio, não entra no que está aberto. Nunca sem avisar.
+    if (romaneioEditando && !resumo.romaneioEdicao) {
+      const seguir = confirm(
+        `Você está acrescentando itens no romaneio #${romaneioEditando.romaneio}.
+
+` +
+          `Retomar este rascunho SAI dessa edição: a lista dele vai gerar um romaneio NOVO ` +
+          `e não entra no #${romaneioEditando.romaneio}.
+
+Continuar mesmo assim?`
+      );
+      if (!seguir) return;
+    }
+
+    let assumido: Awaited<ReturnType<typeof assumirRascunhoApi>>;
+    try {
+      assumido = await assumirRascunhoApi(resumo.id, user.username);
+    } catch (error) {
+      mostrarNotificacao(error instanceof Error ? error.message : "Erro ao retomar o rascunho", "error");
+      return;
+    }
+    if (!assumido) {
+      mostrarNotificacao(
+        "Este rascunho não existe mais — o romaneio já foi registrado ou outra pessoa assumiu a lista. Confira o histórico antes de montar de novo.",
+        "error"
+      );
+      void carregarRascunhos();
+      return;
+    }
+    const { rascunho, deUsuario } = assumido;
 
     // Neutraliza os efeitos que limpam a lista ao detectar troca de filial/tipo:
     // aqui a troca é intencional e já vem com os itens do rascunho.
@@ -3366,13 +3543,17 @@ export default function SaidasEntradasProdutosPage({
     if (rascunho.romaneioEdicao) {
       // Rascunho de EDIÇÃO: volta reabrindo o mesmo romaneio, não montando um
       // romaneio novo. Se o romaneio deixou de aceitar itens, a própria
-      // abrirEdicaoRomaneio avisa e nada é sobrescrito na tela.
+      // abrirEdicaoRomaneio avisa e nada é sobrescrito na tela (o rascunho já
+      // está no MEU escopo e segue na aba).
       const aberto = await abrirEdicaoRomaneio(
         rascunho.tipoOperacao,
         rascunho.romaneioEdicao,
         rascunho.filial
       );
-      if (!aberto) return;
+      if (!aberto) {
+        void carregarRascunhos();
+        return;
+      }
     } else {
       // Retomar rascunho comum é montar um romaneio NOVO: sai da edição.
       setRomaneioEditando(null);
@@ -3404,66 +3585,16 @@ export default function SaidasEntradasProdutosPage({
     setModalAberto(false);
     setAbaLateral("historico");
 
-    const meu = rascunho.username.toLowerCase() === (user?.username || "").toLowerCase();
-
-    /**
-     * Grava no MEU escopo antes de apagar o original. Se a ordem fosse inversa,
-     * entre o DELETE e a próxima gravação a conferência existiria só na memória
-     * do browser — exatamente o buraco que o rascunho existe para fechar.
-     */
-    if (user?.username) {
-      const payload = JSON.stringify({
-        company: companyKey,
-        tipoOperacao: rascunho.tipoOperacao,
-        filial: filial.codFilial,
-        filialLabel: filialOptionLabel(filial),
-        filialDestino: destino?.codFilial ?? null,
-        filialDestinoLabel: destino ? filialOptionLabel(destino) : null,
-        tipoRomaneio: rascunho.tipoRomaneio,
-        observacao: rascunho.observacao,
-        romaneioEdicao: rascunho.romaneioEdicao,
-        itens: rascunho.itens.map((item) => ({
-          produto: item.produto,
-          descProduto: item.descProduto,
-          codigoBarra: item.codigoBarra,
-          corProduto: item.corProduto,
-          descCor: item.descCor,
-          quantidade: item.quantidade,
-          estoque: item.estoque,
-          tamanho: item.tamanho ?? null,
-          tamanhoLabel: item.tamanhoLabel ?? null,
-        })),
-      });
-      try {
-        await salvarRascunhoApi(payload, user.username);
-        rascunhoPayloadRef.current = payload;
-        rascunhoSalvoRef.current = true;
-        setRascunhoStatus("salvo");
-      } catch {
-        // Não gravou: o autosave tenta de novo na próxima alteração. Nesse caso
-        // NÃO apagamos o original — ele continua sendo a única cópia segura.
-        setRascunhoStatus("erro");
-        mostrarNotificacao("Rascunho retomado, mas não foi possível salvá-lo ainda", "error");
-        void carregarRascunhos();
-        return;
-      }
-    }
-
-    if (!meu) {
-      try {
-        await removerRascunhoApi({ id: rascunho.id }, user?.username);
-      } catch {
-        // Se não apagar, fica uma cópia duplicada visível na aba — perde-se a
-        // limpeza, não o trabalho.
-      }
-    }
+    // O servidor já gravou o rascunho no MEU escopo: o autosave só atualiza.
+    rascunhoSalvoRef.current = true;
+    setRascunhoStatus("salvo");
 
     void carregarRascunhos();
     mostrarNotificacao(
-      `Rascunho retomado · ${rascunho.itens.length} produto(s)${meu ? "" : ` de ${rascunho.username}`}`
+      `Rascunho retomado · ${rascunho.itens.length} produto(s)${deUsuario ? ` de ${deUsuario}` : ""}` +
+        (romaneioEditando && !rascunho.romaneioEdicao ? " · vai gerar um romaneio NOVO" : "")
     );
   }, [
-    companyKey,
     filiaisDisponiveis,
     filiaisDestinoDisponiveis,
     filialOptionLabel,
@@ -3472,6 +3603,7 @@ export default function SaidasEntradasProdutosPage({
     abrirEdicaoRomaneio,
     mostrarNotificacao,
     carregarRascunhos,
+    romaneioEditando,
   ]);
 
   const descartarRascunho = useCallback(async (rascunho: RascunhoResumo) => {
@@ -4600,6 +4732,73 @@ export default function SaidasEntradasProdutosPage({
           </div>
         </div>
       )}
+
+      {/* Modal – Entrada que repete um romaneio recente (trava ENTRADA_DIRETA_REPETIDA) */}
+      {repeticaoPendente && (() => {
+        const { repeticao } = repeticaoPendente;
+        const pecasFaltam = diferencaDaRepeticao.reduce((s, p) => s + p.quantidade, 0);
+        return (
+          <div className={styles.modalOverlay} onClick={() => setRepeticaoPendente(null)}>
+            <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+              <div className={styles.modalHeader}>
+                <h2 className={styles.modalTitle}>Esta entrada já foi registrada?</h2>
+                <button className={styles.modalCloseBtn} onClick={() => setRepeticaoPendente(null)}>×</button>
+              </div>
+              <div className={styles.modalBody}>
+                <p className={styles.confirmacaoBloqueio}>
+                  A lista repete a entrada <strong>#{repeticao.romaneio}</strong>
+                  {repeticao.responsavel && <> de <strong>{repeticao.responsavel}</strong></>}
+                  {repeticao.quando && <> ({repeticao.quando})</>}:{" "}
+                  <strong>{repeticao.pecasEmComum}</strong> das {repeticao.pecasPedido} peças da lista já estão nela.
+                  Nada foi lançado — registrar de novo duplicaria o estoque.
+                </p>
+                {pecasFaltam > 0 ? (
+                  <div className={styles.confirmacaoDispensadas}>
+                    <strong>
+                      Faltam no #{repeticao.romaneio}: {diferencaDaRepeticao.length} produto(s) / {pecasFaltam} peça(s)
+                    </strong>
+                    <ul>
+                      {diferencaDaRepeticao.slice(0, 8).map((p) => (
+                        <li key={chaveLinha(p)}>
+                          {p.quantidade}× {p.descProduto || p.produto}
+                          {p.descCor ? ` — ${p.descCor}` : ""}
+                          {p.tamanhoLabel ? ` (${p.tamanhoLabel})` : ""}
+                        </li>
+                      ))}
+                      {diferencaDaRepeticao.length > 8 && <li>… e mais {diferencaDaRepeticao.length - 8}</li>}
+                    </ul>
+                  </div>
+                ) : (
+                  <p className={styles.confirmacaoTexto}>
+                    Tudo o que está na lista já está no #{repeticao.romaneio}.
+                  </p>
+                )}
+                {pecasFaltam > 0 && !podeEditarRomaneio && (
+                  <p className={styles.confirmacaoTexto} style={{ marginTop: "8px" }}>
+                    Para acrescentar o que falta no #{repeticao.romaneio}, peça para a logística usar “+ itens”.
+                  </p>
+                )}
+              </div>
+              <div className={styles.modalFooter}>
+                <button className={styles.btnSecondary} onClick={registrarMesmoAssim}>
+                  É outra nota — registrar como NOVA
+                </button>
+                {pecasFaltam > 0 ? (
+                  podeEditarRomaneio && (
+                    <button className={styles.btnConfirmarEntrada} onClick={() => void acrescentarDiferencaNoRomaneio()}>
+                      Acrescentar só o que falta no #{repeticao.romaneio}
+                    </button>
+                  )
+                ) : (
+                  <button className={styles.btnConfirmarEntrada} onClick={() => void descartarListaRepetida()}>
+                    Descartar a lista
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Modal – Adicionar Produto */}
       {modalAberto && (

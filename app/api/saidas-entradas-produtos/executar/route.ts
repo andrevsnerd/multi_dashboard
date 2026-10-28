@@ -32,6 +32,10 @@ import {
   mensagemEntradaDuplicada,
   observacaoComReferencia,
 } from '@/lib/server/trava-entrada-duplicada';
+import {
+  buscarEntradaDiretaRepetida,
+  mensagemEntradaDiretaRepetida,
+} from '@/lib/server/trava-entrada-direta-repetida';
 import { getActiveFilial } from '@/lib/config/company';
 import { resolveCompanyDynamic } from '@/lib/config/company-server';
 import type { CompanyConfig } from '@/lib/config/company';
@@ -82,6 +86,11 @@ interface SaidaEntradaRequest {
   romaneioReferencia?: { romaneio: string; filialOrigem: string; dataRomaneio?: string } | null;
   /** Tela que fez a operação — vai no OBS do romaneio (ver lib/server/obs-operacao.ts). */
   origemTela?: string | null;
+  /**
+   * Romaneio que a trava de entrada direta repetida apontou e o operador disse
+   * que é OUTRA nota. Pula a trava e fica registrado no OBS.
+   */
+  repeticaoConfirmada?: string | null;
 }
 
 /**
@@ -390,6 +399,29 @@ export async function POST(request: Request) {
     }
     const itensGravar = itensComTamanho.map((it) => ({ ...it, tamanho: tamanhoEfetivo(it, grades) }));
 
+    // TRAVA DE ENTRADA DIRETA REPETIDA — a mesma lista não vira dois romaneios
+    // (836272 × 836273). Ver lib/server/trava-entrada-direta-repetida.ts.
+    const repeticaoConfirmada = (body.repeticaoConfirmada || '').trim() || null;
+    if (tipoOperacao === 'entrada' && !ref?.romaneio && !repeticaoConfirmada) {
+      let repetida = null;
+      try {
+        repetida = await buscarEntradaDiretaRepetida({ filial: filialTrim, itens: itensGravar });
+      } catch (travaError) {
+        // Fail-open, como as outras travas: indisponibilidade não pode impedir a entrada.
+        console.error('Erro ao verificar entrada direta repetida', travaError);
+      }
+      if (repetida) {
+        return NextResponse.json(
+          {
+            error: mensagemEntradaDiretaRepetida(repetida),
+            code: 'ENTRADA_DIRETA_REPETIDA',
+            repeticao: repetida,
+          },
+          { status: 409 }
+        );
+      }
+    }
+
     // TRAVA — confirmação de saída nunca passa do romaneio (item, quantidade e
     // tamanho). Ver lib/server/trava-confirmacao-acima-romaneio.ts.
     if (tipoOperacao === 'entrada' && ref?.romaneio && ref.filialOrigem) {
@@ -443,7 +475,12 @@ export async function POST(request: Request) {
       tela,
       usuario: username,
       responsavelLinx: responsavelFinal,
-      obsUsuario: observacao,
+      obsUsuario: repeticaoConfirmada
+        ? [
+            (observacao || '').trim(),
+            `REGISTRADA COMO ENTRADA NOVA APESAR DE REPETIR O ROMANEIO ${repeticaoConfirmada} (CONFIRMADO POR ${username})`,
+          ].filter(Boolean).join('\n')
+        : observacao,
     });
 
     const pool = shouldUseProxy() ? new ProxyPool() : await getConnectionPool();

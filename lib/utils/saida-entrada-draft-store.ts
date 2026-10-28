@@ -377,3 +377,74 @@ export async function removerRascunho(id: string): Promise<void> {
   await ensureTable();
   await sql`DELETE FROM saida_entrada_rascunhos WHERE id = ${key}`;
 }
+
+/**
+ * Tira o rascunho do lugar e devolve o que ele era (DELETE … RETURNING). Dois
+ * "assumir" ao mesmo tempo: só um recebe o rascunho; o outro recebe null.
+ */
+async function retirarRascunho(id: string): Promise<SaidaEntradaRascunho | null> {
+  const key = norm(id);
+  if (!key) return null;
+
+  if (!hasPostgres()) {
+    const rows = readFileRascunhos();
+    const idx = rows.findIndex((r) => r.id === key);
+    if (idx < 0) return null;
+    const [retirado] = rows.splice(idx, 1);
+    writeFileRascunhos(rows);
+    return retirado;
+  }
+
+  const sql = getNeonSql();
+  await ensureTable();
+  const rows = await sql`DELETE FROM saida_entrada_rascunhos WHERE id = ${key} RETURNING *`;
+  return rows.length > 0 ? rowToRascunho(rows[0] as Record<string, unknown>) : null;
+}
+
+export type AssumirRascunhoResultado =
+  | { ok: true; rascunho: SaidaEntradaRascunho; deUsuario: string | null }
+  | { ok: false; motivo: "inexistente" };
+
+/**
+ * "Retomar" um rascunho da aba Rascunhos, decidido no SERVIDOR.
+ *
+ * A tela guardava a lista da aba desde a última leitura e retomava essa cópia:
+ * se o dono já tinha registrado o romaneio, a cópia velha voltava como lista
+ * nova e virava outro romaneio com os mesmos itens (836272 × 836273, NERD,
+ * 28/10/2026). Aqui o rascunho é relido na hora — se não existe mais, não volta.
+ *
+ * Rascunho de outra pessoa é TRANSFERIDO: retirado do dono (só um "assumir"
+ * ganha) e gravado no escopo de quem assumiu. Se a gravação falhar, o original
+ * volta para o dono — a conferência nunca fica só na memória.
+ */
+export async function assumirRascunho(id: string, username: string): Promise<AssumirRascunhoResultado> {
+  const atual = await buscarRascunho(id);
+  if (!atual) return { ok: false, motivo: "inexistente" };
+  if (atual.username.toLowerCase() === norm(username).toLowerCase()) {
+    return { ok: true, rascunho: atual, deUsuario: null };
+  }
+
+  const retirado = await retirarRascunho(id);
+  if (!retirado) return { ok: false, motivo: "inexistente" };
+
+  const base = {
+    companyKey: retirado.companyKey,
+    tipoOperacao: retirado.tipoOperacao,
+    filial: retirado.filial,
+    filialLabel: retirado.filialLabel,
+    filialDestino: retirado.filialDestino,
+    filialDestinoLabel: retirado.filialDestinoLabel,
+    tipoRomaneio: retirado.tipoRomaneio,
+    observacao: retirado.observacao,
+    romaneioEdicao: retirado.romaneioEdicao,
+    itens: retirado.itens,
+  };
+  try {
+    const meu = await salvarRascunho({ ...base, username });
+    if (!meu) throw new Error("Rascunho assumido sem itens");
+    return { ok: true, rascunho: meu, deUsuario: retirado.username };
+  } catch (erro) {
+    await salvarRascunho({ ...base, username: retirado.username }).catch(() => undefined);
+    throw erro;
+  }
+}

@@ -420,8 +420,8 @@
     "semantic_hash": "3058da7b40497a1f599ba8cdca8c7713"
   },
   "app/api/ajuste-estoque/recentes/route.ts": {
-    "mtime": 1793188061.5453713,
-    "ast_hash": "356a780e9ba0ccecff514490162e820e",
+    "mtime": 1793195626.4811666,
+    "ast_hash": "a0c4513e4ba9c5ef7a8d4c4d018eea0d",
     "semantic_hash": ""
   },
   "app/api/auth/alterar-senha/route.ts": {
@@ -965,8 +965,8 @@
     "semantic_hash": ""
   },
   "app/api/saidas-entradas-produtos/executar/route.ts": {
-    "mtime": 1793127927.5386777,
-    "ast_hash": "2b2d24d235e04a0d0f803c71b5544db6",
+    "mtime": 1793198617.1846473,
+    "ast_hash": "7359ac73f66b6706e7a07268c75040ad",
     "semantic_hash": ""
   },
   "app/api/saidas-entradas-produtos/historico/route.ts": {
@@ -1230,8 +1230,8 @@
     "semantic_hash": "e449c381872599286ae61c72a1af8112"
   },
   "components/ajuste-estoque/AjusteEstoquePage.tsx": {
-    "mtime": 1793188169.042416,
-    "ast_hash": "83d408ea6254ae7035020ce778d2ed38",
+    "mtime": 1793195674.1062284,
+    "ast_hash": "3cf361977d835f0f29b541e8ceff8508",
     "semantic_hash": ""
   },
   "components/auth/AuthContext.tsx": {
@@ -1615,8 +1615,8 @@
     "semantic_hash": ""
   },
   "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx": {
-    "mtime": 1793026162.7999358,
-    "ast_hash": "480bfec90a67f697aac0db597b236e53",
+    "mtime": 1793198838.666437,
+    "ast_hash": "10e506d85c676a19120556524d4b609b",
     "semantic_hash": ""
   },
   "components/shared/CompraIdealCell.tsx": {
@@ -2070,8 +2070,8 @@
     "semantic_hash": ""
   },
   "lib/auth/permissions.ts": {
-    "mtime": 1793188059.0295863,
-    "ast_hash": "f6c7322c9f6de696a09031d226245cac",
+    "mtime": 1793188464.9336846,
+    "ast_hash": "5678efe4cb7590cd7b4d9bf535eb011b",
     "semantic_hash": ""
   },
   "lib/auth/users-store-neon.ts": {
@@ -2380,8 +2380,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/ajusteEstoque.ts": {
-    "mtime": 1793188060.7116978,
-    "ast_hash": "0b0e356e2b900457b025970620635bf8",
+    "mtime": 1793195625.6217108,
+    "ast_hash": "d56b38dec0c198fbc237ae4e9a564a2a",
     "semantic_hash": ""
   },
   "lib/repositories/claudeReport.ts": {
@@ -4190,8 +4190,8 @@
     "semantic_hash": ""
   },
   "app/api/saidas-entradas-produtos/rascunhos/route.ts": {
-    "mtime": 1788353872.306146,
-    "ast_hash": "3d33270c7938671d52128b7db6bcee0f",
+    "mtime": 1793198642.582645,
+    "ast_hash": "f37065ad3dd2bca0b5f01ccea26139e6",
     "semantic_hash": ""
   },
   "app/api/transferencia-produtos/bipar/route.ts": {
@@ -4270,8 +4270,8 @@
     "semantic_hash": ""
   },
   "lib/utils/saida-entrada-draft-store.ts": {
-    "mtime": 1791998181.0648625,
-    "ast_hash": "6f048808fc94f0782f678e821d08719e",
+    "mtime": 1793198640.0376973,
+    "ast_hash": "cb84507d15426386b34282ab770d728f",
     "semantic_hash": ""
   },
   "app/api/relatorios/stream/route.ts": {
@@ -5162,6 +5162,11 @@
   "lib/utils/exportAjusteEstoqueXlsx.ts": {
     "mtime": 1793188121.2529294,
     "ast_hash": "3db231bb01f6dacd9873e411bd97598f",
+    "semantic_hash": ""
+  },
+  "lib/server/trava-entrada-direta-repetida.ts": {
+    "mtime": 1793198598.4492743,
+    "ast_hash": "8ea425609e157d84e14aa6c2e3f05680",
     "semantic_hash": ""
   }
 }
