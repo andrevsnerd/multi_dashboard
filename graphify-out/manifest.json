@@ -325,8 +325,8 @@
     "semantic_hash": "cf2bef2b79543108e9513318bfc96dd6"
   },
   "app/admin/page.tsx": {
-    "mtime": 1792679389.7216938,
-    "ast_hash": "c96be5a8b59f7edab60b44e9cca16093",
+    "mtime": 1793203830.1706784,
+    "ast_hash": "136498b566aba9fd9039420e3cb54779",
     "semantic_hash": ""
   },
   "app/admin/transferencia-permissoes/page.tsx": {
@@ -1425,8 +1425,8 @@
     "semantic_hash": "7a672d31b6ac254cb25f6a420501049d"
   },
   "components/layout/Sidebar.tsx": {
-    "mtime": 1792768612.5024784,
-    "ast_hash": "d5c4dbd578dace98b4729a9c39f48cf9",
+    "mtime": 1793203832.848646,
+    "ast_hash": "2af7c2decff31834d29751a101d94594",
     "semantic_hash": ""
   },
   "components/layout/SidebarContext.tsx": {
@@ -2070,8 +2070,8 @@
     "semantic_hash": ""
   },
   "lib/auth/permissions.ts": {
-    "mtime": 1793188464.9336846,
-    "ast_hash": "5678efe4cb7590cd7b4d9bf535eb011b",
+    "mtime": 1793203829.2638142,
+    "ast_hash": "79d2ccd63fdf52d874b3c49fd99c7012",
     "semantic_hash": ""
   },
   "lib/auth/users-store-neon.ts": {
@@ -2150,8 +2150,8 @@
     "semantic_hash": "29590f1b0f773ebbcd60e9dc314eec58"
   },
   "lib/config/page-permissions.ts": {
-    "mtime": 1792768609.0937762,
-    "ast_hash": "d76e5551fadcbcd83e06889dd8bb96de",
+    "mtime": 1793203828.349895,
+    "ast_hash": "577dda4bfc392bb4fc1312d51e5d5390",
     "semantic_hash": ""
   },
   "lib/constants/columns.ts": {
@@ -5167,6 +5167,41 @@
   "lib/server/trava-entrada-direta-repetida.ts": {
     "mtime": 1793198598.4492743,
     "ast_hash": "8ea425609e157d84e14aa6c2e3f05680",
+    "semantic_hash": ""
+  },
+  "app/(companies)/[company]/aproveitamentos-matriz/page.tsx": {
+    "mtime": 1793203870.5796947,
+    "ast_hash": "d0be463359616cc0f278d3d62c544d23",
+    "semantic_hash": ""
+  },
+  "app/api/aproveitamentos-matriz/route.ts": {
+    "mtime": 1793203851.545493,
+    "ast_hash": "280b247feeaf84e023bfb18a0aa6dd42",
+    "semantic_hash": ""
+  },
+  "components/insumos/AproveitamentosMatrizPage.tsx": {
+    "mtime": 1793204417.097525,
+    "ast_hash": "1294576c811813a97cf20693496cad58",
+    "semantic_hash": ""
+  },
+  "lib/auth/aproveitamentos-matriz-guard.ts": {
+    "mtime": 1793203811.710333,
+    "ast_hash": "e4b96000c7203e457b31742d945f923c",
+    "semantic_hash": ""
+  },
+  "lib/config/aproveitamentos-matriz.ts": {
+    "mtime": 1793205437.3422923,
+    "ast_hash": "d24b72d0ee79826224e8dfc6d0eff882",
+    "semantic_hash": ""
+  },
+  "lib/repositories/aproveitamentosMatriz.ts": {
+    "mtime": 1793203800.125433,
+    "ast_hash": "42eb705e4a7f9c82eeeb052eea9a60f9",
+    "semantic_hash": ""
+  },
+  "lib/utils/aproveitamentos-matriz-store.ts": {
+    "mtime": 1793204046.542972,
+    "ast_hash": "b380ca81aa0d65e5ef25c1cb0e82df5c",
     "semantic_hash": ""
   }
 }

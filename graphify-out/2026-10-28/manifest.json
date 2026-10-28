@@ -325,8 +325,8 @@
     "semantic_hash": "cf2bef2b79543108e9513318bfc96dd6"
   },
   "app/admin/page.tsx": {
-    "mtime": 1792679389.7216938,
-    "ast_hash": "c96be5a8b59f7edab60b44e9cca16093",
+    "mtime": 1793203830.1706784,
+    "ast_hash": "136498b566aba9fd9039420e3cb54779",
     "semantic_hash": ""
   },
   "app/admin/transferencia-permissoes/page.tsx": {
@@ -420,8 +420,8 @@
     "semantic_hash": "3058da7b40497a1f599ba8cdca8c7713"
   },
   "app/api/ajuste-estoque/recentes/route.ts": {
-    "mtime": 1793188061.5453713,
-    "ast_hash": "356a780e9ba0ccecff514490162e820e",
+    "mtime": 1793195626.4811666,
+    "ast_hash": "a0c4513e4ba9c5ef7a8d4c4d018eea0d",
     "semantic_hash": ""
   },
   "app/api/auth/alterar-senha/route.ts": {
@@ -965,8 +965,8 @@
     "semantic_hash": ""
   },
   "app/api/saidas-entradas-produtos/executar/route.ts": {
-    "mtime": 1793127927.5386777,
-    "ast_hash": "2b2d24d235e04a0d0f803c71b5544db6",
+    "mtime": 1793198617.1846473,
+    "ast_hash": "7359ac73f66b6706e7a07268c75040ad",
     "semantic_hash": ""
   },
   "app/api/saidas-entradas-produtos/historico/route.ts": {
@@ -1230,8 +1230,8 @@
     "semantic_hash": "e449c381872599286ae61c72a1af8112"
   },
   "components/ajuste-estoque/AjusteEstoquePage.tsx": {
-    "mtime": 1793188169.042416,
-    "ast_hash": "83d408ea6254ae7035020ce778d2ed38",
+    "mtime": 1793195674.1062284,
+    "ast_hash": "3cf361977d835f0f29b541e8ceff8508",
     "semantic_hash": ""
   },
   "components/auth/AuthContext.tsx": {
@@ -1425,8 +1425,8 @@
     "semantic_hash": "7a672d31b6ac254cb25f6a420501049d"
   },
   "components/layout/Sidebar.tsx": {
-    "mtime": 1792768612.5024784,
-    "ast_hash": "d5c4dbd578dace98b4729a9c39f48cf9",
+    "mtime": 1793203832.848646,
+    "ast_hash": "2af7c2decff31834d29751a101d94594",
     "semantic_hash": ""
   },
   "components/layout/SidebarContext.tsx": {
@@ -1615,8 +1615,8 @@
     "semantic_hash": ""
   },
   "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx": {
-    "mtime": 1793026162.7999358,
-    "ast_hash": "480bfec90a67f697aac0db597b236e53",
+    "mtime": 1793198838.666437,
+    "ast_hash": "10e506d85c676a19120556524d4b609b",
     "semantic_hash": ""
   },
   "components/shared/CompraIdealCell.tsx": {
@@ -2070,8 +2070,8 @@
     "semantic_hash": ""
   },
   "lib/auth/permissions.ts": {
-    "mtime": 1793188059.0295863,
-    "ast_hash": "f6c7322c9f6de696a09031d226245cac",
+    "mtime": 1793203829.2638142,
+    "ast_hash": "79d2ccd63fdf52d874b3c49fd99c7012",
     "semantic_hash": ""
   },
   "lib/auth/users-store-neon.ts": {
@@ -2150,8 +2150,8 @@
     "semantic_hash": "29590f1b0f773ebbcd60e9dc314eec58"
   },
   "lib/config/page-permissions.ts": {
-    "mtime": 1792768609.0937762,
-    "ast_hash": "d76e5551fadcbcd83e06889dd8bb96de",
+    "mtime": 1793203828.349895,
+    "ast_hash": "577dda4bfc392bb4fc1312d51e5d5390",
     "semantic_hash": ""
   },
   "lib/constants/columns.ts": {
@@ -2380,8 +2380,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/ajusteEstoque.ts": {
-    "mtime": 1793188060.7116978,
-    "ast_hash": "0b0e356e2b900457b025970620635bf8",
+    "mtime": 1793195625.6217108,
+    "ast_hash": "d56b38dec0c198fbc237ae4e9a564a2a",
     "semantic_hash": ""
   },
   "lib/repositories/claudeReport.ts": {
@@ -4190,8 +4190,8 @@
     "semantic_hash": ""
   },
   "app/api/saidas-entradas-produtos/rascunhos/route.ts": {
-    "mtime": 1788353872.306146,
-    "ast_hash": "3d33270c7938671d52128b7db6bcee0f",
+    "mtime": 1793198642.582645,
+    "ast_hash": "f37065ad3dd2bca0b5f01ccea26139e6",
     "semantic_hash": ""
   },
   "app/api/transferencia-produtos/bipar/route.ts": {
@@ -4270,8 +4270,8 @@
     "semantic_hash": ""
   },
   "lib/utils/saida-entrada-draft-store.ts": {
-    "mtime": 1791998181.0648625,
-    "ast_hash": "6f048808fc94f0782f678e821d08719e",
+    "mtime": 1793198640.0376973,
+    "ast_hash": "cb84507d15426386b34282ab770d728f",
     "semantic_hash": ""
   },
   "app/api/relatorios/stream/route.ts": {
@@ -5162,6 +5162,46 @@
   "lib/utils/exportAjusteEstoqueXlsx.ts": {
     "mtime": 1793188121.2529294,
     "ast_hash": "3db231bb01f6dacd9873e411bd97598f",
+    "semantic_hash": ""
+  },
+  "lib/server/trava-entrada-direta-repetida.ts": {
+    "mtime": 1793198598.4492743,
+    "ast_hash": "8ea425609e157d84e14aa6c2e3f05680",
+    "semantic_hash": ""
+  },
+  "app/(companies)/[company]/aproveitamentos-matriz/page.tsx": {
+    "mtime": 1793203870.5796947,
+    "ast_hash": "d0be463359616cc0f278d3d62c544d23",
+    "semantic_hash": ""
+  },
+  "app/api/aproveitamentos-matriz/route.ts": {
+    "mtime": 1793203851.545493,
+    "ast_hash": "280b247feeaf84e023bfb18a0aa6dd42",
+    "semantic_hash": ""
+  },
+  "components/insumos/AproveitamentosMatrizPage.tsx": {
+    "mtime": 1793203981.792342,
+    "ast_hash": "ab980a8948c94997c26dc8f8a3cd427e",
+    "semantic_hash": ""
+  },
+  "lib/auth/aproveitamentos-matriz-guard.ts": {
+    "mtime": 1793203811.710333,
+    "ast_hash": "e4b96000c7203e457b31742d945f923c",
+    "semantic_hash": ""
+  },
+  "lib/config/aproveitamentos-matriz.ts": {
+    "mtime": 1793203755.8069456,
+    "ast_hash": "5f22ad7d707ac7a117a38297fb4dbcea",
+    "semantic_hash": ""
+  },
+  "lib/repositories/aproveitamentosMatriz.ts": {
+    "mtime": 1793203800.125433,
+    "ast_hash": "42eb705e4a7f9c82eeeb052eea9a60f9",
+    "semantic_hash": ""
+  },
+  "lib/utils/aproveitamentos-matriz-store.ts": {
+    "mtime": 1793204046.542972,
+    "ast_hash": "b380ca81aa0d65e5ef25c1cb0e82df5c",
     "semantic_hash": ""
   }
 }

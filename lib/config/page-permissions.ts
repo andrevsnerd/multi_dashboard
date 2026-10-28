@@ -57,6 +57,7 @@ export const PAGE_PERMISSION_DEFINITIONS = [
   { key: "gastos-compra", label: "Gastos de Compra", routeSegments: ["gastos-compra"] },
   { key: "compra-ciclo", label: "Ciclo de Compra", routeSegments: ["compra-ciclo"] },
   { key: "embalagens-aviamentos", label: "Embalagens e Aviamentos", routeSegments: ["embalagens-aviamentos"] },
+  { key: "aproveitamentos-matriz", label: "Aproveitamentos Matriz", routeSegments: ["aproveitamentos-matriz"] },
   { key: "mapa-clientes", label: "Mapa de Clientes", routeSegments: ["mapa-clientes"] },
   { key: "filial", label: "Filiais", routeSegments: ["filial"] },
   { key: "exportar-relatorios", label: "Exportar Relatorios", routeSegments: ["exportar-relatorios"] },

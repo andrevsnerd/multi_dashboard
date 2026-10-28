@@ -177,6 +177,8 @@ export default function Sidebar({ companyName }: SidebarProps) {
     basePath && basePath !== "/" ? `${basePath}/compra-ciclo` : "/compra-ciclo";
   const embalagensAviamentosHref =
     basePath && basePath !== "/" ? `${basePath}/embalagens-aviamentos` : "/embalagens-aviamentos";
+  const aproveitamentosMatrizHref =
+    basePath && basePath !== "/" ? `${basePath}/aproveitamentos-matriz` : "/aproveitamentos-matriz";
   const mapaClientesHref =
     basePath && basePath !== "/" ? `${basePath}/mapa-clientes` : "/mapa-clientes";
   const planejamentoReceitaHref =
@@ -285,6 +287,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     "/gastos-compra",
     "/compra-ciclo",
     "/embalagens-aviamentos",
+    "/aproveitamentos-matriz",
     "/produtos",
     "/produtos-recentes",
     "/produto-agrupado",
@@ -620,6 +623,14 @@ export default function Sidebar({ companyName }: SidebarProps) {
                 permission: "embalagens-aviamentos" as const,
                 isActive: (currentPathname: string | null) =>
                   matchesSegment(currentPathname, "/embalagens-aviamentos", embalagensAviamentosHref),
+              },
+              {
+                key: "aproveitamentos-matriz",
+                label: "Aproveitamentos Matriz",
+                href: aproveitamentosMatrizHref,
+                permission: "aproveitamentos-matriz" as const,
+                isActive: (currentPathname: string | null) =>
+                  matchesSegment(currentPathname, "/aproveitamentos-matriz", aproveitamentosMatrizHref),
               },
             ]
           : []),

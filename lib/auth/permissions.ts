@@ -293,6 +293,9 @@ export const ROLE_RESTRICTED_PERMISSIONS: Partial<Record<PermissionKey, RoleKey[
   // sugerida e a data de compra de TODA loja. Politica de reposicao, nao operacao de loja —
   // mesmo conjunto restrito, com diretor entrando somente-leitura.
   "compra-ciclo": ["admin", "diretor", "logistica"],
+  // Aproveitamentos Matriz mostra custo por item e o custo total do estoque offline:
+  // mesma regra de CUSTO_VISIBLE_ROLES (diretor e financeiro entram somente-leitura).
+  "aproveitamentos-matriz": ["admin", "diretor", "logistica", "financeiro"],
   // Área corporativo é exclusiva do admin, diretor e do cliente_corporativo. Supervisor/gerente/logística
   // nunca acessam, pois roleAllowsPermission barra.
   "clientes-corporativos": ["admin", "diretor", "marketing", "cliente_corporativo"],
