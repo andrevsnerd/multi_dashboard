@@ -142,35 +142,73 @@ export interface AjusteRecente {
   responsavel: string;
 }
 
+export const AJUSTES_RECENTES_POR_PAGINA = 30;
+
+/** Escapa curingas do LIKE (%, _, [) além das aspas. */
+function escLike(value: string): string {
+  return esc(value).replace(/\[/g, '[[]').replace(/%/g, '[%]').replace(/_/g, '[_]');
+}
+
 /**
- * Lista os 30 ajustes mais recentes do responsável (para "desfazer"/consultar). Exclui estornos.
- * `responsavel` null = de todos os responsáveis (visão da logística, só consulta).
+ * Lista os ajustes mais recentes do responsável (para "desfazer"/consultar), paginado.
+ * Exclui estornos. `responsavel` null = de todos os responsáveis (visão da logística).
+ * `busca`: cada palavra tem que aparecer no nome do ajuste, na filial ou no responsável
+ * (sem acento/caixa) — palavra a palavra porque FILIAL tem espaço duplo ("LLL -  GALEAO").
  */
-export async function listarAjustesRecentes(responsavel: string | null): Promise<AjusteRecente[]> {
+export async function listarAjustesRecentes(
+  responsavel: string | null,
+  opts: { busca?: string; pagina?: number; porPagina?: number } = {}
+): Promise<{ recentes: AjusteRecente[]; total: number }> {
+  const porPagina = Math.min(100, Math.max(1, Math.floor(opts.porPagina ?? AJUSTES_RECENTES_POR_PAGINA)));
+  const pagina = Math.max(1, Math.floor(opts.pagina ?? 1));
   const filtroResp =
     responsavel == null ? '' : `AND RTRIM(LTRIM(c.RESPONSAVEL)) = '${esc(responsavel.trim())}'`;
-  const rows = await query<{
-    NOME: string;
-    FILIAL: string;
-    EMISSAO: Date;
-    ITENS: number;
-    SOMA: number;
-    RESPONSAVEL: string | null;
-  }>(`
-    SELECT TOP 30 RTRIM(c.NOME_CONTAGEM) AS NOME, RTRIM(c.FILIAL) AS FILIAL, c.EMISSAO,
-           ISNULL(s.ITENS, 0) AS ITENS, ISNULL(s.SOMA, 0) AS SOMA,
-           RTRIM(LTRIM(c.RESPONSAVEL)) AS RESPONSAVEL
-    FROM ESTOQUE_PROD_CONTAGEM c WITH (NOLOCK)
-    LEFT JOIN (
-      SELECT NOME_CONTAGEM, COUNT(*) AS ITENS, SUM(ISNULL(QTDE_AJUSTE, 0)) AS SOMA
-      FROM ESTOQUE_PROD_CTG_AJUSTE WITH (NOLOCK) GROUP BY NOME_CONTAGEM
-    ) s ON s.NOME_CONTAGEM = c.NOME_CONTAGEM
+  const filtroBusca = (opts.busca ?? '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 8)
+    .map((termo) => {
+      const t = escLike(termo);
+      return `AND (c.NOME_CONTAGEM COLLATE Latin1_General_CI_AI LIKE '%${t}%'
+        OR c.FILIAL COLLATE Latin1_General_CI_AI LIKE '%${t}%'
+        OR c.RESPONSAVEL COLLATE Latin1_General_CI_AI LIKE '%${t}%')`;
+    })
+    .join('\n      ');
+  const where = `
     WHERE c.ESTOQUE_AJUSTADO = 1
       ${filtroResp}
       AND (c.OBS IS NULL OR CAST(c.OBS AS VARCHAR(60)) NOT LIKE 'ESTORNO%')
-    ORDER BY c.DATA_PARA_TRANSFERENCIA DESC, c.EMISSAO DESC
-  `);
-  return rows.map((r) => ({
+      ${filtroBusca}`;
+
+  const [rows, contagem] = await Promise.all([
+    query<{
+      NOME: string;
+      FILIAL: string;
+      EMISSAO: Date;
+      ITENS: number;
+      SOMA: number;
+      RESPONSAVEL: string | null;
+    }>(`
+      SELECT RTRIM(c.NOME_CONTAGEM) AS NOME, RTRIM(c.FILIAL) AS FILIAL, c.EMISSAO,
+             ISNULL(s.ITENS, 0) AS ITENS, ISNULL(s.SOMA, 0) AS SOMA,
+             RTRIM(LTRIM(c.RESPONSAVEL)) AS RESPONSAVEL
+      FROM ESTOQUE_PROD_CONTAGEM c WITH (NOLOCK)
+      LEFT JOIN (
+        SELECT NOME_CONTAGEM, COUNT(*) AS ITENS, SUM(ISNULL(QTDE_AJUSTE, 0)) AS SOMA
+        FROM ESTOQUE_PROD_CTG_AJUSTE WITH (NOLOCK) GROUP BY NOME_CONTAGEM
+      ) s ON s.NOME_CONTAGEM = c.NOME_CONTAGEM
+      ${where}
+      ORDER BY c.DATA_PARA_TRANSFERENCIA DESC, c.EMISSAO DESC, c.NOME_CONTAGEM
+      OFFSET ${(pagina - 1) * porPagina} ROWS FETCH NEXT ${porPagina} ROWS ONLY
+    `),
+    query<{ TOTAL: number }>(`
+      SELECT COUNT(*) AS TOTAL
+      FROM ESTOQUE_PROD_CONTAGEM c WITH (NOLOCK)
+      ${where}
+    `),
+  ]);
+  const recentes = rows.map((r) => ({
     nome: r.NOME?.trim() ?? '',
     filial: r.FILIAL?.trim() ?? '',
     emissao: r.EMISSAO ? new Date(r.EMISSAO).toISOString() : '',
@@ -178,6 +216,7 @@ export async function listarAjustesRecentes(responsavel: string | null): Promise
     soma: Number(r.SOMA) || 0,
     responsavel: r.RESPONSAVEL?.trim() ?? '',
   }));
+  return { recentes, total: Number(contagem[0]?.TOTAL) || 0 };
 }
 
 export interface AjusteDetalheItem {

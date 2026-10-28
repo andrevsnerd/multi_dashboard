@@ -323,6 +323,54 @@
   background: var(--s-50);
   padding: 10px 16px;
 }
+/* Ajustes recentes: busca + paginação estilo caixa de e-mail ("1–30 de 412 ‹ ›") */
+.recentesToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 10px 0 12px;
+}
+.recentesBusca {
+  flex: 1 1 280px;
+  max-width: 460px;
+  font-size: 14px;
+  padding: 8px 12px;
+}
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+.pagerInfo {
+  font-size: 13px;
+  color: var(--ae-text-2);
+  font-variant-numeric: tabular-nums;
+  margin-right: 6px;
+  white-space: nowrap;
+}
+.pagerBtn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--ae-border);
+  background: var(--ae-card);
+  color: var(--ae-text);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.pagerBtn:hover:not(:disabled) {
+  background: var(--ae-blue-bg);
+  border-color: var(--ae-blue);
+  color: var(--ae-blue);
+}
+.pagerBtn:disabled {
+  color: var(--ae-text-3);
+  cursor: default;
+}
 .detalheAcoes {
   display: flex;
   justify-content: flex-end;

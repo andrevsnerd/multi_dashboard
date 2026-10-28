@@ -296,26 +296,64 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
   const [detalheCache, setDetalheCache] = useState<Record<string, AjusteDetalhe>>({});
   const [detalheCarregando, setDetalheCarregando] = useState(false);
 
+  // Paginação (30 por página, no servidor) + busca por nome do ajuste / filial / responsável.
+  const [recentesTotal, setRecentesTotal] = useState(0);
+  const [recentesPorPagina, setRecentesPorPagina] = useState(30);
+  const [recentesPagina, setRecentesPagina] = useState(1);
+  const [buscaRecentes, setBuscaRecentes] = useState("");
+  const [buscaAplicada, setBuscaAplicada] = useState("");
+  const [carregandoRecentes, setCarregandoRecentes] = useState(false);
+  const recentesReqRef = useRef(0);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchRecentes = useCallback(async () => {
     if (!username) return;
+    // Só a resposta mais nova vale (digitação rápida / troca de página dispara várias).
+    const req = ++recentesReqRef.current;
+    setCarregandoRecentes(true);
     try {
-      const r = await fetch("/api/ajuste-estoque/recentes", {
+      const params = new URLSearchParams({ pagina: String(recentesPagina) });
+      if (buscaAplicada) params.set("busca", buscaAplicada);
+      const r = await fetch(`/api/ajuste-estoque/recentes?${params}`, {
         headers: { "x-auth-username": username },
       });
       const d = await r.json();
+      if (req !== recentesReqRef.current) return;
       setRecentes(Array.isArray(d?.recentes) ? d.recentes : []);
+      setRecentesTotal(Number(d?.total) || 0);
+      if (Number(d?.porPagina) > 0) setRecentesPorPagina(Number(d.porPagina));
       setRecentesTodos(d?.todos === true);
       setMeuResponsavel(typeof d?.responsavel === "string" ? d.responsavel : "");
     } catch {
       /* silencioso */
+    } finally {
+      if (req === recentesReqRef.current) setCarregandoRecentes(false);
     }
-  }, [username]);
+  }, [username, recentesPagina, buscaAplicada]);
 
   useEffect(() => {
     fetchRecentes();
   }, [fetchRecentes]);
+
+  // Busca com debounce; mudou o termo, volta para a 1ª página.
+  useEffect(() => {
+    const termo = buscaRecentes.trim();
+    if (termo === buscaAplicada) return;
+    const t = setTimeout(() => {
+      setBuscaAplicada(termo);
+      setRecentesPagina(1);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [buscaRecentes, buscaAplicada]);
+
+  const recentesTotalPaginas = Math.max(1, Math.ceil(recentesTotal / recentesPorPagina));
+  // Desfez o último da última página: a página pode ter deixado de existir.
+  useEffect(() => {
+    if (recentesPagina > recentesTotalPaginas && recentesTotal > 0) {
+      setRecentesPagina(recentesTotalPaginas);
+    }
+  }, [recentesPagina, recentesTotalPaginas, recentesTotal]);
 
   const verDetalhe = useCallback(
     async (nome: string) => {
@@ -889,17 +927,62 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
       )}
 
       {/* ── Ajustes recentes (consultar / exportar / desfazer) ── */}
-      {recentes.length > 0 && (
+      {(recentesTotal > 0 || !!buscaAplicada || !!buscaRecentes) && (
         <section className={styles.card}>
           <h2 className={styles.cardTitle}>Ajustes recentes</h2>
           <p className={styles.fileHintMuted}>
-            {recentesTodos ? "Os 30 últimos ajustes (todos os responsáveis)." : "Seus 30 últimos ajustes."}{" "}
+            {recentesTodos ? "Ajustes de todos os responsáveis, do mais novo ao mais antigo." : "Seus ajustes, do mais novo ao mais antigo."}{" "}
             Clique na descrição para ver os itens e exportar o relatório em XLSX.
             {podeDesfazer &&
               (recentesTodos
                 ? " Só os ajustes feitos por você podem ser desfeitos (cria um estorno registrado)."
                 : " Desfazer cria um estorno (ajuste inverso) registrado.")}
           </p>
+          <div className={styles.recentesToolbar}>
+            <input
+              type="search"
+              className={`${styles.input} ${styles.recentesBusca}`}
+              value={buscaRecentes}
+              placeholder={
+                recentesTodos
+                  ? "Buscar por nome do ajuste, filial ou responsável…"
+                  : "Buscar por nome do ajuste ou filial…"
+              }
+              onChange={(e) => setBuscaRecentes(e.target.value)}
+            />
+            <div className={styles.pager}>
+              <span className={styles.pagerInfo}>
+                {carregandoRecentes
+                  ? "Carregando…"
+                  : recentesTotal === 0
+                    ? "0 ajustes"
+                    : `${((recentesPagina - 1) * recentesPorPagina + 1).toLocaleString("pt-BR")}–${Math.min(
+                        recentesPagina * recentesPorPagina,
+                        recentesTotal
+                      ).toLocaleString("pt-BR")} de ${recentesTotal.toLocaleString("pt-BR")}`}
+              </span>
+              <button
+                type="button"
+                className={styles.pagerBtn}
+                onClick={() => setRecentesPagina((p) => Math.max(1, p - 1))}
+                disabled={recentesPagina <= 1 || carregandoRecentes}
+                aria-label="Página anterior"
+                title="Mais recentes"
+              >
+                ‹
+              </button>
+              <button
+                type="button"
+                className={styles.pagerBtn}
+                onClick={() => setRecentesPagina((p) => Math.min(recentesTotalPaginas, p + 1))}
+                disabled={recentesPagina >= recentesTotalPaginas || carregandoRecentes}
+                aria-label="Próxima página"
+                title="Mais antigos"
+              >
+                ›
+              </button>
+            </div>
+          </div>
           <div className={styles.tableScroll}>
             <table className={styles.table}>
               <thead>
@@ -1027,6 +1110,15 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
                   </Fragment>
                   );
                 })}
+                {recentes.length === 0 && !carregandoRecentes && (
+                  <tr>
+                    <td colSpan={colunasRecentes} className={styles.fileHintMuted}>
+                      {buscaAplicada
+                        ? `Nenhum ajuste encontrado para "${buscaAplicada}".`
+                        : "Nenhum ajuste nesta página."}
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
