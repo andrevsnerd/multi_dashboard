@@ -139,27 +139,34 @@ export interface AjusteRecente {
   emissao: string;
   itens: number;
   soma: number;
+  responsavel: string;
 }
 
-/** Lista os 30 ajustes mais recentes do responsável (para "desfazer"/consultar). Exclui estornos. */
-export async function listarAjustesRecentes(responsavel: string): Promise<AjusteRecente[]> {
-  const respEsc = esc(responsavel.trim());
+/**
+ * Lista os 30 ajustes mais recentes do responsável (para "desfazer"/consultar). Exclui estornos.
+ * `responsavel` null = de todos os responsáveis (visão da logística, só consulta).
+ */
+export async function listarAjustesRecentes(responsavel: string | null): Promise<AjusteRecente[]> {
+  const filtroResp =
+    responsavel == null ? '' : `AND RTRIM(LTRIM(c.RESPONSAVEL)) = '${esc(responsavel.trim())}'`;
   const rows = await query<{
     NOME: string;
     FILIAL: string;
     EMISSAO: Date;
     ITENS: number;
     SOMA: number;
+    RESPONSAVEL: string | null;
   }>(`
     SELECT TOP 30 RTRIM(c.NOME_CONTAGEM) AS NOME, RTRIM(c.FILIAL) AS FILIAL, c.EMISSAO,
-           ISNULL(s.ITENS, 0) AS ITENS, ISNULL(s.SOMA, 0) AS SOMA
+           ISNULL(s.ITENS, 0) AS ITENS, ISNULL(s.SOMA, 0) AS SOMA,
+           RTRIM(LTRIM(c.RESPONSAVEL)) AS RESPONSAVEL
     FROM ESTOQUE_PROD_CONTAGEM c WITH (NOLOCK)
     LEFT JOIN (
       SELECT NOME_CONTAGEM, COUNT(*) AS ITENS, SUM(ISNULL(QTDE_AJUSTE, 0)) AS SOMA
       FROM ESTOQUE_PROD_CTG_AJUSTE WITH (NOLOCK) GROUP BY NOME_CONTAGEM
     ) s ON s.NOME_CONTAGEM = c.NOME_CONTAGEM
     WHERE c.ESTOQUE_AJUSTADO = 1
-      AND RTRIM(LTRIM(c.RESPONSAVEL)) = '${respEsc}'
+      ${filtroResp}
       AND (c.OBS IS NULL OR CAST(c.OBS AS VARCHAR(60)) NOT LIKE 'ESTORNO%')
     ORDER BY c.DATA_PARA_TRANSFERENCIA DESC, c.EMISSAO DESC
   `);
@@ -169,6 +176,7 @@ export async function listarAjustesRecentes(responsavel: string): Promise<Ajuste
     emissao: r.EMISSAO ? new Date(r.EMISSAO).toISOString() : '',
     itens: Number(r.ITENS) || 0,
     soma: Number(r.SOMA) || 0,
+    responsavel: r.RESPONSAVEL?.trim() ?? '',
   }));
 }
 

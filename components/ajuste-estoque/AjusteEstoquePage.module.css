@@ -323,6 +323,11 @@
   background: var(--s-50);
   padding: 10px 16px;
 }
+.detalheAcoes {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
 /* KPIs de um ajuste recente (mesmos quadros do preview) */
 .detalheKpis {
   display: flex;

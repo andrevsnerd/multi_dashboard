@@ -3,6 +3,8 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CompanyKey } from "@/lib/config/company";
 import { useAuth } from "@/components/auth/AuthContext";
+import { canDesfazerAjusteEstoque } from "@/lib/auth/permissions";
+import { exportAjusteEstoqueXlsx } from "@/lib/utils/exportAjusteEstoqueXlsx";
 
 import styles from "./AjusteEstoquePage.module.css";
 import AjustarItemPanel from "./AjustarItemPanel";
@@ -57,6 +59,7 @@ interface AjusteRecente {
   emissao: string;
   itens: number;
   soma: number;
+  responsavel?: string;
 }
 
 interface AjusteDetalheItem {
@@ -84,6 +87,8 @@ interface AjusteKpis {
     saldoFinalTotal: number | null;
     itensSaldoNegativo: number | null;
   };
+  unidadesEntrada?: number;
+  unidadesSaida?: number;
   naoEncontrados: number;
   ambiguos: number;
   invalidas: number;
@@ -247,6 +252,8 @@ function sugerirNome(modo: Modo, display: string, dataISO: string): string {
 export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
   const { user } = useAuth();
   const username = user?.username ?? "";
+  // Logística vê os ajustes recentes de todos, mas só desfaz os próprios (ver canDesfazerAjusteEstoque).
+  const podeDesfazer = canDesfazerAjusteEstoque(user?.role, true);
 
   const [filiais, setFiliais] = useState<{ ativas: FilialAjuste[]; inativas: FilialAjuste[] }>({
     ativas: [],
@@ -279,6 +286,10 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
   >(null);
 
   const [recentes, setRecentes] = useState<AjusteRecente[]>([]);
+  const [recentesTodos, setRecentesTodos] = useState(false);
+  /** Login do Linx do usuário (RESPONSAVEL), para saber quais ajustes da lista são dele. */
+  const [meuResponsavel, setMeuResponsavel] = useState("");
+  const [exportandoNome, setExportandoNome] = useState<string | null>(null);
   const [estornandoNome, setEstornandoNome] = useState<string | null>(null);
   const [estornoMsg, setEstornoMsg] = useState<string | null>(null);
   const [detalheAberto, setDetalheAberto] = useState<string | null>(null);
@@ -295,6 +306,8 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
       });
       const d = await r.json();
       setRecentes(Array.isArray(d?.recentes) ? d.recentes : []);
+      setRecentesTodos(d?.todos === true);
+      setMeuResponsavel(typeof d?.responsavel === "string" ? d.responsavel : "");
     } catch {
       /* silencioso */
     }
@@ -363,6 +376,32 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
       }
     },
     [username, fetchRecentes]
+  );
+
+  const exportarAjuste = useCallback(
+    async (r: AjusteRecente) => {
+      const detalhe = detalheCache[r.nome];
+      if (!detalhe) return;
+      setExportandoNome(r.nome);
+      try {
+        await exportAjusteEstoqueXlsx({
+          companyKey,
+          companyName,
+          nome: r.nome,
+          filial: r.filial,
+          emissao: r.emissao,
+          responsavel: r.responsavel,
+          kpis: detalhe.kpis,
+          itens: detalhe.itens,
+        });
+      } catch (err) {
+        console.error("[ajuste-estoque] export xlsx", err);
+        setErro("Erro ao gerar o XLSX do ajuste.");
+      } finally {
+        setExportandoNome(null);
+      }
+    },
+    [detalheCache, companyKey, companyName]
   );
 
   const filialSelecionada = useMemo(() => {
@@ -507,6 +546,7 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
     }
   }, [preview, linhasComDiferenca, username, filialCod, modo, nomeContagem, dataContagem, obs, fetchRecentes]);
 
+  const colunasRecentes = 5 + (recentesTodos ? 1 : 0) + (podeDesfazer ? 1 : 0);
   const podeCalcular = !!filialCod && (modo === "zerar" || !!arquivoTexto.trim());
   const podeConfirmar =
     !!preview && linhasComDiferenca.length > 0 && !!nomeContagem.trim() && nomeContagem.length <= 25;
@@ -710,16 +750,18 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
           <p className={styles.fileHintMuted}>
             Já aparece no extrato dos produtos (CONTAGEM/AJUSTE) com sua descrição e responsável.
           </p>
-          <div className={styles.actionsRow}>
-            <button
-              type="button"
-              className={styles.secondaryBtn}
-              onClick={() => desfazer(resultado.nomeContagem)}
-              disabled={estornandoNome === resultado.nomeContagem}
-            >
-              {estornandoNome === resultado.nomeContagem ? "Desfazendo…" : "↩ Desfazer este ajuste"}
-            </button>
-          </div>
+          {podeDesfazer && (
+            <div className={styles.actionsRow}>
+              <button
+                type="button"
+                className={styles.secondaryBtn}
+                onClick={() => desfazer(resultado.nomeContagem)}
+                disabled={estornandoNome === resultado.nomeContagem}
+              >
+                {estornandoNome === resultado.nomeContagem ? "Desfazendo…" : "↩ Desfazer este ajuste"}
+              </button>
+            </div>
+          )}
         </section>
       )}
 
@@ -846,13 +888,17 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
         </section>
       )}
 
-      {/* ── Desfazer ajustes recentes ── */}
+      {/* ── Ajustes recentes (consultar / exportar / desfazer) ── */}
       {recentes.length > 0 && (
         <section className={styles.card}>
           <h2 className={styles.cardTitle}>Ajustes recentes</h2>
           <p className={styles.fileHintMuted}>
-            Seus 30 últimos ajustes. Clique na descrição para ver os itens. Desfazer cria um
-            estorno (ajuste inverso) registrado.
+            {recentesTodos ? "Os 30 últimos ajustes (todos os responsáveis)." : "Seus 30 últimos ajustes."}{" "}
+            Clique na descrição para ver os itens e exportar o relatório em XLSX.
+            {podeDesfazer &&
+              (recentesTodos
+                ? " Só os ajustes feitos por você podem ser desfeitos (cria um estorno registrado)."
+                : " Desfazer cria um estorno (ajuste inverso) registrado.")}
           </p>
           <div className={styles.tableScroll}>
             <table className={styles.table}>
@@ -861,9 +907,10 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
                   <th>Descrição</th>
                   <th>Filial</th>
                   <th>Data</th>
+                  {recentesTodos && <th>Responsável</th>}
                   <th className={styles.num}>Itens</th>
                   <th className={styles.num}>Variação</th>
-                  <th></th>
+                  {podeDesfazer && <th></th>}
                 </tr>
               </thead>
               <tbody>
@@ -883,29 +930,52 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
                       </td>
                       <td>{r.filial}</td>
                       <td>{r.emissao ? fmtDataLinx(r.emissao) : "—"}</td>
+                      {recentesTodos && <td>{r.responsavel || "—"}</td>}
                       <td className={styles.num}>{r.itens}</td>
                       <td className={`${styles.num} ${r.soma < 0 ? styles.neg : styles.pos}`}>
                         {r.soma > 0 ? "+" : ""}
                         {r.soma}
                       </td>
-                      <td className={styles.num}>
-                        <button
-                          type="button"
-                          className={styles.secondaryBtn}
-                          onClick={() => desfazer(r.nome)}
-                          disabled={estornandoNome === r.nome}
-                        >
-                          {estornandoNome === r.nome ? "Desfazendo…" : "↩ Desfazer"}
-                        </button>
-                      </td>
+                      {podeDesfazer && (
+                        <td className={styles.num}>
+                          {canDesfazerAjusteEstoque(
+                            user?.role,
+                            !recentesTodos ||
+                              (!!meuResponsavel &&
+                                (r.responsavel ?? "").trim().toUpperCase() ===
+                                  meuResponsavel.trim().toUpperCase())
+                          ) && (
+                            <button
+                              type="button"
+                              className={styles.secondaryBtn}
+                              onClick={() => desfazer(r.nome)}
+                              disabled={estornandoNome === r.nome}
+                            >
+                              {estornandoNome === r.nome ? "Desfazendo…" : "↩ Desfazer"}
+                            </button>
+                          )}
+                        </td>
+                      )}
                     </tr>
                     {detalheAberto === r.nome && (
                       <tr>
-                        <td colSpan={6} className={styles.detalheCell}>
+                        <td colSpan={colunasRecentes} className={styles.detalheCell}>
                           {detalheCarregando && !detalheCache[r.nome] ? (
                             <span className={styles.fileHintMuted}>Carregando itens…</span>
                           ) : (
                             <>
+                            {(detalheCache[r.nome]?.itens.length ?? 0) > 0 && (
+                              <div className={styles.detalheAcoes}>
+                                <button
+                                  type="button"
+                                  className={styles.secondaryBtn}
+                                  onClick={() => void exportarAjuste(r)}
+                                  disabled={exportandoNome === r.nome}
+                                >
+                                  {exportandoNome === r.nome ? "Gerando…" : "⬇ Exportar XLSX"}
+                                </button>
+                              </div>
+                            )}
                             {detalheCache[r.nome]?.kpis && (
                               <AjusteKpisResumo kpis={detalheCache[r.nome].kpis as AjusteKpis} />
                             )}

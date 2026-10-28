@@ -420,8 +420,8 @@
     "semantic_hash": "3058da7b40497a1f599ba8cdca8c7713"
   },
   "app/api/ajuste-estoque/recentes/route.ts": {
-    "mtime": 1785948757.3646321,
-    "ast_hash": "c7a2aae3f57332810d465b9a6e37b064",
+    "mtime": 1793188061.5453713,
+    "ast_hash": "356a780e9ba0ccecff514490162e820e",
     "semantic_hash": ""
   },
   "app/api/auth/alterar-senha/route.ts": {
@@ -1230,8 +1230,8 @@
     "semantic_hash": "e449c381872599286ae61c72a1af8112"
   },
   "components/ajuste-estoque/AjusteEstoquePage.tsx": {
-    "mtime": 1792609059.1105325,
-    "ast_hash": "f9cbf27a02b8ea1dff910ad2cf85d340",
+    "mtime": 1793188169.042416,
+    "ast_hash": "83d408ea6254ae7035020ce778d2ed38",
     "semantic_hash": ""
   },
   "components/auth/AuthContext.tsx": {
@@ -2070,8 +2070,8 @@
     "semantic_hash": ""
   },
   "lib/auth/permissions.ts": {
-    "mtime": 1792679389.7133443,
-    "ast_hash": "6914836d7927a3fbb4c8200248d98f35",
+    "mtime": 1793188059.0295863,
+    "ast_hash": "f6c7322c9f6de696a09031d226245cac",
     "semantic_hash": ""
   },
   "lib/auth/users-store-neon.ts": {
@@ -2380,8 +2380,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/ajusteEstoque.ts": {
-    "mtime": 1792609009.733059,
-    "ast_hash": "a68a7eeec67fc319752fa232ca246f64",
+    "mtime": 1793188060.7116978,
+    "ast_hash": "0b0e356e2b900457b025970620635bf8",
     "semantic_hash": ""
   },
   "lib/repositories/claudeReport.ts": {
@@ -5157,6 +5157,11 @@
   "lib/server/trava-confirmacao-acima-romaneio.ts": {
     "mtime": 1793127916.8884459,
     "ast_hash": "6528f81ab59a4ccec16b9d9d793ff79d",
+    "semantic_hash": ""
+  },
+  "lib/utils/exportAjusteEstoqueXlsx.ts": {
+    "mtime": 1793188121.2529294,
+    "ast_hash": "3db231bb01f6dacd9873e411bd97598f",
     "semantic_hash": ""
   }
 }

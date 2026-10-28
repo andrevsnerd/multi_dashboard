@@ -164,6 +164,30 @@ export function canSeeRomaneioAjuste(role: RoleKey | undefined | null): boolean 
 }
 
 /**
+ * Ajuste de Estoque: a logistica acompanha os "Ajustes recentes" de TODOS os
+ * responsaveis (quem ajusta costuma ser outro usuario), mas so desfaz os que ela
+ * mesma fez. As demais funcoes veem so os proprios ajustes.
+ */
+export const AJUSTE_RECENTES_TODOS_ROLES: RoleKey[] = ["logistica"];
+
+/** True se a funcao ve os ajustes recentes de todos os responsaveis. */
+export function seesTodosAjustesRecentes(role: RoleKey | undefined | null): boolean {
+  return !!role && AJUSTE_RECENTES_TODOS_ROLES.includes(role);
+}
+
+/**
+ * True se a funcao pode desfazer (estornar) o ajuste na tela de Ajuste. `proprio` =
+ * o ajuste foi feito pelo proprio usuario; a logistica so desfaz esses.
+ */
+export function canDesfazerAjusteEstoque(
+  role: RoleKey | undefined | null,
+  proprio: boolean
+): boolean {
+  if (!role || isReadOnlyRole(role)) return false;
+  return proprio || !AJUSTE_RECENTES_TODOS_ROLES.includes(role);
+}
+
+/**
  * Reabrir um romaneio de ENTRADA para acrescentar itens (igual ao Linx) e de
  * logistica pra cima. O gerente registra a entrada da loja dele, mas NUNCA
  * reabre um romaneio ja gravado — corrigir movimento de estoque e da logistica.

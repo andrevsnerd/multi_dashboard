@@ -1,0 +1,5162 @@
+{
+  ".claude/settings.json": {
+    "mtime": 1783438819.2702603,
+    "ast_hash": "aa283641e44b0622197b296258634136",
+    "semantic_hash": "aa283641e44b0622197b296258634136"
+  },
+  "C\uf03aUsersNERD TIJUCAAppDataLocalTempanalyze_varejo.py": {
+    "mtime": 1780001199.3390555,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "ajustar_transferencia_A0119739.py": {
+    "mtime": 1770043919.2963133,
+    "ast_hash": "76ce83bcc2a0904eeccb616db1644dd0",
+    "semantic_hash": "76ce83bcc2a0904eeccb616db1644dd0"
+  },
+  "alterar_custo_produto.py": {
+    "mtime": 1770043919.2983127,
+    "ast_hash": "e476291b9d4ec338b41d16b21f526a08",
+    "semantic_hash": "e476291b9d4ec338b41d16b21f526a08"
+  },
+  "alterar_estoque_produto.py": {
+    "mtime": 1770043919.3023243,
+    "ast_hash": "1f9a410991fa3b3df9478f2f52abb084",
+    "semantic_hash": "1f9a410991fa3b3df9478f2f52abb084"
+  },
+  "analisar_estoque_giro_nerd.py": {
+    "mtime": 1780073682.5518863,
+    "ast_hash": "00e9fd3a1c641a61f055e50c548a7f9f",
+    "semantic_hash": "00e9fd3a1c641a61f055e50c548a7f9f"
+  },
+  "analisar_transferencia_teste.py": {
+    "mtime": 1770043919.3044698,
+    "ast_hash": "d35208c3f86506ccc4c16b7ef306500a",
+    "semantic_hash": "d35208c3f86506ccc4c16b7ef306500a"
+  },
+  "app/(companies)/[company]/ajuste-estoque/page.tsx": {
+    "mtime": 1782407112.2515054,
+    "ast_hash": "4f1bbe9a40cc30c840836040ac16b24c",
+    "semantic_hash": "4f1bbe9a40cc30c840836040ac16b24c"
+  },
+  "app/(companies)/[company]/blackfriday/page.tsx": {
+    "mtime": 1768308521.627152,
+    "ast_hash": "513514da0259b5dfe39fcc951df26427",
+    "semantic_hash": "513514da0259b5dfe39fcc951df26427"
+  },
+  "app/(companies)/[company]/clientes/detalhe/page.tsx": {
+    "mtime": 1776093884.959757,
+    "ast_hash": "00644793b196f4f8969ecdeb48946339",
+    "semantic_hash": "00644793b196f4f8969ecdeb48946339"
+  },
+  "app/(companies)/[company]/clientes/page.tsx": {
+    "mtime": 1768308521.5341158,
+    "ast_hash": "52f18cf1728e39a6f4ec710bef6e4b38",
+    "semantic_hash": "52f18cf1728e39a6f4ec710bef6e4b38"
+  },
+  "app/(companies)/[company]/compras-salvas/[id]/page.tsx": {
+    "mtime": 1780073682.5540812,
+    "ast_hash": "aa6b61b79fe41d195f118655b5c0a299",
+    "semantic_hash": "aa6b61b79fe41d195f118655b5c0a299"
+  },
+  "app/(companies)/[company]/compras-salvas/page.tsx": {
+    "mtime": 1780073682.5540812,
+    "ast_hash": "169e5e759c55b9032079180f4720bc54",
+    "semantic_hash": "169e5e759c55b9032079180f4720bc54"
+  },
+  "app/(companies)/[company]/compras-transito/page.tsx": {
+    "mtime": 1780073682.5540812,
+    "ast_hash": "072208f54c84d166876a437edba7fa83",
+    "semantic_hash": "072208f54c84d166876a437edba7fa83"
+  },
+  "app/(companies)/[company]/controle-estoque/estoquedetalhado01-produto/page.tsx": {
+    "mtime": 1770043919.3090231,
+    "ast_hash": "c7281e1b67bc931699a8c6a65eed2f16",
+    "semantic_hash": "c7281e1b67bc931699a8c6a65eed2f16"
+  },
+  "app/(companies)/[company]/controle-estoque/estoquedetalhado01/page.tsx": {
+    "mtime": 1771515825.0703425,
+    "ast_hash": "d334b8dbf9b0529161595a74dfec29f3",
+    "semantic_hash": "d334b8dbf9b0529161595a74dfec29f3"
+  },
+  "app/(companies)/[company]/controle-estoque/estoquedetalhado02/page.tsx": {
+    "mtime": 1768504274.2976046,
+    "ast_hash": "012ee1b403721f71165ff519c6199fe7",
+    "semantic_hash": "012ee1b403721f71165ff519c6199fe7"
+  },
+  "app/(companies)/[company]/controle-estoque/page.tsx": {
+    "mtime": 1768225198.6027155,
+    "ast_hash": "ff521cff34693f7f55be8509852efcb4",
+    "semantic_hash": "ff521cff34693f7f55be8509852efcb4"
+  },
+  "app/(companies)/[company]/controle-estoque/projecao/lista-compra/compras-salvas/[id]/page.tsx": {
+    "mtime": 1775763286.7048075,
+    "ast_hash": "525918a57ef3d3c20ff9e8662efa21aa",
+    "semantic_hash": "525918a57ef3d3c20ff9e8662efa21aa"
+  },
+  "app/(companies)/[company]/controle-estoque/projecao/lista-compra/page.tsx": {
+    "mtime": 1775763286.6643417,
+    "ast_hash": "86fe09dda306c32de8b1a206cd744ea4",
+    "semantic_hash": "86fe09dda306c32de8b1a206cd744ea4"
+  },
+  "app/(companies)/[company]/controle-estoque/projecao/page.tsx": {
+    "mtime": 1770043919.314594,
+    "ast_hash": "9e733e09397e5142f1e98406fea89230",
+    "semantic_hash": "9e733e09397e5142f1e98406fea89230"
+  },
+  "app/(companies)/[company]/controle-giro/page.tsx": {
+    "mtime": 1770043919.316963,
+    "ast_hash": "4a7e95265086e43c6ec5171cff06dff1",
+    "semantic_hash": "4a7e95265086e43c6ec5171cff06dff1"
+  },
+  "app/(companies)/[company]/controle-movimento/page.tsx": {
+    "mtime": 1770043919.3211472,
+    "ast_hash": "81a29e207dac489c5550f85c84affa5b",
+    "semantic_hash": "81a29e207dac489c5550f85c84affa5b"
+  },
+  "app/(companies)/[company]/controle-performance/filial/page.tsx": {
+    "mtime": 1780073682.5579412,
+    "ast_hash": "299742d44f0c6d1b90981e2b01c103d6",
+    "semantic_hash": "299742d44f0c6d1b90981e2b01c103d6"
+  },
+  "app/(companies)/[company]/controle-performance/page.tsx": {
+    "mtime": 1780073682.5579412,
+    "ast_hash": "f7251916f5f267f37b5b0a3804c7281a",
+    "semantic_hash": "f7251916f5f267f37b5b0a3804c7281a"
+  },
+  "app/(companies)/[company]/controle-transferencias/page.tsx": {
+    "mtime": 1770043919.325232,
+    "ast_hash": "fda749c83ba3856161eb309beb76a4a3",
+    "semantic_hash": "fda749c83ba3856161eb309beb76a4a3"
+  },
+  "app/(companies)/[company]/curva-abc/page.tsx": {
+    "mtime": 1780073682.5579412,
+    "ast_hash": "5a1f88a8bff53475baf41474409740ab",
+    "semantic_hash": "5a1f88a8bff53475baf41474409740ab"
+  },
+  "app/(companies)/[company]/curva-por-produto/page.tsx": {
+    "mtime": 1780073682.5579412,
+    "ast_hash": "65bcbef5c294d25cc6f7236fd0a08697",
+    "semantic_hash": "65bcbef5c294d25cc6f7236fd0a08697"
+  },
+  "app/(companies)/[company]/estoque-consulta/page.tsx": {
+    "mtime": 1778154724.3800142,
+    "ast_hash": "89b9d79c6d5295ac504ad82db28f9595",
+    "semantic_hash": "89b9d79c6d5295ac504ad82db28f9595"
+  },
+  "app/(companies)/[company]/estoque-por-filial/page.tsx": {
+    "mtime": 1763561084.0297754,
+    "ast_hash": "b431ded0d6b8717fff98c93dcb92e1f6",
+    "semantic_hash": "b431ded0d6b8717fff98c93dcb92e1f6"
+  },
+  "app/(companies)/[company]/exportar-relatorios/page.tsx": {
+    "mtime": 1768308521.6709423,
+    "ast_hash": "e63eeebe0940f398241362bad7dfb008",
+    "semantic_hash": "e63eeebe0940f398241362bad7dfb008"
+  },
+  "app/(companies)/[company]/extrato-produto/page.tsx": {
+    "mtime": 1782474938.951182,
+    "ast_hash": "38a8326cb44e4e2d125ed3257e35ce17",
+    "semantic_hash": "38a8326cb44e4e2d125ed3257e35ce17"
+  },
+  "app/(companies)/[company]/faturamento/page.tsx": {
+    "mtime": 1782911030.8148787,
+    "ast_hash": "741486f66fd10adc4e7b6a57d3f05dcc",
+    "semantic_hash": "741486f66fd10adc4e7b6a57d3f05dcc"
+  },
+  "app/(companies)/[company]/filial/FilialConsultaClient.tsx": {
+    "mtime": 1780073682.5640135,
+    "ast_hash": "c7ed1f510d93baab6b4603bebd2f7070",
+    "semantic_hash": "c7ed1f510d93baab6b4603bebd2f7070"
+  },
+  "app/(companies)/[company]/filial/page.tsx": {
+    "mtime": 1780073682.5640135,
+    "ast_hash": "0272391ed27cf7fd8b75dbb18bd77dfa",
+    "semantic_hash": "0272391ed27cf7fd8b75dbb18bd77dfa"
+  },
+  "app/(companies)/[company]/fornecedores/page.tsx": {
+    "mtime": 1782398562.2794747,
+    "ast_hash": "4c798ad7270bb8b266eeef16741e5767",
+    "semantic_hash": "4c798ad7270bb8b266eeef16741e5767"
+  },
+  "app/(companies)/[company]/gerador-apresentacoes/page.tsx": {
+    "mtime": 1784810214.6433487,
+    "ast_hash": "cee8c9249bc11f38b55dee394e347e56",
+    "semantic_hash": ""
+  },
+  "app/(companies)/[company]/gerador-relatorios/page.tsx": {
+    "mtime": 1781718186.9220586,
+    "ast_hash": "cf81fec9db37c4ff2996870da34160b9",
+    "semantic_hash": "cf81fec9db37c4ff2996870da34160b9"
+  },
+  "app/(companies)/[company]/historico-transferencias/page.tsx": {
+    "mtime": 1780073682.5665965,
+    "ast_hash": "6de67a203d29a2b222b161e0d10ce0ed",
+    "semantic_hash": "6de67a203d29a2b222b161e0d10ce0ed"
+  },
+  "app/(companies)/[company]/lista-loja/compras-transito/page.tsx": {
+    "mtime": 1780073682.5665965,
+    "ast_hash": "cfe66ab2cb948e900d37d23a2932452d",
+    "semantic_hash": "cfe66ab2cb948e900d37d23a2932452d"
+  },
+  "app/(companies)/[company]/lista-loja/page.tsx": {
+    "mtime": 1780073682.5665965,
+    "ast_hash": "4ad15909d25e1ba7bff8e4c136ebe902",
+    "semantic_hash": "4ad15909d25e1ba7bff8e4c136ebe902"
+  },
+  "app/(companies)/[company]/mapa-clientes/page.tsx": {
+    "mtime": 1780073682.569831,
+    "ast_hash": "af2dd53875074bea557adbd96fc4f4cb",
+    "semantic_hash": "af2dd53875074bea557adbd96fc4f4cb"
+  },
+  "app/(companies)/[company]/nova-filial/page.tsx": {
+    "mtime": 1780073682.569831,
+    "ast_hash": "d6904427803f1181566534f91d0d2dba",
+    "semantic_hash": "d6904427803f1181566534f91d0d2dba"
+  },
+  "app/(companies)/[company]/page.tsx": {
+    "mtime": 1783361172.6126566,
+    "ast_hash": "22fb3b211837aa03ef47e9f7ea779ca8",
+    "semantic_hash": "22fb3b211837aa03ef47e9f7ea779ca8"
+  },
+  "app/(companies)/[company]/painel-colecoes/page.tsx": {
+    "mtime": 1783084714.810094,
+    "ast_hash": "3aad55f7a074f962e6c8d6f8bb106370",
+    "semantic_hash": "3aad55f7a074f962e6c8d6f8bb106370"
+  },
+  "app/(companies)/[company]/produto-agrupado/page.tsx": {
+    "mtime": 1780073682.5724976,
+    "ast_hash": "6ca314d39ce05a15dd00a3924e3cdf99",
+    "semantic_hash": "6ca314d39ce05a15dd00a3924e3cdf99"
+  },
+  "app/(companies)/[company]/produto-descontinuado/page.tsx": {
+    "mtime": 1781209226.4106648,
+    "ast_hash": "5d8d1e552ff5b973fc5a38fb82e895d6",
+    "semantic_hash": "5d8d1e552ff5b973fc5a38fb82e895d6"
+  },
+  "app/(companies)/[company]/produto-detalhado/page.tsx": {
+    "mtime": 1763561084.0297754,
+    "ast_hash": "6e20ec9f9dc2f04a34edbd57a3b46939",
+    "semantic_hash": "6e20ec9f9dc2f04a34edbd57a3b46939"
+  },
+  "app/(companies)/[company]/produto-performance/page.tsx": {
+    "mtime": 1781266682.8655212,
+    "ast_hash": "118dcf04c07ce3e53193748ec386b210",
+    "semantic_hash": "118dcf04c07ce3e53193748ec386b210"
+  },
+  "app/(companies)/[company]/produtos-novos/page.tsx": {
+    "mtime": 1780073682.5724976,
+    "ast_hash": "b846d5d2e06db186d756adcf04d13ba1",
+    "semantic_hash": "b846d5d2e06db186d756adcf04d13ba1"
+  },
+  "app/(companies)/[company]/produtos-parados/page.tsx": {
+    "mtime": 1781114450.8229227,
+    "ast_hash": "bc7e1a7ff67ae867ea463fbb8d4c4e2f",
+    "semantic_hash": "bc7e1a7ff67ae867ea463fbb8d4c4e2f"
+  },
+  "app/(companies)/[company]/produtos-recentes/page.tsx": {
+    "mtime": 1780073682.5724976,
+    "ast_hash": "30a1eeeb392a1674b614b6f4cc45b622",
+    "semantic_hash": "30a1eeeb392a1674b614b6f4cc45b622"
+  },
+  "app/(companies)/[company]/produtos/page.tsx": {
+    "mtime": 1763561084.0297754,
+    "ast_hash": "684f4834674f159d896743ea784334b7",
+    "semantic_hash": "684f4834674f159d896743ea784334b7"
+  },
+  "app/(companies)/[company]/relatorio-claude/page.tsx": {
+    "mtime": 1780073682.5771234,
+    "ast_hash": "47b32e91d2214b9c27280c261db83442",
+    "semantic_hash": "47b32e91d2214b9c27280c261db83442"
+  },
+  "app/(companies)/[company]/romaneios/[romaneio]/page.tsx": {
+    "mtime": 1780073682.5771234,
+    "ast_hash": "e754dec42afdecd0a60d420d0f50be81",
+    "semantic_hash": "e754dec42afdecd0a60d420d0f50be81"
+  },
+  "app/(companies)/[company]/romaneios/page.tsx": {
+    "mtime": 1772801955.315845,
+    "ast_hash": "a68652e5e2806ad4acb438576fc0d632",
+    "semantic_hash": "a68652e5e2806ad4acb438576fc0d632"
+  },
+  "app/(companies)/[company]/saidas-entradas-produtos/historico/page.tsx": {
+    "mtime": 1780073682.5771234,
+    "ast_hash": "49dfcad6e37982ee2ffbdbee62731a55",
+    "semantic_hash": "49dfcad6e37982ee2ffbdbee62731a55"
+  },
+  "app/(companies)/[company]/saidas-entradas-produtos/page.tsx": {
+    "mtime": 1770645967.553269,
+    "ast_hash": "3e020d36635ef9753c337b76c6f3d3c9",
+    "semantic_hash": "3e020d36635ef9753c337b76c6f3d3c9"
+  },
+  "app/(companies)/[company]/sincronizacao/page.tsx": {
+    "mtime": 1780073682.5808327,
+    "ast_hash": "df2421ea324a0a1a37e5fa2aef190190",
+    "semantic_hash": "df2421ea324a0a1a37e5fa2aef190190"
+  },
+  "app/(companies)/[company]/transferencia-produtos/page.tsx": {
+    "mtime": 1771588589.9112065,
+    "ast_hash": "0fc04bc745839e178b034c3f13c40245",
+    "semantic_hash": "0fc04bc745839e178b034c3f13c40245"
+  },
+  "app/(companies)/[company]/vendedores/detalhe/cliente/page.tsx": {
+    "mtime": 1780073682.5808327,
+    "ast_hash": "3897f3271499c0bc044e05a35db2d8b7",
+    "semantic_hash": "3897f3271499c0bc044e05a35db2d8b7"
+  },
+  "app/(companies)/[company]/vendedores/detalhe/page.tsx": {
+    "mtime": 1771588589.9199758,
+    "ast_hash": "bab7430683fb47eb39e7c3943e6553ad",
+    "semantic_hash": "bab7430683fb47eb39e7c3943e6553ad"
+  },
+  "app/(companies)/[company]/vendedores/detalhe/produto/page.tsx": {
+    "mtime": 1773243097.5160136,
+    "ast_hash": "426531cb00bc2ff7e98beda003841d3e",
+    "semantic_hash": "426531cb00bc2ff7e98beda003841d3e"
+  },
+  "app/(companies)/[company]/vendedores/page.tsx": {
+    "mtime": 1768308521.5195951,
+    "ast_hash": "fa5a9fe9585cf2a3bd7b59081dff80d4",
+    "semantic_hash": "fa5a9fe9585cf2a3bd7b59081dff80d4"
+  },
+  "app/admin/filial-grupos/page.tsx": {
+    "mtime": 1783341076.4946673,
+    "ast_hash": "cf2bef2b79543108e9513318bfc96dd6",
+    "semantic_hash": "cf2bef2b79543108e9513318bfc96dd6"
+  },
+  "app/admin/page.tsx": {
+    "mtime": 1792679389.7216938,
+    "ast_hash": "c96be5a8b59f7edab60b44e9cca16093",
+    "semantic_hash": ""
+  },
+  "app/admin/transferencia-permissoes/page.tsx": {
+    "mtime": 1780073682.5881364,
+    "ast_hash": "a22cac6888afa4ca1d6efa336a2d44a7",
+    "semantic_hash": "a22cac6888afa4ca1d6efa336a2d44a7"
+  },
+  "app/alterar-senha/page.tsx": {
+    "mtime": 1783420002.0386996,
+    "ast_hash": "b117f4ea6b2fd8c471d576c781621681",
+    "semantic_hash": "b117f4ea6b2fd8c471d576c781621681"
+  },
+  "app/api/[transport]/route.ts": {
+    "mtime": 1780593484.662635,
+    "ast_hash": "01a96a9a015c7438b7b91db4fcb6b543",
+    "semantic_hash": "01a96a9a015c7438b7b91db4fcb6b543"
+  },
+  "app/api/admin/ajuste-historico/route.ts": {
+    "mtime": 1785427736.164585,
+    "ast_hash": "0c26e913e3371299b79e6ea2df116d28",
+    "semantic_hash": ""
+  },
+  "app/api/admin/ajuste-historico/seed-031100/route.ts": {
+    "mtime": 1785427762.7611852,
+    "ast_hash": "235a1bb479f35952c0305ca223f53049",
+    "semantic_hash": ""
+  },
+  "app/api/admin/filiais-disponiveis/route.ts": {
+    "mtime": 1780583176.635509,
+    "ast_hash": "7745ebdaa1e6a75bb930c7236ee8a568",
+    "semantic_hash": "7745ebdaa1e6a75bb930c7236ee8a568"
+  },
+  "app/api/admin/filial-grupos/[id]/route.ts": {
+    "mtime": 1780073682.5891464,
+    "ast_hash": "7d3fa2d021c997f167b895b9302c0053",
+    "semantic_hash": "7d3fa2d021c997f167b895b9302c0053"
+  },
+  "app/api/admin/filial-grupos/route.ts": {
+    "mtime": 1783341099.4981194,
+    "ast_hash": "eff07990090faacec8da06ebcdb6c475",
+    "semantic_hash": "eff07990090faacec8da06ebcdb6c475"
+  },
+  "app/api/admin/transferencia-permissoes/route.ts": {
+    "mtime": 1785761951.1682532,
+    "ast_hash": "a5a26f12dbdb4f7141cbdb9b13e36ad5",
+    "semantic_hash": ""
+  },
+  "app/api/admin/transferencia-permissoes/setup-logistica/route.ts": {
+    "mtime": 1780073682.5943303,
+    "ast_hash": "be7b07d3290617da12152adbb7ac2d08",
+    "semantic_hash": "be7b07d3290617da12152adbb7ac2d08"
+  },
+  "app/api/admin/transferencias-duplicadas/route.ts": {
+    "mtime": 1791996419.1309876,
+    "ast_hash": "0073bc5388cd603e1abe6524de3e4543",
+    "semantic_hash": ""
+  },
+  "app/api/admin/users/[id]/route.ts": {
+    "mtime": 1783425731.7874248,
+    "ast_hash": "5298e69de53e8f7e24f6ff75a6e35408",
+    "semantic_hash": "5298e69de53e8f7e24f6ff75a6e35408"
+  },
+  "app/api/admin/users/route.ts": {
+    "mtime": 1783425748.861835,
+    "ast_hash": "be6dcf060458a662526cacf73fe769dc",
+    "semantic_hash": "be6dcf060458a662526cacf73fe769dc"
+  },
+  "app/api/ajuste-estoque/detalhe/route.ts": {
+    "mtime": 1792609024.1294873,
+    "ast_hash": "f63f05cd8947fd9d69cce63a70bf031b",
+    "semantic_hash": ""
+  },
+  "app/api/ajuste-estoque/estornar/route.ts": {
+    "mtime": 1785427762.7611852,
+    "ast_hash": "72ea28c4b48912278b5884f4115c633c",
+    "semantic_hash": ""
+  },
+  "app/api/ajuste-estoque/executar/route.ts": {
+    "mtime": 1791380407.823286,
+    "ast_hash": "0cf09d12e4e1022d1a91a4a41524c7ad",
+    "semantic_hash": ""
+  },
+  "app/api/ajuste-estoque/filiais/route.ts": {
+    "mtime": 1782407062.2488942,
+    "ast_hash": "436d14f06a084440c9dbcb2bcf1ee0cb",
+    "semantic_hash": "436d14f06a084440c9dbcb2bcf1ee0cb"
+  },
+  "app/api/ajuste-estoque/preview/route.ts": {
+    "mtime": 1782407431.2994955,
+    "ast_hash": "3058da7b40497a1f599ba8cdca8c7713",
+    "semantic_hash": "3058da7b40497a1f599ba8cdca8c7713"
+  },
+  "app/api/ajuste-estoque/recentes/route.ts": {
+    "mtime": 1785948757.3646321,
+    "ast_hash": "c7a2aae3f57332810d465b9a6e37b064",
+    "semantic_hash": ""
+  },
+  "app/api/auth/alterar-senha/route.ts": {
+    "mtime": 1783419990.8073876,
+    "ast_hash": "9fe80985763ffb94626e1f07eb3a3694",
+    "semantic_hash": "9fe80985763ffb94626e1f07eb3a3694"
+  },
+  "app/api/auth/login/route.ts": {
+    "mtime": 1783425704.2402923,
+    "ast_hash": "26cd49d67de05c4f594192bc3929009b",
+    "semantic_hash": "26cd49d67de05c4f594192bc3929009b"
+  },
+  "app/api/clientes/[cliente]/compras/route.ts": {
+    "mtime": 1776093870.0017195,
+    "ast_hash": "4e28795fc0fcf9c10238cc129707d84b",
+    "semantic_hash": "4e28795fc0fcf9c10238cc129707d84b"
+  },
+  "app/api/clientes/[cliente]/detalhe/route.ts": {
+    "mtime": 1776093871.0731716,
+    "ast_hash": "1e490cf65af5022fdf5439857b2b89ed",
+    "semantic_hash": "1e490cf65af5022fdf5439857b2b89ed"
+  },
+  "app/api/clientes/[cliente]/produtos/route.ts": {
+    "mtime": 1780073682.5955284,
+    "ast_hash": "244062fccae05b1bb57e22c797f10892",
+    "semantic_hash": "244062fccae05b1bb57e22c797f10892"
+  },
+  "app/api/clientes/[cliente]/resumo/route.ts": {
+    "mtime": 1776093869.0721395,
+    "ast_hash": "e10fd472642de20d9c0767bd004da9a5",
+    "semantic_hash": "e10fd472642de20d9c0767bd004da9a5"
+  },
+  "app/api/clientes/route.ts": {
+    "mtime": 1780073682.597276,
+    "ast_hash": "1e25a323e4a40a3c251eda947cd7fe24",
+    "semantic_hash": "1e25a323e4a40a3c251eda947cd7fe24"
+  },
+  "app/api/clientes/vendedores/route.ts": {
+    "mtime": 1771433372.166425,
+    "ast_hash": "77c38a65dd15d19a89050cc06cf15c03",
+    "semantic_hash": "77c38a65dd15d19a89050cc06cf15c03"
+  },
+  "app/api/compras-transito/[id]/reconciliacao/route.ts": {
+    "mtime": 1781287699.6642754,
+    "ast_hash": "302ff0f89fa8c812985a9e8830559be4",
+    "semantic_hash": "302ff0f89fa8c812985a9e8830559be4"
+  },
+  "app/api/compras-transito/[id]/route.ts": {
+    "mtime": 1788264818.1222873,
+    "ast_hash": "acc7cd78223a03fdfb22f49258b4dbcc",
+    "semantic_hash": ""
+  },
+  "app/api/compras-transito/backfill-barcodes/route.ts": {
+    "mtime": 1782495408.1037233,
+    "ast_hash": "91db4d82d6d5da24166bf6d880db3a21",
+    "semantic_hash": "91db4d82d6d5da24166bf6d880db3a21"
+  },
+  "app/api/compras-transito/reconciliacao/route.ts": {
+    "mtime": 1781287711.1418638,
+    "ast_hash": "d49f2273e7d8c35208a05b59ff588a00",
+    "semantic_hash": "d49f2273e7d8c35208a05b59ff588a00"
+  },
+  "app/api/compras-transito/route.ts": {
+    "mtime": 1791291101.661374,
+    "ast_hash": "d7e9528c7dc37777940db7eb0dee1967",
+    "semantic_hash": ""
+  },
+  "app/api/controle-estoque/compra-data-fixa/route.ts": {
+    "mtime": 1782235090.7017899,
+    "ast_hash": "f683467faad4c8a2e91d0a70d67661ca",
+    "semantic_hash": "f683467faad4c8a2e91d0a70d67661ca"
+  },
+  "app/api/controle-estoque/compra-final/route.ts": {
+    "mtime": 1775743759.9984233,
+    "ast_hash": "9b3e647991b59c0a29c993b5e60fa955",
+    "semantic_hash": "9b3e647991b59c0a29c993b5e60fa955"
+  },
+  "app/api/controle-estoque/compras-salvas/[id]/route.ts": {
+    "mtime": 1780073682.597276,
+    "ast_hash": "b421970808fa960745cfb8eacae40f20",
+    "semantic_hash": "b421970808fa960745cfb8eacae40f20"
+  },
+  "app/api/controle-estoque/compras-salvas/route.ts": {
+    "mtime": 1784201673.9977152,
+    "ast_hash": "a4dd121c265e8a94ca5fa9a4cacd2237",
+    "semantic_hash": ""
+  },
+  "app/api/controle-estoque/detalhes-por-filial/route.ts": {
+    "mtime": 1790785575.552272,
+    "ast_hash": "418c4bc0c238053ce08410ce5a7987b2",
+    "semantic_hash": ""
+  },
+  "app/api/controle-estoque/detalhes/route.ts": {
+    "mtime": 1782989296.7972941,
+    "ast_hash": "ceb455827622b33a0ecda860fc913b54",
+    "semantic_hash": "ceb455827622b33a0ecda860fc913b54"
+  },
+  "app/api/controle-estoque/estoque-por-filial-item/route.ts": {
+    "mtime": 1780073682.6062684,
+    "ast_hash": "7d71b3a3b3b7060be1619b2b76a1ddf6",
+    "semantic_hash": "7d71b3a3b3b7060be1619b2b76a1ddf6"
+  },
+  "app/api/controle-estoque/lista-compra-sugerida/route.ts": {
+    "mtime": 1780073682.6062684,
+    "ast_hash": "05950b3fb63fb6900d9d66c3795cd159",
+    "semantic_hash": "05950b3fb63fb6900d9d66c3795cd159"
+  },
+  "app/api/controle-estoque/metricas-itens/route.ts": {
+    "mtime": 1780073682.6062684,
+    "ast_hash": "7c40819706d9fd59db7a33812f27498e",
+    "semantic_hash": "7c40819706d9fd59db7a33812f27498e"
+  },
+  "app/api/controle-estoque/projecao-historico/route.ts": {
+    "mtime": 1772450710.9686327,
+    "ast_hash": "1bcfb90c5071a356b7cf39769e9353bd",
+    "semantic_hash": "1bcfb90c5071a356b7cf39769e9353bd"
+  },
+  "app/api/controle-estoque/route.ts": {
+    "mtime": 1781120012.1945755,
+    "ast_hash": "e852605571195b7f7564e5923515f8a2",
+    "semantic_hash": "e852605571195b7f7564e5923515f8a2"
+  },
+  "app/api/controle-estoque/vendas-por-filial-item/route.ts": {
+    "mtime": 1780073682.6062684,
+    "ast_hash": "4bbeddff8de9894fead586f3f035c206",
+    "semantic_hash": "4bbeddff8de9894fead586f3f035c206"
+  },
+  "app/api/controle-giro/route.ts": {
+    "mtime": 1774291312.452554,
+    "ast_hash": "40415bf6e90f402611bbd9b6c9b71864",
+    "semantic_hash": "40415bf6e90f402611bbd9b6c9b71864"
+  },
+  "app/api/controle-movimento/detalhes/route.ts": {
+    "mtime": 1770043919.377427,
+    "ast_hash": "1cd056accb0c509126971a193aa1db37",
+    "semantic_hash": "1cd056accb0c509126971a193aa1db37"
+  },
+  "app/api/controle-movimento/route.ts": {
+    "mtime": 1770043919.3815076,
+    "ast_hash": "51d27572aeb64f2ed6a50a41107ffc09",
+    "semantic_hash": "51d27572aeb64f2ed6a50a41107ffc09"
+  },
+  "app/api/controle-performance/filial/produtos-vendedores/route.ts": {
+    "mtime": 1780581768.5119555,
+    "ast_hash": "2fa963689a6cfa6e83500862a888fc4b",
+    "semantic_hash": "2fa963689a6cfa6e83500862a888fc4b"
+  },
+  "app/api/controle-performance/filial/route.ts": {
+    "mtime": 1780581728.9264328,
+    "ast_hash": "4f268833e89a0258cc686881b3b3bd99",
+    "semantic_hash": "4f268833e89a0258cc686881b3b3bd99"
+  },
+  "app/api/controle-performance/route.ts": {
+    "mtime": 1780581697.608696,
+    "ast_hash": "365c62e32565ca5714d5df9f0e047864",
+    "semantic_hash": "365c62e32565ca5714d5df9f0e047864"
+  },
+  "app/api/controle-transferencias/route.ts": {
+    "mtime": 1780073682.6139908,
+    "ast_hash": "6933b1cb9c4862692a8242b7a5cf958b",
+    "semantic_hash": "6933b1cb9c4862692a8242b7a5cf958b"
+  },
+  "app/api/corporativo/catalogo/buscar/route.ts": {
+    "mtime": 1783944051.6469636,
+    "ast_hash": "62e00a1689464031cd491c1c74a09805",
+    "semantic_hash": ""
+  },
+  "app/api/corporativo/catalogo/route.ts": {
+    "mtime": 1783948242.5217817,
+    "ast_hash": "1224d50527dbafd10393240f011174d4",
+    "semantic_hash": ""
+  },
+  "app/api/corporativo/cep/[cep]/route.ts": {
+    "mtime": 1783361503.5463204,
+    "ast_hash": "2c2233814d60b378bba20fc901bc4989",
+    "semantic_hash": "2c2233814d60b378bba20fc901bc4989"
+  },
+  "app/api/corporativo/clientes/[codigo]/route.ts": {
+    "mtime": 1783364321.13694,
+    "ast_hash": "74bba930ed0dc0f0c9fae4510dd67166",
+    "semantic_hash": "74bba930ed0dc0f0c9fae4510dd67166"
+  },
+  "app/api/corporativo/clientes/route.ts": {
+    "mtime": 1783538338.2784908,
+    "ast_hash": "e7d41158c8c7a4ae413f054760f77e04",
+    "semantic_hash": ""
+  },
+  "app/api/corporativo/cnpj/[cnpj]/route.ts": {
+    "mtime": 1783361496.8943563,
+    "ast_hash": "bb553845d99d78640451561d20c22cd6",
+    "semantic_hash": "bb553845d99d78640451561d20c22cd6"
+  },
+  "app/api/corporativo/imagens/route.ts": {
+    "mtime": 1790081316.2488558,
+    "ast_hash": "9f1b31121dcb9161879efdfe150af667",
+    "semantic_hash": ""
+  },
+  "app/api/corporativo/loja/produto/[produto]/route.ts": {
+    "mtime": 1783948619.408257,
+    "ast_hash": "a8f5512171a192505d86b73d6e21a291",
+    "semantic_hash": ""
+  },
+  "app/api/corporativo/loja/produtos/route.ts": {
+    "mtime": 1783948607.8988605,
+    "ast_hash": "1d03c158df8bb4bb88ae810e05a35b0b",
+    "semantic_hash": ""
+  },
+  "app/api/corporativo/lookups/route.ts": {
+    "mtime": 1783360801.9764335,
+    "ast_hash": "3a2abe79ca3d4e961a2e057431e05ec5",
+    "semantic_hash": "3a2abe79ca3d4e961a2e057431e05ec5"
+  },
+  "app/api/corporativo/meu-cliente/route.ts": {
+    "mtime": 1783425884.5663464,
+    "ast_hash": "faa4bee7ced6c2565cad071c379f16c3",
+    "semantic_hash": "faa4bee7ced6c2565cad071c379f16c3"
+  },
+  "app/api/corporativo/pedidos/[id]/route.ts": {
+    "mtime": 1790081316.2488558,
+    "ast_hash": "00c8718db8d5217f4c26bb6fddeb66ba",
+    "semantic_hash": ""
+  },
+  "app/api/corporativo/pedidos/route.ts": {
+    "mtime": 1790081316.2479448,
+    "ast_hash": "0bfa5c687610dd36dc6b5132196fa1aa",
+    "semantic_hash": ""
+  },
+  "app/api/curva-abc-observacoes/route.ts": {
+    "mtime": 1781206965.3516777,
+    "ast_hash": "b902bf3e0fd3ad63c77c2ccd57038ec9",
+    "semantic_hash": "b902bf3e0fd3ad63c77c2ccd57038ec9"
+  },
+  "app/api/curva-abc/route.ts": {
+    "mtime": 1789045364.7515914,
+    "ast_hash": "9f1e6d6deb0a0c8539c271eb1da580a4",
+    "semantic_hash": ""
+  },
+  "app/api/curva-por-produto/route.ts": {
+    "mtime": 1780581789.1275427,
+    "ast_hash": "f336dc7d5b39ed29750cb415a42ef5f6",
+    "semantic_hash": "f336dc7d5b39ed29750cb415a42ef5f6"
+  },
+  "app/api/daily-revenue/route.ts": {
+    "mtime": 1779914926.5428946,
+    "ast_hash": "3926c3cc6b9df52ee62d21859b7a6cdf",
+    "semantic_hash": "3926c3cc6b9df52ee62d21859b7a6cdf"
+  },
+  "app/api/dashboard-data/route.ts": {
+    "mtime": 1780073682.6162903,
+    "ast_hash": "feb02c1e1e87897496f14ac466233676",
+    "semantic_hash": "feb02c1e1e87897496f14ac466233676"
+  },
+  "app/api/data/route.ts": {
+    "mtime": 1762989352.1931915,
+    "ast_hash": "3fd6a528ff65c4ac69e30b3d8eb9207d",
+    "semantic_hash": "3fd6a528ff65c4ac69e30b3d8eb9207d"
+  },
+  "app/api/destino-romaneio/route.ts": {
+    "mtime": 1783538281.190879,
+    "ast_hash": "7475a2608d455c4155272be3a493380c",
+    "semantic_hash": ""
+  },
+  "app/api/extrato-produto/filiais/route.ts": {
+    "mtime": 1782474810.9225557,
+    "ast_hash": "348f373d9ea8ff6674cb6aefbfbdeabf",
+    "semantic_hash": "348f373d9ea8ff6674cb6aefbfbdeabf"
+  },
+  "app/api/extrato-produto/produtos/route.ts": {
+    "mtime": 1782474797.440598,
+    "ast_hash": "46a07d2e6577a3e46cb6adcc5fda6699",
+    "semantic_hash": "46a07d2e6577a3e46cb6adcc5fda6699"
+  },
+  "app/api/extrato-produto/route.ts": {
+    "mtime": 1791224430.4254212,
+    "ast_hash": "b404be36975e8459fe0d0cf5864330fa",
+    "semantic_hash": ""
+  },
+  "app/api/faturamento/detalhe/route.ts": {
+    "mtime": 1782910987.2081108,
+    "ast_hash": "40fc6d6fcbac79d0cc1dddcad55cb624",
+    "semantic_hash": "40fc6d6fcbac79d0cc1dddcad55cb624"
+  },
+  "app/api/faturamento/route.ts": {
+    "mtime": 1782910980.3298788,
+    "ast_hash": "0c8ef6b33660dd3e2528381864e76599",
+    "semantic_hash": "0c8ef6b33660dd3e2528381864e76599"
+  },
+  "app/api/filiais/route.ts": {
+    "mtime": 1780073682.6162903,
+    "ast_hash": "7ab31c19d967b57b3c5c16a5e25ac3c6",
+    "semantic_hash": "7ab31c19d967b57b3c5c16a5e25ac3c6"
+  },
+  "app/api/filial-performance/route.ts": {
+    "mtime": 1763990113.9755487,
+    "ast_hash": "bed4329d7cab9c5db3d1da414fac6e8c",
+    "semantic_hash": "bed4329d7cab9c5db3d1da414fac6e8c"
+  },
+  "app/api/fornecedores/[id]/route.ts": {
+    "mtime": 1782398450.6112783,
+    "ast_hash": "c2c0c0c8d3f926b0f80435dbbd6edb37",
+    "semantic_hash": "c2c0c0c8d3f926b0f80435dbbd6edb37"
+  },
+  "app/api/fornecedores/route.ts": {
+    "mtime": 1782398442.0172741,
+    "ast_hash": "c1a4760fe0ac77bc6d0b9e66c03c50b7",
+    "semantic_hash": "c1a4760fe0ac77bc6d0b9e66c03c50b7"
+  },
+  "app/api/gerador-apresentacoes/assets/route.ts": {
+    "mtime": 1785852269.1409385,
+    "ast_hash": "5f66855ce431112bbe0ed1f6c427f0b7",
+    "semantic_hash": ""
+  },
+  "app/api/gerador-apresentacoes/colecao/route.ts": {
+    "mtime": 1791294502.4895892,
+    "ast_hash": "e02938501a0e5099aa76b6c9a063495a",
+    "semantic_hash": ""
+  },
+  "app/api/gerador-apresentacoes/comparativo-resumido/route.ts": {
+    "mtime": 1791294502.4929695,
+    "ast_hash": "01ec6f305368a4c2cad32554325d3361",
+    "semantic_hash": ""
+  },
+  "app/api/gerador-apresentacoes/comparativo/route.ts": {
+    "mtime": 1791294502.4895892,
+    "ast_hash": "16096d391d5f6de260c046d11a4a07bb",
+    "semantic_hash": ""
+  },
+  "app/api/goals/route.ts": {
+    "mtime": 1792777470.0331752,
+    "ast_hash": "831ab50fec3bacb221fb4ce55815624b",
+    "semantic_hash": ""
+  },
+  "app/api/lista-loja/[id]/route.ts": {
+    "mtime": 1778690829.0183127,
+    "ast_hash": "f36eff855450160a84795a10d6b364a7",
+    "semantic_hash": "f36eff855450160a84795a10d6b364a7"
+  },
+  "app/api/lista-loja/route.ts": {
+    "mtime": 1778690829.0218885,
+    "ast_hash": "2f2987c8873f6184fddaf3aa198c42a3",
+    "semantic_hash": "2f2987c8873f6184fddaf3aa198c42a3"
+  },
+  "app/api/mapa-clientes/route.ts": {
+    "mtime": 1782989359.0270884,
+    "ast_hash": "9619327e8df90da8b3acdc29002327e4",
+    "semantic_hash": "9619327e8df90da8b3acdc29002327e4"
+  },
+  "app/api/nova-filial/route.ts": {
+    "mtime": 1780583483.4295378,
+    "ast_hash": "14b2f06cbaa6af762ca8e2798a5ca934",
+    "semantic_hash": "14b2f06cbaa6af762ca8e2798a5ca934"
+  },
+  "app/api/painel-colecoes/route.ts": {
+    "mtime": 1785786543.1455507,
+    "ast_hash": "029493cfa631d92473b0a5ba970292a1",
+    "semantic_hash": ""
+  },
+  "app/api/product-detail/color/route.ts": {
+    "mtime": 1780073682.622445,
+    "ast_hash": "224ba15740df9520b912b1c293c5b61f",
+    "semantic_hash": "224ba15740df9520b912b1c293c5b61f"
+  },
+  "app/api/product-detail/custos/route.ts": {
+    "mtime": 1770147664.0430727,
+    "ast_hash": "15e59be85d11f3515f8790aece4c2226",
+    "semantic_hash": "15e59be85d11f3515f8790aece4c2226"
+  },
+  "app/api/product-detail/precos/route.ts": {
+    "mtime": 1770147664.0430727,
+    "ast_hash": "375029dfe9726d996f9527c6b6575430",
+    "semantic_hash": "375029dfe9726d996f9527c6b6575430"
+  },
+  "app/api/product-detail/route.ts": {
+    "mtime": 1782989450.8229303,
+    "ast_hash": "5446415e2057712468b9738d1bbc5e39",
+    "semantic_hash": "5446415e2057712468b9738d1bbc5e39"
+  },
+  "app/api/product-detail/stock-progress/route.ts": {
+    "mtime": 1780073682.622445,
+    "ast_hash": "75518e330cf41a76e442bd2fe4695a5b",
+    "semantic_hash": "75518e330cf41a76e442bd2fe4695a5b"
+  },
+  "app/api/product-detail/update-price-or-cost/route.ts": {
+    "mtime": 1783538291.6632173,
+    "ast_hash": "68030ea0d62c0efd18ccd5af0413bd82",
+    "semantic_hash": ""
+  },
+  "app/api/products/colecoes/route.ts": {
+    "mtime": 1785786188.14819,
+    "ast_hash": "b93a88a5d1778bfcebd0e3bf0c923951",
+    "semantic_hash": ""
+  },
+  "app/api/products/cores/route.ts": {
+    "mtime": 1788956347.8968575,
+    "ast_hash": "3950a10d199fa4d835d1d348a012c3b5",
+    "semantic_hash": ""
+  },
+  "app/api/products/grades/route.ts": {
+    "mtime": 1768227711.9904811,
+    "ast_hash": "f713a94e1c6d5430fe12ffd6c074e11b",
+    "semantic_hash": "f713a94e1c6d5430fe12ffd6c074e11b"
+  },
+  "app/api/products/grupos/route.ts": {
+    "mtime": 1768227679.5560057,
+    "ast_hash": "ec317a00c17844ab52593e918320d95d",
+    "semantic_hash": "ec317a00c17844ab52593e918320d95d"
+  },
+  "app/api/products/linhas/route.ts": {
+    "mtime": 1773075048.404737,
+    "ast_hash": "7bd6310573f88283593111b6385ad273",
+    "semantic_hash": "7bd6310573f88283593111b6385ad273"
+  },
+  "app/api/products/route.ts": {
+    "mtime": 1788463027.4119928,
+    "ast_hash": "573ef46bdc8a0296a7f6c2b4775cef49",
+    "semantic_hash": ""
+  },
+  "app/api/products/search/route.ts": {
+    "mtime": 1783520661.0364802,
+    "ast_hash": "aabca1b32608b4aba829ecd99b1d53f6",
+    "semantic_hash": ""
+  },
+  "app/api/products/stock-by-filial/route.ts": {
+    "mtime": 1780073682.628749,
+    "ast_hash": "098fda1c9b1667c14d50d922c0da8fea",
+    "semantic_hash": "098fda1c9b1667c14d50d922c0da8fea"
+  },
+  "app/api/products/subgrupos/route.ts": {
+    "mtime": 1768227704.0400922,
+    "ast_hash": "e1fc9622d1c120d10d67d32d2d76ed9a",
+    "semantic_hash": "e1fc9622d1c120d10d67d32d2d76ed9a"
+  },
+  "app/api/products/tipos/route.ts": {
+    "mtime": 1781717982.9945369,
+    "ast_hash": "4ccd9115605298593a0aaea0b63559c2",
+    "semantic_hash": "4ccd9115605298593a0aaea0b63559c2"
+  },
+  "app/api/produtos-agrupados/route.ts": {
+    "mtime": 1780073682.630498,
+    "ast_hash": "051d65fae7e00053e1d1f9896a0d07b5",
+    "semantic_hash": "051d65fae7e00053e1d1f9896a0d07b5"
+  },
+  "app/api/produtos-descontinuados/route.ts": {
+    "mtime": 1781209170.4054072,
+    "ast_hash": "0ac16fedcdfb5e45e99c31c5b04335d3",
+    "semantic_hash": "0ac16fedcdfb5e45e99c31c5b04335d3"
+  },
+  "app/api/produtos-novos/sync/route.ts": {
+    "mtime": 1780073682.630498,
+    "ast_hash": "2fe2ac2a7f3e25feaf4be9b256bccdc2",
+    "semantic_hash": "2fe2ac2a7f3e25feaf4be9b256bccdc2"
+  },
+  "app/api/produtos-parados/entradas-por-filial/route.ts": {
+    "mtime": 1781182353.9990003,
+    "ast_hash": "6b3ff6afe84f32e7ffebe31c30d80509",
+    "semantic_hash": "6b3ff6afe84f32e7ffebe31c30d80509"
+  },
+  "app/api/produtos-parados/route.ts": {
+    "mtime": 1781114338.0644004,
+    "ast_hash": "c396cff41a61a69a0b62a565c89581fb",
+    "semantic_hash": "c396cff41a61a69a0b62a565c89581fb"
+  },
+  "app/api/relatorio-claude/route.ts": {
+    "mtime": 1781186934.075715,
+    "ast_hash": "a572d0d80aca3a941b3b525e1202409d",
+    "semantic_hash": "a572d0d80aca3a941b3b525e1202409d"
+  },
+  "app/api/relatorios/compra-sugerida-abc/stream/route.ts": {
+    "mtime": 1787842300.0092528,
+    "ast_hash": "e913ad4d58a48a743fc867f57cf27a6e",
+    "semantic_hash": ""
+  },
+  "app/api/relatorios/dados/route.ts": {
+    "mtime": 1787842264.9515066,
+    "ast_hash": "4e99335dbac9170c7e6207ac20d02796",
+    "semantic_hash": ""
+  },
+  "app/api/relatorios/download/route.ts": {
+    "mtime": 1781813481.4872005,
+    "ast_hash": "5bfb2b67c2c665f06b5846a1db570917",
+    "semantic_hash": "5bfb2b67c2c665f06b5846a1db570917"
+  },
+  "app/api/relatorios/gerar/route.ts": {
+    "mtime": 1781813481.4872005,
+    "ast_hash": "83a0947e75c691fb4ae90c1e3e1cb8fa",
+    "semantic_hash": "83a0947e75c691fb4ae90c1e3e1cb8fa"
+  },
+  "app/api/relatorios/presets/[id]/route.ts": {
+    "mtime": 1781878985.136336,
+    "ast_hash": "46704da203bba8b2c1d6979e7d5e264f",
+    "semantic_hash": "46704da203bba8b2c1d6979e7d5e264f"
+  },
+  "app/api/relatorios/presets/route.ts": {
+    "mtime": 1781878976.67249,
+    "ast_hash": "9692ae42b8ccf2b5e0ea45aeeb9aa3a5",
+    "semantic_hash": "9692ae42b8ccf2b5e0ea45aeeb9aa3a5"
+  },
+  "app/api/relatorios/processar/route.ts": {
+    "mtime": 1780073682.6357248,
+    "ast_hash": "eb70de2c170b7eb704fe9ea9826cad99",
+    "semantic_hash": "eb70de2c170b7eb704fe9ea9826cad99"
+  },
+  "app/api/relatorios/query/route.ts": {
+    "mtime": 1768308521.6435585,
+    "ast_hash": "3136877746d42feabbd7abeab02e36c2",
+    "semantic_hash": "3136877746d42feabbd7abeab02e36c2"
+  },
+  "app/api/romaneio-confirmar-entrada/route.ts": {
+    "mtime": 1792761271.3169563,
+    "ast_hash": "9b836024d1b7a9a2a06fc395af0ca281",
+    "semantic_hash": ""
+  },
+  "app/api/romaneios/editar-qtd/route.ts": {
+    "mtime": 1792003218.2908084,
+    "ast_hash": "3cf02a5666cda0fef09ba437e1e8f6d3",
+    "semantic_hash": ""
+  },
+  "app/api/romaneios/entradas/route.ts": {
+    "mtime": 1792760930.9921958,
+    "ast_hash": "4388a702d6d3cfd1ce0b19c2c7cc53fa",
+    "semantic_hash": ""
+  },
+  "app/api/romaneios/liberar-transito/route.ts": {
+    "mtime": 1791204265.8154674,
+    "ast_hash": "bd35d7bb1f9fe8e56248ccb0312b64d9",
+    "semantic_hash": ""
+  },
+  "app/api/romaneios/renomear-romaneio/route.ts": {
+    "mtime": 1780073682.6390262,
+    "ast_hash": "fe3bc07ccdce7c954dc20a51b9994725",
+    "semantic_hash": "fe3bc07ccdce7c954dc20a51b9994725"
+  },
+  "app/api/romaneios/saidas/route.ts": {
+    "mtime": 1792761285.6838548,
+    "ast_hash": "01e839824cb2cef42133dcf7a82662fd",
+    "semantic_hash": ""
+  },
+  "app/api/romaneios/transito/route.ts": {
+    "mtime": 1787673179.7305357,
+    "ast_hash": "df115555976c144097b18cb1c9a8ea75",
+    "semantic_hash": ""
+  },
+  "app/api/saidas-entradas-produtos/executar/route.ts": {
+    "mtime": 1793127927.5386777,
+    "ast_hash": "2b2d24d235e04a0d0f803c71b5544db6",
+    "semantic_hash": ""
+  },
+  "app/api/saidas-entradas-produtos/historico/route.ts": {
+    "mtime": 1780489180.6993496,
+    "ast_hash": "051efa45712cae00f5a301e53809505f",
+    "semantic_hash": "051efa45712cae00f5a301e53809505f"
+  },
+  "app/api/saidas-entradas-produtos/log/[tipo]/[romaneio]/[filial]/route.ts": {
+    "mtime": 1791996442.4107258,
+    "ast_hash": "ef44fe524f7399dcfc767a034dd784e1",
+    "semantic_hash": ""
+  },
+  "app/api/sales-summary/route.ts": {
+    "mtime": 1772109179.9187593,
+    "ast_hash": "8239633d32112bd19b91dc5ae0d554b0",
+    "semantic_hash": "8239633d32112bd19b91dc5ae0d554b0"
+  },
+  "app/api/sincronizacao/route.ts": {
+    "mtime": 1780073682.6464155,
+    "ast_hash": "6a7a6b09d7f2da715ce629259a363f7d",
+    "semantic_hash": "6a7a6b09d7f2da715ce629259a363f7d"
+  },
+  "app/api/stock-by-filial/route.ts": {
+    "mtime": 1771433372.168422,
+    "ast_hash": "453af9be8aff724913ad301fd99d982b",
+    "semantic_hash": "453af9be8aff724913ad301fd99d982b"
+  },
+  "app/api/top-categories/route.ts": {
+    "mtime": 1779914947.9514852,
+    "ast_hash": "c163490179b530c82693d3f7f85131f4",
+    "semantic_hash": "c163490179b530c82693d3f7f85131f4"
+  },
+  "app/api/top-products/route.ts": {
+    "mtime": 1780073682.6464155,
+    "ast_hash": "abf83b5447e534f2ea52216e1abd4669",
+    "semantic_hash": "abf83b5447e534f2ea52216e1abd4669"
+  },
+  "app/api/transferencia-produtos/executar/route.ts": {
+    "mtime": 1791995134.5579143,
+    "ast_hash": "b3fd167323baef77091b779f26ac9c50",
+    "semantic_hash": ""
+  },
+  "app/api/transferencia-produtos/filiais/route.ts": {
+    "mtime": 1782927727.1992211,
+    "ast_hash": "68a69aeb58a9c9ece1d3be94232d8ef7",
+    "semantic_hash": "68a69aeb58a9c9ece1d3be94232d8ef7"
+  },
+  "app/api/transferencia-produtos/log-debug/route.ts": {
+    "mtime": 1770841638.5929546,
+    "ast_hash": "6be9e0704a0dc0e8bd1622d08ead7b12",
+    "semantic_hash": "6be9e0704a0dc0e8bd1622d08ead7b12"
+  },
+  "app/api/transferencia-produtos/log-detalhes/route.ts": {
+    "mtime": 1791998513.3307967,
+    "ast_hash": "010988f4f14e5870ec9a126083577141",
+    "semantic_hash": ""
+  },
+  "app/api/transferencia-produtos/log-saidas/route.ts": {
+    "mtime": 1780073682.6540332,
+    "ast_hash": "79228f5007617053b5e6736930a6139f",
+    "semantic_hash": "79228f5007617053b5e6736930a6139f"
+  },
+  "app/api/transferencia-produtos/log/route.ts": {
+    "mtime": 1780073682.6540332,
+    "ast_hash": "a13ca5ab8e2218ca8f2ce66c73b0ff47",
+    "semantic_hash": "a13ca5ab8e2218ca8f2ce66c73b0ff47"
+  },
+  "app/api/transferencia-produtos/permissoes/route.ts": {
+    "mtime": 1780073682.6540332,
+    "ast_hash": "0304bff133e7e4076c7b13283be44f55",
+    "semantic_hash": "0304bff133e7e4076c7b13283be44f55"
+  },
+  "app/api/transferencia-produtos/produto-por-codigo-barras/route.ts": {
+    "mtime": 1780073682.6540332,
+    "ast_hash": "b8fb2d3642327f1af98d2c3fa2ceb8cf",
+    "semantic_hash": "b8fb2d3642327f1af98d2c3fa2ceb8cf"
+  },
+  "app/api/transferencia-produtos/produtos/route.ts": {
+    "mtime": 1783520661.032935,
+    "ast_hash": "7d33bcb1a7e4f79443ed23bb700b688f",
+    "semantic_hash": ""
+  },
+  "app/api/transferencia-produtos/responsaveis/route.ts": {
+    "mtime": 1780073682.6540332,
+    "ast_hash": "b6529d21b1262ba030abc28ebf770cb9",
+    "semantic_hash": "b6529d21b1262ba030abc28ebf770cb9"
+  },
+  "app/api/transferencia-produtos/tipos-romaneio/route.ts": {
+    "mtime": 1793026135.2110991,
+    "ast_hash": "c98cc6385621876b9d39061abda69f65",
+    "semantic_hash": ""
+  },
+  "app/api/transferencias-pendentes/contadores/route.ts": {
+    "mtime": 1780073682.662203,
+    "ast_hash": "9c34378264a60f66c8a637bf959e53aa",
+    "semantic_hash": "9c34378264a60f66c8a637bf959e53aa"
+  },
+  "app/api/transferencias-pendentes/cooldown/route.ts": {
+    "mtime": 1780073682.6636407,
+    "ast_hash": "378b444d2ba0e72bfef13bc054499e36",
+    "semantic_hash": "378b444d2ba0e72bfef13bc054499e36"
+  },
+  "app/api/transferencias-pendentes/route.ts": {
+    "mtime": 1780073682.6636407,
+    "ast_hash": "36d31f8ea7a916527ef9baa5278918f1",
+    "semantic_hash": "36d31f8ea7a916527ef9baa5278918f1"
+  },
+  "app/api/transferencias-quantidade-real/route.ts": {
+    "mtime": 1783538393.8615339,
+    "ast_hash": "e62118e267e4f7f87a17c0ea2ffcc4c9",
+    "semantic_hash": ""
+  },
+  "app/api/transferencias-realizadas/export/route.ts": {
+    "mtime": 1770301201.0743353,
+    "ast_hash": "4c149fad5a363e9545059e22bc2b2d38",
+    "semantic_hash": "4c149fad5a363e9545059e22bc2b2d38"
+  },
+  "app/api/transferencias-realizadas/migrate/route.ts": {
+    "mtime": 1775763614.83137,
+    "ast_hash": "a35ed7f2a86572b6fd381c71f8b00aa0",
+    "semantic_hash": "a35ed7f2a86572b6fd381c71f8b00aa0"
+  },
+  "app/api/transferencias-realizadas/route.ts": {
+    "mtime": 1783538380.7994304,
+    "ast_hash": "d9c1d11948630a49615107e72559e477",
+    "semantic_hash": ""
+  },
+  "app/api/vendedores/[vendedor]/clientes/route.ts": {
+    "mtime": 1780073682.6656542,
+    "ast_hash": "112b19c0292df60a71d08eab5cd83205",
+    "semantic_hash": "112b19c0292df60a71d08eab5cd83205"
+  },
+  "app/api/vendedores/[vendedor]/produto-vendas/route.ts": {
+    "mtime": 1780073682.6668668,
+    "ast_hash": "20b1baf6480f47630e6b268a7f56475e",
+    "semantic_hash": "20b1baf6480f47630e6b268a7f56475e"
+  },
+  "app/api/vendedores/[vendedor]/produtos/route.ts": {
+    "mtime": 1771433372.1709466,
+    "ast_hash": "bb8f21af1420fd0b4820d83e650a90ae",
+    "semantic_hash": "bb8f21af1420fd0b4820d83e650a90ae"
+  },
+  "app/api/vendedores/route.ts": {
+    "mtime": 1780073682.6668668,
+    "ast_hash": "da6e790c67172ae66037b3dc35c9ce74",
+    "semantic_hash": "da6e790c67172ae66037b3dc35c9ce74"
+  },
+  "app/corporativo/[codigo]/page.tsx": {
+    "mtime": 1783365198.4551404,
+    "ast_hash": "8b1ec8cdf714183a0e3746f12adb5e30",
+    "semantic_hash": "8b1ec8cdf714183a0e3746f12adb5e30"
+  },
+  "app/corporativo/_components/ClienteCorporativoForm.tsx": {
+    "mtime": 1790085175.7166536,
+    "ast_hash": "89c9248e7e44affe64566f3cac40f992",
+    "semantic_hash": ""
+  },
+  "app/corporativo/_components/formTypes.ts": {
+    "mtime": 1790085159.2565782,
+    "ast_hash": "a25ee28329e6d2bbd23333ac0c151836",
+    "semantic_hash": ""
+  },
+  "app/corporativo/_components/mapDetalhe.ts": {
+    "mtime": 1790085159.2576587,
+    "ast_hash": "fa9e9ceb98cdc96c3ac59810eddf4b3b",
+    "semantic_hash": ""
+  },
+  "app/corporativo/catalogo/page.tsx": {
+    "mtime": 1783961868.3724637,
+    "ast_hash": "9bdf9ecf30ac9e3954fde1857d36f1b8",
+    "semantic_hash": ""
+  },
+  "app/corporativo/layout.tsx": {
+    "mtime": 1783952665.242743,
+    "ast_hash": "5b9457c74754a645cddb7a6ef8d533fe",
+    "semantic_hash": ""
+  },
+  "app/corporativo/loja/CartContext.tsx": {
+    "mtime": 1783955450.051703,
+    "ast_hash": "29ed238a0ecccee7bb8163a982cf7cd0",
+    "semantic_hash": ""
+  },
+  "app/corporativo/loja/carrinho/page.tsx": {
+    "mtime": 1783948867.1793084,
+    "ast_hash": "790b1132b7c828bff77fa5966985beef",
+    "semantic_hash": ""
+  },
+  "app/corporativo/loja/checkout/page.tsx": {
+    "mtime": 1783952756.8361006,
+    "ast_hash": "1614196f73e28c01cab35ff984f6bfd2",
+    "semantic_hash": ""
+  },
+  "app/corporativo/loja/layout.tsx": {
+    "mtime": 1790081339.4532118,
+    "ast_hash": "59c119bba40d75b3d2f05de42437d96e",
+    "semantic_hash": ""
+  },
+  "app/corporativo/loja/page.tsx": {
+    "mtime": 1783948852.712466,
+    "ast_hash": "4c4fa32ad843916d74c417440e52166a",
+    "semantic_hash": ""
+  },
+  "app/corporativo/loja/pedido/[id]/page.tsx": {
+    "mtime": 1783948879.7891445,
+    "ast_hash": "bfefafcc0cd6abe191c5ea9e9a1995a0",
+    "semantic_hash": ""
+  },
+  "app/corporativo/loja/produto/[produto]/page.tsx": {
+    "mtime": 1783948858.7749598,
+    "ast_hash": "689f29d31499f1799288c71c62df5932",
+    "semantic_hash": ""
+  },
+  "app/corporativo/novo/page.tsx": {
+    "mtime": 1790085175.721549,
+    "ast_hash": "febb29eedffe623994ac6fe1da74e6c6",
+    "semantic_hash": ""
+  },
+  "app/corporativo/page.tsx": {
+    "mtime": 1783952698.4811769,
+    "ast_hash": "e450d29c90bae40ac2e9a86a849ac0d9",
+    "semantic_hash": ""
+  },
+  "app/corporativo/pedidos/page.tsx": {
+    "mtime": 1790081323.6177874,
+    "ast_hash": "17b1c7e0af4efa3b89d4b3ac0ef67766",
+    "semantic_hash": ""
+  },
+  "app/exportar-relatorios/page.tsx": {
+    "mtime": 1780073682.669476,
+    "ast_hash": "04a03e1ff0cb73f657e6958e47cd5545",
+    "semantic_hash": "04a03e1ff0cb73f657e6958e47cd5545"
+  },
+  "app/layout.tsx": {
+    "mtime": 1788964842.669846,
+    "ast_hash": "f01440884368ff5e1c505bb9e29baec9",
+    "semantic_hash": ""
+  },
+  "app/login/page.tsx": {
+    "mtime": 1771588589.3136365,
+    "ast_hash": "a1242bf3687b4d3abac34a0a9e8d271d",
+    "semantic_hash": "a1242bf3687b4d3abac34a0a9e8d271d"
+  },
+  "app/page.tsx": {
+    "mtime": 1783944020.8187644,
+    "ast_hash": "abb575c5459c480a38aedc60ae14687a",
+    "semantic_hash": ""
+  },
+  "aws-setup/install-aws.sh": {
+    "mtime": 1772797317.5117204,
+    "ast_hash": "56c63f597c1e9a411ff9a803d4d621d3",
+    "semantic_hash": "56c63f597c1e9a411ff9a803d4d621d3"
+  },
+  "buscar_ecommerce_pashmina_fev2025.py": {
+    "mtime": 1772131891.361737,
+    "ast_hash": "2942d6c55958acbbed70be79279a07c2",
+    "semantic_hash": "2942d6c55958acbbed70be79279a07c2"
+  },
+  "buscar_tipos_romaneio.py": {
+    "mtime": 1770043919.4743397,
+    "ast_hash": "e449c381872599286ae61c72a1af8112",
+    "semantic_hash": "e449c381872599286ae61c72a1af8112"
+  },
+  "components/ajuste-estoque/AjusteEstoquePage.tsx": {
+    "mtime": 1792609059.1105325,
+    "ast_hash": "f9cbf27a02b8ea1dff910ad2cf85d340",
+    "semantic_hash": ""
+  },
+  "components/auth/AuthContext.tsx": {
+    "mtime": 1777402983.6596458,
+    "ast_hash": "bca4d0dbbc4f2a152309746d1d436c9b",
+    "semantic_hash": "bca4d0dbbc4f2a152309746d1d436c9b"
+  },
+  "components/auth/AuthGuard.tsx": {
+    "mtime": 1785419299.7944398,
+    "ast_hash": "fba1c8db571685006825df4fdc7d32c1",
+    "semantic_hash": ""
+  },
+  "components/auth/UserHeaderBar.tsx": {
+    "mtime": 1785419302.6644073,
+    "ast_hash": "bc7d92804a282127ddb31ea73c0f95cd",
+    "semantic_hash": ""
+  },
+  "components/auth/UserMenu.tsx": {
+    "mtime": 1783420048.409523,
+    "ast_hash": "f14ad53955a1f58097f889108f54d206",
+    "semantic_hash": "f14ad53955a1f58097f889108f54d206"
+  },
+  "components/blackfriday/BlackFridayPage.tsx": {
+    "mtime": 1780073682.6775858,
+    "ast_hash": "78782a73e6e67682e86db85473ac24f2",
+    "semantic_hash": "78782a73e6e67682e86db85473ac24f2"
+  },
+  "components/clientes/ClienteDetalhePage.tsx": {
+    "mtime": 1780919225.7045178,
+    "ast_hash": "4f64b791aff28c08df49dd0f0cac5ad2",
+    "semantic_hash": "4f64b791aff28c08df49dd0f0cac5ad2"
+  },
+  "components/clientes/ClientesPage.tsx": {
+    "mtime": 1780073682.6798215,
+    "ast_hash": "6de25c24105504e4a95fc8b791443d45",
+    "semantic_hash": "6de25c24105504e4a95fc8b791443d45"
+  },
+  "components/clientes/ClientesTable.tsx": {
+    "mtime": 1785152512.735628,
+    "ast_hash": "0c394f94cd27ca83360f1dde218c5d49",
+    "semantic_hash": ""
+  },
+  "components/controle-transferencias/ConfirmarTransferenciaModal.tsx": {
+    "mtime": 1770317637.3565967,
+    "ast_hash": "1a36a1a3caea82ab73bcbada09227d67",
+    "semantic_hash": "1a36a1a3caea82ab73bcbada09227d67"
+  },
+  "components/controle-transferencias/ControleTransferenciasPage.tsx": {
+    "mtime": 1787659663.3900912,
+    "ast_hash": "534794b93de74f7710792a0619b56ad7",
+    "semantic_hash": ""
+  },
+  "components/controle-transferencias/ControleTransferenciasTable.tsx": {
+    "mtime": 1792003063.225086,
+    "ast_hash": "8e4fd69ca8b510c4f46087ff694667d5",
+    "semantic_hash": ""
+  },
+  "components/controle-transferencias/RealizadasPanel.tsx": {
+    "mtime": 1780073682.6824787,
+    "ast_hash": "b948990f48c2dec2fa1b806ef5dd6461",
+    "semantic_hash": "b948990f48c2dec2fa1b806ef5dd6461"
+  },
+  "components/controle-transferencias/TransferenciaConfirmModal.tsx": {
+    "mtime": 1791998889.6289406,
+    "ast_hash": "7d4d2a8670220abcd2f55b98240de8f8",
+    "semantic_hash": ""
+  },
+  "components/controle-transferencias/exportToPDF.ts": {
+    "mtime": 1783529591.599146,
+    "ast_hash": "cba26323c49ab333f47e1c803e012916",
+    "semantic_hash": ""
+  },
+  "components/dashboard/CompanyDashboard.tsx": {
+    "mtime": 1792777707.23414,
+    "ast_hash": "de9930758fa61d521365fde4245a6e62",
+    "semantic_hash": ""
+  },
+  "components/dashboard/CompanyRevenueLists.tsx": {
+    "mtime": 1780073682.686467,
+    "ast_hash": "b7aa239347828cfb6e0f57fc4d93ee4d",
+    "semantic_hash": "b7aa239347828cfb6e0f57fc4d93ee4d"
+  },
+  "components/dashboard/DailyRevenueChart.tsx": {
+    "mtime": 1784816405.2850056,
+    "ast_hash": "c9781ed4da9b4fea129be685859c253c",
+    "semantic_hash": ""
+  },
+  "components/dashboard/GoalCard.tsx": {
+    "mtime": 1784817155.099521,
+    "ast_hash": "1d3955a65b381e444d3774c5bec644bf",
+    "semantic_hash": ""
+  },
+  "components/dashboard/GoalsModal.tsx": {
+    "mtime": 1792777402.8751469,
+    "ast_hash": "a5a51f7bd2a7ac2367a72db448550b3d",
+    "semantic_hash": ""
+  },
+  "components/dashboard/RevenueDashboard.tsx": {
+    "mtime": 1780073682.69018,
+    "ast_hash": "b8f3dc9d3bedc2374fde108d97c5c13a",
+    "semantic_hash": "b8f3dc9d3bedc2374fde108d97c5c13a"
+  },
+  "components/dashboard/SummaryCards.tsx": {
+    "mtime": 1780334088.2163973,
+    "ast_hash": "1f13894059c7c73365fb5303040f3f5a",
+    "semantic_hash": "1f13894059c7c73365fb5303040f3f5a"
+  },
+  "components/extrato-produto/ExtratoProdutoPage.tsx": {
+    "mtime": 1791224445.5577123,
+    "ast_hash": "0a52b341c04d7275fe5eff550a1968a3",
+    "semantic_hash": ""
+  },
+  "components/faturamento/FaturamentoPage.tsx": {
+    "mtime": 1782911447.0907376,
+    "ast_hash": "b9f7b7fcdefff148bdd07d9a15eb20fa",
+    "semantic_hash": "b9f7b7fcdefff148bdd07d9a15eb20fa"
+  },
+  "components/filters/DateRangeFilter.tsx": {
+    "mtime": 1785161426.0031328,
+    "ast_hash": "56710a192215b513a95ba80c3876d0ba",
+    "semantic_hash": ""
+  },
+  "components/filters/FilialFilter.tsx": {
+    "mtime": 1792777707.2312987,
+    "ast_hash": "0cffcbb3cc693d094ed148caf5620a5e",
+    "semantic_hash": ""
+  },
+  "components/filters/MultiSelectFilter.tsx": {
+    "mtime": 1780073682.6997192,
+    "ast_hash": "155969265e16f704d57f6409fb79866c",
+    "semantic_hash": "155969265e16f704d57f6409fb79866c"
+  },
+  "components/filters/SelectFilter.tsx": {
+    "mtime": 1763990113.9790246,
+    "ast_hash": "20b666da541dd284294093705dc0b812",
+    "semantic_hash": "20b666da541dd284294093705dc0b812"
+  },
+  "components/filters/VendedorFilter.tsx": {
+    "mtime": 1780073682.6997192,
+    "ast_hash": "f30b8ab9dc128a22d2b67dba48b0932c",
+    "semantic_hash": "f30b8ab9dc128a22d2b67dba48b0932c"
+  },
+  "components/fornecedores/FornecedoresPage.tsx": {
+    "mtime": 1782398622.0756679,
+    "ast_hash": "2d8c2c39521fd4c7f45fc1f5b0999cbb",
+    "semantic_hash": "2d8c2c39521fd4c7f45fc1f5b0999cbb"
+  },
+  "components/gerador-apresentacoes/ColecaoDeck.tsx": {
+    "mtime": 1791294608.0543232,
+    "ast_hash": "660aafeecbeca62dc043e7bc85f416ea",
+    "semantic_hash": ""
+  },
+  "components/gerador-apresentacoes/ComparativoDeck.tsx": {
+    "mtime": 1791294608.0543232,
+    "ast_hash": "599fbd695cf73341aad8b78ddbdf4af8",
+    "semantic_hash": ""
+  },
+  "components/gerador-apresentacoes/ComparativoResumidoDeck.tsx": {
+    "mtime": 1791294608.0627604,
+    "ast_hash": "577e3672d3c12f1fc1cabaed2834450c",
+    "semantic_hash": ""
+  },
+  "components/gerador-apresentacoes/GeradorApresentacoesPage.tsx": {
+    "mtime": 1791295244.4367838,
+    "ast_hash": "5b9eefc4a7d8892acfd80e017688cfe0",
+    "semantic_hash": ""
+  },
+  "components/historico-transferencias/HistoricoTransferenciasPage.tsx": {
+    "mtime": 1780073682.7025206,
+    "ast_hash": "78f7ff4bb9cbcb62e5a22d2f72cb9950",
+    "semantic_hash": "78f7ff4bb9cbcb62e5a22d2f72cb9950"
+  },
+  "components/layout/AppHeader.tsx": {
+    "mtime": 1770043919.543633,
+    "ast_hash": "36f517e543e4616089aea72819968c8d",
+    "semantic_hash": "36f517e543e4616089aea72819968c8d"
+  },
+  "components/layout/CorporativoSidebar.tsx": {
+    "mtime": 1783952687.7869406,
+    "ast_hash": "ebe73d06169e822851e030427779b8ce",
+    "semantic_hash": ""
+  },
+  "components/layout/MainContent.tsx": {
+    "mtime": 1763144153.8585725,
+    "ast_hash": "ee7b8770b1b4a22f0bf71613b03cca67",
+    "semantic_hash": "ee7b8770b1b4a22f0bf71613b03cca67"
+  },
+  "components/layout/PageLayout.tsx": {
+    "mtime": 1780073682.7025206,
+    "ast_hash": "7a672d31b6ac254cb25f6a420501049d",
+    "semantic_hash": "7a672d31b6ac254cb25f6a420501049d"
+  },
+  "components/layout/Sidebar.tsx": {
+    "mtime": 1792768612.5024784,
+    "ast_hash": "d5c4dbd578dace98b4729a9c39f48cf9",
+    "semantic_hash": ""
+  },
+  "components/layout/SidebarContext.tsx": {
+    "mtime": 1780073682.7077994,
+    "ast_hash": "78a8564289bab29c80b8796cdc0abfd0",
+    "semantic_hash": "78a8564289bab29c80b8796cdc0abfd0"
+  },
+  "components/layout/TopHeader.tsx": {
+    "mtime": 1763130093.4616866,
+    "ast_hash": "112092fcd4095eef665d855cde38d203",
+    "semantic_hash": "112092fcd4095eef665d855cde38d203"
+  },
+  "components/lista-loja/ComprasTransitoPage.tsx": {
+    "mtime": 1788282144.8236587,
+    "ast_hash": "1eb1901547c9d365c6ef5655fb3f1861",
+    "semantic_hash": ""
+  },
+  "components/lista-loja/ComprasTransitoPickerModal.tsx": {
+    "mtime": 1782496297.5831983,
+    "ast_hash": "65e992ce7dbc8c45c5099ef86a3966b1",
+    "semantic_hash": "65e992ce7dbc8c45c5099ef86a3966b1"
+  },
+  "components/lista-loja/ListaLojaPage.tsx": {
+    "mtime": 1785414861.8492613,
+    "ast_hash": "d6b22411fa1bb6ed975fb75da6483c27",
+    "semantic_hash": ""
+  },
+  "components/mapa-clientes/BrazilMap.tsx": {
+    "mtime": 1780918219.8191822,
+    "ast_hash": "275603955f0903e4da6f1b654c5ea462",
+    "semantic_hash": "275603955f0903e4da6f1b654c5ea462"
+  },
+  "components/mapa-clientes/MapaClientesPage.tsx": {
+    "mtime": 1780918215.561623,
+    "ast_hash": "67f25009d516e494f44cf72d88a397a3",
+    "semantic_hash": "67f25009d516e494f44cf72d88a397a3"
+  },
+  "components/movimento/ControleMovimentoPage.tsx": {
+    "mtime": 1785786157.8515804,
+    "ast_hash": "dc9e08706e91956eaa00c71d42793f9e",
+    "semantic_hash": ""
+  },
+  "components/movimento/MovimentoDetalhesModal.tsx": {
+    "mtime": 1783538642.0855544,
+    "ast_hash": "4a59689067e4e5439a2f12a938288846",
+    "semantic_hash": ""
+  },
+  "components/painel-colecoes/ColecoesPanelPage.tsx": {
+    "mtime": 1785787032.1036718,
+    "ast_hash": "5a6ae2cf749d9eec3b9f17842d6d4de6",
+    "semantic_hash": ""
+  },
+  "components/performance/ControlePerformancePage.tsx": {
+    "mtime": 1780073682.724007,
+    "ast_hash": "3a1ac7d9dac7349b3338e8b433eb5031",
+    "semantic_hash": "3a1ac7d9dac7349b3338e8b433eb5031"
+  },
+  "components/performance/CurvaAbcPage.tsx": {
+    "mtime": 1789134489.7963204,
+    "ast_hash": "63d9b558f58a38ee9766f1673d739ad8",
+    "semantic_hash": ""
+  },
+  "components/performance/CurvaPorProdutoPage.tsx": {
+    "mtime": 1782314572.265437,
+    "ast_hash": "995726df9244be29cbfa6caacb58d2e8",
+    "semantic_hash": "995726df9244be29cbfa6caacb58d2e8"
+  },
+  "components/performance/CurvaPorProdutoPickerModal.tsx": {
+    "mtime": 1780073682.7296786,
+    "ast_hash": "aefd9f60bf6581ff48f3c57c3cfa3815",
+    "semantic_hash": "aefd9f60bf6581ff48f3c57c3cfa3815"
+  },
+  "components/performance/FilialPerformancePage.tsx": {
+    "mtime": 1783539181.8593154,
+    "ast_hash": "55151c3df9b128d747725b33a702145a",
+    "semantic_hash": ""
+  },
+  "components/performance/FilialVendedoresTab.tsx": {
+    "mtime": 1780073682.7336936,
+    "ast_hash": "0b5ad5a6a170aae19121ceecb240c743",
+    "semantic_hash": "0b5ad5a6a170aae19121ceecb240c743"
+  },
+  "components/performance/NovaFilialPage.tsx": {
+    "mtime": 1780073682.7336936,
+    "ast_hash": "9cdf84835c0aea6502a496a59c222273",
+    "semantic_hash": "9cdf84835c0aea6502a496a59c222273"
+  },
+  "components/products-new/ProductsNewPage.tsx": {
+    "mtime": 1785179133.5079215,
+    "ast_hash": "48cd9b7fa252eb310022903b39f4abff",
+    "semantic_hash": ""
+  },
+  "components/products/ProductDetailKPIs.tsx": {
+    "mtime": 1786557260.2276776,
+    "ast_hash": "cbbddfbb40b67f19a7f29df4ef614245",
+    "semantic_hash": ""
+  },
+  "components/products/ProductDetailPage.tsx": {
+    "mtime": 1791204053.80672,
+    "ast_hash": "09395bc3638dfd54e269add1fd269c49",
+    "semantic_hash": ""
+  },
+  "components/products/ProductPerformancePage.tsx": {
+    "mtime": 1781267484.1546042,
+    "ast_hash": "330b246b4c13379f58ab5895fdfda5c2",
+    "semantic_hash": "330b246b4c13379f58ab5895fdfda5c2"
+  },
+  "components/products/ProductPerformanceTable.tsx": {
+    "mtime": 1780073682.7417748,
+    "ast_hash": "bc18c01e3eb4b31ef8180b166bb5bb8b",
+    "semantic_hash": "bc18c01e3eb4b31ef8180b166bb5bb8b"
+  },
+  "components/products/ProductSaleHistoryTable.tsx": {
+    "mtime": 1780073682.7417748,
+    "ast_hash": "8eaecb852a573cb09c4cb5ee804b5698",
+    "semantic_hash": "8eaecb852a573cb09c4cb5ee804b5698"
+  },
+  "components/products/ProductsPage.tsx": {
+    "mtime": 1785786061.58382,
+    "ast_hash": "749518b4358870e4acdf01843d72fb6b",
+    "semantic_hash": ""
+  },
+  "components/products/ProductsRecentPage.tsx": {
+    "mtime": 1785786080.652741,
+    "ast_hash": "4dcf720aeaced78dfa85389753bc6bbc",
+    "semantic_hash": ""
+  },
+  "components/products/ProductsRecentTable.tsx": {
+    "mtime": 1783538610.373308,
+    "ast_hash": "2c12b7904b40d8427c3597f2762f41fe",
+    "semantic_hash": ""
+  },
+  "components/products/ProductsTable.tsx": {
+    "mtime": 1784219431.1011875,
+    "ast_hash": "2b5912facd8835c232607faeb7cf6463",
+    "semantic_hash": ""
+  },
+  "components/produto-agrupado/ProdutoAgrupadoPage.tsx": {
+    "mtime": 1780073682.7538762,
+    "ast_hash": "c5803a8e6b190f412db24b0bbcfe4610",
+    "semantic_hash": "c5803a8e6b190f412db24b0bbcfe4610"
+  },
+  "components/produto-descontinuado/ProdutoDescontinuadoPage.tsx": {
+    "mtime": 1781209199.7517874,
+    "ast_hash": "e6038431a2d98fa1e74bcd34534ee96c",
+    "semantic_hash": "e6038431a2d98fa1e74bcd34534ee96c"
+  },
+  "components/relatorio-claude/ClaudeReportPage.tsx": {
+    "mtime": 1781187026.6240144,
+    "ast_hash": "337b2c757a154433551b54f1d956b3ff",
+    "semantic_hash": "337b2c757a154433551b54f1d956b3ff"
+  },
+  "components/relatorios/ExportarRelatoriosPage.tsx": {
+    "mtime": 1781811672.2677202,
+    "ast_hash": "7100ad93329f4cae6f0cf2636fa8a06f",
+    "semantic_hash": "7100ad93329f4cae6f0cf2636fa8a06f"
+  },
+  "components/relatorios/GeradorRelatoriosPage.tsx": {
+    "mtime": 1792428028.5854247,
+    "ast_hash": "d942c0f80ec4b43879be7efca005a135",
+    "semantic_hash": ""
+  },
+  "components/romaneios/RomaneioDeleteModal.tsx": {
+    "mtime": 1781205245.3228767,
+    "ast_hash": "c1db24d3ffabe5b57c07dc935de08446",
+    "semantic_hash": "c1db24d3ffabe5b57c07dc935de08446"
+  },
+  "components/romaneios/RomaneioDetalhePage.tsx": {
+    "mtime": 1793127965.5807114,
+    "ast_hash": "5c1cb6b6ad4cc615fd969fbe9b3ea01b",
+    "semantic_hash": ""
+  },
+  "components/romaneios/RomaneiosDuplicadosPanel.tsx": {
+    "mtime": 1783438290.8626285,
+    "ast_hash": "685d5c1f8a52c86087dce25ac25d445b",
+    "semantic_hash": "685d5c1f8a52c86087dce25ac25d445b"
+  },
+  "components/romaneios/RomaneiosPage.tsx": {
+    "mtime": 1793128334.4571116,
+    "ast_hash": "450b1efcbf1d7291f1ec71d36148a485",
+    "semantic_hash": ""
+  },
+  "components/saidas-entradas-produtos/HistoricoSaidasEntradasPage.tsx": {
+    "mtime": 1788448906.4890332,
+    "ast_hash": "fbb25fc59116239c5a7167f924ecd7c8",
+    "semantic_hash": ""
+  },
+  "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx": {
+    "mtime": 1793026162.7999358,
+    "ast_hash": "480bfec90a67f697aac0db597b236e53",
+    "semantic_hash": ""
+  },
+  "components/shared/CompraIdealCell.tsx": {
+    "mtime": 1784831224.8993921,
+    "ast_hash": "34049145fe1bff8ebfed96c5230e7462",
+    "semantic_hash": ""
+  },
+  "components/shared/CompraIdealExplainCard.tsx": {
+    "mtime": 1784562870.534233,
+    "ast_hash": "35050859ef2bde5d4eee08725afb000a",
+    "semantic_hash": ""
+  },
+  "components/shared/MiniAreaChart.tsx": {
+    "mtime": 1784818346.3298914,
+    "ast_hash": "1501fb32dcec98153c24c41d8bc863ec",
+    "semantic_hash": ""
+  },
+  "components/sincronizacao/SincronizacaoPage.tsx": {
+    "mtime": 1780073682.7675796,
+    "ast_hash": "f9f455e79710f72c6b9952301879ebc6",
+    "semantic_hash": "f9f455e79710f72c6b9952301879ebc6"
+  },
+  "components/stock/CompraSalvaDetalhePage.tsx": {
+    "mtime": 1791397340.7417839,
+    "ast_hash": "0cc7fdb8043b58da60791a3ea4764664",
+    "semantic_hash": ""
+  },
+  "components/stock/ComprasSalvasListPanel.tsx": {
+    "mtime": 1780073682.7675796,
+    "ast_hash": "5b21b7819087a6e0b75f02e1d0da817e",
+    "semantic_hash": "5b21b7819087a6e0b75f02e1d0da817e"
+  },
+  "components/stock/ControleEstoquePage.tsx": {
+    "mtime": 1785786102.6448815,
+    "ast_hash": "190d547f367c8051ccadbbce642c0f37",
+    "semantic_hash": ""
+  },
+  "components/stock/ControleGiroPage.tsx": {
+    "mtime": 1785786122.79964,
+    "ast_hash": "d4f6e66a799af600c83ef5e0cbc55f16",
+    "semantic_hash": ""
+  },
+  "components/stock/EstoqueDetalhado01Page.tsx": {
+    "mtime": 1783538667.5399222,
+    "ast_hash": "3a7f9e18dd43d68b9ed20b67db8b5fdc",
+    "semantic_hash": ""
+  },
+  "components/stock/EstoqueDetalhado01ProdutoPage.tsx": {
+    "mtime": 1783539015.1237228,
+    "ast_hash": "6e35a8733aec410fedde1f4f09fd8273",
+    "semantic_hash": ""
+  },
+  "components/stock/EstoqueDetalhado02Page.tsx": {
+    "mtime": 1783539090.9487667,
+    "ast_hash": "f9054cfdc5f59c0be34671caee2fdeb1",
+    "semantic_hash": ""
+  },
+  "components/stock/EstoqueItemPage.tsx": {
+    "mtime": 1790785403.4603274,
+    "ast_hash": "0124b22f27948eee1c587d5210b4a958",
+    "semantic_hash": ""
+  },
+  "components/stock/ListaCompraSugeridaPage.tsx": {
+    "mtime": 1783539537.9753623,
+    "ast_hash": "6952e97184785bf5da537f5f20e62fc0",
+    "semantic_hash": ""
+  },
+  "components/stock/ProdutosParadosPage.tsx": {
+    "mtime": 1785786219.4098418,
+    "ast_hash": "bdad9a8e962ae7d01d7dcf6931f6850b",
+    "semantic_hash": ""
+  },
+  "components/stock/ProjecaoEstoquePage.tsx": {
+    "mtime": 1785786203.7553124,
+    "ast_hash": "0dc98d933f0455bab2a78a3622ef5c07",
+    "semantic_hash": ""
+  },
+  "components/stock/StockByFilialPage.tsx": {
+    "mtime": 1780073682.7864518,
+    "ast_hash": "db3ea89e8077363769c41754ac62491d",
+    "semantic_hash": "db3ea89e8077363769c41754ac62491d"
+  },
+  "components/stock/StockByFilialTable.tsx": {
+    "mtime": 1786555356.6412282,
+    "ast_hash": "6eb7399eb77cbc22cdd9d1b7a49a9b9a",
+    "semantic_hash": ""
+  },
+  "components/theme/ThemeContext.tsx": {
+    "mtime": 1782497067.377612,
+    "ast_hash": "c015cb42e4a7bf526b057d6ec3529c36",
+    "semantic_hash": "c015cb42e4a7bf526b057d6ec3529c36"
+  },
+  "components/theme/ThemeToggle.tsx": {
+    "mtime": 1782497076.1430678,
+    "ast_hash": "c3d8552308664c531b91249e9459549f",
+    "semantic_hash": "c3d8552308664c531b91249e9459549f"
+  },
+  "components/transferencia-produtos/TransferenciaProdutosPage.tsx": {
+    "mtime": 1783433262.528473,
+    "ast_hash": "f5d0ea121a697e33b3bc9cb5b99974dc",
+    "semantic_hash": "f5d0ea121a697e33b3bc9cb5b99974dc"
+  },
+  "components/vendedores/ClienteDetalhePage.tsx": {
+    "mtime": 1780919231.2406387,
+    "ast_hash": "55b09ee132fac2e0be0965b8f800da6e",
+    "semantic_hash": "55b09ee132fac2e0be0965b8f800da6e"
+  },
+  "components/vendedores/VendedorDetalhePage.tsx": {
+    "mtime": 1780919205.7142432,
+    "ast_hash": "42d5a4f7fd54aa3b6f6e54cd0c514373",
+    "semantic_hash": "42d5a4f7fd54aa3b6f6e54cd0c514373"
+  },
+  "components/vendedores/VendedorProdutoDetalhePage.tsx": {
+    "mtime": 1780919219.2833424,
+    "ast_hash": "9c3aeefa2875d5b9d6135cf311e4c043",
+    "semantic_hash": "9c3aeefa2875d5b9d6135cf311e4c043"
+  },
+  "components/vendedores/VendedoresPage.tsx": {
+    "mtime": 1780073682.7962592,
+    "ast_hash": "a3d83eae835fb53f2e559524bec8f3b8",
+    "semantic_hash": "a3d83eae835fb53f2e559524bec8f3b8"
+  },
+  "components/vendedores/VendedoresTable.tsx": {
+    "mtime": 1780919199.582302,
+    "ast_hash": "b5fb2bf9832595184e789ea36b766a15",
+    "semantic_hash": "b5fb2bf9832595184e789ea36b766a15"
+  },
+  "conferir_transferencia_28100002.py": {
+    "mtime": 1771588589.899046,
+    "ast_hash": "f3677fd0b58da626bfe5d144e8c9a7c5",
+    "semantic_hash": "f3677fd0b58da626bfe5d144e8c9a7c5"
+  },
+  "corrigir_loja_entradas_orfas.py": {
+    "mtime": 1770043919.6514215,
+    "ast_hash": "7af386296ff5c92f3fbbf3929f9eb9e3",
+    "semantic_hash": "7af386296ff5c92f3fbbf3929f9eb9e3"
+  },
+  "corrigir_registros_especificos.py": {
+    "mtime": 1770043919.6557832,
+    "ast_hash": "2ad908d32d65210bb88021e10a155478",
+    "semantic_hash": "2ad908d32d65210bb88021e10a155478"
+  },
+  "corrigir_tipo_romaneio_n4a50012.py": {
+    "mtime": 1770043919.6587832,
+    "ast_hash": "07865a5de4e64c3e7a774ac834892329",
+    "semantic_hash": "07865a5de4e64c3e7a774ac834892329"
+  },
+  "criar_transferencia.py": {
+    "mtime": 1770043919.6627839,
+    "ast_hash": "34537e31a915638b6406c4b7b7df38c1",
+    "semantic_hash": "34537e31a915638b6406c4b7b7df38c1"
+  },
+  "data/compra-data-fixa.json": {
+    "mtime": 1784645799.427902,
+    "ast_hash": "c59af4d3784c007dbc995b77e7ce5ed3",
+    "semantic_hash": ""
+  },
+  "data/compra-final.json": {
+    "mtime": 1777040963.8454065,
+    "ast_hash": "d3fbb3a74d02b90b1523054e0347c535",
+    "semantic_hash": "d3fbb3a74d02b90b1523054e0347c535"
+  },
+  "data/compras-salvas.json": {
+    "mtime": 1781030796.7553828,
+    "ast_hash": "f55fc96be11905ebd70ae557c7b8a50a",
+    "semantic_hash": "f55fc96be11905ebd70ae557c7b8a50a"
+  },
+  "data/compras-transito.json": {
+    "mtime": 1781278046.6481771,
+    "ast_hash": "df48e0de198a7563b33588f39ae206b6",
+    "semantic_hash": "df48e0de198a7563b33588f39ae206b6"
+  },
+  "data/corporativo-catalogo.json": {
+    "mtime": 1783948021.5738087,
+    "ast_hash": "65bff470bd3b022116e235a5cb860798",
+    "semantic_hash": ""
+  },
+  "data/curva-abc-observacoes.json": {
+    "mtime": 1780073682.8023067,
+    "ast_hash": "c862698843336d8b5cc43714c5fb8296",
+    "semantic_hash": "c862698843336d8b5cc43714c5fb8296"
+  },
+  "data/destino-romaneio.json": {
+    "mtime": 1780073682.8023067,
+    "ast_hash": "e7cd82f73b83a431de43d2922a094b15",
+    "semantic_hash": "e7cd82f73b83a431de43d2922a094b15"
+  },
+  "data/filial-grupos.json": {
+    "mtime": 1780583613.311838,
+    "ast_hash": "24e0374405f84337115d1cf06b961c57",
+    "semantic_hash": "24e0374405f84337115d1cf06b961c57"
+  },
+  "data/fornecedores.json": {
+    "mtime": 1782399244.0475533,
+    "ast_hash": "d751713988987e9331980363e24189ce",
+    "semantic_hash": "d751713988987e9331980363e24189ce"
+  },
+  "data/goals.json": {
+    "mtime": 1792777565.1405334,
+    "ast_hash": "31660a4f5d52a2a38bd5e5b40c2967e8",
+    "semantic_hash": "31660a4f5d52a2a38bd5e5b40c2967e8"
+  },
+  "data/notificacao-trava-prazo.json": {
+    "mtime": 1784639763.311753,
+    "ast_hash": "45e97365f6ae0f5820412a6d287f62a0",
+    "semantic_hash": ""
+  },
+  "data/notificacoes-leitura.json": {
+    "mtime": 1781531985.2967927,
+    "ast_hash": "f593cb28d7f65ac5dee386668a7b4a27",
+    "semantic_hash": "f593cb28d7f65ac5dee386668a7b4a27"
+  },
+  "data/presentation-assets.json": {
+    "mtime": 1783339027.459372,
+    "ast_hash": "d751713988987e9331980363e24189ce",
+    "semantic_hash": "d751713988987e9331980363e24189ce"
+  },
+  "data/produto-labels.json": {
+    "mtime": 1784649675.1739728,
+    "ast_hash": "2b2182c319efc40cfb8b26eba1261101",
+    "semantic_hash": ""
+  },
+  "data/produtos-agrupados.json": {
+    "mtime": 1780073682.8023067,
+    "ast_hash": "6561de7bd7ef6635bd68b266589c14b0",
+    "semantic_hash": "6561de7bd7ef6635bd68b266589c14b0"
+  },
+  "data/produtos-descontinuados.json": {
+    "mtime": 1781209550.2515998,
+    "ast_hash": "cd6a89130450bd0fc1674269c458bdd1",
+    "semantic_hash": "cd6a89130450bd0fc1674269c458bdd1"
+  },
+  "data/report-presets.json": {
+    "mtime": 1781719021.699602,
+    "ast_hash": "d751713988987e9331980363e24189ce",
+    "semantic_hash": "d751713988987e9331980363e24189ce"
+  },
+  "data/romaneio-confirmacoes.json": {
+    "mtime": 1780073682.8023067,
+    "ast_hash": "1d1fd99f0e593b4a30cfda93666578a4",
+    "semantic_hash": "1d1fd99f0e593b4a30cfda93666578a4"
+  },
+  "data/transferencia-permissoes.json": {
+    "mtime": 1781528511.2714503,
+    "ast_hash": "954ece99184de3578ed1d1532d7fed50",
+    "semantic_hash": "954ece99184de3578ed1d1532d7fed50"
+  },
+  "data/users.json": {
+    "mtime": 1783947222.2137544,
+    "ast_hash": "c04c2992a54240b4718c233652c3a408",
+    "semantic_hash": ""
+  },
+  "debug_guarulhos_acessorios.py": {
+    "mtime": 1773235376.5252337,
+    "ast_hash": "e35e4be8fb3abd262abacf8ee88bbda7",
+    "semantic_hash": "e35e4be8fb3abd262abacf8ee88bbda7"
+  },
+  "easy.py": {
+    "mtime": 1775850270.472488,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "entradas_nerd_mes.py": {
+    "mtime": 1770127875.864494,
+    "ast_hash": "3f65265dec30dd0bb01fa19d46dcada0",
+    "semantic_hash": "3f65265dec30dd0bb01fa19d46dcada0"
+  },
+  "eslint.config.mjs": {
+    "mtime": 1780073682.810701,
+    "ast_hash": "6c4307ffa009658f5c97f5629094c0c2",
+    "semantic_hash": "6c4307ffa009658f5c97f5629094c0c2"
+  },
+  "estoque_tecido_scarfme.py": {
+    "mtime": 1770043925.1760185,
+    "ast_hash": "281ee61b3fb335a1768f01f0108ceee5",
+    "semantic_hash": "281ee61b3fb335a1768f01f0108ceee5"
+  },
+  "exportar_estoque_historico.py": {
+    "mtime": 1770841638.6599576,
+    "ast_hash": "9f6bdfd2637107603fe83fc687838d2b",
+    "semantic_hash": "9f6bdfd2637107603fe83fc687838d2b"
+  },
+  "exportar_projecao_produtos.py": {
+    "mtime": 1780073682.8142462,
+    "ast_hash": "2baa072602f2af41822478f454d35b6a",
+    "semantic_hash": "2baa072602f2af41822478f454d35b6a"
+  },
+  "exportar_todos_relatorios.py": {
+    "mtime": 1780073682.8154483,
+    "ast_hash": "9382a08c0f9602847b4aeae203afef4f",
+    "semantic_hash": "9382a08c0f9602847b4aeae203afef4f"
+  },
+  "install-cloudflared.ps1": {
+    "mtime": 1770043925.2920952,
+    "ast_hash": "fad3e3456b68664208df4c7d75fc6ab2",
+    "semantic_hash": "fad3e3456b68664208df4c7d75fc6ab2"
+  },
+  "investigar_entradas.py": {
+    "mtime": 1770043925.3126235,
+    "ast_hash": "dd5239411eeb62d196763bb21237dacb",
+    "semantic_hash": "dd5239411eeb62d196763bb21237dacb"
+  },
+  "investigar_entradas_profundo.py": {
+    "mtime": 1770043925.317073,
+    "ast_hash": "2ac82b2b1601e13b22f351dad57aa065",
+    "semantic_hash": "2ac82b2b1601e13b22f351dad57aa065"
+  },
+  "investigar_estoque_n4a50012.py": {
+    "mtime": 1770043925.3340132,
+    "ast_hash": "b126ec7f9e305ea9ba7cd28557dad981",
+    "semantic_hash": "b126ec7f9e305ea9ba7cd28557dad981"
+  },
+  "investigar_estoque_n4a50012_completo.py": {
+    "mtime": 1770043925.338215,
+    "ast_hash": "acfaa399ea6b8c9127779b63b8a65219",
+    "semantic_hash": "acfaa399ea6b8c9127779b63b8a65219"
+  },
+  "investigar_exemplo_contagem.py": {
+    "mtime": 1781263752.7491124,
+    "ast_hash": "692307ecc55b2aca69a95f5d547d10e2",
+    "semantic_hash": "692307ecc55b2aca69a95f5d547d10e2"
+  },
+  "investigar_extrato2.py": {
+    "mtime": 1780073682.8154483,
+    "ast_hash": "024411a659e9a96a3afc16f3afc9b08c",
+    "semantic_hash": "024411a659e9a96a3afc16f3afc9b08c"
+  },
+  "investigar_extrato3.py": {
+    "mtime": 1780073682.8154483,
+    "ast_hash": "555c7ca43eecc505c746af8294ff4a20",
+    "semantic_hash": "555c7ca43eecc505c746af8294ff4a20"
+  },
+  "investigar_extrato_produto.py": {
+    "mtime": 1780073682.818882,
+    "ast_hash": "762fccd172ba5b9f5fd7ef9c8d3c77a6",
+    "semantic_hash": "762fccd172ba5b9f5fd7ef9c8d3c77a6"
+  },
+  "investigar_log_entradas_saidas.py": {
+    "mtime": 1770841638.568968,
+    "ast_hash": "d4b8125781e9490564f0f31af4df3c78",
+    "semantic_hash": "d4b8125781e9490564f0f31af4df3c78"
+  },
+  "investigar_loja_saidas.py": {
+    "mtime": 1770043925.3477626,
+    "ast_hash": "e5000598096f5113023b2f3f591995b4",
+    "semantic_hash": "e5000598096f5113023b2f3f591995b4"
+  },
+  "investigar_movimento_reconciliacao.py": {
+    "mtime": 1781262964.2343292,
+    "ast_hash": "6c2e67dc144d74fe2f48ce171e127e8d",
+    "semantic_hash": "6c2e67dc144d74fe2f48ce171e127e8d"
+  },
+  "investigar_movimento_reconciliacao_v2.py": {
+    "mtime": 1781263237.9518867,
+    "ast_hash": "e9cf5aca0614788ca04a65ce16cb0bcd",
+    "semantic_hash": "e9cf5aca0614788ca04a65ce16cb0bcd"
+  },
+  "investigar_observacoes_transferencia.py": {
+    "mtime": 1770645094.616791,
+    "ast_hash": "b468f20c305432185d8deaa1e6a884e1",
+    "semantic_hash": "b468f20c305432185d8deaa1e6a884e1"
+  },
+  "investigar_padrao_romaneios_geracao.py": {
+    "mtime": 1770043925.363943,
+    "ast_hash": "1c715e6f8ff9ed983d098aa309764ce4",
+    "semantic_hash": "1c715e6f8ff9ed983d098aa309764ce4"
+  },
+  "investigar_registros_orfos_detalhes.py": {
+    "mtime": 1770043925.3677943,
+    "ast_hash": "1ffd30cb0bbf583fe7ef1e8706ff5ace",
+    "semantic_hash": "1ffd30cb0bbf583fe7ef1e8706ff5ace"
+  },
+  "investigar_responsaveis_empresas.py": {
+    "mtime": 1770043925.3763616,
+    "ast_hash": "27bca0e4278b2aca7109024449481bcc",
+    "semantic_hash": "27bca0e4278b2aca7109024449481bcc"
+  },
+  "investigar_romaneio_028964_linx.py": {
+    "mtime": 1770043925.3963256,
+    "ast_hash": "9b1829445248a7e6b24c42cb5a73fac1",
+    "semantic_hash": "9b1829445248a7e6b24c42cb5a73fac1"
+  },
+  "investigar_romaneio_automatico.py": {
+    "mtime": 1770043925.406268,
+    "ast_hash": "4760bb9b147aa73631fc45e7f927560e",
+    "semantic_hash": "4760bb9b147aa73631fc45e7f927560e"
+  },
+  "investigar_romaneios_especiais.py": {
+    "mtime": 1770043925.4156153,
+    "ast_hash": "1042e915682afef88f786699714f2031",
+    "semantic_hash": "1042e915682afef88f786699714f2031"
+  },
+  "investigar_romaneios_transferencia.py": {
+    "mtime": 1770043925.4553263,
+    "ast_hash": "37750150ecf60ecd4a6ee23ee6280e8d",
+    "semantic_hash": "37750150ecf60ecd4a6ee23ee6280e8d"
+  },
+  "investigar_saida_completa.py": {
+    "mtime": 1770043925.5566273,
+    "ast_hash": "34be8d64572907a84905dcb2243db086",
+    "semantic_hash": "34be8d64572907a84905dcb2243db086"
+  },
+  "investigar_saidas.py": {
+    "mtime": 1770043925.575982,
+    "ast_hash": "639ccf6b502bd6863672dc7ec6672048",
+    "semantic_hash": "639ccf6b502bd6863672dc7ec6672048"
+  },
+  "investigar_saidas_linx_completo.py": {
+    "mtime": 1770043925.5870922,
+    "ast_hash": "ad7c884cd3f8d69ea9a41dcc68d7117b",
+    "semantic_hash": "ad7c884cd3f8d69ea9a41dcc68d7117b"
+  },
+  "investigar_stored_procedure_detalhes.py": {
+    "mtime": 1770043925.6026812,
+    "ast_hash": "82760330f9e28d8592af99a8c7804575",
+    "semantic_hash": "82760330f9e28d8592af99a8c7804575"
+  },
+  "investigar_stored_procedures_romaneio.py": {
+    "mtime": 1770043925.6067164,
+    "ast_hash": "6c583da52b4b884d0993ab425fe5401d",
+    "semantic_hash": "6c583da52b4b884d0993ab425fe5401d"
+  },
+  "investigar_tabela_sequenciais.py": {
+    "mtime": 1770043925.6367834,
+    "ast_hash": "34e1eb4b36ae9a4246218c02c93deca5",
+    "semantic_hash": "34e1eb4b36ae9a4246218c02c93deca5"
+  },
+  "investigar_tipos_entrada_saida.py": {
+    "mtime": 1770043925.646321,
+    "ast_hash": "ce33594d317ccc95201563bc2c95bad4",
+    "semantic_hash": "ce33594d317ccc95201563bc2c95bad4"
+  },
+  "investigar_transferencias.py": {
+    "mtime": 1770043925.6565073,
+    "ast_hash": "0036a63e93f645dea3e7674df84b3832",
+    "semantic_hash": "0036a63e93f645dea3e7674df84b3832"
+  },
+  "investigar_triggers.py": {
+    "mtime": 1780073682.818882,
+    "ast_hash": "0306a3bc3c2fe7eadc98b00facd6f686",
+    "semantic_hash": "0306a3bc3c2fe7eadc98b00facd6f686"
+  },
+  "lib/ajuste-estoque-executor.ts": {
+    "mtime": 1791891328.3664865,
+    "ast_hash": "e57eacdaa5c53950b201bc0c4a10cfef",
+    "semantic_hash": ""
+  },
+  "lib/auth/permission-normalizer.ts": {
+    "mtime": 1788442640.384259,
+    "ast_hash": "0933a2f684b0e3f73f36d7b20f27cf61",
+    "semantic_hash": ""
+  },
+  "lib/auth/permissions.ts": {
+    "mtime": 1792679389.7133443,
+    "ast_hash": "6914836d7927a3fbb4c8200248d98f35",
+    "semantic_hash": ""
+  },
+  "lib/auth/users-store-neon.ts": {
+    "mtime": 1792679389.70916,
+    "ast_hash": "2e090eabeeb7b5fc44c8e6e3de0b650d",
+    "semantic_hash": ""
+  },
+  "lib/auth/users-store.ts": {
+    "mtime": 1783537902.1431963,
+    "ast_hash": "fe304a3227c27db9b69b6fd330489075",
+    "semantic_hash": ""
+  },
+  "lib/client/compra-data-fixa.ts": {
+    "mtime": 1782235102.513901,
+    "ast_hash": "69fa99743f3988b30f78882057f6b512",
+    "semantic_hash": "69fa99743f3988b30f78882057f6b512"
+  },
+  "lib/client/compras-transito.ts": {
+    "mtime": 1791291101.667961,
+    "ast_hash": "f73fa2eac7dddd2ecac1f5c1a63afc82",
+    "semantic_hash": ""
+  },
+  "lib/client/controle-estoque-metricas.ts": {
+    "mtime": 1780073682.823993,
+    "ast_hash": "c2900036e6d5eeda4319626d40443159",
+    "semantic_hash": "c2900036e6d5eeda4319626d40443159"
+  },
+  "lib/client/use-catraca-data-compra.ts": {
+    "mtime": 1782237541.3013535,
+    "ast_hash": "cbe3b7e3830bcd95b2c1ac6967755860",
+    "semantic_hash": "cbe3b7e3830bcd95b2c1ac6967755860"
+  },
+  "lib/clientes/cliente-types.ts": {
+    "mtime": 1785152465.7206726,
+    "ast_hash": "21aee007b75d9c57ccdac8ede148c671",
+    "semantic_hash": ""
+  },
+  "lib/clientes/sem-cadastro-chave.ts": {
+    "mtime": 1776094109.2708328,
+    "ast_hash": "2d4134d69a71f3e78fc9f37711c02e7c",
+    "semantic_hash": "2d4134d69a71f3e78fc9f37711c02e7c"
+  },
+  "lib/config/colorMapping.json": {
+    "mtime": 1763390845.6299274,
+    "ast_hash": "f7b8a83773b11cfb78adcec19e964b7c",
+    "semantic_hash": "f7b8a83773b11cfb78adcec19e964b7c"
+  },
+  "lib/config/company-server.ts": {
+    "mtime": 1786556168.1849983,
+    "ast_hash": "14cca784a1a57e6aedb988b6365033fd",
+    "semantic_hash": ""
+  },
+  "lib/config/company.ts": {
+    "mtime": 1786556838.653602,
+    "ast_hash": "1a604f615d5d5280a455af7e294faadc",
+    "semantic_hash": ""
+  },
+  "lib/config/compra-ciclo.ts": {
+    "mtime": 1788964727.867492,
+    "ast_hash": "67b36b9e88c18dc92e8fa4ca88f6adf3",
+    "semantic_hash": ""
+  },
+  "lib/config/filial-config-builder.ts": {
+    "mtime": 1786555356.6453655,
+    "ast_hash": "db0945bf4ef8f417a0467a6fe4162d96",
+    "semantic_hash": ""
+  },
+  "lib/config/filial-registry.ts": {
+    "mtime": 1786556162.164879,
+    "ast_hash": "a70d9f3f9b87be3597afd19dfcfb7845",
+    "semantic_hash": ""
+  },
+  "lib/config/nav-route-map.ts": {
+    "mtime": 1780073682.8271632,
+    "ast_hash": "29590f1b0f773ebbcd60e9dc314eec58",
+    "semantic_hash": "29590f1b0f773ebbcd60e9dc314eec58"
+  },
+  "lib/config/page-permissions.ts": {
+    "mtime": 1792768609.0937762,
+    "ast_hash": "d76e5551fadcbcd83e06889dd8bb96de",
+    "semantic_hash": ""
+  },
+  "lib/constants/columns.ts": {
+    "mtime": 1762989352.7311516,
+    "ast_hash": "149ead3bfaba48f1c8cfa05d7a280f09",
+    "semantic_hash": "149ead3bfaba48f1c8cfa05d7a280f09"
+  },
+  "lib/corporativo/types.ts": {
+    "mtime": 1790085088.4939802,
+    "ast_hash": "b518005a95f80c0687170fef9f595940",
+    "semantic_hash": ""
+  },
+  "lib/db/connection.ts": {
+    "mtime": 1780073682.8271632,
+    "ast_hash": "f760022593c0f6cf6dd9db19c52be753",
+    "semantic_hash": "f760022593c0f6cf6dd9db19c52be753"
+  },
+  "lib/db/neon.ts": {
+    "mtime": 1775763604.4244292,
+    "ast_hash": "3c4ad348578816913d51c6492f969206",
+    "semantic_hash": "3c4ad348578816913d51c6492f969206"
+  },
+  "lib/db/proxy.ts": {
+    "mtime": 1788898076.6978295,
+    "ast_hash": "f52a0468fd26a5c13b8e9e096905ac3d",
+    "semantic_hash": ""
+  },
+  "lib/mcp/auth.ts": {
+    "mtime": 1792679239.9909024,
+    "ast_hash": "ebed3c3b065ac4b0008619f503eef88f",
+    "semantic_hash": ""
+  },
+  "lib/mcp/registry.ts": {
+    "mtime": 1782933828.4934711,
+    "ast_hash": "9193c69371d1efc463aaa56f19c2822d",
+    "semantic_hash": "9193c69371d1efc463aaa56f19c2822d"
+  },
+  "lib/mcp/shared.ts": {
+    "mtime": 1780585461.5679543,
+    "ast_hash": "ee4a0de024a4cff3246585ff3404e8d9",
+    "semantic_hash": "ee4a0de024a4cff3246585ff3404e8d9"
+  },
+  "lib/mcp/tools/categorias.ts": {
+    "mtime": 1780585855.3432856,
+    "ast_hash": "fc0127cb75c6243b7888355028b7de56",
+    "semantic_hash": "fc0127cb75c6243b7888355028b7de56"
+  },
+  "lib/mcp/tools/compras.ts": {
+    "mtime": 1791291193.0613134,
+    "ast_hash": "8ac36a8af292b447483506665cb53250",
+    "semantic_hash": ""
+  },
+  "lib/mcp/tools/curva.ts": {
+    "mtime": 1780928252.547423,
+    "ast_hash": "1be21b44207325d1bcebc832d1681055",
+    "semantic_hash": "1be21b44207325d1bcebc832d1681055"
+  },
+  "lib/mcp/tools/discovery.ts": {
+    "mtime": 1780584842.6426156,
+    "ast_hash": "7bd959d4efaf315f6e12b61f179ccb83",
+    "semantic_hash": "7bd959d4efaf315f6e12b61f179ccb83"
+  },
+  "lib/mcp/tools/estoque.ts": {
+    "mtime": 1780585480.627179,
+    "ast_hash": "c8e5baa891c005a465057c25fa601fe1",
+    "semantic_hash": "c8e5baa891c005a465057c25fa601fe1"
+  },
+  "lib/mcp/tools/faturamento.ts": {
+    "mtime": 1782910947.6503382,
+    "ast_hash": "d78deb7e450f3beea7dd892fc2721130",
+    "semantic_hash": "d78deb7e450f3beea7dd892fc2721130"
+  },
+  "lib/mcp/tools/movimento.ts": {
+    "mtime": 1780585519.0602405,
+    "ast_hash": "7ca37225b3a7772de884db2a6c89008a",
+    "semantic_hash": "7ca37225b3a7772de884db2a6c89008a"
+  },
+  "lib/mcp/tools/pessoas.ts": {
+    "mtime": 1780923962.9732635,
+    "ast_hash": "15c10382304b6bb88e38d7a8a7868b42",
+    "semantic_hash": "15c10382304b6bb88e38d7a8a7868b42"
+  },
+  "lib/mcp/tools/produto-curva.ts": {
+    "mtime": 1780592794.5843406,
+    "ast_hash": "64b5dd76b6eac36775f124799636c5bb",
+    "semantic_hash": "64b5dd76b6eac36775f124799636c5bb"
+  },
+  "lib/mcp/tools/produto.ts": {
+    "mtime": 1780925469.394181,
+    "ast_hash": "6c6f4410e61b4acd8443dfda70cb1485",
+    "semantic_hash": "6c6f4410e61b4acd8443dfda70cb1485"
+  },
+  "lib/mcp/tools/produtos-parados.ts": {
+    "mtime": 1780930087.5874994,
+    "ast_hash": "3963782248308d4ad8a6ec1590f64f88",
+    "semantic_hash": "3963782248308d4ad8a6ec1590f64f88"
+  },
+  "lib/mcp/tools/produtos-vendidos.ts": {
+    "mtime": 1788463043.634539,
+    "ast_hash": "d62c2a746be9086e26580e514b02f738",
+    "semantic_hash": ""
+  },
+  "lib/mcp/tools/relatorios.ts": {
+    "mtime": 1782933810.2914283,
+    "ast_hash": "d9aafc7b44ad3a062c65b3e87a917a3a",
+    "semantic_hash": "d9aafc7b44ad3a062c65b3e87a917a3a"
+  },
+  "lib/mcp/tools/romaneios.ts": {
+    "mtime": 1785435689.1466963,
+    "ast_hash": "e592452f4a4c628bdff7ca96efe9191c",
+    "semantic_hash": ""
+  },
+  "lib/mcp/tools/top-produtos.ts": {
+    "mtime": 1780930095.774063,
+    "ast_hash": "2f58d9e3f8ea2f0c8631e4934db7c140",
+    "semantic_hash": "2f58d9e3f8ea2f0c8631e4934db7c140"
+  },
+  "lib/mcp/tools/vendas.ts": {
+    "mtime": 1780924755.17787,
+    "ast_hash": "aa1fdcc312f0c477e56547715cda9a57",
+    "semantic_hash": "aa1fdcc312f0c477e56547715cda9a57"
+  },
+  "lib/performance/curvaPorProduto.ts": {
+    "mtime": 1780073682.8271632,
+    "ast_hash": "7869ccd7cdc2cfef7bfa623841ffa9a7",
+    "semantic_hash": "7869ccd7cdc2cfef7bfa623841ffa9a7"
+  },
+  "lib/performance/novaFilial.ts": {
+    "mtime": 1783361196.1127315,
+    "ast_hash": "f76303f947b42f97b9920ab5821e1bae",
+    "semantic_hash": "f76303f947b42f97b9920ab5821e1bae"
+  },
+  "lib/performance/outrosCategories.ts": {
+    "mtime": 1780073682.8271632,
+    "ast_hash": "41fb64961769ad630728c114ac5c0480",
+    "semantic_hash": "41fb64961769ad630728c114ac5c0480"
+  },
+  "lib/presentations/palettes.ts": {
+    "mtime": 1785842877.4084191,
+    "ast_hash": "6ffe776c31ab1dda77819ce8dd300e27",
+    "semantic_hash": ""
+  },
+  "lib/presentations/registry.ts": {
+    "mtime": 1791294546.7575483,
+    "ast_hash": "4d3b774725b7b5c480a72b8ef3abeefe",
+    "semantic_hash": ""
+  },
+  "lib/reports/clientes-filial.ts": {
+    "mtime": 1788540413.9422603,
+    "ast_hash": "2b47bf3e4089a32ec5f5017074cf27a8",
+    "semantic_hash": ""
+  },
+  "lib/reports/column-sources.ts": {
+    "mtime": 1782217532.3486032,
+    "ast_hash": "b24a0a0b5db334825826a2ed2e21aee3",
+    "semantic_hash": "b24a0a0b5db334825826a2ed2e21aee3"
+  },
+  "lib/reports/company-columns.ts": {
+    "mtime": 1781894421.8077087,
+    "ast_hash": "d907b2b11f2629a2edb97e34f6158c45",
+    "semantic_hash": "d907b2b11f2629a2edb97e34f6158c45"
+  },
+  "lib/reports/compra-sugerida-abc.ts": {
+    "mtime": 1789409703.581668,
+    "ast_hash": "5b540e6bb228abd6e09c5c9604db27cb",
+    "semantic_hash": ""
+  },
+  "lib/reports/enrich.server.ts": {
+    "mtime": 1782472817.0994813,
+    "ast_hash": "459288f759cd65627de962137ef9cd3f",
+    "semantic_hash": "459288f759cd65627de962137ef9cd3f"
+  },
+  "lib/reports/estoque-rede.ts": {
+    "mtime": 1790786790.9244735,
+    "ast_hash": "8dc5c3e7c1913c0599bb1f4eac129839",
+    "semantic_hash": ""
+  },
+  "lib/reports/format.ts": {
+    "mtime": 1787841910.378267,
+    "ast_hash": "fbe7d42e23dd5a0e59532b238d80c922",
+    "semantic_hash": ""
+  },
+  "lib/reports/keys.ts": {
+    "mtime": 1789409303.949674,
+    "ast_hash": "166cd5480bc4b86608452394975c14a3",
+    "semantic_hash": ""
+  },
+  "lib/reports/produtos-cadastro.ts": {
+    "mtime": 1788540413.9422603,
+    "ast_hash": "31ef5a9c6b9d25aa16f00b787adcee97",
+    "semantic_hash": ""
+  },
+  "lib/reports/produtos-parados.ts": {
+    "mtime": 1788540413.9396448,
+    "ast_hash": "80ebbb91327b9f2a38d635195a224784",
+    "semantic_hash": ""
+  },
+  "lib/reports/registry.server.ts": {
+    "mtime": 1792427551.4455352,
+    "ast_hash": "e77d911bf8f14c0b7690e2b82d81c4bb",
+    "semantic_hash": ""
+  },
+  "lib/reports/registry.ts": {
+    "mtime": 1792427551.4455352,
+    "ast_hash": "7792a266ff0cdfbea0eb737ae02d67e9",
+    "semantic_hash": ""
+  },
+  "lib/reports/types.ts": {
+    "mtime": 1792427456.3614626,
+    "ast_hash": "5b94d96bce7e5e3669aa61df214b4bae",
+    "semantic_hash": ""
+  },
+  "lib/reports/vendas-faturamento.ts": {
+    "mtime": 1788540413.939131,
+    "ast_hash": "b3dd346435fa043c51958df665229344",
+    "semantic_hash": ""
+  },
+  "lib/reports/vendas-historico.ts": {
+    "mtime": 1788540413.9396448,
+    "ast_hash": "ba08e468d1720ec3e76ed22c41452a54",
+    "semantic_hash": ""
+  },
+  "lib/repositories/ajuste-historico.ts": {
+    "mtime": 1785418328.554834,
+    "ast_hash": "be5ebc922e64a3da56948482511d7cdd",
+    "semantic_hash": ""
+  },
+  "lib/repositories/ajusteEstoque.ts": {
+    "mtime": 1792609009.733059,
+    "ast_hash": "a68a7eeec67fc319752fa232ca246f64",
+    "semantic_hash": ""
+  },
+  "lib/repositories/claudeReport.ts": {
+    "mtime": 1783520661.0385869,
+    "ast_hash": "462d8abe9d19178b04ce597631504eac",
+    "semantic_hash": ""
+  },
+  "lib/repositories/clienteCorporativo.ts": {
+    "mtime": 1790085140.5851147,
+    "ast_hash": "f30802fe9194928e1487b4153d07fdcc",
+    "semantic_hash": ""
+  },
+  "lib/repositories/clientes.ts": {
+    "mtime": 1785152482.6367211,
+    "ast_hash": "b6101545d95290da8cf73aab62dfeca4",
+    "semantic_hash": ""
+  },
+  "lib/repositories/colecao.ts": {
+    "mtime": 1789409670.888868,
+    "ast_hash": "e9cfee23e0a0e04eb1d002fa408dec84",
+    "semantic_hash": ""
+  },
+  "lib/repositories/colecaoPresentation.ts": {
+    "mtime": 1791294453.9338574,
+    "ast_hash": "07148214c032f4c16844a4d069e0d817",
+    "semantic_hash": ""
+  },
+  "lib/repositories/collectionReport.ts": {
+    "mtime": 1791294414.6072981,
+    "ast_hash": "cb6bf9ec55b8a7c6acf8c8a4eb309506",
+    "semantic_hash": ""
+  },
+  "lib/repositories/comparativoColecoes.ts": {
+    "mtime": 1791294486.310362,
+    "ast_hash": "88a53a25b8a21d7ed6a91b2826b5991d",
+    "semantic_hash": ""
+  },
+  "lib/repositories/comparativoResumido.ts": {
+    "mtime": 1791294486.3119178,
+    "ast_hash": "ba55d30a50c3b7f8065b421f4daacd08",
+    "semantic_hash": ""
+  },
+  "lib/repositories/comprasTransitoReconciliacao.ts": {
+    "mtime": 1781283961.5591154,
+    "ast_hash": "8c1d93a8e7b6ea254bb47828f9553e06",
+    "semantic_hash": "8c1d93a8e7b6ea254bb47828f9553e06"
+  },
+  "lib/repositories/controleEstoque.ts": {
+    "mtime": 1791397330.0524905,
+    "ast_hash": "f0a1e4ef7c9c899e9a67cb1b3d45f3a5",
+    "semantic_hash": ""
+  },
+  "lib/repositories/controleMovimento.ts": {
+    "mtime": 1780581107.9999115,
+    "ast_hash": "17a7b28fb86fc1dc52680809ef8ddcee",
+    "semantic_hash": "17a7b28fb86fc1dc52680809ef8ddcee"
+  },
+  "lib/repositories/controleTransferencias.ts": {
+    "mtime": 1786555356.6539087,
+    "ast_hash": "a7c84a48d1431cdd90c4ec013b1fd374",
+    "semantic_hash": ""
+  },
+  "lib/repositories/corporativoProdutos.ts": {
+    "mtime": 1783948587.3896947,
+    "ast_hash": "56d2e688b549e8b7214301386a01dd12",
+    "semantic_hash": ""
+  },
+  "lib/repositories/corporativoStore.ts": {
+    "mtime": 1783960083.9166687,
+    "ast_hash": "d494b39da9238f3c804753d696c21b4a",
+    "semantic_hash": ""
+  },
+  "lib/repositories/ecommerce.ts": {
+    "mtime": 1790694295.0424335,
+    "ast_hash": "3297e8af6dc3a667a2fb5eea668e7f60",
+    "semantic_hash": ""
+  },
+  "lib/repositories/entries.ts": {
+    "mtime": 1783520661.0501547,
+    "ast_hash": "88bb5bf0ffe15298289861fecdc2fb4d",
+    "semantic_hash": ""
+  },
+  "lib/repositories/faturamento.ts": {
+    "mtime": 1783343535.2812805,
+    "ast_hash": "a1128b4c28f0c52db3f1b078d79b2517",
+    "semantic_hash": "a1128b4c28f0c52db3f1b078d79b2517"
+  },
+  "lib/repositories/filiais.ts": {
+    "mtime": 1780073682.8356698,
+    "ast_hash": "066a5baa83768cce362af8b5057b0a7c",
+    "semantic_hash": "066a5baa83768cce362af8b5057b0a7c"
+  },
+  "lib/repositories/giroCache.ts": {
+    "mtime": 1771529803.5182462,
+    "ast_hash": "582c9b2d1c590f2265c6dc19322098ea",
+    "semantic_hash": "582c9b2d1c590f2265c6dc19322098ea"
+  },
+  "lib/repositories/inventory.ts": {
+    "mtime": 1781870296.652079,
+    "ast_hash": "ebe082ad415117cdceeb506e2b07954c",
+    "semantic_hash": "ebe082ad415117cdceeb506e2b07954c"
+  },
+  "lib/repositories/logEntradas.ts": {
+    "mtime": 1780917425.5539784,
+    "ast_hash": "a2035ad5498c52867b04eb7e1a7878ca",
+    "semantic_hash": "a2035ad5498c52867b04eb7e1a7878ca"
+  },
+  "lib/repositories/logSaidas.ts": {
+    "mtime": 1792761347.3380027,
+    "ast_hash": "69f23802435caf970d14ff69ca5ac312",
+    "semantic_hash": ""
+  },
+  "lib/repositories/logTransito.ts": {
+    "mtime": 1780489109.6774337,
+    "ast_hash": "e7b25fbf2e0069ee8a6c5a9fdf73a34d",
+    "semantic_hash": "e7b25fbf2e0069ee8a6c5a9fdf73a34d"
+  },
+  "lib/repositories/performance.ts": {
+    "mtime": 1789580711.4179864,
+    "ast_hash": "ddd127308fd14c0c5b900382d82a29ce",
+    "semantic_hash": ""
+  },
+  "lib/repositories/productDetail.ts": {
+    "mtime": 1786556811.607677,
+    "ast_hash": "08686a4f6398fb0b9e9b170fb907ca87",
+    "semantic_hash": ""
+  },
+  "lib/repositories/products.ts": {
+    "mtime": 1787842083.1262012,
+    "ast_hash": "c2a4fb90db35efd37a75feedad37331c",
+    "semantic_hash": ""
+  },
+  "lib/repositories/produtosNovos.ts": {
+    "mtime": 1785179104.4815183,
+    "ast_hash": "2e0270e95ad56c84e8fc0824ad0b574d",
+    "semantic_hash": ""
+  },
+  "lib/repositories/projecaoEstoqueHistorico.ts": {
+    "mtime": 1775763621.9731877,
+    "ast_hash": "77d91793644e18f273e7a0578eebdd8b",
+    "semantic_hash": "77d91793644e18f273e7a0578eebdd8b"
+  },
+  "lib/repositories/rawData.ts": {
+    "mtime": 1783520661.057432,
+    "ast_hash": "215f1a1568c3abb48cbbe942d498013b",
+    "semantic_hash": ""
+  },
+  "lib/repositories/relatorios.ts": {
+    "mtime": 1783520661.057432,
+    "ast_hash": "7461fd1219a536ecf2358232e5906b44",
+    "semantic_hash": ""
+  },
+  "lib/repositories/reportClientesFilial.ts": {
+    "mtime": 1783351353.7208707,
+    "ast_hash": "36ad099560d5d50a879355f562c7807a",
+    "semantic_hash": "36ad099560d5d50a879355f562c7807a"
+  },
+  "lib/repositories/reportCompraSugeridaAbc.ts": {
+    "mtime": 1789410055.9807189,
+    "ast_hash": "98eecc9cb05d67b2b097b7b84ae363c5",
+    "semantic_hash": ""
+  },
+  "lib/repositories/reportEstoque.ts": {
+    "mtime": 1790786775.530323,
+    "ast_hash": "b4d0e0c17ff72e2e01ab1afcf150754a",
+    "semantic_hash": ""
+  },
+  "lib/repositories/reportProdutosCadastro.ts": {
+    "mtime": 1781890583.2145603,
+    "ast_hash": "5a341e0bf3085036647c525e33f4d842",
+    "semantic_hash": "5a341e0bf3085036647c525e33f4d842"
+  },
+  "lib/repositories/reportProdutosParados.ts": {
+    "mtime": 1782125828.7043676,
+    "ast_hash": "234df7ca790fa285814435a673e30214",
+    "semantic_hash": "234df7ca790fa285814435a673e30214"
+  },
+  "lib/repositories/reportVendas.ts": {
+    "mtime": 1791291089.7988594,
+    "ast_hash": "ffc642f3fdb50b7109df7f661ecfe749",
+    "semantic_hash": ""
+  },
+  "lib/repositories/reportVendasHistorico.ts": {
+    "mtime": 1783520661.0612419,
+    "ast_hash": "447a5dcbf2dfa3e2fd16f6eb6300b779",
+    "semantic_hash": ""
+  },
+  "lib/repositories/sales.ts": {
+    "mtime": 1781699146.2066677,
+    "ast_hash": "5a75626af480a31c0f57e6945e971dc9",
+    "semantic_hash": "5a75626af480a31c0f57e6945e971dc9"
+  },
+  "lib/repositories/sincronizacao.ts": {
+    "mtime": 1783095461.1894069,
+    "ast_hash": "5c506fd8662b17d3a3b5e535f23e2ba5",
+    "semantic_hash": "5c506fd8662b17d3a3b5e535f23e2ba5"
+  },
+  "lib/repositories/stockByFilial.ts": {
+    "mtime": 1786555356.6561909,
+    "ast_hash": "1cec9a9fe31aa7f2581907da3b7ee72f",
+    "semantic_hash": ""
+  },
+  "lib/repositories/vendedores-v2.ts": {
+    "mtime": 1783520661.0612419,
+    "ast_hash": "4f5eac4d7210e0193e27388fad44db1f",
+    "semantic_hash": ""
+  },
+  "lib/saida-entrada-executor.js": {
+    "mtime": 1792070816.7587898,
+    "ast_hash": "445347a15517833e7ba99a2f6ef6e7f9",
+    "semantic_hash": ""
+  },
+  "lib/server/company-live.ts": {
+    "mtime": 1780583165.6706636,
+    "ast_hash": "9eddf9670b47badc98fc52338eaf5662",
+    "semantic_hash": "9eddf9670b47badc98fc52338eaf5662"
+  },
+  "lib/server/compra-transito-barcodes.ts": {
+    "mtime": 1782495384.8364923,
+    "ast_hash": "3a04c2346d182ca8b26aa88fe31cbe41",
+    "semantic_hash": "3a04c2346d182ca8b26aa88fe31cbe41"
+  },
+  "lib/server/compra-transito-recebimento.ts": {
+    "mtime": 1788964892.4744272,
+    "ast_hash": "726d0d6d84769b7e3903d59e7ef1c25e",
+    "semantic_hash": ""
+  },
+  "lib/server/compra-transito-reconciliacao.ts": {
+    "mtime": 1791291067.913632,
+    "ast_hash": "7805c7a63a90391ef9bbb1b651555d8e",
+    "semantic_hash": ""
+  },
+  "lib/server/controle-estoque-metricas.ts": {
+    "mtime": 1782848686.6150796,
+    "ast_hash": "cebdd70246e568d82c730720aa588bdc",
+    "semantic_hash": "cebdd70246e568d82c730720aa588bdc"
+  },
+  "lib/server/filial-resolver.ts": {
+    "mtime": 1780577842.783474,
+    "ast_hash": "280e305071cb3d851fec7c3f8298fe24",
+    "semantic_hash": "280e305071cb3d851fec7c3f8298fe24"
+  },
+  "lib/services/dataPipeline.ts": {
+    "mtime": 1780073682.852095,
+    "ast_hash": "29ce1c73943d226f43e1886d06bd8173",
+    "semantic_hash": "29ce1c73943d226f43e1886d06bd8173"
+  },
+  "lib/services/salesTotals.ts": {
+    "mtime": 1789044928.434448,
+    "ast_hash": "63477a8942a625237aacd43f0f2b5676",
+    "semantic_hash": ""
+  },
+  "lib/transfer-executor.js": {
+    "mtime": 1783433521.017442,
+    "ast_hash": "0b8954b17475370ac6a12a94f46eb2c0",
+    "semantic_hash": "0b8954b17475370ac6a12a94f46eb2c0"
+  },
+  "lib/types/compra-salva.ts": {
+    "mtime": 1777294939.6698186,
+    "ast_hash": "81d1d82896e1c079861572ceb253feb5",
+    "semantic_hash": "81d1d82896e1c079861572ceb253feb5"
+  },
+  "lib/types/compra-transito.ts": {
+    "mtime": 1788264675.5397868,
+    "ast_hash": "ab14b2887756a49f1af2c06f0c6c26d1",
+    "semantic_hash": ""
+  },
+  "lib/types/report-preset.ts": {
+    "mtime": 1781717999.861012,
+    "ast_hash": "1ee9004e2237f1faf364e4cfb6f61d94",
+    "semantic_hash": "1ee9004e2237f1faf364e4cfb6f61d94"
+  },
+  "lib/utils/active-filial-detector.ts": {
+    "mtime": 1780073682.8544247,
+    "ast_hash": "ae19450a4dfb2de74822b47f3b31d4c3",
+    "semantic_hash": "ae19450a4dfb2de74822b47f3b31d4c3"
+  },
+  "lib/utils/brasilia-datetime.ts": {
+    "mtime": 1779717164.1447794,
+    "ast_hash": "4b385e0c6ec1abc57aa1f3e76b62c52f",
+    "semantic_hash": "4b385e0c6ec1abc57aa1f3e76b62c52f"
+  },
+  "lib/utils/colorMapping.ts": {
+    "mtime": 1783518625.9118667,
+    "ast_hash": "13dcd35b946d1be4f1f51b6786eb3cf3",
+    "semantic_hash": ""
+  },
+  "lib/utils/compra-data-fixa-store.ts": {
+    "mtime": 1782235078.3341117,
+    "ast_hash": "e28b31d85d8323da900bed3f033d4f47",
+    "semantic_hash": "e28b31d85d8323da900bed3f033d4f47"
+  },
+  "lib/utils/compra-final-destino.ts": {
+    "mtime": 1788877857.0490448,
+    "ast_hash": "a91179982544127a7a8ab9ed97f7dae0",
+    "semantic_hash": ""
+  },
+  "lib/utils/compra-final-store.ts": {
+    "mtime": 1775743748.362993,
+    "ast_hash": "37ea71ca6457aed7d45ede842d5903dd",
+    "semantic_hash": "37ea71ca6457aed7d45ede842d5903dd"
+  },
+  "lib/utils/compra-ideal.ts": {
+    "mtime": 1784562849.8424025,
+    "ast_hash": "a2cf0ba580e16263910f7b64dc4d9d9c",
+    "semantic_hash": ""
+  },
+  "lib/utils/compra-salva-store.ts": {
+    "mtime": 1784201667.1675014,
+    "ast_hash": "d2d4fd21577b06ee9c190edb17da413e",
+    "semantic_hash": ""
+  },
+  "lib/utils/compra-transito-analytics.ts": {
+    "mtime": 1780073682.860419,
+    "ast_hash": "5a762a235ec819b12cd2e37d9d8eb5c8",
+    "semantic_hash": "5a762a235ec819b12cd2e37d9d8eb5c8"
+  },
+  "lib/utils/compra-transito-reconciliacao.ts": {
+    "mtime": 1781719277.7328355,
+    "ast_hash": "bfc79776c6c4ff84bce8641721736896",
+    "semantic_hash": "bfc79776c6c4ff84bce8641721736896"
+  },
+  "lib/utils/compra-transito-status.ts": {
+    "mtime": 1780073682.860419,
+    "ast_hash": "3435db708a6771659868eb96b21c0cde",
+    "semantic_hash": "3435db708a6771659868eb96b21c0cde"
+  },
+  "lib/utils/compra-transito-store.ts": {
+    "mtime": 1788264754.2909975,
+    "ast_hash": "ef58a8c38028f301ed9c89ba624533fc",
+    "semantic_hash": ""
+  },
+  "lib/utils/controle-estoque-metricas.ts": {
+    "mtime": 1788463054.115673,
+    "ast_hash": "2e54caf2cf2f95ec1df4bbbea75d9e90",
+    "semantic_hash": ""
+  },
+  "lib/utils/curva-abc-observacoes-store.ts": {
+    "mtime": 1781206954.6359856,
+    "ast_hash": "d83f6fd9127839e259f3ed355aeb4969",
+    "semantic_hash": "d83f6fd9127839e259f3ed355aeb4969"
+  },
+  "lib/utils/dataTransform.ts": {
+    "mtime": 1780073682.8643472,
+    "ast_hash": "7ac469c4c9df8c6ee69da76e69525594",
+    "semantic_hash": "7ac469c4c9df8c6ee69da76e69525594"
+  },
+  "lib/utils/date.ts": {
+    "mtime": 1782930369.2914069,
+    "ast_hash": "ebd8b8cd063c337f8da6d6750e234647",
+    "semantic_hash": "ebd8b8cd063c337f8da6d6750e234647"
+  },
+  "lib/utils/destino-romaneio-store.ts": {
+    "mtime": 1792689892.5933657,
+    "ast_hash": "0cf35c5aaaed4b309d53befcaafdb105",
+    "semantic_hash": ""
+  },
+  "lib/utils/exportClientes.ts": {
+    "mtime": 1785152575.2484577,
+    "ast_hash": "f657a8e6b7709955a41618850c2f5401",
+    "semantic_hash": ""
+  },
+  "lib/utils/exportClientesFilialXlsx.ts": {
+    "mtime": 1788540513.9743214,
+    "ast_hash": "3c70027595ecab0d2b8782979f909e84",
+    "semantic_hash": ""
+  },
+  "lib/utils/exportColecoesPanelXlsx.ts": {
+    "mtime": 1783087287.0941746,
+    "ast_hash": "b49b5b9ead7d54146b24809bb4c99a58",
+    "semantic_hash": "b49b5b9ead7d54146b24809bb4c99a58"
+  },
+  "lib/utils/exportCompraSugeridaAbcXlsx.ts": {
+    "mtime": 1788540514.0881634,
+    "ast_hash": "99fb3f9b79e5b7d77d4e8f9f05ce57db",
+    "semantic_hash": ""
+  },
+  "lib/utils/exportControlePerformanceXlsx.ts": {
+    "mtime": 1775479519.8385277,
+    "ast_hash": "0f515657d57ce7ea70faba8f3ff33dc2",
+    "semantic_hash": "0f515657d57ce7ea70faba8f3ff33dc2"
+  },
+  "lib/utils/exportCurvaAbcSimpleCsv.ts": {
+    "mtime": 1780073682.8643472,
+    "ast_hash": "24f29a4cb7f47f692faf3e3159ed9b31",
+    "semantic_hash": "24f29a4cb7f47f692faf3e3159ed9b31"
+  },
+  "lib/utils/exportCurvaAbcSimpleXlsx.ts": {
+    "mtime": 1784646243.5442154,
+    "ast_hash": "36a7db08cda3d1f2e35894ac91c07095",
+    "semantic_hash": ""
+  },
+  "lib/utils/exportCurvaPorProdutoCsv.ts": {
+    "mtime": 1780073682.8689008,
+    "ast_hash": "de332d97806ab676c81073d92552280f",
+    "semantic_hash": "de332d97806ab676c81073d92552280f"
+  },
+  "lib/utils/exportCurvaPorProdutoXlsx.ts": {
+    "mtime": 1780511999.7946403,
+    "ast_hash": "2c6bc657047a7d5f88563d890565c552",
+    "semantic_hash": "2c6bc657047a7d5f88563d890565c552"
+  },
+  "lib/utils/exportDetalhadoXlsx.ts": {
+    "mtime": 1771531718.7739432,
+    "ast_hash": "87271718df315d2a6b494754c318c177",
+    "semantic_hash": "87271718df315d2a6b494754c318c177"
+  },
+  "lib/utils/exportEstoqueConsultaXlsx.ts": {
+    "mtime": 1784125156.826723,
+    "ast_hash": "102bd58337809a15d0cea68c82f51e76",
+    "semantic_hash": "102bd58337809a15d0cea68c82f51e76"
+  },
+  "lib/utils/exportHtml.ts": {
+    "mtime": 1780073682.8689008,
+    "ast_hash": "4b2b7f92f84d97c629da4d7f45ef926e",
+    "semantic_hash": "4b2b7f92f84d97c629da4d7f45ef926e"
+  },
+  "lib/utils/exportListaLoja.ts": {
+    "mtime": 1782146867.7780504,
+    "ast_hash": "aa78c54b82404e09653c29e18fc079c3",
+    "semantic_hash": "aa78c54b82404e09653c29e18fc079c3"
+  },
+  "lib/utils/exportProductsToExcel.ts": {
+    "mtime": 1781195628.5681307,
+    "ast_hash": "decaabcb7dda892a30dbfa7faa5e9273",
+    "semantic_hash": "decaabcb7dda892a30dbfa7faa5e9273"
+  },
+  "lib/utils/exportProdutosParadosXlsx.ts": {
+    "mtime": 1781114849.7456954,
+    "ast_hash": "8701380f942e9ca88c5421d89e76ee7a",
+    "semantic_hash": "8701380f942e9ca88c5421d89e76ee7a"
+  },
+  "lib/utils/exportRelatorioXlsx.ts": {
+    "mtime": 1788540565.562315,
+    "ast_hash": "3bb7db990992178b04c18d7987451797",
+    "semantic_hash": ""
+  },
+  "lib/utils/exportRelatorios.ts": {
+    "mtime": 1771433372.1909478,
+    "ast_hash": "2cca84e613eabf78773ec5923eea9c1d",
+    "semantic_hash": "2cca84e613eabf78773ec5923eea9c1d"
+  },
+  "lib/utils/exportVendedores.ts": {
+    "mtime": 1780073682.8743443,
+    "ast_hash": "ce9add07aa29acb7791dbfd9ea65124a",
+    "semantic_hash": "ce9add07aa29acb7791dbfd9ea65124a"
+  },
+  "lib/utils/filial-grupos-store.ts": {
+    "mtime": 1786556162.201528,
+    "ast_hash": "7af890ddc9b055e968b929db295fa9d0",
+    "semantic_hash": "7af890ddc9b055e968b929db295fa9d0"
+  },
+  "lib/utils/fornecedor-matcher.ts": {
+    "mtime": 1782398384.7685282,
+    "ast_hash": "84d9e942b133fd413189606958472d70",
+    "semantic_hash": "84d9e942b133fd413189606958472d70"
+  },
+  "lib/utils/fornecedores-store.ts": {
+    "mtime": 1782399189.047869,
+    "ast_hash": "7f2f13f8eb26b86bd42e3230834215f8",
+    "semantic_hash": "7f2f13f8eb26b86bd42e3230834215f8"
+  },
+  "lib/utils/generateStockActionsPDF.ts": {
+    "mtime": 1780073682.8743443,
+    "ast_hash": "773866e50efc8494c8aa38a90425ebcd",
+    "semantic_hash": "773866e50efc8494c8aa38a90425ebcd"
+  },
+  "lib/utils/giro-session-cache.ts": {
+    "mtime": 1780576415.1667757,
+    "ast_hash": "53a34a8964ba09a12147a6d04274d9f2",
+    "semantic_hash": "53a34a8964ba09a12147a6d04274d9f2"
+  },
+  "lib/utils/goals-storage.ts": {
+    "mtime": 1770043926.016786,
+    "ast_hash": "937cf3d566963d72366caebf16650432",
+    "semantic_hash": "937cf3d566963d72366caebf16650432"
+  },
+  "lib/utils/necessidade-minima.ts": {
+    "mtime": 1780073682.8765333,
+    "ast_hash": "7b300dca66292d89126a0267fcee841a",
+    "semantic_hash": "7b300dca66292d89126a0267fcee841a"
+  },
+  "lib/utils/presentation-asset-store.ts": {
+    "mtime": 1785852251.4039557,
+    "ast_hash": "704ae10e6f6f78dc662be653f7b5a1d9",
+    "semantic_hash": ""
+  },
+  "lib/utils/processRelatorios.ts": {
+    "mtime": 1780073682.8765333,
+    "ast_hash": "fc92b1bd1a49d5b9c6d5ce603b66c0ee",
+    "semantic_hash": "fc92b1bd1a49d5b9c6d5ce603b66c0ee"
+  },
+  "lib/utils/product-coverage.ts": {
+    "mtime": 1781267376.5860653,
+    "ast_hash": "89ec7c4db779a711e7bec60f604bbfe6",
+    "semantic_hash": "89ec7c4db779a711e7bec60f604bbfe6"
+  },
+  "lib/utils/produto-agrupado-aggregation.ts": {
+    "mtime": 1788462982.77031,
+    "ast_hash": "0bca1183aa7812e7cb14de184b9e0b72",
+    "semantic_hash": ""
+  },
+  "lib/utils/produto-agrupado-store.ts": {
+    "mtime": 1780073682.8795533,
+    "ast_hash": "7ed20a320bab14bf1150c70c75d16990",
+    "semantic_hash": "7ed20a320bab14bf1150c70c75d16990"
+  },
+  "lib/utils/produto-descontinuado-store.ts": {
+    "mtime": 1781209158.4814398,
+    "ast_hash": "d6c862366b0b8c6a7f52c0d2a0802dfb",
+    "semantic_hash": "d6c862366b0b8c6a7f52c0d2a0802dfb"
+  },
+  "lib/utils/produto-labels-store.ts": {
+    "mtime": 1780073682.8795533,
+    "ast_hash": "541cffda89c0207fe13b48e2b73dbc29",
+    "semantic_hash": "541cffda89c0207fe13b48e2b73dbc29"
+  },
+  "lib/utils/produtos-agrupados.ts": {
+    "mtime": 1788462769.24093,
+    "ast_hash": "14b4cf91924cfb22a7fbfadc2d5f03f0",
+    "semantic_hash": ""
+  },
+  "lib/utils/produtos-descontinuados.ts": {
+    "mtime": 1781209136.9738398,
+    "ast_hash": "68b4e77230b380395a84aa68609bc4df",
+    "semantic_hash": "68b4e77230b380395a84aa68609bc4df"
+  },
+  "lib/utils/redis-client.ts": {
+    "mtime": 1771588589.9171124,
+    "ast_hash": "be15c28736a16b6fbb7063112965b8a7",
+    "semantic_hash": "be15c28736a16b6fbb7063112965b8a7"
+  },
+  "lib/utils/report-preset-store.ts": {
+    "mtime": 1781718046.0802755,
+    "ast_hash": "8574a22068d81c11c33afb088ddecd70",
+    "semantic_hash": "8574a22068d81c11c33afb088ddecd70"
+  },
+  "lib/utils/romaneio-confirmacao-store.ts": {
+    "mtime": 1792761292.6929183,
+    "ast_hash": "530e8692a0e26d5a08f10bee84d64dbb",
+    "semantic_hash": ""
+  },
+  "lib/utils/romaneios-date.ts": {
+    "mtime": 1782844096.1639943,
+    "ast_hash": "cfcffcd75dd31e9752493e43d5afb57b",
+    "semantic_hash": "cfcffcd75dd31e9752493e43d5afb57b"
+  },
+  "lib/utils/suggestion-rules.ts": {
+    "mtime": 1780345409.603045,
+    "ast_hash": "a8d89ff66889a4f3d3731a71e52bed0f",
+    "semantic_hash": "a8d89ff66889a4f3d3731a71e52bed0f"
+  },
+  "lib/utils/transferencia-pendente-store.ts": {
+    "mtime": 1783540363.9655702,
+    "ast_hash": "8579658a688af2777f97ea58b190446a",
+    "semantic_hash": ""
+  },
+  "lib/utils/transferencia-permissoes-store.ts": {
+    "mtime": 1785761951.1789758,
+    "ast_hash": "043e76e1534d3f41596fb50cd7761535",
+    "semantic_hash": ""
+  },
+  "lib/utils/transferencias-quantidade-real-storage.ts": {
+    "mtime": 1771588589.2552686,
+    "ast_hash": "7e71e63069f5a1879e587820fdd10822",
+    "semantic_hash": "7e71e63069f5a1879e587820fdd10822"
+  },
+  "lib/utils/transferencias-realizadas-storage.ts": {
+    "mtime": 1770301201.1345456,
+    "ast_hash": "97fa514668e7992bc98e4e50afe2fc51",
+    "semantic_hash": "97fa514668e7992bc98e4e50afe2fc51"
+  },
+  "listar_registros_orfos.py": {
+    "mtime": 1770043926.0335605,
+    "ast_hash": "99ab23f0b8ecceae221bac9701e1b6b1",
+    "semantic_hash": "99ab23f0b8ecceae221bac9701e1b6b1"
+  },
+  "mapear_origem_romaneio_sp.py": {
+    "mtime": 1770043926.044696,
+    "ast_hash": "faf4e030ab1a328553b74e366e2a81dd",
+    "semantic_hash": "faf4e030ab1a328553b74e366e2a81dd"
+  },
+  "next.config.ts": {
+    "mtime": 1792071901.9235623,
+    "ast_hash": "7a51b74fe13aea0718add4181fb03c21",
+    "semantic_hash": ""
+  },
+  "package.json": {
+    "mtime": 1791289559.2461114,
+    "ast_hash": "1edb4e6a1c66548b6c06fc86aa71a513",
+    "semantic_hash": ""
+  },
+  "procurar_estoque_alternativo_n4a50012.py": {
+    "mtime": 1770043926.073735,
+    "ast_hash": "ab98f1dbaec820c30bc3e85acc798604",
+    "semantic_hash": "ab98f1dbaec820c30bc3e85acc798604"
+  },
+  "proxy-server/package.json": {
+    "mtime": 1763471233.1808338,
+    "ast_hash": "a9f413d196e19a889a467ea3904af67d",
+    "semantic_hash": "a9f413d196e19a889a467ea3904af67d"
+  },
+  "proxy-server/proxy-helpers.js": {
+    "mtime": 1763471300.913688,
+    "ast_hash": "65d786a1615ad3042938ed3cce229160",
+    "semantic_hash": "65d786a1615ad3042938ed3cce229160"
+  },
+  "proxy-server/server.js": {
+    "mtime": 1788897728.8764188,
+    "ast_hash": "794cf9267afe7b9eede3f7d10c41d5cb",
+    "semantic_hash": ""
+  },
+  "relatorio_entradas_vendas_estoque.py": {
+    "mtime": 1780073682.8890896,
+    "ast_hash": "8de25f99c66c9351bb328c73ae52f8f2",
+    "semantic_hash": "8de25f99c66c9351bb328c73ae52f8f2"
+  },
+  "remover_romaneio_028969.py": {
+    "mtime": 1770043926.1176727,
+    "ast_hash": "7c87042aa18912a8700a61f5d367c785",
+    "semantic_hash": "7c87042aa18912a8700a61f5d367c785"
+  },
+  "remover_romaneio_028972.py": {
+    "mtime": 1770043926.144441,
+    "ast_hash": "7f80fd19445fedef79b77f6df8eb7d8e",
+    "semantic_hash": "7f80fd19445fedef79b77f6df8eb7d8e"
+  },
+  "script_add_tipos_romaneio.ps1": {
+    "mtime": 1777569385.3463385,
+    "ast_hash": "8d9e710fa1dd163dc0057fb3bd48cfd2",
+    "semantic_hash": "8d9e710fa1dd163dc0057fb3bd48cfd2"
+  },
+  "script_galeao.ps1": {
+    "mtime": 1780337184.3622987,
+    "ast_hash": "166bd0b9f440e4bfa90f79199242a61b",
+    "semantic_hash": "166bd0b9f440e4bfa90f79199242a61b"
+  },
+  "script_nerd_eldorado_morumbi2.ps1": {
+    "mtime": 1775825708.671328,
+    "ast_hash": "84e883ad94b8a0fc658938ca62db0a14",
+    "semantic_hash": "84e883ad94b8a0fc658938ca62db0a14"
+  },
+  "scripts/_validate-filial-config.ts": {
+    "mtime": 1780578197.1070902,
+    "ast_hash": "ab68553201b36843a295e948b593e305",
+    "semantic_hash": "ab68553201b36843a295e948b593e305"
+  },
+  "scripts/conferir_estoque_projecao.py": {
+    "mtime": 1780337185.4920058,
+    "ast_hash": "d1dcb5734147cefe2ca154b36830987f",
+    "semantic_hash": "d1dcb5734147cefe2ca154b36830987f"
+  },
+  "scripts/confirmar-entradas-galeao.mjs": {
+    "mtime": 1780490286.3507767,
+    "ast_hash": "3a5a16ea93485680a999f49b50703ef6",
+    "semantic_hash": "3a5a16ea93485680a999f49b50703ef6"
+  },
+  "scripts/contar-entradas-presas.mjs": {
+    "mtime": 1780073682.891516,
+    "ast_hash": "b916cd73ebe83d730f1a7e658f6cd593",
+    "semantic_hash": "b916cd73ebe83d730f1a7e658f6cd593"
+  },
+  "scripts/create-projecao-estoque-historico.sql": {
+    "mtime": 1772450710.9673076,
+    "ast_hash": "68cbf394a7556d6204a05d42869c7722",
+    "semantic_hash": "68cbf394a7556d6204a05d42869c7722"
+  },
+  "scripts/diag-extrato.mjs": {
+    "mtime": 1780073682.8925223,
+    "ast_hash": "8276dc3745a6111a1fbbd510207f6057",
+    "semantic_hash": "8276dc3745a6111a1fbbd510207f6057"
+  },
+  "scripts/diag-galeao-destinos.mjs": {
+    "mtime": 1780488276.589166,
+    "ast_hash": "4abde19141bc941e0e20510affd53fc0",
+    "semantic_hash": "4abde19141bc941e0e20510affd53fc0"
+  },
+  "scripts/diag-romaneios-erp.mjs": {
+    "mtime": 1780488844.748047,
+    "ast_hash": "8f4d56943bf8b1a8af8ef321f504a236",
+    "semantic_hash": "8f4d56943bf8b1a8af8ef321f504a236"
+  },
+  "scripts/exemplo-tempo-positivo.ts": {
+    "mtime": 1779710697.1141465,
+    "ast_hash": "421ff71225eba6753946f85fa6b2dcee",
+    "semantic_hash": "421ff71225eba6753946f85fa6b2dcee"
+  },
+  "scripts/fix-tipos-romaneio-acento.mjs": {
+    "mtime": 1777569687.741432,
+    "ast_hash": "649e8b1955b5cf1785ca958cc6987087",
+    "semantic_hash": "649e8b1955b5cf1785ca958cc6987087"
+  },
+  "scripts/inspecionar-trigger-entradas.mjs": {
+    "mtime": 1780073682.8925223,
+    "ast_hash": "625ea55991d7268dd5c4b43184b2ebaa",
+    "semantic_hash": "625ea55991d7268dd5c4b43184b2ebaa"
+  },
+  "scripts/investigar-entradas-presas.mjs": {
+    "mtime": 1780073682.8943586,
+    "ast_hash": "ab1970fa43ef1ce7c1a1b500fa80266d",
+    "semantic_hash": "ab1970fa43ef1ce7c1a1b500fa80266d"
+  },
+  "scripts/investigar-romaneios-transito.mjs": {
+    "mtime": 1780073682.8943586,
+    "ast_hash": "8187f4813f4d95d0e1031b3c01dc49c7",
+    "semantic_hash": "8187f4813f4d95d0e1031b3c01dc49c7"
+  },
+  "scripts/limpar-transitos-fake.mjs": {
+    "mtime": 1780073682.896278,
+    "ast_hash": "cc1854f568008579fd44be19e8172da9",
+    "semantic_hash": "cc1854f568008579fd44be19e8172da9"
+  },
+  "scripts/migrar-destino-galeao.mjs": {
+    "mtime": 1780487101.578668,
+    "ast_hash": "59f91269c47208848ac0f8f082e2019a",
+    "semantic_hash": "59f91269c47208848ac0f8f082e2019a"
+  },
+  "scripts/migrar-permissoes-galeao.ps1": {
+    "mtime": 1780337626.2718327,
+    "ast_hash": "4827113f48349b5209cbf6a9d8b95d03",
+    "semantic_hash": "4827113f48349b5209cbf6a9d8b95d03"
+  },
+  "scripts/setup-logistica-permissoes.ts": {
+    "mtime": 1780073682.896278,
+    "ast_hash": "1d81dcb55a0c2b6ef5782259f90780fe",
+    "semantic_hash": "1d81dcb55a0c2b6ef5782259f90780fe"
+  },
+  "scripts/valida-panneaux.mjs": {
+    "mtime": 1781189420.9150164,
+    "ast_hash": "debc2c3941aac7b9cc8d30f5c8b54a91",
+    "semantic_hash": "debc2c3941aac7b9cc8d30f5c8b54a91"
+  },
+  "scripts/verificar-seguranca-limpeza.mjs": {
+    "mtime": 1780073682.896278,
+    "ast_hash": "536a19fb0904f967d5be175f85b61c2f",
+    "semantic_hash": "536a19fb0904f967d5be175f85b61c2f"
+  },
+  "start-proxy.ps1": {
+    "mtime": 1763471613.7062557,
+    "ast_hash": "bf5f923ccb9c3e3d95bcda684535b19d",
+    "semantic_hash": "bf5f923ccb9c3e3d95bcda684535b19d"
+  },
+  "testar_saida_entrada.js": {
+    "mtime": 1780073682.9009686,
+    "ast_hash": "7657558529770cf94a3e7a1d1e14250e",
+    "semantic_hash": "7657558529770cf94a3e7a1d1e14250e"
+  },
+  "testar_stored_procedure_direto.py": {
+    "mtime": 1770043926.1847272,
+    "ast_hash": "b38e16e52bd347bc819cca51317f188c",
+    "semantic_hash": "b38e16e52bd347bc819cca51317f188c"
+  },
+  "tmp/linx_release_832350_20260514_173709.json": {
+    "mtime": 1778791029.3297746,
+    "ast_hash": "ad107f0a368e6133829ceeb3523de303",
+    "semantic_hash": "ad107f0a368e6133829ceeb3523de303"
+  },
+  "tmp/linx_release_backup_20260514_172405.json": {
+    "mtime": 1778790245.946023,
+    "ast_hash": "f54cb54518ce7decab3156eed7a529e5",
+    "semantic_hash": "f54cb54518ce7decab3156eed7a529e5"
+  },
+  "tmp/linx_release_backup_20260514_172500.json": {
+    "mtime": 1778790301.7750902,
+    "ast_hash": "d760c57f30e2e927dd462e9ddecd5904",
+    "semantic_hash": "d760c57f30e2e927dd462e9ddecd5904"
+  },
+  "tmp/linx_release_backup_remaining_20260514_173230.json": {
+    "mtime": 1778790752.116044,
+    "ast_hash": "2280569604d3ca03543877d15515ae25",
+    "semantic_hash": "2280569604d3ca03543877d15515ae25"
+  },
+  "tmp/server-only-stub.js": {
+    "mtime": 1780073682.905932,
+    "ast_hash": "b8296ad0a8e359d3b29b11936674d289",
+    "semantic_hash": "b8296ad0a8e359d3b29b11936674d289"
+  },
+  "tmp/test-calculo-6-51.ts": {
+    "mtime": 1780073682.905932,
+    "ast_hash": "b636ec9c76d4676bae4aa9a7a136ec0f",
+    "semantic_hash": "b636ec9c76d4676bae4aa9a7a136ec0f"
+  },
+  "tmp/test-compra-ciclo.ts": {
+    "mtime": 1784563030.3881283,
+    "ast_hash": "e02a3a341fbae6faa47ed12c1eafc579",
+    "semantic_hash": ""
+  },
+  "tmp/test-po-badge.ts": {
+    "mtime": 1780073682.905932,
+    "ast_hash": "65a1959b80b77b474a15ab030f601cd8",
+    "semantic_hash": "65a1959b80b77b474a15ab030f601cd8"
+  },
+  "tmp/test-po-candidatos.ts": {
+    "mtime": 1780073682.905932,
+    "ast_hash": "57a07dccbbf996aee6e2f2bd6f5a3c10",
+    "semantic_hash": "57a07dccbbf996aee6e2f2bd6f5a3c10"
+  },
+  "tmp/test-produto-especifico.ts": {
+    "mtime": 1780073682.905932,
+    "ast_hash": "60f11a496dc8fd18a9e5ef7bae812baf",
+    "semantic_hash": "60f11a496dc8fd18a9e5ef7bae812baf"
+  },
+  "tmp/test-produto-v2.ts": {
+    "mtime": 1780073682.9118624,
+    "ast_hash": "1c55f68858f1f87c92a244cdb8460e1a",
+    "semantic_hash": "1c55f68858f1f87c92a244cdb8460e1a"
+  },
+  "tsconfig.json": {
+    "mtime": 1780073682.9118624,
+    "ast_hash": "2ce4be694918e7e073e9fc279ee6f7c6",
+    "semantic_hash": "2ce4be694918e7e073e9fc279ee6f7c6"
+  },
+  "types/auth.ts": {
+    "mtime": 1792679389.7066343,
+    "ast_hash": "de02902689a5559f03297255fe68fc23",
+    "semantic_hash": ""
+  },
+  "types/dashboard.ts": {
+    "mtime": 1780073682.9139652,
+    "ast_hash": "24d4b879ed9a1d9ee11824ed45c00d08",
+    "semantic_hash": "24d4b879ed9a1d9ee11824ed45c00d08"
+  },
+  "types/react-date-range.d.ts": {
+    "mtime": 1763476509.6066208,
+    "ast_hash": "e3bf23263f65610f701505303d537c23",
+    "semantic_hash": "e3bf23263f65610f701505303d537c23"
+  },
+  "types/react-simple-maps.d.ts": {
+    "mtime": 1780073682.9139652,
+    "ast_hash": "6400e75d7eb085e00bf00cc62f7c4cf4",
+    "semantic_hash": "6400e75d7eb085e00bf00cc62f7c4cf4"
+  },
+  "validar_sqls_transferencia.py": {
+    "mtime": 1770043926.195927,
+    "ast_hash": "0f657f5227a159777dca69e97eed7894",
+    "semantic_hash": "0f657f5227a159777dca69e97eed7894"
+  },
+  "vercel.json": {
+    "mtime": 1769459254.8882897,
+    "ast_hash": "adfa748c320c5777ff39713ea4489e59",
+    "semantic_hash": "adfa748c320c5777ff39713ea4489e59"
+  },
+  "verificar_028964.py": {
+    "mtime": 1770043926.2027373,
+    "ast_hash": "78483e6769a35bb7484acfde1bcf7984",
+    "semantic_hash": "78483e6769a35bb7484acfde1bcf7984"
+  },
+  "verificar_contagem_query.py": {
+    "mtime": 1781264223.0689726,
+    "ast_hash": "1e264b2ebee180dc0634b7fb3cf99487",
+    "semantic_hash": "1e264b2ebee180dc0634b7fb3cf99487"
+  },
+  "verificar_entradas_saidas.py": {
+    "mtime": 1770043926.211531,
+    "ast_hash": "ee7a43cc1bc7a76d3db913e18d46d3d9",
+    "semantic_hash": "ee7a43cc1bc7a76d3db913e18d46d3d9"
+  },
+  "verificar_integridade_banco.py": {
+    "mtime": 1770043926.2155616,
+    "ast_hash": "6395746099ca81f65167ee65d3da1b65",
+    "semantic_hash": "6395746099ca81f65167ee65d3da1b65"
+  },
+  "verificar_romaneio_existente.py": {
+    "mtime": 1770043926.223735,
+    "ast_hash": "644580e448f51c6026395f61b9dc787e",
+    "semantic_hash": "644580e448f51c6026395f61b9dc787e"
+  },
+  "verificar_transferencia_executada.py": {
+    "mtime": 1770043926.2263157,
+    "ast_hash": "59d2cb7a1165d737476f2d49cc688e32",
+    "semantic_hash": "59d2cb7a1165d737476f2d49cc688e32"
+  },
+  "verificar_transferencia_incompleta.py": {
+    "mtime": 1770043926.2351656,
+    "ast_hash": "fbd6fba9a3658e700fe5bb0729e626c7",
+    "semantic_hash": "fbd6fba9a3658e700fe5bb0729e626c7"
+  },
+  "vm-setup/firewall-setup.sh": {
+    "mtime": 1768308521.6133971,
+    "ast_hash": "473be55a90a75dec411438f36752be8d",
+    "semantic_hash": "473be55a90a75dec411438f36752be8d"
+  },
+  "vm-setup/install.sh": {
+    "mtime": 1780073682.9139652,
+    "ast_hash": "13b10626efb1b650fd9a9d669d662dac",
+    "semantic_hash": "13b10626efb1b650fd9a9d669d662dac"
+  },
+  "CLAUDE.md": {
+    "mtime": 1791995282.9016137,
+    "ast_hash": "d2c9676960b5eecbd0b6f86d977556d0",
+    "semantic_hash": ""
+  },
+  "QUICK_START_CLOUDFLARE.md": {
+    "mtime": 1770043919.290346,
+    "ast_hash": "2a09356e9df207f39c34f0b36ad45d64",
+    "semantic_hash": "2a09356e9df207f39c34f0b36ad45d64"
+  },
+  "README.md": {
+    "mtime": 1780073682.550132,
+    "ast_hash": "98d00b58e3b1b8892167b7a27285c92c",
+    "semantic_hash": "98d00b58e3b1b8892167b7a27285c92c"
+  },
+  "aws-setup/README.md": {
+    "mtime": 1772796505.2313316,
+    "ast_hash": "b7f7c3dcc18da583763d9ceb0a2f3d98",
+    "semantic_hash": "b7f7c3dcc18da583763d9ceb0a2f3d98"
+  },
+  "docs/AWS_PROXY_SETUP.md": {
+    "mtime": 1772796477.7422254,
+    "ast_hash": "9e848abc8795769871b20472c79e9bcc",
+    "semantic_hash": "9e848abc8795769871b20472c79e9bcc"
+  },
+  "docs/CLOUDFLARE_TUNNEL_SETUP.md": {
+    "mtime": 1780073682.810701,
+    "ast_hash": "ef1e699a1a91314d57e0d2cee09aed69",
+    "semantic_hash": "ef1e699a1a91314d57e0d2cee09aed69"
+  },
+  "docs/MAPA_LOGICAS_PAGINAS_COMPLETO.md": {
+    "mtime": 1776085771.83525,
+    "ast_hash": "ceda2ef1bde3f2e8165b2b9b81e7351e",
+    "semantic_hash": "ceda2ef1bde3f2e8165b2b9b81e7351e"
+  },
+  "docs/PRODUCAO_FUNCAO_GESTOR.md": {
+    "mtime": 1771588589.2125435,
+    "ast_hash": "fefd8eb8094c5e4d417662f99d5c0102",
+    "semantic_hash": "fefd8eb8094c5e4d417662f99d5c0102"
+  },
+  "docs/PROJECAO_ESTOQUE_HISTORICO.md": {
+    "mtime": 1772473807.1251142,
+    "ast_hash": "490ab38980b4f8def2c7c61fa4edfe9d",
+    "semantic_hash": "490ab38980b4f8def2c7c61fa4edfe9d"
+  },
+  "docs/PROJECAO_ESTOQUE_LOGICA.md": {
+    "mtime": 1772206207.617999,
+    "ast_hash": "9569356c7913b210f29fb6a9d3df4e6b",
+    "semantic_hash": "9569356c7913b210f29fb6a9d3df4e6b"
+  },
+  "docs/ROMANEIOS_TRANSFERENCIA.md": {
+    "mtime": 1770043925.1461623,
+    "ast_hash": "bcec3ab82291a4e613cf762de35840b7",
+    "semantic_hash": "bcec3ab82291a4e613cf762de35840b7"
+  },
+  "docs/RUNBOOK_LOGICAS_DETALHADAS.md": {
+    "mtime": 1776085779.122567,
+    "ast_hash": "86563bd904375bc1ee391c493e44c519",
+    "semantic_hash": "86563bd904375bc1ee391c493e44c519"
+  },
+  "docs/TRANSFERENCIAS.md": {
+    "mtime": 1770043925.152189,
+    "ast_hash": "88dd826021c5293c0b0cd07ac8a474ef",
+    "semantic_hash": "88dd826021c5293c0b0cd07ac8a474ef"
+  },
+  "docs/TRANSFERENCIAS_PASSOS.md": {
+    "mtime": 1770301276.9774554,
+    "ast_hash": "5dd9db3b2c99406facc1bea61fe4c035",
+    "semantic_hash": "5dd9db3b2c99406facc1bea61fe4c035"
+  },
+  "docs/TRANSFERENCIAS_PERSISTENCIA.md": {
+    "mtime": 1770301276.9769473,
+    "ast_hash": "c65c3bd64e724b3ed056e4a9050b22bd",
+    "semantic_hash": "c65c3bd64e724b3ed056e4a9050b22bd"
+  },
+  "docs/TUNEL_FIXO_CLOUDFLARE.md": {
+    "mtime": 1771588589.830917,
+    "ast_hash": "2e37bfda2852a9f142c465e1dc7d733d",
+    "semantic_hash": "2e37bfda2852a9f142c465e1dc7d733d"
+  },
+  "docs/VERCEL_NEON_SETUP.md": {
+    "mtime": 1771588589.2067287,
+    "ast_hash": "7ee29f13d487b1a58e9356a9780aaeae",
+    "semantic_hash": "7ee29f13d487b1a58e9356a9780aaeae"
+  },
+  "docs/mcp-guia.md": {
+    "mtime": 1782934042.0147443,
+    "ast_hash": "50d0b8221582535d278e4eab632b92b9",
+    "semantic_hash": "50d0b8221582535d278e4eab632b92b9"
+  },
+  "docs/mcp-server.md": {
+    "mtime": 1782911420.5600028,
+    "ast_hash": "a0423fe80bfe542315627bd94d3161ce",
+    "semantic_hash": "a0423fe80bfe542315627bd94d3161ce"
+  },
+  "projecao_produtos_2026-03-10.txt": {
+    "mtime": 1773173933.5670183,
+    "ast_hash": "20e30f7d7468e7219f67eaa503c1268c",
+    "semantic_hash": "20e30f7d7468e7219f67eaa503c1268c"
+  },
+  "projecao_produtos_2026-03-11.txt": {
+    "mtime": 1773254587.1073825,
+    "ast_hash": "961fa673504868e97f3de461c568f49d",
+    "semantic_hash": "961fa673504868e97f3de461c568f49d"
+  },
+  "proxy-server/README.md": {
+    "mtime": 1772796511.9103873,
+    "ast_hash": "39d3f59e9434b9a563e3a70e82f459ef",
+    "semantic_hash": "39d3f59e9434b9a563e3a70e82f459ef"
+  },
+  "resumo_padrao_romaneios.md": {
+    "mtime": 1770043926.1656337,
+    "ast_hash": "ddb8cf898684ac34e758e025d0bf9f68",
+    "semantic_hash": "ddb8cf898684ac34e758e025d0bf9f68"
+  },
+  "tmp_scarfme_poliester_pages.txt": {
+    "mtime": 1778617541.8960483,
+    "ast_hash": "fcec647b97e7b1c2b5066adb6b38e22a",
+    "semantic_hash": "fcec647b97e7b1c2b5066adb6b38e22a"
+  },
+  "visualizar_transferencia_teste.md": {
+    "mtime": 1770043926.2408004,
+    "ast_hash": "f88c2bcff17e02e17238573fdd48fc67",
+    "semantic_hash": "f88c2bcff17e02e17238573fdd48fc67"
+  },
+  "vm-setup/README.md": {
+    "mtime": 1768308521.5698533,
+    "ast_hash": "fff0144dfc285f47db7315503eb3b389",
+    "semantic_hash": "fff0144dfc285f47db7315503eb3b389"
+  },
+  "public/file.svg": {
+    "mtime": 1762967101.960413,
+    "ast_hash": "d09f95206c3fa0bb9bd9fefabfd0ea71",
+    "semantic_hash": "d09f95206c3fa0bb9bd9fefabfd0ea71"
+  },
+  "public/globe.svg": {
+    "mtime": 1762967101.981441,
+    "ast_hash": "2aaafa6a49b6563925fe440891e32717",
+    "semantic_hash": "2aaafa6a49b6563925fe440891e32717"
+  },
+  "public/next.svg": {
+    "mtime": 1762967102.0045717,
+    "ast_hash": "8e061864f388b47f33a1c3780831193e",
+    "semantic_hash": "8e061864f388b47f33a1c3780831193e"
+  },
+  "public/vercel.svg": {
+    "mtime": 1762967102.0241663,
+    "ast_hash": "c0af2f507b369b085b35ef4bbe3bcf1e",
+    "semantic_hash": "c0af2f507b369b085b35ef4bbe3bcf1e"
+  },
+  "public/window.svg": {
+    "mtime": 1762967102.0414453,
+    "ast_hash": "a2760511c65806022ad20adf74370ff3",
+    "semantic_hash": "a2760511c65806022ad20adf74370ff3"
+  },
+  "app/(companies)/[company]/loja-raio-x/page.tsx": {
+    "mtime": 1783442131.1490104,
+    "ast_hash": "bdc4b7ffb89fc757c6a0a24ec339c88d",
+    "semantic_hash": ""
+  },
+  "app/api/loja-raio-x/route.ts": {
+    "mtime": 1784554855.9950442,
+    "ast_hash": "da5fc81ee33f8e27c9155c4c873d5fb6",
+    "semantic_hash": ""
+  },
+  "components/loja-raio-x/LojaRaioXPage.tsx": {
+    "mtime": 1786988601.6463926,
+    "ast_hash": "78f712857ea6487af99242251a7f9e7f",
+    "semantic_hash": ""
+  },
+  "lib/repositories/lojaRaioX.ts": {
+    "mtime": 1791291089.7988594,
+    "ast_hash": "1a6624b57becd950b40a2d4c94b06719",
+    "semantic_hash": ""
+  },
+  "lib/utils/exportLojaRaioXXlsx.ts": {
+    "mtime": 1784647068.1535492,
+    "ast_hash": "8e044482fa0972ecda1b9508b864fd24",
+    "semantic_hash": ""
+  },
+  "app/api/transferencias-pendentes/detectar/route.ts": {
+    "mtime": 1783536447.4354212,
+    "ast_hash": "68f0b6ef66f3eb31f646d87218b7b1db",
+    "semantic_hash": ""
+  },
+  "lib/repositories/detectTransferenciasExternas.ts": {
+    "mtime": 1783536597.909673,
+    "ast_hash": "e0a722052909637ab07f5ce31a1431df",
+    "semantic_hash": ""
+  },
+  "lib/server/detectar-transferencias-externas.ts": {
+    "mtime": 1783536432.5249412,
+    "ast_hash": "0d76d36ec407245f454034724cc50cf9",
+    "semantic_hash": ""
+  },
+  "lib/auth/route-guards.ts": {
+    "mtime": 1783538139.7982001,
+    "ast_hash": "e2559679cea8f3a9444b4fbd29ec90f8",
+    "semantic_hash": ""
+  },
+  "app/api/corporativo/registro/[id]/aprovar/route.ts": {
+    "mtime": 1783952369.1767218,
+    "ast_hash": "bb250eafde41ee60a1d46fffc67a2945",
+    "semantic_hash": ""
+  },
+  "app/api/corporativo/registro/[id]/rejeitar/route.ts": {
+    "mtime": 1783952378.8763626,
+    "ast_hash": "927174660f827ba3da646f661485859e",
+    "semantic_hash": ""
+  },
+  "app/api/corporativo/registro/[id]/route.ts": {
+    "mtime": 1783952353.27714,
+    "ast_hash": "aad0a6ef847f0876793e74e79c6d15d4",
+    "semantic_hash": ""
+  },
+  "app/api/corporativo/registro/route.ts": {
+    "mtime": 1790085190.4356284,
+    "ast_hash": "31e8a062b6753fc5a3acb0b69d600817",
+    "semantic_hash": ""
+  },
+  "app/cadastro/page.tsx": {
+    "mtime": 1783952492.891338,
+    "ast_hash": "573c8cefbeffb1653e5d2b058fd692f9",
+    "semantic_hash": ""
+  },
+  "app/corporativo/aprovacoes/[id]/page.tsx": {
+    "mtime": 1790085175.721549,
+    "ast_hash": "31ead7ee69e38749d165a5fa20b028ff",
+    "semantic_hash": ""
+  },
+  "app/corporativo/aprovacoes/page.tsx": {
+    "mtime": 1783952556.1253562,
+    "ast_hash": "cebb37a9eafa6866607be96cb828cd0f",
+    "semantic_hash": ""
+  },
+  "lib/corporativo/regioes.ts": {
+    "mtime": 1783952125.1343107,
+    "ast_hash": "0ec229ea16bbe83bf295e347177b2682",
+    "semantic_hash": ""
+  },
+  "lib/corporativo/registroDefaults.ts": {
+    "mtime": 1790085190.4356284,
+    "ast_hash": "5cb623cde9bda450eab734fcf4d82542",
+    "semantic_hash": ""
+  },
+  "lib/repositories/corporativoCadastros.ts": {
+    "mtime": 1783952270.309992,
+    "ast_hash": "f7e4edbe5d3bba422fb51f463def9237",
+    "semantic_hash": ""
+  },
+  "app/api/corporativo/catalogo/cores/route.ts": {
+    "mtime": 1783961807.7034948,
+    "ast_hash": "369c005b252c251217e8a68d7ff7b4ff",
+    "semantic_hash": ""
+  },
+  "app/api/corporativo/pedidos/[id]/efetivar/route.ts": {
+    "mtime": 1783960099.6872747,
+    "ast_hash": "c2cf2f20978506d5138bf57b0e1d367b",
+    "semantic_hash": ""
+  },
+  "lib/corporativo/config.ts": {
+    "mtime": 1790085078.9773536,
+    "ast_hash": "73cbd5933d178497707c12d820e5a534",
+    "semantic_hash": ""
+  },
+  "lib/repositories/pedidoVendaLinx.ts": {
+    "mtime": 1783959841.328051,
+    "ast_hash": "ef9bf64ad8fd89626edef8dc278efeec",
+    "semantic_hash": ""
+  },
+  "docs/CORPORATIVO_PEDIDO_LINX.md": {
+    "mtime": 1783959927.6702356,
+    "ast_hash": "740f780f4cb7d8ce8f3e2191b4611f5a",
+    "semantic_hash": ""
+  },
+  "lib/utils/transferencia-regras.ts": {
+    "mtime": 1784046983.5969415,
+    "ast_hash": "da681acfe24791a644e9897279bb0b37",
+    "semantic_hash": ""
+  },
+  "app/(companies)/[company]/distribuicao-matriz/page.tsx": {
+    "mtime": 1784054304.889788,
+    "ast_hash": "e7cd5dc488a127dcffd79922da1404ae",
+    "semantic_hash": ""
+  },
+  "components/distribuicao-matriz/DistribuicaoMatrizPage.tsx": {
+    "mtime": 1785434701.2698224,
+    "ast_hash": "8c205609dc5e91c735913fa2153a5761",
+    "semantic_hash": ""
+  },
+  "lib/utils/distribuicao-matriz.ts": {
+    "mtime": 1784906293.1337478,
+    "ast_hash": "b9f628b339e3b7aa93fe5bf87214ebf0",
+    "semantic_hash": ""
+  },
+  "app/api/distribuicao-matriz/route.ts": {
+    "mtime": 1784055332.9539638,
+    "ast_hash": "3ec3dd329bba0f93438d15b9eaa899a0",
+    "semantic_hash": ""
+  },
+  "lib/repositories/distribuicaoMatriz.ts": {
+    "mtime": 1785434378.7237024,
+    "ast_hash": "3b9f29ea5e2ca7b12d83a926e9ccdb89",
+    "semantic_hash": ""
+  },
+  "app/(companies)/[company]/aumentos-descontos/page.tsx": {
+    "mtime": 1784139369.4717162,
+    "ast_hash": "7786be1d9a43da7cb66891dc1d99f65a",
+    "semantic_hash": ""
+  },
+  "app/api/aumentos-descontos/route.ts": {
+    "mtime": 1784208716.6676948,
+    "ast_hash": "2369236bb8199444854d319017f2b844",
+    "semantic_hash": ""
+  },
+  "components/aumentos-descontos/AumentosDescontosPage.tsx": {
+    "mtime": 1784208968.408709,
+    "ast_hash": "f2da8295c8bfbe5466e134a6fb991ec9",
+    "semantic_hash": ""
+  },
+  "lib/repositories/aumentosDescontos.ts": {
+    "mtime": 1784208679.0260458,
+    "ast_hash": "107799a89cffef9017277562b28ecb7a",
+    "semantic_hash": ""
+  },
+  "lib/utils/exportAumentosDescontosXlsx.ts": {
+    "mtime": 1784144850.4647293,
+    "ast_hash": "a0c50dd7238e56791698d0abe90b323e",
+    "semantic_hash": ""
+  },
+  "lib/utils/exportEstoqueConsultaItemXlsx.ts": {
+    "mtime": 1787155483.232486,
+    "ast_hash": "ec0b290bdc2a74e81ce0f88e277a2476",
+    "semantic_hash": ""
+  },
+  "app/api/painel-colecoes/detalhe/route.ts": {
+    "mtime": 1784206680.114411,
+    "ast_hash": "16d0f450d7784167ad6e833589d07abe",
+    "semantic_hash": ""
+  },
+  "components/painel-colecoes/ColecaoDetalhePanel.tsx": {
+    "mtime": 1784208027.1026213,
+    "ast_hash": "c456485159d5b7463bd98f2a74862b93",
+    "semantic_hash": ""
+  },
+  "lib/utils/exportEstoqueRedeXlsx.ts": {
+    "mtime": 1788540514.029621,
+    "ast_hash": "640438566ff42e3341368fb242979c35",
+    "semantic_hash": ""
+  },
+  "app/(companies)/[company]/produto-giro/page.tsx": {
+    "mtime": 1784723299.9263024,
+    "ast_hash": "5e5c4fc7608b7b0e569ddd915bfd2bb0",
+    "semantic_hash": ""
+  },
+  "components/stock/ProdutoGiroPage.tsx": {
+    "mtime": 1784822715.2724154,
+    "ast_hash": "e49d33eed2ea33e136c0d7dbf4a36b37",
+    "semantic_hash": ""
+  },
+  "lib/utils/exportProdutoGiroXlsx.ts": {
+    "mtime": 1784747612.7166445,
+    "ast_hash": "dc66ccf56cf0bccdc5ed6cc308c47e74",
+    "semantic_hash": ""
+  },
+  "app/api/produto-giro/performance/route.ts": {
+    "mtime": 1784739272.6275232,
+    "ast_hash": "7d6ded0f9338e3e3437ccb841aac28a0",
+    "semantic_hash": ""
+  },
+  "components/stock/ProdutoGiroPerformanceChart.tsx": {
+    "mtime": 1784816472.4457502,
+    "ast_hash": "8f1fa8fb34e5f6edd3bbd1e6c2da8082",
+    "semantic_hash": ""
+  },
+  "app/api/produto-giro/diario/route.ts": {
+    "mtime": 1784747529.4558425,
+    "ast_hash": "68f6197dcf29161da252a21efeb0603f",
+    "semantic_hash": ""
+  },
+  "app/api/produto-giro/filiais/route.ts": {
+    "mtime": 1784744881.0621946,
+    "ast_hash": "7fca19f20577b50618ea2882110c09cd",
+    "semantic_hash": ""
+  },
+  "scripts/diag-galeao-dup.mjs": {
+    "mtime": 1784744183.3445475,
+    "ast_hash": "e81caaee6fad0151ac242d4794b82a91",
+    "semantic_hash": ""
+  },
+  "scripts/verif-produto-giro-filiais.mjs": {
+    "mtime": 1784744038.51305,
+    "ast_hash": "988c1648c567dd75d7057b06d635a1f1",
+    "semantic_hash": ""
+  },
+  "scripts/verif-produto-giro-viscose.mjs": {
+    "mtime": 1784742023.337838,
+    "ast_hash": "9a3b213cc5e00a15927b36ab842c2926",
+    "semantic_hash": ""
+  },
+  "scripts/diag-giro-reconcile.mjs": {
+    "mtime": 1784746970.314608,
+    "ast_hash": "e561456d53e3695464009c52049bdf14",
+    "semantic_hash": ""
+  },
+  "app/api/gerador-apresentacoes/produto-giro/route.ts": {
+    "mtime": 1784809633.2002437,
+    "ast_hash": "27160fb05acc8372bda6ff15b5a9a356",
+    "semantic_hash": ""
+  },
+  "components/gerador-apresentacoes/ProdutoGiroDeck.tsx": {
+    "mtime": 1786035849.0290372,
+    "ast_hash": "62f34155908d6016cb71f864eae02bb2",
+    "semantic_hash": ""
+  },
+  "lib/repositories/produtoGiroPresentation.ts": {
+    "mtime": 1784810380.9221728,
+    "ast_hash": "8c01cdb1c830906f95d6f877268866fb",
+    "semantic_hash": ""
+  },
+  "lib/config/distribuicao-minimos.ts": {
+    "mtime": 1784906357.0403469,
+    "ast_hash": "290827211676f5e69999440cc5ef6096",
+    "semantic_hash": ""
+  },
+  "lib/utils/exportDistribuicaoMatriz.ts": {
+    "mtime": 1785436112.9789176,
+    "ast_hash": "9cc15f942349e24fb3d72d8da7fce514",
+    "semantic_hash": ""
+  },
+  "app/(companies)/[company]/vm/page.tsx": {
+    "mtime": 1785412325.4312396,
+    "ast_hash": "4e56a63cfb00a2645569983a0025e85c",
+    "semantic_hash": ""
+  },
+  "app/api/vm/confirmar/route.ts": {
+    "mtime": 1785416025.5181713,
+    "ast_hash": "5e74d1621aa6e45cbe1232a45b05a19c",
+    "semantic_hash": ""
+  },
+  "app/api/vm/cores/route.ts": {
+    "mtime": 1785412116.4872317,
+    "ast_hash": "984b616e0f82d318b40674621cc9dff9",
+    "semantic_hash": ""
+  },
+  "app/api/vm/marcadores/route.ts": {
+    "mtime": 1785414466.606974,
+    "ast_hash": "25b431559e658e370b867bb147162c92",
+    "semantic_hash": ""
+  },
+  "app/api/vm/preview/route.ts": {
+    "mtime": 1785412087.7180219,
+    "ast_hash": "1f5f7a4f158f74e640abf48ca54ce3de",
+    "semantic_hash": ""
+  },
+  "app/api/vm/route.ts": {
+    "mtime": 1785414283.051092,
+    "ast_hash": "23afab856322d08174e941d0b3e52390",
+    "semantic_hash": ""
+  },
+  "components/shared/VmBadge.tsx": {
+    "mtime": 1785414506.441601,
+    "ast_hash": "32c9b91538bc2843571cf369e00e66fd",
+    "semantic_hash": ""
+  },
+  "components/vm/VmPage.tsx": {
+    "mtime": 1785416016.6368208,
+    "ast_hash": "94e85b3c04c963f0720989b354cec4e3",
+    "semantic_hash": ""
+  },
+  "lib/client/use-vm-marcadores.ts": {
+    "mtime": 1785414803.9475853,
+    "ast_hash": "647c5a3953037d010fadf17111a00e46",
+    "semantic_hash": ""
+  },
+  "lib/server/responsavel-linx.ts": {
+    "mtime": 1785427698.028513,
+    "ast_hash": "ceb75bb0ab3462fd435d676ed596ace5",
+    "semantic_hash": ""
+  },
+  "lib/server/vm-escopo.ts": {
+    "mtime": 1785414267.7295952,
+    "ast_hash": "d7e6bce9801ae06a05f0b4dfe7ffd521",
+    "semantic_hash": ""
+  },
+  "lib/server/vm-movimento.ts": {
+    "mtime": 1792000168.4101648,
+    "ast_hash": "7f727e0e09d1fa50fedc08d666460f68",
+    "semantic_hash": ""
+  },
+  "lib/utils/vm-store.ts": {
+    "mtime": 1785414250.3688674,
+    "ast_hash": "a9ff3589d7fa9841f457a401c7c43543",
+    "semantic_hash": ""
+  },
+  "lib/utils/vm.ts": {
+    "mtime": 1785415853.787849,
+    "ast_hash": "cc03337bddfb13ab854e99fa45c68653",
+    "semantic_hash": ""
+  },
+  "scripts/corrigir-estoque-834279.mjs": {
+    "mtime": 1785418507.5612879,
+    "ast_hash": "f9e8b031f9cb15c56d994fb2e8ec4a35",
+    "semantic_hash": ""
+  },
+  "scripts/diag-834279-b.mjs": {
+    "mtime": 1785417531.841656,
+    "ast_hash": "2654925e4fe00633d09adee45efc1658",
+    "semantic_hash": ""
+  },
+  "scripts/diag-834279-c.mjs": {
+    "mtime": 1785417640.404072,
+    "ast_hash": "d9e7bb007b04dae1f0b172d17a4b5239",
+    "semantic_hash": ""
+  },
+  "scripts/diag-834279-d.mjs": {
+    "mtime": 1785417846.4382775,
+    "ast_hash": "02d6893c524613fc966243120c0e5d63",
+    "semantic_hash": ""
+  },
+  "scripts/diag-834279-e.mjs": {
+    "mtime": 1785417950.2626088,
+    "ast_hash": "9d722702499aee6cf733071f445ada84",
+    "semantic_hash": ""
+  },
+  "scripts/diag-834279-f.mjs": {
+    "mtime": 1785418237.5799887,
+    "ast_hash": "d1f373762146c4e46ff2e5abe21f9186",
+    "semantic_hash": ""
+  },
+  "scripts/diag-834279-g.mjs": {
+    "mtime": 1785418866.91253,
+    "ast_hash": "1c8169f1295b345da57d920cbefab055",
+    "semantic_hash": ""
+  },
+  "scripts/diag-834279.mjs": {
+    "mtime": 1785417364.9330876,
+    "ast_hash": "466a833fe1e93be08902ba08e5d31fc5",
+    "semantic_hash": ""
+  },
+  "scripts/diag-extrato-responsavel.mjs": {
+    "mtime": 1785420778.030409,
+    "ast_hash": "0a76401d9eac8132b2f383c5ca990d6f",
+    "semantic_hash": ""
+  },
+  "scripts/diag-extrato-responsavel2.mjs": {
+    "mtime": 1785420873.1519415,
+    "ast_hash": "4b4fdbe0b9e1e5c62b161e64e3c0d6a0",
+    "semantic_hash": ""
+  },
+  "scripts/diag-filial-nerd-matriz.mjs": {
+    "mtime": 1785419839.740893,
+    "ast_hash": "d31ca731f599b020aa3af69dbd5756a9",
+    "semantic_hash": ""
+  },
+  "scripts/normalizar-responsavel-linx.mjs": {
+    "mtime": 1785427994.7014806,
+    "ast_hash": "a475e954b9257c5d13387470948d5943",
+    "semantic_hash": ""
+  },
+  "lib/config/filiais-especiais.ts": {
+    "mtime": 1788974074.5228422,
+    "ast_hash": "f1e6f4d6c7f04bfbd67104347542ca90",
+    "semantic_hash": ""
+  },
+  "app/(companies)/[company]/alterar-cadastro/page.tsx": {
+    "mtime": 1785933541.899353,
+    "ast_hash": "af8b13558e446c08d7bd65272320dea5",
+    "semantic_hash": ""
+  },
+  "app/(companies)/[company]/alterar-precos/page.tsx": {
+    "mtime": 1785783836.061981,
+    "ast_hash": "399521559a18861389cedc527f6f1cd3",
+    "semantic_hash": ""
+  },
+  "app/(companies)/[company]/alterar-produtos-massa/page.tsx": {
+    "mtime": 1785933552.0578823,
+    "ast_hash": "c1cc1d9a38a94b750c91d3555e029bee",
+    "semantic_hash": ""
+  },
+  "app/api/ajuste-estoque/item/buscar/route.ts": {
+    "mtime": 1785949437.358816,
+    "ast_hash": "9084c71609c3ffc60ea9915f63d0bf1d",
+    "semantic_hash": ""
+  },
+  "app/api/ajuste-estoque/item/executar/route.ts": {
+    "mtime": 1785949493.0590875,
+    "ast_hash": "de7bdbe40538dcf333cffd742f56e880",
+    "semantic_hash": ""
+  },
+  "app/api/ajuste-estoque/item/saldo/route.ts": {
+    "mtime": 1787592659.559467,
+    "ast_hash": "369b90edca351f54ad3c4ae4b76c807e",
+    "semantic_hash": ""
+  },
+  "app/api/cadastro/dimensoes/route.ts": {
+    "mtime": 1785938087.4075167,
+    "ast_hash": "1d700faeafba2d20488b29fc4f966450",
+    "semantic_hash": ""
+  },
+  "app/api/cadastro/executar/route.ts": {
+    "mtime": 1785933122.644049,
+    "ast_hash": "ee55acf8087e78a3b5f52e2768dd9d3d",
+    "semantic_hash": ""
+  },
+  "app/api/cadastro/historico/route.ts": {
+    "mtime": 1785933131.9522862,
+    "ast_hash": "59bac66deaa9e19f4711a25aeed1e452",
+    "semantic_hash": ""
+  },
+  "app/api/cadastro/opcoes/route.ts": {
+    "mtime": 1785933068.3710403,
+    "ast_hash": "a87e4980fdecf04586a56d0d152d6641",
+    "semantic_hash": ""
+  },
+  "app/api/cadastro/produtos/route.ts": {
+    "mtime": 1785933107.795037,
+    "ast_hash": "c9c24e629b21b5aa68480daab16360b5",
+    "semantic_hash": ""
+  },
+  "app/api/cadastro/reverter/route.ts": {
+    "mtime": 1785933140.564413,
+    "ast_hash": "002b9c90c30574ffcfdcfef64e4242b2",
+    "semantic_hash": ""
+  },
+  "app/api/gerador-apresentacoes/colecao-produtos/route.ts": {
+    "mtime": 1791294502.4956868,
+    "ast_hash": "45b1ed85443cc0b13c265daf602d7210",
+    "semantic_hash": ""
+  },
+  "app/api/gerador-apresentacoes/top-produtos/route.ts": {
+    "mtime": 1787760999.8515968,
+    "ast_hash": "dd4f81fd7de36147d6f6d8b8ae3a42c9",
+    "semantic_hash": ""
+  },
+  "app/api/precos/executar/route.ts": {
+    "mtime": 1785774968.638744,
+    "ast_hash": "f41e481eda0a6600b5c8a981b930d054",
+    "semantic_hash": ""
+  },
+  "app/api/precos/historico/route.ts": {
+    "mtime": 1785774976.5796406,
+    "ast_hash": "af8a776d0fee2c70e74605feae63fc78",
+    "semantic_hash": ""
+  },
+  "app/api/precos/opcoes/route.ts": {
+    "mtime": 1785778342.72247,
+    "ast_hash": "58e2a0e4012bbfecb989834f9d33c30a",
+    "semantic_hash": ""
+  },
+  "app/api/precos/produtos/route.ts": {
+    "mtime": 1785778328.527675,
+    "ast_hash": "f1c97a72d472388703056f4225ad2163",
+    "semantic_hash": ""
+  },
+  "app/api/precos/reverter/route.ts": {
+    "mtime": 1785774984.8493793,
+    "ast_hash": "5545359a629291a213bf8b62084c0d7a",
+    "semantic_hash": ""
+  },
+  "app/api/products/colecoes/descricoes/route.ts": {
+    "mtime": 1785787702.5049365,
+    "ast_hash": "441cf864f3951076e734b93a5d1074b0",
+    "semantic_hash": ""
+  },
+  "components/ajuste-estoque/AjustarItemPanel.tsx": {
+    "mtime": 1787592659.559467,
+    "ast_hash": "bdd464bbaf2dd946ec646c037252dd83",
+    "semantic_hash": ""
+  },
+  "components/cadastro/AbaDimensoes.tsx": {
+    "mtime": 1785938087.4075167,
+    "ast_hash": "f405cf852b68b7b958d114f226df0dbe",
+    "semantic_hash": ""
+  },
+  "components/cadastro/AlterarCadastroPage.tsx": {
+    "mtime": 1791220706.3205943,
+    "ast_hash": "8c94c9e7553524034507bec2d794a26a",
+    "semantic_hash": ""
+  },
+  "components/cadastro/AlterarMultiplosProdutosPage.tsx": {
+    "mtime": 1785940985.6941235,
+    "ast_hash": "a44c64964e35fb23352cd3c53d6ada52",
+    "semantic_hash": ""
+  },
+  "components/cadastro/CadastroHistorico.tsx": {
+    "mtime": 1785933253.0669434,
+    "ast_hash": "dec9b4452dbec31aa8a1b5068b239beb",
+    "semantic_hash": ""
+  },
+  "components/cadastro/types.ts": {
+    "mtime": 1785937844.5033314,
+    "ast_hash": "50bf0e9e1087996be6070f20513b570c",
+    "semantic_hash": ""
+  },
+  "components/gerador-apresentacoes/TopProdutosDeck.tsx": {
+    "mtime": 1787761125.4790218,
+    "ast_hash": "018c88cf5c2ebb28812a2c0f06686728",
+    "semantic_hash": ""
+  },
+  "components/precos/AlterarPrecosPage.tsx": {
+    "mtime": 1785935184.9388816,
+    "ast_hash": "b6971f5fa8ff553a8f030e5b800647cf",
+    "semantic_hash": ""
+  },
+  "lib/auth/cadastro-guard.ts": {
+    "mtime": 1785933026.2943165,
+    "ast_hash": "8ad7b7d4d6949cdccde039c978d1eb40",
+    "semantic_hash": ""
+  },
+  "lib/auth/precos-guard.ts": {
+    "mtime": 1785774953.6088095,
+    "ast_hash": "1742e11662410f9ab220434c698d6bad",
+    "semantic_hash": ""
+  },
+  "lib/config/cadastro-nomes-sensiveis.ts": {
+    "mtime": 1785932643.711602,
+    "ast_hash": "0ec05587b0be92d54eb394732200fe85",
+    "semantic_hash": ""
+  },
+  "lib/config/painel-colecoes.ts": {
+    "mtime": 1785786523.3249898,
+    "ast_hash": "ffaa41e77d6e3ac2d2a6a601a0f58fe8",
+    "semantic_hash": ""
+  },
+  "lib/repositories/cadastro.ts": {
+    "mtime": 1791220851.7930868,
+    "ast_hash": "68c7723bc68502577f930bcfe0fa7920",
+    "semantic_hash": ""
+  },
+  "lib/repositories/precos.ts": {
+    "mtime": 1785782586.6107998,
+    "ast_hash": "fdd9f212a844d74b5c4c8f3682aa2b05",
+    "semantic_hash": ""
+  },
+  "lib/repositories/topProdutosPresentation.ts": {
+    "mtime": 1787760991.8069527,
+    "ast_hash": "df1e4c478448e022d8eea361dd025ca9",
+    "semantic_hash": ""
+  },
+  "lib/utils/transferencia-permissoes-filiais.ts": {
+    "mtime": 1785761951.1789758,
+    "ast_hash": "92854a2ed038a4188b5ca624ac008f63",
+    "semantic_hash": ""
+  },
+  "app/(companies)/[company]/imprimir-etiquetas/page.tsx": {
+    "mtime": 1786018882.6225386,
+    "ast_hash": "0e382c479eedbf04f0ef1e2e1e858d1d",
+    "semantic_hash": ""
+  },
+  "app/api/etiquetas/config/route.ts": {
+    "mtime": 1786017762.6403775,
+    "ast_hash": "b3e85e27cf01d71fb0ad39dcc601133f",
+    "semantic_hash": ""
+  },
+  "app/api/etiquetas/produtos/route.ts": {
+    "mtime": 1786017747.9095845,
+    "ast_hash": "e0b92b1e7565f1635b79202d94fa3127",
+    "semantic_hash": ""
+  },
+  "components/etiquetas/ConfiguracaoEtiqueta.tsx": {
+    "mtime": 1786546077.7597938,
+    "ast_hash": "645349bfa029e7a9a7d9abedfec0493f",
+    "semantic_hash": ""
+  },
+  "components/etiquetas/EtiquetaSvg.tsx": {
+    "mtime": 1786546359.1175091,
+    "ast_hash": "398642241668307021b3309462a94988",
+    "semantic_hash": ""
+  },
+  "components/etiquetas/ImprimirEtiquetasPage.tsx": {
+    "mtime": 1787229093.2791317,
+    "ast_hash": "af57e65d08d2f7bc7f9317dc5ee35cc7",
+    "semantic_hash": ""
+  },
+  "components/etiquetas/zebra-browser-print.ts": {
+    "mtime": 1786545152.2230532,
+    "ast_hash": "c785e0c51848080f4aac735116945ae2",
+    "semantic_hash": ""
+  },
+  "lib/auth/etiquetas-guard.ts": {
+    "mtime": 1786017727.3150394,
+    "ast_hash": "c758b0992ebe4834b466834fa23edbc5",
+    "semantic_hash": ""
+  },
+  "lib/etiquetas/barcode.ts": {
+    "mtime": 1786541980.419697,
+    "ast_hash": "e5564a07c3fb29e3db3f9536451316a7",
+    "semantic_hash": ""
+  },
+  "lib/etiquetas/tipos.ts": {
+    "mtime": 1786546922.9391694,
+    "ast_hash": "b580b322532487f8841096be8070a28e",
+    "semantic_hash": ""
+  },
+  "lib/etiquetas/zpl.ts": {
+    "mtime": 1786546478.5842795,
+    "ast_hash": "ab15606a676669f77db46acfb8d07cd9",
+    "semantic_hash": ""
+  },
+  "lib/repositories/etiquetas.ts": {
+    "mtime": 1787841826.879326,
+    "ast_hash": "0a1a57f531e4e976c131e0ab065a7a15",
+    "semantic_hash": ""
+  },
+  "lib/utils/etiquetas-config-store.ts": {
+    "mtime": 1786017675.2298787,
+    "ast_hash": "c539c0e3ed8efad89fe523407bef4eed",
+    "semantic_hash": ""
+  },
+  "app/api/etiquetas/sugestoes/route.ts": {
+    "mtime": 1786021497.360051,
+    "ast_hash": "cc13d1c6bfc02d84341602622494d52a",
+    "semantic_hash": ""
+  },
+  "lib/presentations/brand.ts": {
+    "mtime": 1786035814.4803033,
+    "ast_hash": "28f9dda43bab370bd4504f32e1d9a5a7",
+    "semantic_hash": ""
+  },
+  "components/etiquetas/CalibracaoEtiqueta.tsx": {
+    "mtime": 1786384222.3078258,
+    "ast_hash": "f273c255a16f705964bf39d3d6654359",
+    "semantic_hash": ""
+  },
+  "components/etiquetas/EditorVisualEtiqueta.tsx": {
+    "mtime": 1786388626.8343909,
+    "ast_hash": "eed4a2684105c7d73febdcca6529a172",
+    "semantic_hash": ""
+  },
+  "lib/etiquetas/layout.ts": {
+    "mtime": 1786544029.8285344,
+    "ast_hash": "8e4b40b76eb009330faf5c6a2810a431",
+    "semantic_hash": ""
+  },
+  "app/api/controle-estoque/estoque-por-tamanho-item/route.ts": {
+    "mtime": 1786641227.3487184,
+    "ast_hash": "532504938caabf11b18d88f8664be3da",
+    "semantic_hash": ""
+  },
+  "lib/utils/compra-destino-tamanho.ts": {
+    "mtime": 1787592872.2387815,
+    "ast_hash": "325c7ebbfddcddbfdeb69e3bc0456abb",
+    "semantic_hash": ""
+  },
+  "lib/utils/grade-tamanhos.ts": {
+    "mtime": 1786641188.2333765,
+    "ast_hash": "a83db6a2997781e7b1209d543861d90e",
+    "semantic_hash": ""
+  },
+  "scripts/liberar-vm-gerentes-nerd.mjs": {
+    "mtime": 1786629536.7956011,
+    "ast_hash": "cb96aba40638d663093eb80f2796b8c9",
+    "semantic_hash": ""
+  },
+  "app/api/etiquetas/cores/adicionar/route.ts": {
+    "mtime": 1787228851.0791266,
+    "ast_hash": "33f94fe3cf8c58d00cab09604a2738b1",
+    "semantic_hash": ""
+  },
+  "app/api/etiquetas/cores/route.ts": {
+    "mtime": 1787228841.4504633,
+    "ast_hash": "dfbd540a6e3cd8b50eb41c21cd569a48",
+    "semantic_hash": ""
+  },
+  "components/etiquetas/ModalAdicionarCor.tsx": {
+    "mtime": 1787229893.4661818,
+    "ast_hash": "3d9e9cf3def6d58fa8c86ae8570957a6",
+    "semantic_hash": ""
+  },
+  "components/etiquetas/ModalCustoProduto.tsx": {
+    "mtime": 1786972626.1121454,
+    "ast_hash": "e3cedcb3b316cdecbfdb3b2c0add3710",
+    "semantic_hash": ""
+  },
+  "lib/auth/cores-guard.ts": {
+    "mtime": 1787228831.631385,
+    "ast_hash": "3717bc635a3791a4e8d2683eab523eeb",
+    "semantic_hash": ""
+  },
+  "lib/repositories/produtoCores.ts": {
+    "mtime": 1790876432.23248,
+    "ast_hash": "cbc5090df320437b3caef176166a06f7",
+    "semantic_hash": ""
+  },
+  "app/api/saidas-entradas-produtos/defeito-do-dia/route.ts": {
+    "mtime": 1787590841.197629,
+    "ast_hash": "9c6daf75cfe306de99d5ed14483da635",
+    "semantic_hash": ""
+  },
+  "lib/server/trava-defeito.ts": {
+    "mtime": 1787590831.4005587,
+    "ast_hash": "a03d6dc9cf9f7e26ce44a94784dd49e7",
+    "semantic_hash": ""
+  },
+  "app/(companies)/[company]/gastos-compra/page.tsx": {
+    "mtime": 1787679019.1241403,
+    "ast_hash": "75d47f0a992702944ce2c15111befe07",
+    "semantic_hash": ""
+  },
+  "app/api/compras-gastos/[id]/route.ts": {
+    "mtime": 1787678576.8337383,
+    "ast_hash": "cec7c4d206e04be3a6c6cab53be6ca34",
+    "semantic_hash": ""
+  },
+  "app/api/compras-gastos/orcamento/route.ts": {
+    "mtime": 1787747088.7503138,
+    "ast_hash": "b18c52e647e717cf887228761fb8f930",
+    "semantic_hash": ""
+  },
+  "app/api/compras-gastos/reconhecer/route.ts": {
+    "mtime": 1788184451.8039107,
+    "ast_hash": "cf7176b2623066715afa2ab522fa5ad2",
+    "semantic_hash": ""
+  },
+  "app/api/compras-gastos/route.ts": {
+    "mtime": 1789046423.3213966,
+    "ast_hash": "ce7442246752e6c8ae2eb26ce873b6be",
+    "semantic_hash": ""
+  },
+  "app/api/saidas-entradas-produtos/rascunhos/route.ts": {
+    "mtime": 1788353872.306146,
+    "ast_hash": "3d33270c7938671d52128b7db6bcee0f",
+    "semantic_hash": ""
+  },
+  "app/api/transferencia-produtos/bipar/route.ts": {
+    "mtime": 1791998151.5619197,
+    "ast_hash": "b3f36a9e0a7ca5c4ea653b08574a38c1",
+    "semantic_hash": ""
+  },
+  "components/compras/GastosCompraDrawer.tsx": {
+    "mtime": 1789046526.9911916,
+    "ast_hash": "d6ea53d1ca84e36c9fc115a2ea2147ce",
+    "semantic_hash": ""
+  },
+  "components/compras/GastosCompraGrafico.tsx": {
+    "mtime": 1787678772.141335,
+    "ast_hash": "9b3357fc3dda02f38ca739ab836584d1",
+    "semantic_hash": ""
+  },
+  "components/compras/GastosCompraPanel.tsx": {
+    "mtime": 1789046526.9911916,
+    "ast_hash": "98bd93cc3f32d4693e91b220fb089d6d",
+    "semantic_hash": ""
+  },
+  "components/compras/NovaCompraModal.tsx": {
+    "mtime": 1789046575.950281,
+    "ast_hash": "30641d434cd4dbdea32f66160e78c01a",
+    "semantic_hash": ""
+  },
+  "components/compras/ParcelasEditor.tsx": {
+    "mtime": 1788281709.143732,
+    "ast_hash": "1e7a2501803dc964409dcd6c55c3e04d",
+    "semantic_hash": ""
+  },
+  "components/compras/gastos-compra-format.ts": {
+    "mtime": 1788355774.8163486,
+    "ast_hash": "3220d2d2e368b974dc0860884469e122",
+    "semantic_hash": ""
+  },
+  "lib/reports/abas.ts": {
+    "mtime": 1787760232.5816214,
+    "ast_hash": "b280edece1dc1880cd06a37d5f079281",
+    "semantic_hash": ""
+  },
+  "lib/types/compra-gasto.ts": {
+    "mtime": 1789046399.367446,
+    "ast_hash": "59698f977ad87fcdb51c8a9c51d16eb3",
+    "semantic_hash": ""
+  },
+  "lib/utils/compra-gastos-agregacao.ts": {
+    "mtime": 1789046406.085484,
+    "ast_hash": "ba01c5653d3a53215a76ecd19a399836",
+    "semantic_hash": ""
+  },
+  "lib/utils/compra-gastos-import.ts": {
+    "mtime": 1788184483.7228036,
+    "ast_hash": "6563ca939e592c3542eee713959b5f2f",
+    "semantic_hash": ""
+  },
+  "lib/utils/compra-gastos-store.ts": {
+    "mtime": 1789046416.5251813,
+    "ast_hash": "12547e18faaf80d95f96e19322306526",
+    "semantic_hash": ""
+  },
+  "lib/utils/exportGastosCompraXlsx.ts": {
+    "mtime": 1788281559.8740509,
+    "ast_hash": "6d90888d7228680222fc22a42d5b582a",
+    "semantic_hash": ""
+  },
+  "lib/utils/exportRelatorioAbasXlsx.ts": {
+    "mtime": 1788540565.5866637,
+    "ast_hash": "12f0517d978569ddb2c1a0792f5ceda2",
+    "semantic_hash": ""
+  },
+  "lib/utils/romaneio-tipos.ts": {
+    "mtime": 1787673151.7584255,
+    "ast_hash": "c3851b15f1d089e6ee1fe3c747f7455e",
+    "semantic_hash": ""
+  },
+  "lib/utils/saida-entrada-draft-store.ts": {
+    "mtime": 1791998181.0648625,
+    "ast_hash": "6f048808fc94f0782f678e821d08719e",
+    "semantic_hash": ""
+  },
+  "app/api/relatorios/stream/route.ts": {
+    "mtime": 1787842285.7665937,
+    "ast_hash": "1aa56e324080ed4454eda7a667695bed",
+    "semantic_hash": ""
+  },
+  "lib/reports/params.ts": {
+    "mtime": 1790786775.528095,
+    "ast_hash": "738b3b38a253658a335a88b509a9e2b7",
+    "semantic_hash": ""
+  },
+  "lib/reports/projecao-vendas.ts": {
+    "mtime": 1788540413.9447618,
+    "ast_hash": "907172856a0096074e7069020398f1d2",
+    "semantic_hash": ""
+  },
+  "lib/repositories/reportProjecaoVendas.ts": {
+    "mtime": 1787844381.7835512,
+    "ast_hash": "43b7fe01d5fa2d7c3a91df88b201eb17",
+    "semantic_hash": ""
+  },
+  "lib/utils/exportProjecaoVendasXlsx.ts": {
+    "mtime": 1788540536.2520492,
+    "ast_hash": "00e85b2bb174e86ece4ea168a39d8186",
+    "semantic_hash": ""
+  },
+  "lib/utils/projecao-vendas.ts": {
+    "mtime": 1787844234.907359,
+    "ast_hash": "fa6c41c277a31c5abec8efff8a2b897b",
+    "semantic_hash": ""
+  },
+  "tmp/test-projecao.js": {
+    "mtime": 1787844691.1134317,
+    "ast_hash": "8128a6ed0fb6f79915f5f4ded0e88a28",
+    "semantic_hash": ""
+  },
+  "app/api/relatorios/resolver-produtos/route.ts": {
+    "mtime": 1787844162.7287097,
+    "ast_hash": "3e40891ee22796c113224740f5e5b7ac",
+    "semantic_hash": ""
+  },
+  "lib/repositories/produtoCodigos.ts": {
+    "mtime": 1787844730.9815056,
+    "ast_hash": "707d0784fb7f21f9c8843621b6d32246",
+    "semantic_hash": ""
+  },
+  "app/api/relatorios/custos-defeitos/route.ts": {
+    "mtime": 1788185563.041312,
+    "ast_hash": "3e0d81fe9b82c5392ffcec7971e785a5",
+    "semantic_hash": ""
+  },
+  "lib/reports/custos-defeitos.ts": {
+    "mtime": 1788540413.9447618,
+    "ast_hash": "33733b47cfc5081d9cadac1218f98d0f",
+    "semantic_hash": ""
+  },
+  "lib/repositories/reportCustosDefeitos.ts": {
+    "mtime": 1788185563.048862,
+    "ast_hash": "ba324c74f2f43a3d0e5a94207d26b255",
+    "semantic_hash": ""
+  },
+  "lib/server/compra-transito-gasto.ts": {
+    "mtime": 1788264798.985681,
+    "ast_hash": "da9731ff53b1d5c49d8d6f9b4c58200e",
+    "semantic_hash": ""
+  },
+  "lib/utils/compra-transito-pagamento.ts": {
+    "mtime": 1788264706.7299125,
+    "ast_hash": "c76c73e7ff6e60442573d7b6cb4fcce2",
+    "semantic_hash": ""
+  },
+  "lib/utils/exportCustosDefeitosXlsx.ts": {
+    "mtime": 1788540582.799924,
+    "ast_hash": "0e6af7d65ebca53a4bc58f546ba0e1d5",
+    "semantic_hash": ""
+  },
+  "docs/INVESTIGACAO_B1.10.0023_FONE_TWS_VOLT.md": {
+    "mtime": 1788202737.2767615,
+    "ast_hash": "ddc464acc4060af05bc67808f55df8b0",
+    "semantic_hash": ""
+  },
+  "docs/GASTOS_COMPRA_FORNECEDORES.md": {
+    "mtime": 1789046614.0814545,
+    "ast_hash": "2a908cd044d33abb7b49c9df7a0995b9",
+    "semantic_hash": ""
+  },
+  "app/api/saidas-entradas-produtos/entrada-editar/route.ts": {
+    "mtime": 1792003185.7829607,
+    "ast_hash": "48dafa76b212b9f23226ea708df6dee2",
+    "semantic_hash": ""
+  },
+  "app/api/controle-estoque/filtro-opcoes/route.ts": {
+    "mtime": 1788368364.6820726,
+    "ast_hash": "6bc709e3412280d2de36fa192c3f6c8c",
+    "semantic_hash": ""
+  },
+  "components/controle-transferencias/exportToXlsx.ts": {
+    "mtime": 1788369643.1517365,
+    "ast_hash": "6f31a972aff1a21de957b6f1d76784a9",
+    "semantic_hash": ""
+  },
+  "app/api/relatorios/filtro-opcoes/route.ts": {
+    "mtime": 1788372494.7971213,
+    "ast_hash": "f566319d12a676a5b5d4adccbf13c85d",
+    "semantic_hash": ""
+  },
+  "app/(companies)/[company]/projecao-compra/page.tsx": {
+    "mtime": 1788442145.2792056,
+    "ast_hash": "d903d5ff142007ec9d8850f9bd65bb0e",
+    "semantic_hash": ""
+  },
+  "app/api/projecao-compra/route.ts": {
+    "mtime": 1789580775.344804,
+    "ast_hash": "3261e7f293baf80ddc996f6342aab254",
+    "semantic_hash": ""
+  },
+  "components/stock/ProjecaoCompraPage.tsx": {
+    "mtime": 1791557402.0992389,
+    "ast_hash": "179f1aea3f20ff808b7133b7c415ee5d",
+    "semantic_hash": ""
+  },
+  "lib/config/saida-estoque-negativo.ts": {
+    "mtime": 1791994121.6107213,
+    "ast_hash": "01b38c5ef4d46a424fc7d297ef27e1d2",
+    "semantic_hash": ""
+  },
+  "scripts/backfill-custo-entradas.mjs": {
+    "mtime": 1788436458.3682394,
+    "ast_hash": "acd1a7c658b0143018a36ca9559c10f1",
+    "semantic_hash": ""
+  },
+  "app/api/saidas-entradas-produtos/saida-editar/route.ts": {
+    "mtime": 1792003185.7772305,
+    "ast_hash": "0a8f3879f6a4e245e18f704141417873",
+    "semantic_hash": ""
+  },
+  "lib/reports/tickets.ts": {
+    "mtime": 1790697739.7703564,
+    "ast_hash": "b34bf446cce30b2601d7f4846cb14512",
+    "semantic_hash": ""
+  },
+  "lib/repositories/reportTickets.ts": {
+    "mtime": 1791207585.8468823,
+    "ast_hash": "3c01ecfda853c88d2b9640a15edfc79f",
+    "semantic_hash": ""
+  },
+  "lib/utils/exportTicketsXlsx.ts": {
+    "mtime": 1790697750.5907423,
+    "ast_hash": "63d674bdb553b2c8bc992213ba799320",
+    "semantic_hash": ""
+  },
+  "lib/utils/reportFilename.ts": {
+    "mtime": 1788540825.5694613,
+    "ast_hash": "ea92e9cd5b23abfadc080b9291ae7b31",
+    "semantic_hash": ""
+  },
+  "app/api/products/dimensoes-escopo/route.ts": {
+    "mtime": 1789577676.717049,
+    "ast_hash": "3147729dfd8fad85a21ca6594b018298",
+    "semantic_hash": ""
+  },
+  "app/(companies)/[company]/compra-ciclo/page.tsx": {
+    "mtime": 1788965074.3659663,
+    "ast_hash": "bbe16c9fa9ecc961a4f5f1bd5bd2bee9",
+    "semantic_hash": ""
+  },
+  "app/api/compra-ciclo/presets/route.ts": {
+    "mtime": 1788966410.584048,
+    "ast_hash": "6a6786c2849b59dc7f476988f824c30c",
+    "semantic_hash": ""
+  },
+  "app/api/compra-ciclo/route.ts": {
+    "mtime": 1788966397.4755871,
+    "ast_hash": "a4ec4beadd5c1d7019cd38e8fa73e08d",
+    "semantic_hash": ""
+  },
+  "components/compras/CompraCicloPage.tsx": {
+    "mtime": 1788966486.3448744,
+    "ast_hash": "202f6ee24058a00242e975ce7cce3ff5",
+    "semantic_hash": ""
+  },
+  "lib/auth/compra-ciclo-guard.ts": {
+    "mtime": 1788964801.4866848,
+    "ast_hash": "dac0ac05568a36c73e5aaa46c9277045",
+    "semantic_hash": ""
+  },
+  "lib/config/compra-ciclo-store.ts": {
+    "mtime": 1788966391.3056152,
+    "ast_hash": "a2635a6dd348e6ef9369d8c52ad48af3",
+    "semantic_hash": ""
+  },
+  "lib/config/compra-ciclo-tipos.ts": {
+    "mtime": 1788966318.0050182,
+    "ast_hash": "d0d7821927d73fbd1e4ee74fa0af67e2",
+    "semantic_hash": ""
+  },
+  "scripts/conferir-movimento-estoque.mjs": {
+    "mtime": 1788969866.276787,
+    "ast_hash": "3db9ba78649f40adbe5466beeb60a44f",
+    "semantic_hash": ""
+  },
+  "app/api/projecao-embalagens/route.ts": {
+    "mtime": 1791480745.588877,
+    "ast_hash": "22879262d8cf07db7b2a6ec8f5a227b7",
+    "semantic_hash": ""
+  },
+  "components/stock/ProjecaoComoFunciona.tsx": {
+    "mtime": 1789157720.4220233,
+    "ast_hash": "bfefd0bb4a70b57c93f4dfe16e7f26d7",
+    "semantic_hash": ""
+  },
+  "components/stock/ProjecaoEmbalagensPanel.tsx": {
+    "mtime": 1791557379.2344544,
+    "ast_hash": "b3c2ea16024bc9337b849c04dc120cf7",
+    "semantic_hash": ""
+  },
+  "components/stock/ProjecaoItensMensais.tsx": {
+    "mtime": 1789580959.6854112,
+    "ast_hash": "44a976527ecd9c804c38e72d677fd161",
+    "semantic_hash": ""
+  },
+  "lib/config/embalagens.ts": {
+    "mtime": 1791480745.7324607,
+    "ast_hash": "a0e5aefdbea52395a7e49d1cd09ff213",
+    "semantic_hash": ""
+  },
+  "lib/repositories/projecaoEmbalagens.ts": {
+    "mtime": 1791480745.7341032,
+    "ast_hash": "4ff365548fa0ae6e0f5e5d9ed837bf30",
+    "semantic_hash": ""
+  },
+  "lib/utils/embalagens-estoque-store.ts": {
+    "mtime": 1791480745.7363598,
+    "ast_hash": "f37e5f11e8b44eef67e83e35a2f7830f",
+    "semantic_hash": ""
+  },
+  "lib/utils/projecao-realista.ts": {
+    "mtime": 1789135463.2412095,
+    "ast_hash": "8dcd98503d5e2b45377819fd125fc56a",
+    "semantic_hash": ""
+  },
+  "lib/utils/projecao-regras.ts": {
+    "mtime": 1789157720.4192524,
+    "ast_hash": "913e8bb7cef6253594dcfcf041577e09",
+    "semantic_hash": ""
+  },
+  "lib/repositories/projecaoSazonalCategoria.ts": {
+    "mtime": 1789389459.3672233,
+    "ast_hash": "4349c32d8cebfe789dada15306b72d47",
+    "semantic_hash": ""
+  },
+  "lib/server/compra-transito-index.ts": {
+    "mtime": 1791291089.795322,
+    "ast_hash": "57b21d92ab530c8d6a1f77862485edab",
+    "semantic_hash": ""
+  },
+  "lib/utils/projecao-sazonal.ts": {
+    "mtime": 1789135120.968696,
+    "ast_hash": "fe7bc075c72f95556e3542df4eade885",
+    "semantic_hash": ""
+  },
+  "lib/utils/projecao-linha-ajuste.ts": {
+    "mtime": 1789389417.2781951,
+    "ast_hash": "26d6ee4313c7845f690ea3317851ce0b",
+    "semantic_hash": ""
+  },
+  "scripts/backtest-projecao.mjs": {
+    "mtime": 1789390057.5070329,
+    "ast_hash": "eb6f291504a0165619dc2c8db5578958",
+    "semantic_hash": ""
+  },
+  "scripts/lib/alias-hooks.mjs": {
+    "mtime": 1789389742.1992614,
+    "ast_hash": "f343ab798f651359104ce6e029976f32",
+    "semantic_hash": ""
+  },
+  "scripts/lib/alias-register.mjs": {
+    "mtime": 1789389746.3349605,
+    "ast_hash": "a20e98b9b7b852660ddb2af51f45cd96",
+    "semantic_hash": ""
+  },
+  "app/api/product-detail/rename/route.ts": {
+    "mtime": 1789410598.7464588,
+    "ast_hash": "8ef58d70796e1396cc0ee74f83ad3935",
+    "semantic_hash": ""
+  },
+  "app/(companies)/[company]/defeitos/page.tsx": {
+    "mtime": 1790192693.3278396,
+    "ast_hash": "0388d582c869832fa1ba6ec4fb43e48e",
+    "semantic_hash": ""
+  },
+  "app/api/defeitos/entradas/route.ts": {
+    "mtime": 1790192229.4067008,
+    "ast_hash": "eb6fc8c8112c7547cc8f7f6b1f283377",
+    "semantic_hash": ""
+  },
+  "app/api/defeitos/item/route.ts": {
+    "mtime": 1792689943.743746,
+    "ast_hash": "404ad4e1685fe80864668b1bb9236dbd",
+    "semantic_hash": ""
+  },
+  "app/api/defeitos/itens/route.ts": {
+    "mtime": 1790192216.270064,
+    "ast_hash": "1911a4bf2a46946345dfae91a372725a",
+    "semantic_hash": ""
+  },
+  "app/api/defeitos/romaneios/route.ts": {
+    "mtime": 1790192169.298423,
+    "ast_hash": "0c9ff358e8c3209524b69aa3e60a2ab0",
+    "semantic_hash": ""
+  },
+  "components/defeitos/DefeitosPage.tsx": {
+    "mtime": 1792003063.2113323,
+    "ast_hash": "049cddc0d97e731c961346034c3c0d70",
+    "semantic_hash": ""
+  },
+  "lib/repositories/defeitos.ts": {
+    "mtime": 1792689932.745507,
+    "ast_hash": "0abfcf58bb3282aa6503d2944d9ab1b5",
+    "semantic_hash": ""
+  },
+  "lib/utils/romaneio-agrupamento.ts": {
+    "mtime": 1790194160.7730596,
+    "ast_hash": "c8f144e364a3265ebeeee42b67786507",
+    "semantic_hash": ""
+  },
+  "lib/reports/vendas-por-preco.ts": {
+    "mtime": 1790694367.6504838,
+    "ast_hash": "298b211a37a95525111e493325de0fa4",
+    "semantic_hash": ""
+  },
+  "lib/repositories/reportVendasPorPreco.ts": {
+    "mtime": 1790697768.79072,
+    "ast_hash": "021d137e6508b041a950b422dc8b617f",
+    "semantic_hash": ""
+  },
+  "lib/utils/exportVendasPorPrecoXlsx.ts": {
+    "mtime": 1790694367.6532483,
+    "ast_hash": "9dd5b6a27956b51d368eebd7b5418f1e",
+    "semantic_hash": ""
+  },
+  "app/(companies)/[company]/cadastrar-produto/page.tsx": {
+    "mtime": 1790877190.9836764,
+    "ast_hash": "3644b51083f55f647b5859bdb0966b56",
+    "semantic_hash": ""
+  },
+  "app/api/produto-novo/criar/route.ts": {
+    "mtime": 1790877173.8831577,
+    "ast_hash": "22e0931417d06be644270ab9b745c07b",
+    "semantic_hash": ""
+  },
+  "app/api/produto-novo/modelo/route.ts": {
+    "mtime": 1790877173.8315508,
+    "ast_hash": "18484e5c5b80958fd655c0603e589174",
+    "semantic_hash": ""
+  },
+  "app/api/produto-novo/opcoes/route.ts": {
+    "mtime": 1790877173.6733048,
+    "ast_hash": "5d6d5eb13acdffbc7c59a83538df1ec8",
+    "semantic_hash": ""
+  },
+  "app/api/produto-novo/previa/route.ts": {
+    "mtime": 1790877173.7516038,
+    "ast_hash": "fdd2de7d2fd5dd918c3fa8ddc9502135",
+    "semantic_hash": ""
+  },
+  "components/produto-novo/CadastrarProdutoPage.tsx": {
+    "mtime": 1790878039.3550227,
+    "ast_hash": "d2da64138e52f2fba8e5bc9f56508c22",
+    "semantic_hash": ""
+  },
+  "lib/repositories/produtoNovo.ts": {
+    "mtime": 1790877856.105131,
+    "ast_hash": "0416c06cb9f645c9bc6a594400d2ef92",
+    "semantic_hash": ""
+  },
+  "app/api/gerador-apresentacoes/colecao-vendas/route.ts": {
+    "mtime": 1791294502.4929695,
+    "ast_hash": "6052126b6ed6c7b524bb0342e044d13e",
+    "semantic_hash": ""
+  },
+  "app/api/romaneios/trava-inventario/route.ts": {
+    "mtime": 1791204265.8198776,
+    "ast_hash": "e4adcf4f9609b351c484adc4fd5833b6",
+    "semantic_hash": ""
+  },
+  "components/gerador-apresentacoes/ColecaoExclusaoVendas.tsx": {
+    "mtime": 1791294546.7591655,
+    "ast_hash": "f13776f317bf97cdeccf5309079812ed",
+    "semantic_hash": ""
+  },
+  "components/romaneios/TravaInventarioPanel.tsx": {
+    "mtime": 1791204265.8366942,
+    "ast_hash": "2aa8f1e882bbb8b60be64f1b98c81410",
+    "semantic_hash": ""
+  },
+  "lib/server/trava-inventario.ts": {
+    "mtime": 1791204265.8366942,
+    "ast_hash": "8f27e80de85ac1aeeec8e05f491e3ff2",
+    "semantic_hash": ""
+  },
+  "lib/utils/trava-inventario-store.ts": {
+    "mtime": 1791204265.8413744,
+    "ast_hash": "d711d9a95cd5163be15192b06f43d957",
+    "semantic_hash": ""
+  },
+  "app/api/controle-estoque/metragem-produtos/route.ts": {
+    "mtime": 1791397419.2759361,
+    "ast_hash": "9499276b3c3797f648e056c36052cac7",
+    "semantic_hash": ""
+  },
+  "lib/config/metragem-produto.ts": {
+    "mtime": 1791457134.0968404,
+    "ast_hash": "783f22c9f8caebf2c0580814633a0005",
+    "semantic_hash": ""
+  },
+  "app/(companies)/[company]/editar-produto/page.tsx": {
+    "mtime": 1791220719.1725008,
+    "ast_hash": "0926e5946c49d74fcf7f3969b0ff272d",
+    "semantic_hash": ""
+  },
+  "app/api/cadastro/busca/route.ts": {
+    "mtime": 1791220566.4632585,
+    "ast_hash": "cf85090b4d5e4a42676a1e4561990c11",
+    "semantic_hash": ""
+  },
+  "components/cadastro/BuscaProdutoCadastro.tsx": {
+    "mtime": 1791220665.7244973,
+    "ast_hash": "144312555fa77ba8031e902df81ece99",
+    "semantic_hash": ""
+  },
+  "components/cadastro/EditarProdutoPage.tsx": {
+    "mtime": 1791220695.696205,
+    "ast_hash": "7a70a1260fe437e9fb42dc2f91c0e5c3",
+    "semantic_hash": ""
+  },
+  "components/cadastro/FichaProdutoEditor.tsx": {
+    "mtime": 1791220695.696205,
+    "ast_hash": "faeef934f3fead745754c4ed2459286a",
+    "semantic_hash": ""
+  },
+  "lib/server/trava-entrada-duplicada.ts": {
+    "mtime": 1791226119.6416588,
+    "ast_hash": "cb69f4ddba90c9db72c1a8d58ed9f504",
+    "semantic_hash": ""
+  },
+  "app/api/relatorios/estoque-inventario/route.ts": {
+    "mtime": 1791289666.0509543,
+    "ast_hash": "b943e5a08f398001d3b9672efd503c67",
+    "semantic_hash": ""
+  },
+  "components/relatorios/EstoqueInventarioPanel.tsx": {
+    "mtime": 1791289687.6758137,
+    "ast_hash": "010502e8cc453bb961df32a764130cf4",
+    "semantic_hash": ""
+  },
+  "lib/reports/estoque-inventario.ts": {
+    "mtime": 1791289451.5338006,
+    "ast_hash": "ba436c4a2c8012a22ac0525e25763cb2",
+    "semantic_hash": ""
+  },
+  "lib/repositories/reportEstoqueInventario.ts": {
+    "mtime": 1791290413.4802887,
+    "ast_hash": "3bd287196fa91273e16043e56ea49d12",
+    "semantic_hash": ""
+  },
+  "lib/presentations/item-filters.ts": {
+    "mtime": 1791294353.1251423,
+    "ast_hash": "1368223042616bf22f06a55c01aaf52e",
+    "semantic_hash": ""
+  },
+  "app/(companies)/[company]/planejamento-receita/page.tsx": {
+    "mtime": 1791374374.6750727,
+    "ast_hash": "5f0c8c587e0eedaf2fb9d6685f82b775",
+    "semantic_hash": ""
+  },
+  "app/api/planejamento-receita/route.ts": {
+    "mtime": 1791376414.339147,
+    "ast_hash": "8706667c0c606b48320486008595fb40",
+    "semantic_hash": ""
+  },
+  "components/planejamento-receita/GraficoMensal.tsx": {
+    "mtime": 1791374571.2959175,
+    "ast_hash": "24ec1d612ba9e2a5a3ab63dcd980097f",
+    "semantic_hash": ""
+  },
+  "components/planejamento-receita/PlanejamentoReceitaPage.tsx": {
+    "mtime": 1791379144.5085788,
+    "ast_hash": "5a48a018e2d625e5b228eda837b98daa",
+    "semantic_hash": ""
+  },
+  "components/planejamento-receita/TabelaPlanejamento.tsx": {
+    "mtime": 1791374645.2394414,
+    "ast_hash": "ff8a8dd273f8aad104682879a2d6e27d",
+    "semantic_hash": ""
+  },
+  "components/planejamento-receita/calc.ts": {
+    "mtime": 1791379144.5085788,
+    "ast_hash": "d64528447e7a514d38febf0b0f83ca69",
+    "semantic_hash": ""
+  },
+  "lib/config/planejamento-receita.ts": {
+    "mtime": 1791376197.0551617,
+    "ast_hash": "a034a0bda5a6438b7d28a375e14be339",
+    "semantic_hash": ""
+  },
+  "lib/repositories/planejamentoReceita.ts": {
+    "mtime": 1791374337.3349984,
+    "ast_hash": "0c303253e8e808547ea146f09e5ae820",
+    "semantic_hash": ""
+  },
+  "lib/types/planejamento-receita.ts": {
+    "mtime": 1791376395.7830124,
+    "ast_hash": "8d763e6d468bef07f7c8e979c1cef746",
+    "semantic_hash": ""
+  },
+  "app/api/planejamento-receita/orcado/route.ts": {
+    "mtime": 1791376415.4303672,
+    "ast_hash": "ea7cbc7f53d95b57bd69e44ec69f4516",
+    "semantic_hash": ""
+  },
+  "components/planejamento-receita/EditorOrcado.tsx": {
+    "mtime": 1791376473.8579955,
+    "ast_hash": "fb904df99999ebae6e4143a5dd01a6ba",
+    "semantic_hash": ""
+  },
+  "lib/auth/planejamento-receita-guard.ts": {
+    "mtime": 1791376336.7636812,
+    "ast_hash": "e691b112b26975a5b0a63d80c1b12cfb",
+    "semantic_hash": ""
+  },
+  "lib/utils/planejamento-receita-store.ts": {
+    "mtime": 1791376473.8579955,
+    "ast_hash": "01ca8a47b8645050c1df1651d6e63527",
+    "semantic_hash": ""
+  },
+  "lib/utils/ajuste-estoque-kpis-store.ts": {
+    "mtime": 1791380367.0432184,
+    "ast_hash": "be7110ff610993bb73b40e9ff373dc7c",
+    "semantic_hash": ""
+  },
+  "app/api/projecao-aviamentos/route.ts": {
+    "mtime": 1791482679.070868,
+    "ast_hash": "47bd1208d7bbf3c230c720d11b69b5f5",
+    "semantic_hash": ""
+  },
+  "components/stock/ProjecaoAviamentosPanel.tsx": {
+    "mtime": 1791557394.8007996,
+    "ast_hash": "ed2abfd9bd1fb5c856d0870d1eb1bfe8",
+    "semantic_hash": ""
+  },
+  "lib/config/aviamentos.ts": {
+    "mtime": 1791485120.214087,
+    "ast_hash": "4717a7458d4521d69b04c3b77f057a83",
+    "semantic_hash": ""
+  },
+  "lib/repositories/projecaoAviamentos.ts": {
+    "mtime": 1791485099.8465788,
+    "ast_hash": "e5462dc959af1d9d9ddb746d7e0d457d",
+    "semantic_hash": ""
+  },
+  "lib/utils/aviamentos-estoque-store.ts": {
+    "mtime": 1791480783.296668,
+    "ast_hash": "de1593d42a241c4830371fa3c56bb81a",
+    "semantic_hash": ""
+  },
+  "app/(companies)/[company]/embalagens-aviamentos/page.tsx": {
+    "mtime": 1791557338.8474514,
+    "ast_hash": "2334b1337acd094cc66523a8980fff61",
+    "semantic_hash": ""
+  },
+  "app/api/embalagens-aviamentos/route.ts": {
+    "mtime": 1791557971.4125803,
+    "ast_hash": "6a44a96053584f29b68764cb5ee91c67",
+    "semantic_hash": ""
+  },
+  "components/insumos/EmbalagensAviamentosPage.tsx": {
+    "mtime": 1791557971.4150524,
+    "ast_hash": "b83655dc174e8f13f5428ac497ba8d62",
+    "semantic_hash": ""
+  },
+  "lib/utils/insumos-estoque-store.ts": {
+    "mtime": 1792071900.7794461,
+    "ast_hash": "2b387b84dc643b3e4c51c9d66aabc57c",
+    "semantic_hash": ""
+  },
+  "app/(companies)/[company]/controle-financeiro/page.tsx": {
+    "mtime": 1791981717.016853,
+    "ast_hash": "0c878f11d7a253d06b1ff74583b33cb1",
+    "semantic_hash": ""
+  },
+  "app/api/financeiro/aba/route.ts": {
+    "mtime": 1791979065.7328374,
+    "ast_hash": "21ce2d9f0842eb9cc9d19bd31635d806",
+    "semantic_hash": ""
+  },
+  "app/api/financeiro/dre/route.ts": {
+    "mtime": 1791979063.5342555,
+    "ast_hash": "c9699243aa71c5d659eca4be82275a80",
+    "semantic_hash": ""
+  },
+  "app/api/financeiro/importacoes/[id]/route.ts": {
+    "mtime": 1791984648.483591,
+    "ast_hash": "c22fd34d45e63af20fe779ca6bf1769a",
+    "semantic_hash": ""
+  },
+  "app/api/financeiro/importacoes/route.ts": {
+    "mtime": 1791979066.8704824,
+    "ast_hash": "73e986dfa68c4dcebf44717f1e4a97d9",
+    "semantic_hash": ""
+  },
+  "app/api/financeiro/lancamentos/route.ts": {
+    "mtime": 1791979064.6327267,
+    "ast_hash": "9e6e987248cd3e7b5e9031f60ae5b16e",
+    "semantic_hash": ""
+  },
+  "app/api/financeiro/route.ts": {
+    "mtime": 1791979062.442873,
+    "ast_hash": "3889c41bc00827b0d5f6a93731ae109e",
+    "semantic_hash": ""
+  },
+  "components/controle-financeiro/Budget.tsx": {
+    "mtime": 1791981001.7975123,
+    "ast_hash": "7bcd83e20c4c4483a97e67e28d60b8b2",
+    "semantic_hash": ""
+  },
+  "components/controle-financeiro/ControleFinanceiroPage.tsx": {
+    "mtime": 1792679109.033823,
+    "ast_hash": "3b9b086502e2091cf5fd85e052506593",
+    "semantic_hash": ""
+  },
+  "components/controle-financeiro/Dre.tsx": {
+    "mtime": 1791981528.5056398,
+    "ast_hash": "e25c73e0bad0598097d54740067cb34f",
+    "semantic_hash": ""
+  },
+  "components/controle-financeiro/FluxoCaixa.tsx": {
+    "mtime": 1791980926.325651,
+    "ast_hash": "9cd1f0c9e3b63708b3c31199e61864a0",
+    "semantic_hash": ""
+  },
+  "components/controle-financeiro/Graficos.tsx": {
+    "mtime": 1791981528.502623,
+    "ast_hash": "219ec1108cf75b4af4d9e67cdcf3a71d",
+    "semantic_hash": ""
+  },
+  "components/controle-financeiro/Importacoes.tsx": {
+    "mtime": 1791981038.555982,
+    "ast_hash": "1d1682351dc5ba29f9570f9861469660",
+    "semantic_hash": ""
+  },
+  "components/controle-financeiro/Lancamentos.tsx": {
+    "mtime": 1791985011.6174529,
+    "ast_hash": "e82d90be298fbcda69c3060a0f40b7e4",
+    "semantic_hash": ""
+  },
+  "components/controle-financeiro/Planilha.tsx": {
+    "mtime": 1791981852.903649,
+    "ast_hash": "dc92d5c15d8a1b3bd61f7b30a71afc77",
+    "semantic_hash": ""
+  },
+  "components/controle-financeiro/Recebimentos.tsx": {
+    "mtime": 1791984867.5816164,
+    "ast_hash": "5b3f96f3aae78b1cf481f1ed0fbfb4b8",
+    "semantic_hash": ""
+  },
+  "components/controle-financeiro/UploadModal.tsx": {
+    "mtime": 1791981082.0824716,
+    "ast_hash": "5e90e28ce27e0c5f54d7dc30c5e5270e",
+    "semantic_hash": ""
+  },
+  "components/controle-financeiro/VisaoGeral.tsx": {
+    "mtime": 1791981324.5877652,
+    "ast_hash": "96065a8b171341fccf8c67bf0d55065b",
+    "semantic_hash": ""
+  },
+  "components/controle-financeiro/dre-util.ts": {
+    "mtime": 1791980755.5155876,
+    "ast_hash": "de5410659f593cacd15af44149a84372",
+    "semantic_hash": ""
+  },
+  "components/controle-financeiro/shared.ts": {
+    "mtime": 1791984867.5768163,
+    "ast_hash": "f9d0b3159a7119120b256f84c8661c5d",
+    "semantic_hash": ""
+  },
+  "lib/auth/controle-financeiro-guard.ts": {
+    "mtime": 1792683355.427439,
+    "ast_hash": "ff0ac2a7a5b7d935c849063aff76c783",
+    "semantic_hash": ""
+  },
+  "lib/financeiro/api.ts": {
+    "mtime": 1791979061.3409734,
+    "ast_hash": "ada1a4ac7e467230fa4cc0fdfd18e2f2",
+    "semantic_hash": ""
+  },
+  "lib/financeiro/ler-planilha.ts": {
+    "mtime": 1791981324.5877652,
+    "ast_hash": "cfc73487d3c72ec598a11932eef609b6",
+    "semantic_hash": ""
+  },
+  "lib/financeiro/planilha.ts": {
+    "mtime": 1791978605.2997215,
+    "ast_hash": "a72c7b8bcfd035f07958ac379b23c176",
+    "semantic_hash": ""
+  },
+  "lib/financeiro/store.ts": {
+    "mtime": 1791984587.1780386,
+    "ast_hash": "cfa8ea22af15e25d298e1151b9574257",
+    "semantic_hash": ""
+  },
+  "app/api/financeiro/normalizacao/route.ts": {
+    "mtime": 1791984646.3028226,
+    "ast_hash": "fbbf8e87bcbf0c4db8155f5426376522",
+    "semantic_hash": ""
+  },
+  "lib/financeiro/normalizacao-store.ts": {
+    "mtime": 1792006624.089599,
+    "ast_hash": "7c5ed35604a45b1155ec3de3eb254f94",
+    "semantic_hash": ""
+  },
+  "lib/financeiro/normalizacao.ts": {
+    "mtime": 1792006611.4054973,
+    "ast_hash": "014e462366a2b213535549e95ad4c670",
+    "semantic_hash": ""
+  },
+  "lib/server/trava-estoque-negativo.ts": {
+    "mtime": 1791997696.1714542,
+    "ast_hash": "574182ae3b273b056dac652342ac8e1e",
+    "semantic_hash": ""
+  },
+  "app/api/saidas-entradas-produtos/tamanhos/route.ts": {
+    "mtime": 1792070858.0472095,
+    "ast_hash": "6c8a20310c82553ccd0511d41f427114",
+    "semantic_hash": ""
+  },
+  "lib/server/grade-produto.ts": {
+    "mtime": 1791997723.8776326,
+    "ast_hash": "681ac88f6f563094a3dba625d5e2f161",
+    "semantic_hash": ""
+  },
+  "lib/server/conferencia-divergencias.ts": {
+    "mtime": 1792003276.214526,
+    "ast_hash": "33570e7c4f7667c1555d9d46fa74f74f",
+    "semantic_hash": ""
+  },
+  "lib/server/obs-operacao.ts": {
+    "mtime": 1792003299.075053,
+    "ast_hash": "67b52c55a269af22c0c301d8545b2d25",
+    "semantic_hash": ""
+  },
+  "lib/utils/conferencia-divergencia-calculo.ts": {
+    "mtime": 1792002844.8144598,
+    "ast_hash": "b2a76fa96a79ffa17a3da778f717255a",
+    "semantic_hash": ""
+  },
+  "lib/utils/obs-operacao-texto.ts": {
+    "mtime": 1792003299.075053,
+    "ast_hash": "2536feb89cd419bb6ab450f38a353221",
+    "semantic_hash": ""
+  },
+  "lib/reports/ranking-vendedores.ts": {
+    "mtime": 1792427475.3864222,
+    "ast_hash": "77c8f9f58641f2f76e681a884b8d4c52",
+    "semantic_hash": ""
+  },
+  "lib/repositories/reportRankingVendedores.ts": {
+    "mtime": 1792428165.315058,
+    "ast_hash": "0f5b9043325d9bb86022092e2531a058",
+    "semantic_hash": ""
+  },
+  "lib/utils/exportRankingVendedoresXlsx.ts": {
+    "mtime": 1792427961.6086774,
+    "ast_hash": "2f3d257f92da1c1a7667fe9991a8cf28",
+    "semantic_hash": ""
+  },
+  "app/api/financeiro/orcamento-mes/route.ts": {
+    "mtime": 1792679310.9190073,
+    "ast_hash": "36294e690f8b485909c739ebfe37a199",
+    "semantic_hash": ""
+  },
+  "components/controle-financeiro/OrcamentoMes.tsx": {
+    "mtime": 1792679143.3581207,
+    "ast_hash": "9ba57bf28a5bb69cc6bb2e4e49872e2a",
+    "semantic_hash": ""
+  },
+  "lib/config/orcamento-despesas.ts": {
+    "mtime": 1792676517.4480581,
+    "ast_hash": "5a2988646212cf46a132bbc8921b322d",
+    "semantic_hash": ""
+  },
+  "lib/financeiro/orcamento-mes.ts": {
+    "mtime": 1792679572.8580465,
+    "ast_hash": "560f54664dd384c07e52df6da30eaa5d",
+    "semantic_hash": ""
+  },
+  "app/api/mcp-financeiro/[transport]/route.ts": {
+    "mtime": 1792679240.4792178,
+    "ast_hash": "7e627d940a5db0c070eb52f8e37ffb24",
+    "semantic_hash": ""
+  },
+  "lib/mcp/financeiro.ts": {
+    "mtime": 1792679572.855618,
+    "ast_hash": "83518dd9e067b51e98571eca5570c129",
+    "semantic_hash": ""
+  },
+  "lib/mcp/url-token.ts": {
+    "mtime": 1792679240.0310788,
+    "ast_hash": "5ee79d231063edc9cd40db1ffbeeed36",
+    "semantic_hash": ""
+  },
+  "lib/server/romaneio-conferencia.ts": {
+    "mtime": 1792761253.749747,
+    "ast_hash": "0a1ad269ccc701a4338b0daa85af53e6",
+    "semantic_hash": ""
+  },
+  "scripts/backfill-romaneio-conferencia.mjs": {
+    "mtime": 1792761348.4217813,
+    "ast_hash": "6b63ce6810b79950557155fc759a5dab",
+    "semantic_hash": ""
+  },
+  "app/(companies)/[company]/inventario/page.tsx": {
+    "mtime": 1792768607.942621,
+    "ast_hash": "d2e25e4e416b9b72fb01309b81b79cf8",
+    "semantic_hash": ""
+  },
+  "app/api/inventario/executar/route.ts": {
+    "mtime": 1792769094.6022763,
+    "ast_hash": "577791f57e413b2cab81e22a832fdf5d",
+    "semantic_hash": ""
+  },
+  "app/api/inventario/preview/route.ts": {
+    "mtime": 1792769092.4559937,
+    "ast_hash": "13cac4afcad4e8f3cd277ddef64e6306",
+    "semantic_hash": ""
+  },
+  "app/api/inventario/rascunhos/route.ts": {
+    "mtime": 1792768100.996265,
+    "ast_hash": "39d0ef59f8493a61f276235a64c5fe94",
+    "semantic_hash": ""
+  },
+  "app/api/inventario/saldo/route.ts": {
+    "mtime": 1792768102.0835843,
+    "ast_hash": "a988c67c64ba611348f47cfea45c0051",
+    "semantic_hash": ""
+  },
+  "components/inventario/InventarioBipagemPage.tsx": {
+    "mtime": 1792769391.922886,
+    "ast_hash": "a3340ce5988afd31f5ba3db6f579e0f4",
+    "semantic_hash": ""
+  },
+  "lib/repositories/inventarioBipagem.ts": {
+    "mtime": 1792768049.569533,
+    "ast_hash": "c729b15ff1789cb535883ec287103c40",
+    "semantic_hash": ""
+  },
+  "lib/utils/inventario-draft-store.ts": {
+    "mtime": 1792768082.0709531,
+    "ast_hash": "6731317a668bcbe1e38778ab06980e1f",
+    "semantic_hash": ""
+  },
+  "app/api/romaneios/bipagem/codigos/route.ts": {
+    "mtime": 1793126123.3447468,
+    "ast_hash": "767116cfa28c53a86cd72ae9cc62c08b",
+    "semantic_hash": ""
+  },
+  "app/api/romaneios/bipagem/route.ts": {
+    "mtime": 1793126122.4510238,
+    "ast_hash": "ccd17c30edab490e298ea97f17106e18",
+    "semantic_hash": ""
+  },
+  "components/romaneios/RomaneioBipagemPanel.tsx": {
+    "mtime": 1793127751.7754855,
+    "ast_hash": "28d41e76be029d9785bb8ae89324befd",
+    "semantic_hash": ""
+  },
+  "lib/utils/romaneio-bipagem-store.ts": {
+    "mtime": 1793126091.093346,
+    "ast_hash": "fc5b2acb0d829b48809c357a3db7e201",
+    "semantic_hash": ""
+  },
+  "lib/server/trava-confirmacao-acima-romaneio.ts": {
+    "mtime": 1793127916.8884459,
+    "ast_hash": "6528f81ab59a4ccec16b9d9d793ff79d",
+    "semantic_hash": ""
+  }
+}
