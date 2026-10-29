@@ -1,7 +1,7 @@
-# Graph Report - multi_dashboard  (2026-10-28)
+# Graph Report - multi_dashboard  (2026-10-29)
 
 ## Corpus Check
-- 1033 files · ~1,277,984 words
+- 1033 files · ~1,277,923 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -10,7 +10,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `ccf6e493`
+- Built from commit: `f091df8f`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -716,8 +716,8 @@ Cohesion: 0.22
 Nodes (19): DELETE(), PUT(), GET(), POST(), slugify(), Fornecedor, DEFAULT_FORNECEDORES, deleteFornecedor() (+11 more)
 
 ### Community 40 - "Collection Sales Report"
-Cohesion: 0.10
-Nodes (35): POST(), GET(), POST(), DELETE(), ensureTable(), GET(), PUT(), ensureTable() (+27 more)
+Cohesion: 0.13
+Nodes (27): POST(), GET(), POST(), DELETE(), ensureTable(), GET(), PUT(), ensureTable() (+19 more)
 
 ### Community 41 - "Product Performance & Coverage"
 Cohesion: 0.07
@@ -852,8 +852,8 @@ Cohesion: 0.15
 Nodes (35): DELETE(), GET(), PATCH(), GET(), PUT(), GET(), COMPRA_GASTO_CANAIS, CompraGastoLoteInput (+27 more)
 
 ### Community 75 - "Transfer Item & Destino Store"
-Cohesion: 0.13
-Nodes (23): chartDisp(), ColecaoConfig, ColecaoPanelItem, ColecaoPanelMonthPoint, fetchEcommerceVendasPorColecao(), fetchMonthsByGroup(), fetchSkusCadastradosPorCodigo(), GET() (+15 more)
+Cohesion: 0.42
+Nodes (8): AjusteKpisSnapshot, chave(), DATA_FILE, ensureTable(), obterKpisAjuste(), readFile(), salvarKpisAjuste(), writeFile()
 
 ### Community 76 - "Transfer Products Page"
 Cohesion: 0.08
@@ -952,8 +952,8 @@ Cohesion: 0.12
 Nodes (24): POST(), RequestBody, POST(), RequestBody, POST(), RequestBody, cleanList(), describeItemFilters() (+16 more)
 
 ### Community 100 - "Compra Ideal UI Cells"
-Cohesion: 0.16
-Nodes (29): ColecaoDetalheCanal, ColecaoDetalheDestaque, GET(), isEcommerceFilial(), buildEcommerceCollectionFilter(), buildEcommerceFilialFilter(), buildSalesFilialFilter(), CollectionComparativeExtras (+21 more)
+Cohesion: 0.08
+Nodes (52): ColecaoDetalheCanal, ColecaoDetalheDestaque, GET(), chartDisp(), ColecaoConfig, ColecaoPanelItem, ColecaoPanelMonthPoint, fetchEcommerceVendasPorColecao() (+44 more)
 
 ### Community 101 - "Performance Export to Excel"
 Cohesion: 0.05
@@ -1899,9 +1899,9 @@ Nodes (28): isAdmin(), POST(), GET(), isAdmin(), GET(), GET(), lit(), POST() (+2
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `CompanyKey` connect `Report Registry & Presets` to `Lista Loja Page & Estoque/Curva Utilities`, `Curva ABC Page & Purchase Suggestions`, `Corporate Client Registration`, `Clientes API Routes`, `page.tsx`, `route.ts`, `page.tsx`, `Compra Ideal Purchase Suggestion`, `App Shell: Auth, Layout & Admin Pages`, `Curva por Produto Page & Export`, `page.tsx`, `Nova Filial Stock Comparison Page`, `Product Detail & Stock Fetching`, `Products Listing Pages`, `Faturamento & Notas Fiscais`, `Estoque Detalhado Pages`, `Admin Users & Permissions`, `Filial Registry & Resolver`, `Saidas/Entradas Products Page`, `Lista de Compra Sugerida Page`, `Extrato de Produto Feature`, `Transferências & Vendedores API Routes`, `Dashboard Pages & Filters`, `MCP Tools Registry Setup`, `Claude Sales Report Page`, `MCP Product Filter Tools`, `Compras Salvas (Saved Purchases)`, `Notifications & Romaneio Duplicates`, `Ajuste de Estoque por Contagem`, `Sales & Entries Filter Builders`, `Loja Corporativa E-commerce`, `Romaneio Detail & Deletion`, `Curva Por Produto Picker`, `Barcode & DB Connection Utilities`, `Vendedores Filters & Table`, `Report Enrichment Pipeline`, `Transfer Item & Destino Store`, `Report Generator Column Sources`, `Collection Presentation Data`, `Estoque Consulta Item Page`, `Clientes Pages & Types`, `Compra Final Store (CRUD)`, `Revenue Chart & Theme Context`, `Compra Ideal UI Cells`, `Performance Export to Excel`, `Curva ABC Observations Store`, `Stagnant Products Page & Export`, `Compra Trânsito Reconciliation`, `Company/Filial Resolution`, `s`, `Customer Map & Date Utilities`, `Presentation Generator & Filters`, `Comparativo Resumido Report`, `Stock Entry/Exit History Page`, `Filial Consulta Client`, `page.tsx`, `Raw Data Fetchers`, `Lista Compra Response Cache`, `FilialConsultaClient.tsx`, `users-store-neon.ts`, `ClientesPage.tsx`, `fix-tipos-romaneio-acento.mjs`, `test-projecao.js`, `discovery.ts`, `page.tsx`, `page.tsx`, `GeradorApresentacoesPage.tsx`, `MiniAreaChart.tsx`, `giroCache.ts`, `exportProjecaoVendasXlsx.ts`, `fetchUltimasEntradasPorFilial`, `ClienteCorporativoForm.tsx`, `canSeeCusto`, `route.ts`, `EstoqueDetalhado01Page.tsx`, `produtosNovos.ts`, `sincronizacao.ts`, `ComprasTransitoPickerModal.tsx`, `route.ts`, `transferencias-realizadas-storage.ts`, `GoalsModal.tsx`, `registroDefaults.ts`, `ProjecaoComoFunciona.tsx`, `projecaoAviamentos.ts`, `page.tsx`, `FaturamentoPage.tsx`?**
+- **Why does `CompanyKey` connect `Report Registry & Presets` to `Lista Loja Page & Estoque/Curva Utilities`, `Curva ABC Page & Purchase Suggestions`, `Corporate Client Registration`, `Clientes API Routes`, `page.tsx`, `route.ts`, `page.tsx`, `Compra Ideal Purchase Suggestion`, `App Shell: Auth, Layout & Admin Pages`, `Curva por Produto Page & Export`, `page.tsx`, `Nova Filial Stock Comparison Page`, `Product Detail & Stock Fetching`, `Products Listing Pages`, `Faturamento & Notas Fiscais`, `Estoque Detalhado Pages`, `Admin Users & Permissions`, `Filial Registry & Resolver`, `Saidas/Entradas Products Page`, `Lista de Compra Sugerida Page`, `Extrato de Produto Feature`, `Transferências & Vendedores API Routes`, `Dashboard Pages & Filters`, `MCP Tools Registry Setup`, `Claude Sales Report Page`, `MCP Product Filter Tools`, `Compras Salvas (Saved Purchases)`, `Notifications & Romaneio Duplicates`, `Ajuste de Estoque por Contagem`, `Sales & Entries Filter Builders`, `Loja Corporativa E-commerce`, `Romaneio Detail & Deletion`, `Curva Por Produto Picker`, `Barcode & DB Connection Utilities`, `Vendedores Filters & Table`, `Report Enrichment Pipeline`, `Report Generator Column Sources`, `Collection Presentation Data`, `Estoque Consulta Item Page`, `Clientes Pages & Types`, `Compra Final Store (CRUD)`, `Revenue Chart & Theme Context`, `Compra Ideal UI Cells`, `Performance Export to Excel`, `Curva ABC Observations Store`, `Stagnant Products Page & Export`, `Compra Trânsito Reconciliation`, `Company/Filial Resolution`, `s`, `Customer Map & Date Utilities`, `Presentation Generator & Filters`, `Comparativo Resumido Report`, `Stock Entry/Exit History Page`, `Filial Consulta Client`, `page.tsx`, `Raw Data Fetchers`, `Lista Compra Response Cache`, `FilialConsultaClient.tsx`, `users-store-neon.ts`, `ClientesPage.tsx`, `fix-tipos-romaneio-acento.mjs`, `test-projecao.js`, `discovery.ts`, `page.tsx`, `page.tsx`, `GeradorApresentacoesPage.tsx`, `MiniAreaChart.tsx`, `giroCache.ts`, `exportProjecaoVendasXlsx.ts`, `fetchUltimasEntradasPorFilial`, `ClienteCorporativoForm.tsx`, `canSeeCusto`, `route.ts`, `EstoqueDetalhado01Page.tsx`, `produtosNovos.ts`, `sincronizacao.ts`, `ComprasTransitoPickerModal.tsx`, `route.ts`, `transferencias-realizadas-storage.ts`, `GoalsModal.tsx`, `registroDefaults.ts`, `ProjecaoComoFunciona.tsx`, `projecaoAviamentos.ts`, `page.tsx`, `FaturamentoPage.tsx`?**
   _High betweenness centrality (0.068) - this node is a cross-community bridge._
-- **Why does `withRequest()` connect `page.tsx` to `Dashboard Page Routes`, `Estoque Control API & Filters`, `Revenue Dashboard Routes & Components`, `Controle Estoque Métricas Cache`, `Corporativo Products & Orders`, `Claude Report Generation`, `Colecao Presentation Deck`, `Admin User Management API`, `Product Detail & Stock Fetching`, `Faturamento & Notas Fiscais`, `Extrato de Produto Feature`, `Performance Control & Curva Categories`, `page.tsx`, `Report Generator Export/Formatting`, `MCP Tools Registry Setup`, `MCP Product Filter Tools`, `Compras Salvas (Saved Purchases)`, `route.ts`, `Product Performance & Coverage`, `Notifications & Confirmation Lock`, `Notifications & Romaneio Duplicates`, `Grouped Product Management`, `Curva Por Produto Picker`, `giroCache.ts`, `Report Presets Management`, `Vendedores Filters & Table`, `distribuicao-minimos.ts`, `Grouped Product Aggregation`, `Transfer Item & Destino Store`, `Transfer Products Page`, `EstoqueDetalhado01Page.tsx`, `Collection Comparison Presentation`, `Collection Presentation Data`, `route.ts`, `Clientes Pages & Types`, `Compra Final Store (CRUD)`, `ProdutoAgrupadoPage.tsx`, `Presentation Deck Components`, `Collection Report Page`, `Compra Ideal UI Cells`, `Performance Export to Excel`, `test-projecao.js`, `registroDefaults.ts`, `projecaoAviamentos.ts`, `AjusteEstoquePage.tsx`, `page.tsx`, `canSeeCusto`?**
+- **Why does `withRequest()` connect `page.tsx` to `Dashboard Page Routes`, `Estoque Control API & Filters`, `Revenue Dashboard Routes & Components`, `Controle Estoque Métricas Cache`, `Corporativo Products & Orders`, `Claude Report Generation`, `Colecao Presentation Deck`, `Admin User Management API`, `Product Detail & Stock Fetching`, `Faturamento & Notas Fiscais`, `Extrato de Produto Feature`, `Performance Control & Curva Categories`, `page.tsx`, `Report Generator Export/Formatting`, `MCP Tools Registry Setup`, `MCP Product Filter Tools`, `Compras Salvas (Saved Purchases)`, `route.ts`, `Product Performance & Coverage`, `Notifications & Confirmation Lock`, `Notifications & Romaneio Duplicates`, `Grouped Product Management`, `Curva Por Produto Picker`, `giroCache.ts`, `Report Presets Management`, `Vendedores Filters & Table`, `distribuicao-minimos.ts`, `Grouped Product Aggregation`, `Transfer Products Page`, `EstoqueDetalhado01Page.tsx`, `Collection Comparison Presentation`, `Collection Presentation Data`, `route.ts`, `Clientes Pages & Types`, `Compra Final Store (CRUD)`, `ProdutoAgrupadoPage.tsx`, `Presentation Deck Components`, `Collection Report Page`, `Compra Ideal UI Cells`, `Performance Export to Excel`, `test-projecao.js`, `registroDefaults.ts`, `projecaoAviamentos.ts`, `AjusteEstoquePage.tsx`, `page.tsx`, `canSeeCusto`?**
   _High betweenness centrality (0.054) - this node is a cross-community bridge._
 - **Why does `useAuth()` connect `Report Generator Column Sources` to `Lista Loja Page & Estoque/Curva Utilities`, `Product Labels Store`, `reportCompraSugeridaAbc.ts`, `Curva ABC Page & Purchase Suggestions`, `Clientes API Routes`, `Presentation Generator & Filters`, `Compra Ideal Purchase Suggestion`, `Transfer Control Page`, `Goals Storage`, `page.tsx`, `Product Detail & Stock Fetching`, `Estoque Detalhado Pages`, `Admin Users & Permissions`, `Filial Registry & Resolver`, `Stock Adjustment Page`, `Saidas/Entradas Products Page`, `Lista de Compra Sugerida Page`, `Brazil Map Component`, `Transferências & Vendedores API Routes`, `page.tsx`, `Product Detail KPIs & Page`, `Romaneio Detail & Deletion`, `Barcode & DB Connection Utilities`, `Stock Control Dashboard Page`, `company-live.ts`, `route.ts`, `Coleções Panel & Export`, `produto-labels-store.ts`, `calc.ts`, `ComprasTransitoPickerModal.tsx`, `Filial Options & Active Rules`, `resolveCanonicalFilial`, `s`, `ComprasTransitoPickerModal.tsx`, `Revenue Chart & Theme Context`, `transferencias-realizadas-storage.ts`, `GoalsModal.tsx`, `test-projecao.js`, `Stock Count Adjustment Executor`, `Barcode & Recebimento Resolution`, `fix-tipos-romaneio-acento.mjs`, `Controle de Movimento Feature`, `page.tsx`, `ProductDetailKPIs.tsx`, `Compra Trânsito Reconciliation`, `compra-transito-barcodes.ts`, `Company/Filial Resolution`, `exportEstoqueConsultaItemXlsx.ts`, `ajuste-estoque-kpis-store.ts`, `ProductSaleHistoryTable.tsx`?**
   _High betweenness centrality (0.050) - this node is a cross-community bridge._

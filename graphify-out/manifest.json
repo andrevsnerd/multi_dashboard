@@ -655,8 +655,8 @@
     "semantic_hash": "b902bf3e0fd3ad63c77c2ccd57038ec9"
   },
   "app/api/curva-abc/route.ts": {
-    "mtime": 1789045364.7515914,
-    "ast_hash": "9f1e6d6deb0a0c8539c271eb1da580a4",
+    "mtime": 1793283578.737131,
+    "ast_hash": "d6aeffd4ef25ae0f09f6bbbc2a016ab2",
     "semantic_hash": ""
   },
   "app/api/curva-por-produto/route.ts": {
@@ -5180,8 +5180,8 @@
     "semantic_hash": ""
   },
   "components/insumos/AproveitamentosMatrizPage.tsx": {
-    "mtime": 1793204417.097525,
-    "ast_hash": "1294576c811813a97cf20693496cad58",
+    "mtime": 1793206035.1935048,
+    "ast_hash": "2aba668ee33839786a096089dc519cfb",
     "semantic_hash": ""
   },
   "lib/auth/aproveitamentos-matriz-guard.ts": {
@@ -5190,8 +5190,8 @@
     "semantic_hash": ""
   },
   "lib/config/aproveitamentos-matriz.ts": {
-    "mtime": 1793205437.3422923,
-    "ast_hash": "d24b72d0ee79826224e8dfc6d0eff882",
+    "mtime": 1793209347.76432,
+    "ast_hash": "4448e8e3b35d3e001ee1c0de571c2996",
     "semantic_hash": ""
   },
   "lib/repositories/aproveitamentosMatriz.ts": {

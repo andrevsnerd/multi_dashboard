@@ -9137,7 +9137,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_painel_colecoes_route",
-      "community": 75,
+      "community": 100,
       "norm_label": "route.ts"
     },
     {
@@ -9147,7 +9147,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "app_api_painel_colecoes_route_colecaoconfig",
-      "community": 75,
+      "community": 100,
       "norm_label": "colecaoconfig"
     },
     {
@@ -9157,7 +9157,7 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "app_api_painel_colecoes_route_round2",
-      "community": 75,
+      "community": 100,
       "norm_label": "round2()"
     },
     {
@@ -9167,7 +9167,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "app_api_painel_colecoes_route_colecaopanelmonthpoint",
-      "community": 75,
+      "community": 100,
       "norm_label": "colecaopanelmonthpoint"
     },
     {
@@ -9177,7 +9177,7 @@
       "source_location": "L47",
       "_origin": "ast",
       "id": "app_api_painel_colecoes_route_colecaopanelitem",
-      "community": 75,
+      "community": 100,
       "norm_label": "colecaopanelitem"
     },
     {
@@ -9187,7 +9187,7 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "app_api_painel_colecoes_route_meses_curtos",
-      "community": 75,
+      "community": 100,
       "norm_label": "meses_curtos"
     },
     {
@@ -9197,7 +9197,7 @@
       "source_location": "L69",
       "_origin": "ast",
       "id": "app_api_painel_colecoes_route_chartdisp",
-      "community": 75,
+      "community": 100,
       "norm_label": "chartdisp()"
     },
     {
@@ -9207,7 +9207,7 @@
       "source_location": "L81",
       "_origin": "ast",
       "id": "app_api_painel_colecoes_route_fetchmonthsbygroup",
-      "community": 75,
+      "community": 100,
       "norm_label": "fetchmonthsbygroup()"
     },
     {
@@ -9217,7 +9217,7 @@
       "source_location": "L130",
       "_origin": "ast",
       "id": "app_api_painel_colecoes_route_fetchskuscadastradosporcodigo",
-      "community": 75,
+      "community": 100,
       "norm_label": "fetchskuscadastradosporcodigo()"
     },
     {
@@ -9227,7 +9227,7 @@
       "source_location": "L174",
       "_origin": "ast",
       "id": "app_api_painel_colecoes_route_fetchecommercevendasporcolecao",
-      "community": 75,
+      "community": 100,
       "norm_label": "fetchecommercevendasporcolecao()"
     },
     {
@@ -9237,7 +9237,7 @@
       "source_location": "L223",
       "_origin": "ast",
       "id": "app_api_painel_colecoes_route_get",
-      "community": 75,
+      "community": 100,
       "norm_label": "get()"
     },
     {
@@ -9647,7 +9647,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_products_colecoes_descricoes_route",
-      "community": 75,
+      "community": 100,
       "norm_label": "route.ts"
     },
     {
@@ -9657,7 +9657,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "app_api_products_colecoes_descricoes_route_get",
-      "community": 75,
+      "community": 100,
       "norm_label": "get()"
     },
     {
@@ -43489,7 +43489,7 @@
       "source_location": "L163",
       "_origin": "ast",
       "id": "lib_config_filial_registry_getfiliaisbycompany",
-      "community": 75,
+      "community": 100,
       "norm_label": "getfiliaisbycompany()"
     },
     {
@@ -52539,7 +52539,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_colecao",
-      "community": 75,
+      "community": 100,
       "norm_label": "colecao.ts"
     },
     {
@@ -52549,7 +52549,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "lib_repositories_colecao_getcolecaodescmap",
-      "community": 75,
+      "community": 100,
       "norm_label": "getcolecaodescmap()"
     },
     {
@@ -52559,7 +52559,7 @@
       "source_location": "L63",
       "_origin": "ast",
       "id": "lib_repositories_colecao_getcolecaoiniciomatrizmap",
-      "community": 75,
+      "community": 100,
       "norm_label": "getcolecaoiniciomatrizmap()"
     },
     {
@@ -52569,7 +52569,7 @@
       "source_location": "L109",
       "_origin": "ast",
       "id": "lib_repositories_colecao_fetchcolecaocodebyproduto",
-      "community": 75,
+      "community": 100,
       "norm_label": "fetchcolecaocodebyproduto()"
     },
     {
@@ -52579,7 +52579,7 @@
       "source_location": "L136",
       "_origin": "ast",
       "id": "lib_repositories_colecao_applycolecaolabels",
-      "community": 75,
+      "community": 100,
       "norm_label": "applycolecaolabels()"
     },
     {
@@ -61939,7 +61939,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_reportvendashistorico",
-      "community": 75,
+      "community": 100,
       "norm_label": "reportvendashistorico.ts"
     },
     {
@@ -61949,7 +61949,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "lib_repositories_reportvendashistorico_round2",
-      "community": 75,
+      "community": 100,
       "norm_label": "round2()"
     },
     {
@@ -61959,7 +61959,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "lib_repositories_reportvendashistorico_roundint",
-      "community": 75,
+      "community": 100,
       "norm_label": "roundint()"
     },
     {
@@ -61969,7 +61969,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "lib_repositories_reportvendashistorico_toisodate",
-      "community": 75,
+      "community": 100,
       "norm_label": "toisodate()"
     },
     {
@@ -61979,7 +61979,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "lib_repositories_reportvendashistorico_prepinlist",
-      "community": 75,
+      "community": 100,
       "norm_label": "prepinlist()"
     },
     {
@@ -61989,7 +61989,7 @@
       "source_location": "L53",
       "_origin": "ast",
       "id": "lib_repositories_reportvendashistorico_rawrow",
-      "community": 75,
+      "community": 100,
       "norm_label": "rawrow"
     },
     {
@@ -61999,7 +61999,7 @@
       "source_location": "L83",
       "_origin": "ast",
       "id": "lib_repositories_reportvendashistorico_fetchvendashistorico",
-      "community": 75,
+      "community": 100,
       "norm_label": "fetchvendashistorico()"
     },
     {
@@ -64109,7 +64109,7 @@
       "source_location": "L117",
       "_origin": "ast",
       "id": "lib_server_filial_resolver_nameforid",
-      "community": 75,
+      "community": 100,
       "norm_label": "nameforid()"
     },
     {
@@ -66079,7 +66079,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_utils_ajuste_estoque_kpis_store",
-      "community": 40,
+      "community": 75,
       "norm_label": "ajuste-estoque-kpis-store.ts"
     },
     {
@@ -66089,7 +66089,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "lib_utils_ajuste_estoque_kpis_store_ajustekpissnapshot",
-      "community": 40,
+      "community": 75,
       "norm_label": "ajustekpissnapshot"
     },
     {
@@ -66099,7 +66099,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "lib_utils_ajuste_estoque_kpis_store_data_file",
-      "community": 40,
+      "community": 75,
       "norm_label": "data_file"
     },
     {
@@ -66109,7 +66109,7 @@
       "source_location": "L35",
       "_origin": "ast",
       "id": "lib_utils_ajuste_estoque_kpis_store_readfile",
-      "community": 40,
+      "community": 75,
       "norm_label": "readfile()"
     },
     {
@@ -66119,7 +66119,7 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "lib_utils_ajuste_estoque_kpis_store_writefile",
-      "community": 40,
+      "community": 75,
       "norm_label": "writefile()"
     },
     {
@@ -66129,7 +66129,7 @@
       "source_location": "L54",
       "_origin": "ast",
       "id": "lib_utils_ajuste_estoque_kpis_store_ensuretable",
-      "community": 40,
+      "community": 75,
       "norm_label": "ensuretable()"
     },
     {
@@ -66139,7 +66139,7 @@
       "source_location": "L77",
       "_origin": "ast",
       "id": "lib_utils_ajuste_estoque_kpis_store_chave",
-      "community": 40,
+      "community": 75,
       "norm_label": "chave()"
     },
     {
@@ -66149,7 +66149,7 @@
       "source_location": "L81",
       "_origin": "ast",
       "id": "lib_utils_ajuste_estoque_kpis_store_salvarkpisajuste",
-      "community": 40,
+      "community": 75,
       "norm_label": "salvarkpisajuste()"
     },
     {
@@ -66159,7 +66159,7 @@
       "source_location": "L104",
       "_origin": "ast",
       "id": "lib_utils_ajuste_estoque_kpis_store_obterkpisajuste",
-      "community": 40,
+      "community": 75,
       "norm_label": "obterkpisajuste()"
     },
     {
@@ -114111,7 +114111,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "app/api/curva-abc/route.ts",
-      "source_location": "L219",
+      "source_location": "L223",
       "weight": 1.0,
       "source": "app_api_curva_abc_route_get",
       "target": "app_api_curva_abc_route_produtoaggkey",
@@ -114122,7 +114122,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "app/api/curva-abc/route.ts",
-      "source_location": "L185",
+      "source_location": "L189",
       "weight": 1.0,
       "source": "app_api_curva_abc_route_get",
       "target": "app_api_curva_abc_route_normalizefilialkey",
@@ -114144,7 +114144,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "app/api/curva-abc/route.ts",
-      "source_location": "L208",
+      "source_location": "L212",
       "weight": 1.0,
       "source": "app_api_curva_abc_route_get",
       "target": "app_api_curva_abc_route_resolvecanonicalfilial",
@@ -114156,7 +114156,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/api/curva-abc/route.ts",
-      "source_location": "L92",
+      "source_location": "L96",
       "weight": 1.0,
       "source": "app_api_curva_abc_route_get",
       "target": "lib_config_company_server_resolvecompanydynamic"
@@ -114167,7 +114167,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/api/curva-abc/route.ts",
-      "source_location": "L348",
+      "source_location": "L352",
       "weight": 1.0,
       "source": "app_api_curva_abc_route_get",
       "target": "lib_repositories_performance_fetchfilialprodutosales"
@@ -114178,7 +114178,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/api/curva-abc/route.ts",
-      "source_location": "L127",
+      "source_location": "L131",
       "weight": 1.0,
       "source": "app_api_curva_abc_route_get",
       "target": "lib_repositories_performance_fetchperformancedata"
@@ -114189,7 +114189,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/api/curva-abc/route.ts",
-      "source_location": "L140",
+      "source_location": "L144",
       "weight": 1.0,
       "source": "app_api_curva_abc_route_get",
       "target": "lib_repositories_performance_fetchprodutocordescricoes"
@@ -114200,7 +114200,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/api/curva-abc/route.ts",
-      "source_location": "L355",
+      "source_location": "L360",
       "weight": 1.0,
       "source": "app_api_curva_abc_route_get",
       "target": "lib_repositories_performance_fetchprodutoestoqueporfilial"
@@ -114211,7 +114211,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/api/curva-abc/route.ts",
-      "source_location": "L352",
+      "source_location": "L357",
       "weight": 1.0,
       "source": "app_api_curva_abc_route_get",
       "target": "lib_repositories_performance_fetchprodutoqtdeporfilial"
@@ -114222,7 +114222,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/api/curva-abc/route.ts",
-      "source_location": "L290",
+      "source_location": "L294",
       "weight": 1.0,
       "source": "app_api_curva_abc_route_get",
       "target": "lib_services_salestotals_fetchsalestotals"
@@ -114233,7 +114233,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/api/curva-abc/route.ts",
-      "source_location": "L416",
+      "source_location": "L421",
       "weight": 1.0,
       "source": "app_api_curva_abc_route_get",
       "target": "lib_utils_date_formatdateforquery"
@@ -114244,7 +114244,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/api/curva-abc/route.ts",
-      "source_location": "L112",
+      "source_location": "L116",
       "weight": 1.0,
       "source": "app_api_curva_abc_route_get",
       "target": "lib_utils_date_normalizerangeforquery"
@@ -114255,7 +114255,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "app/api/curva-abc/route.ts",
-      "source_location": "L447",
+      "source_location": "L452",
       "weight": 1.0,
       "source": "app_api_curva_abc_route_get",
       "target": "lib_utils_destino_romaneio_store_key"
@@ -114266,7 +114266,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/api/curva-abc/route.ts",
-      "source_location": "L128",
+      "source_location": "L132",
       "weight": 1.0,
       "source": "app_api_curva_abc_route_get",
       "target": "lib_utils_goals_storage_readgoals"
@@ -114277,7 +114277,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/api/curva-abc/route.ts",
-      "source_location": "L357",
+      "source_location": "L362",
       "weight": 1.0,
       "source": "app_api_curva_abc_route_get",
       "target": "lib_utils_produto_agrupado_aggregation_aggregatefilialprodutosaleswithgroups"
@@ -114288,7 +114288,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/api/curva-abc/route.ts",
-      "source_location": "L363",
+      "source_location": "L368",
       "weight": 1.0,
       "source": "app_api_curva_abc_route_get",
       "target": "lib_utils_produto_agrupado_aggregation_aggregateprodutoestoqueporfilialwithgroups"
@@ -114299,7 +114299,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/api/curva-abc/route.ts",
-      "source_location": "L358",
+      "source_location": "L363",
       "weight": 1.0,
       "source": "app_api_curva_abc_route_get",
       "target": "lib_utils_produto_agrupado_aggregation_aggregateprodutoqtdeporfilialwithgroups"
@@ -114310,7 +114310,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/api/curva-abc/route.ts",
-      "source_location": "L129",
+      "source_location": "L133",
       "weight": 1.0,
       "source": "app_api_curva_abc_route_get",
       "target": "lib_utils_produto_agrupado_store_listprodutoagrupadogroups"
@@ -114321,7 +114321,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/api/curva-abc/route.ts",
-      "source_location": "L130",
+      "source_location": "L134",
       "weight": 1.0,
       "source": "app_api_curva_abc_route_get",
       "target": "lib_utils_produto_descontinuado_store_listprodutosdescontinuados"
@@ -114332,7 +114332,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/api/curva-abc/route.ts",
-      "source_location": "L132",
+      "source_location": "L136",
       "weight": 1.0,
       "source": "app_api_curva_abc_route_get",
       "target": "lib_utils_produtos_descontinuados_builddescontinuadokeyset"
@@ -114343,7 +114343,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/api/curva-abc/route.ts",
-      "source_location": "L396",
+      "source_location": "L401",
       "weight": 1.0,
       "source": "app_api_curva_abc_route_get",
       "target": "lib_utils_produtos_descontinuados_isprodutodescontinuado"
@@ -344517,5 +344517,5 @@
       "source_file": "tmp_scarfme_poliester_pages.txt"
     }
   ],
-  "built_at_commit": "ccf6e4936368a16fc6066b92bec38eb84788b680"
+  "built_at_commit": "f091df8ff78656a90c787ff72c9a263dc74a5852"
 }
