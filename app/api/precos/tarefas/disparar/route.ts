@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { TENTATIVAS_QSTASH, assinaturaValida } from '@/lib/precos/agendador-qstash';
+import { TENTATIVAS_QSTASH, agendarDisparo, assinaturaValida } from '@/lib/precos/agendador-qstash';
 import { executarTarefa, usuarioPodeGravarPrecos } from '@/lib/precos/tarefas-executor';
 import { atualizarTarefa, obterTarefa, reivindicarExecucao } from '@/lib/precos/tarefas-store';
 
@@ -34,6 +34,19 @@ export async function POST(request: Request) {
 
   const existente = await obterTarefa(tarefaId);
   if (!existente) return NextResponse.json({ ignorado: 'Tarefa não existe mais.' });
+
+  // Salto intermediário (agendamento além do limite de 7 dias do QStash): ainda não é a
+  // hora — só publica o próximo salto e troca o messageId da tarefa.
+  if (
+    existente.status === 'agendada' &&
+    existente.qstashMessageId === messageId &&
+    existente.agendadoPara &&
+    new Date(existente.agendadoPara).getTime() > Date.now() + 60_000
+  ) {
+    const proximo = await agendarDisparo(tarefaId, new Date(existente.agendadoPara));
+    await atualizarTarefa(tarefaId, { qstashMessageId: proximo });
+    return NextResponse.json({ reagendado: existente.agendadoPara });
+  }
 
   const usuario = existente.agendadoPor || existente.criadoPor;
   if (!(await usuarioPodeGravarPrecos(usuario))) {

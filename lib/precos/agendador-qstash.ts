@@ -44,14 +44,22 @@ function cliente(): Client {
   return new Client(url ? { token, baseUrl: url } : { token });
 }
 
-/** Agenda o disparo e devolve o id da mensagem (guardado na tarefa). */
+/**
+ * O plano gratuito do QStash não aceita atraso acima de 7 dias (`max_delay` 604800).
+ * Agendamento mais longe vira saltos de até 6 dias: o disparo intermediário só reagenda
+ * (ver `/disparar`), e o último cai no horário certo.
+ */
+const SALTO_MAXIMO_MS = 6 * 24 * 60 * 60 * 1000;
+
+/** Agenda o disparo (ou o próximo salto) e devolve o id da mensagem, guardado na tarefa. */
 export async function agendarDisparo(tarefaId: string, quando: Date): Promise<string> {
   const falta = faltaConfigurarAgendamento();
   if (falta) throw new Error(`Agendamento indisponível: ${falta}`);
+  const alvo = Math.min(quando.getTime(), Date.now() + SALTO_MAXIMO_MS);
   const res = await cliente().publishJSON({
     url: `${baseUrl()}${ROTA_DISPARO}`,
     body: { tarefaId },
-    notBefore: Math.floor(quando.getTime() / 1000),
+    notBefore: Math.floor(alvo / 1000),
     retries: TENTATIVAS_QSTASH,
   });
   return res.messageId;
