@@ -437,7 +437,8 @@ export async function fetchHistoricoLotesCor(company: PrecoCompany, limite = 30)
       SELECT TOP ${top}
         h.LOTE AS lote, MIN(h.DATA_ALTERACAO) AS data, MAX(h.USUARIO) AS usuario, MAX(h.EMPRESA) AS empresa,
         SUM(CASE WHEN h.CAMPO = 'PRECO1' THEN 1 ELSE 0 END) AS alteracoes,
-        COUNT(DISTINCT h.PRODUTO + '|' + ISNULL(h.COR_PRODUTO, '')) AS produtos,
+        -- Só linhas de preço: a linha de conversão (VARIA_PRECO_COR, sem cor) não é um item a mais.
+        COUNT(DISTINCT CASE WHEN h.CAMPO = 'PRECO1' THEN h.PRODUTO + '|' + ISNULL(h.COR_PRODUTO, '') END) AS produtos,
         SUM(CASE WHEN h.CAMPO = 'VARIA_PRECO_COR' THEN 1 ELSE 0 END) AS convertidos,
         MAX(ISNULL(h.OBS, '')) AS obs, MAX(ISNULL(h.REVERTE_LOTE, '')) AS reverteLote,
         (SELECT TOP 1 e.LOTE FROM ${TABELA_HISTORICO} e WITH (NOLOCK) WHERE e.REVERTE_LOTE = h.LOTE) AS revertidoPor,
