@@ -1425,8 +1425,8 @@
     "semantic_hash": "7a672d31b6ac254cb25f6a420501049d"
   },
   "components/layout/Sidebar.tsx": {
-    "mtime": 1793203832.848646,
-    "ast_hash": "2af7c2decff31834d29751a101d94594",
+    "mtime": 1793367222.7395525,
+    "ast_hash": "8eb9cf2bb528fd34883c8810345f9f9f",
     "semantic_hash": ""
   },
   "components/layout/SidebarContext.tsx": {
@@ -2150,8 +2150,8 @@
     "semantic_hash": "29590f1b0f773ebbcd60e9dc314eec58"
   },
   "lib/config/page-permissions.ts": {
-    "mtime": 1793203828.349895,
-    "ast_hash": "577dda4bfc392bb4fc1312d51e5d5390",
+    "mtime": 1793367222.7395525,
+    "ast_hash": "5357ad51a3411f8516615f962f7d5cf3",
     "semantic_hash": ""
   },
   "lib/constants/columns.ts": {
@@ -2970,8 +2970,8 @@
     "semantic_hash": ""
   },
   "package.json": {
-    "mtime": 1791289559.2461114,
-    "ast_hash": "1edb4e6a1c66548b6c06fc86aa71a513",
+    "mtime": 1793366721.816641,
+    "ast_hash": "8f1fb4fa59b6978c95c1fd7a140bd80a",
     "semantic_hash": ""
   },
   "procurar_estoque_alternativo_n4a50012.py": {
@@ -5202,6 +5202,61 @@
   "lib/utils/aproveitamentos-matriz-store.ts": {
     "mtime": 1793204046.542972,
     "ast_hash": "b380ca81aa0d65e5ef25c1cb0e82df5c",
+    "semantic_hash": ""
+  },
+  "app/(companies)/[company]/programar-precos/page.tsx": {
+    "mtime": 1793367205.5658143,
+    "ast_hash": "61cbcc5a65a2d21405b7a5874b170962",
+    "semantic_hash": ""
+  },
+  "app/api/precos/tarefas/[id]/executar/route.ts": {
+    "mtime": 1793366953.0127242,
+    "ast_hash": "b11eaf537c271187dc0005b7795b0e71",
+    "semantic_hash": ""
+  },
+  "app/api/precos/tarefas/[id]/route.ts": {
+    "mtime": 1793366952.183651,
+    "ast_hash": "e204a6cba7634ebe304647df9c1ddcd9",
+    "semantic_hash": ""
+  },
+  "app/api/precos/tarefas/disparar/route.ts": {
+    "mtime": 1793366972.426894,
+    "ast_hash": "4e0f526b3cf3da994367d52e44bdd2b4",
+    "semantic_hash": ""
+  },
+  "app/api/precos/tarefas/lote/route.ts": {
+    "mtime": 1793366973.3037992,
+    "ast_hash": "ab72080d3c88fd8d49d1888493d8f397",
+    "semantic_hash": ""
+  },
+  "app/api/precos/tarefas/route.ts": {
+    "mtime": 1793366951.3420942,
+    "ast_hash": "eca86ae34bf6aaaa2f6d0c2a27e4603e",
+    "semantic_hash": ""
+  },
+  "components/precos/ProgramarPrecosPage.tsx": {
+    "mtime": 1793367666.6896315,
+    "ast_hash": "17bb27f48dab9004cac5c92f37678346",
+    "semantic_hash": ""
+  },
+  "lib/precos/agendador-qstash.ts": {
+    "mtime": 1793366863.68619,
+    "ast_hash": "d770d1751c91c858739513620fbf97fa",
+    "semantic_hash": ""
+  },
+  "lib/precos/tarefas-executor.ts": {
+    "mtime": 1793366896.6541398,
+    "ast_hash": "48d8efd380e5434ed2b5767636292776",
+    "semantic_hash": ""
+  },
+  "lib/precos/tarefas-store.ts": {
+    "mtime": 1793366846.267924,
+    "ast_hash": "f1c8fc8a6eea5f2c29af1ab1f74a985c",
+    "semantic_hash": ""
+  },
+  "lib/repositories/precosTarefas.ts": {
+    "mtime": 1793366912.8317847,
+    "ast_hash": "b81d0bca4859864ff41b0d7a48adf28b",
     "semantic_hash": ""
   }
 }

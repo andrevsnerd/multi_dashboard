@@ -63,7 +63,8 @@ export const PAGE_PERMISSION_DEFINITIONS = [
   { key: "exportar-relatorios", label: "Exportar Relatorios", routeSegments: ["exportar-relatorios"] },
   { key: "gerador-relatorios", label: "Gerador de Relatorios", routeSegments: ["gerador-relatorios"] },
   { key: "aumentos-descontos", label: "Aumentos e Descontos", routeSegments: ["aumentos-descontos"] },
-  { key: "alterar-precos", label: "Alterar Custo / Preco", routeSegments: ["alterar-precos"] },
+  // Programar Preços grava o mesmo cadastro de preço: herda a permissão.
+  { key: "alterar-precos", label: "Alterar Custo / Preco", routeSegments: ["alterar-precos", "programar-precos"] },
   { key: "cadastrar-produto", label: "Cadastrar Produto", routeSegments: ["cadastrar-produto"] },
   // Editar Produto é a mesma edição de ficha da aba "Alterar Produto": herda a permissão.
   {

@@ -108,6 +108,8 @@ export default function Sidebar({ companyName }: SidebarProps) {
     basePath && basePath !== "/" ? `${basePath}/aumentos-descontos` : "/aumentos-descontos";
   const alterarPrecosHref =
     basePath && basePath !== "/" ? `${basePath}/alterar-precos` : "/alterar-precos";
+  const programarPrecosHref =
+    basePath && basePath !== "/" ? `${basePath}/programar-precos` : "/programar-precos";
   const cadastrarProdutoHref =
     basePath && basePath !== "/" ? `${basePath}/cadastrar-produto` : "/cadastrar-produto";
   const alterarCadastroHref =
@@ -305,6 +307,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     "/gerador-relatorios",
     "/aumentos-descontos",
     "/alterar-precos",
+    "/programar-precos",
     "/cadastrar-produto",
     "/editar-produto",
     "/alterar-cadastro",
@@ -679,6 +682,19 @@ export default function Sidebar({ companyName }: SidebarProps) {
           isActive: (currentPathname) =>
             matchesSegment(currentPathname, "/alterar-precos", alterarPrecosHref),
         },
+        // Tarefas de preço (pendentes/agendadas): mesma permissão do Alterar Custo / Preço.
+        ...(isScarfme || isNerd
+          ? [
+              {
+                key: "programar-precos",
+                label: "Programar Preços",
+                href: programarPrecosHref,
+                permission: "alterar-precos" as const,
+                isActive: (currentPathname: string | null) =>
+                  matchesSegment(currentPathname, "/programar-precos", programarPrecosHref),
+              },
+            ]
+          : []),
         ...(isScarfme || isNerd
           ? [
               {
