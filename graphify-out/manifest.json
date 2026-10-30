@@ -5225,18 +5225,18 @@
     "semantic_hash": ""
   },
   "app/api/precos/tarefas/lote/route.ts": {
-    "mtime": 1793366973.3037992,
-    "ast_hash": "ab72080d3c88fd8d49d1888493d8f397",
+    "mtime": 1793392847.8708932,
+    "ast_hash": "93068d6fc2fd37a8cd94e0dc582c7a72",
     "semantic_hash": ""
   },
   "app/api/precos/tarefas/route.ts": {
-    "mtime": 1793366951.3420942,
-    "ast_hash": "eca86ae34bf6aaaa2f6d0c2a27e4603e",
+    "mtime": 1793392847.8723161,
+    "ast_hash": "d92515b6e13b506381bc5e346fa6c710",
     "semantic_hash": ""
   },
   "components/precos/ProgramarPrecosPage.tsx": {
-    "mtime": 1793371940.6756144,
-    "ast_hash": "d12b4b8c8bab42e716fbd53714406e57",
+    "mtime": 1793392897.8857236,
+    "ast_hash": "93d200188bfea561eba98f8cb9cd3438",
     "semantic_hash": ""
   },
   "lib/precos/agendador-qstash.ts": {
@@ -5245,13 +5245,13 @@
     "semantic_hash": ""
   },
   "lib/precos/tarefas-executor.ts": {
-    "mtime": 1793366896.6541398,
-    "ast_hash": "48d8efd380e5434ed2b5767636292776",
+    "mtime": 1793392847.8789444,
+    "ast_hash": "92533a5877fc4d59a7673f80a4506f69",
     "semantic_hash": ""
   },
   "lib/precos/tarefas-store.ts": {
-    "mtime": 1793366846.267924,
-    "ast_hash": "f1c8fc8a6eea5f2c29af1ab1f74a985c",
+    "mtime": 1793392847.8809562,
+    "ast_hash": "5ecb59d5522dcd37b9de8aed43bc7fd9",
     "semantic_hash": ""
   },
   "lib/repositories/precosTarefas.ts": {

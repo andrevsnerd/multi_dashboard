@@ -155,6 +155,23 @@ function parseEntrada(texto: string): Entrada | null | undefined {
   return n === null || n < 0 ? null : { tipo: "abs", valor: n };
 }
 
+/**
+ * Campo "Desconto %": aceita "60", "60%", "60,5" (o sinal é implícito — é desconto).
+ * `undefined` = campo vazio; `null` = inválido (fora de 0–100).
+ */
+function parseDesconto(texto: string): Entrada | null | undefined {
+  const t = (texto ?? "").trim().replace(/[\s%-]/g, "");
+  if (!t) return undefined;
+  const n = parseNumero(t);
+  if (n === null || n <= 0 || n >= 100) return null;
+  return { tipo: "pct", pct: -n };
+}
+
+/** Chaves de texto dos campos que valem para a tabela inteira (não para um grupo). */
+function ehChaveTabela(chave: string): boolean {
+  return chave.startsWith("TODOS||") || chave.startsWith("DESC||");
+}
+
 function calcular(entrada: Entrada, atual: number | null): number | null {
   if (entrada.tipo === "abs") return Math.round(entrada.valor * 100) / 100;
   if (atual === null) return null;
@@ -463,20 +480,33 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
   }, [rowsAtivas, tabelasMarcadas, tabelasVisiveis, temRegistro, valorDe]);
 
   // Regrupar invalida o texto digitado por grupo; o valor planejado fica em `novos`.
+  // Os campos da tabela inteira ("Novo p/ todos" e "Desconto %") continuam valendo.
   useEffect(() => {
-    setTextos((prev) => Object.fromEntries(Object.entries(prev).filter(([k]) => k.startsWith("TODOS||"))));
+    setTextos((prev) => Object.fromEntries(Object.entries(prev).filter(([k]) => ehChaveTabela(k))));
   }, [tabelasMarcadas, removidos]);
 
-  /** Aplica o texto digitado a um conjunto de produtos numa tabela. */
+  /**
+   * Aplica o texto digitado a um conjunto de produtos numa tabela. `entrada` vem pronta
+   * quando o campo não fala a mesma língua do texto (o "Desconto %" recebe "60" e
+   * significa -60%).
+   */
   const aplicarTexto = useCallback(
-    (chaveTexto: string, membros: ProdutoRow[], cod: string, texto: string) => {
+    (
+      chaveTexto: string,
+      membros: ProdutoRow[],
+      cod: string,
+      texto: string,
+      entrada: Entrada | null | undefined = parseEntrada(texto)
+    ) => {
       setTextos((prev) => {
         const prox = { ...prev, [chaveTexto]: texto };
-        // Mexeu num grupo: o "para todos" daquela tabela deixou de ser verdade.
-        if (!chaveTexto.startsWith("TODOS||")) delete prox[`TODOS||${cod}`];
+        // Mexeu num grupo: o valor/desconto "para todos" daquela tabela deixou de ser verdade.
+        if (!ehChaveTabela(chaveTexto)) {
+          delete prox[`TODOS||${cod}`];
+          delete prox[`DESC||${cod}`];
+        }
         return prox;
       });
-      const entrada = parseEntrada(texto);
       if (entrada === null) return; // inválido: mantém o planejado até corrigir
       const campoKey = `T::${cod}::PRECO1`;
       setNovos((prev) => {
@@ -494,15 +524,19 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
     [temRegistro, valorDe]
   );
 
-  /** "Para todos" sobrescreve os grupos: limpa o texto que cada grupo tinha nessa tabela. */
+  /**
+   * Campo da tabela inteira: valor único ("Novo p/ todos") ou desconto sobre o preço atual
+   * de cada produto ("Desconto %"). Sobrescreve os grupos e o outro campo da mesma tabela.
+   */
   const aplicarTodos = useCallback(
-    (cod: string, texto: string) => {
+    (cod: string, texto: string, modo: "valor" | "desconto") => {
       setTextos((prev) => {
         const prox: Record<string, string> = {};
         for (const [k, v] of Object.entries(prev)) if (!k.endsWith(`||${cod}`)) prox[k] = v;
         return prox;
       });
-      aplicarTexto(`TODOS||${cod}`, rowsAtivas, cod, texto);
+      if (modo === "desconto") aplicarTexto(`DESC||${cod}`, rowsAtivas, cod, texto, parseDesconto(texto));
+      else aplicarTexto(`TODOS||${cod}`, rowsAtivas, cod, texto);
     },
     [aplicarTexto, rowsAtivas]
   );
@@ -936,6 +970,7 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
                     <th>Descrição da Tabela</th>
                     <th className={base.thNum}>Itens</th>
                     <th className={base.thNum}>Preço (1) atual</th>
+                    <th className={base.thNum}>Desconto %</th>
                     <th className={base.thNum}>Novo p/ todos</th>
                   </tr>
                 </thead>
@@ -967,6 +1002,35 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
                         </td>
                         <td className={base.thNum}>
                           {(() => {
+                            const chave = `DESC||${t.codigo}`;
+                            const entrada = textos[chave] !== undefined ? parseDesconto(textos[chave]) : undefined;
+                            const previa =
+                              entrada && entrada.tipo === "pct"
+                                ? [calcular(entrada, t.min) ?? 0, calcular(entrada, t.max) ?? 0]
+                                : null;
+                            return (
+                              <div className={styles.descontoCelula}>
+                                <input
+                                  className={`${styles.inputNovo} ${styles.inputPct} ${entrada === null ? styles.inputInvalido : ""}`}
+                                  value={textos[chave] ?? ""}
+                                  placeholder="60"
+                                  disabled={!marcada || !podeExecutar}
+                                  inputMode="decimal"
+                                  title="Desconto sobre o preço atual de cada produto desta tabela (ex.: 60 = 60% off)"
+                                  onChange={(e) => aplicarTodos(t.codigo, e.target.value, "desconto")}
+                                />
+                                <span className={styles.pctSufixo}>%</span>
+                                {previa && (
+                                  <span className={styles.previa}>
+                                    = R$ {mesmoValor(previa[0], previa[1]) ? fmt(previa[0]) : `${fmt(previa[0])} – ${fmt(previa[1])}`}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </td>
+                        <td className={base.thNum}>
+                          {(() => {
                             const chave = `TODOS||${t.codigo}`;
                             const invalido = textos[chave] !== undefined && parseEntrada(textos[chave]) === null;
                             return (
@@ -977,7 +1041,7 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
                                 disabled={!marcada || !podeExecutar}
                                 inputMode="decimal"
                                 title="Mesmo valor (ou percentual, ex.: -20%) para todos os produtos desta tabela"
-                                onChange={(e) => aplicarTodos(t.codigo, e.target.value)}
+                                onChange={(e) => aplicarTodos(t.codigo, e.target.value, "valor")}
                               />
                             );
                           })()}
@@ -989,8 +1053,9 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
               </table>
             </div>
             <p className={base.dica}>
-              Valor em reais (119,90) ou percentual com sinal sobre o preço atual (-20%, +5%). O Preço Líquido
-              acompanha o Preço, como no script.
+              Desconto %: digite só o número (60 = 60% off) e cada produto recebe o desconto sobre o próprio preço
+              atual. Novo p/ todos: um valor único em reais. Nos grupos dá para ajustar um a um (119,90, -20% ou +5%).
+              O Preço Líquido acompanha o Preço, como no script.
             </p>
 
             {/* ── grupos ── */}
