@@ -725,6 +725,37 @@ async function lerPrecosCor(
 }
 
 /**
+ * O PDV das lojas baixa o preço calculado por FX_LJ_PRECO_PRODUTO(filial, tabela, PRODUTO, cor)
+ * e descobre O QUE baixar pelo DATA_PARA_TRANSFERENCIA de PRODUTOS_PRECOS. Mudar só
+ * PRODUTOS_PRECO_COR deixa esse carimbo parado (na capa do teste, 2023) e a loja continua com o
+ * preço antigo. Carimbamos a tabela alterada e as derivadas dela (FX_RETORNA_TABELAS_FILHAS).
+ *
+ * Só carimbo — nenhuma coluna de preço muda. Seguro porque roda com o produto AINDA por cor:
+ * no LXU_PRODUTOS_PRECOS os blocos de custo/sugerido/derivadas exigem UPDATE(PRECOn), e o de
+ * preço por loja só age em VARIA_PRECO_COR = 0.
+ */
+async function carimbarEnvioLojas(pares: Array<{ produto: string; tabela: string }>): Promise<void> {
+  const unicos = [...new Map(pares.map((p) => [`${p.produto}||${p.tabela}`, p])).values()];
+  for (const parte of chunk(unicos, CHUNK)) {
+    await withRequest(async (request) => {
+      const values = parte.map((p, i) => {
+        request.input(`cp${i}`, sql.VarChar, p.produto);
+        request.input(`ct${i}`, sql.VarChar, p.tabela);
+        return `(@cp${i}, @ct${i})`;
+      });
+      await request.query(`
+        UPDATE pp SET pp.DATA_PARA_TRANSFERENCIA = GETDATE()
+        FROM PRODUTOS_PRECOS pp
+        INNER JOIN PRODUTOS p ON p.PRODUTO = pp.PRODUTO AND ISNULL(p.VARIA_PRECO_COR, 0) = 1
+        INNER JOIN (VALUES ${values.join(', ')}) AS v(P, T) ON pp.PRODUTO = v.P
+        WHERE pp.CODIGO_TAB_PRECO = v.T
+           OR pp.CODIGO_TAB_PRECO IN (SELECT f.CODIGO_TAB_PRECO FROM dbo.FX_RETORNA_TABELAS_FILHAS(v.T) f)
+      `);
+    });
+  }
+}
+
+/**
  * Aplica preços por cor (convertendo produtos quando preciso). Ordem: converter → alterar →
  * reler para confirmar → devolver cadastro → (estorno) desligar flag → histórico.
  */
@@ -878,6 +909,14 @@ export async function executarAlteracaoPrecosCor(params: ExecutarCorParams): Pro
         naoConfirmados += aAlterar.length;
         erros.push(`Falha ao alterar a tabela ${tabela}: ${erro instanceof Error ? erro.message : String(erro)}`);
       }
+    }
+    // 2b. Carimbo de envio para as lojas (ver carimbarEnvioLojas).
+    try {
+      await carimbarEnvioLojas(
+        historico.filter((h) => h.campo === 'PRECO1' && h.tabela).map((h) => ({ produto: h.produto, tabela: h.tabela! }))
+      );
+    } catch (erro) {
+      erros.push(`Preços alterados, mas falhou ao avisar as lojas (carimbo de envio): ${erro instanceof Error ? erro.message : String(erro)}`);
     }
   } finally {
     // 3. Preço sugerido/custo do produto de volta ao que era (o gatilho de cor os zera).
