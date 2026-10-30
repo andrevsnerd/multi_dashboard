@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 
 import { autorizarPrecos, parsePrecoCompany } from '@/lib/auth/precos-guard';
 import { fetchLoteDetalhe } from '@/lib/repositories/precosTarefas';
-import { fetchLoteCorDetalhe } from '@/lib/repositories/precosCor';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
@@ -20,9 +19,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    // Lote de preço por cor (prefixo PRCC) mora em outra tabela de histórico.
-    if (lote.startsWith('PRCC')) return NextResponse.json(await fetchLoteCorDetalhe(lote, company));
-    return NextResponse.json({ linhas: await fetchLoteDetalhe(lote, company), convertidos: [] });
+    return NextResponse.json({ linhas: await fetchLoteDetalhe(lote, company) });
   } catch (error) {
     console.error('[precos/tarefas/lote] erro', error);
     return NextResponse.json(
