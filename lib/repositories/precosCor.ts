@@ -300,19 +300,37 @@ export async function fetchPrecosCor(entradas: string[]): Promise<PrecosCorResul
 }
 
 /** Produtos que já são "preço por cor" — no modo por produto a alteração não chega no PDV. */
-export async function fetchProdutosVariaCor(produtos: string[]): Promise<string[]> {
-  const out: string[] = [];
+export interface FlagsLoja {
+  /** Já são preço por cor (modo por produto não chega ao PDV deles). */
+  variaPorCor: string[];
+  /**
+   * Não vão para as lojas: o envio é a fila LJ_ETL_REPOSITORIO, e os gatilhos LX*_ETL_* só
+   * enfileiram produto com ENVIA_LOJA_VAREJO = 1 e status LIBERADO (TIPO_STATUS_PRODUTO = 3).
+   * Produto "EM DESENVOLVIMENTO" muda no Linx e a loja segue com o preço antigo — vale também
+   * para alteração feita no próprio Linx. Foi o que travou o teste da capa 28.48.229.
+   */
+  naoVaoParaLoja: string[];
+}
+
+export async function fetchFlagsLoja(produtos: string[]): Promise<FlagsLoja> {
+  const out: FlagsLoja = { variaPorCor: [], naoVaoParaLoja: [] };
   const limpos = [...new Set(produtos.map(limpar).filter(Boolean))];
   for (const lote of chunk(limpos, CHUNK)) {
     const rows = await withRequest(async (request) => {
       const ph = inLista(request, lote, 'vc');
-      const r = await request.query<{ produto: string }>(`
-        SELECT LTRIM(RTRIM(PRODUTO)) produto FROM PRODUTOS WITH (NOLOCK)
-        WHERE PRODUTO IN (${ph}) AND ISNULL(VARIA_PRECO_COR, 0) = 1
+      const r = await request.query<{ produto: string; varia: number; envia: number }>(`
+        SELECT LTRIM(RTRIM(PRODUTO)) produto,
+               CAST(ISNULL(VARIA_PRECO_COR, 0) AS INT) varia,
+               CASE WHEN ISNULL(ENVIA_LOJA_VAREJO, 0) = 1 AND ISNULL(TIPO_STATUS_PRODUTO, 0) = 3 THEN 1 ELSE 0 END envia
+        FROM PRODUTOS WITH (NOLOCK)
+        WHERE PRODUTO IN (${ph})
       `);
       return r.recordset;
     });
-    out.push(...rows.map((r) => limpar(r.produto)));
+    for (const r of rows) {
+      if (r.varia === 1) out.variaPorCor.push(limpar(r.produto));
+      if (r.envia !== 1) out.naoVaoParaLoja.push(limpar(r.produto));
+    }
   }
   return out;
 }
@@ -725,37 +743,6 @@ async function lerPrecosCor(
 }
 
 /**
- * O PDV das lojas baixa o preço calculado por FX_LJ_PRECO_PRODUTO(filial, tabela, PRODUTO, cor)
- * e descobre O QUE baixar pelo DATA_PARA_TRANSFERENCIA de PRODUTOS_PRECOS. Mudar só
- * PRODUTOS_PRECO_COR deixa esse carimbo parado (na capa do teste, 2023) e a loja continua com o
- * preço antigo. Carimbamos a tabela alterada e as derivadas dela (FX_RETORNA_TABELAS_FILHAS).
- *
- * Só carimbo — nenhuma coluna de preço muda. Seguro porque roda com o produto AINDA por cor:
- * no LXU_PRODUTOS_PRECOS os blocos de custo/sugerido/derivadas exigem UPDATE(PRECOn), e o de
- * preço por loja só age em VARIA_PRECO_COR = 0.
- */
-async function carimbarEnvioLojas(pares: Array<{ produto: string; tabela: string }>): Promise<void> {
-  const unicos = [...new Map(pares.map((p) => [`${p.produto}||${p.tabela}`, p])).values()];
-  for (const parte of chunk(unicos, CHUNK)) {
-    await withRequest(async (request) => {
-      const values = parte.map((p, i) => {
-        request.input(`cp${i}`, sql.VarChar, p.produto);
-        request.input(`ct${i}`, sql.VarChar, p.tabela);
-        return `(@cp${i}, @ct${i})`;
-      });
-      await request.query(`
-        UPDATE pp SET pp.DATA_PARA_TRANSFERENCIA = GETDATE()
-        FROM PRODUTOS_PRECOS pp
-        INNER JOIN PRODUTOS p ON p.PRODUTO = pp.PRODUTO AND ISNULL(p.VARIA_PRECO_COR, 0) = 1
-        INNER JOIN (VALUES ${values.join(', ')}) AS v(P, T) ON pp.PRODUTO = v.P
-        WHERE pp.CODIGO_TAB_PRECO = v.T
-           OR pp.CODIGO_TAB_PRECO IN (SELECT f.CODIGO_TAB_PRECO FROM dbo.FX_RETORNA_TABELAS_FILHAS(v.T) f)
-      `);
-    });
-  }
-}
-
-/**
  * Aplica preços por cor (convertendo produtos quando preciso). Ordem: converter → alterar →
  * reler para confirmar → devolver cadastro → (estorno) desligar flag → histórico.
  */
@@ -909,14 +896,6 @@ export async function executarAlteracaoPrecosCor(params: ExecutarCorParams): Pro
         naoConfirmados += aAlterar.length;
         erros.push(`Falha ao alterar a tabela ${tabela}: ${erro instanceof Error ? erro.message : String(erro)}`);
       }
-    }
-    // 2b. Carimbo de envio para as lojas (ver carimbarEnvioLojas).
-    try {
-      await carimbarEnvioLojas(
-        historico.filter((h) => h.campo === 'PRECO1' && h.tabela).map((h) => ({ produto: h.produto, tabela: h.tabela! }))
-      );
-    } catch (erro) {
-      erros.push(`Preços alterados, mas falhou ao avisar as lojas (carimbo de envio): ${erro instanceof Error ? erro.message : String(erro)}`);
     }
   } finally {
     // 3. Preço sugerido/custo do produto de volta ao que era (o gatilho de cor os zera).

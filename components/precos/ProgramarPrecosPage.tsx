@@ -274,6 +274,11 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
   const [modoCor, setModoCor] = useState(false);
   /** Modo por produto: produtos que já são preço por cor — a alteração não chegaria ao PDV. */
   const [variaCorSet, setVariaCorSet] = useState<Set<string>>(new Set());
+  /**
+   * Produtos que o Linx não envia às lojas (status ≠ LIBERADO ou ENVIA_LOJA_VAREJO desligado):
+   * a alteração grava no Linx, mas o PDV continua com o preço antigo.
+   */
+  const [naoVaiLojaSet, setNaoVaiLojaSet] = useState<Set<string>>(new Set());
   const [dados, setDados] = useState<RespostaProdutos | null>(null);
   const [codigosLidos, setCodigosLidos] = useState(0);
   const [carregando, setCarregando] = useState(false);
@@ -421,16 +426,22 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
         }
         const resposta = json as RespostaProdutos;
         // Por produto: quem já é preço por cor no Linx não recebe a alteração no PDV.
+        // Nos dois modos: produto que não é enviado às lojas (não LIBERADO) só muda no Linx.
         let varia = new Set<string>();
-        if (!cor && resposta.rows.length > 0) {
+        let semLoja = new Set<string>();
+        if (resposta.rows.length > 0) {
           const v = await api("/api/precos/tarefas/varia-cor", {
             method: "POST",
-            body: JSON.stringify({ produtos: resposta.rows.map((r) => r.produto) }),
+            body: JSON.stringify({ produtos: [...new Set(resposta.rows.map((r) => r.produto.split("|")[0]))] }),
           });
-          if (v.ok) varia = new Set<string>(v.json.variaPorCor ?? []);
+          if (v.ok) {
+            if (!cor) varia = new Set<string>(v.json.variaPorCor ?? []);
+            semLoja = new Set<string>(v.json.naoVaoParaLoja ?? []);
+          }
         }
         setModoCor(cor);
         setVariaCorSet(varia);
+        setNaoVaiLojaSet(semLoja);
         setDados(resposta);
         setCodigosLidos(new Set(codigos).size);
         setRemovidos([]);
@@ -1086,6 +1097,15 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
             desta tarefa. Use &quot;Preço por cor&quot; com os códigos de barras das cores.
           </div>
         )}
+        {dados && naoVaiLojaSet.size > 0 && (
+          <div className={base.avisoBox}>
+            <strong>{naoVaiLojaSet.size} produto(s) não são enviados às lojas</strong> (
+            {[...naoVaiLojaSet].slice(0, 8).join(", ")}
+            {naoVaiLojaSet.size > 8 ? "…" : ""}): no cadastro do Linx estão com status diferente de LIBERADO (ex.: em
+            desenvolvimento) ou sem &quot;envia para loja&quot;. O preço muda no Linx, mas o PDV continua com o antigo —
+            igual quando se altera pelo próprio Linx. Libere o produto no cadastro para a mudança chegar à loja.
+          </div>
+        )}
         {derivadasComBase.length > 0 && (
           <div className={base.avisoBox}>
             A(s) tabela(s) {derivadasComBase.join(", ")} são calculadas pelo Linx a partir de outra tabela marcada.
@@ -1254,6 +1274,14 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
                             {!modoCor && variaCorSet.has(m.produto) && (
                               <span className={styles.badgeConverte} title="Já tem preço por cor: fica fora no modo por produto">
                                 preço por cor — fora
+                              </span>
+                            )}
+                            {naoVaiLojaSet.has(m.produto.split("|")[0]) && (
+                              <span
+                                className={base.badgeInativa}
+                                title="Status diferente de LIBERADO no Linx: a mudança não é enviada ao PDV das lojas"
+                              >
+                                não vai p/ loja
                               </span>
                             )}
                             <button
