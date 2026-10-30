@@ -5220,8 +5220,8 @@
     "semantic_hash": ""
   },
   "app/api/precos/tarefas/disparar/route.ts": {
-    "mtime": 1793366972.426894,
-    "ast_hash": "4e0f526b3cf3da994367d52e44bdd2b4",
+    "mtime": 1793368553.871863,
+    "ast_hash": "ece505fe7f1c47f1a1ad73f090b1b51d",
     "semantic_hash": ""
   },
   "app/api/precos/tarefas/lote/route.ts": {
@@ -5235,13 +5235,13 @@
     "semantic_hash": ""
   },
   "components/precos/ProgramarPrecosPage.tsx": {
-    "mtime": 1793367666.6896315,
-    "ast_hash": "17bb27f48dab9004cac5c92f37678346",
+    "mtime": 1793371940.6756144,
+    "ast_hash": "d12b4b8c8bab42e716fbd53714406e57",
     "semantic_hash": ""
   },
   "lib/precos/agendador-qstash.ts": {
-    "mtime": 1793366863.68619,
-    "ast_hash": "d770d1751c91c858739513620fbf97fa",
+    "mtime": 1793368552.2017498,
+    "ast_hash": "91ef18863390adc14183b34226cb1dd6",
     "semantic_hash": ""
   },
   "lib/precos/tarefas-executor.ts": {

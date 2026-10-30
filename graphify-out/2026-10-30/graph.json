@@ -7477,7 +7477,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_etiquetas_produtos_route",
-      "community": 133,
+      "community": 86,
       "norm_label": "route.ts"
     },
     {
@@ -7487,7 +7487,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "app_api_etiquetas_produtos_route_body",
-      "community": 133,
+      "community": 86,
       "norm_label": "body"
     },
     {
@@ -7497,7 +7497,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "app_api_etiquetas_produtos_route_post",
-      "community": 133,
+      "community": 86,
       "norm_label": "post()"
     },
     {
@@ -26886,7 +26886,7 @@
       "label": "TabelaAlteracoes()",
       "file_type": "code",
       "source_file": "components/precos/ProgramarPrecosPage.tsx",
-      "source_location": "L1505",
+      "source_location": "L1534",
       "_origin": "ast",
       "id": "components_precos_programarprecospage_tabelaalteracoes",
       "community": 98,
@@ -27339,7 +27339,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_products_productperformancetable",
-      "community": 536,
+      "community": 75,
       "norm_label": "productperformancetable.tsx"
     },
     {
@@ -27359,7 +27359,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "components_products_productperformancetable_formatcurrency",
-      "community": 536,
+      "community": 75,
       "norm_label": "formatcurrency()"
     },
     {
@@ -27369,7 +27369,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "components_products_productperformancetable_formatnumber",
-      "community": 536,
+      "community": 75,
       "norm_label": "formatnumber()"
     },
     {
@@ -27379,7 +27379,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "components_products_productperformancetable_productperformancetable",
-      "community": 536,
+      "community": 75,
       "norm_label": "productperformancetable()"
     },
     {
@@ -27389,7 +27389,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_products_productsalehistorytable",
-      "community": 75,
+      "community": 536,
       "norm_label": "productsalehistorytable.tsx"
     },
     {
@@ -27409,7 +27409,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "components_products_productsalehistorytable_formatcurrency",
-      "community": 75,
+      "community": 536,
       "norm_label": "formatcurrency()"
     },
     {
@@ -27419,7 +27419,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "components_products_productsalehistorytable_formatnumber",
-      "community": 75,
+      "community": 536,
       "norm_label": "formatnumber()"
     },
     {
@@ -27429,7 +27429,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "components_products_productsalehistorytable_formatdate",
-      "community": 75,
+      "community": 536,
       "norm_label": "formatdate()"
     },
     {
@@ -27439,7 +27439,7 @@
       "source_location": "L34",
       "_origin": "ast",
       "id": "components_products_productsalehistorytable_productsalehistorytable",
-      "community": 75,
+      "community": 536,
       "norm_label": "productsalehistorytable()"
     },
     {
@@ -57089,7 +57089,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_girocache",
-      "community": 503,
+      "community": 28,
       "norm_label": "girocache.ts"
     },
     {
@@ -57099,7 +57099,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "lib_repositories_girocache_girocacheentry",
-      "community": 503,
+      "community": 28,
       "norm_label": "girocacheentry"
     },
     {
@@ -57109,7 +57109,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "lib_repositories_girocache_cache",
-      "community": 503,
+      "community": 28,
       "norm_label": "cache"
     },
     {
@@ -57119,7 +57119,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "lib_repositories_girocache_cachekey",
-      "community": 503,
+      "community": 28,
       "norm_label": "cachekey()"
     },
     {
@@ -57129,7 +57129,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "lib_repositories_girocache_getgirocache",
-      "community": 503,
+      "community": 28,
       "norm_label": "getgirocache()"
     },
     {
@@ -57139,7 +57139,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "lib_repositories_girocache_setgirocache",
-      "community": 503,
+      "community": 28,
       "norm_label": "setgirocache()"
     },
     {
@@ -69079,7 +69079,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics",
-      "community": 228,
+      "community": 503,
       "norm_label": "compra-transito-analytics.ts"
     },
     {
@@ -69089,7 +69089,7 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_transitawaresuggestiontype",
-      "community": 228,
+      "community": 503,
       "norm_label": "transitawaresuggestiontype"
     },
     {
@@ -69099,7 +69099,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_transitadjustmentresult",
-      "community": 228,
+      "community": 503,
       "norm_label": "transitadjustmentresult"
     },
     {
@@ -69109,7 +69109,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_transitawaresuggestionview",
-      "community": 228,
+      "community": 503,
       "norm_label": "transitawaresuggestionview"
     },
     {
@@ -69119,7 +69119,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_startoflocalday",
-      "community": 228,
+      "community": 503,
       "norm_label": "startoflocalday()"
     },
     {
@@ -69129,7 +69129,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_normalizedate",
-      "community": 228,
+      "community": 503,
       "norm_label": "normalizedate()"
     },
     {
@@ -69139,7 +69139,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_daysuntil",
-      "community": 228,
+      "community": 503,
       "norm_label": "daysuntil()"
     },
     {
@@ -69149,7 +69149,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_groupentriesbyday",
-      "community": 228,
+      "community": 503,
       "norm_label": "groupentriesbyday()"
     },
     {
@@ -69159,7 +69159,7 @@
       "source_location": "L68",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_computecoveragedeficit",
-      "community": 228,
+      "community": 503,
       "norm_label": "computecoveragedeficit()"
     },
     {
@@ -69169,7 +69169,7 @@
       "source_location": "L94",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_summarizetransitadjustment",
-      "community": 228,
+      "community": 503,
       "norm_label": "summarizetransitadjustment()"
     },
     {
@@ -69179,7 +69179,7 @@
       "source_location": "L170",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_applytransittosuggestion",
-      "community": 228,
+      "community": 503,
       "norm_label": "applytransittosuggestion()"
     },
     {
@@ -188066,7 +188066,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/precos/ProgramarPrecosPage.tsx",
-      "source_location": "L1505",
+      "source_location": "L1534",
       "weight": 1.0,
       "source": "components_precos_programarprecospage",
       "target": "components_precos_programarprecospage_tabelaalteracoes",
@@ -188171,7 +188171,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/precos/ProgramarPrecosPage.tsx",
-      "source_location": "L1539",
+      "source_location": "L1568",
       "weight": 1.0,
       "source": "components_precos_programarprecospage_tabelaalteracoes",
       "target": "components_precos_programarprecospage_fmt",
@@ -188215,7 +188215,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/precos/ProgramarPrecosPage.tsx",
-      "source_location": "L780",
+      "source_location": "L806",
       "weight": 1.0,
       "source": "components_precos_programarprecospage_programarprecospage",
       "target": "components_precos_programarprecospage_separarcodigos",
@@ -188270,7 +188270,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/precos/ProgramarPrecosPage.tsx",
-      "source_location": "L1363",
+      "source_location": "L1389",
       "weight": 1.0,
       "source": "components_precos_programarprecospage_programarprecospage",
       "target": "components_precos_programarprecospage_datalinx",
@@ -188292,7 +188292,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/precos/ProgramarPrecosPage.tsx",
-      "source_location": "L1054",
+      "source_location": "L1080",
       "weight": 1.0,
       "source": "components_precos_programarprecospage_programarprecospage",
       "target": "components_precos_programarprecospage_variacao",
@@ -188303,7 +188303,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/precos/ProgramarPrecosPage.tsx",
-      "source_location": "L1530",
+      "source_location": "L1559",
       "weight": 1.0,
       "source": "components_precos_programarprecospage_tabelaalteracoes",
       "target": "components_precos_programarprecospage_variacao",

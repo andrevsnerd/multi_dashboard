@@ -1,7 +1,7 @@
 # Graph Report - multi_dashboard  (2026-10-30)
 
 ## Corpus Check
-- 1044 files · ~1,288,288 words
+- 1044 files · ~1,288,441 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -682,8 +682,8 @@ Cohesion: 0.10
 Nodes (43): brl(), codigoDistinto(), compacto(), dataBr(), dataBrCompleta(), dataCurta(), hojeIso(), mesCurto() (+35 more)
 
 ### Community 28 - "Lista de Compra Sugerida Page"
-Cohesion: 0.07
-Nodes (51): getNecessidadeMinimaQty(), applyTransitToListaCompraSuggestion(), buildSuggestionKey(), calcQtdSugestaoEInfoFromListaCompraRule(), calcQtdSugestaoSFromListaCompraRule(), calcularCurvas(), Curva, CURVA_BADGE_CLASS (+43 more)
+Cohesion: 0.06
+Nodes (56): getNecessidadeMinimaQty(), applyTransitToListaCompraSuggestion(), buildSuggestionKey(), calcQtdSugestaoEInfoFromListaCompraRule(), calcQtdSugestaoSFromListaCompraRule(), calcularCurvas(), Curva, CURVA_BADGE_CLASS (+48 more)
 
 ### Community 29 - "Extrato de Produto Feature"
 Cohesion: 0.08
@@ -867,7 +867,7 @@ Nodes (51): DELETE(), GET(), PATCH(), GET(), PUT(), GET(), GET(), POST() (+43 mo
 
 ### Community 75 - "Transfer Item & Destino Store"
 Cohesion: 0.11
-Nodes (25): POST(), RequestBody, formatCurrency(), formatInteger(), getPositiveStockTotal(), ProductDetailKPIs(), ProductDetailKPIsProps, LoadingPhase (+17 more)
+Nodes (24): POST(), RequestBody, formatCurrency(), formatInteger(), getPositiveStockTotal(), ProductDetailKPIs(), ProductDetailKPIsProps, LoadingPhase (+16 more)
 
 ### Community 76 - "Transfer Products Page"
 Cohesion: 0.08
@@ -910,8 +910,8 @@ Cohesion: 0.19
 Nodes (16): CompraTransitoStatusReal, AllocatedEntry, applyAllocation(), buildReconcileKey(), dayDiff(), dayKey(), dayKeyFromDate(), deriveItemStatusReal() (+8 more)
 
 ### Community 86 - "Produtos Novos Page"
-Cohesion: 0.24
-Nodes (15): GET(), PUT(), parseEtiquetaCompany(), CAMPOS_DISPONIVEIS, CONFIG_PADRAO, normalizarConfig(), ARQUIVO, ArquivoConfig (+7 more)
+Cohesion: 0.19
+Nodes (17): GET(), PUT(), Body, POST(), parseEtiquetaCompany(), CAMPOS_DISPONIVEIS, CONFIG_PADRAO, normalizarConfig() (+9 more)
 
 ### Community 87 - "App Logic Documentation Runbook"
 Cohesion: 0.10
@@ -1098,8 +1098,8 @@ Cohesion: 0.08
 Nodes (38): POST(), RequestBody, fmtCurrency(), fmtInt(), fmtPct1(), ordinal(), pad2(), TopProdutosDeck() (+30 more)
 
 ### Community 133 - "Compra Data Fixa Store"
-Cohesion: 0.16
-Nodes (22): Body, POST(), BarraRow, buscarProdutosParaEtiqueta(), buscarSugestoesProduto(), condicaoTermo(), CorEtiqueta, CorRow (+14 more)
+Cohesion: 0.18
+Nodes (20): BarraRow, buscarProdutosParaEtiqueta(), buscarSugestoesProduto(), condicaoTermo(), CorEtiqueta, CorRow, descNormalizada(), EMPRESA_CODES (+12 more)
 
 ### Community 134 - "Presentation Generator & Filters"
 Cohesion: 0.11
@@ -1458,8 +1458,8 @@ Cohesion: 0.43
 Nodes (7): brl(), config, ecomSql(), main(), num(), one(), posSql()
 
 ### Community 228 - "fix-tipos-romaneio-acento.mjs"
-Cohesion: 0.07
-Nodes (51): applyTransitToProjectionSuggestion(), buildProdutoCorKey(), calcDiasAteAcabar(), computeReposicaoScope(), ExcelJSCell, fetchProjecao(), fmt(), fmtBRL() (+43 more)
+Cohesion: 0.09
+Nodes (41): applyTransitToProjectionSuggestion(), buildProdutoCorKey(), calcDiasAteAcabar(), computeReposicaoScope(), ExcelJSCell, fetchProjecao(), fmt(), fmtBRL() (+33 more)
 
 ### Community 229 - "ComprasTransitoPickerModal.tsx"
 Cohesion: 0.20
@@ -1810,8 +1810,8 @@ Cohesion: 0.27
 Nodes (15): buildDiferencaSheets(), buildProdutosSheets(), buildResumoSheet(), buildRupturasSheet(), buildTableSheet(), buildVendedoresSheet(), round2(), shortDate() (+7 more)
 
 ### Community 503 - "giroCache.ts"
-Cohesion: 0.47
-Nodes (5): cache, cacheKey(), getGiroCache(), GiroCacheEntry, setGiroCache()
+Cohesion: 0.33
+Nodes (10): applyTransitToSuggestion(), computeCoverageDeficit(), daysUntil(), groupEntriesByDay(), normalizeDate(), startOfLocalDay(), summarizeTransitAdjustment(), TransitAdjustmentResult (+2 more)
 
 ### Community 504 - "canSeeCusto"
 Cohesion: 0.16
@@ -1942,8 +1942,8 @@ Cohesion: 0.50
 Nodes (3): generateMetadata(), RomaneioDetalheRoute(), RomaneioDetalheRouteProps
 
 ### Community 536 - "ProductPerformanceTable.tsx"
-Cohesion: 0.83
-Nodes (3): formatCurrency(), formatNumber(), ProductPerformanceTable()
+Cohesion: 0.70
+Nodes (4): formatCurrency(), formatDate(), formatNumber(), ProductSaleHistoryTable()
 
 ### Community 537 - "fetchRomaneioParaEdicao"
 Cohesion: 0.67

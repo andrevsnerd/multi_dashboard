@@ -21,12 +21,17 @@ interface TabelaSelecionada {
   descricao: string;
   inativa: boolean;
   comRegistro: number;
+  /** Tabela derivada: recalculada pelo Linx a partir desta base (só vem no modo cor). */
+  base?: string | null;
 }
 
 interface ProdutoRow {
+  /** Código do produto; no modo cor, `PRODUTO|COR`. */
   produto: string;
   descricao: string;
   inativo: boolean;
+  /** Modo cor: o produto já é preço por cor no Linx (falso = aplicar converte). */
+  variaPorCor?: boolean;
   v: Array<number | null>;
   sr: number[];
 }
@@ -38,7 +43,11 @@ interface RespostaProdutos {
   total: number;
   truncated: boolean;
   naoEncontrados: string[];
+  /** Modo cor: códigos de produto colados (não dizem a cor). */
+  semCor?: string[];
 }
+
+type TarefaModo = "produto" | "cor";
 
 type TarefaStatus = "pendente" | "agendada" | "executando" | "aplicada" | "erro";
 
@@ -54,6 +63,7 @@ interface TarefaAlteracao {
 interface Tarefa {
   id: string;
   nome: string;
+  modo?: TarefaModo;
   status: TarefaStatus;
   agendadoPara: string | null;
   agendadoPor: string | null;
@@ -74,6 +84,9 @@ interface Resultado {
   semRegistro: number;
   naoConfirmados: number;
   erros: string[];
+  /** Modo cor: produtos que viraram preço por cor neste lote. */
+  convertidos?: string[];
+  desconvertidos?: string[];
 }
 
 interface HistoricoLote {
@@ -86,10 +99,14 @@ interface HistoricoLote {
   obs: string | null;
   reverteLote: string | null;
   revertidoPor: string | null;
+  /** Lote de preço por cor (NERD_PRECO_COR_HISTORICO, prefixo PRCC). */
+  porCor?: boolean;
+  convertidos?: number;
 }
 
 interface LoteLinha {
   produto: string;
+  cor?: string;
   descricao: string;
   tabela: string;
   tabelaDesc: string;
@@ -153,6 +170,23 @@ function parseEntrada(texto: string): Entrada | null | undefined {
   if (t.includes("%")) return null;
   const n = parseNumero(t.replace(/^R\$/i, ""));
   return n === null || n < 0 ? null : { tipo: "abs", valor: n };
+}
+
+/**
+ * Campo "Desconto %": aceita "60", "60%", "60,5" (o sinal é implícito — é desconto).
+ * `undefined` = campo vazio; `null` = inválido (fora de 0–100).
+ */
+function parseDesconto(texto: string): Entrada | null | undefined {
+  const t = (texto ?? "").trim().replace(/[\s%-]/g, "");
+  if (!t) return undefined;
+  const n = parseNumero(t);
+  if (n === null || n <= 0 || n >= 100) return null;
+  return { tipo: "pct", pct: -n };
+}
+
+/** Chaves de texto dos campos que valem para a tabela inteira (não para um grupo). */
+function ehChaveTabela(chave: string): boolean {
+  return chave.startsWith("TODOS||") || chave.startsWith("DESC||");
 }
 
 function calcular(entrada: Entrada, atual: number | null): number | null {
@@ -233,6 +267,13 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [nome, setNome] = useState("");
   const [codigosTexto, setCodigosTexto] = useState("");
+  /**
+   * Preço por cor: cada código de barras altera só a cor dele (PRODUTOS_PRECO_COR). Produto
+   * que ainda é "por produto" é convertido na aplicação. Desligado = preço do produto inteiro.
+   */
+  const [modoCor, setModoCor] = useState(false);
+  /** Modo por produto: produtos que já são preço por cor — a alteração não chegaria ao PDV. */
+  const [variaCorSet, setVariaCorSet] = useState<Set<string>>(new Set());
   const [dados, setDados] = useState<RespostaProdutos | null>(null);
   const [codigosLidos, setCodigosLidos] = useState(0);
   const [carregando, setCarregando] = useState(false);
@@ -269,6 +310,8 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
   const [buscaHistorico, setBuscaHistorico] = useState("");
   const [loteAberto, setLoteAberto] = useState<string | null>(null);
   const [lotesCache, setLotesCache] = useState<Record<string, LoteLinha[]>>({});
+  /** Lotes por cor: frase de cada produto convertido/desconvertido, para o detalhe. */
+  const [lotesConvertidos, setLotesConvertidos] = useState<Record<string, string[]>>({});
 
   // ── mensagens ──
   const [erro, setErro] = useState<string | null>(null);
@@ -291,10 +334,19 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
     setAgendamentoIndisponivel(json.agendamentoIndisponivel ?? null);
   }, [api, username, companyKey, mostrarAplicadas]);
 
+  /** Lotes por produto (NERD_PRECO_HISTORICO) + por cor (NERD_PRECO_COR_HISTORICO), juntos por data. */
   const carregarHistorico = useCallback(async () => {
     if (!username) return;
-    const { ok, json } = await api(`/api/precos/historico?company=${companyKey}&limite=${limiteHistorico}`);
-    if (ok) setHistorico(Array.isArray(json.lotes) ? json.lotes : []);
+    const [porProduto, porCor] = await Promise.all([
+      api(`/api/precos/historico?company=${companyKey}&limite=${limiteHistorico}`),
+      api(`/api/precos/tarefas/historico-cor?company=${companyKey}&limite=${limiteHistorico}`),
+    ]);
+    const lotes: HistoricoLote[] = [
+      ...(porProduto.ok && Array.isArray(porProduto.json.lotes) ? porProduto.json.lotes : []),
+      ...(porCor.ok && Array.isArray(porCor.json.lotes) ? porCor.json.lotes : []),
+    ];
+    lotes.sort((a, b) => b.data.localeCompare(a.data));
+    setHistorico(lotes.slice(0, limiteHistorico));
   }, [api, username, companyKey, limiteHistorico]);
 
   useEffect(() => {
@@ -338,25 +390,48 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
   }, []);
 
   const carregarProdutos = useCallback(
-    async (codigos: string[], preset?: { novos: Record<string, number>; marcadas: string[] }) => {
+    async (
+      codigos: string[],
+      preset?: { novos: Record<string, number>; marcadas: string[] },
+      /** Força o modo (abrir tarefa/lote salvo); sem isso vale o interruptor da tela. */
+      modoForcado?: boolean
+    ) => {
       if (codigos.length === 0) {
         setErro("Cole pelo menos um código de barras ou código de produto.");
         return;
       }
+      const cor = modoForcado ?? modoCor;
       setCarregando(true);
       setErro(null);
       try {
         // Lista colada vale como está: sem escopo de empresa e com inativos, para nenhum
         // código sumir calado (o que não existe aparece em "não encontrados").
-        const { ok, json } = await api("/api/precos/produtos", {
-          method: "POST",
-          body: JSON.stringify({ company: companyKey, codigos, incluirInativos: true, todoCadastro: true }),
-        });
+        const { ok, json } = cor
+          ? await api("/api/precos/tarefas/produtos-cor", {
+              method: "POST",
+              body: JSON.stringify({ company: companyKey, codigos }),
+            })
+          : await api("/api/precos/produtos", {
+              method: "POST",
+              body: JSON.stringify({ company: companyKey, codigos, incluirInativos: true, todoCadastro: true }),
+            });
         if (!ok) {
           setErro(json?.error ?? "Erro ao carregar os produtos.");
           return;
         }
-        setDados(json as RespostaProdutos);
+        const resposta = json as RespostaProdutos;
+        // Por produto: quem já é preço por cor no Linx não recebe a alteração no PDV.
+        let varia = new Set<string>();
+        if (!cor && resposta.rows.length > 0) {
+          const v = await api("/api/precos/tarefas/varia-cor", {
+            method: "POST",
+            body: JSON.stringify({ produtos: resposta.rows.map((r) => r.produto) }),
+          });
+          if (v.ok) varia = new Set<string>(v.json.variaPorCor ?? []);
+        }
+        setModoCor(cor);
+        setVariaCorSet(varia);
+        setDados(resposta);
         setCodigosLidos(new Set(codigos).size);
         setRemovidos([]);
         setTextos({});
@@ -370,7 +445,7 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
         setCarregando(false);
       }
     },
-    [api, companyKey]
+    [api, companyKey, modoCor]
   );
 
   // ───────── índices ─────────
@@ -463,20 +538,33 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
   }, [rowsAtivas, tabelasMarcadas, tabelasVisiveis, temRegistro, valorDe]);
 
   // Regrupar invalida o texto digitado por grupo; o valor planejado fica em `novos`.
+  // Os campos da tabela inteira ("Novo p/ todos" e "Desconto %") continuam valendo.
   useEffect(() => {
-    setTextos((prev) => Object.fromEntries(Object.entries(prev).filter(([k]) => k.startsWith("TODOS||"))));
+    setTextos((prev) => Object.fromEntries(Object.entries(prev).filter(([k]) => ehChaveTabela(k))));
   }, [tabelasMarcadas, removidos]);
 
-  /** Aplica o texto digitado a um conjunto de produtos numa tabela. */
+  /**
+   * Aplica o texto digitado a um conjunto de produtos numa tabela. `entrada` vem pronta
+   * quando o campo não fala a mesma língua do texto (o "Desconto %" recebe "60" e
+   * significa -60%).
+   */
   const aplicarTexto = useCallback(
-    (chaveTexto: string, membros: ProdutoRow[], cod: string, texto: string) => {
+    (
+      chaveTexto: string,
+      membros: ProdutoRow[],
+      cod: string,
+      texto: string,
+      entrada: Entrada | null | undefined = parseEntrada(texto)
+    ) => {
       setTextos((prev) => {
         const prox = { ...prev, [chaveTexto]: texto };
-        // Mexeu num grupo: o "para todos" daquela tabela deixou de ser verdade.
-        if (!chaveTexto.startsWith("TODOS||")) delete prox[`TODOS||${cod}`];
+        // Mexeu num grupo: o valor/desconto "para todos" daquela tabela deixou de ser verdade.
+        if (!ehChaveTabela(chaveTexto)) {
+          delete prox[`TODOS||${cod}`];
+          delete prox[`DESC||${cod}`];
+        }
         return prox;
       });
-      const entrada = parseEntrada(texto);
       if (entrada === null) return; // inválido: mantém o planejado até corrigir
       const campoKey = `T::${cod}::PRECO1`;
       setNovos((prev) => {
@@ -494,15 +582,19 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
     [temRegistro, valorDe]
   );
 
-  /** "Para todos" sobrescreve os grupos: limpa o texto que cada grupo tinha nessa tabela. */
+  /**
+   * Campo da tabela inteira: valor único ("Novo p/ todos") ou desconto sobre o preço atual
+   * de cada produto ("Desconto %"). Sobrescreve os grupos e o outro campo da mesma tabela.
+   */
   const aplicarTodos = useCallback(
-    (cod: string, texto: string) => {
+    (cod: string, texto: string, modo: "valor" | "desconto") => {
       setTextos((prev) => {
         const prox: Record<string, string> = {};
         for (const [k, v] of Object.entries(prev)) if (!k.endsWith(`||${cod}`)) prox[k] = v;
         return prox;
       });
-      aplicarTexto(`TODOS||${cod}`, rowsAtivas, cod, texto);
+      if (modo === "desconto") aplicarTexto(`DESC||${cod}`, rowsAtivas, cod, texto, parseDesconto(texto));
+      else aplicarTexto(`TODOS||${cod}`, rowsAtivas, cod, texto);
     },
     [aplicarTexto, rowsAtivas]
   );
@@ -531,6 +623,8 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
   const alteracoes = useMemo(() => {
     const out: TarefaAlteracao[] = [];
     for (const row of rowsAtivas) {
+      // Por produto, item que já é preço por cor fica de fora: o PDV não leria a mudança.
+      if (!modoCor && variaCorSet.has(row.produto)) continue;
       for (const cod of tabelasMarcadas) {
         const campoKey = `T::${cod}::PRECO1`;
         if (!temRegistro(row, campoKey)) continue;
@@ -542,7 +636,27 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
       }
     }
     return out;
-  }, [rowsAtivas, tabelasMarcadas, novos, temRegistro, valorDe, descTabela]);
+  }, [rowsAtivas, tabelasMarcadas, novos, temRegistro, valorDe, descTabela, modoCor, variaCorSet]);
+
+  /** Modo cor: produtos que esta tarefa vai transformar em preço por cor. */
+  const viramPorCor = useMemo(() => {
+    if (!modoCor) return [] as string[];
+    const comAlteracao = new Set(alteracoes.map((a) => a.produto));
+    return [
+      ...new Set(
+        rowsAtivas.filter((r) => !r.variaPorCor && comAlteracao.has(r.produto)).map((r) => r.produto.split("|")[0])
+      ),
+    ];
+  }, [modoCor, alteracoes, rowsAtivas]);
+
+  /** Tabela derivada marcada junto com a base dela: o Linx recalcula a derivada a partir da base. */
+  const derivadasComBase = useMemo(() => {
+    const porCodigo = new Map((dados?.tabelas ?? []).map((t) => [t.codigo, t]));
+    return tabelasMarcadas.filter((cod) => {
+      const base = porCodigo.get(cod)?.base;
+      return !!base && tabelasMarcadas.includes(base);
+    });
+  }, [dados, tabelasMarcadas]);
 
   const produtosComAlteracao = useMemo(() => new Set(alteracoes.map((a) => a.produto)).size, [alteracoes]);
 
@@ -573,6 +687,7 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
           id: editandoId,
           company: companyKey,
           nome: nome.trim(),
+          modo: modoCor ? "cor" : "produto",
           produtos: rowsAtivas.map((r) => ({ produto: r.produto, descricao: r.descricao })),
           alteracoes,
           agendadoPara,
@@ -598,7 +713,7 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
     } finally {
       setSalvando(false);
     }
-  }, [alteracoes, nome, quandoModo, quandoValor, api, editandoId, companyKey, rowsAtivas, limparEditor, carregarTarefas]);
+  }, [alteracoes, nome, quandoModo, quandoValor, api, editandoId, companyKey, rowsAtivas, limparEditor, carregarTarefas, modoCor]);
 
   // ───────── tarefas: ações ─────────
 
@@ -617,7 +732,11 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
       }
       const preset: Record<string, number> = {};
       for (const a of t.alteracoes) preset[`${a.produto}||${a.campoKey}`] = a.valor;
-      void carregarProdutos(codigos, { novos: preset, marcadas: [...new Set(t.alteracoes.map((a) => a.tabela))] });
+      void carregarProdutos(
+        codigos,
+        { novos: preset, marcadas: [...new Set(t.alteracoes.map((a) => a.tabela))] },
+        t.modo === "cor"
+      );
       window.scrollTo({ top: 0, behavior: "smooth" });
     },
     [carregarProdutos]
@@ -625,11 +744,11 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
 
   /** Reaproveitar: só os PRODUTOS vão para uma tarefa nova; preços se definem de novo. */
   const novaTarefaCom = useCallback(
-    (produtos: string[], nomeBase: string) => {
+    (produtos: string[], nomeBase: string, cor?: boolean) => {
       limparEditor();
       setNome(nomeBase);
       setCodigosTexto(produtos.join("\n"));
-      void carregarProdutos(produtos);
+      void carregarProdutos(produtos, undefined, cor);
       window.scrollTo({ top: 0, behavior: "smooth" });
     },
     [limparEditor, carregarProdutos]
@@ -718,6 +837,9 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
       }
       const linhas = (json.linhas ?? []) as LoteLinha[];
       setLotesCache((prev) => ({ ...prev, [lote]: linhas }));
+      const convertidos = ((json.convertidos ?? []) as Array<{ produto: string; para: number | null }>)
+        .map((c) => `${c.produto} ${c.para === 1 ? "virou preço por cor" : "voltou a preço único"}`);
+      setLotesConvertidos((prev) => ({ ...prev, [lote]: convertidos }));
       return linhas;
     },
     [api, companyKey, lotesCache]
@@ -742,18 +864,25 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
       setOcupado(null);
       if (!linhas || linhas.length === 0) return;
       const base = (h.obs ?? "").replace(/^Tarefa:\s*/, "") || h.lote;
-      novaTarefaCom([...new Set(linhas.map((l) => l.produto))], `${base} (nova)`);
+      // Lote por cor reabre no modo cor, item a item (`PRODUTO|COR`).
+      const itens = h.porCor ? linhas.map((l) => `${l.produto}|${l.cor ?? ""}`) : linhas.map((l) => l.produto);
+      novaTarefaCom([...new Set(itens)], `${base} (nova)`, !!h.porCor);
     },
     [carregarLote, novaTarefaCom]
   );
 
   const reverter = useCallback(
     async (h: HistoricoLote) => {
-      if (!window.confirm(`Reverter o lote ${h.lote}? Os preços voltam para o valor anterior a ele.`)) return;
+      const msg =
+        h.porCor && (h.convertidos ?? 0) > 0
+          ? `Reverter o lote ${h.lote}? Os preços das cores voltam ao valor anterior e o(s) produto(s) que ` +
+            `este lote transformou em preço por cor voltam a ter preço único.`
+          : `Reverter o lote ${h.lote}? Os preços voltam para o valor anterior a ele.`;
+      if (!window.confirm(msg)) return;
       setOcupado(h.lote);
       setErro(null);
       try {
-        const { ok, json } = await api("/api/precos/reverter", {
+        const { ok, json } = await api(h.porCor ? "/api/precos/tarefas/reverter-cor" : "/api/precos/reverter", {
           method: "POST",
           body: JSON.stringify({ company: companyKey, lote: h.lote }),
         });
@@ -846,6 +975,12 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
               <> · <span className={base.textoErro}>{resultado.r.naoConfirmados} não confirmada(s)</span></>
             )}
             {resultado.r.lote && <> · lote <code className={base.lote}>{resultado.r.lote}</code></>}
+            {(resultado.r.convertidos?.length ?? 0) > 0 && (
+              <> · {resultado.r.convertidos!.length} produto(s) viraram preço por cor</>
+            )}
+            {(resultado.r.desconvertidos?.length ?? 0) > 0 && (
+              <> · {resultado.r.desconvertidos!.length} produto(s) voltaram a preço único</>
+            )}
             <button type="button" className={base.btnTexto} onClick={() => setResultado(null)}>
               fechar
             </button>
@@ -864,17 +999,39 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
       <section className={base.card}>
         <h2 className={base.cardTitle}>{editandoId ? "Editando tarefa" : "Nova tarefa"}</h2>
 
+        <label className={`${base.check} ${styles.modoCor} ${modoCor ? styles.modoCorLigado : ""}`}>
+          <input
+            type="checkbox"
+            checked={modoCor}
+            onChange={(e) => {
+              // Trocar de modo muda o que cada linha É (produto × produto+cor): recomeça a grade.
+              setModoCor(e.target.checked);
+              setDados(null);
+              setNovos({});
+              setTextos({});
+              setTabelasMarcadas([]);
+              setRemovidos([]);
+            }}
+          />
+          <span>
+            <strong>Preço por cor</strong> — cada código de barras altera só a cor dele. Produto que ainda tem preço
+            único vira &quot;preço por cor&quot; no Linx ao aplicar (as outras cores ficam com o preço de hoje).
+          </span>
+        </label>
+
         <div className={base.codigosBox}>
           <label className={base.campoTexto}>
             <span className={base.campoLabel}>
-              Códigos de barras ou de produto — um por linha (ou separados por vírgula/espaço)
+              {modoCor
+                ? "Códigos de barras (cada um define produto + cor) — um por linha"
+                : "Códigos de barras ou de produto — um por linha (ou separados por vírgula/espaço)"}
             </span>
             <textarea
               className={base.textarea}
               value={codigosTexto}
               onChange={(e) => setCodigosTexto(e.target.value)}
               rows={5}
-              placeholder={"7891234567890\n7891234567891\nN1.3.0018"}
+              placeholder={modoCor ? "7891234567890\n7891234567891" : "7891234567890\n7891234567891\nN1.3.0018"}
             />
           </label>
         </div>
@@ -882,7 +1039,7 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
         <div className={base.acoes}>
           <span className={styles.reconhecidos}>
             {dados
-              ? `${codigosLidos} código(s) → ${rows.length} produto(s) reconhecido(s)` +
+              ? `${codigosLidos} código(s) → ${rows.length} ${modoCor ? "produto × cor" : "produto(s)"} reconhecido(s)` +
                 (dados.naoEncontrados.length > 0 ? ` · ${dados.naoEncontrados.length} não encontrado(s)` : "")
               : totalColados > 0
                 ? `${totalColados} código(s) colado(s)`
@@ -916,6 +1073,25 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
             Lista cortada em {rows.length} de {dados.total} produtos. Divida em mais de uma tarefa.
           </div>
         )}
+        {dados && (dados.semCor?.length ?? 0) > 0 && (
+          <div className={base.avisoBox}>
+            Códigos de produto não dizem a cor e ficaram de fora ({dados.semCor!.length}):{" "}
+            {dados.semCor!.slice(0, 20).join(", ")}. Use o código de barras da cor, ou desligue &quot;Preço por cor&quot;.
+          </div>
+        )}
+        {dados && !modoCor && variaCorSet.size > 0 && (
+          <div className={base.avisoBox}>
+            {variaCorSet.size} produto(s) já têm preço por cor no Linx ({[...variaCorSet].slice(0, 8).join(", ")}
+            {variaCorSet.size > 8 ? "…" : ""}). Mudar o preço do produto não chega ao PDV para eles, então ficam fora
+            desta tarefa. Use &quot;Preço por cor&quot; com os códigos de barras das cores.
+          </div>
+        )}
+        {derivadasComBase.length > 0 && (
+          <div className={base.avisoBox}>
+            A(s) tabela(s) {derivadasComBase.join(", ")} são calculadas pelo Linx a partir de outra tabela marcada.
+            Ao alterar a base, o Linx recalcula a derivada — o valor digitado nela pode ser sobrescrito.
+          </div>
+        )}
 
         {dados && rows.length > 0 && (
           <>
@@ -936,6 +1112,7 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
                     <th>Descrição da Tabela</th>
                     <th className={base.thNum}>Itens</th>
                     <th className={base.thNum}>Preço (1) atual</th>
+                    <th className={base.thNum}>Desconto %</th>
                     <th className={base.thNum}>Novo p/ todos</th>
                   </tr>
                 </thead>
@@ -960,10 +1137,43 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
                         <td className={base.tdDesc}>
                           {t.descricao}
                           {t.inativa && <span className={base.badgeInativa}>inativa</span>}
+                          {(() => {
+                            const b = dados?.tabelas.find((x) => x.codigo === t.codigo)?.base;
+                            return b ? <span className={base.dica}> · calculada a partir da {b}</span> : null;
+                          })()}
                         </td>
                         <td className={base.thNum}>{t.itens}</td>
                         <td className={base.thNum}>
                           {mesmoValor(t.min, t.max) ? `R$ ${fmt(t.min)}` : `R$ ${fmt(t.min)} – ${fmt(t.max)}`}
+                        </td>
+                        <td className={base.thNum}>
+                          {(() => {
+                            const chave = `DESC||${t.codigo}`;
+                            const entrada = textos[chave] !== undefined ? parseDesconto(textos[chave]) : undefined;
+                            const previa =
+                              entrada && entrada.tipo === "pct"
+                                ? [calcular(entrada, t.min) ?? 0, calcular(entrada, t.max) ?? 0]
+                                : null;
+                            return (
+                              <div className={styles.descontoCelula}>
+                                <input
+                                  className={`${styles.inputNovo} ${styles.inputPct} ${entrada === null ? styles.inputInvalido : ""}`}
+                                  value={textos[chave] ?? ""}
+                                  placeholder="ex.: 60"
+                                  disabled={!marcada || !podeExecutar}
+                                  inputMode="decimal"
+                                  title="Desconto sobre o preço atual de cada produto desta tabela (ex.: 60 = 60% off)"
+                                  onChange={(e) => aplicarTodos(t.codigo, e.target.value, "desconto")}
+                                />
+                                <span className={styles.pctSufixo}>%</span>
+                                {previa && (
+                                  <span className={styles.previa}>
+                                    = R$ {mesmoValor(previa[0], previa[1]) ? fmt(previa[0]) : `${fmt(previa[0])} – ${fmt(previa[1])}`}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td className={base.thNum}>
                           {(() => {
@@ -977,7 +1187,7 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
                                 disabled={!marcada || !podeExecutar}
                                 inputMode="decimal"
                                 title="Mesmo valor (ou percentual, ex.: -20%) para todos os produtos desta tabela"
-                                onChange={(e) => aplicarTodos(t.codigo, e.target.value)}
+                                onChange={(e) => aplicarTodos(t.codigo, e.target.value, "valor")}
                               />
                             );
                           })()}
@@ -989,8 +1199,9 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
               </table>
             </div>
             <p className={base.dica}>
-              Valor em reais (119,90) ou percentual com sinal sobre o preço atual (-20%, +5%). O Preço Líquido
-              acompanha o Preço, como no script.
+              Desconto %: digite só o número (60 = 60% off) e cada produto recebe o desconto sobre o próprio preço
+              atual. Novo p/ todos: um valor único em reais. Nos grupos dá para ajustar um a um (119,90, -20% ou +5%).
+              O Preço Líquido acompanha o Preço, como no script.
             </p>
 
             {/* ── grupos ── */}
@@ -1031,9 +1242,20 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
                       <div className={styles.grupoProdutos}>
                         {g.membros.map((m) => (
                           <span key={m.produto} className={styles.chip}>
-                            <span className={styles.chipCodigo}>{m.produto}</span>
+                            <span className={styles.chipCodigo}>{modoCor ? m.produto.split("|")[0] : m.produto}</span>
                             {m.descricao}
                             {m.inativo && <span className={base.badgeInativa}>inativo</span>}
+                            {modoCor && !m.variaPorCor && (
+                              <span className={styles.badgeConverte} title="Ao aplicar, o produto passa a ter preço por cor no Linx">
+                                vira preço por cor
+                              </span>
+                            )}
+                            {modoCor && m.variaPorCor && <span className={styles.badgePorCor}>preço por cor</span>}
+                            {!modoCor && variaCorSet.has(m.produto) && (
+                              <span className={styles.badgeConverte} title="Já tem preço por cor: fica fora no modo por produto">
+                                preço por cor — fora
+                              </span>
+                            )}
                             <button
                               type="button"
                               className={styles.chipRemover}
@@ -1114,7 +1336,8 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
             {/* ── salvar ── */}
             <div className={styles.salvarBox}>
               <div className={base.resumoLinha}>
-                <strong>{alteracoes.length}</strong> alteração(ões) em <strong>{produtosComAlteracao}</strong> produto(s)
+                <strong>{alteracoes.length}</strong> alteração(ões) em <strong>{produtosComAlteracao}</strong>{" "}
+                {modoCor ? "produto × cor" : "produto(s)"}
                 {tabelasMarcadas.length > 0 && <> · tabelas {tabelasMarcadas.join(", ")}</>}
                 {alteracoes.length > 0 && (
                   <button type="button" className={base.btnTexto} onClick={() => setVerAlteracoes((v) => !v)}>
@@ -1122,6 +1345,14 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
                   </button>
                 )}
               </div>
+              {viramPorCor.length > 0 && (
+                <div className={base.avisoBox}>
+                  Ao aplicar, {viramPorCor.length} produto(s) passam a ter <strong>preço por cor</strong> no Linx (
+                  {viramPorCor.slice(0, 6).join(", ")}
+                  {viramPorCor.length > 6 ? "…" : ""}): as cores que não estão na lista continuam com o preço de hoje.
+                  Reverter o lote devolve o preço único.
+                </div>
+              )}
 
               {verAlteracoes && alteracoes.length > 0 && (
                 <div className={base.tabelaWrap}>
@@ -1223,6 +1454,7 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
                         <button type="button" className={styles.linkLinha} onClick={() => setTarefaAberta(aberta ? null : t.id)}>
                           {aberta ? "▾" : "▸"} {t.nome}
                         </button>
+                        {t.modo === "cor" && <span className={styles.badgePorCor}>por cor</span>}
                         {editandoId === t.id && <span className={base.dica}> · em edição</span>}
                       </td>
                       <td>
@@ -1319,7 +1551,7 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
                             <button
                               type="button"
                               className={base.btnTexto}
-                              onClick={() => novaTarefaCom(t.produtos.map((p) => p.produto), `${t.nome} (nova)`)}
+                              onClick={() => novaTarefaCom(t.produtos.map((p) => p.produto), `${t.nome} (nova)`, t.modo === "cor")}
                             >
                               Reaproveitar produtos
                             </button>
@@ -1392,7 +1624,11 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
                       </td>
                       <td className={base.tdMeta}>
                         <strong>{nomesLote.get(h.lote)?.nome || "sem nome"}</strong>
-                        <span className={base.tdMetaSub}>{nomesLote.get(h.lote)?.origem}</span>
+                        <span className={base.tdMetaSub}>
+                          {nomesLote.get(h.lote)?.origem}
+                          {h.porCor && " · por cor"}
+                          {h.porCor && (h.convertidos ?? 0) > 0 && ` · ${h.convertidos} conversão(ões)`}
+                        </span>
                       </td>
                       <td>{h.usuario}</td>
                       <td className={base.thNum}>
@@ -1438,6 +1674,10 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
                           {!linhas ? (
                             <span className={base.dica}>Carregando itens…</span>
                           ) : (
+                            <>
+                            {(lotesConvertidos[h.lote] ?? []).length > 0 && (
+                              <p className={base.dica}>{lotesConvertidos[h.lote].join(" · ")}</p>
+                            )}
                             <table className={base.tabelaFicha}>
                               <thead>
                                 <tr>
@@ -1455,7 +1695,7 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
                                 {linhas.map((l, i) => (
                                   <tr key={`${l.produto}|${l.tabela}|${l.slot}|${i}`}>
                                     <td className={base.thFichaNum}>{i + 1}</td>
-                                    <td className={base.tdCodigo}>{l.produto}</td>
+                                    <td className={base.tdCodigo}>{l.cor ? `${l.produto} · ${l.cor}` : l.produto}</td>
                                     <td className={base.tdDesc}>{l.descricao}</td>
                                     <td className={base.tdDesc}>
                                       {l.tabela} · {l.tabelaDesc}
@@ -1469,6 +1709,7 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
                                 ))}
                               </tbody>
                             </table>
+                            </>
                           )}
                         </td>
                       </tr>

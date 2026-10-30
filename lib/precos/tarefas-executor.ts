@@ -10,6 +10,7 @@ import { findUserByUsername } from "@/lib/auth/users-store";
 import { isReadOnlyRole, normalizeRole } from "@/lib/auth/permissions";
 import { PRECOS_VIEW_ROLES } from "@/lib/auth/precos-guard";
 import { executarAlteracaoPrecos, type ExecutarPrecosResult } from "@/lib/repositories/precos";
+import { executarAlteracaoPrecosCor, separarItemCor } from "@/lib/repositories/precosCor";
 import { agendarDisparo, cancelarDisparo } from "@/lib/precos/agendador-qstash";
 import { atualizarTarefa, type PrecoTarefa } from "@/lib/precos/tarefas-store";
 
@@ -73,6 +74,32 @@ export async function usuarioPodeGravarPrecos(username: string): Promise<boolean
 }
 
 /**
+ * Modo cor: cada alteração é `PRODUTO|COR` × tabela. Devolve no mesmo formato do modo por
+ * produto (a tela e o store não precisam saber a diferença), com `convertidos` a mais.
+ */
+async function executarTarefaPorCor(
+  tarefa: PrecoTarefa,
+  usuario: string,
+  obs: string
+): Promise<ExecutarPrecosResult & { convertidos: string[] }> {
+  const alteracoes = tarefa.alteracoes.flatMap((a) => {
+    const item = separarItemCor(a.produto);
+    return item ? [{ produto: item.produto, cor: item.cor, tabela: a.tabela, valor: a.valor }] : [];
+  });
+  const r = await executarAlteracaoPrecosCor({ company: tarefa.company, usuario, alteracoes, obs });
+  return {
+    lote: r.lote,
+    aplicados: r.aplicados,
+    semMudanca: r.semMudanca,
+    semRegistro: r.semRegistro,
+    naoConfirmados: r.naoConfirmados,
+    porCampo: [],
+    erros: r.erros,
+    convertidos: r.convertidos,
+  };
+}
+
+/**
  * Executa uma tarefa JÁ reivindicada (status 'executando') e grava o desfecho.
  * Erro inesperado sobe para quem chamou decidir: o manual mostra, o agendado pode
  * devolver a tarefa para o QStash tentar de novo.
@@ -85,15 +112,19 @@ export async function executarTarefa(
     throw new Error("A tarefa não tem alterações.");
   }
 
-  const resultado = await executarAlteracaoPrecos({
-    company: tarefa.company,
-    usuario,
-    alteracoes: tarefa.alteracoes.map((a) => ({ produto: a.produto, campoKey: a.campoKey, valor: a.valor })),
-    // Mesma regra da tela Alterar Custo / Preço: o Preço Líquido acompanha o Preço.
-    sincronizarPrecoLiquido: true,
-    sincronizarPrecoAVista: false,
-    obs: `Tarefa: ${tarefa.nome}`.slice(0, 300),
-  });
+  const obs = `Tarefa: ${tarefa.nome}`.slice(0, 300);
+  const resultado: ExecutarPrecosResult =
+    tarefa.modo === "cor"
+      ? await executarTarefaPorCor(tarefa, usuario, obs)
+      : await executarAlteracaoPrecos({
+          company: tarefa.company,
+          usuario,
+          alteracoes: tarefa.alteracoes.map((a) => ({ produto: a.produto, campoKey: a.campoKey, valor: a.valor })),
+          // Mesma regra da tela Alterar Custo / Preço: o Preço Líquido acompanha o Preço.
+          sincronizarPrecoLiquido: true,
+          sincronizarPrecoAVista: false,
+          obs,
+        });
 
   const falhouTudo = resultado.aplicados === 0 && (resultado.naoConfirmados > 0 || resultado.erros.length > 0);
 

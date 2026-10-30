@@ -8,8 +8,10 @@ import {
   obterTarefa,
   salvarTarefa,
   type TarefaAlteracao,
+  type TarefaModo,
   type TarefaProduto,
 } from '@/lib/precos/tarefas-store';
+import { separarItemCor } from '@/lib/repositories/precosCor';
 import { LIMITE_ALTERACOES, parseCampoKey } from '@/lib/repositories/precos';
 
 export const dynamic = 'force-dynamic';
@@ -44,6 +46,7 @@ interface Body {
   id?: string | null;
   company?: string;
   nome?: string;
+  modo?: TarefaModo;
   produtos?: TarefaProduto[];
   alteracoes?: TarefaAlteracao[];
   /** ISO; null deixa pendente; ausente mantém o agendamento atual. */
@@ -58,7 +61,10 @@ function limpar(v: unknown): string {
  * Só preço de tabela (PRODUTOS_PRECOS) entra numa tarefa: é o que a tela edita. A chave
  * passa pela mesma whitelist do Alterar Custo / Preço — nada do cliente vai cru ao SQL.
  */
-function validarAlteracoes(entrada: unknown): { alteracoes: TarefaAlteracao[]; erro: string | null } {
+function validarAlteracoes(
+  entrada: unknown,
+  modo: TarefaModo
+): { alteracoes: TarefaAlteracao[]; erro: string | null } {
   if (!Array.isArray(entrada) || entrada.length === 0) {
     return { alteracoes: [], erro: 'A tarefa não tem nenhuma alteração.' };
   }
@@ -70,6 +76,10 @@ function validarAlteracoes(entrada: unknown): { alteracoes: TarefaAlteracao[]; e
     const valor = Number(raw?.valor);
     if (!produto || !campo || campo.origem !== 'PRODUTOS_PRECOS') {
       return { alteracoes: [], erro: `Alteração inválida (${produto || 'sem produto'}).` };
+    }
+    // Modo cor: o item é `PRODUTO|COR`; modo produto: código puro (sem a barra).
+    if ((modo === 'cor') !== produto.includes('|') || (modo === 'cor' && !separarItemCor(produto))) {
+      return { alteracoes: [], erro: `Item ${produto} não combina com o modo ${modo === 'cor' ? 'por cor' : 'por produto'}.` };
     }
     if (!Number.isFinite(valor) || valor < 0) {
       return { alteracoes: [], erro: `Valor inválido para ${produto} na tabela ${campo.codigoTabela}.` };
@@ -107,7 +117,8 @@ export async function POST(request: Request) {
     const nome = limpar(body.nome).slice(0, 120);
     if (!nome) return NextResponse.json({ error: 'Dê um nome para a tarefa.' }, { status: 400 });
 
-    const { alteracoes, erro } = validarAlteracoes(body.alteracoes);
+    const modo: TarefaModo = body.modo === 'cor' ? 'cor' : 'produto';
+    const { alteracoes, erro } = validarAlteracoes(body.alteracoes, modo);
     if (erro) return NextResponse.json({ error: erro }, { status: 400 });
 
     const comAlteracao = new Set(alteracoes.map((a) => a.produto));
@@ -126,7 +137,7 @@ export async function POST(request: Request) {
       }
     }
 
-    let tarefa = await salvarTarefa({ id, company, nome, produtos, alteracoes, usuario });
+    let tarefa = await salvarTarefa({ id, company, nome, modo, produtos, alteracoes, usuario });
 
     if (body.agendadoPara !== undefined) {
       try {

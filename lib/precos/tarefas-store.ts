@@ -21,6 +21,12 @@ import type { ExecutarPrecosResult, PrecoCompany } from "@/lib/repositories/prec
 
 export type TarefaStatus = "pendente" | "agendada" | "executando" | "aplicada" | "erro";
 
+/**
+ * `produto`: preço da tabela vale para todas as cores (PRODUTOS_PRECOS).
+ * `cor`: cada item é `PRODUTO|COR` e grava PRODUTOS_PRECO_COR (ver precosCor.ts).
+ */
+export type TarefaModo = "produto" | "cor";
+
 export interface TarefaProduto {
   produto: string;
   descricao: string;
@@ -41,6 +47,7 @@ export interface PrecoTarefa {
   id: string;
   company: PrecoCompany;
   nome: string;
+  modo: TarefaModo;
   status: TarefaStatus;
   agendadoPara: string | null;
   agendadoPor: string | null;
@@ -140,6 +147,8 @@ async function runMigrations(): Promise<void> {
     )
   `);
   await ddl(() => sql`CREATE INDEX IF NOT EXISTS preco_tarefas_company_idx ON preco_tarefas (company, status)`);
+  // `modo` entrou com o preço por cor; tarefas antigas são por produto.
+  await ddl(() => sql`ALTER TABLE preco_tarefas ADD COLUMN IF NOT EXISTS modo TEXT NOT NULL DEFAULT 'produto'`);
 }
 
 type Row = Record<string, unknown>;
@@ -155,6 +164,7 @@ function fromRow(r: Row): PrecoTarefa {
     id: String(r.id),
     company: r.company === "scarfme" ? "scarfme" : "nerd",
     nome: String(r.nome ?? ""),
+    modo: r.modo === "cor" ? "cor" : "produto",
     status: String(r.status ?? "pendente") as TarefaStatus,
     agendadoPara: iso(r.agendado_para),
     agendadoPor: (r.agendado_por as string | null) ?? null,
@@ -216,6 +226,7 @@ export interface SalvarTarefaInput {
   id?: string | null;
   company: PrecoCompany;
   nome: string;
+  modo: TarefaModo;
   produtos: TarefaProduto[];
   alteracoes: TarefaAlteracao[];
   usuario: string;
@@ -229,10 +240,10 @@ export async function salvarTarefa(input: SalvarTarefaInput): Promise<PrecoTaref
     const todas = lerArquivo();
     const existente = input.id ? todas.find((t) => t.id === input.id) : undefined;
     const tarefa: PrecoTarefa = existente
-      ? { ...existente, nome: input.nome, produtos: input.produtos, alteracoes: input.alteracoes,
+      ? { ...existente, nome: input.nome, modo: input.modo, produtos: input.produtos, alteracoes: input.alteracoes,
           atualizadoPor: input.usuario, atualizadoEm: agora }
       : {
-          id: randomUUID(), company: input.company, nome: input.nome, status: "pendente",
+          id: randomUUID(), company: input.company, nome: input.nome, modo: input.modo, status: "pendente",
           agendadoPara: null, agendadoPor: null, qstashMessageId: null,
           produtos: input.produtos, alteracoes: input.alteracoes,
           criadoPor: input.usuario, criadoEm: agora, atualizadoPor: null, atualizadoEm: agora,
@@ -250,7 +261,7 @@ export async function salvarTarefa(input: SalvarTarefaInput): Promise<PrecoTaref
   if (input.id) {
     const rows = (await sql`
       UPDATE preco_tarefas
-      SET nome = ${input.nome}, produtos = ${produtos}::jsonb, alteracoes = ${alteracoes}::jsonb,
+      SET nome = ${input.nome}, modo = ${input.modo}, produtos = ${produtos}::jsonb, alteracoes = ${alteracoes}::jsonb,
           atualizado_por = ${input.usuario}, atualizado_em = NOW()
       WHERE id = ${input.id} AND company = ${input.company}
       RETURNING *
@@ -260,8 +271,8 @@ export async function salvarTarefa(input: SalvarTarefaInput): Promise<PrecoTaref
   }
 
   const rows = (await sql`
-    INSERT INTO preco_tarefas (id, company, nome, status, produtos, alteracoes, criado_por)
-    VALUES (${randomUUID()}, ${input.company}, ${input.nome}, 'pendente',
+    INSERT INTO preco_tarefas (id, company, nome, modo, status, produtos, alteracoes, criado_por)
+    VALUES (${randomUUID()}, ${input.company}, ${input.nome}, ${input.modo}, 'pendente',
             ${produtos}::jsonb, ${alteracoes}::jsonb, ${input.usuario})
     RETURNING *
   `) as Row[];
