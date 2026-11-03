@@ -3925,8 +3925,8 @@
     "semantic_hash": ""
   },
   "app/api/precos/reverter/route.ts": {
-    "mtime": 1785774984.8493793,
-    "ast_hash": "5545359a629291a213bf8b62084c0d7a",
+    "mtime": 1793707713.078073,
+    "ast_hash": "df711110f6b42577f255199460cd3b25",
     "semantic_hash": ""
   },
   "app/api/products/colecoes/descricoes/route.ts": {
@@ -4000,8 +4000,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/precos.ts": {
-    "mtime": 1785782586.6107998,
-    "ast_hash": "fdd9f212a844d74b5c4c8f3682aa2b05",
+    "mtime": 1793707711.4449573,
+    "ast_hash": "a09957d503570856740d55f8bf17b295",
     "semantic_hash": ""
   },
   "lib/repositories/topProdutosPresentation.ts": {
@@ -5235,8 +5235,8 @@
     "semantic_hash": ""
   },
   "components/precos/ProgramarPrecosPage.tsx": {
-    "mtime": 1793392897.8857236,
-    "ast_hash": "93d200188bfea561eba98f8cb9cd3438",
+    "mtime": 1793707752.8303463,
+    "ast_hash": "bbbd1cb3f6d6d675a00ead83ec66921f",
     "semantic_hash": ""
   },
   "lib/precos/agendador-qstash.ts": {
@@ -5255,8 +5255,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/precosTarefas.ts": {
-    "mtime": 1793366912.8317847,
-    "ast_hash": "b81d0bca4859864ff41b0d7a48adf28b",
+    "mtime": 1793707713.909649,
+    "ast_hash": "ea54204c1de1b80e199223e874042193",
     "semantic_hash": ""
   }
 }

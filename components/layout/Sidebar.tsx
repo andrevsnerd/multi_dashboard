@@ -682,14 +682,14 @@ export default function Sidebar({ companyName }: SidebarProps) {
           isActive: (currentPathname) =>
             matchesSegment(currentPathname, "/alterar-precos", alterarPrecosHref),
         },
-        // Tarefas de preço (pendentes/agendadas): mesma permissão do Alterar Custo / Preço.
+        // Tarefas de preço (pendentes/agendadas).
         ...(isScarfme || isNerd
           ? [
               {
                 key: "programar-precos",
                 label: "Programar Preços",
                 href: programarPrecosHref,
-                permission: "alterar-precos" as const,
+                permission: "programar-precos" as const,
                 isActive: (currentPathname: string | null) =>
                   matchesSegment(currentPathname, "/programar-precos", programarPrecosHref),
               },

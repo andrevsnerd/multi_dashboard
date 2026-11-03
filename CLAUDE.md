@@ -96,6 +96,26 @@ Foi o que fizeram o antigo `romaneios/editar-qtd` e o `transfer-executor` (rota 
 desalinhada agora **trava operação**. Saídas conferem saldo antes de gravar:
 [lib/server/trava-estoque-negativo.ts](lib/server/trava-estoque-negativo.ts).
 
+## ⛔ REGRA OBRIGATÓRIA — TODA PÁGINA NOVA TEM PERMISSÃO PRÓPRIA NO ADMIN
+
+Toda página nova (rota em `app/(companies)/[company]/<segmento>`) precisa poder ser marcada
+para um usuário no `/admin`. **Nunca** pendure a rota nova no `routeSegments` de outra chave
+("herda a permissão de X") — isso some com o checkbox e só admin/diretor enxergam a página.
+Foi o que aconteceu com o Programar Preços (rota dentro de `alterar-precos`, corrigido em 03/11/2026).
+
+Ao criar a página, no mesmo commit:
+
+1. [lib/config/page-permissions.ts](lib/config/page-permissions.ts) — entrada própria
+   `{ key: "<segmento>", label: "…", routeSegments: ["<segmento>"] }`. É ela que gera o checkbox do admin.
+2. [components/layout/Sidebar.tsx](components/layout/Sidebar.tsx) — item com `permission: "<segmento>"`.
+3. Se mexe em custo/preço/cadastro ou é restrita por função, adicione a chave em
+   `ROLE_RESTRICTED_PERMISSIONS` ([lib/auth/permissions.ts](lib/auth/permissions.ts)) — sem isso,
+   gerente/supervisor também poderiam receber a página.
+4. Rotas de API da página continuam checando função/escrita no servidor (ex.: `autorizarPrecos`).
+
+Sub-rota de detalhe (`romaneios/[romaneio]`, `vendedores/detalhe`) herda a página-mãe; isso é
+permitido. Só pode compartilhar chave entre páginas irmãs se o dono pedir.
+
 ## graphify
 
 This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
