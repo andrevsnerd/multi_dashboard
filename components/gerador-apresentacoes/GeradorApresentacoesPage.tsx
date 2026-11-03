@@ -1133,8 +1133,18 @@ export default function GeradorApresentacoesPage({
         canvas.height = 0;
       }
 
+      // "GALEÃO RJ" → "galeao-rj"; "JUL–AGO 2026" → "jul-ago" (sem o ano).
+      const slug = (s: string) =>
+        s
+          .normalize("NFD")
+          .replace(/[̀-ͯ]/g, "")
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-+|-+$/g, "");
       const baseName = topProdutos
-        ? `top-produtos-${topProdutos.period.start}-${topProdutos.period.end}`
+        ? `top-produtos-${companyKey}-${slug(topProdutos.scope.eyebrow)}-${slug(
+            topProdutos.period.label.replace(/\s*\d{4}(–\d{4})?$/, "")
+          )}`
         : giro
         ? `giro-${(giro.title || "produtos").toLowerCase()}-${giro.period.start}-${giro.period.end}`
         : comparativo
@@ -1149,7 +1159,7 @@ export default function GeradorApresentacoesPage({
     } finally {
       setExportingPdf(false);
     }
-  }, [report, comparativo, resumido, giro, topProdutos, activePalette]);
+  }, [report, comparativo, resumido, giro, topProdutos, activePalette, companyKey]);
 
   const hasResult = Boolean(report || comparativo || resumido || giro || topProdutos);
 
