@@ -2835,14 +2835,14 @@
     "semantic_hash": "7af890ddc9b055e968b929db295fa9d0"
   },
   "lib/utils/fornecedor-matcher.ts": {
-    "mtime": 1782398384.7685282,
-    "ast_hash": "84d9e942b133fd413189606958472d70",
-    "semantic_hash": "84d9e942b133fd413189606958472d70"
+    "mtime": 1793716557.2843497,
+    "ast_hash": "9462a85947f09aaa9d70a06b17efecf3",
+    "semantic_hash": ""
   },
   "lib/utils/fornecedores-store.ts": {
-    "mtime": 1782399189.047869,
-    "ast_hash": "7f2f13f8eb26b86bd42e3230834215f8",
-    "semantic_hash": "7f2f13f8eb26b86bd42e3230834215f8"
+    "mtime": 1793716575.8489997,
+    "ast_hash": "f7f9b76c951535bae010ad00387102b2",
+    "semantic_hash": ""
   },
   "lib/utils/generateStockActionsPDF.ts": {
     "mtime": 1780073682.8743443,

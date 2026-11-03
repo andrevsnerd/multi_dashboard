@@ -1395,8 +1395,8 @@
     "semantic_hash": ""
   },
   "components/gerador-apresentacoes/GeradorApresentacoesPage.tsx": {
-    "mtime": 1791295244.4367838,
-    "ast_hash": "5b9eefc4a7d8892acfd80e017688cfe0",
+    "mtime": 1793713576.4871223,
+    "ast_hash": "3f06c188b815dd379df30ad94993dcd9",
     "semantic_hash": ""
   },
   "components/historico-transferencias/HistoricoTransferenciasPage.tsx": {
@@ -1425,8 +1425,8 @@
     "semantic_hash": "7a672d31b6ac254cb25f6a420501049d"
   },
   "components/layout/Sidebar.tsx": {
-    "mtime": 1793367222.7395525,
-    "ast_hash": "8eb9cf2bb528fd34883c8810345f9f9f",
+    "mtime": 1793708111.7507305,
+    "ast_hash": "3d8d6dc2eb9c99b8f1240644e3a02866",
     "semantic_hash": ""
   },
   "components/layout/SidebarContext.tsx": {
@@ -2070,8 +2070,8 @@
     "semantic_hash": ""
   },
   "lib/auth/permissions.ts": {
-    "mtime": 1793203829.2638142,
-    "ast_hash": "79d2ccd63fdf52d874b3c49fd99c7012",
+    "mtime": 1793708110.9336195,
+    "ast_hash": "5c076d14a02f6f7aa0d52352088e024a",
     "semantic_hash": ""
   },
   "lib/auth/users-store-neon.ts": {
@@ -2150,8 +2150,8 @@
     "semantic_hash": "29590f1b0f773ebbcd60e9dc314eec58"
   },
   "lib/config/page-permissions.ts": {
-    "mtime": 1793367222.7395525,
-    "ast_hash": "5357ad51a3411f8516615f962f7d5cf3",
+    "mtime": 1793708110.1057847,
+    "ast_hash": "3f9f3da6f5df7bd1174b55996fff5c18",
     "semantic_hash": ""
   },
   "lib/constants/columns.ts": {
@@ -3270,8 +3270,8 @@
     "semantic_hash": "13b10626efb1b650fd9a9d669d662dac"
   },
   "CLAUDE.md": {
-    "mtime": 1791995282.9016137,
-    "ast_hash": "d2c9676960b5eecbd0b6f86d977556d0",
+    "mtime": 1793708125.132152,
+    "ast_hash": "8259fdd8b1384ef9c0b01144f70e1c00",
     "semantic_hash": ""
   },
   "QUICK_START_CLOUDFLARE.md": {

@@ -20,12 +20,9 @@ const FORNECEDORES_FILE = path.join(process.cwd(), 'data', 'fornecedores.json');
 
 let tableChecked = false;
 
-// ── In-memory cache (invalida ao salvar/deletar) ──────────────────────────────
-let _cache: Fornecedor[] | null = null;
-
-function invalidateCache() {
-  _cache = null;
-}
+// Sem cache em memória de propósito: em serverless cada instância guardava a sua cópia e a
+// edição (marca nova no Externo) não chegava às outras — o Centro seguia trazendo a marca.
+// Ver memória [[cache-processo-store-valor-velho]].
 
 // ── Marcas NF (fornecedor externo) — semente derivada dos scripts Python ──────
 // estoque_produto_geral_nerd.py: produtos com nota fiscal de terceiros.
@@ -68,8 +65,9 @@ export const DEFAULT_FORNECEDORES: Fornecedor[] = [
 
 function normalizeFornecedor(raw: Partial<Fornecedor>): Fornecedor {
   const nowIso = SEED_TS;
+  const id = String(raw.id ?? '').trim();
   return {
-    id: String(raw.id ?? '').trim(),
+    id,
     company: String(raw.company ?? '').toLowerCase().trim(),
     nome: String(raw.nome ?? '').trim(),
     modo: (raw.modo === 'complemento' ? 'complemento' : 'explicito') as FornecedorModo,
@@ -81,8 +79,9 @@ function normalizeFornecedor(raw: Partial<Fornecedor>): Fornecedor {
           .map((i) => ({ produto: String(i?.produto ?? '').trim(), cor: i?.cor ? String(i.cor).trim() : null }))
           .filter((i) => i.produto)
       : [],
+    // Um complemento ignorando a si mesmo não ignora nada (vira "captura tudo").
     ignorarFornecedorIds: Array.isArray(raw.ignorarFornecedorIds)
-      ? raw.ignorarFornecedorIds.map((id) => String(id).trim()).filter(Boolean)
+      ? raw.ignorarFornecedorIds.map((x) => String(x).trim()).filter((x) => x && x !== id)
       : [],
     createdAt: raw.createdAt ? String(raw.createdAt) : nowIso,
     updatedAt: raw.updatedAt ? String(raw.updatedAt) : nowIso,
@@ -135,7 +134,6 @@ async function ensureTable(sql: ReturnType<typeof getNeonSql>) {
 // ── CRUD ──────────────────────────────────────────────────────────────────────
 
 export async function listFornecedores(): Promise<Fornecedor[]> {
-  if (_cache !== null) return _cache;
 
   let fornecedores: Fornecedor[];
 
@@ -164,7 +162,6 @@ export async function listFornecedores(): Promise<Fornecedor[]> {
     );
   }
 
-  _cache = fornecedores;
   return fornecedores;
 }
 
@@ -200,7 +197,6 @@ export async function saveFornecedor(input: Partial<Fornecedor>): Promise<Fornec
     if (idx === -1) fornecedores.push(fornecedor);
     else fornecedores[idx] = fornecedor;
     writeFornecedoresFile(fornecedores);
-    invalidateCache();
     return fornecedor;
   }
 
@@ -228,7 +224,6 @@ export async function saveFornecedor(input: Partial<Fornecedor>): Promise<Fornec
       ignorar_fornecedor_ids = EXCLUDED.ignorar_fornecedor_ids,
       updated_at = NOW()
   `;
-  invalidateCache();
   return fornecedor;
 }
 
@@ -236,12 +231,10 @@ export async function deleteFornecedor(id: string): Promise<void> {
   if (!hasPostgres()) {
     const fornecedores = readFornecedoresFile();
     writeFornecedoresFile(fornecedores.filter((f) => f.id !== id));
-    invalidateCache();
     return;
   }
 
   const sql = getNeonSql();
   await ensureTable(sql);
   await sql`DELETE FROM fornecedores WHERE id = ${id}`;
-  invalidateCache();
 }

@@ -562,5 +562,9 @@
   "560": "page.tsx",
   "561": "page.tsx",
   "562": "EstoqueInventarioPanel.tsx",
-  "563": "produto-curva.ts"
+  "563": "produto-curva.ts",
+  "564": "page.tsx",
+  "565": "page.tsx",
+  "566": "calcularDiferencasLocal",
+  "567": "executeQueryWithParams"
 }

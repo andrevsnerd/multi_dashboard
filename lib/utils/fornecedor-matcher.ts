@@ -104,8 +104,11 @@ export function productMatchesFornecedor(
     return matchExplicito(alvo, info);
   }
 
-  // Complemento: pertence se nenhum fornecedor ignorado o captura.
+  // Complemento: pertence se nenhum fornecedor ignorado o captura. Auto-referência é
+  // descartada: o Centro chegou a ser salvo ignorando a si mesmo (out/2026) e, sem regra
+  // própria, não ignorava nada — o filtro "Centro" trazia os externos junto.
   for (const ignoradoId of alvo.ignorarFornecedorIds ?? []) {
+    if (ignoradoId === alvo.id) continue;
     const ignorado = fornecedores.find((f) => f.id === ignoradoId);
     if (ignorado && matchExplicito(ignorado, info)) return false;
   }
