@@ -6,13 +6,16 @@ import { reverterLotePrecos } from '@/lib/repositories/precos';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
-/** Desfaz um lote reaplicando os valores anteriores (novo lote marcado como estorno). */
+/**
+ * Desfaz um lote reaplicando os valores anteriores (novo lote marcado como estorno).
+ * Com `produto`, desfaz só aquele produto e o resto do lote segue em vigor.
+ */
 export async function POST(request: Request) {
   const autorizacao = await autorizarPrecos(request, { exigirEscrita: true });
   if ('erro' in autorizacao) return autorizacao.erro;
 
   try {
-    const body = (await request.json()) as { company?: string; lote?: string };
+    const body = (await request.json()) as { company?: string; lote?: string; produto?: string };
     const company = parsePrecoCompany(body.company);
     const lote = (body.lote ?? '').trim();
     if (!company) {
@@ -22,7 +25,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Lote não informado.' }, { status: 400 });
     }
 
-    const resultado = await reverterLotePrecos(lote, company, autorizacao.auth.username);
+    const resultado = await reverterLotePrecos(lote, company, autorizacao.auth.username, body.produto);
     return NextResponse.json(resultado);
   } catch (error) {
     console.error('[precos/reverter] erro', error);

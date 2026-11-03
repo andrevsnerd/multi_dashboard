@@ -82,6 +82,7 @@ interface HistoricoLote {
   usuario: string;
   alteracoes: number;
   produtos: number;
+  produtosRevertidos: number;
   campos: string[];
   obs: string | null;
   reverteLote: string | null;
@@ -743,8 +744,8 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
   // ───────── histórico: ações ─────────
 
   const carregarLote = useCallback(
-    async (lote: string): Promise<LoteLinha[] | null> => {
-      if (lotesCache[lote]) return lotesCache[lote];
+    async (lote: string, forcar = false): Promise<LoteLinha[] | null> => {
+      if (!forcar && lotesCache[lote]) return lotesCache[lote];
       const { ok, json } = await api(`/api/precos/tarefas/lote?company=${companyKey}&lote=${encodeURIComponent(lote)}`);
       if (!ok) {
         setErro(json?.error ?? "Erro ao carregar o lote.");
@@ -794,11 +795,39 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
         if (!ok) setErro(json?.error ?? "Erro ao reverter.");
         else setResultado({ titulo: `Lote ${h.lote} revertido`, r: json as Resultado });
         void carregarHistorico();
+        if (loteAberto === h.lote) void carregarLote(h.lote, true);
       } finally {
         setOcupado(null);
       }
     },
-    [api, companyKey, carregarHistorico]
+    [api, companyKey, carregarHistorico, carregarLote, loteAberto]
+  );
+
+  /** Desfaz só um produto do lote; os demais seguem em vigor com o mesmo nome de lote. */
+  const reverterProduto = useCallback(
+    async (h: HistoricoLote, produto: string, nomeLote: string) => {
+      if (
+        !window.confirm(
+          `Reverter o produto ${produto} do lote "${nomeLote}"? O preço dele volta para o valor anterior; os outros produtos do lote continuam como estão.`
+        )
+      )
+        return;
+      setOcupado(`${h.lote}|${produto}`);
+      setErro(null);
+      try {
+        const { ok, json } = await api("/api/precos/reverter", {
+          method: "POST",
+          body: JSON.stringify({ company: companyKey, lote: h.lote, produto }),
+        });
+        if (!ok) setErro(json?.error ?? "Erro ao reverter o produto.");
+        else setResultado({ titulo: `Produto ${produto} revertido (${nomeLote})`, r: json as Resultado });
+        void carregarHistorico();
+        void carregarLote(h.lote, true);
+      } finally {
+        setOcupado(null);
+      }
+    },
+    [api, companyKey, carregarHistorico, carregarLote]
   );
 
   /**
@@ -817,7 +846,11 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
     for (const h of historico) {
       if (h.reverteLote) {
         const original = proprio.get(h.reverteLote)?.nome;
-        out.set(h.lote, { nome: `Estorno de: ${original || h.reverteLote}`, origem: "Reverter" });
+        const produto = /^Estorno do produto (\S+) /.exec(h.obs ?? "")?.[1];
+        out.set(h.lote, {
+          nome: `Estorno de: ${original || h.reverteLote}${produto ? ` (produto ${produto})` : ""}`,
+          origem: "Reverter",
+        });
       } else {
         out.set(h.lote, proprio.get(h.lote)!);
       }
@@ -1428,7 +1461,8 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
         </div>
         <p className={base.dica}>
           Todos os lotes de preço (desta tela e do Alterar Custo / Preço). Clique para ver os itens; Reverter devolve o
-          preço anterior; Reaproveitar abre uma tarefa nova com os mesmos produtos.
+          preço anterior (do lote inteiro, ou de um produto só pelo detalhe do lote); Reaproveitar abre uma tarefa nova
+          com os mesmos produtos.
         </p>
         <div className={base.tabelaWrap}>
           <table className={base.tabela}>
@@ -1446,6 +1480,7 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
               {historicoFiltrado.map((h) => {
                 const aberto = loteAberto === h.lote;
                 const linhas = lotesCache[h.lote];
+                const podeReverterProduto = podeExecutar && !h.revertidoPor && !h.reverteLote;
                 return (
                   <Fragment key={h.lote}>
                     <tr>
@@ -1469,7 +1504,14 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
                         ) : h.reverteLote ? (
                           <span className={`${styles.status} ${styles.statusPendente}`}>estorno</span>
                         ) : (
-                          <span className={`${styles.status} ${styles.statusAplicada}`}>em vigor</span>
+                          <>
+                            <span className={`${styles.status} ${styles.statusAplicada}`}>em vigor</span>
+                            {h.produtosRevertidos > 0 && (
+                              <span className={base.tdMetaSub}>
+                                {h.produtosRevertidos} prod. revertido{h.produtosRevertidos > 1 ? "s" : ""}
+                              </span>
+                            )}
+                          </>
                         )}
                       </td>
                       <td>
@@ -1514,6 +1556,7 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
                                   <th className={base.thNum}>Preço depois</th>
                                   <th className={base.thNum}>Líquido antes</th>
                                   <th className={base.thNum}>Líquido depois</th>
+                                  {podeReverterProduto && <th />}
                                 </tr>
                               </thead>
                               <tbody>
@@ -1530,6 +1573,24 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
                                     <td className={base.thNum}>{l.precoAntes === null && l.precoDepois === null ? "—" : fmt(l.precoDepois)}</td>
                                     <td className={base.thNum}>{l.liquidoAntes === null && l.liquidoDepois === null ? "—" : fmt(l.liquidoAntes)}</td>
                                     <td className={base.thNum}>{l.liquidoAntes === null && l.liquidoDepois === null ? "—" : fmt(l.liquidoDepois)}</td>
+                                    {podeReverterProduto && (
+                                      <td>
+                                        {/* Linhas vêm ordenadas por produto: o botão vai só na primeira de cada um. */}
+                                        {(i === 0 || linhas[i - 1].produto !== l.produto) && (
+                                          <button
+                                            type="button"
+                                            className={base.btnTexto}
+                                            disabled={ocupado !== null}
+                                            title="Desfaz só este produto (todas as tabelas dele neste lote)"
+                                            onClick={() =>
+                                              void reverterProduto(h, l.produto, nomesLote.get(h.lote)?.nome || h.lote)
+                                            }
+                                          >
+                                            {ocupado === `${h.lote}|${l.produto}` ? "…" : "Reverter produto"}
+                                          </button>
+                                        )}
+                                      </td>
+                                    )}
                                   </tr>
                                 ))}
                               </tbody>

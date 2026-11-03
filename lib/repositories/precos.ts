@@ -792,9 +792,38 @@ export async function ensureHistoricoTable(): Promise<void> {
       )
       ALTER TABLE ${TABELA_HISTORICO} ALTER COLUMN VALOR_NOVO NUMERIC(14,4) NULL
     `);
+    // REVERTIDO_POR marca, linha a linha, qual estorno desfez aquela alteração — é o que
+    // permite reverter um produto só e deixar o resto do lote em vigor. Antes dela todo
+    // estorno era do lote inteiro, então o backfill marca todas as linhas desses lotes.
+    // Roda só na criação da coluna (EXEC compila depois do ALTER); 2705 = outra request
+    // criou a coluna ao mesmo tempo.
+    await request.query(`
+      BEGIN TRY
+        IF COL_LENGTH(N'${TABELA_HISTORICO}', 'REVERTIDO_POR') IS NULL
+        BEGIN
+          ALTER TABLE ${TABELA_HISTORICO} ADD REVERTIDO_POR VARCHAR(40) NULL;
+          EXEC(N'
+            UPDATE h SET h.REVERTIDO_POR = e.LOTE
+            FROM ${TABELA_HISTORICO} h
+            INNER JOIN (
+              SELECT REVERTE_LOTE, MIN(LOTE) AS LOTE
+              FROM ${TABELA_HISTORICO}
+              WHERE REVERTE_LOTE IS NOT NULL
+              GROUP BY REVERTE_LOTE
+            ) e ON e.REVERTE_LOTE = h.LOTE
+          ');
+        END
+      END TRY
+      BEGIN CATCH
+        IF ERROR_NUMBER() <> 2705 THROW;
+      END CATCH
+    `);
   });
   historicoGarantido = true;
 }
+
+/** Marca de linha revertida quando o estorno não precisou gravar nada (já estava no valor). */
+const REVERTIDO_SEM_ALTERACAO = 'SEM_ALTERACAO';
 
 export interface HistoricoLinha {
   id: number;
@@ -810,6 +839,8 @@ export interface HistoricoLinha {
   valorNovo: number;
   obs: string | null;
   reverteLote: string | null;
+  /** Estorno que desfez esta linha (reversão do lote inteiro ou só do produto). */
+  revertidoPor: string | null;
 }
 
 export interface HistoricoLote {
@@ -817,13 +848,16 @@ export interface HistoricoLote {
   data: string;
   usuario: string;
   empresa: string;
+  /** Alterações/produtos ainda em vigor; num lote todo desfeito, o total original. */
   alteracoes: number;
   produtos: number;
+  /** Produtos revertidos um a um (o lote segue em vigor para os demais). */
+  produtosRevertidos: number;
   campos: string[];
   obs: string | null;
   /** Lote que este lote estornou (quando é um estorno). */
   reverteLote: string | null;
-  /** Lote de estorno já aplicado sobre este (quando já foi desfeito). */
+  /** Estorno que desfez a última linha em vigor (quando o lote todo já foi desfeito). */
   revertidoPor: string | null;
 }
 
@@ -847,7 +881,10 @@ export async function fetchHistoricoLotes(
       usuario: string;
       empresa: string;
       alteracoes: number;
+      ativas: number;
       produtos: number;
+      produtosAtivos: number;
+      produtosRevertidos: number;
       campos: string;
       obs: string | null;
       reverteLote: string | null;
@@ -859,12 +896,15 @@ export async function fetchHistoricoLotes(
         MAX(h.USUARIO) AS usuario,
         MAX(h.EMPRESA) AS empresa,
         COUNT(*) AS alteracoes,
+        SUM(CASE WHEN h.REVERTIDO_POR IS NULL THEN 1 ELSE 0 END) AS ativas,
         COUNT(DISTINCT h.PRODUTO) AS produtos,
+        COUNT(DISTINCT CASE WHEN h.REVERTIDO_POR IS NULL THEN h.PRODUTO END) AS produtosAtivos,
+        COUNT(DISTINCT CASE WHEN h.REVERTIDO_POR IS NOT NULL THEN h.PRODUTO END) AS produtosRevertidos,
         MAX(ISNULL(h.OBS, '')) AS obs,
         MAX(ISNULL(h.REVERTE_LOTE, '')) AS reverteLote,
-        (
-          SELECT TOP 1 e.LOTE FROM ${TABELA_HISTORICO} e WITH (NOLOCK)
-          WHERE e.REVERTE_LOTE = h.LOTE
+        ISNULL(
+          MAX(CASE WHEN h.REVERTIDO_POR <> '${REVERTIDO_SEM_ALTERACAO}' THEN h.REVERTIDO_POR END),
+          MAX(h.REVERTIDO_POR)
         ) AS revertidoPor,
         STUFF((
           SELECT DISTINCT ', ' + LTRIM(RTRIM(ISNULL(d.COD_TABELA, 'CADASTRO'))) + '/' + LTRIM(RTRIM(d.CAMPO))
@@ -878,21 +918,26 @@ export async function fetchHistoricoLotes(
       ORDER BY MIN(h.DATA_ALTERACAO) DESC
     `);
 
-    return r.recordset.map((row) => ({
-      lote: limpar(row.lote),
-      data: toIso(row.data),
-      usuario: limpar(row.usuario),
-      empresa: limpar(row.empresa),
-      alteracoes: Number(row.alteracoes ?? 0),
-      produtos: Number(row.produtos ?? 0),
-      campos: limpar(row.campos)
-        .split(', ')
-        .map((c) => c.trim())
-        .filter(Boolean),
-      obs: limpar(row.obs) || null,
-      reverteLote: limpar(row.reverteLote) || null,
-      revertidoPor: limpar(row.revertidoPor) || null,
-    }));
+    return r.recordset.map((row) => {
+      // Todas as linhas revertidas = lote desfeito; aí os totais mostram o que ele tinha.
+      const desfeito = Number(row.ativas ?? 0) === 0;
+      return {
+        lote: limpar(row.lote),
+        data: toIso(row.data),
+        usuario: limpar(row.usuario),
+        empresa: limpar(row.empresa),
+        alteracoes: Number((desfeito ? row.alteracoes : row.ativas) ?? 0),
+        produtos: Number((desfeito ? row.produtos : row.produtosAtivos) ?? 0),
+        produtosRevertidos: desfeito ? 0 : Number(row.produtosRevertidos ?? 0),
+        campos: limpar(row.campos)
+          .split(', ')
+          .map((c) => c.trim())
+          .filter(Boolean),
+        obs: limpar(row.obs) || null,
+        reverteLote: limpar(row.reverteLote) || null,
+        revertidoPor: desfeito ? limpar(row.revertidoPor) || null : null,
+      };
+    });
   });
 }
 
@@ -905,7 +950,7 @@ export async function fetchHistoricoLinhas(lote: string): Promise<HistoricoLinha
     request.input('loteId', sql.VarChar, loteLimpo);
     const r = await request.query<Record<string, unknown>>(`
       SELECT ID, LOTE, DATA_ALTERACAO, EMPRESA, USUARIO, PRODUTO, ORIGEM,
-             COD_TABELA, CAMPO, VALOR_ANTERIOR, VALOR_NOVO, OBS, REVERTE_LOTE
+             COD_TABELA, CAMPO, VALOR_ANTERIOR, VALOR_NOVO, OBS, REVERTE_LOTE, REVERTIDO_POR
       FROM ${TABELA_HISTORICO} WITH (NOLOCK)
       WHERE LOTE = @loteId
       ORDER BY ID
@@ -924,6 +969,7 @@ export async function fetchHistoricoLinhas(lote: string): Promise<HistoricoLinha
       valorNovo: toNumber(row.VALOR_NOVO) ?? 0,
       obs: limpar(row.OBS) || null,
       reverteLote: limpar(row.REVERTE_LOTE) || null,
+      revertidoPor: limpar(row.REVERTIDO_POR) || null,
     }));
   });
 }
@@ -1234,32 +1280,73 @@ export async function executarAlteracaoPrecos(
   };
 }
 
+/** Marca as linhas do lote original como desfeitas pelo estorno. */
+async function marcarRevertidas(
+  lote: string,
+  ids: number[],
+  marca: string,
+  /** Só as linhas cuja coluna aparece no estorno (quando parte dele falhou). */
+  soConfirmadasNoEstorno: boolean
+): Promise<void> {
+  for (const parte of chunk(ids, 500)) {
+    await withRequest(async (request) => {
+      request.input('mLote', sql.VarChar, lote);
+      request.input('mMarca', sql.VarChar, marca);
+      await request.query(`
+        UPDATE h SET h.REVERTIDO_POR = @mMarca
+        FROM ${TABELA_HISTORICO} h
+        WHERE h.LOTE = @mLote
+          AND h.REVERTIDO_POR IS NULL
+          AND h.ID IN (${parte.map((id) => Math.trunc(id)).join(', ')})
+          ${
+            soConfirmadasNoEstorno
+              ? `AND EXISTS (
+                  SELECT 1 FROM ${TABELA_HISTORICO} e
+                  WHERE e.LOTE = @mMarca AND e.PRODUTO = h.PRODUTO AND e.ORIGEM = h.ORIGEM
+                    AND ISNULL(e.COD_TABELA, '') = ISNULL(h.COD_TABELA, '') AND e.CAMPO = h.CAMPO
+                )`
+              : ''
+          }
+      `);
+    });
+  }
+}
+
 /**
  * Desfaz um lote reaplicando os valores anteriores. Não apaga nada: o estorno é
  * um novo lote, marcado com REVERTE_LOTE, igual ao estorno do Ajuste de Estoque.
+ *
+ * Com `produto`, desfaz só as linhas daquele produto: o lote original segue em vigor
+ * (mesmo nome, mesmo histórico) para os demais, e o produto sai da lista dele.
  */
 export async function reverterLotePrecos(
   lote: string,
   company: PrecoCompany,
-  usuario: string
+  usuario: string,
+  produto?: string | null
 ): Promise<ExecutarPrecosResult> {
-  const linhas = await fetchHistoricoLinhas(lote);
-  if (linhas.length === 0) {
+  const todas = await fetchHistoricoLinhas(lote);
+  if (todas.length === 0) {
     throw new Error('Lote não encontrado no histórico.');
   }
-  if (linhas.some((l) => l.empresa !== company)) {
+  if (todas.some((l) => l.empresa !== company)) {
     throw new Error('Este lote pertence a outra empresa.');
   }
 
-  const jaRevertido = await withRequest(async (request) => {
-    request.input('revLote', sql.VarChar, limpar(lote));
-    const r = await request.query<{ lote: string }>(`
-      SELECT TOP 1 LOTE AS lote FROM ${TABELA_HISTORICO} WITH (NOLOCK) WHERE REVERTE_LOTE = @revLote
-    `);
-    return r.recordset[0]?.lote ?? null;
-  });
-  if (jaRevertido) {
-    throw new Error(`Este lote já foi desfeito pelo lote ${limpar(jaRevertido)}.`);
+  const produtoAlvo = limpar(produto);
+  if (produtoAlvo && !todas.some((l) => l.produto === produtoAlvo)) {
+    throw new Error(`O produto ${produtoAlvo} não faz parte deste lote.`);
+  }
+
+  const linhas = todas.filter((l) => !l.revertidoPor && (!produtoAlvo || l.produto === produtoAlvo));
+  if (linhas.length === 0) {
+    const desfeitoPor = todas.find((l) => l.revertidoPor && l.revertidoPor !== REVERTIDO_SEM_ALTERACAO)?.revertidoPor;
+    const porQual = desfeitoPor ? ` pelo lote ${desfeitoPor}` : '';
+    throw new Error(
+      produtoAlvo
+        ? `O produto ${produtoAlvo} já foi revertido neste lote${porQual}.`
+        : `Este lote já foi desfeito${porQual}.`
+    );
   }
 
   const alteracoes: AlteracaoInput[] = [];
@@ -1278,14 +1365,28 @@ export async function reverterLotePrecos(
   }
 
   // Sem espelho automático: o lote original já registrou cada coluna que tocou.
-  return executarAlteracaoPrecos({
+  const resultado = await executarAlteracaoPrecos({
     company,
     usuario,
     alteracoes,
     permitirNulo: true,
     sincronizarPrecoLiquido: false,
     sincronizarPrecoAVista: false,
-    obs: `Estorno do lote ${limpar(lote)}`,
+    obs: produtoAlvo ? `Estorno do produto ${produtoAlvo} do lote ${limpar(lote)}` : `Estorno do lote ${limpar(lote)}`,
     reverteLote: limpar(lote),
   });
+
+  // Sem falha, todas as linhas pedidas estão desfeitas (inclusive as que já estavam no
+  // valor anterior). Com falha, só as que o estorno confirmou — o resto segue em vigor.
+  const semFalha = resultado.naoConfirmados === 0 && resultado.erros.length === 0;
+  if (semFalha || resultado.lote) {
+    await marcarRevertidas(
+      limpar(lote),
+      linhas.map((l) => l.id),
+      resultado.lote || REVERTIDO_SEM_ALTERACAO,
+      !semFalha
+    );
+  }
+
+  return resultado;
 }

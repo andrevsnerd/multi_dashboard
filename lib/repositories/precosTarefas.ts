@@ -60,7 +60,10 @@ export interface LoteDetalheLinha {
  * produto/tabela viram uma linha só (o espelho é gravado como linha própria no histórico).
  */
 export async function fetchLoteDetalhe(lote: string, company: PrecoCompany): Promise<LoteDetalheLinha[]> {
-  const linhas = (await fetchHistoricoLinhas(lote)).filter((l) => l.empresa === company);
+  const doLote = (await fetchHistoricoLinhas(lote)).filter((l) => l.empresa === company);
+  // Produto revertido sozinho sai da lista; lote todo desfeito mostra o que ele tinha.
+  const emVigor = doLote.filter((l) => !l.revertidoPor);
+  const linhas = emVigor.length > 0 ? emVigor : doLote;
   if (linhas.length === 0) return [];
 
   const [produtos, tabelas] = await Promise.all([
