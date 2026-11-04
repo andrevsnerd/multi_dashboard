@@ -209,14 +209,174 @@ function salvarBipagem(diario: BipagemDiario) {
   }
 }
 
-/** Tira da lista o que acabou de subir — e só isso. Peça bipada durante a gravação fica. */
-function descontarGravados(lista: LinhaInventario[], gravados: LinhaInventario[]): LinhaInventario[] {
-  const restante = new Map<string, number>();
-  for (const g of gravados) restante.set(chaveLinha(g), (restante.get(chaveLinha(g)) ?? 0) + g.quantidade);
+/** Assinatura da lista — a confirmação vale só para a lista que foi conferida. */
+function assinaturaLista(lista: LinhaInventario[]): string {
+  return [...qtdPorChave(lista).entries()]
+    .map(([k, q]) => `${k}=${q}`)
+    .sort()
+    .join(";");
+}
+
+/* ── RASCUNHO COMPARTILHADO ─────────────────────────────────────────────────
+ * Um rascunho por filial (ver `lib/utils/inventario-draft-store.ts`): quem abre
+ * a filial conta na mesma lista. A tela nunca manda "a lista é esta" — manda só
+ * as linhas que mexeu (quantidade na BASE e agora), e o servidor soma por cima do
+ * que os colegas já gravaram. A resposta traz só o que mudou desde a versão que a
+ * tela conhecia, e a tela REBASEIA: lista = servidor + (o que ainda não subiu).
+ *
+ * Não há consulta automática: a tela fala com o servidor quando muda algo, quando
+ * a pessoa clica em "Atualizar agora" e, obrigatoriamente, antes de subir.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+/** Item do rascunho no servidor (quantidade 0 = removido, só em "o que mudou"). */
+interface RascunhoItemServidor {
+  produto: string;
+  descProduto: string;
+  codigoBarra: string | null;
+  corProduto: string | null;
+  descCor: string;
+  quantidade: number;
+  tamanho?: number | null;
+  tamanhoLabel?: string | null;
+  /** Quantas peças desta linha cada usuário contou. */
+  porUsuario?: Record<string, number>;
+}
+
+interface ParticipanteRascunho {
+  username: string;
+  pecas: number;
+  ultimoBipeEm: string | null;
+  /** Bipes dessa pessoa que NÃO entraram (painel vermelho da tela dela). */
+  ocorrencias: number;
+  ocorrenciasEm: string | null;
+}
+
+/** Cabeçalho do rascunho (os itens vêm à parte). */
+interface RascunhoResumo {
+  id: string;
+  companyKey: string;
+  /** Quem começou. */
+  username: string;
+  filialCod: string;
+  filialNome: string;
+  nomeContagem: string;
+  nomeEditado: boolean;
+  observacao: string;
+  createdAt: string;
+  updatedAt: string;
+  /** false = rascunho antigo (por usuário, antes de 04/11/2026). */
+  compartilhado: boolean;
+  versao: number;
+  status: "aberto" | "finalizando" | "finalizado" | "descartado";
+  travaVencida: boolean;
+  atualizadoPor: string;
+  finalizadoPor: string | null;
+  finalizadoEm: string | null;
+  participantes: ParticipanteRascunho[];
+  totalPecas: number;
+  totalLinhas: number;
+}
+
+/** Rascunho + itens: completo, ou só o que mudou desde a versão pedida. */
+interface SnapshotRascunho {
+  rascunho: RascunhoResumo;
+  itens: RascunhoItemServidor[];
+  completo: boolean;
+}
+
+type RascunhoStatus = "idle" | "salvando" | "salvo" | "erro" | "aguardando";
+
+/** Descrição/observação: compartilhadas, a última gravação vence. */
+interface CabecalhoInventario {
+  nomeContagem: string;
+  nomeEditado: boolean;
+  observacao: string;
+}
+
+const CAB_VAZIO: CabecalhoInventario = { nomeContagem: "", nomeEditado: false, observacao: "" };
+
+function cabecalhoLocal(nomeContagem: string, nomeEditado: boolean, observacao: string): CabecalhoInventario {
+  // Descrição automática não é dado: cada tela calcula a sugestão.
+  return { nomeEditado, nomeContagem: nomeEditado ? nomeContagem.trim().slice(0, 25) : "", observacao: observacao.trim() };
+}
+
+function cabecalhoDoServidor(r: RascunhoResumo): CabecalhoInventario {
+  return cabecalhoLocal(r.nomeContagem, r.nomeEditado, r.observacao);
+}
+
+function mesmoCabecalho(x: CabecalhoInventario, y: CabecalhoInventario): boolean {
+  return x.nomeEditado === y.nomeEditado && x.nomeContagem === y.nomeContagem && x.observacao === y.observacao;
+}
+
+/** Reenvio do que ficou sem resposta (só enquanto há bipe desta tela não gravado). */
+const REENVIO_MS = 5000;
+
+/** Mesma chave do servidor (`chaveItemInventario`): produto × cor × tamanho, aparados. */
+function chaveSync(p: { produto: string; corProduto: string | null; tamanho?: number | null }): string {
+  return `${(p.produto ?? "").trim()}|${(p.corProduto ?? "").trim()}|${p.tamanho ?? ""}`;
+}
+
+function qtdPorChave(
+  lista: Iterable<{ produto: string; corProduto: string | null; tamanho?: number | null; quantidade: number }>
+): Map<string, number> {
+  const m = new Map<string, number>();
+  for (const p of lista) m.set(chaveSync(p), (m.get(chaveSync(p)) ?? 0) + p.quantidade);
+  return m;
+}
+
+function mesmasQuantidades(x: Map<string, number>, y: Map<string, number>): boolean {
+  if (x.size !== y.size) return false;
+  for (const [k, n] of x) if (y.get(k) !== n) return false;
+  return true;
+}
+
+function linhaDoServidor(it: RascunhoItemServidor): LinhaInventario {
+  return {
+    produto: it.produto,
+    descProduto: it.descProduto,
+    codigoBarra: it.codigoBarra,
+    corProduto: it.corProduto,
+    descCor: it.descCor,
+    quantidade: it.quantidade,
+    tamanho: it.tamanho ?? null,
+    tamanhoLabel: it.tamanhoLabel ?? null,
+  };
+}
+
+/**
+ * REBASE: lista = servidor + (lista da tela − referência), onde a referência é o
+ * que a tela mandou (ou a base que ela conhecia). O que a tela mexeu e ainda não
+ * subiu continua; o que os colegas biparam entra. A ordem da tela é mantida;
+ * linha nova do servidor vai para o fim.
+ */
+function rebaseLista(
+  prev: LinhaInventario[],
+  referencia: Map<string, number>,
+  servidor: Map<string, RascunhoItemServidor>
+): LinhaInventario[] {
+  const naTela = qtdPorChave(prev);
+  const feitas = new Set<string>();
+  const out: LinhaInventario[] = [];
+  const emitir = (k: string, modelo: LinhaInventario | null) => {
+    if (feitas.has(k)) return;
+    feitas.add(k);
+    const srv = servidor.get(k);
+    const q = (srv?.quantidade ?? 0) + (naTela.get(k) ?? 0) - (referencia.get(k) ?? 0);
+    if (q <= 0) return;
+    if (modelo) out.push({ ...modelo, quantidade: q });
+    else if (srv) out.push(linhaDoServidor(srv));
+  };
+  for (const p of prev) emitir(chaveSync(p), p);
+  for (const k of servidor.keys()) emitir(k, null);
+  return out;
+}
+
+/** O que está na tela além da base (o que não subiu): parte positiva de (lista − base). */
+function alemDaBase(lista: LinhaInventario[], base: Map<string, number>): LinhaInventario[] {
+  const restante = new Map(base);
   return lista.flatMap((p) => {
-    const k = chaveLinha(p);
+    const k = chaveSync(p);
     const r = restante.get(k) ?? 0;
-    if (r <= 0) return [p];
     const usado = Math.min(r, p.quantidade);
     restante.set(k, r - usado);
     const sobra = p.quantidade - usado;
@@ -224,40 +384,189 @@ function descontarGravados(lista: LinhaInventario[], gravados: LinhaInventario[]
   });
 }
 
-/** Assinatura da lista — a confirmação vale só para a lista que foi conferida. */
-function assinaturaLista(lista: LinhaInventario[]): string {
-  return lista
-    .map((p) => `${chaveLinha(p)}=${p.quantidade}`)
-    .sort()
-    .join(";");
+function itemParaServidor(p: LinhaInventario | RascunhoItemServidor, quantidade: number): RascunhoItemServidor {
+  return {
+    produto: p.produto,
+    descProduto: p.descProduto,
+    codigoBarra: p.codigoBarra,
+    corProduto: p.corProduto,
+    descCor: p.descCor,
+    quantidade,
+    tamanho: p.tamanho ?? null,
+    tamanhoLabel: p.tamanhoLabel ?? null,
+  };
 }
 
-/** Rascunho persistido no Neon (ver `lib/utils/inventario-draft-store.ts`). */
-interface RascunhoResumo {
-  id: string;
-  companyKey: string;
-  username: string;
+/** Um envio ao servidor. Fica "incerto" até a resposta: o reenvio usa o MESMO syncId (idempotente). */
+interface EnvioSync {
+  body: string;
+  enviado: LinhaInventario[];
+  cabEnviado: CabecalhoInventario;
+  /** Bipes que não entraram, informados neste envio (null = não mudou). */
+  ocorrencias: number | null;
+}
+
+/** Contexto de sincronização de UMA filial na tela. Troca de filial / fim do inventário = contexto novo. */
+interface SyncCtx {
   filialCod: string;
-  filialNome: string;
-  nomeContagem: string;
-  nomeEditado: boolean;
-  observacao: string;
-  zerarNaoContados: boolean;
-  itens: Array<{
-    produto: string;
-    descProduto: string;
-    codigoBarra: string | null;
-    corProduto: string | null;
-    descCor: string;
-    quantidade: number;
-    tamanho?: number | null;
-    tamanhoLabel?: string | null;
-  }>;
-  createdAt: string;
-  updatedAt: string;
+  rascunhoId: string | null;
+  base: { versao: number; itens: Map<string, RascunhoItemServidor>; cab: CabecalhoInventario } | null;
+  emVoo: Promise<void> | null;
+  incerto: EnvioSync | null;
+  abandonado: boolean;
+  /** Abandonado com envio no ar: a lista que esse envio levou (referência do resto). */
+  refAbandono: { itens: LinhaInventario[]; cab: CabecalhoInventario } | null;
+  ocorrenciasEnviadas: number | null;
+  /** Chave no localStorage onde ESTE contexto guarda o que ainda não foi gravado. */
+  chaveLocal: string | null;
 }
 
-type RascunhoStatus = "idle" | "salvando" | "salvo" | "erro";
+function novoSyncCtx(filialCod: string): SyncCtx {
+  return {
+    filialCod,
+    rascunhoId: null,
+    base: null,
+    emVoo: null,
+    incerto: null,
+    abandonado: false,
+    refAbandono: null,
+    ocorrenciasEnviadas: null,
+    chaveLocal: null,
+  };
+}
+
+/* ── BIPE NUNCA SE PERDE ─────────────────────────────────────────────────────
+ * Peça que entrou na tela e ainda não foi gravada no servidor (sem internet,
+ * servidor fora) fica guardada NO NAVEGADOR, como os envios exatos que faltam:
+ *   1º o envio que saiu e não teve resposta (mesmo syncId → reenviar não soma 2×);
+ *   2º o resto, que nunca saiu.
+ * Regra: o envio é guardado ANTES de sair. Se a página fechar/travar, ao reabrir
+ * a filial esses envios são mandados de novo; o que não puder mais entrar (o
+ * inventário já subiu) aparece na tela, peça por peça.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+const PENDENTE_PREFIX = "inventario:pendente:";
+
+interface PendenteGuardado {
+  envios: Array<{ body: string; pecas: Array<{ rotulo: string; quantidade: number }> }>;
+  /** Quantos envios já foram aceitos na recuperação (não repete). */
+  enviados: number;
+  em: string;
+}
+
+function prefixoPendente(companyKey: string, username: string, filialCod: string): string {
+  return `${PENDENTE_PREFIX}${companyKey}|${username.toLowerCase()}|${filialCod}|`;
+}
+
+function rotuloPeca(p: LinhaInventario): string {
+  const cor = textoCorProduto(p.descCor, p.corProduto);
+  return `${p.descProduto || p.produto}${cor ? ` · ${cor}` : ""}${p.tamanhoLabel ? ` · ${p.tamanhoLabel}` : ""}`;
+}
+
+function pecasDe(lista: LinhaInventario[]): Array<{ rotulo: string; quantidade: number }> {
+  return lista.map((p) => ({ rotulo: rotuloPeca(p), quantidade: p.quantidade }));
+}
+
+function lerPendente(chave: string): PendenteGuardado | null {
+  try {
+    const raw = window.localStorage.getItem(chave);
+    return raw ? (JSON.parse(raw) as PendenteGuardado) : null;
+  } catch {
+    return null;
+  }
+}
+
+function gravarPendente(chave: string, valor: PendenteGuardado | null) {
+  try {
+    if (!valor || valor.envios.length <= valor.enviados) window.localStorage.removeItem(chave);
+    else window.localStorage.setItem(chave, JSON.stringify(valor));
+  } catch {
+    // sem localStorage (aba privada): vale só o aviso na tela
+  }
+}
+
+function chavesPendentes(prefixo: string): string[] {
+  try {
+    const out: string[] = [];
+    for (let i = 0; i < window.localStorage.length; i += 1) {
+      const k = window.localStorage.key(i);
+      if (k && k.startsWith(prefixo)) out.push(k);
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+function baseLista(ctx: SyncCtx): RascunhoItemServidor[] {
+  return ctx.base ? [...ctx.base.itens.values()] : [];
+}
+
+/**
+ * Monta o envio: só as linhas que mudaram em relação à referência (o inventário
+ * da loja inteira pode ter milhares de linhas — mandar tudo a cada bipe pesa).
+ */
+function montarEnvio(
+  ctx: SyncCtx,
+  referencia: Array<LinhaInventario | RascunhoItemServidor>,
+  lista: LinhaInventario[],
+  cab: CabecalhoInventario,
+  cabReferencia: CabecalhoInventario,
+  vivo: { companyKey: string; filialNome: string; ocorrencias: number }
+): EnvioSync | null {
+  const refQ = qtdPorChave(referencia);
+  const locQ = qtdPorChave(lista);
+  const modeloLocal = new Map(lista.map((p) => [chaveSync(p), p]));
+  const modeloRef = new Map(referencia.map((p) => [chaveSync(p), p]));
+  const base: RascunhoItemServidor[] = [];
+  const itens: RascunhoItemServidor[] = [];
+  for (const k of new Set([...refQ.keys(), ...locQ.keys()])) {
+    const r = refQ.get(k) ?? 0;
+    const l = locQ.get(k) ?? 0;
+    if (r === l) continue;
+    const modelo = modeloLocal.get(k) ?? modeloRef.get(k);
+    if (!modelo) continue;
+    if (r > 0) base.push(itemParaServidor(modelo, r));
+    if (l > 0) itens.push(itemParaServidor(modelo, l));
+  }
+  const mudouCab = !mesmoCabecalho(cab, cabReferencia);
+  const ocorrencias = vivo.ocorrencias !== (ctx.ocorrenciasEnviadas ?? 0) ? vivo.ocorrencias : null;
+  if (base.length === 0 && itens.length === 0 && !mudouCab && ocorrencias === null) return null;
+  // Sem rascunho ainda e nada na tela: não cria rascunho vazio.
+  if (!ctx.rascunhoId && itens.length === 0 && !mudouCab) return null;
+  return {
+    enviado: lista,
+    cabEnviado: cab,
+    ocorrencias,
+    body: JSON.stringify({
+      company: vivo.companyKey,
+      filialCod: ctx.filialCod,
+      filialNome: vivo.filialNome,
+      rascunhoId: ctx.rascunhoId,
+      versaoBase: ctx.base?.versao ?? -1,
+      syncId: novoIdBipe(),
+      base,
+      itens,
+      cabecalho: mudouCab ? cab : null,
+      ocorrencias,
+    }),
+  };
+}
+
+type SyncResposta =
+  | ({ estado: "ok" } & SnapshotRascunho)
+  | { estado: "travado"; rascunho: RascunhoResumo }
+  | { estado: "encerrado"; rascunho: RascunhoResumo | null };
+
+/** O inventário que estava nesta tela acabou (subido ou descartado): não dá mais para bipar nele. */
+interface EncerramentoInventario {
+  status: "finalizado" | "descartado";
+  por: string | null;
+  em: string | null;
+  nome: string;
+  /** Peças bipadas nesta tela que não chegaram a entrar. */
+  sobra: LinhaInventario[];
+}
 
 /* ── Histórico (o mesmo do Ajuste de Estoque) ── */
 
@@ -569,26 +878,68 @@ async function fetchRascunhos(companyKey: string): Promise<RascunhoResumo[]> {
   return json.data || [];
 }
 
-async function salvarRascunhoApi(payload: string, username: string, keepalive = false): Promise<void> {
+async function sincronizarApi(body: string, username: string, keepalive = false): Promise<SyncResposta> {
   const response = await fetch("/api/inventario/rascunhos", {
     method: "PUT",
     headers: { "Content-Type": "application/json", "x-auth-username": username },
-    body: payload,
+    body,
     keepalive,
   });
   if (!response.ok) throw new Error("Erro ao salvar rascunho");
+  return (await response.json()) as SyncResposta;
 }
 
-async function removerRascunhoApi(
-  params: { id: string } | { companyKey: string; filialCod: string },
-  username?: string
-): Promise<void> {
-  const search = new URLSearchParams(
-    "id" in params ? { id: params.id } : { company: params.companyKey, filialCod: params.filialCod }
-  );
-  const headers: Record<string, string> = {};
-  if (username) headers["x-auth-username"] = username;
-  await fetch(`/api/inventario/rascunhos?${search.toString()}`, { method: "DELETE", headers });
+/** "Atualizar agora": o que mudou desde a versão (null = o rascunho não existe mais). */
+async function atualizarRascunhoApi(id: string, versao: number): Promise<SnapshotRascunho | null> {
+  const params = new URLSearchParams({ id, versao: String(versao) });
+  const response = await fetch(`/api/inventario/rascunhos?${params.toString()}`, { cache: "no-store" });
+  if (!response.ok) throw new Error("Erro ao atualizar o rascunho");
+  const json = (await response.json()) as { data: SnapshotRascunho | null };
+  return json.data ?? null;
+}
+
+/** Entra na filial: o compartilhado completo (convertendo o rascunho antigo do usuário, se for o caso). */
+async function abrirFilialApi(companyKey: string, filialCod: string, username: string): Promise<SnapshotRascunho | null> {
+  const response = await fetch("/api/inventario/rascunhos", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-auth-username": username },
+    body: JSON.stringify({ acao: "abrir", company: companyKey, filialCod }),
+  });
+  if (!response.ok) throw new Error("Erro ao abrir o rascunho");
+  const json = (await response.json()) as { data: SnapshotRascunho | null };
+  return json.data ?? null;
+}
+
+async function adotarRascunhoApi(
+  id: string,
+  somar: boolean,
+  username: string
+): Promise<
+  | { estado: "ok"; rascunho: RascunhoResumo }
+  | { estado: "conflito"; existente: RascunhoResumo; antigo: RascunhoResumo }
+  | { estado: "nao_encontrado" }
+> {
+  const response = await fetch("/api/inventario/rascunhos", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-auth-username": username },
+    body: JSON.stringify({ acao: "adotar", id, somar }),
+  });
+  if (!response.ok) throw new Error("Erro ao continuar o rascunho");
+  return response.json();
+}
+
+async function descartarRascunhoApi(id: string, username: string): Promise<void> {
+  const response = await fetch(`/api/inventario/rascunhos?${new URLSearchParams({ id }).toString()}`, {
+    method: "DELETE",
+    headers: { "x-auth-username": username },
+  });
+  if (!response.ok) throw new Error("Erro ao descartar o rascunho");
+}
+
+function fmtHora(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "" : d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
 
 /* ── KPIs (mesmos quadros do Ajuste de Estoque) ── */
@@ -796,14 +1147,33 @@ export default function InventarioBipagemPage({ companyKey, companyName }: Props
   const [loadingRascunhos, setLoadingRascunhos] = useState(false);
   const [rascunhoStatus, setRascunhoStatus] = useState<RascunhoStatus>("idle");
   const [rascunhoRestauradoEm, setRascunhoRestauradoEm] = useState<string | null>(null);
-  /** Último payload gravado — evita reenviar o mesmo rascunho a cada render. */
-  const rascunhoPayloadRef = useRef<string>("");
-  /** Payload esperando o debounce — gravado na hora se a filial trocar ou a aba fechar. */
-  const rascunhoPendenteRef = useRef<{ payload: string; username: string } | null>(null);
-  /** Já há rascunho gravado neste escopo? Sem isso o 1º render (lista vazia) apagaria o rascunho. */
-  const rascunhoSalvoRef = useRef(false);
-  /** Estado (não ref) de propósito: o autosave precisa ser reavaliado quando a restauração termina. */
+  /** Estado (não ref) de propósito: o autosave precisa ser reavaliado quando a abertura termina. */
   const [hidratandoRascunho, setHidratandoRascunho] = useState(false);
+  /** Sincronização com o rascunho compartilhado da filial (ver `SyncCtx`). */
+  const syncRef = useRef<SyncCtx>(novoSyncCtx(""));
+  /** Última versão do servidor aplicada na tela (participantes, rastro por linha). */
+  const [rascunhoAtual, setRascunhoAtual] = useState<RascunhoResumo | null>(null);
+  /** Quem está subindo este inventário agora (bipes esperam). */
+  const [travadoPor, setTravadoPor] = useState<string | null>(null);
+  const travadoPorRef = useRef<string | null>(null);
+  /** Alguém subiu/descartou o inventário que estava nesta tela. */
+  const [encerramento, setEncerramento] = useState<EncerramentoInventario | null>(null);
+  /** "fulana bipou +2 peças" — o que chegou dos colegas na última consulta. */
+  const [atividadeRemota, setAtividadeRemota] = useState<string | null>(null);
+  /** Esta tela está subindo: resposta de "encerrado" no meio é da própria subida. */
+  const executandoRef = useRef(false);
+  /** O inventário desta tela acabou: não aceita bipe até "Começar novo inventário". */
+  const encerradoRef = useRef(false);
+  /** Itens do servidor conhecidos pela tela (rastro de quem bipou cada linha). */
+  const [baseItens, setBaseItens] = useState<Map<string, RascunhoItemServidor>>(() => new Map());
+  const [atualizando, setAtualizando] = useState(false);
+  const [ultimaAtualizacao, setUltimaAtualizacao] = useState<string | null>(null);
+  /** Na confirmação: subir mesmo com bipes que não entraram na tela de colegas. */
+  const [aceitarOcorrencias, setAceitarOcorrencias] = useState(false);
+  /** Bipes guardados no navegador (de antes de recarregar/trocar de filial) ainda não gravados. */
+  const [pecasRecuperando, setPecasRecuperando] = useState(0);
+  /** Bipes guardados que não puderam mais entrar (o inventário deles já tinha subido). */
+  const [pecasPerdidas, setPecasPerdidas] = useState<Array<{ rotulo: string; quantidade: number }>>([]);
 
   const mostrarNotificacao = useCallback((mensagem: string, tipo: "success" | "error" = "success") => {
     setNotificacao({ mensagem, tipo });
@@ -1087,6 +1457,11 @@ export default function InventarioBipagemPage({ companyKey, companyName }: Props
   /** Põe a peça na lista. No inventário não há teto: saldo zerado/negativo também entra. */
   const adicionarItemBipado = useCallback(
     (item: BipeItem, codigoLido: string): boolean => {
+      // Bipe que estava em consulta quando o inventário subiu: não entra mais nele.
+      if (encerradoRef.current) {
+        registrarBipe(false, "Inventário encerrado — a peça NÃO entrou", `O código ${codigoLido} chegou depois que o inventário subiu.`);
+        return false;
+      }
       if (!filialCod) {
         anotarOcorrencia({
           codigo: codigoLido,
@@ -1159,6 +1534,14 @@ export default function InventarioBipagemPage({ companyKey, companyName }: Props
       if (!codigo) return;
       if (!filialCod || !filialNomeLinx) {
         registrarBipe(false, "Selecione a filial", "Escolha a loja antes de bipar.");
+        return;
+      }
+      if (encerradoRef.current) {
+        registrarBipe(
+          false,
+          "Inventário encerrado — a peça NÃO entrou",
+          "Este inventário já subiu. Para contar de novo, clique em “Começar novo inventário”."
+        );
         return;
       }
 
@@ -1376,11 +1759,10 @@ export default function InventarioBipagemPage({ companyKey, companyName }: Props
         buffer = "";
         if (editavel && alvo && inicio?.alvo === alvo) {
           const valorAntes = inicio.valor;
-          const idxQtd = alvo.dataset.leitorQtd;
-          if (idxQtd !== undefined) {
-            const idx = Number(idxQtd);
+          const chaveQtd = alvo.dataset.leitorQtd;
+          if (chaveQtd !== undefined) {
             const qtd = Math.max(1, parseInt(valorAntes, 10) || 1);
-            setProdutosSelecionados((prev) => prev.map((p, i) => (i === idx ? { ...p, quantidade: qtd } : p)));
+            setProdutosSelecionados((prev) => prev.map((p) => (chaveLinha(p) === chaveQtd ? { ...p, quantidade: qtd } : p)));
           } else if (alvo.dataset.leitorObs !== undefined) {
             setObservacao(valorAntes);
           } else if (alvo.dataset.leitorNome !== undefined) {
@@ -1403,20 +1785,29 @@ export default function InventarioBipagemPage({ companyKey, companyName }: Props
 
   // ── LISTA: quantidade, tamanho, remover ────────────────────────────────────
 
-  const atualizarQuantidade = useCallback((index: number, quantidade: number) => {
+  // Por CHAVE, não por posição: a lista é rebaseada com os bipes dos colegas a qualquer momento.
+  const atualizarQuantidade = useCallback((chave: string, quantidade: number) => {
     if (!Number.isFinite(quantidade) || quantidade < 1) return;
-    setProdutosSelecionados((prev) => prev.map((p, i) => (i === index ? { ...p, quantidade: Math.trunc(quantidade) } : p)));
+    setProdutosSelecionados((prev) =>
+      prev.map((p) => (chaveLinha(p) === chave ? { ...p, quantidade: Math.trunc(quantidade) } : p))
+    );
   }, []);
 
-  const removerProduto = useCallback((index: number) => {
-    setProdutosSelecionados((prev) => prev.filter((_, i) => i !== index));
+  const removerProduto = useCallback((chave: string) => {
+    setProdutosSelecionados((prev) => prev.filter((p) => chaveLinha(p) !== chave));
   }, []);
 
   const limparLista = useCallback(() => {
-    if (!window.confirm("Limpar a lista inteira deste inventário? O que foi bipado será perdido.")) return;
+    const eu = username.toLowerCase();
+    const outros = (rascunhoAtual?.participantes ?? []).filter((p) => p.username !== eu).map((p) => p.username);
+    const aviso =
+      outros.length > 0
+        ? `Limpar a lista inteira deste inventário? Apaga também o que ${outros.join(", ")} bipou.`
+        : "Limpar a lista inteira deste inventário? O que foi bipado será perdido.";
+    if (!window.confirm(aviso)) return;
     setProdutosSelecionados([]);
     zerarBipagem();
-  }, [zerarBipagem]);
+  }, [zerarBipagem, username, rascunhoAtual]);
 
   /**
    * Grade das linhas que ainda não a conhecem (adicionadas pela busca ou vindas do
@@ -1459,9 +1850,10 @@ export default function InventarioBipagemPage({ companyKey, companyName }: Props
   }, [produtosSelecionados, filialCod, filialNomeLinx, companyKey, mostrarNotificacao]);
 
   /** Escolhe o tamanho de uma linha; se já há linha no mesmo tamanho, as duas se juntam. */
-  const escolherTamanho = useCallback((index: number, ordinal: number) => {
+  const escolherTamanho = useCallback((chave: string, ordinal: number) => {
     setProdutosSelecionados((prev) => {
-      const linha = prev[index];
+      const index = prev.findIndex((p) => chaveLinha(p) === chave);
+      const linha = index === -1 ? undefined : prev[index];
       const opcao = linha?.tamanhos?.find((t) => t.ordinal === ordinal);
       if (!linha || !opcao) return prev;
       const destino = prev.findIndex(
@@ -1595,6 +1987,10 @@ export default function InventarioBipagemPage({ companyKey, companyName }: Props
   /** Peça adicionada pela busca entra direto na lista (+1), como um bipe. */
   const adicionarProdutoBusca = useCallback(
     (produto: Produto) => {
+      if (encerradoRef.current) {
+        mostrarNotificacao("Este inventário já subiu. Clique em “Começar novo inventário”.", "error");
+        return;
+      }
       if (!filialCod) {
         mostrarNotificacao("Selecione uma filial primeiro", "error");
         return;
@@ -1654,7 +2050,7 @@ export default function InventarioBipagemPage({ companyKey, companyName }: Props
     void carregarRascunhos();
   }, [carregarRascunhos]);
 
-  /** Um rascunho por empresa × usuário × filial. */
+  /** Escopo da tela (diário da bipagem, que é de cada um): empresa × usuário × filial. */
   const escopoRascunho = username && filialCod ? `${companyKey}|${username}|${filialCod}` : null;
 
   useEffect(() => {
@@ -1670,22 +2066,422 @@ export default function InventarioBipagemPage({ companyKey, companyName }: Props
     if (bipagem.escopo === escopoRascunho) salvarBipagem(bipagem);
   }, [bipagem, escopoRascunho]);
 
-  /** Grava na hora o que estava esperando o debounce (troca de filial, aba fechando). */
-  const gravarRascunhoPendente = useCallback((keepalive = false) => {
-    const pendente = rascunhoPendenteRef.current;
-    if (!pendente || pendente.payload === rascunhoPayloadRef.current) return;
-    rascunhoPendenteRef.current = null;
-    rascunhoPayloadRef.current = pendente.payload;
-    void salvarRascunhoApi(pendente.payload, pendente.username, keepalive).catch(() => undefined);
-  }, []);
+  // ── RASCUNHO COMPARTILHADO: sincronização ──────────────────────────────────
+
+  /** Valores de agora para a sincronização (que roda fora do render). Declarado antes do autosave. */
+  const vivoRef = useRef({
+    username,
+    companyKey: companyKey as string,
+    filialNome: "",
+    cab: CAB_VAZIO,
+    ocorrencias: 0,
+  });
+  useEffect(() => {
+    vivoRef.current = {
+      username,
+      companyKey,
+      filialNome: filialSelecionada?.nome ?? filialNomeLinx,
+      cab: cabecalhoLocal(nomeContagem, nomeEditado, observacao),
+      ocorrencias: bipagem.ocorrencias.length,
+    };
+  }, [username, companyKey, filialSelecionada, filialNomeLinx, nomeContagem, nomeEditado, observacao, bipagem.ocorrencias.length]);
 
   useEffect(() => {
-    const aoSair = () => gravarRascunhoPendente(true);
+    travadoPorRef.current = travadoPor;
+  }, [travadoPor]);
+
+  const eu = username.toLowerCase();
+  const participantes = rascunhoAtual?.participantes ?? [];
+  const contandoJunto = participantes.some((p) => p.username !== eu && p.pecas > 0);
+  /** Colegas com bipe que não entrou na contagem (painel vermelho da tela deles). */
+  const colegasComOcorrencia = participantes.filter((p) => p.username !== eu && p.ocorrencias > 0);
+
+  // "fulana bipou +2" some depois de uns segundos.
+  useEffect(() => {
+    if (!atividadeRemota) return;
+    const t = setTimeout(() => setAtividadeRemota(null), 12000);
+    return () => clearTimeout(t);
+  }, [atividadeRemota]);
+
+  /**
+   * Aplica uma resposta do servidor (REBASE): base nova = base + o que mudou;
+   * lista = base nova + (tela − referência). `referencia` = o que a tela tinha
+   * mandado/conhecia. O cabeçalho do servidor só entra se a pessoa não mexeu nele.
+   */
+  const aplicarServidor = useCallback(
+    (
+      ctx: SyncCtx,
+      snap: SnapshotRascunho,
+      referencia: Array<LinhaInventario | RascunhoItemServidor>,
+      cabReferencia: CabecalhoInventario | null
+    ) => {
+      const r = snap.rascunho;
+      const mesmoRascunho = !!ctx.base && ctx.rascunhoId === r.id;
+      const antes = mesmoRascunho && ctx.base ? ctx.base.itens : new Map<string, RascunhoItemServidor>();
+      const novaBase = snap.completo || !mesmoRascunho ? new Map<string, RascunhoItemServidor>() : new Map(antes);
+      for (const it of snap.itens) {
+        const k = chaveSync(it);
+        if (it.quantidade > 0) novaBase.set(k, it);
+        else novaBase.delete(k);
+      }
+
+      const refQ = qtdPorChave(referencia);
+      const transformar = (lista: LinhaInventario[]) => rebaseLista(lista, refQ, novaBase);
+      // O ref é atualizado JÁ: o próximo envio (pode ser no mesmo tick) compara com a base nova.
+      produtosSelecionadosRef.current = transformar(produtosSelecionadosRef.current);
+      setProdutosSelecionados((prev) => {
+        const next = transformar(prev);
+        produtosSelecionadosRef.current = next;
+        return next;
+      });
+
+      const cabServidor = cabecalhoDoServidor(r);
+      const cabTela = vivoRef.current.cab;
+      if ((cabReferencia === null || mesmoCabecalho(cabTela, cabReferencia)) && !mesmoCabecalho(cabTela, cabServidor)) {
+        setNomeEditado(cabServidor.nomeEditado);
+        if (cabServidor.nomeEditado) setNomeContagem(cabServidor.nomeContagem);
+        setObservacao(cabServidor.observacao);
+        vivoRef.current = { ...vivoRef.current, cab: cabServidor };
+      }
+
+      // Rastro: o que os colegas biparam desde a última versão que esta tela viu.
+      if (mesmoRascunho) {
+        const euAgora = vivoRef.current.username.toLowerCase();
+        const ganhos = new Map<string, number>();
+        for (const it of snap.itens) {
+          const pu0 = antes.get(chaveSync(it))?.porUsuario ?? {};
+          for (const [u, n] of Object.entries(it.porUsuario ?? {})) {
+            if (u === euAgora) continue;
+            const d = n - (pu0[u] ?? 0);
+            if (d > 0) ganhos.set(u, (ganhos.get(u) ?? 0) + d);
+          }
+        }
+        if (ganhos.size > 0) {
+          setAtividadeRemota(
+            [...ganhos.entries()].map(([u, n]) => `${u} bipou +${n} ${n === 1 ? "peça" : "peças"}`).join(" · ")
+          );
+        }
+      }
+
+      ctx.base = { versao: r.versao, itens: novaBase, cab: cabServidor };
+      ctx.rascunhoId = r.id;
+      setRascunhoAtual(r);
+      setBaseItens(novaBase);
+    },
+    []
+  );
+
+  /**
+   * Guarda no navegador o que esta tela ainda não gravou: o envio sem resposta
+   * (exato, mesmo syncId) e o resto que nunca saiu. Chamado ANTES de cada envio e
+   * a cada mudança na lista. Lista igual ao servidor = nada guardado.
+   */
+  const persistirPendente = useCallback((ctx: SyncCtx) => {
+    if (!ctx.filialCod || ctx.abandonado || encerradoRef.current) return;
+    const vivo = vivoRef.current;
+    if (!vivo.username) return;
+    const lista = produtosSelecionadosRef.current;
+    const base = baseLista(ctx);
+    const envios: PendenteGuardado["envios"] = [];
+    if (ctx.incerto) {
+      envios.push({ body: ctx.incerto.body, pecas: pecasDe(alemDaBase(ctx.incerto.enviado, qtdPorChave(base))) });
+    }
+    const ref = ctx.incerto ? ctx.incerto.enviado : base;
+    const cabRef = ctx.incerto ? ctx.incerto.cabEnviado : ctx.base?.cab ?? CAB_VAZIO;
+    const resto = montarEnvio(ctx, ref, lista, vivo.cab, cabRef, { ...vivo, ocorrencias: ctx.ocorrenciasEnviadas ?? 0 });
+    if (resto) envios.push({ body: resto.body, pecas: pecasDe(alemDaBase(lista, qtdPorChave(ref))) });
+    if (!ctx.chaveLocal) {
+      if (envios.length === 0) return;
+      ctx.chaveLocal = prefixoPendente(vivo.companyKey, vivo.username, ctx.filialCod) + novoIdBipe();
+    }
+    gravarPendente(ctx.chaveLocal, envios.length > 0 ? { envios, enviados: 0, em: new Date().toISOString() } : null);
+  }, []);
+
+  /** Esquece o que um contexto guardou (o conteúdo já está na tela de outro jeito ou foi mostrado). */
+  const esquecerPendente = useCallback((ctx: SyncCtx) => {
+    if (ctx.chaveLocal) gravarPendente(ctx.chaveLocal, null);
+  }, []);
+
+  /**
+   * Manda, EXATAMENTE como foram guardados, os envios de um contexto que não está
+   * mais na tela (página recarregada, filial trocada). O que não puder mais entrar
+   * (inventário já subiu) vai para a lista de peças que não entraram, na tela.
+   */
+  const enviarGuardado = useCallback(async (chave: string): Promise<number> => {
+    const user = vivoRef.current.username;
+    const g = lerPendente(chave);
+    if (!g || !user) return 0;
+    for (let i = g.enviados; i < g.envios.length; i += 1) {
+      let r: SyncResposta;
+      try {
+        r = await sincronizarApi(g.envios[i].body, user);
+      } catch {
+        return g.envios.slice(i).reduce((acc, e) => acc + e.pecas.reduce((a, p) => a + p.quantidade, 0), 0);
+      }
+      if (r.estado === "ok") {
+        g.enviados = i + 1;
+        gravarPendente(chave, g);
+        continue;
+      }
+      if (r.estado === "travado") {
+        return g.envios.slice(i).reduce((acc, e) => acc + e.pecas.reduce((a, p) => a + p.quantidade, 0), 0);
+      }
+      // Encerrado: o inventário desses bipes já subiu (ou foi descartado).
+      const perdidas = g.envios.slice(i).flatMap((e) => e.pecas);
+      gravarPendente(chave, null);
+      if (perdidas.length > 0) setPecasPerdidas((prev) => [...prev, ...perdidas]);
+      return 0;
+    }
+    gravarPendente(chave, null);
+    return 0;
+  }, []);
+
+  /** Recupera os bipes guardados desta filial (menos os do contexto na tela). Devolve as peças ainda pendentes. */
+  const recuperandoRef = useRef<Promise<number> | null>(null);
+  const pendentesGuardadosRef = useRef(0);
+  const recuperarPendentes = useCallback((): Promise<number> => {
+    if (recuperandoRef.current) return recuperandoRef.current;
+    const rodada = (async () => {
+      const ctx = syncRef.current;
+      const vivo = vivoRef.current;
+      if (!ctx.filialCod || !vivo.username) return 0;
+      const chaves = chavesPendentes(prefixoPendente(vivo.companyKey, vivo.username, ctx.filialCod)).filter(
+        (k) => k !== ctx.chaveLocal
+      );
+      let pendentes = 0;
+      for (const chave of chaves) pendentes += await enviarGuardado(chave);
+      pendentesGuardadosRef.current = pendentes;
+      setPecasRecuperando(pendentes);
+      return pendentes;
+    })().finally(() => {
+      recuperandoRef.current = null;
+    });
+    recuperandoRef.current = rodada;
+    return rodada;
+  }, [enviarGuardado]);
+
+  /**
+   * Fecha o inventário NESTA tela: a lista some, o que não chegou a entrar fica
+   * listado no aviso e a tela trava — para bipar de novo, "Começar novo inventário".
+   */
+  const fecharNaTela = useCallback(
+    (ctx: SyncCtx, info: Omit<EncerramentoInventario, "sobra">) => {
+      const sobra = alemDaBase(produtosSelecionadosRef.current, qtdPorChave(baseLista(ctx)));
+      // A sobra é mostrada no aviso — e não pode mais entrar em lugar nenhum.
+      esquecerPendente(ctx);
+      ctx.abandonado = true;
+      syncRef.current = novoSyncCtx(ctx.filialCod);
+      encerradoRef.current = true;
+      produtosSelecionadosRef.current = [];
+      setProdutosSelecionados([]);
+      setRascunhoAtual(null);
+      setBaseItens(new Map());
+      setTravadoPor(null);
+      setPreviewServidor(null);
+      setRascunhoStatus("idle");
+      setRascunhoRestauradoEm(null);
+      setEncerramento({ ...info, sobra });
+      setSaldoRefreshKey((k) => k + 1);
+      void fetchRecentes();
+      void carregarRascunhos();
+    },
+    [fetchRecentes, carregarRascunhos, esquecerPendente]
+  );
+
+  /** O servidor disse que o inventário acabou (alguém subiu ou descartou). */
+  const encerrarRascunho = useCallback(
+    (ctx: SyncCtx, r: RascunhoResumo | null) => {
+      // Esta tela está subindo: quem fecha é a própria subida, com o resultado dela.
+      if (executandoRef.current || syncRef.current !== ctx) return;
+      if (!r || (r.status !== "finalizado" && r.status !== "descartado")) {
+        // Rascunho sumiu sem ser fechado (limpeza de vazio): recomeça com TUDO o que
+        // está na tela (o contexto novo guarda/manda; o guardado do velho sairia 2×).
+        esquecerPendente(ctx);
+        ctx.abandonado = true;
+        syncRef.current = novoSyncCtx(ctx.filialCod);
+        setRascunhoAtual(null);
+        setBaseItens(new Map());
+        persistirPendente(syncRef.current);
+        return;
+      }
+      fecharNaTela(ctx, { status: r.status, por: r.finalizadoPor, em: r.finalizadoEm, nome: r.nomeContagem });
+    },
+    [fecharNaTela, esquecerPendente, persistirPendente]
+  );
+
+  /**
+   * Manda o que mudou nesta tela e rebaseia com a resposta, em volta até não sobrar
+   * diferença. Uma rodada por vez; quem chama durante uma rodada recebe a mesma promessa.
+   */
+  const sincronizar = useCallback((): Promise<void> => {
+    const ctx = syncRef.current;
+    if (!ctx.filialCod || ctx.abandonado || encerradoRef.current) return Promise.resolve();
+    if (ctx.emVoo) return ctx.emVoo;
+    const rodada = (async () => {
+      for (let volta = 0; volta < 25; volta += 1) {
+        if (syncRef.current !== ctx || ctx.abandonado) return;
+        const vivo = vivoRef.current;
+        if (!vivo.username) return;
+        const envio =
+          ctx.incerto ??
+          montarEnvio(ctx, baseLista(ctx), produtosSelecionadosRef.current, vivo.cab, ctx.base?.cab ?? CAB_VAZIO, vivo);
+        if (!envio) {
+          setRascunhoStatus((st) => (st === "salvando" || st === "erro" ? "salvo" : st));
+          return;
+        }
+        // Incerto até a resposta: se falhar, o reenvio é o MESMO (o servidor reconhece o syncId).
+        // Guardado no navegador ANTES de sair: se a página cair agora, ele é reenviado ao reabrir.
+        ctx.incerto = envio;
+        persistirPendente(ctx);
+        setRascunhoStatus("salvando");
+        let resposta: SyncResposta;
+        try {
+          resposta = await sincronizarApi(envio.body, vivo.username);
+        } catch {
+          if (syncRef.current === ctx) setRascunhoStatus("erro");
+          return;
+        }
+        // Contexto abandonado no meio (troca de filial): quem manda o guardado agora é a recuperação.
+        if (ctx.abandonado) return;
+        ctx.incerto = null;
+        if (resposta.estado === "ok") {
+          ctx.rascunhoId = resposta.rascunho.id;
+          if (envio.ocorrencias !== null) ctx.ocorrenciasEnviadas = envio.ocorrencias;
+          if (syncRef.current !== ctx) return;
+          aplicarServidor(ctx, resposta, envio.enviado, envio.cabEnviado);
+          persistirPendente(ctx);
+          setTravadoPor(null);
+          setRascunhoStatus("salvo");
+          continue;
+        }
+        if (syncRef.current !== ctx) return;
+        if (resposta.estado === "travado") {
+          // Alguém está subindo: nada foi aplicado; o que está na tela espera (e é reenviado).
+          persistirPendente(ctx);
+          setTravadoPor(resposta.rascunho.finalizadoPor || "alguém");
+          setRascunhoAtual(resposta.rascunho);
+          setRascunhoStatus("aguardando");
+          return;
+        }
+        encerrarRascunho(ctx, resposta.rascunho);
+        return;
+      }
+    })();
+    const emVoo = rodada.finally(() => {
+      if (ctx.emVoo === emVoo) ctx.emVoo = null;
+    });
+    ctx.emVoo = emVoo;
+    return emVoo;
+  }, [aplicarServidor, encerrarRascunho, persistirPendente]);
+
+  /**
+   * ATUALIZAR AGORA: manda o que é desta tela e traz o que os colegas biparam.
+   * Também roda, obrigatoriamente, antes de conferir e antes de subir.
+   * Devolve false se não deu para falar com o servidor.
+   */
+  const atualizarAgora = useCallback(async (): Promise<boolean> => {
+    if (!username) return true;
+    setAtualizando(true);
+    try {
+      // Primeiro, os bipes guardados de antes (página recarregada, filial trocada).
+      await recuperarPendentes();
+      if (encerradoRef.current) return true;
+      for (let tentativa = 0; tentativa < 4; tentativa += 1) {
+        await sincronizar();
+        const ctx = syncRef.current;
+        if (encerradoRef.current || ctx.abandonado || !ctx.filialCod) return true;
+        if (ctx.incerto) return false; // o que é desta tela não subiu
+        if (ctx.rascunhoId) {
+          const snap = await atualizarRascunhoApi(ctx.rascunhoId, ctx.base?.versao ?? -1);
+          if (syncRef.current !== ctx || ctx.abandonado) return true;
+          // Um envio começou enquanto a consulta ia: aplicar agora contaria peça 2×. Refaz.
+          if (ctx.emVoo || ctx.incerto) continue;
+          if (!snap) {
+            encerrarRascunho(ctx, null);
+            continue;
+          }
+          const r = snap.rascunho;
+          if (r.status === "aberto") {
+            aplicarServidor(ctx, snap, baseLista(ctx), ctx.base?.cab ?? CAB_VAZIO);
+            setTravadoPor(null);
+            setRascunhoStatus((st) => (st === "aguardando" ? "salvo" : st));
+          } else if (r.status === "finalizando") {
+            setTravadoPor(r.finalizadoPor || "alguém");
+            setRascunhoAtual(r);
+          } else {
+            encerrarRascunho(ctx, r);
+          }
+        } else {
+          // Ainda sem rascunho: alguém já começou o desta filial? Entra nele.
+          const snap = await abrirFilialApi(companyKey, ctx.filialCod, username);
+          if (syncRef.current !== ctx || ctx.abandonado) return true;
+          if (ctx.emVoo || ctx.incerto || ctx.rascunhoId) continue;
+          if (snap && (snap.rascunho.status === "aberto" || snap.rascunho.status === "finalizando")) {
+            aplicarServidor(ctx, snap, [], CAB_VAZIO);
+            if (snap.rascunho.status === "finalizando") setTravadoPor(snap.rascunho.finalizadoPor || "alguém");
+            continue; // manda o que esta tela tinha para o rascunho em que acabou de entrar
+          }
+        }
+        setUltimaAtualizacao(new Date().toISOString());
+        return true;
+      }
+      return !syncRef.current.incerto;
+    } catch {
+      return false;
+    } finally {
+      setAtualizando(false);
+    }
+  }, [username, companyKey, sincronizar, aplicarServidor, encerrarRascunho, recuperarPendentes]);
+
+  /**
+   * A tela deixa esta filial: guarda o que faltava e manda EXATAMENTE o guardado
+   * (o envio no ar vai junto, com o mesmo syncId — se ele já tinha entrado, não
+   * soma de novo). Se não der agora, fica guardado e sai quando a filial reabrir.
+   */
+  const abandonarContexto = useCallback(
+    (ctx: SyncCtx) => {
+      if (ctx.abandonado) return;
+      persistirPendente(ctx);
+      ctx.abandonado = true;
+      const chave = ctx.chaveLocal;
+      if (!chave) return;
+      void (async () => {
+        try {
+          if (ctx.emVoo) await ctx.emVoo;
+        } catch {
+          // segue: o guardado tem tudo
+        }
+        await enviarGuardado(chave);
+      })();
+    },
+    [persistirPendente, enviarGuardado]
+  );
+
+  // Aba fechando: manda o que estava esperando o debounce (keepalive). Fica guardado
+  // ANTES de sair — se o envio não chegar, sai de novo (mesmo syncId) ao reabrir.
+  useEffect(() => {
+    const aoSair = () => {
+      const ctx = syncRef.current;
+      const vivo = vivoRef.current;
+      if (!ctx.filialCod || !vivo.username || ctx.abandonado || ctx.emVoo || encerradoRef.current) return;
+      const envio =
+        ctx.incerto ??
+        montarEnvio(ctx, baseLista(ctx), produtosSelecionadosRef.current, vivo.cab, ctx.base?.cab ?? CAB_VAZIO, vivo);
+      if (!envio) return;
+      ctx.incerto = envio;
+      persistirPendente(ctx);
+      void sincronizarApi(envio.body, vivo.username, true).catch(() => undefined);
+    };
     window.addEventListener("pagehide", aoSair);
     return () => window.removeEventListener("pagehide", aoSair);
-  }, [gravarRascunhoPendente]);
+  }, [persistirPendente]);
 
-  // Trocar de filial: a lista da tela passa a ser a da filial nova (o rascunho da antiga fica salvo).
+  // Cada mudança na lista/cabeçalho atualiza o guardado no navegador (antes do envio).
+  useEffect(() => {
+    persistirPendente(syncRef.current);
+  }, [produtosSelecionados, observacao, nomeContagem, nomeEditado, persistirPendente]);
+
+  // Trocar de filial: a lista da tela passa a ser a da filial nova (a da antiga fica no rascunho dela).
   const filialCodRef = useRef<string>(filialCod);
   useEffect(() => {
     if (filialCodRef.current !== filialCod) {
@@ -1698,77 +2494,68 @@ export default function InventarioBipagemPage({ companyKey, companyName }: Props
 
   const trocarFilial = useCallback(
     (cod: string) => {
-      gravarRascunhoPendente();
+      abandonarContexto(syncRef.current);
       // Limpa no MESMO render da troca: um render com a filial nova e a lista velha
-      // faria o autosave gravar a contagem de uma loja no rascunho da outra.
+      // faria a sincronização mandar a contagem de uma loja para o rascunho da outra.
       filialCodRef.current = cod;
       produtosSelecionadosRef.current = [];
+      encerradoRef.current = false;
       setProdutosSelecionados([]);
       setResultado(null);
       setPreviewServidor(null);
+      setEncerramento(null);
       setNomeEditado(false);
       setObservacao("");
       setFilialCod(cod);
     },
-    [gravarRascunhoPendente]
+    [abandonarContexto]
   );
 
-  // Restaura o rascunho do escopo atual (carga da página ou troca de filial).
+  // Abre a filial: entra no rascunho compartilhado dela (carga da página ou troca de filial).
   useEffect(() => {
-    rascunhoPayloadRef.current = "";
-    rascunhoPendenteRef.current = null;
-    rascunhoSalvoRef.current = false;
+    syncRef.current.abandonado = true;
+    const ctx = novoSyncCtx(filialCod);
+    syncRef.current = ctx;
+    encerradoRef.current = false;
+    setEncerramento(null);
+    setRascunhoAtual(null);
+    setBaseItens(new Map());
+    setTravadoPor(null);
     setRascunhoStatus("idle");
     setRascunhoRestauradoEm(null);
-    if (!escopoRascunho || !username || !filialCod) return;
+    setAtividadeRemota(null);
+    setUltimaAtualizacao(null);
+    if (!escopoRascunho || !username || !filialCod) {
+      setHidratandoRascunho(false);
+      return;
+    }
 
-    const cod = filialCod;
     let cancelado = false;
     setHidratandoRascunho(true);
+    setPecasRecuperando(0);
     (async () => {
       try {
-        const lista = await fetchRascunhos(companyKey);
-        if (cancelado) return;
-        setRascunhos(lista);
-        const meu = lista.find(
-          (r) =>
-            r.username.toLowerCase() === username.toLowerCase() &&
-            r.filialCod.trim().toUpperCase() === cod.trim().toUpperCase()
-        );
-        if (!meu || meu.itens.length === 0) return;
-
-        // Só restaura sobre lista vazia: o que foi bipado enquanto a consulta ia vale mais.
-        let aplicou = false;
-        setProdutosSelecionados((prev) => {
-          if (prev.length > 0) return prev;
-          aplicou = true;
-          const itens = meu.itens.map((item) => ({
-            produto: item.produto,
-            descProduto: item.descProduto,
-            codigoBarra: item.codigoBarra,
-            corProduto: item.corProduto,
-            descCor: item.descCor,
-            quantidade: item.quantidade,
-            tamanho: item.tamanho ?? null,
-            tamanhoLabel: item.tamanhoLabel ?? null,
-          }));
-          produtosSelecionadosRef.current = itens;
-          return itens;
-        });
-        if (!aplicou) return;
-        rascunhoSalvoRef.current = true;
-        setRascunhoRestauradoEm(meu.updatedAt);
-        setObservacao(meu.observacao);
-        if (meu.nomeEditado && meu.nomeContagem) {
-          setNomeContagem(meu.nomeContagem);
-          setNomeEditado(true);
-        }
+        // Bipes desta pessoa nesta filial que ficaram guardados (página caiu/fechou,
+        // filial trocada sem conexão): saem ANTES de carregar, para a lista já vir com eles.
+        await recuperarPendentes();
+        if (cancelado || syncRef.current !== ctx) return;
+        const snap = await abrirFilialApi(companyKey, filialCod, username);
+        if (cancelado || syncRef.current !== ctx) return;
+        setUltimaAtualizacao(new Date().toISOString());
+        if (!snap) return;
+        const r = snap.rascunho;
+        if (r.status !== "aberto" && r.status !== "finalizando") return;
+        // Soma ao que já foi bipado enquanto a consulta ia (nada se perde).
+        aplicarServidor(ctx, snap, [], null);
+        if (r.status === "finalizando") setTravadoPor(r.finalizadoPor || "alguém");
+        if (snap.itens.length > 0) setRascunhoRestauradoEm(r.updatedAt);
       } catch {
-        // sem rascunho recuperado: a tela segue com a lista vazia
+        // Sem rascunho agora: o primeiro envio entra no da filial (ou cria). "Atualizar agora" tenta de novo.
       } finally {
         if (!cancelado) setHidratandoRascunho(false);
       }
     })();
+    void carregarRascunhos();
     return () => {
       cancelado = true;
       setHidratandoRascunho(false);
@@ -1777,71 +2564,59 @@ export default function InventarioBipagemPage({ companyKey, companyName }: Props
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [escopoRascunho, companyKey, username]);
 
-  // Autosave: grava o rascunho pouco depois de cada mudança (bipe, quantidade, obs).
+  // Autosave: manda pouco depois de cada mudança (bipe, quantidade, descrição, obs, bipe recusado).
   useEffect(() => {
-    if (!username || !filialCod) return;
-    if (hidratandoRascunho) return;
-    // Lista vazia e nada gravado = estado inicial: um PUT vazio apagaria o rascunho.
-    if (produtosSelecionados.length === 0 && !rascunhoSalvoRef.current) return;
-
-    const payload = JSON.stringify({
-      company: companyKey,
-      filialCod,
-      filialNome: filialSelecionada?.nome ?? filialNomeLinx,
-      nomeContagem,
-      nomeEditado,
-      observacao,
-      zerarNaoContados,
-      itens: produtosSelecionados.map((p) => ({
-        produto: p.produto,
-        descProduto: p.descProduto,
-        codigoBarra: p.codigoBarra,
-        corProduto: p.corProduto,
-        descCor: p.descCor,
-        quantidade: p.quantidade,
-        tamanho: p.tamanho ?? null,
-        tamanhoLabel: p.tamanhoLabel ?? null,
-      })),
-    });
-    if (payload === rascunhoPayloadRef.current) return;
-    rascunhoPendenteRef.current = { payload, username };
-
-    const vazia = produtosSelecionados.length === 0;
-    const timeoutId = setTimeout(async () => {
-      if (rascunhoPendenteRef.current?.payload !== payload) return;
-      setRascunhoStatus("salvando");
-      try {
-        await salvarRascunhoApi(payload, username);
-        rascunhoPayloadRef.current = payload;
-        if (rascunhoPendenteRef.current?.payload === payload) rascunhoPendenteRef.current = null;
-        rascunhoSalvoRef.current = !vazia;
-        setRascunhoStatus("salvo");
-        void carregarRascunhos();
-      } catch {
-        // Não marca como gravado: a próxima alteração tenta de novo.
-        setRascunhoStatus("erro");
-      }
-    }, 400);
+    if (!username || !filialCod || hidratandoRascunho || encerramento) return;
+    const timeoutId = setTimeout(() => void sincronizar(), 400);
     return () => clearTimeout(timeoutId);
   }, [
     produtosSelecionados,
     observacao,
     nomeContagem,
     nomeEditado,
-    zerarNaoContados,
+    bipagem.ocorrencias.length,
     filialCod,
-    filialSelecionada,
-    filialNomeLinx,
-    companyKey,
     username,
     hidratandoRascunho,
-    carregarRascunhos,
+    encerramento,
+    sincronizar,
   ]);
 
+  // Sem consulta automática. Só REENVIA o que é desta tela e ficou sem gravar
+  // (rede caiu, ou alguém estava subindo, ou bipe guardado de antes) — nada se perde.
+  useEffect(() => {
+    if (rascunhoStatus !== "erro" && rascunhoStatus !== "aguardando" && pecasRecuperando === 0) return;
+    const intervalo = window.setInterval(() => {
+      if (pecasRecuperando > 0) void recuperarPendentes();
+      if (rascunhoStatus === "erro" || rascunhoStatus === "aguardando") void sincronizar();
+    }, REENVIO_MS);
+    return () => window.clearInterval(intervalo);
+  }, [rascunhoStatus, pecasRecuperando, sincronizar, recuperarPendentes]);
+
+  /** Novo inventário depois que o anterior subiu: tela destrava, lista vazia. */
+  const comecarNovoInventario = useCallback(() => {
+    esquecerPendente(syncRef.current);
+    syncRef.current.abandonado = true;
+    syncRef.current = novoSyncCtx(filialCod);
+    encerradoRef.current = false;
+    produtosSelecionadosRef.current = [];
+    setProdutosSelecionados([]);
+    setEncerramento(null);
+    setResultado(null);
+    setRascunhoAtual(null);
+    setBaseItens(new Map());
+    setNomeEditado(false);
+    setObservacao("");
+    zerarBipagem();
+    // Se um colega já começou o novo inventário desta filial, entra nele.
+    void atualizarAgora();
+    focarCampoBipe();
+  }, [filialCod, zerarBipagem, atualizarAgora, focarCampoBipe, esquecerPendente]);
+
   /**
-   * Assume um rascunho (inclusive de outro usuário — o inventário é da LOJA, e
-   * quem entra no turno precisa continuar a contagem, não duplicá-la). Grava no
-   * MEU escopo antes de apagar o original.
+   * "Continuar" um rascunho: o inventário é da LOJA — quem entra conta na MESMA
+   * lista (não numa cópia). Rascunho antigo (por usuário) vira o compartilhado da
+   * filial; se ela já tiver um, a pessoa decide se soma.
    */
   const retomarRascunho = useCallback(
     async (rascunho: RascunhoResumo) => {
@@ -1852,78 +2627,80 @@ export default function InventarioBipagemPage({ companyKey, companyName }: Props
         return;
       }
       if (!username) return;
-      gravarRascunhoPendente();
 
-      const itens: LinhaInventario[] = rascunho.itens.map((item) => ({
-        produto: item.produto,
-        descProduto: item.descProduto,
-        codigoBarra: item.codigoBarra,
-        corProduto: item.corProduto,
-        descCor: item.descCor,
-        quantidade: item.quantidade,
-        tamanho: item.tamanho ?? null,
-        tamanhoLabel: item.tamanhoLabel ?? null,
-      }));
-
-      const payload = JSON.stringify({
-        company: companyKey,
-        filialCod: rascunho.filialCod,
-        filialNome: rascunho.filialNome,
-        nomeContagem: rascunho.nomeContagem,
-        nomeEditado: rascunho.nomeEditado,
-        observacao: rascunho.observacao,
-        zerarNaoContados: true,
-        itens: rascunho.itens,
-      });
-      try {
-        await salvarRascunhoApi(payload, username);
-      } catch {
-        // Não gravou: o original continua sendo a única cópia segura — não troca a tela.
-        mostrarNotificacao("Não foi possível assumir o rascunho agora. Tente de novo.", "error");
-        return;
-      }
-      const meu = rascunho.username.toLowerCase() === username.toLowerCase();
-      if (!meu) {
-        await removerRascunhoApi({ id: rascunho.id }, username).catch(() => undefined);
+      let alvo = rascunho;
+      if (!rascunho.compartilhado) {
+        try {
+          let resp = await adotarRascunhoApi(rascunho.id, false, username);
+          if (resp.estado === "conflito") {
+            const ex = resp.existente;
+            const quem = ex.participantes.map((p) => p.username).join(", ") || ex.username;
+            const ok = window.confirm(
+              `${rascunho.filialNome} já tem um inventário em andamento (${quem} · ${ex.totalPecas} peças).\n\n` +
+                `Somar as ${rascunho.totalPecas} peças deste rascunho antigo de ${rascunho.username} a ele?\n\n` +
+                "Só some se forem peças que ainda não foram contadas no outro — a mesma peça nos dois fica contada duas vezes."
+            );
+            if (!ok) return;
+            resp = await adotarRascunhoApi(rascunho.id, true, username);
+          }
+          if (resp.estado !== "ok") {
+            mostrarNotificacao("Este rascunho não existe mais.", "error");
+            void carregarRascunhos();
+            return;
+          }
+          alvo = resp.rascunho;
+        } catch {
+          mostrarNotificacao("Não foi possível continuar o rascunho agora. Tente de novo.", "error");
+          return;
+        }
       }
 
-      // Neutraliza o efeito que limpa a lista na troca de filial: aqui a troca é intencional.
-      filialCodRef.current = rascunho.filialCod;
-      produtosSelecionadosRef.current = itens;
-      setFilialCod(rascunho.filialCod);
-      setProdutosSelecionados(itens);
-      setObservacao(rascunho.observacao);
-      setNomeEditado(rascunho.nomeEditado);
-      if (rascunho.nomeEditado && rascunho.nomeContagem) setNomeContagem(rascunho.nomeContagem);
-      setResultado(null);
+      const mesmaFilial = !!filialCod && alvo.filialCod.trim().toUpperCase() === filialCod.trim().toUpperCase();
+      if (!mesmaFilial) {
+        trocarFilial(alvo.filialCod); // a abertura da filial entra no rascunho dela
+      } else {
+        if (encerradoRef.current) comecarNovoInventario();
+        else void atualizarAgora();
+      }
       setAbaLateral("historico");
       void carregarRascunhos();
+      const outros = [
+        ...new Set([...alvo.participantes.map((p) => p.username), alvo.username.toLowerCase()].filter((u) => u && u !== eu)),
+      ];
       mostrarNotificacao(
-        `Rascunho retomado · ${rascunho.itens.length} produto(s)${meu ? "" : ` de ${rascunho.username}`}`
+        outros.length > 0
+          ? `Você está contando junto com ${outros.join(", ")} — o que você bipar soma na mesma contagem.`
+          : `Inventário de ${alvo.filialNome} na tela.`
       );
     },
-    [filiais, username, companyKey, gravarRascunhoPendente, carregarRascunhos, mostrarNotificacao]
+    [filiais, username, eu, filialCod, trocarFilial, atualizarAgora, comecarNovoInventario, carregarRascunhos, mostrarNotificacao]
   );
 
   const descartarRascunho = useCallback(
     async (rascunho: RascunhoResumo) => {
-      if (!window.confirm(`Descartar o rascunho de ${rascunho.filialNome} com ${rascunho.itens.length} produto(s)?`)) {
-        return;
-      }
+      const outros = rascunho.participantes.filter((p) => p.username !== eu);
+      const mensagem =
+        outros.length > 0
+          ? `Descartar o inventário de ${rascunho.filialNome} (${rascunho.totalPecas} peças)?\n\nApaga a contagem de TODOS que estão contando: ${rascunho.participantes
+              .map((p) => `${p.username} (${p.pecas})`)
+              .join(", ")}.`
+          : `Descartar o rascunho de ${rascunho.filialNome} com ${rascunho.totalLinhas} produto(s)?`;
+      if (!window.confirm(mensagem)) return;
       try {
-        await removerRascunhoApi({ id: rascunho.id }, username);
-        const ehOAtual =
-          !!filialCod &&
-          rascunho.filialCod.trim().toUpperCase() === filialCod.trim().toUpperCase() &&
-          rascunho.username.toLowerCase() === username.toLowerCase();
-        if (ehOAtual) {
-          rascunhoSalvoRef.current = false;
-          rascunhoPayloadRef.current = "";
-          rascunhoPendenteRef.current = null;
-          setRascunhoRestauradoEm(null);
-          setRascunhoStatus("idle");
+        await descartarRascunhoApi(rascunho.id, username);
+        const ctx = syncRef.current;
+        if (ctx.rascunhoId === rascunho.id) {
+          esquecerPendente(ctx); // descarte é decisão consciente: o que não tinha subido vai junto
+          ctx.abandonado = true;
+          syncRef.current = novoSyncCtx(ctx.filialCod);
           produtosSelecionadosRef.current = [];
           setProdutosSelecionados([]);
+          setRascunhoAtual(null);
+          setBaseItens(new Map());
+          setTravadoPor(null);
+          setRascunhoStatus("idle");
+          setRascunhoRestauradoEm(null);
+          setPreviewServidor(null);
           zerarBipagem();
         }
         void carregarRascunhos();
@@ -1932,8 +2709,34 @@ export default function InventarioBipagemPage({ companyKey, companyName }: Props
         mostrarNotificacao("Erro ao descartar o rascunho", "error");
       }
     },
-    [username, filialCod, carregarRascunhos, mostrarNotificacao, zerarBipagem]
+    [username, eu, carregarRascunhos, mostrarNotificacao, zerarBipagem, esquecerPendente]
   );
+
+  /**
+   * Antes de conferir/subir: ATUALIZA na hora (manda o desta tela, o guardado de
+   * antes e traz o dos colegas) e só libera se a tela estiver igual ao rascunho
+   * compartilhado. Devolve o motivo quando não dá.
+   */
+  const garantirSincronizado = useCallback(async (): Promise<string | null> => {
+    const conectou = await atualizarAgora();
+    const ctx = syncRef.current;
+    if (encerradoRef.current) return "Este inventário já foi encerrado — veja o aviso na tela.";
+    if (!conectou || ctx.incerto) {
+      return "Sem conexão com o rascunho compartilhado: não dá para garantir que a contagem de todos está aqui. Tente de novo em instantes.";
+    }
+    if (pendentesGuardadosRef.current > 0) {
+      return `${pendentesGuardadosRef.current} peça(s) bipada(s) antes nesta tela ainda não foram gravadas — aguarde enviar (aviso na tela) e tente de novo.`;
+    }
+    if (travadoPorRef.current) return `${travadoPorRef.current} está subindo este inventário agora.`;
+    if (produtosSelecionadosRef.current.length === 0) return null; // a conferência avisa "bipe pelo menos um produto"
+    if (!ctx.rascunhoId || !ctx.base) {
+      return "Esta tela ainda não está ligada ao rascunho compartilhado da filial. Clique em “Atualizar agora” e tente de novo.";
+    }
+    if (ctx.emVoo || !mesmasQuantidades(qtdPorChave(produtosSelecionadosRef.current), qtdPorChave(baseLista(ctx)))) {
+      return "Ainda chegando bipe (desta tela ou de quem conta junto). Aguarde um instante e tente de novo.";
+    }
+    return null;
+  }, [atualizarAgora]);
 
   // ── SUBIR ESTOQUE ──────────────────────────────────────────────────────────
 
@@ -1969,6 +2772,13 @@ export default function InventarioBipagemPage({ companyKey, companyName }: Props
         "error"
       );
       focarCampoBipe();
+      return;
+    }
+    // A conferência é da contagem de TODOS (rascunho compartilhado), não só desta tela.
+    setConferindo(true);
+    const naoSincronizou = await garantirSincronizado().finally(() => setConferindo(false));
+    if (naoSincronizou) {
+      mostrarNotificacao(naoSincronizou, "error");
       return;
     }
     const lista = produtosSelecionadosRef.current;
@@ -2011,6 +2821,7 @@ export default function InventarioBipagemPage({ companyKey, companyName }: Props
       }
       if (data.nomeSugerido) setNomeContagem(data.nomeSugerido);
       setConfirmCheck(false);
+      setAceitarOcorrencias(false);
       setPreviewAssinatura(assinaturaLista(lista));
       setPreviewServidor(data);
     } catch {
@@ -2030,6 +2841,7 @@ export default function InventarioBipagemPage({ companyKey, companyName }: Props
     linhasParaServidor,
     mostrarNotificacao,
     focarCampoBipe,
+    garantirSincronizado,
   ]);
 
   const listaMudouDesdeConferencia =
@@ -2039,15 +2851,26 @@ export default function InventarioBipagemPage({ companyKey, companyName }: Props
     if (!previewServidor || executando) return;
     // Bipe lido com o modal aberto (o leitor não para): mesma trava do botão.
     if (bipagem.emVoo.length > 0 || bipagem.ocorrencias.length > 0) return;
+    setExecutando(true);
+    const naoSincronizou = await garantirSincronizado();
     const lista = produtosSelecionadosRef.current;
-    if (assinaturaLista(lista) !== previewAssinatura) return;
+    if (naoSincronizou || assinaturaLista(lista) !== previewAssinatura) {
+      setExecutando(false);
+      mostrarNotificacao(
+        naoSincronizou ??
+          "A contagem mudou depois da conferência (peça bipada por você ou por quem conta junto). Feche e confira de novo.",
+        "error"
+      );
+      return;
+    }
+    const ctxSubida = syncRef.current;
 
     const snapBipagem = {
       lidos: bipagem.lidos,
       aceitos: bipagem.aceitos,
       dispensadas: bipagem.dispensadas.map((d) => d.id),
     };
-    setExecutando(true);
+    executandoRef.current = true;
     try {
       const resp = await fetch("/api/inventario/executar", {
         method: "POST",
@@ -2060,35 +2883,42 @@ export default function InventarioBipagemPage({ companyKey, companyName }: Props
           obs: observacao.trim() || null,
           zerarNaoContados,
           itens: linhasParaServidor(lista),
+          rascunhoId: ctxSubida.rascunhoId,
+          rascunhoVersao: ctxSubida.base?.versao ?? null,
+          aceitarOcorrenciasDe: aceitarOcorrencias ? colegasComOcorrencia.map((p) => p.username) : [],
         }),
       });
       const data = await resp.json().catch(() => null);
       if (!resp.ok || !data) {
         mostrarNotificacao(data?.error ?? "Erro ao subir o inventário.", "error");
-        if (resp.status === 409) void fetchRecentes();
+        if (data?.motivo === "encerrado" && data.rascunho) {
+          executandoRef.current = false;
+          encerrarRascunho(ctxSubida, data.rascunho as RascunhoResumo);
+        } else if (["mudou", "lista_diferente", "ocorrencias", "sem_rascunho", "finalizando"].includes(data?.motivo)) {
+          // Traz o que mudou: a lista/os avisos na tela passam a mostrar o porquê.
+          executandoRef.current = false;
+          void atualizarAgora();
+        } else if (resp.status === 409) {
+          void fetchRecentes();
+        }
         return;
       }
 
-      // O rascunho existe só até o estoque subir. Zerar os controles do autosave
-      // ANTES de mexer na lista evita gravar um rascunho velho logo depois.
-      rascunhoSalvoRef.current = false;
-      rascunhoPayloadRef.current = "";
-      rascunhoPendenteRef.current = null;
-      setRascunhoStatus("idle");
-      setRascunhoRestauradoEm(null);
-      await removerRascunhoApi({ companyKey, filialCod }, username).catch(() => undefined);
-
-      // Tira da lista só o que subiu: peça bipada durante a gravação fica.
-      const sobra = descontarGravados(produtosSelecionadosRef.current, lista);
-      setProdutosSelecionados((prev) => {
-        const next = descontarGravados(prev, lista);
-        produtosSelecionadosRef.current = next;
-        return next;
+      // O servidor já fechou o rascunho compartilhado (quem subiu = responsável).
+      // Esta tela trava: o inventário acabou. Peça bipada durante a gravação NÃO
+      // entrou e fica listada no aviso (não vira inventário novo sozinha).
+      const pecasSobra = alemDaBase(produtosSelecionadosRef.current, qtdPorChave(baseLista(ctxSubida))).reduce(
+        (acc, p) => acc + p.quantidade,
+        0
+      );
+      fecharNaTela(ctxSubida, {
+        status: "finalizado",
+        por: eu,
+        em: new Date().toISOString(),
+        nome: data.nomeContagem,
       });
-      produtosSelecionadosRef.current = sobra;
       fecharBipagemDoRegistro(snapBipagem);
 
-      const pecasSobra = sobra.reduce((acc, p) => acc + p.quantidade, 0);
       setResultado({
         nomeContagem: data.nomeContagem,
         filialNome: data.filialNome,
@@ -2109,8 +2939,11 @@ export default function InventarioBipagemPage({ companyKey, companyName }: Props
         "Sem resposta do servidor. O inventário pode ter sido aplicado — confira o Histórico antes de subir de novo.",
         "error"
       );
+      // Depois que a tela sair do modo "subindo", descobre se o inventário fechou.
+      setTimeout(() => void atualizarAgora(), 1500);
       void fetchRecentes();
     } finally {
+      executandoRef.current = false;
       setExecutando(false);
       setConfirmCheck(false);
     }
@@ -2130,6 +2963,13 @@ export default function InventarioBipagemPage({ companyKey, companyName }: Props
     fetchRecentes,
     carregarRascunhos,
     fecharBipagemDoRegistro,
+    garantirSincronizado,
+    encerrarRascunho,
+    atualizarAgora,
+    fecharNaTela,
+    eu,
+    aceitarOcorrencias,
+    colegasComOcorrencia,
   ]);
 
   // ── DERIVADOS ──────────────────────────────────────────────────────────────
@@ -2146,13 +2986,24 @@ export default function InventarioBipagemPage({ companyKey, companyName }: Props
 
   const rascunhosVisiveis = rascunhos.filter(
     (r) =>
-      r.itens.length > 0 &&
+      r.totalLinhas > 0 &&
       (filiais.ativas.some((f) => f.cod === r.filialCod) || filiais.inativas.some((f) => f.cod === r.filialCod))
   );
 
   const isBusy = executando || conferindo;
+  /** Peças na tela que o servidor ainda não tem (o que ainda não foi gravado). */
+  const pecasNaoGravadasTela = useMemo(
+    () => alemDaBase(produtosSelecionados, qtdPorChave(baseItens.values())).reduce((acc, p) => acc + p.quantidade, 0),
+    [produtosSelecionados, baseItens]
+  );
   const podeSubir =
-    !!filialCod && produtosSelecionados.length > 0 && !isBusy && !somenteLeitura && !!saldoDaFilial;
+    !!filialCod &&
+    produtosSelecionados.length > 0 &&
+    !isBusy &&
+    !somenteLeitura &&
+    !!saldoDaFilial &&
+    !encerramento &&
+    !travadoPor;
 
   const detalhe = detalheAberto ? detalheCache[detalheAberto.nome] : undefined;
   const detalheComSaldo = (detalhe?.itens ?? []).some((it) => it.saldoFinal != null);
@@ -2305,7 +3156,7 @@ export default function InventarioBipagemPage({ companyKey, companyName }: Props
             </strong>{" "}
             un. Já aparece no extrato dos produtos.
             {resultado.sobra > 0 &&
-              ` ${resultado.sobra} peça(s) bipada(s) durante a gravação ficaram na lista para o próximo inventário.`}
+              ` ${resultado.sobra} peça(s) bipada(s) durante a gravação NÃO entraram — veja a lista no aviso da contagem.`}
           </p>
           <div className={styles.resultadoAcoes}>
             <button
@@ -2355,7 +3206,7 @@ export default function InventarioBipagemPage({ companyKey, companyName }: Props
             {abaLateral === "rascunhos" ? (
               <>
                 <div className={`${s.historicoActionRow} ${styles.histActionRow}`}>
-                  <span className={s.rascunhosAjuda}>Inventários em aberto — somem quando o estoque sobe.</span>
+                  <span className={s.rascunhosAjuda}>Inventários em aberto — um por filial, de quem estiver contando. Somem quando o estoque sobe.</span>
                 </div>
                 {loadingRascunhos && rascunhosVisiveis.length === 0 ? (
                   <div className={s.emptyLog}>Carregando...</div>
@@ -2368,39 +3219,49 @@ export default function InventarioBipagemPage({ companyKey, companyName }: Props
                   <div className={s.logScrollContainer}>
                     <div className={s.logList}>
                       {rascunhosVisiveis.map((rascunho) => {
-                        const pecas = rascunho.itens.reduce((acc, i) => acc + i.quantidade, 0);
-                        const ehAtual =
-                          !!filialCod &&
-                          rascunho.filialCod.trim().toUpperCase() === filialCod.trim().toUpperCase() &&
-                          rascunho.username.toLowerCase() === username.toLowerCase();
+                        const pecas = rascunho.totalPecas;
+                        const ehAtual = rascunhoAtual?.id === rascunho.id;
+                        const quem =
+                          rascunho.participantes.length > 0
+                            ? rascunho.participantes.map((p) => `${p.username} (${p.pecas})`).join(", ")
+                            : rascunho.username;
                         return (
                           <div key={rascunho.id} className={s.rascunhoItem}>
                             <div className={s.rascunhoTopo}>
-                              <span className={`${s.rascunhoTipoPill} ${s.rascunhoTipoPillEntrada}`}>Inventário</span>
+                              <span className={`${s.rascunhoTipoPill} ${s.rascunhoTipoPillEntrada}`}>
+                                {rascunho.compartilhado ? "Inventário" : "Rascunho antigo"}
+                              </span>
                               <span className={s.rascunhoFilial}>{rascunho.filialNome}</span>
                               {ehAtual && <span className={`${s.rascunhoAtualPill} ${styles.pillVerde}`}>na tela</span>}
+                              {rascunho.status === "finalizando" && (
+                                <span className={`${s.rascunhoAtualPill} ${styles.pillVerde}`}>subindo…</span>
+                              )}
                             </div>
                             <div className={s.rascunhoMeta}>
-                              {rascunho.itens.length} prod · {pecas} {pecas === 1 ? "peça" : "peças"}
+                              {rascunho.totalLinhas} prod · {pecas} {pecas === 1 ? "peça" : "peças"}
                             </div>
                             <div className={s.rascunhoMeta}>
-                              {rascunho.username} · {fmtDataHora(rascunho.updatedAt)}
+                              {quem} · {fmtDataHora(rascunho.updatedAt)}
                             </div>
                             <div className={s.rascunhoAcoes}>
                               <button
                                 type="button"
                                 className={`${s.rascunhoRetomarBtn} ${styles.retomarVerde}`}
                                 onClick={() => void retomarRascunho(rascunho)}
-                                disabled={ehAtual || isBusy}
-                                title={ehAtual ? "Este rascunho já é a lista da tela" : "Trazer para a tela"}
+                                disabled={ehAtual || isBusy || rascunho.status === "finalizando"}
+                                title={
+                                  ehAtual
+                                    ? "Este inventário já está na tela"
+                                    : "Entrar neste inventário: o que você bipar soma na mesma contagem"
+                                }
                               >
-                                {ehAtual ? "Em edição" : "Retomar"}
+                                {ehAtual ? "Na tela" : "Continuar"}
                               </button>
                               <button
                                 type="button"
                                 className={s.rascunhoDescartarBtn}
                                 onClick={() => void descartarRascunho(rascunho)}
-                                disabled={isBusy}
+                                disabled={isBusy || rascunho.status === "finalizando"}
                               >
                                 Descartar
                               </button>
@@ -2487,18 +3348,22 @@ export default function InventarioBipagemPage({ companyKey, companyName }: Props
                 <div className={s.cardHeaderRight}>
                   {rascunhoStatus !== "idle" && (
                     <span
-                      className={`${s.rascunhoStatus} ${rascunhoStatus === "erro" ? s.rascunhoStatusErro : ""}`}
+                      className={`${s.rascunhoStatus} ${rascunhoStatus === "erro" || rascunhoStatus === "aguardando" ? s.rascunhoStatusErro : ""}`}
                       title={
                         rascunhoStatus === "erro"
-                          ? "Não foi possível salvar o rascunho — a próxima alteração tenta de novo."
-                          : "A contagem é salva automaticamente e sobrevive a queda/fechamento da aba."
+                          ? "Não foi possível sincronizar — tentando de novo a cada poucos segundos. Nada do que está na tela se perde."
+                          : rascunhoStatus === "aguardando"
+                            ? "Alguém está subindo este inventário: o que você bipar agora espera na tela."
+                            : "A contagem é salva automaticamente e é a mesma para todos que abrirem esta filial."
                       }
                     >
                       {rascunhoStatus === "salvando"
-                        ? "salvando rascunho…"
+                        ? "sincronizando…"
                         : rascunhoStatus === "salvo"
                           ? "rascunho salvo"
-                          : "rascunho não salvo"}
+                          : rascunhoStatus === "aguardando"
+                            ? "aguardando envio"
+                            : "sem conexão — tentando de novo"}
                     </span>
                   )}
                   {totalProdutos > 0 && (
@@ -2508,6 +3373,159 @@ export default function InventarioBipagemPage({ companyKey, companyName }: Props
                   )}
                 </div>
               </div>
+
+              {encerramento && (
+                <div className={styles.encerramentoAviso} role="status">
+                  <div className={styles.encerramentoTexto}>
+                    <strong>
+                      {encerramento.status === "descartado"
+                        ? "Este inventário foi descartado"
+                        : `Inventário ${encerramento.nome ? `${encerramento.nome} ` : ""}subido para o estoque`}
+                    </strong>
+                    {encerramento.por ? ` por ${encerramento.por === eu ? "você" : encerramento.por}` : ""}
+                    {encerramento.em ? ` às ${fmtHora(encerramento.em)}` : ""}
+                    {encerramento.status === "finalizado" && encerramento.por ? " (responsável no Linx)" : ""}. Esta contagem
+                    está encerrada — não dá mais para bipar nela.
+                    {encerramento.sobra.length > 0 && (
+                      <div className={styles.encerramentoSobra}>
+                        <strong>
+                          {encerramento.sobra.reduce((acc, p) => acc + p.quantidade, 0)} peça(s) bipada(s) nesta tela NÃO
+                          entraram no inventário
+                        </strong>{" "}
+                        (bipadas depois da última sincronização ou durante a subida):
+                        <ul>
+                          {encerramento.sobra.slice(0, 15).map((p) => (
+                            <li key={chaveLinha(p)}>
+                              {p.quantidade}× {p.descProduto || p.produto}
+                              {textoCorProduto(p.descCor, p.corProduto) ? ` · ${textoCorProduto(p.descCor, p.corProduto)}` : ""}
+                              {p.tamanhoLabel ? ` · ${p.tamanhoLabel}` : ""}
+                            </li>
+                          ))}
+                          {encerramento.sobra.length > 15 && <li>… e mais {encerramento.sobra.length - 15} produto(s)</li>}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    className={`${styles.btnSecundario} ${styles.novoInventarioBtn}`}
+                    onClick={comecarNovoInventario}
+                    disabled={isBusy}
+                  >
+                    Começar novo inventário
+                  </button>
+                </div>
+              )}
+
+              {rascunhoStatus === "erro" && pecasNaoGravadasTela > 0 && (
+                <div className={styles.naoGravadoAviso} role="alert">
+                  ⚠{" "}
+                  <strong>
+                    {pecasNaoGravadasTela} peça(s) bipada(s) nesta tela ainda NÃO foram gravadas no servidor
+                  </strong>{" "}
+                  (sem conexão). Estão guardadas neste navegador e são enviadas sozinhas quando a conexão voltar —{" "}
+                  <strong>não limpe os dados do navegador</strong> até este aviso sumir.
+                </div>
+              )}
+
+              {pecasRecuperando > 0 && (
+                <div className={styles.naoGravadoAviso} role="alert">
+                  ⚠{" "}
+                  <strong>
+                    {pecasRecuperando} peça(s) bipada(s) antes (página recarregada ou filial trocada) ainda NÃO foram
+                    gravadas
+                  </strong>{" "}
+                  — tentando de novo a cada 5 segundos. O inventário não sobe enquanto elas não entrarem.{" "}
+                  <button type="button" className={styles.btnSecundario} onClick={() => void atualizarAgora()} disabled={atualizando}>
+                    Tentar agora
+                  </button>
+                </div>
+              )}
+
+              {pecasPerdidas.length > 0 && (
+                <div className={styles.naoGravadoAviso} role="alert">
+                  <div>
+                    ⚠{" "}
+                    <strong>
+                      {pecasPerdidas.reduce((acc, p) => acc + p.quantidade, 0)} peça(s) bipada(s) antes nesta tela NÃO
+                      entraram
+                    </strong>
+                    : quando a conexão voltou, o inventário delas já tinha subido (ou sido descartado). Confira se precisam
+                    entrar na contagem nova:
+                    <ul className={styles.listaPecas}>
+                      {pecasPerdidas.slice(0, 20).map((p, i) => (
+                        <li key={`${p.rotulo}-${i}`}>
+                          {p.quantidade}× {p.rotulo}
+                        </li>
+                      ))}
+                      {pecasPerdidas.length > 20 && <li>… e mais {pecasPerdidas.length - 20} linha(s)</li>}
+                    </ul>
+                  </div>
+                  <button type="button" className={styles.btnSecundario} onClick={() => setPecasPerdidas([])}>
+                    Entendi
+                  </button>
+                </div>
+              )}
+
+              {travadoPor && (
+                <div className={styles.travadoAviso} role="status">
+                  ⏳ <strong>{travadoPor === eu ? "Você está" : `${travadoPor} está`}</strong> subindo este inventário para
+                  o estoque. O que for bipado agora fica nesta tela e não entra neste envio.
+                </div>
+              )}
+
+              {filialCod && !encerramento && (
+                <div className={styles.equipeBar}>
+                  <span className={styles.equipeTitulo}>{contandoJunto ? "Contando juntos" : "Contagem compartilhada"}</span>
+                  {participantes
+                    .filter((p) => p.pecas > 0 || p.ocorrencias > 0)
+                    .map((p) => (
+                      <span
+                        key={p.username}
+                        className={`${styles.equipeChip} ${p.username === eu ? styles.equipeChipEu : ""} ${
+                          p.ocorrencias > 0 ? styles.equipeChipAlerta : ""
+                        }`}
+                        title={
+                          (p.ultimoBipeEm ? `Último bipe às ${fmtHora(p.ultimoBipeEm)}` : "") +
+                          (p.ocorrencias > 0 ? ` · ${p.ocorrencias} bipe(s) que NÃO entraram (painel vermelho da tela dela/dele)` : "")
+                        }
+                      >
+                        {p.username === eu ? "você" : p.username} · {p.pecas.toLocaleString("pt-BR")}
+                        {p.username !== eu && p.ultimoBipeEm ? ` · ${fmtHora(p.ultimoBipeEm)}` : ""}
+                        {p.ocorrencias > 0 ? ` · ⚠ ${p.ocorrencias} não entraram` : ""}
+                      </span>
+                    ))}
+                  {!contandoJunto && (
+                    <span className={styles.equipeHint}>quem abrir esta filial no inventário conta nesta mesma lista</span>
+                  )}
+                  {atividadeRemota && <span className={styles.equipeAtividade}>{atividadeRemota}</span>}
+                  <span className={styles.equipeAtualizar}>
+                    {ultimaAtualizacao && (
+                      <span className={styles.equipeHint}>
+                        atualizado às{" "}
+                        {new Date(ultimaAtualizacao).toLocaleTimeString("pt-BR", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          second: "2-digit",
+                        })}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      className={styles.btnSecundario}
+                      onClick={() => {
+                        void atualizarAgora().then((ok) => {
+                          if (!ok) mostrarNotificacao("Sem conexão com o rascunho — tente de novo.", "error");
+                        });
+                      }}
+                      disabled={atualizando || isBusy}
+                      title="Traz o que os colegas biparam e manda o que é desta tela"
+                    >
+                      {atualizando ? "Atualizando…" : "↻ Atualizar agora"}
+                    </button>
+                  </span>
+                </div>
+              )}
 
               {saldoDaFilial && (
                 <KpiStrip totais={diferencas.totais} naoBipados={diferencas.naoBipados} zerarNaoContados={zerarNaoContados} />
@@ -2737,9 +3755,12 @@ export default function InventarioBipagemPage({ companyKey, companyName }: Props
                       if ((e.target as HTMLElement).closest("button")) focarCampoBipe();
                     }}
                   >
-                    {produtosSelecionados.map((produto, index) => {
+                    {produtosSelecionados.map((produto) => {
                       const corTxt = textoCorProduto(produto.descCor, produto.corProduto);
                       const chaveItem = chaveLinha(produto);
+                      const quemContou = contandoJunto
+                        ? Object.entries(baseItens.get(chaveSync(produto))?.porUsuario ?? {}).sort((x, y) => y[1] - x[1])
+                        : [];
                       const destacado = itemDestacado === chaveItem;
                       const semTamanho = faltaTamanho(produto);
                       const saldoLinha = saldoDaLinha(produto);
@@ -2762,6 +3783,15 @@ export default function InventarioBipagemPage({ companyKey, companyName }: Props
                               {corTxt ? ` · ${corTxt}` : ""}
                               {produto.codigoBarra && ` · ${produto.codigoBarra}`}
                             </div>
+                            {quemContou.length > 0 && (
+                              <div className={styles.linhaQuem} title="Quem contou estas peças">
+                                {quemContou.map(([u, n]) => (
+                                  <span key={u} className={u === username.toLowerCase() ? styles.linhaQuemEu : undefined}>
+                                    {u === username.toLowerCase() ? "você" : u} {n}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                             {produto.tamanhos && produto.tamanhos.length > 0 && (
                               <div className={s.tamanhoRow} role="group" aria-label="Tamanho">
                                 <span className={semTamanho ? s.tamanhoLabelFaltando : s.tamanhoLabel}>
@@ -2775,7 +3805,7 @@ export default function InventarioBipagemPage({ companyKey, companyName }: Props
                                       key={t.ordinal}
                                       type="button"
                                       className={`${s.tamanhoChip} ${ativo ? s.tamanhoChipAtivo : ""}`}
-                                      onClick={() => escolherTamanho(index, t.ordinal)}
+                                      onClick={() => escolherTamanho(chaveItem, t.ordinal)}
                                       disabled={isBusy}
                                       title={`${t.label} — saldo ${saldoT}`}
                                     >
@@ -2791,7 +3821,7 @@ export default function InventarioBipagemPage({ companyKey, companyName }: Props
                             <div className={s.qtyControl}>
                               <button
                                 className={s.qtyBtn}
-                                onClick={() => atualizarQuantidade(index, produto.quantidade - 1)}
+                                onClick={() => atualizarQuantidade(chaveItem, produto.quantidade - 1)}
                                 disabled={produto.quantidade <= 1}
                               >
                                 −
@@ -2799,19 +3829,19 @@ export default function InventarioBipagemPage({ companyKey, companyName }: Props
                               <input
                                 type="number"
                                 className={s.qtyInput}
-                                data-leitor-qtd={index}
+                                data-leitor-qtd={chaveItem}
                                 value={produto.quantidade}
-                                onChange={(e) => atualizarQuantidade(index, parseInt(e.target.value, 10) || 1)}
+                                onChange={(e) => atualizarQuantidade(chaveItem, parseInt(e.target.value, 10) || 1)}
                                 min={1}
                               />
-                              <button className={s.qtyBtn} onClick={() => atualizarQuantidade(index, produto.quantidade + 1)}>
+                              <button className={s.qtyBtn} onClick={() => atualizarQuantidade(chaveItem, produto.quantidade + 1)}>
                                 +
                               </button>
                             </div>
                             <div className={s.stockPill} title="Contado / saldo atual no Linx">
                               {produto.quantidade}/{saldoLinha ?? "?"}
                             </div>
-                            <button className={s.removeBtn} onClick={() => removerProduto(index)} title="Remover">
+                            <button className={s.removeBtn} onClick={() => removerProduto(chaveItem)} title="Remover">
                               🗑
                             </button>
                           </div>
@@ -2899,7 +3929,7 @@ export default function InventarioBipagemPage({ companyKey, companyName }: Props
                   type="button"
                   className={`${s.addProductBtn} ${s.addProductBtnEntrada} ${styles.addVerde}`}
                   onClick={abrirModalAdicionarProduto}
-                  disabled={!filialCod || isBusy}
+                  disabled={!filialCod || isBusy || !!encerramento}
                 >
                   <span className={s.addProductBtnIcon} aria-hidden="true">
                     <svg viewBox="0 0 24 24" fill="none">
@@ -2909,7 +3939,7 @@ export default function InventarioBipagemPage({ companyKey, companyName }: Props
                   Adicionar Produto
                 </button>
                 {produtosSelecionados.length > 0 && (
-                  <button type="button" className={s.clearProductsBtn} onClick={limparLista} disabled={isBusy}>
+                  <button type="button" className={s.clearProductsBtn} onClick={limparLista} disabled={isBusy || !!encerramento}>
                     Limpar lista
                   </button>
                 )}
@@ -2987,6 +4017,47 @@ export default function InventarioBipagemPage({ companyKey, companyName }: Props
                 Filial: <strong>{previewServidor.filialNome}</strong> · Descrição: <strong>{nomeContagem}</strong> ·
                 Responsável: <strong>{username}</strong>
               </p>
+              <p className={styles.confirmLinha}>
+                Contagem atualizada agora com o que todos biparam
+                {ultimaAtualizacao ? ` (às ${new Date(ultimaAtualizacao).toLocaleTimeString("pt-BR")})` : ""}. Quem sobe fica
+                como responsável no Linx.
+              </p>
+              {contandoJunto && (
+                <p className={styles.confirmLinha}>
+                  Contado por:{" "}
+                  <strong>
+                    {participantes
+                      .filter((p) => p.pecas > 0)
+                      .map(
+                        (p) =>
+                          `${p.username === eu ? "você" : p.username} (${p.pecas}${
+                            p.username !== eu && p.ultimoBipeEm ? `, último bipe ${fmtHora(p.ultimoBipeEm)}` : ""
+                          })`
+                      )
+                      .join(" · ")}
+                  </strong>
+                </p>
+              )}
+              {colegasComOcorrencia.length > 0 && (
+                <div className={styles.alertaZerar}>
+                  <span>
+                    <strong>
+                      Bipes que NÃO entraram na contagem na tela de:{" "}
+                      {colegasComOcorrencia.map((p) => `${p.username} (${p.ocorrencias})`).join(", ")}
+                    </strong>
+                    . Peça para resolverem no painel vermelho da tela deles — se subir agora, essas peças contam como não
+                    bipadas (viram 0).
+                  </span>
+                  <label className={styles.confirmCheck}>
+                    <input
+                      type="checkbox"
+                      checked={aceitarOcorrencias}
+                      onChange={(e) => setAceitarOcorrencias(e.target.checked)}
+                    />
+                    Subir mesmo assim, sem esses bipes.
+                  </label>
+                </div>
+              )}
               {previewServidor.nomeSugerido && (
                 <p className={styles.confirmLinha}>
                   Já existe um inventário com a descrição sugerida hoje — usando <strong>{previewServidor.nomeSugerido}</strong>.
@@ -3057,14 +4128,19 @@ export default function InventarioBipagemPage({ companyKey, companyName }: Props
               )}
               {listaMudouDesdeConferencia && (
                 <p className={styles.avisoLista}>
-                  A lista mudou depois desta conferência (peça bipada com a janela aberta). Feche e clique em “Subir estoque”
-                  de novo para conferir.
+                  A lista mudou depois desta conferência (peça bipada com a janela aberta, aqui ou por quem conta junto).
+                  Feche e clique em “Subir estoque” de novo para conferir.
                 </p>
               )}
               <p className={a.modalWarn}>Altera o estoque real no Linx e registra no extrato. Dá pra desfazer depois.</p>
               <label className={styles.confirmCheck}>
                 <input type="checkbox" checked={confirmCheck} onChange={(e) => setConfirmCheck(e.target.checked)} />
-                Confirmo que revisei as diferenças e desejo subir o inventário.
+                {contandoJunto
+                  ? `Confirmo que revisei as diferenças, que todos que estão contando (${participantes
+                      .filter((p) => p.pecas > 0 && p.username !== eu)
+                      .map((p) => p.username)
+                      .join(", ")}) já terminaram, e desejo subir o inventário.`
+                  : "Confirmo que revisei as diferenças e desejo subir o inventário."}
               </label>
             </div>
             <div className={s.modalFooter}>
@@ -3076,6 +4152,7 @@ export default function InventarioBipagemPage({ companyKey, companyName }: Props
                 onClick={() => void subirEstoque()}
                 disabled={
                   !confirmCheck ||
+                  (colegasComOcorrencia.length > 0 && !aceitarOcorrencias) ||
                   executando ||
                   bipesEmVoo > 0 ||
                   bipagem.ocorrencias.length > 0 ||

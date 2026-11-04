@@ -4,12 +4,17 @@ import { getConnectionPool } from '@/lib/db/connection';
 import { shouldUseProxy, ProxyPool } from '@/lib/db/proxy';
 import { findUserByUsername } from '@/lib/auth/users-store';
 import { isReadOnlyRole } from '@/lib/auth/permissions';
-import { resolverNomeFilial } from '@/lib/repositories/ajusteEstoque';
+import { filialDaContagem, resolverNomeFilial } from '@/lib/repositories/ajusteEstoque';
 import { calcularDiferencasBipagem, type LinhaBipada } from '@/lib/repositories/inventarioBipagem';
 import { executarAjusteContagem } from '@/lib/ajuste-estoque-executor';
 import { resolveResponsavelLinx } from '@/lib/server/responsavel-linx';
 import { salvarKpisAjuste } from '@/lib/utils/ajuste-estoque-kpis-store';
-import { inventarioRascunhoId, removerInventarioRascunho } from '@/lib/utils/inventario-draft-store';
+import {
+  finalizarInventarioRascunho,
+  liberarInventarioTravado,
+  resolverTravaVencida,
+  travarInventarioParaFinalizar,
+} from '@/lib/utils/inventario-draft-store';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
@@ -21,6 +26,11 @@ interface ExecutarRequest {
   dataContagem: string; // 'YYYY-MM-DD'
   obs?: string | null;
   itens: LinhaBipada[];
+  /** Rascunho compartilhado que a tela conferiu, e em qual versão. */
+  rascunhoId?: string | null;
+  rascunhoVersao?: number | null;
+  /** Colegas cujos bipes que não entraram a pessoa aceitou deixar de fora (de propósito). */
+  aceitarOcorrenciasDe?: string[];
 }
 
 function isValidDate(s: string): boolean {
@@ -37,6 +47,11 @@ function isValidDate(s: string): boolean {
  *
  * Dupla gravação: a descrição (NOME_CONTAGEM) é PK no Linx e o executor recusa
  * nome repetido — clique duplo ou "achou que falhou e mandou de novo" esbarra nela.
+ *
+ * Contagem a várias mãos: o rascunho é da filial. Antes de gravar ele é TRAVADO na
+ * versão que a tela conferiu — se um colega bipou depois, recusa (409) e a tela
+ * confere de novo; enquanto trava, os bipes dos colegas esperam. Quem sobe é o
+ * responsável (RESPONSAVEL no Linx); o rascunho vira lápide com o nome dele.
  */
 export async function POST(request: Request) {
   try {
@@ -102,9 +117,57 @@ export async function POST(request: Request) {
       );
     }
 
-    const pool = shouldUseProxy() ? new ProxyPool() : await getConnectionPool();
+    // A contagem que sobe é SEMPRE a do rascunho compartilhado da filial: sem ele,
+    // uma tela que nunca sincronizou subiria só a lista dela e zeraria o que os
+    // colegas contaram.
+    const rascunhoId = (body.rascunhoId || '').trim();
+    if (!rascunhoId) {
+      return NextResponse.json(
+        {
+          error:
+            'Esta tela não está ligada ao rascunho compartilhado da filial (sem conexão?). Clique em "Atualizar agora" e confira de novo.',
+          motivo: 'sem_rascunho',
+        },
+        { status: 409 }
+      );
+    }
+    const pedirTrava = () =>
+      travarInventarioParaFinalizar({
+        id: rascunhoId,
+        versao: Number(body.rascunhoVersao),
+        username,
+        nomeContagem,
+        itens: body.itens.map((l) => ({ produto: l.produto, cor: l.cor ?? '', quantidade: l.quantidade })),
+        aceitarOcorrenciasDe: Array.isArray(body.aceitarOcorrenciasDe) ? body.aceitarOcorrenciasDe : [],
+      });
+    let trava = await pedirTrava();
+    // Subida anterior caiu no meio: o Linx diz se ela gravou (aí já era) ou não (aí reabre).
+    if (!trava.ok && trava.motivo === 'finalizando' && trava.rascunho?.travaVencida) {
+      const r = await resolverTravaVencida(rascunhoId, async (nome) => (await filialDaContagem(nome)) !== null);
+      if (r !== 'nada') trava = await pedirTrava();
+    }
+    if (!trava.ok) {
+      const quem = trava.rascunho?.finalizadoPor || trava.rascunho?.atualizadoPor || 'outra pessoa';
+      const mensagens: Record<typeof trava.motivo, string> = {
+        mudou: 'A contagem mudou depois da conferência (alguém bipou ou mexeu na lista). Confira de novo antes de subir.',
+        lista_diferente: 'A lista desta tela não é a do rascunho compartilhado. Clique em "Atualizar agora" e confira de novo.',
+        ocorrencias: `Há bipes que NÃO entraram na contagem na tela de: ${trava.detalhe ?? '—'}. Resolva no painel vermelho de cada um (ou aceite deixá-los de fora na confirmação).`,
+        finalizando: `${quem} já está subindo este inventário.`,
+        encerrado:
+          trava.rascunho?.status === 'descartado'
+            ? `Este inventário foi descartado por ${quem}.`
+            : `Este inventário já foi subido por ${quem}. Confira o Histórico.`,
+        nao_encontrado: 'O rascunho deste inventário não existe mais. Confira o Histórico.',
+      };
+      return NextResponse.json(
+        { error: mensagens[trava.motivo], motivo: trava.motivo, rascunho: trava.rascunho },
+        { status: 409 }
+      );
+    }
+
     let resultado;
     try {
+      const pool = shouldUseProxy() ? new ProxyPool() : await getConnectionPool();
       resultado = await executarAjusteContagem(pool as unknown as { request: () => unknown }, {
         filialNome,
         nomeContagem,
@@ -114,6 +177,25 @@ export async function POST(request: Request) {
         itens,
       });
     } catch (error) {
+      // O executor é tudo-ou-nada, mas um erro de rede pode vir DEPOIS do commit:
+      // só reabre o rascunho se o Linx confirmar que a contagem não existe.
+      // "Já existe uma contagem" é a checagem ANTES de gravar: o nome é de outra contagem, nada subiu.
+      const nomeJaUsado = /Já existe uma contagem/i.test(error instanceof Error ? error.message : '');
+      const gravouMesmo = nomeJaUsado
+        ? false
+        : await filialDaContagem(nomeContagem)
+            .then((f) => f !== null)
+            .catch(() => null);
+      if (gravouMesmo === false) {
+        await liberarInventarioTravado(rascunhoId).catch((err) =>
+          console.error('[inventario/executar] liberar rascunho', err)
+        );
+      } else if (gravouMesmo === true) {
+        await finalizarInventarioRascunho({ id: rascunhoId, username, nomeContagem }).catch((err) =>
+          console.error('[inventario/executar] finalizar rascunho', err)
+        );
+      }
+      // gravouMesmo = null (Linx fora): fica travado; quem esbarrar depois confere de novo.
       const msg = error instanceof Error ? error.message : 'Erro ao subir o inventário.';
       // Nome repetido quase sempre é o mesmo inventário mandado duas vezes.
       const repetido = /Já existe uma contagem/i.test(msg);
@@ -141,11 +223,10 @@ export async function POST(request: Request) {
       criadoEm: new Date().toISOString(),
     }).catch((err) => console.error('[inventario/executar] snapshot KPIs', err));
 
-    if (body.companyKey) {
-      await removerInventarioRascunho(inventarioRascunhoId(body.companyKey, username, filialCod)).catch((err) =>
-        console.error('[inventario/executar] remover rascunho', err)
-      );
-    }
+    // Se isto falhar, a trava vence e quem esbarrar nela confirma no Linx que já subiu.
+    await finalizarInventarioRascunho({ id: rascunhoId, username, nomeContagem: resultado.nomeContagem }).catch(
+      (err) => console.error('[inventario/executar] finalizar rascunho', err)
+    );
 
     return NextResponse.json({ ...resultado, filialNome, totais: dif.totais, naoBipados: dif.naoBipados });
   } catch (error) {

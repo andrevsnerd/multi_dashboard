@@ -484,3 +484,150 @@
   font-weight: 600;
   margin: 8px 0 0;
 }
+
+/* ─── Contagem a várias mãos (rascunho compartilhado da filial) ───── */
+.equipeBar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.equipeTitulo {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.equipeChip {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--s-50);
+  border: 1px solid var(--border);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.equipeChipEu {
+  background: var(--entrada-bg);
+  border-color: var(--entrada-border);
+  color: var(--entrada);
+}
+
+.equipeHint {
+  color: var(--text-3);
+}
+
+.equipeAtividade {
+  font-weight: 600;
+  color: var(--entrada);
+}
+
+.linhaQuem {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+.linhaQuemEu {
+  color: var(--entrada);
+  font-weight: 600;
+}
+
+.encerramentoAviso {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--entrada-bg);
+  border: 1px solid var(--entrada-border);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+.encerramentoFechar {
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+  background: none;
+  border: none;
+  color: var(--text-3);
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+.travadoAviso {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--saida-bg);
+  border: 1px solid var(--saida-border);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+.equipeChipAlerta {
+  background: var(--saida-bg);
+  border-color: var(--saida-border);
+  color: var(--saida);
+}
+
+.equipeAtualizar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.encerramentoTexto {
+  min-width: 0;
+}
+
+.encerramentoSobra {
+  margin-top: 6px;
+}
+
+.encerramentoSobra ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+.novoInventarioBtn {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* Bipe que entrou na tela e ainda não foi gravado no servidor — nunca some calado. */
+.naoGravadoAviso {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--saida-bg);
+  border: 1px solid var(--saida-border);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+.naoGravadoAviso strong {
+  color: var(--saida);
+}
+
+.listaPecas {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
