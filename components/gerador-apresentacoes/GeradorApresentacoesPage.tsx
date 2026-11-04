@@ -43,6 +43,7 @@ import ColecaoDeck from "./ColecaoDeck";
 import ColecaoExclusaoVendas from "./ColecaoExclusaoVendas";
 import ComparativoDeck from "./ComparativoDeck";
 import ComparativoResumidoDeck from "./ComparativoResumidoDeck";
+import ExportMensalColecoes from "./ExportMensalColecoes";
 import ProdutoGiroDeck from "./ProdutoGiroDeck";
 import TopProdutosDeck from "./TopProdutosDeck";
 import styles from "./GeradorApresentacoesPage.module.css";
@@ -1855,6 +1856,20 @@ export default function GeradorApresentacoesPage({
           </span>
         )}
       </section>
+
+      {/* Export mensal de coleções (só admin — o componente se esconde para as demais funções) */}
+      {isColecaoType && companyKey === "scarfme" && (
+        <ExportMensalColecoes
+          companyKey={companyKey}
+          filial={filial}
+          start={startStr}
+          end={endStr}
+          filtros={filtrosPayload}
+          todosProdutos={todosProdutos}
+          produtoTotal={produtoTotal}
+          logoDataUrl={logoDataUrl}
+        />
+      )}
 
       {error && <div className={styles.error}>{error}</div>}
 

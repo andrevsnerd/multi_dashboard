@@ -1,0 +1,84 @@
+.acoes {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.arquivos {
+  font-size: 12px;
+  color: var(--t-500);
+}
+
+.lista {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  border-top: 1px solid var(--b-200);
+}
+
+.linha {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.4fr) minmax(150px, 1fr) 130px minmax(160px, 1.4fr);
+  gap: 10px;
+  align-items: center;
+  padding: 7px 4px;
+  border-bottom: 1px solid var(--b-200);
+  font-size: 13px;
+}
+
+.nome {
+  color: var(--t-900);
+  font-weight: 600;
+}
+
+.code {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--t-500);
+}
+
+.arquivo {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: var(--t-500);
+}
+
+.status {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.detalhe {
+  font-size: 12px;
+  color: var(--t-500);
+}
+
+.st_fila .status {
+  color: var(--t-400);
+}
+
+.st_gerando .status,
+.st_exportando .status {
+  color: #2563eb;
+}
+
+.st_ok .status {
+  color: #15803d;
+}
+
+.st_sem_venda .status {
+  color: #a16207;
+}
+
+.st_erro .status,
+.st_erro .detalhe {
+  color: #dc2626;
+}
+
+@media (max-width: 720px) {
+  .linha {
+    grid-template-columns: 1fr 1fr;
+  }
+}
