@@ -110,6 +110,8 @@ export default function Sidebar({ companyName }: SidebarProps) {
     basePath && basePath !== "/" ? `${basePath}/alterar-precos` : "/alterar-precos";
   const programarPrecosHref =
     basePath && basePath !== "/" ? `${basePath}/programar-precos` : "/programar-precos";
+  const blackFridayHref =
+    basePath && basePath !== "/" ? `${basePath}/blackfriday` : "/blackfriday";
   const cadastrarProdutoHref =
     basePath && basePath !== "/" ? `${basePath}/cadastrar-produto` : "/cadastrar-produto";
   const alterarCadastroHref =
@@ -308,6 +310,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     "/aumentos-descontos",
     "/alterar-precos",
     "/programar-precos",
+    "/blackfriday",
     "/cadastrar-produto",
     "/editar-produto",
     "/alterar-cadastro",
@@ -333,6 +336,19 @@ export default function Sidebar({ companyName }: SidebarProps) {
             currentPathname === basePath &&
             !dashboardBlockedSegments.some((segment) => currentPathname.includes(segment)),
         },
+        // Painel da Black Friday (itens da Black × venda × estoque, com rebaixa de preço).
+        ...(isScarfme || isNerd
+          ? [
+              {
+                key: "blackfriday",
+                label: "Black Friday",
+                href: blackFridayHref,
+                permission: "blackfriday" as const,
+                isActive: (currentPathname: string | null) =>
+                  matchesSegment(currentPathname, "/blackfriday", blackFridayHref),
+              },
+            ]
+          : []),
         // Orçado da planilha do financeiro: por enquanto só a Scarf Me tem.
         ...(isScarfme
           ? [

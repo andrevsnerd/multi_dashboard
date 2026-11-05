@@ -40,9 +40,9 @@
     "semantic_hash": "4f1bbe9a40cc30c840836040ac16b24c"
   },
   "app/(companies)/[company]/blackfriday/page.tsx": {
-    "mtime": 1768308521.627152,
-    "ast_hash": "513514da0259b5dfe39fcc951df26427",
-    "semantic_hash": "513514da0259b5dfe39fcc951df26427"
+    "mtime": 1793884019.1712058,
+    "ast_hash": "4ffe0fdacaad6b02e528e2e1ab392969",
+    "semantic_hash": ""
   },
   "app/(companies)/[company]/clientes/detalhe/page.tsx": {
     "mtime": 1776093884.959757,
@@ -1255,9 +1255,9 @@
     "semantic_hash": "f14ad53955a1f58097f889108f54d206"
   },
   "components/blackfriday/BlackFridayPage.tsx": {
-    "mtime": 1780073682.6775858,
-    "ast_hash": "78782a73e6e67682e86db85473ac24f2",
-    "semantic_hash": "78782a73e6e67682e86db85473ac24f2"
+    "mtime": 1793886062.7194903,
+    "ast_hash": "d4d5c53daf0fce4abe471f6bc025de82",
+    "semantic_hash": ""
   },
   "components/clientes/ClienteDetalhePage.tsx": {
     "mtime": 1780919225.7045178,
@@ -1425,8 +1425,8 @@
     "semantic_hash": "7a672d31b6ac254cb25f6a420501049d"
   },
   "components/layout/Sidebar.tsx": {
-    "mtime": 1793708111.7507305,
-    "ast_hash": "3d8d6dc2eb9c99b8f1240644e3a02866",
+    "mtime": 1793884029.1401012,
+    "ast_hash": "27da432812d85aa2f1ab82bcfd700553",
     "semantic_hash": ""
   },
   "components/layout/SidebarContext.tsx": {
@@ -2070,8 +2070,8 @@
     "semantic_hash": ""
   },
   "lib/auth/permissions.ts": {
-    "mtime": 1793708110.9336195,
-    "ast_hash": "5c076d14a02f6f7aa0d52352088e024a",
+    "mtime": 1793884020.0231428,
+    "ast_hash": "b1f1b508d69e2e628f90290298a531f8",
     "semantic_hash": ""
   },
   "lib/auth/users-store-neon.ts": {
@@ -5267,6 +5267,31 @@
   "lib/presentations/export-mensal-colecoes.ts": {
     "mtime": 1793791365.779254,
     "ast_hash": "6ae032adeac98bdaa2941b39a31563f8",
+    "semantic_hash": ""
+  },
+  "app/api/black-friday/lojas/route.ts": {
+    "mtime": 1793884165.3624668,
+    "ast_hash": "198e94669c28dbf814ffc6c8e6717846",
+    "semantic_hash": ""
+  },
+  "app/api/black-friday/painel/route.ts": {
+    "mtime": 1793885651.4916277,
+    "ast_hash": "e2ad35c479cd34b58744436323119e48",
+    "semantic_hash": ""
+  },
+  "app/api/black-friday/rebaixar/route.ts": {
+    "mtime": 1793883719.956357,
+    "ast_hash": "c48e708ad6d1c625f2c6adb55c691a2b",
+    "semantic_hash": ""
+  },
+  "lib/blackfriday/datas.ts": {
+    "mtime": 1793883683.9670906,
+    "ast_hash": "20208d8624aa2e0557dc1b111a8cc923",
+    "semantic_hash": ""
+  },
+  "lib/repositories/blackFriday.ts": {
+    "mtime": 1793885619.9209824,
+    "ast_hash": "aaad16240cdc42820e175ac1968c8a8b",
     "semantic_hash": ""
   }
 }

@@ -276,6 +276,9 @@ export const ROLE_RESTRICTED_PERMISSIONS: Partial<Record<PermissionKey, RoleKey[
   // Programar Preços grava o mesmo cadastro de preço (e o histórico mostra custo):
   // mesma regra do Alterar Custo / Preço, com checkbox próprio no admin.
   "programar-precos": ["admin", "diretor", "logistica"],
+  // Black Friday mostra custo (piso) e baixa preço pelo mesmo executor do Programar
+  // Preços: mesma regra, diretor somente-leitura.
+  blackfriday: ["admin", "diretor", "logistica"],
   // Alterar Cadastro renomeia dimensao (grupo/subgrupo/linha), o que cascateia para
   // milhares de produtos e desalinha regras que casam por nome. Ato estrutural:
   // mesmo conjunto restrito, com diretor entrando somente-leitura.
