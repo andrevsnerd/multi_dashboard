@@ -525,6 +525,8 @@ export async function fetchCompraSugeridaAbc(
       COR: corKey ?? "",
       COR_DESCRICAO: d.descCorProduto ?? "",
       DESCRICAO: d.productName ?? "",
+      // Giro = total vendido na rede no período (venda canônica; grupo = membros somados).
+      GIRO: roundInt(d.totalQuantity),
       GRUPO: d.grupo ?? "",
       SUBGRUPO: d.subgrupo ?? "",
       LINHA: d.linha ?? "",
@@ -579,6 +581,13 @@ export async function fetchCompraSugeridaAbc(
     // Cobertura medida pelos MEMBROS reais (ver `baseMemberKeys`): ruptura de um membro cuja
     // linha de grupo já saiu é absorvida (o grupo decidiu), nunca vira linha duplicada.
     const grupoLookup = buildProdutoAgrupadoLookup(grupos);
+    // Giro da ruptura = venda de REDE do membro no período (mesma fonte canônica das linhas
+    // principais). Membro fora do universo cai na soma da venda por loja da própria ruptura.
+    const giroRedePorMembro = new Map<string, number>();
+    for (const d of filtered) {
+      const key = canonicalKey(d.productId, d.corProduto);
+      giroRedePorMembro.set(key, (giroRedePorMembro.get(key) ?? 0) + Number(d.totalQuantity ?? 0));
+    }
     const rupturaRange = normalizeRangeForQuery({ start: filters.start, end: filters.end });
 
     let rupturasFeitas = 0;
@@ -618,6 +627,8 @@ export async function fetchCompraSugeridaAbc(
       /** Estoque de rede por MEMBRO (o mesmo membro repete por loja → fica o maior). */
       estoqueRedePorMembro: Map<string, number>;
       membros: Map<string, { produto: string; cor: string | null }>;
+      /** Venda por loja somada por MEMBRO — fallback do Giro quando o membro não está na rede. */
+      vendidoLojasPorMembro: Map<string, number>;
       /** Quantidade por loja — o total da linha é a soma dela (ver emissão abaixo). */
       qtyByLabel: Map<string, number>;
     }
@@ -667,6 +678,7 @@ export async function fetchCompraSugeridaAbc(
           grade: item.grade ?? "",
           custoUnitario: item.custoUnitario,
           estoqueRedePorMembro: new Map<string, number>(),
+          vendidoLojasPorMembro: new Map<string, number>(),
           membros: new Map<string, { produto: string; cor: string | null }>(),
           qtyByLabel: new Map<string, number>(),
         };
@@ -674,6 +686,10 @@ export async function fetchCompraSugeridaAbc(
         acc.estoqueRedePorMembro.set(
           membroKey,
           Math.max(acc.estoqueRedePorMembro.get(membroKey) ?? 0, item.estoqueRede)
+        );
+        acc.vendidoLojasPorMembro.set(
+          membroKey,
+          (acc.vendidoLojasPorMembro.get(membroKey) ?? 0) + Math.max(0, Number(item.qtdVendida ?? 0))
         );
         if (avaliado) {
           // Grupo avaliado: membros vindos do plano (lista completa) e quantidade do grupo,
@@ -701,6 +717,11 @@ export async function fetchCompraSugeridaAbc(
         (s, v) => s + Math.max(0, v),
         0
       );
+      let giro = 0;
+      for (const key of acc.membros.keys()) {
+        // Chave de `membros` já é canonicalKey(produto, cor) — a mesma dos dois mapas.
+        giro += giroRedePorMembro.get(key) ?? acc.vendidoLojasPorMembro.get(key) ?? 0;
+      }
       const row: ReportRow = {
         [ROW_COR_FIELD]: acc.cor ?? "",
         [ROW_RUPTURA_FIELD]: 1,
@@ -709,6 +730,7 @@ export async function fetchCompraSugeridaAbc(
         COR: acc.cor ?? "",
         COR_DESCRICAO: acc.corDescricao ?? "",
         DESCRICAO: acc.descricao ?? "",
+        GIRO: roundInt(giro),
         GRUPO: acc.grupo,
         SUBGRUPO: acc.subgrupo,
         LINHA: acc.linha,

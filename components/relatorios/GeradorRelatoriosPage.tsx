@@ -26,6 +26,8 @@ import {
   COMPRA_LENS_PRESET_COLUMNS,
   COMPRA_SUGERIDA_ABC_ID,
   COMPRA_TRANSFER_LENS_COLUMNS,
+  GIRO_LABEL_RE,
+  buildGiroLabel,
 } from "@/lib/reports/compra-sugerida-abc";
 import { CLIENTES_FILIAL_ID, FILIAL_COMPRAS_COL_PREFIX } from "@/lib/reports/clientes-filial";
 import {
@@ -990,6 +992,14 @@ export default function GeradorRelatoriosPage({
       if (reportTypeId === COMPRA_SUGERIDA_ABC_ID) {
         // Liga a lente de transferência no backend só quando uma coluna de transferência
         // está selecionada (opt-in — export idêntico ao de hoje até você adicionar a coluna).
+        // Coluna Giro: o título carrega os dias do período gerado ("Giro 45d"). Só o rótulo
+        // automático é reescrito — nome editado à mão pelo usuário fica como está.
+        const giroLabel = buildGiroLabel(startStr, endStr);
+        setWorkingColumns((cols) =>
+          cols.map((c) =>
+            c.key === "GIRO" && GIRO_LABEL_RE.test(c.label.trim()) ? { ...c, label: giroLabel } : c
+          )
+        );
         const transferOn = workingColumns.some(
           (c) => c.enabled && COMPRA_TRANSFER_LENS_COLUMNS.includes(c.key as (typeof COMPRA_TRANSFER_LENS_COLUMNS)[number])
         );
@@ -1042,6 +1052,8 @@ export default function GeradorRelatoriosPage({
     clearResultOnError,
     generateViaStream,
     filtrosResumo,
+    startStr,
+    endStr,
   ]);
 
   // ---------- ordenação client-side ----------

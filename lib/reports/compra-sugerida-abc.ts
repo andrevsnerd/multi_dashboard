@@ -23,6 +23,9 @@ export const COMPRA_SUGERIDA_ABC_COLUMNS: ReportColumnDef[] = [
   { key: "COR", defaultLabel: "Cor (cód.)", type: "text" },
   { key: "COR_DESCRICAO", defaultLabel: "Cor", type: "text" },
   { key: "DESCRICAO", defaultLabel: "Descrição", type: "text" },
+  // Total vendido do item (rede) no período filtrado — o rótulo ganha os dias do período ao
+  // gerar ("Giro 45d"), ver GIRO_LABEL_RE / buildGiroLabel.
+  { key: "GIRO", defaultLabel: "Giro", type: "int" },
   { key: "GRUPO", defaultLabel: "Grupo", type: "text" },
   { key: "SUBGRUPO", defaultLabel: "Subgrupo", type: "text" },
   { key: "LINHA", defaultLabel: "Linha", type: "text" },
@@ -41,6 +44,17 @@ export const COMPRA_SUGERIDA_ABC_COLUMNS: ReportColumnDef[] = [
   { key: "CUSTO_LIQUIDO", defaultLabel: "Custo líquido", type: "currency" },
   { key: "TRANSFERIR_DE", defaultLabel: "Transferir de", type: "text" },
 ];
+
+/** Rótulo automático da coluna Giro ("Giro" / "Giro 45d") — só ele é reescrito ao gerar. */
+export const GIRO_LABEL_RE = /^giro(\s+\d+d)?$/i;
+
+/** "Giro {N}d", N = dias do período (inclusivo), a partir das datas yyyy-mm-dd. */
+export function buildGiroLabel(start: string, end: string): string {
+  const s = Date.parse(`${start}T00:00:00Z`);
+  const e = Date.parse(`${end}T00:00:00Z`);
+  if (!Number.isFinite(s) || !Number.isFinite(e) || e < s) return "Giro";
+  return `Giro ${Math.round((e - s) / 86_400_000) + 1}d`;
+}
 
 /** Colunas que, se selecionadas, ligam a lente de transferência no backend. */
 export const COMPRA_TRANSFER_LENS_COLUMNS = [
@@ -69,6 +83,7 @@ const COMPRA_SUGERIDA_ABC_PRESETS: ReportPresetDef[] = [
     columns: [
       col("COR_DESCRICAO"),
       col("DESCRICAO"),
+      col("GIRO"),
       col("CUSTO_UNITARIO", "Custo unit."),
       col("ESTOQUE_REDE", "Estoque rede"),
       col("COMPRA_TOTAL", "Compra total"),
@@ -88,6 +103,7 @@ const COMPRA_SUGERIDA_ABC_PRESETS: ReportPresetDef[] = [
     columns: [
       col("COR_DESCRICAO"),
       col("DESCRICAO"),
+      col("GIRO"),
       col("CUSTO_UNITARIO", "Custo unit."),
       col("ESTOQUE_REDE", "Estoque rede"),
       col("COMPRA_TOTAL", "Compra total"),

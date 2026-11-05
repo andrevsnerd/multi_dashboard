@@ -1585,8 +1585,8 @@
     "semantic_hash": "7100ad93329f4cae6f0cf2636fa8a06f"
   },
   "components/relatorios/GeradorRelatoriosPage.tsx": {
-    "mtime": 1792428028.5854247,
-    "ast_hash": "d942c0f80ec4b43879be7efca005a135",
+    "mtime": 1793888720.4872334,
+    "ast_hash": "ea4876cacc24b50dcd57cfb07845d0a3",
     "semantic_hash": ""
   },
   "components/romaneios/RomaneioDeleteModal.tsx": {
@@ -2315,8 +2315,8 @@
     "semantic_hash": "d907b2b11f2629a2edb97e34f6158c45"
   },
   "lib/reports/compra-sugerida-abc.ts": {
-    "mtime": 1789409703.581668,
-    "ast_hash": "5b540e6bb228abd6e09c5c9604db27cb",
+    "mtime": 1793888686.8196225,
+    "ast_hash": "09bfb323b9aa95a9d9201fdfbbb4cc57",
     "semantic_hash": ""
   },
   "lib/reports/enrich.server.ts": {
@@ -2540,8 +2540,8 @@
     "semantic_hash": "36ad099560d5d50a879355f562c7807a"
   },
   "lib/repositories/reportCompraSugeridaAbc.ts": {
-    "mtime": 1789410055.9807189,
-    "ast_hash": "98eecc9cb05d67b2b097b7b84ae363c5",
+    "mtime": 1793888709.3962452,
+    "ast_hash": "7249ee257085b9b06d829b49a37ac076",
     "semantic_hash": ""
   },
   "lib/repositories/reportEstoque.ts": {
