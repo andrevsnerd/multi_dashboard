@@ -509,7 +509,17 @@ export function registerPrecosTools(server: McpServer) {
           return { lote: input.lote.trim(), itens: linhas.length, linhas };
         }
         const lotes = await fetchHistoricoLotes(input.empresa, input.limite ?? 30);
-        return { lotes: lotes.map((l) => ({ ...l, dataBR: dataBR(l.data) })) };
+        // DATA_ALTERACAO é GETDATE() (já hora de Brasília) e o driver rotula como UTC:
+        // formatar em UTC devolve o relógio gravado — mesma regra do `dataLinx` da tela.
+        return {
+          lotes: lotes.map((l) => {
+            const d = new Date(l.data);
+            const dataBR = Number.isNaN(d.getTime())
+              ? l.data
+              : d.toLocaleString('pt-BR', { timeZone: 'UTC', dateStyle: 'short', timeStyle: 'short' });
+            return { ...l, dataBR };
+          }),
+        };
       })
   );
 
