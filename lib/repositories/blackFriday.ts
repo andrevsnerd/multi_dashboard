@@ -28,6 +28,15 @@ const OBS_BLACK = '%Black Friday%';
 /** Prefixo da OBS das rebaixas gravadas por este painel (cai no filtro acima). */
 export const OBS_REBAIXA_PAINEL = 'Black Friday · rebaixa pelo painel';
 
+/**
+ * Produtos incluídos na Black à mão, cujo lote não traz "Black Friday" na OBS.
+ * Entram só as alterações de PRECO1 a partir de `desde` (yyyy-MM-dd).
+ */
+const ITENS_EXTRAS: Record<PrecoCompany, { desde: string; produtos: string[] }> = {
+  nerd: { desde: '2026-11-06', produtos: [] },
+  scarfme: { desde: '2026-11-06', produtos: ['13.B1.0093', '13.B1.0094', '13.B1.0095'] },
+};
+
 const CHUNK = 900;
 
 function chunk<T>(items: T[], size: number): T[][] {
@@ -108,9 +117,17 @@ interface HistRow {
 
 /** Itens que estão na Black hoje, com preço original/atual, custo e trilha de rebaixas. */
 export async function fetchItensBlackFriday(company: PrecoCompany): Promise<BlackItensResult> {
+  const extras = ITENS_EXTRAS[company];
   const hist = await withRequest(async (request) => {
     request.input('bfEmpresa', sql.VarChar, company);
     request.input('bfObs', sql.VarChar, OBS_BLACK);
+    request.input('bfExtraDesde', sql.VarChar, extras.desde);
+    extras.produtos.forEach((p, i) => request.input(`bfExtra${i}`, sql.VarChar, p));
+    const filtroExtras =
+      extras.produtos.length > 0
+        ? `OR (h.PRODUTO IN (${extras.produtos.map((_, i) => `@bfExtra${i}`).join(', ')})
+               AND h.DATA_ALTERACAO >= CONVERT(DATETIME, @bfExtraDesde, 23))`
+        : '';
     const r = await request.query<HistRow>(`
       SELECT h.ID, h.LOTE, h.DATA_ALTERACAO, h.USUARIO, h.PRODUTO, h.COD_TABELA,
              h.VALOR_ANTERIOR, h.VALOR_NOVO, h.OBS, h.REVERTIDO_POR
@@ -119,7 +136,7 @@ export async function fetchItensBlackFriday(company: PrecoCompany): Promise<Blac
         AND h.ORIGEM = 'PRODUTOS_PRECOS'
         AND h.CAMPO = 'PRECO1'
         AND h.REVERTE_LOTE IS NULL
-        AND h.OBS LIKE @bfObs
+        AND (h.OBS LIKE @bfObs ${filtroExtras})
       ORDER BY h.ID
     `);
     return r.recordset;
