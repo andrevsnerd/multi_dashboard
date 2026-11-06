@@ -344,7 +344,34 @@ export async function resolverCodigosOuBarras(entradas: string[]): Promise<Resol
   const limpos = [...new Set(entradas.map(limpar).filter(Boolean))];
   if (limpos.length === 0) return { produtos: [], naoEncontrados: [] };
 
+  const mapa = await mapearCodigosOuBarras(limpos);
+
+  const produtos: string[] = [];
+  const naoEncontrados: string[] = [];
+  const vistos = new Set<string>();
+  for (const entrada of limpos) {
+    const produto = mapa.get(entrada);
+    if (!produto) {
+      naoEncontrados.push(entrada);
+      continue;
+    }
+    if (vistos.has(produto)) continue;
+    vistos.add(produto);
+    produtos.push(produto);
+  }
+
+  return { produtos, naoEncontrados };
+}
+
+/**
+ * Entrada digitada (código de produto ou de barras) → código do produto. Quem precisa
+ * saber de QUAL entrada veio cada produto (lista "código; preço") usa este mapa; quem
+ * só quer a lista de produtos usa `resolverCodigosOuBarras`.
+ */
+export async function mapearCodigosOuBarras(entradas: string[]): Promise<Map<string, string>> {
+  const limpos = [...new Set(entradas.map(limpar).filter(Boolean))];
   const mapa = new Map<string, string>();
+  if (limpos.length === 0) return mapa;
 
   for (const lote of chunk(limpos, CHUNK)) {
     const encontrados = await withRequest(async (request) => {
@@ -375,21 +402,7 @@ export async function resolverCodigosOuBarras(entradas: string[]): Promise<Resol
     for (const row of encontrados) mapa.set(limpar(row.barra), limpar(row.produto));
   }
 
-  const produtos: string[] = [];
-  const naoEncontrados: string[] = [];
-  const vistos = new Set<string>();
-  for (const entrada of limpos) {
-    const produto = mapa.get(entrada);
-    if (!produto) {
-      naoEncontrados.push(entrada);
-      continue;
-    }
-    if (vistos.has(produto)) continue;
-    vistos.add(produto);
-    produtos.push(produto);
-  }
-
-  return { produtos, naoEncontrados };
+  return mapa;
 }
 
 // ───────────────────────── busca de produtos + valores ─────────────────────────
