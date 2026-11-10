@@ -490,3 +490,29 @@
     font-size: 1.6rem;
   }
 }
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--b-200);
+}
+
+.tab {
+  padding: 10px 16px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--t-500);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tab:hover {
+  color: var(--t-900);
+}
+
+.tabActive {
+  border-bottom-color: var(--shp-accent);
+  color: var(--t-900);
+}

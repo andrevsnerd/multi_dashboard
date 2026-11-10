@@ -67,9 +67,10 @@ export interface ShopifyRefundRow {
 
 /**
  * Chave da linha de estado: a empresa (varredura incremental) ou "<empresa>#backfill"
- * (carga do histórico completo, cursor próprio por created_at — não interfere na outra).
+ * (carga do histórico completo, cursor próprio por created_at — não interfere na outra)
+ * ou "<empresa>#catalog" (varredura do catálogo de variantes).
  */
-export type ShopifySyncKey = ShopifyCompany | `${ShopifyCompany}#backfill`;
+export type ShopifySyncKey = ShopifyCompany | `${ShopifyCompany}#backfill` | `${ShopifyCompany}#catalog`;
 
 export interface ShopifySyncState {
   company: ShopifySyncKey;
