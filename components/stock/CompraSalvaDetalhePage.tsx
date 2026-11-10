@@ -829,6 +829,35 @@ export default function CompraSalvaDetalhePage({
       cancelled = true;
     };
   }, [companyKey, mostraMetragem, metragemProdutosKey]);
+  // Subgrupo do cadastro por produto (Scarf Me) — não depende da lista sugerida,
+  // então todo item mostra o seu.
+  const mostraSubgrupo = companyKey === "scarfme";
+  const [subgrupoByProduto, setSubgrupoByProduto] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (!mostraSubgrupo || !metragemProdutosKey) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/controle-estoque/classificacao-produtos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ produtos: metragemProdutosKey.split("|") }),
+        });
+        const json = (await res.json()) as { data?: Record<string, { subgrupo: string }> };
+        if (cancelled || !res.ok) return;
+        const map: Record<string, string> = {};
+        for (const [produto, c] of Object.entries(json.data ?? {})) {
+          if (c?.subgrupo) map[produto] = c.subgrupo;
+        }
+        setSubgrupoByProduto(map);
+      } catch {
+        // sem resposta: cai no subgrupo da lista sugerida, quando houver
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [mostraSubgrupo, metragemProdutosKey]);
   const [titleEdit, setTitleEdit] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -2653,6 +2682,11 @@ ${fmtMetros(r.metrosPorPeca)}/peça`
                             <div className={styles.productCode}>Grade: {it.grade || match?.grade}</div>
                           )}
                           {it.colecao && <div className={styles.productCode}>Coleção: {it.colecao}</div>}
+                          {mostraSubgrupo && (subgrupoByProduto[produtoK] || match?.subgrupo) && (
+                            <div className={styles.productCode}>
+                              Subgrupo: {subgrupoByProduto[produtoK] || match?.subgrupo}
+                            </div>
+                          )}
                         </td>
                         <td className={styles.right}>
                           {isManual ? (

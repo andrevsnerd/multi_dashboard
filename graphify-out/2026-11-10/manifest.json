@@ -1640,8 +1640,8 @@
     "semantic_hash": "f9f455e79710f72c6b9952301879ebc6"
   },
   "components/stock/CompraSalvaDetalhePage.tsx": {
-    "mtime": 1791397340.7417839,
-    "ast_hash": "0cc7fdb8043b58da60791a3ea4764664",
+    "mtime": 1794330500.4353945,
+    "ast_hash": "7151f8ee206d81d19104a6851648b3ba",
     "semantic_hash": ""
   },
   "components/stock/ComprasSalvasListPanel.tsx": {
@@ -5345,8 +5345,8 @@
     "semantic_hash": ""
   },
   "components/shopify/ShopifyPage.tsx": {
-    "mtime": 1794326534.6211243,
-    "ast_hash": "96d9e37a053f5362e5806466cd43d071",
+    "mtime": 1794329676.7285752,
+    "ast_hash": "320a924ea1a2611a676f1f6cf6933966",
     "semantic_hash": ""
   },
   "lib/mcp/precos.ts": {
@@ -5400,8 +5400,8 @@
     "semantic_hash": ""
   },
   "components/shopify/ShopifyMapaLinx.tsx": {
-    "mtime": 1794328889.587566,
-    "ast_hash": "6c9d8651fac35226385b0e4b396434e7",
+    "mtime": 1794329677.5962114,
+    "ast_hash": "b43e113f5a831254ebb9b5edc6ac008f",
     "semantic_hash": ""
   },
   "lib/shopify/auth.ts": {

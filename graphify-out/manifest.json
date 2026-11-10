@@ -1640,8 +1640,8 @@
     "semantic_hash": "f9f455e79710f72c6b9952301879ebc6"
   },
   "components/stock/CompraSalvaDetalhePage.tsx": {
-    "mtime": 1791397340.7417839,
-    "ast_hash": "0cc7fdb8043b58da60791a3ea4764664",
+    "mtime": 1794330674.9728942,
+    "ast_hash": "d2e1418011163a9209cf5949ee3a8691",
     "semantic_hash": ""
   },
   "components/stock/ComprasSalvasListPanel.tsx": {
@@ -5427,6 +5427,11 @@
   "lib/shopify/cross-store.ts": {
     "mtime": 1794328705.2712057,
     "ast_hash": "75ad29744ca770ff277b1017558488a2",
+    "semantic_hash": ""
+  },
+  "app/api/controle-estoque/classificacao-produtos/route.ts": {
+    "mtime": 1794330673.2094455,
+    "ast_hash": "a169555ed18fd2864d3bf879a826d990",
     "semantic_hash": ""
   }
 }
