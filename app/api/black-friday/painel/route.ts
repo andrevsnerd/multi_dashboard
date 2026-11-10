@@ -11,6 +11,8 @@ import { chaveCor, fetchEstoqueProdutosPorFilial, fetchItensBlackFriday } from "
 import { fetchFilialProdutoSales, type FilialProdutoSalesRow } from "@/lib/repositories/performance";
 import { normalizeRangeForQuery } from "@/lib/utils/date";
 import { addDiasYmd, hojeBrasilia, listarDias, MATRIZ_FILIAIS, mapWithConcurrency } from "@/lib/blackfriday/datas";
+import { fetchShopifyVendasBlack, LOJA_SHOPIFY } from "@/lib/shopify/blackfriday";
+import { getShopifyCredentials } from "@/lib/shopify/config";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -19,7 +21,7 @@ export const maxDuration = 300;
 const DIAS_BASE = 28;
 const CONCURRENCY = 6;
 
-/** Venda por loja de um item: período da Black, hoje e base pré-Black. */
+/** Venda por loja de um item: período da Black, hoje e base pré-Black. f = frete (só Shopify). */
 interface VendaLoja {
   v: number;
   q: number;
@@ -27,6 +29,9 @@ interface VendaLoja {
   qh: number;
   vb: number;
   qb: number;
+  f: number;
+  fh: number;
+  fb: number;
 }
 
 /**
@@ -81,7 +86,10 @@ export async function GET(request: Request) {
     const ecommerceSet = new Set((company.ecommerceFilials ?? []).map(normalizeFilialLookupKey));
     const vendaFiliais = (company.filialFilters.sales ?? []).filter((f) => !matriz.has(normalizeFilialLookupKey(f)));
     const pos = vendaFiliais.filter((f) => !ecommerceSet.has(normalizeFilialLookupKey(f)));
-    const ecom = vendaFiliais.filter((f) => ecommerceSet.has(normalizeFilialLookupKey(f)));
+    // Scarf Me: o e-commerce vem do SHOPIFY (dia do pedido, tempo real), não das notas do Linx
+    // (que só saem em dia útil, depois do pedido). Pedido do dono em 10/11/2026.
+    const usaShopify = companyKey === "scarfme" && !!getShopifyCredentials("scarfme");
+    const ecom = usaShopify ? [] : vendaFiliais.filter((f) => ecommerceSet.has(normalizeFilialLookupKey(f)));
 
     const buscar = (start: string, end: string) =>
       fetchFilialProdutoSales(companyKey, pos, ecom, normalizeRangeForQuery({ start, end }), "month", {
@@ -96,16 +104,22 @@ export async function GET(request: Request) {
     const estoqueFiliais = filterStockCarryingFilials(company, company.filialFilters.inventory ?? []);
     const estoqueSet = new Set(estoqueFiliais.map(normalizeFilialLookupKey));
 
-    const [porDia, base, estoqueRows] = await Promise.all([
+    const [porDia, base, estoqueRows, shopifyRows] = await Promise.all([
       mapWithConcurrency(dias, CONCURRENCY, (d) => buscar(d, d)),
       buscar(baseInicio, baseFim),
       fetchEstoqueProdutosPorFilial(produtos),
+      usaShopify ? fetchShopifyVendasBlack("scarfme", produtos, baseInicio) : Promise.resolve([]),
     ]);
 
     // ── lojas (rótulo de exibição: grupos colapsados, e-commerce numa linha só) ──
     const lojas = new Map<string, { key: string; label: string; ecommerce: boolean; matriz: boolean }>();
     const lojaDe = (rawFilial: string) => {
-      const label = getFilialLabelForDisplay(company, rawFilial);
+      // Com Shopify, o ESTOQUE dos CNPJs de e-commerce vai para a loja Shopify (é de onde o
+      // site vende) — a loja "E-COMMERCE" some da página.
+      const label =
+        usaShopify && ecommerceSet.has(normalizeFilialLookupKey(rawFilial))
+          ? LOJA_SHOPIFY.scarfme
+          : getFilialLabelForDisplay(company, rawFilial);
       if (!lojas.has(label)) {
         const norm = normalizeFilialLookupKey(rawFilial);
         lojas.set(label, {
@@ -125,14 +139,17 @@ export async function GET(request: Request) {
       qh: number;
       vb: number;
       qb: number;
-      dia: Array<{ v: number; q: number }>;
+      f: number;
+      fh: number;
+      fb: number;
+      dia: Array<{ v: number; q: number; f: number }>;
       lojas: Map<string, VendaLoja>;
       estoque: number;
       estoqueLojas: Map<string, number>;
     };
     const novo = (): Acc => ({
-      v: 0, q: 0, vh: 0, qh: 0, vb: 0, qb: 0,
-      dia: dias.map(() => ({ v: 0, q: 0 })),
+      v: 0, q: 0, vh: 0, qh: 0, vb: 0, qb: 0, f: 0, fh: 0, fb: 0,
+      dia: dias.map(() => ({ v: 0, q: 0, f: 0 })),
       lojas: new Map(),
       estoque: 0,
       estoqueLojas: new Map(),
@@ -164,7 +181,7 @@ export async function GET(request: Request) {
     const lojaAcc = (a: Acc, label: string) => {
       let l = a.lojas.get(label);
       if (!l) {
-        l = { v: 0, q: 0, vh: 0, qh: 0, vb: 0, qb: 0 };
+        l = { v: 0, q: 0, vh: 0, qh: 0, vb: 0, qb: 0, f: 0, fh: 0, fb: 0 };
         a.lojas.set(label, l);
       }
       return l;
@@ -211,6 +228,37 @@ export async function GET(request: Request) {
         l.qb += q;
       }
     }
+    // Shopify (Scarf Me): pedido do dia → produto × cor do Linx pelo vínculo; frete separado.
+    if (usaShopify) {
+      const label = LOJA_SHOPIFY.scarfme;
+      lojas.set(label, { key: label, label, ecommerce: true, matriz: false });
+      const produtoDe = new Map(produtos.map((p) => [p.trim().toUpperCase(), p]));
+      const idxDia = new Map(dias.map((d, i) => [d, i]));
+      for (const r of shopifyRows) {
+        const produto = produtoDe.get(r.produto.trim().toUpperCase());
+        const ap = produto ? acc.get(produto) : undefined;
+        if (!produto || !ap) continue;
+        const idx = idxDia.get(r.ymd);
+        const naBase = r.ymd >= baseInicio && r.ymd <= baseFim;
+        if (idx === undefined && !naBase) continue;
+        for (const a of [ap, corDe(produto, r.cor, r.corDesc ?? undefined)]) {
+          const l = lojaAcc(a, label);
+          if (idx !== undefined) {
+            a.v += r.v; a.q += r.q; a.f += r.f;
+            a.dia[idx].v += r.v; a.dia[idx].q += r.q; a.dia[idx].f += r.f;
+            l.v += r.v; l.q += r.q; l.f += r.f;
+            if (idx === ultimo) {
+              a.vh += r.v; a.qh += r.q; a.fh += r.f;
+              l.vh += r.v; l.qh += r.q; l.fh += r.f;
+            }
+          } else {
+            a.vb += r.v; a.qb += r.q; a.fb += r.f;
+            l.vb += r.v; l.qb += r.q; l.fb += r.f;
+          }
+        }
+      }
+    }
+
     for (const r of estoqueRows) {
       const ap = acc.get(r.produto);
       if (!ap) continue;
@@ -226,7 +274,7 @@ export async function GET(request: Request) {
     const serializar = (a: Acc) => {
       const porLoja: Record<string, VendaLoja> = {};
       for (const [label, l] of a.lojas) {
-        porLoja[label] = { v: r2(l.v), q: l.q, vh: r2(l.vh), qh: l.qh, vb: r2(l.vb), qb: l.qb };
+        porLoja[label] = { v: r2(l.v), q: l.q, vh: r2(l.vh), qh: l.qh, vb: r2(l.vb), qb: l.qb, f: r2(l.f), fh: r2(l.fh), fb: r2(l.fb) };
       }
       return {
         vendas: a.v,
@@ -235,7 +283,11 @@ export async function GET(request: Request) {
         qtdeHoje: a.qh,
         vendasBase: a.vb,
         qtdeBase: a.qb,
-        dia: a.dia.map((d) => [r2(d.v), d.q] as [number, number]),
+        // Frete (só do Shopify): a tela soma na venda quando "Incluir frete" está marcado.
+        frete: r2(a.f),
+        freteHoje: r2(a.fh),
+        freteBase: r2(a.fb),
+        dia: a.dia.map((d) => [r2(d.v), d.q, r2(d.f)] as [number, number, number]),
         porLoja,
         estoque: Math.round(a.estoque),
         estoqueLojas: Object.fromEntries([...a.estoqueLojas].map(([k, n]) => [k, Math.round(n)])),

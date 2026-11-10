@@ -6,6 +6,8 @@ import { resolveCompanyDynamic } from "@/lib/config/company-server";
 import { fetchSalesTotals } from "@/lib/services/salesTotals";
 import { normalizeRangeForQuery } from "@/lib/utils/date";
 import { hojeBrasilia, isYmd, MATRIZ_FILIAIS, mapWithConcurrency } from "@/lib/blackfriday/datas";
+import { fetchShopifyTotalLoja, LOJA_SHOPIFY } from "@/lib/shopify/blackfriday";
+import { getShopifyCredentials } from "@/lib/shopify/config";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -42,9 +44,12 @@ export async function GET(request: Request) {
     const ecommerceSet = new Set((company.ecommerceFilials ?? []).map(normalizeFilialLookupKey));
     const vendaFiliais = (company.filialFilters.sales ?? []).filter((f) => !matriz.has(normalizeFilialLookupKey(f)));
 
+    // Scarf Me: e-commerce = Shopify (mesma troca do painel). As notas do Linx saem da conta.
+    const usaShopify = companyKey === "scarfme" && !!getShopifyCredentials("scarfme");
     const buckets = new Map<string, { label: string; ecommerce: boolean; membros: string[] }>();
     for (const f of vendaFiliais) {
       const ecommerce = ecommerceSet.has(normalizeFilialLookupKey(f));
+      if (ecommerce && usaShopify) continue;
       const label = getFilialLabelForDisplay(company, f);
       const b = buckets.get(label) ?? { label, ecommerce, membros: [] };
       b.membros.push(f);
@@ -65,8 +70,13 @@ export async function GET(request: Request) {
         vendas: partes.reduce((s, p) => s + Number(p.vendas ?? 0), 0),
         qtde: partes.reduce((s, p) => s + Number(p.qtde ?? 0), 0),
         tickets: partes.reduce((s, p) => s + Number(p.tickets ?? 0), 0),
+        frete: 0,
       };
     });
+    if (usaShopify) {
+      const s = await fetchShopifyTotalLoja("scarfme", inicio, hoje);
+      resultados.push({ label: LOJA_SHOPIFY.scarfme, ecommerce: true, vendas: s.vendas, qtde: s.qtde, tickets: s.tickets, frete: s.frete });
+    }
 
     return NextResponse.json(
       {
@@ -77,6 +87,7 @@ export async function GET(request: Request) {
           vendas: resultados.reduce((s, r) => s + r.vendas, 0),
           qtde: resultados.reduce((s, r) => s + r.qtde, 0),
           tickets: resultados.reduce((s, r) => s + r.tickets, 0),
+          frete: resultados.reduce((s, r) => s + r.frete, 0),
         },
       },
       { headers: { "Cache-Control": "no-store" } }

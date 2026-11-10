@@ -25,6 +25,10 @@ interface VendaLoja {
   qh: number;
   vb: number;
   qb: number;
+  /** Frete (só a loja Shopify): período, hoje, base. */
+  f?: number;
+  fh?: number;
+  fb?: number;
 }
 
 interface CorApi {
@@ -36,7 +40,12 @@ interface CorApi {
   qtdeHoje: number;
   vendasBase: number;
   qtdeBase: number;
-  dia: Array<[number, number]>;
+  /** Frete do Shopify rateado pelo valor do item (0 nas lojas físicas). */
+  frete?: number;
+  freteHoje?: number;
+  freteBase?: number;
+  /** [venda, peças, frete] por dia. */
+  dia: Array<[number, number, number?]>;
   porLoja: Record<string, VendaLoja>;
   estoque: number;
   estoqueLojas: Record<string, number>;
@@ -65,7 +74,10 @@ interface ItemApi {
   qtdeHoje: number;
   vendasBase: number;
   qtdeBase: number;
-  dia: Array<[number, number]>;
+  frete?: number;
+  freteHoje?: number;
+  freteBase?: number;
+  dia: Array<[number, number, number?]>;
   porLoja: Record<string, VendaLoja>;
   estoque: number;
   estoqueLojas: Record<string, number>;
@@ -91,8 +103,43 @@ interface PainelApi {
 }
 
 interface TotaisLojasApi {
-  lojas: Array<{ label: string; ecommerce: boolean; vendas: number; qtde: number; tickets: number }>;
-  total: { vendas: number; qtde: number; tickets: number };
+  lojas: Array<{ label: string; ecommerce: boolean; vendas: number; qtde: number; tickets: number; frete?: number }>;
+  total: { vendas: number; qtde: number; tickets: number; frete?: number };
+}
+
+/**
+ * "Incluir frete" (Scarf Me, loja Shopify): soma o frete rateado na venda em TODA a página
+ * (KPIs, curva, lojas, itens). Feito na carga, então o resto da tela não muda.
+ */
+function somarFreteVenda<T extends { vendas: number; vendasHoje: number; vendasBase: number; frete?: number; freteHoje?: number; freteBase?: number; dia: Array<[number, number, number?]>; porLoja: Record<string, VendaLoja> }>(x: T): T {
+  const porLoja: Record<string, VendaLoja> = {};
+  for (const [k, l] of Object.entries(x.porLoja)) {
+    porLoja[k] = { ...l, v: l.v + (l.f ?? 0), vh: l.vh + (l.fh ?? 0), vb: l.vb + (l.fb ?? 0) };
+  }
+  return {
+    ...x,
+    vendas: x.vendas + (x.frete ?? 0),
+    vendasHoje: x.vendasHoje + (x.freteHoje ?? 0),
+    vendasBase: x.vendasBase + (x.freteBase ?? 0),
+    dia: x.dia.map((d) => [d[0] + (d[2] ?? 0), d[1], d[2]] as [number, number, number?]),
+    porLoja,
+  };
+}
+
+function comFretePainel(p: PainelApi | null, incluir: boolean): PainelApi | null {
+  if (!p || !incluir) return p;
+  return {
+    ...p,
+    itens: p.itens.map((it) => ({ ...somarFreteVenda(it), cores: it.cores?.map((c) => somarFreteVenda(c)) })),
+  };
+}
+
+function comFreteTotais(t: TotaisLojasApi | null, incluir: boolean): TotaisLojasApi | null {
+  if (!t || !incluir) return t;
+  return {
+    lojas: t.lojas.map((l) => ({ ...l, vendas: l.vendas + (l.frete ?? 0) })),
+    total: { ...t.total, vendas: t.total.vendas + (t.total.frete ?? 0) },
+  };
 }
 
 /* ═══════════════════════════════ status ═══════════════════════════════ */
@@ -295,8 +342,13 @@ export default function BlackFridayPage({ companyKey, companyName }: Props) {
   const { user } = useAuth();
   const username = user?.username ?? "";
 
-  const [painel, setPainel] = useState<PainelApi | null>(null);
-  const [totaisLojas, setTotaisLojas] = useState<TotaisLojasApi | null>(null);
+  const [painelRaw, setPainel] = useState<PainelApi | null>(null);
+  const [totaisRaw, setTotaisLojas] = useState<TotaisLojasApi | null>(null);
+  // Frete do Shopify: sempre abre marcado (mesma regra da página Shopify).
+  const [comFrete, setComFrete] = useState(true);
+  const painel = useMemo(() => comFretePainel(painelRaw, comFrete), [painelRaw, comFrete]);
+  const totaisLojas = useMemo(() => comFreteTotais(totaisRaw, comFrete), [totaisRaw, comFrete]);
+  const temShopify = !!painelRaw?.lojas.some((l) => l.label.startsWith("SHOPIFY"));
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [recarga, setRecarga] = useState(0);
@@ -698,6 +750,13 @@ export default function BlackFridayPage({ companyKey, companyName }: Props) {
           </p>
         </div>
         <div className={styles.headerActions}>
+          {temShopify && (
+            <label className={styles.fimLabel} title="Soma o frete cobrado no Shopify (rateado pelo valor de cada item) na venda">
+              <span>
+                <input type="checkbox" checked={comFrete} onChange={(e) => setComFrete(e.target.checked)} /> Incluir frete
+              </span>
+            </label>
+          )}
           <label className={styles.fimLabel}>
             Fim da Black
             <input type="date" value={fim} onChange={(e) => e.target.value && mudarFim(e.target.value)} />
@@ -900,6 +959,11 @@ export default function BlackFridayPage({ companyKey, companyName }: Props) {
                       <Th o="vendas" atual={ordem} desc={desc} onClick={ordenarPor} dica="Venda líquida na Black (trocas abatidas)">
                         Vendido
                       </Th>
+                      {temShopify && (
+                        <th title="Frete do Shopify rateado pelo valor do item no pedido (já somado em Vendido quando 'Incluir frete' está marcado)">
+                          Frete
+                        </th>
+                      )}
                       <Th o="hoje" atual={ordem} desc={desc} onClick={ordenarPor}>
                         Hoje
                       </Th>
@@ -957,6 +1021,11 @@ export default function BlackFridayPage({ companyKey, companyName }: Props) {
                             <strong>{fmtQ(it.qtde)} pç</strong>
                             <span className={styles.sub}>{fmtR(it.vendas)}</span>
                           </td>
+                          {temShopify && (
+                            <td className={styles.num}>
+                              {it.frete ? <span className={styles.sub}>{fmtR(it.frete)}</span> : <span className={styles.sub}>—</span>}
+                            </td>
+                          )}
                           <td className={styles.num}>{it.qtdeHoje ? <strong>{fmtQ(it.qtdeHoje)}</strong> : <span className={styles.sub}>—</span>}</td>
                           <td className={styles.num}>
                             <Lift lift={it.lift} qtde={it.qtde} />
