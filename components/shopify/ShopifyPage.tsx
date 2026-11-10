@@ -666,17 +666,33 @@ export default function ShopifyPage({
                   </thead>
                   <tbody>
                     {data?.topProdutos.map((prod, index) => (
-                      <tr key={`${prod.productId ?? prod.titulo}-${index}`}>
+                      <tr key={`${prod.linx ? `${prod.linx.produto}|${prod.linx.cor}` : (prod.productId ?? prod.titulo)}-${index}`}>
                         <td>
-                          <div className={styles.clientCell}>
-                            <span>{prod.titulo}</span>
-                            <small>
-                              {prod.skus.length > 0
-                                ? `SKU ${prod.skus.slice(0, 3).join(", ")}${prod.skus.length > 3 ? "…" : ""}`
-                                : "sem SKU"}
-                              {prod.tipo ? ` · ${prod.tipo}` : ""}
-                            </small>
-                          </div>
+                          {/* Com vínculo no Linx: visão do Linx (produto × cor + código de barras).
+                              Sem vínculo: nome do Shopify. */}
+                          {prod.linx ? (
+                            <div className={styles.clientCell}>
+                              <span>
+                                <b>{prod.linx.produto}</b> {prod.linx.descProduto}
+                                {prod.linx.descCor ? ` · ${prod.linx.descCor}` : ""}
+                              </span>
+                              <small>
+                                {prod.linx.codigoBarra ? `cód. barras ${prod.linx.codigoBarra}` : "sem código de barras"}
+                                {` · Shopify: ${prod.titulo}`}
+                              </small>
+                            </div>
+                          ) : (
+                            <div className={styles.clientCell}>
+                              <span>{prod.titulo}</span>
+                              <small>
+                                <span className={styles.semVinculo}>sem vínculo no Linx</span>
+                                {prod.skus.length > 0
+                                  ? ` · SKU ${prod.skus.slice(0, 3).join(", ")}${prod.skus.length > 3 ? "…" : ""}`
+                                  : ""}
+                                {prod.tipo ? ` · ${prod.tipo}` : ""}
+                              </small>
+                            </div>
+                          )}
                         </td>
                         <td className={styles.num}>{int(prod.qtde)}</td>
                         <td className={styles.num}>{brl(prod.venda)}</td>

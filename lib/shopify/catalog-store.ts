@@ -95,6 +95,9 @@ const DDL = [
      PRIMARY KEY (company, variant_id)
    )`,
   `CREATE INDEX IF NOT EXISTS shopify_variant_map_produto_idx ON shopify_variant_map (company, produto, cor_produto)`,
+  // Código de barras do Linx do produto×cor(×tamanho) vinculado — o MAIS CURTO (regra do
+  // dashboard). Derivado do Linx, guardado aqui p/ a página Shopify não consultar o Linx.
+  `ALTER TABLE shopify_variant_map ADD COLUMN IF NOT EXISTS codigo_barra TEXT`,
   // Lotes anteriores: a MESMA peça do Shopify com outro código de produto no Linx (reposição
   // e coleção nova ganham código novo — "PILAR 09/24", "PILAR C 11/24"). O vínculo principal
   // (shopify_variant_map) é o do SKU; estes são os códigos antigos que ainda faturam.

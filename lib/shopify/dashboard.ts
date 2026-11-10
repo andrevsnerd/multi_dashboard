@@ -86,6 +86,8 @@ export interface ShopifyPedido {
 
 export interface ShopifyTopProduto {
   productId: string | null;
+  /** Vínculo confirmado no Linx (null = sem vínculo: mostrar o nome do Shopify). */
+  linx: { produto: string; cor: string | null; descProduto: string | null; descCor: string | null; codigoBarra: string | null } | null;
   titulo: string;
   skus: string[];
   tipo: string | null;
@@ -263,19 +265,30 @@ export async function fetchShopifyResumo(
       ) as Promise<Array<Record<string, unknown>>>,
       sql.query(
         // Frete é do pedido: rateado entre os itens pelo valor de cada um.
+        // Item com vínculo confirmado no Linx aparece como no Linx (produto × cor + código de
+        // barras) e soma todas as vitrines do Shopify daquele item; sem vínculo, nome do Shopify.
         `WITH linhas AS (
            SELECT l.product_id, l.title, l.product_type, l.sku, l.current_quantity, l.net,
-                  o.total_shipping, SUM(l.net) OVER (PARTITION BY l.order_id) AS net_pedido
+                  o.total_shipping, SUM(l.net) OVER (PARTITION BY l.order_id) AS net_pedido,
+                  CASE WHEN m.status = 'vinculado' AND m.produto IS NOT NULL THEN m.produto END AS linx_produto,
+                  CASE WHEN m.status = 'vinculado' AND m.produto IS NOT NULL THEN m.cor_produto END AS linx_cor,
+                  m.desc_produto, m.desc_cor, m.codigo_barra
              FROM shopify_order_lines l
              JOIN shopify_orders o ON o.company = l.company AND o.order_id = l.order_id
+             LEFT JOIN shopify_variant_map m ON m.company = l.company AND m.variant_id = l.variant_id
             WHERE ${SALE} AND o.created_at >= $2 AND o.created_at < $3 AND l.current_quantity > 0
          )
-         SELECT product_id, MIN(title) AS titulo, MIN(product_type) AS tipo,
+         SELECT CASE WHEN linx_produto IS NULL THEN product_id END AS product_id,
+                linx_produto, linx_cor, MIN(desc_produto) AS desc_produto, MIN(desc_cor) AS desc_cor,
+                MIN(codigo_barra) AS codigo_barra,
+                MIN(title) AS titulo, MIN(product_type) AS tipo,
                 ARRAY_REMOVE(ARRAY_AGG(DISTINCT sku), NULL) AS skus,
                 SUM(current_quantity) AS qtde, SUM(net) AS venda,
                 SUM(CASE WHEN net_pedido > 0 THEN total_shipping * net / net_pedido ELSE 0 END) AS frete
            FROM linhas
-          GROUP BY product_id, CASE WHEN product_id IS NULL THEN title END
+          GROUP BY linx_produto, linx_cor,
+                   CASE WHEN linx_produto IS NULL THEN product_id END,
+                   CASE WHEN linx_produto IS NULL AND product_id IS NULL THEN title END
           ORDER BY venda DESC
           LIMIT 20`,
         [company, from.toISOString(), to.toISOString()],
@@ -354,6 +367,15 @@ export async function fetchShopifyResumo(
     })),
     topProdutos: topRows.map((r) => ({
       productId: (r.product_id as string) ?? null,
+      linx: r.linx_produto
+        ? {
+            produto: String(r.linx_produto).trim(),
+            cor: (r.linx_cor as string | null)?.trim() ?? null,
+            descProduto: (r.desc_produto as string | null)?.trim() ?? null,
+            descCor: (r.desc_cor as string | null)?.trim() ?? null,
+            codigoBarra: (r.codigo_barra as string | null) ?? null,
+          }
+        : null,
       titulo: String(r.titulo ?? "—"),
       skus: Array.isArray(r.skus) ? (r.skus as string[]) : [],
       tipo: (r.tipo as string) ?? null,

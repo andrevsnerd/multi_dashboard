@@ -1,6 +1,7 @@
 import "server-only";
 
 import { query } from "@/lib/db/connection";
+import { getNeonSql } from "@/lib/db/neon";
 import type { ShopifyCompany } from "@/lib/shopify/config";
 import {
   listAllShopifyVariants,
@@ -524,6 +525,7 @@ export async function rematchShopifyVariants(
     porStatus[r.status] = (porStatus[r.status] ?? 0) + 1;
   }
   await saveVariantMaps(company, toSave, { onlyAuto: true });
+  await preencherCodigoBarra(company, { todos: !onlyVariantIds });
   return { variantes: variants.length, gravadas: toSave.length, manuaisPreservadas: manuais, porStatus };
 }
 
@@ -604,4 +606,57 @@ export async function vincularManual(
   });
   await saveVariantMaps(company, rows, { onlyAuto: false, updatedBy: username });
   return { gravadas: rows.length, semCor: rows.filter((r) => r.cor_produto == null).length };
+}
+
+/**
+ * Grava em shopify_variant_map.codigo_barra o código de barras do Linx do produto×cor
+ * vinculado (do tamanho, quando o vínculo tem tamanho). Escolhe o MAIS CURTO e, no empate,
+ * o menor — mesma regra do resto do dashboard (memória ean-corporativo-menor-nao-maior).
+ * `todos`: refaz tudo; senão só as linhas ainda sem código (barato, roda após ação manual).
+ */
+export async function preencherCodigoBarra(company: ShopifyCompany, opts: { todos?: boolean } = {}) {
+  const sql = getNeonSql();
+  const rows = (await sql.query(
+    `SELECT DISTINCT produto FROM shopify_variant_map
+      WHERE company = $1 AND produto IS NOT NULL ${opts.todos ? "" : "AND codigo_barra IS NULL"}`,
+    [company],
+  )) as Array<{ produto: string }>;
+  const produtos = rows.map((r) => r.produto.trim()).filter(Boolean);
+  if (produtos.length === 0) return 0;
+  const melhor = new Map<string, string>();
+  const escolhe = (k: string, cod: string) => {
+    const cur = melhor.get(k);
+    if (!cur || cod.length < cur.length || (cod.length === cur.length && cod < cur)) melhor.set(k, cod);
+  };
+  for (let i = 0; i < produtos.length; i += 500) {
+    const lista = produtos.slice(i, i + 500).map((p) => `'${esc(p)}'`).join(",");
+    const barras = await query<LinxBarra>(
+      `SELECT LTRIM(RTRIM(CODIGO_BARRA)) AS CODIGO_BARRA, LTRIM(RTRIM(PRODUTO)) AS PRODUTO,
+              LTRIM(RTRIM(COR_PRODUTO)) AS COR_PRODUTO, TAMANHO, '' AS GRADE
+         FROM PRODUTOS_BARRA WHERE PRODUTO IN (${lista})`,
+    );
+    for (const b of barras) {
+      const base = `${up(b.PRODUTO)}|${numKey(up(b.COR_PRODUTO))}`;
+      escolhe(base, b.CODIGO_BARRA);
+      if (b.TAMANHO != null) escolhe(`${base}|${b.TAMANHO}`, b.CODIGO_BARRA);
+    }
+  }
+  const valores = [...melhor].map(([k, codigo]) => {
+    const [produto, cor, tam] = k.split("|");
+    return { produto, cor, tam: tam ?? null, codigo };
+  });
+  // Casa produto + cor (tolerando "06" × "6") e, se houver, o tamanho do vínculo.
+  const corM = "CASE WHEN TRIM(m.cor_produto) ~ '^[0-9]+$' THEN (TRIM(m.cor_produto)::bigint)::text ELSE UPPER(TRIM(m.cor_produto)) END";
+  const res = (await sql.query(
+    `WITH x AS (SELECT * FROM jsonb_to_recordset($2::jsonb) AS x(produto text, cor text, tam text, codigo text))
+     UPDATE shopify_variant_map m
+        SET codigo_barra = COALESCE(
+          (SELECT x.codigo FROM x WHERE x.produto = UPPER(TRIM(m.produto)) AND x.tam = m.tamanho::text AND x.cor = ${corM} LIMIT 1),
+          (SELECT x.codigo FROM x WHERE x.produto = UPPER(TRIM(m.produto)) AND x.tam IS NULL AND x.cor = ${corM} LIMIT 1))
+      WHERE m.company = $1 AND m.produto IS NOT NULL AND m.cor_produto IS NOT NULL
+        ${opts.todos ? "" : "AND m.codigo_barra IS NULL"}
+      RETURNING 1`,
+    [company, JSON.stringify(valores)],
+  )) as unknown[];
+  return res.length;
 }
