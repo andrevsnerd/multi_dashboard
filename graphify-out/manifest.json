@@ -5395,13 +5395,13 @@
     "semantic_hash": ""
   },
   "app/api/shopify/mapa/route.ts": {
-    "mtime": 1794332444.4271166,
-    "ast_hash": "5dc5e8d2bfb1e567f15004d3f34bb3aa",
+    "mtime": 1794333679.4474108,
+    "ast_hash": "11d3714809a7d985e8772b9e59105361",
     "semantic_hash": ""
   },
   "components/shopify/ShopifyMapaLinx.tsx": {
-    "mtime": 1794329677.5962114,
-    "ast_hash": "b43e113f5a831254ebb9b5edc6ac008f",
+    "mtime": 1794333679.4474108,
+    "ast_hash": "cb5b32c1fc4d31d160236dc66b87ddd3",
     "semantic_hash": ""
   },
   "lib/shopify/auth.ts": {
@@ -5410,8 +5410,8 @@
     "semantic_hash": ""
   },
   "lib/shopify/catalog-store.ts": {
-    "mtime": 1794321858.704828,
-    "ast_hash": "9656497e33acbd895fdb691b4bf2caf8",
+    "mtime": 1794333630.7300563,
+    "ast_hash": "217e48ac8795d3162a20cff0e072b3ba",
     "semantic_hash": ""
   },
   "lib/shopify/catalog-sync.ts": {
@@ -5442,6 +5442,11 @@
   "lib/utils/black-friday-observacoes-store.ts": {
     "mtime": 1794330964.7341514,
     "ast_hash": "e2ee6a76bdf28f351667cdf5e6ffd45d",
+    "semantic_hash": ""
+  },
+  "lib/shopify/linx-lotes.ts": {
+    "mtime": 1794333664.6772661,
+    "ast_hash": "3e55831e1894b94e5cb273d4dcdd529d",
     "semantic_hash": ""
   }
 }

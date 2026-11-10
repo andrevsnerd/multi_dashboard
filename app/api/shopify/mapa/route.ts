@@ -12,6 +12,7 @@ import {
 import { runShopifyCatalogSync } from "@/lib/shopify/catalog-sync";
 import { getShopifyCredentials, isShopifyCompany, type ShopifyCompany } from "@/lib/shopify/config";
 import { sincronizarEquivalentes } from "@/lib/shopify/cross-store";
+import { parearLotesLinx } from "@/lib/shopify/linx-lotes";
 import { rematchShopifyVariants, vincularManual } from "@/lib/shopify/linx-match";
 import { getShopifySyncState } from "@/lib/shopify/orders-store";
 
@@ -123,6 +124,9 @@ export async function POST(request: Request) {
         const outra = sync.complete ? await repassar(company) : null;
         return NextResponse.json({ data: { sync, rematch, outraLoja: outra } });
       }
+      case "lotes":
+        // Lotes anteriores do Linx (mesma peça, código de produto antigo) — ver linx-lotes.ts.
+        return NextResponse.json({ data: { lotes: await parearLotesLinx(company) } });
       case "remapear": {
         const rematch = await rematchShopifyVariants(company);
         return NextResponse.json({ data: { rematch, outraLoja: await repassar(company) } });

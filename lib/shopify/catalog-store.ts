@@ -95,6 +95,22 @@ const DDL = [
      PRIMARY KEY (company, variant_id)
    )`,
   `CREATE INDEX IF NOT EXISTS shopify_variant_map_produto_idx ON shopify_variant_map (company, produto, cor_produto)`,
+  // Lotes anteriores: a MESMA peça do Shopify com outro código de produto no Linx (reposição
+  // e coleção nova ganham código novo — "PILAR 09/24", "PILAR C 11/24"). O vínculo principal
+  // (shopify_variant_map) é o do SKU; estes são os códigos antigos que ainda faturam.
+  `CREATE TABLE IF NOT EXISTS shopify_variant_linx_extra (
+     company TEXT NOT NULL,
+     variant_id TEXT NOT NULL,
+     produto TEXT NOT NULL,
+     cor_produto TEXT NOT NULL DEFAULT '',
+     desc_produto TEXT,
+     desc_cor TEXT,
+     origem TEXT NOT NULL DEFAULT 'auto',
+     metodo TEXT,
+     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+     PRIMARY KEY (company, variant_id, produto, cor_produto)
+   )`,
+  `CREATE INDEX IF NOT EXISTS shopify_variant_linx_extra_produto_idx ON shopify_variant_linx_extra (company, produto, cor_produto)`,
 ];
 
 const TOLERATED = new Set(["23505", "42P07", "42710"]);
@@ -251,6 +267,8 @@ export interface MapaVarianteView {
   descCor: string | null;
   componentes: MapaComponente[] | null;
   atualizadoPor: string | null;
+  /** Outros códigos de produto do Linx da mesma peça (lotes anteriores). */
+  lotes: Array<{ produto: string; cor: string; descProduto: string | null; descCor: string | null }>;
 }
 
 export interface MapaProdutoView {
@@ -346,7 +364,11 @@ export async function fetchMapaProdutos(
             v.sku, v.barcode, v.options, v.inventory_qty,
             COALESCE(m.status, 'pendente') AS status, COALESCE(m.origem, 'auto') AS origem, m.metodo,
             m.score::float AS score, m.produto, m.cor_produto, m.tamanho, m.desc_produto, m.desc_cor,
-            m.componentes, m.updated_by
+            m.componentes, m.updated_by,
+            (SELECT json_agg(json_build_object('produto', x.produto, 'cor', x.cor_produto,
+                     'descProduto', x.desc_produto, 'descCor', x.desc_cor) ORDER BY x.produto)
+               FROM shopify_variant_linx_extra x
+              WHERE x.company = v.company AND x.variant_id = v.variant_id) AS lotes
        FROM shopify_variants v
        LEFT JOIN shopify_variant_map m ON m.company = v.company AND m.variant_id = v.variant_id
       WHERE v.company = $1 AND v.product_id = ANY($2::text[])
@@ -391,6 +413,7 @@ export async function fetchMapaProdutos(
       descCor: (r.desc_cor as string) ?? null,
       componentes: (r.componentes as MapaComponente[]) ?? null,
       atualizadoPor: (r.updated_by as string) ?? null,
+      lotes: (r.lotes as MapaVarianteView["lotes"]) ?? [],
     });
   }
   return { total, produtos: [...byProduct.values()] };

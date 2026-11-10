@@ -535,3 +535,8 @@
   --mp-accent: #f08f96;
   --mp-good: #e8dcdd;
 }
+
+.lotes {
+  font-size: 0.74rem;
+  color: var(--mp-accent);
+}

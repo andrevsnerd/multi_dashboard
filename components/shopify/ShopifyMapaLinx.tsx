@@ -201,6 +201,17 @@ export default function ShopifyMapaLinx({ companyKey }: Props) {
             >
               {ocupado === "remapear" ? "Recalculando…" : "Recalcular automático"}
             </button>
+            {companyKey === "scarfme" && (
+              <button
+                type="button"
+                className={styles.secondary}
+                disabled={!!ocupado}
+                title="Acha no Linx os códigos antigos (reposição/coleção anterior) da mesma peça, pelo nome + cor + tamanho"
+                onClick={() => void acao("lotes", { acao: "lotes" }, "Lotes anteriores do Linx pareados.")}
+              >
+                {ocupado === "lotes" ? "Pareando lotes…" : "Parear lotes anteriores do Linx"}
+              </button>
+            )}
           </div>
         )}
       </section>
@@ -380,6 +391,11 @@ export default function ShopifyMapaLinx({ companyKey }: Props) {
                                 {v.cor ? `cor ${v.cor}${v.descCor ? ` ${v.descCor}` : ""}` : "cor a definir"}
                                 {v.tamanho != null ? ` · tam. ${v.tamanho}` : ""}
                               </small>
+                              {v.lotes.length > 0 && (
+                                <small className={styles.lotes}>
+                                  também no Linx: {v.lotes.map((l) => `${l.produto} ${l.descProduto ?? ""}`.trim()).join(" · ")}
+                                </small>
+                              )}
                             </div>
                           ) : (
                             <span className={styles.muted}>{v.status === "nao_linx" ? "não é produto do Linx" : "—"}</span>
