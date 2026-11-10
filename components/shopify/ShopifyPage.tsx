@@ -146,8 +146,26 @@ export default function ShopifyPage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [comFrete, setComFrete] = useState(false);
   const requestId = useRef(0);
   const { theme } = useTheme();
+
+  // Preferência do checkbox lembrada só neste navegador (conveniência; falha calada).
+  useEffect(() => {
+    try {
+      setComFrete(window.localStorage.getItem("shopify:comFrete") === "1");
+    } catch {
+      /* armazenamento indisponível */
+    }
+  }, []);
+  function toggleFrete(value: boolean) {
+    setComFrete(value);
+    try {
+      window.localStorage.setItem("shopify:comFrete", value ? "1" : "0");
+    } catch {
+      /* armazenamento indisponível */
+    }
+  }
 
   const load = useCallback(
     async (silent = false) => {
@@ -234,6 +252,22 @@ export default function ShopifyPage({
 
   const k = data?.kpis;
   const p = data?.kpisAnterior;
+  // "Incluir frete": venda + frete líquido (= "Vendas totais" do painel do Shopify).
+  const kpiValor = (kp: ShopifyKpis, key: keyof ShopifyKpis) => {
+    if (!comFrete) return kp[key];
+    if (key === "venda") return kp.venda + kp.freteLiquido;
+    if (key === "ticketMedio") return kp.pedidos > 0 ? (kp.venda + kp.freteLiquido) / kp.pedidos : 0;
+    return kp[key];
+  };
+  const chartData = useMemo(
+    () =>
+      (data?.serie ?? []).map((pt) => ({
+        ...pt,
+        valor: pt.venda + (comFrete ? pt.frete : 0),
+        valorAnterior: pt.vendaAnterior + (comFrete ? pt.freteAnterior : 0),
+      })),
+    [data, comFrete],
+  );
   const comparLabel = useMemo(() => {
     if (!data) return "";
     const a = data.anterior;
@@ -249,7 +283,7 @@ export default function ShopifyPage({
     label: string;
     format: (v: number) => string;
   }> = [
-    { key: "venda", label: "Venda líquida", format: (v) => brl(v) },
+    { key: "venda", label: comFrete ? "Venda + frete" : "Venda líquida", format: (v) => brl(v) },
     { key: "pedidos", label: "Pedidos pagos", format: int },
     { key: "ticketMedio", label: "Ticket médio", format: (v) => brl(v) },
     { key: "itens", label: "Peças", format: int },
@@ -361,6 +395,14 @@ export default function ShopifyPage({
                   setRange((r) => ({ ...r, end: e.target.value || r.end }));
                 }}
               />
+              <label className={styles.freteToggle}>
+                <input
+                  type="checkbox"
+                  checked={comFrete}
+                  onChange={(e) => toggleFrete(e.target.checked)}
+                />
+                Incluir frete
+              </label>
             </div>
           </div>
 
@@ -379,8 +421,8 @@ export default function ShopifyPage({
 
           <section className={styles.kpis}>
             {mainCards.map((card) => {
-              const value = k?.[card.key] ?? 0;
-              const d = k && p ? delta(value, p[card.key]) : null;
+              const value = k ? kpiValor(k, card.key) : 0;
+              const d = k && p ? delta(value, kpiValor(p, card.key)) : null;
               return (
                 <div
                   key={card.key}
@@ -412,8 +454,13 @@ export default function ShopifyPage({
               <strong>{k ? brl(k.descontos) : "—"}</strong>
             </div>
             <div>
-              <span>Frete cobrado (fora da venda)</span>
-              <strong>{k ? brl(k.frete) : "—"}</strong>
+              <span>{comFrete ? "Frete (incluído na venda)" : "Frete (fora da venda)"}</span>
+              <strong>
+                {k ? brl(k.freteLiquido) : "—"}
+                {k && k.freteEstornado > 0 && (
+                  <small className={styles.subNote}> · {brl(k.freteEstornado)} estornado</small>
+                )}
+              </strong>
             </div>
             <div>
               <span>Devoluções (no dia do reembolso)</span>
@@ -433,6 +480,7 @@ export default function ShopifyPage({
             <div className={styles.cardHeader}>
               <h2>
                 {data?.periodo.porHora ? "Venda por hora" : "Venda por dia"}
+                {comFrete ? " (com frete)" : ""}
               </h2>
               <div className={styles.legend}>
                 <span>
@@ -455,7 +503,7 @@ export default function ShopifyPage({
               {data && data.serie.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart
-                    data={data.serie}
+                    data={chartData}
                     margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
                   >
                     <CartesianGrid stroke={chartColors.grid} vertical={false} />
@@ -484,17 +532,17 @@ export default function ShopifyPage({
                       }}
                       formatter={(value, name) => [
                         brl(Number(value)),
-                        name === "venda" ? "Período" : "Anterior",
+                        name === "valor" ? "Período" : "Anterior",
                       ]}
                     />
                     <Bar
-                      dataKey="venda"
+                      dataKey="valor"
                       fill={chartColors.bar}
                       radius={[4, 4, 0, 0]}
                       maxBarSize={36}
                     />
                     <Line
-                      dataKey="vendaAnterior"
+                      dataKey="valorAnterior"
                       stroke={chartColors.prev}
                       strokeDasharray="4 4"
                       strokeWidth={2}
@@ -529,6 +577,8 @@ export default function ShopifyPage({
                       <th>Status</th>
                       <th className={styles.num}>Peças</th>
                       <th className={styles.num}>Venda</th>
+                      <th className={styles.num}>Frete</th>
+                      <th className={styles.num}>Total</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -568,11 +618,17 @@ export default function ShopifyPage({
                         </td>
                         <td className={styles.num}>{int(o.itens)}</td>
                         <td className={styles.num}>{brl(o.venda, 2)}</td>
+                        <td className={`${styles.num} ${styles.muted}`}>
+                          {o.frete > 0 ? brl(o.frete, 2) : "grátis"}
+                        </td>
+                        <td className={`${styles.num} ${styles.strong}`}>
+                          {brl(o.venda + o.frete, 2)}
+                        </td>
                       </tr>
                     ))}
                     {data && data.pedidos.length === 0 && (
                       <tr>
-                        <td colSpan={6} className={styles.empty}>
+                        <td colSpan={8} className={styles.empty}>
                           Nenhum pedido no período.
                         </td>
                       </tr>
@@ -585,7 +641,9 @@ export default function ShopifyPage({
             <section className={styles.card}>
               <div className={styles.cardHeader}>
                 <h2>Mais vendidos</h2>
-                <span className={styles.muted}>por venda líquida</span>
+                <span className={styles.muted}>
+                  por venda líquida · frete rateado pelo valor do item no pedido
+                </span>
               </div>
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
@@ -594,6 +652,8 @@ export default function ShopifyPage({
                       <th>Produto</th>
                       <th className={styles.num}>Peças</th>
                       <th className={styles.num}>Venda</th>
+                      <th className={styles.num}>Frete</th>
+                      <th className={styles.num}>Total</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -612,11 +672,15 @@ export default function ShopifyPage({
                         </td>
                         <td className={styles.num}>{int(prod.qtde)}</td>
                         <td className={styles.num}>{brl(prod.venda)}</td>
+                        <td className={`${styles.num} ${styles.muted}`}>{brl(prod.frete)}</td>
+                        <td className={`${styles.num} ${styles.strong}`}>
+                          {brl(prod.venda + prod.frete)}
+                        </td>
                       </tr>
                     ))}
                     {data && data.topProdutos.length === 0 && (
                       <tr>
-                        <td colSpan={3} className={styles.empty}>
+                        <td colSpan={5} className={styles.empty}>
                           Sem vendas no período.
                         </td>
                       </tr>
@@ -632,12 +696,14 @@ export default function ShopifyPage({
             <Ranking
               title="Por estado (entrega)"
               rows={data?.estados ?? []}
-              total={k?.vendaPedidos ?? 0}
+              total={(k?.vendaPedidos ?? 0) + (comFrete ? (k?.frete ?? 0) : 0)}
+              comFrete={comFrete}
             />
             <Ranking
               title="Por forma de pagamento"
               rows={data?.pagamentos ?? []}
-              total={k?.vendaPedidos ?? 0}
+              total={(k?.vendaPedidos ?? 0) + (comFrete ? (k?.frete ?? 0) : 0)}
+              comFrete={comFrete}
             />
           </div>
         </>
@@ -650,11 +716,14 @@ function Ranking({
   title,
   rows,
   total,
+  comFrete,
 }: {
   title: string;
   rows: ShopifyResumo["estados"];
   total: number;
+  comFrete: boolean;
 }) {
+  const valor = (row: ShopifyResumo["estados"][number]) => row.venda + (comFrete ? row.frete : 0);
   return (
     <section className={styles.card}>
       <div className={styles.cardHeader}>
@@ -662,15 +731,16 @@ function Ranking({
       </div>
       <ul className={styles.ranking}>
         {rows.map((row) => {
-          const share = total > 0 ? row.venda / total : 0;
+          const share = total > 0 ? valor(row) / total : 0;
           return (
             <li key={row.chave}>
               <div className={styles.rankingTop}>
                 <span>{row.chave}</span>
                 <span className={styles.num}>
-                  {brl(row.venda)}{" "}
+                  {brl(valor(row))}{" "}
                   <small>
                     · {int(row.pedidos)} ped. · {(share * 100).toFixed(0)}%
+                    {!comFrete && row.frete > 0 ? ` · frete ${brl(row.frete)}` : ""}
                   </small>
                 </span>
               </div>

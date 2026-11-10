@@ -42,7 +42,12 @@ export interface ShopifyKpis {
   ticketMedio: number;
   itens: number;
   descontos: number;
+  /** Frete cobrado nos pedidos do período (data do pedido). */
   frete: number;
+  /** Frete devolvido nos estornos do período (data do estorno). */
+  freteEstornado: number;
+  /** frete − freteEstornado: é o que entra em "venda + frete" (= "Vendas totais" do Shopify). */
+  freteLiquido: number;
   devolucoes: number;
   pendentesQtd: number;
   pendentesValor: number;
@@ -57,7 +62,10 @@ export interface ShopifySeriePoint {
   label: string;
   venda: number;
   pedidos: number;
+  /** Frete líquido do bucket (pedido − estorno de frete). */
+  frete: number;
   vendaAnterior: number;
+  freteAnterior: number;
 }
 
 export interface ShopifyPedido {
@@ -83,12 +91,15 @@ export interface ShopifyTopProduto {
   tipo: string | null;
   qtde: number;
   venda: number;
+  /** Frete do pedido rateado pelo valor de cada item (frete é do pedido, não do produto). */
+  frete: number;
 }
 
 export interface ShopifyRanking {
   chave: string;
   pedidos: number;
   venda: number;
+  frete: number;
 }
 
 export interface ShopifyResumo {
@@ -148,7 +159,7 @@ async function fetchKpis(company: ShopifyCompany, from: Date, to: Date): Promise
        FROM shopify_orders o
        WHERE ${VALID} AND o.created_at >= $2 AND o.created_at < $3
      ), dev AS (
-       SELECT COALESCE(SUM(r.amount), 0) AS devolucoes
+       SELECT COALESCE(SUM(r.amount), 0) AS devolucoes, COALESCE(SUM(r.shipping), 0) AS frete_estornado
          FROM shopify_refunds r
          JOIN shopify_orders o ON o.company = r.company AND o.order_id = r.order_id
         WHERE ${SALE} AND r.company = $1 AND r.created_at >= $2 AND r.created_at < $3
@@ -169,6 +180,8 @@ async function fetchKpis(company: ShopifyCompany, from: Date, to: Date): Promise
     itens: num(r.itens),
     descontos: num(r.descontos),
     frete: num(r.frete),
+    freteEstornado: num(r.frete_estornado),
+    freteLiquido: num(r.frete) - num(r.frete_estornado),
     devolucoes,
     pendentesQtd: num(r.pendentes_qtd),
     pendentesValor: num(r.pendentes_valor),
@@ -183,7 +196,7 @@ async function fetchSerie(
   from: Date,
   to: Date,
   porHora: boolean,
-): Promise<Map<string, { venda: number; pedidos: number }>> {
+): Promise<Map<string, { venda: number; pedidos: number; frete: number }>> {
   const sql = getNeonSql();
   const bucket = (col: string) =>
     porHora
@@ -191,20 +204,20 @@ async function fetchSerie(
       : `to_char(${col} AT TIME ZONE 'America/Sao_Paulo', 'YYYY-MM-DD')`;
   // Pedido entra na hora/dia em que foi criado; devolução sai na hora/dia do reembolso.
   const rows = (await sql.query(
-    `SELECT k, SUM(v) AS venda, SUM(p) AS pedidos FROM (
-       SELECT ${bucket("o.created_at")} AS k, o.subtotal AS v, 1 AS p
+    `SELECT k, SUM(v) AS venda, SUM(p) AS pedidos, SUM(f) AS frete FROM (
+       SELECT ${bucket("o.created_at")} AS k, o.subtotal AS v, 1 AS p, o.total_shipping AS f
          FROM shopify_orders o
         WHERE ${SALE} AND o.created_at >= $2 AND o.created_at < $3
        UNION ALL
-       SELECT ${bucket("r.created_at")} AS k, -r.amount AS v, 0 AS p
+       SELECT ${bucket("r.created_at")} AS k, -r.amount AS v, 0 AS p, -r.shipping AS f
          FROM shopify_refunds r
          JOIN shopify_orders o ON o.company = r.company AND o.order_id = r.order_id
         WHERE ${SALE} AND r.company = $1 AND r.created_at >= $2 AND r.created_at < $3
      ) t
      GROUP BY k`,
     [company, from.toISOString(), to.toISOString()],
-  )) as Array<{ k: string; venda: unknown; pedidos: unknown }>;
-  return new Map(rows.map((r) => [r.k, { venda: num(r.venda), pedidos: num(r.pedidos) }]));
+  )) as Array<{ k: string; venda: unknown; pedidos: unknown; frete: unknown }>;
+  return new Map(rows.map((r) => [r.k, { venda: num(r.venda), pedidos: num(r.pedidos), frete: num(r.frete) }]));
 }
 
 export async function fetchShopifyResumo(
@@ -249,26 +262,33 @@ export async function fetchShopifyResumo(
         [company, from.toISOString(), to.toISOString()],
       ) as Promise<Array<Record<string, unknown>>>,
       sql.query(
-        `SELECT l.product_id, MIN(l.title) AS titulo, MIN(l.product_type) AS tipo,
-                ARRAY_REMOVE(ARRAY_AGG(DISTINCT l.sku), NULL) AS skus,
-                SUM(l.current_quantity) AS qtde, SUM(l.net) AS venda
-           FROM shopify_order_lines l
-           JOIN shopify_orders o ON o.company = l.company AND o.order_id = l.order_id
-          WHERE ${SALE} AND o.created_at >= $2 AND o.created_at < $3 AND l.current_quantity > 0
-          GROUP BY l.product_id, CASE WHEN l.product_id IS NULL THEN l.title END
+        // Frete é do pedido: rateado entre os itens pelo valor de cada um.
+        `WITH linhas AS (
+           SELECT l.product_id, l.title, l.product_type, l.sku, l.current_quantity, l.net,
+                  o.total_shipping, SUM(l.net) OVER (PARTITION BY l.order_id) AS net_pedido
+             FROM shopify_order_lines l
+             JOIN shopify_orders o ON o.company = l.company AND o.order_id = l.order_id
+            WHERE ${SALE} AND o.created_at >= $2 AND o.created_at < $3 AND l.current_quantity > 0
+         )
+         SELECT product_id, MIN(title) AS titulo, MIN(product_type) AS tipo,
+                ARRAY_REMOVE(ARRAY_AGG(DISTINCT sku), NULL) AS skus,
+                SUM(current_quantity) AS qtde, SUM(net) AS venda,
+                SUM(CASE WHEN net_pedido > 0 THEN total_shipping * net / net_pedido ELSE 0 END) AS frete
+           FROM linhas
+          GROUP BY product_id, CASE WHEN product_id IS NULL THEN title END
           ORDER BY venda DESC
           LIMIT 20`,
         [company, from.toISOString(), to.toISOString()],
       ) as Promise<Array<Record<string, unknown>>>,
       sql.query(
-        `SELECT COALESCE(o.ship_state, '—') AS chave, COUNT(*) AS pedidos, SUM(o.subtotal) AS venda
+        `SELECT COALESCE(o.ship_state, '—') AS chave, COUNT(*) AS pedidos, SUM(o.subtotal) AS venda, SUM(o.total_shipping) AS frete
            FROM shopify_orders o
           WHERE ${SALE} AND o.created_at >= $2 AND o.created_at < $3
           GROUP BY 1 ORDER BY venda DESC LIMIT 12`,
         [company, from.toISOString(), to.toISOString()],
       ) as Promise<Array<Record<string, unknown>>>,
       sql.query(
-        `SELECT COALESCE(o.gateways, '—') AS chave, COUNT(*) AS pedidos, SUM(o.subtotal) AS venda
+        `SELECT COALESCE(o.gateways, '—') AS chave, COUNT(*) AS pedidos, SUM(o.subtotal) AS venda, SUM(o.total_shipping) AS frete
            FROM shopify_orders o
           WHERE ${SALE} AND o.created_at >= $2 AND o.created_at < $3
           GROUP BY 1 ORDER BY venda DESC LIMIT 8`,
@@ -287,7 +307,9 @@ export async function fetchShopifyResumo(
         label: `${String(h).padStart(2, "0")}h`,
         venda: serieAtual.get(k)?.venda ?? 0,
         pedidos: serieAtual.get(k)?.pedidos ?? 0,
+        frete: serieAtual.get(k)?.frete ?? 0,
         vendaAnterior: serieAnterior.get(k)?.venda ?? 0,
+        freteAnterior: serieAnterior.get(k)?.frete ?? 0,
       });
     }
   } else {
@@ -300,7 +322,9 @@ export async function fetchShopifyResumo(
         label: `${day.slice(8, 10)}/${day.slice(5, 7)}`,
         venda: serieAtual.get(day)?.venda ?? 0,
         pedidos: serieAtual.get(day)?.pedidos ?? 0,
+        frete: serieAtual.get(day)?.frete ?? 0,
         vendaAnterior: serieAnterior.get(prevDay)?.venda ?? 0,
+        freteAnterior: serieAnterior.get(prevDay)?.frete ?? 0,
       });
     }
   }
@@ -335,9 +359,10 @@ export async function fetchShopifyResumo(
       tipo: (r.tipo as string) ?? null,
       qtde: num(r.qtde),
       venda: num(r.venda),
+      frete: num(r.frete),
     })),
-    estados: estadosRows.map((r) => ({ chave: String(r.chave), pedidos: num(r.pedidos), venda: num(r.venda) })),
-    pagamentos: pagRows.map((r) => ({ chave: String(r.chave), pedidos: num(r.pedidos), venda: num(r.venda) })),
+    estados: estadosRows.map((r) => ({ chave: String(r.chave), pedidos: num(r.pedidos), venda: num(r.venda), frete: num(r.frete) })),
+    pagamentos: pagRows.map((r) => ({ chave: String(r.chave), pedidos: num(r.pedidos), venda: num(r.venda), frete: num(r.frete) })),
     sync: {
       ultimaExecucao: iso(state?.last_run_at),
       ultimaCompleta: iso(state?.last_complete_at),

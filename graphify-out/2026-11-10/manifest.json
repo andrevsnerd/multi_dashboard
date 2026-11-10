@@ -5345,8 +5345,8 @@
     "semantic_hash": ""
   },
   "components/shopify/ShopifyPage.tsx": {
-    "mtime": 1794319549.7538464,
-    "ast_hash": "b903d3f3dbc6c237145c862c6f3e7f94",
+    "mtime": 1794325546.3961563,
+    "ast_hash": "825917e90f9efbb90b073eef2584d8eb",
     "semantic_hash": ""
   },
   "lib/mcp/precos.ts": {
@@ -5365,8 +5365,8 @@
     "semantic_hash": ""
   },
   "lib/shopify/client.ts": {
-    "mtime": 1794320968.6951134,
-    "ast_hash": "962814a7e5b6a17b682a2c9926160299",
+    "mtime": 1794321333.5879223,
+    "ast_hash": "253e53b22f98a89d4bb3b1cca55e97a2",
     "semantic_hash": ""
   },
   "lib/shopify/config.ts": {
@@ -5380,13 +5380,48 @@
     "semantic_hash": ""
   },
   "lib/shopify/orders-store.ts": {
-    "mtime": 1794320968.698372,
-    "ast_hash": "7938d46dbf9ab90f9a802715ebed7338",
+    "mtime": 1794321868.6888554,
+    "ast_hash": "9307ba493b580e6affec0d75f2e2e38e",
     "semantic_hash": ""
   },
   "lib/shopify/sync.ts": {
     "mtime": 1794320993.6317568,
     "ast_hash": "d8fdfb4e0a3130ae47a014323b7cb4b5",
+    "semantic_hash": ""
+  },
+  "app/api/shopify/mapa/linx/route.ts": {
+    "mtime": 1794322000.8956277,
+    "ast_hash": "f0745cb5ef987d70bc5e378a37c10723",
+    "semantic_hash": ""
+  },
+  "app/api/shopify/mapa/route.ts": {
+    "mtime": 1794322000.0283072,
+    "ast_hash": "4aad1228102fa7ad2d4aa4550ce07ad0",
+    "semantic_hash": ""
+  },
+  "components/shopify/ShopifyMapaLinx.tsx": {
+    "mtime": 1794325516.3776271,
+    "ast_hash": "02c649593f5b037d8c7b459a4974ed0a",
+    "semantic_hash": ""
+  },
+  "lib/shopify/auth.ts": {
+    "mtime": 1794321999.19137,
+    "ast_hash": "38050d86186af07284b501d28cef7d98",
+    "semantic_hash": ""
+  },
+  "lib/shopify/catalog-store.ts": {
+    "mtime": 1794321858.704828,
+    "ast_hash": "9656497e33acbd895fdb691b4bf2caf8",
+    "semantic_hash": ""
+  },
+  "lib/shopify/catalog-sync.ts": {
+    "mtime": 1794322140.2313073,
+    "ast_hash": "6e3849464253b0fcb5a18e3f8b291296",
+    "semantic_hash": ""
+  },
+  "lib/shopify/linx-match.ts": {
+    "mtime": 1794322452.5868852,
+    "ast_hash": "3cb87028dbcb6036208b36b70732b011",
     "semantic_hash": ""
   }
 }

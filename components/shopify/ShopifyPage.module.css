@@ -516,3 +516,28 @@
   border-bottom-color: var(--shp-accent);
   color: var(--t-900);
 }
+
+.freteToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+  padding: 7px 12px;
+  border: 1px solid var(--b-200);
+  border-radius: 10px;
+  background: var(--s-white);
+  color: var(--t-700);
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+
+.freteToggle input {
+  accent-color: var(--shp-accent);
+}
+
+.subNote {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--t-500);
+}
