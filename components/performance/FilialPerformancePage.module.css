@@ -1575,6 +1575,25 @@
 
 /* Descontinuado: só a badge sinaliza — sem tingir a linha inteira. */
 
+.apostaBadge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: #4a3a12;
+  background: #e3cc85;
+  border: 1px solid #c9a646;
+  border-radius: 4px;
+  padding: 1px 6px;
+  line-height: 1.4;
+  text-transform: uppercase;
+  user-select: none;
+  white-space: nowrap;
+}
+
+/* Aposta: idem — só a badge sinaliza. */
+
 .groupedTooltipWrapper {
   position: relative;
   display: inline-flex;

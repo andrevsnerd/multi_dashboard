@@ -594,13 +594,22 @@ export default function ProductsTable({
               return (
                 <tr
                   key={`${product.productId}-${product.corProduto || ''}-${index}`}
-                  className={product.descontinuado ? styles.descontinuadoRow : undefined}
+                  className={
+                    product.descontinuado
+                      ? styles.descontinuadoRow
+                      : product.aposta
+                        ? styles.apostaRow
+                        : undefined
+                  }
                 >
                   <td className={styles.descriptionCell}>
                     <div className={styles.productNameRow}>
                       <span className={styles.productName}>{product.productName}</span>
                       {product.descontinuado && (
                         <span className={styles.descontinuadoBadge}>DESCONTINUADO</span>
+                      )}
+                      {product.aposta && (
+                        <span className={styles.apostaBadge}>APOSTA</span>
                       )}
                     </div>
                     {product.isGroupedProduct && groupedMembers.length > 0 ? (

@@ -86,6 +86,8 @@ export default function Sidebar({ companyName }: SidebarProps) {
     basePath && basePath !== "/" ? `${basePath}/produto-agrupado` : "/produto-agrupado";
   const produtoDescontinuadoHref =
     basePath && basePath !== "/" ? `${basePath}/produto-descontinuado` : "/produto-descontinuado";
+  const produtoApostaHref =
+    basePath && basePath !== "/" ? `${basePath}/produto-aposta` : "/produto-aposta";
   const vmHref = basePath && basePath !== "/" ? `${basePath}/vm` : "/vm";
   const produtosNovosHref =
     basePath && basePath !== "/" ? `${basePath}/produtos-novos` : "/produtos-novos";
@@ -225,6 +227,13 @@ export default function Sidebar({ companyName }: SidebarProps) {
       permission: "produto-descontinuado",
       isActive: (currentPathname) => !!currentPathname && currentPathname.includes("/produto-descontinuado"),
     },
+    {
+      key: "produto-aposta",
+      label: "Produto Aposta",
+      href: produtoApostaHref,
+      permission: "produto-aposta",
+      isActive: (currentPathname) => !!currentPathname && currentPathname.includes("/produto-aposta"),
+    },
     // VM move estoque com ajuste tipo VM — habilitado só para NERD por enquanto.
     ...(isNerd
       ? [
@@ -296,6 +305,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     "/produtos-recentes",
     "/produto-agrupado",
     "/produto-descontinuado",
+    "/produto-aposta",
     "/vm",
     "/produtos-novos",
     "/painel-colecoes",

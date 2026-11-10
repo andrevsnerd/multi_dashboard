@@ -115,6 +115,7 @@ interface ProdutoRow {
   groupId?: string | null;
   groupedMembers?: ProdutoAgrupadoMember[];
   descontinuado?: boolean;
+  aposta?: boolean;
 }
 
 type FilialFilterCompanyConfig = Pick<
@@ -3484,6 +3485,9 @@ const handleBadgeClick = (cat: string) => {
                                     )}
                                     {p.descontinuado && (
                                       <span className={styles.descontinuadoBadge}>DESCONTINUADO</span>
+                                    )}
+                                    {p.aposta && (
+                                      <span className={styles.apostaBadge}>APOSTA</span>
                                     )}
                                   </div>
                                   {p.isGroupedProduct ? (

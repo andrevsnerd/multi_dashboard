@@ -549,6 +549,24 @@
   background-color: #fef2f2 !important;
 }
 
+.apostaBadge {
+  display: inline-flex;
+  align-items: center;
+  background-color: #e3cc85;
+  color: #4a3a12;
+  font-size: 9px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.apostaRow td {
+  background-color: #fbf6e6 !important;
+}
+
 .markupCell {
   text-align: center !important;
   min-width: 80px;
@@ -937,6 +955,9 @@
 }
 :global(:root[data-theme="dark"]) .descontinuadoRow td {
   background-color: rgba(244, 63, 94, 0.12) !important;
+}
+:global(:root[data-theme="dark"]) .apostaRow td {
+  background-color: rgba(214, 182, 96, 0.12) !important;
 }
 :global(:root[data-theme="dark"]) .markupValue {
   background-color: rgba(34, 197, 94, 0.12);

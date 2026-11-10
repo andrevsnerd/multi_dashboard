@@ -39,6 +39,7 @@ export interface ProductDetail {
   groupId?: string | null;
   groupedMembers?: ProdutoAgrupadoMember[];
   descontinuado?: boolean; // true se o produto está marcado como descontinuado
+  aposta?: boolean; // true se o produto está marcado como aposta (página Produto Aposta)
 }
 
 export interface ProductsQueryParams {

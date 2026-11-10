@@ -14,6 +14,8 @@ import {
 import { listProdutoAgrupadoGroups } from '@/lib/utils/produto-agrupado-store';
 import { listProdutosDescontinuados } from '@/lib/utils/produto-descontinuado-store';
 import { buildDescontinuadoKeySet, isProdutoDescontinuado } from '@/lib/utils/produtos-descontinuados';
+import { listProdutosAposta } from '@/lib/utils/produto-aposta-store';
+import { buildApostaKeySet, isProdutoAposta } from '@/lib/utils/produtos-aposta';
 import { readGoals } from '@/lib/utils/goals-storage';
 import { type CompanyKey, VAREJO_VALUE } from '@/lib/config/company';
 import { resolveCompanyDynamic } from '@/lib/config/company-server';
@@ -127,13 +129,15 @@ export async function GET(request: Request) {
   }
 
   try {
-    const [performanceData, allGoals, groupedProducts, descontinuados] = await Promise.all([
+    const [performanceData, allGoals, groupedProducts, descontinuados, apostas] = await Promise.all([
       fetchPerformanceData(companyKey, resolvedRange, comparisonMode, { linhas: linhasFilter }),
       readGoals(),
       listProdutoAgrupadoGroups(companyKey),
       listProdutosDescontinuados(companyKey),
+      listProdutosAposta(companyKey),
     ]);
     const descontinuadoKeys = buildDescontinuadoKeySet(descontinuados);
+    const apostaKeys = buildApostaKeySet(apostas);
 
     // Produto agrupado por COR: o grupo é definido no nível produto, mas por cor ele
     // precisa fundir "CP BASIC 1 AZUL + CP BASIC 2 AZUL". Como o código de cor é
@@ -399,6 +403,7 @@ export async function GET(request: Request) {
           estoque,
           estoquePorFilial: porFilial,
           descontinuado: isProdutoDescontinuado(descontinuadoKeys, p.produto),
+          aposta: isProdutoAposta(apostaKeys, p.produto),
         };
       });
 
@@ -546,6 +551,7 @@ export async function GET(request: Request) {
         estoqueRede,
         estoqueRedePorFilial: porFilialRede,
         descontinuado: isProdutoDescontinuado(descontinuadoKeys, p.produto),
+        aposta: isProdutoAposta(apostaKeys, p.produto),
       };
     });
 

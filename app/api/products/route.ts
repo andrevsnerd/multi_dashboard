@@ -6,6 +6,8 @@ import { aggregateProductDetailsWithGroups } from '@/lib/utils/produto-agrupado-
 import { listProdutoAgrupadoGroups } from '@/lib/utils/produto-agrupado-store';
 import { listProdutosDescontinuados } from '@/lib/utils/produto-descontinuado-store';
 import { buildDescontinuadoKeySet, isProdutoDescontinuado } from '@/lib/utils/produtos-descontinuados';
+import { listProdutosAposta } from '@/lib/utils/produto-aposta-store';
+import { buildApostaKeySet, isProdutoAposta } from '@/lib/utils/produtos-aposta';
 import type { CompanyKey } from '@/lib/config/company';
 
 // Evita timeout em produção (proxy/túnel); padrão seria 10s no Hobby.
@@ -49,7 +51,7 @@ export async function GET(request: Request) {
 
   try {
     const isKnownCompany = company === 'nerd' || company === 'scarfme';
-    const [rawData, groupedProducts, descontinuados] = await Promise.all([
+    const [rawData, groupedProducts, descontinuados, apostas] = await Promise.all([
       fetchProductsWithDetails({
         company,
         range,
@@ -67,6 +69,7 @@ export async function GET(request: Request) {
       }),
       isKnownCompany ? listProdutoAgrupadoGroups(company as CompanyKey) : Promise.resolve([]),
       isKnownCompany ? listProdutosDescontinuados(company as CompanyKey) : Promise.resolve([]),
+      isKnownCompany ? listProdutosAposta(company as CompanyKey) : Promise.resolve([]),
     ]);
 
     // Por cor o grupo quebra por cor (CAPA BASIC AZUL = CP BASIC 1 AZUL + CP BASIC 2 AZUL).
@@ -84,9 +87,11 @@ export async function GET(request: Request) {
     });
 
     const descontinuadoKeys = buildDescontinuadoKeySet(descontinuados);
+    const apostaKeys = buildApostaKeySet(apostas);
     const data: ProductDetail[] = aggregated.map((product) => ({
       ...product,
       descontinuado: isProdutoDescontinuado(descontinuadoKeys, product.productId),
+      aposta: isProdutoAposta(apostaKeys, product.productId),
     }));
 
     return NextResponse.json({ data });
