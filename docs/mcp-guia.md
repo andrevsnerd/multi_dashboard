@@ -143,6 +143,17 @@ pode sempre refinar na pergunta seguinte ("e só na Paulista?", "e em abril?").
 > pode falar normal ("da coleção Pantanal Vivo 25") — o Claude descobre o código
 > sozinho perguntando as categorias disponíveis, se precisar.
 
+### 🛒 Loja online — Shopify Scarf Me e Shopify NERD (tempo real)
+Os mesmos dados da página **Shopify** do dashboard: pedidos do site minutos depois de acontecerem.
+Venda sem frete, com o frete sempre separado. **Não soma com o faturamento do Linx** (o mesmo
+pedido vira nota no Linx depois — o número do pedido fica na OBS da nota).
+- "Quanto o site da Scarf Me vendeu hoje? E com frete?" → `shopify_resumo`
+- "Vendas do Shopify NERD na semana, comparando com a anterior"
+- "Últimos pedidos do site", "pedidos pendentes (Pix aguardando)", "pedidos cancelados de outubro" → `shopify_pedidos`
+- "Detalhe do pedido #65997" (itens, cliente, frete, reembolso, produto do Linx) → `shopify_pedido`
+- "Quem mais comprou no site em novembro? Quantos clientes novos?" → `shopify_clientes`
+- "Pashminas mais vendidas no site este mês" → `shopify_produtos` (item vinculado sai com o código e o código de barras do Linx)
+
 ### 🧭 Descoberta (quando não souber os nomes)
 - "Quais empresas e filiais existem?"
 - "Quais categorias (grupos/linhas) a SCARF ME tem?"

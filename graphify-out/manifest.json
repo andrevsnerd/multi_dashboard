@@ -2185,9 +2185,9 @@
     "semantic_hash": ""
   },
   "lib/mcp/registry.ts": {
-    "mtime": 1782933828.4934711,
-    "ast_hash": "9193c69371d1efc463aaa56f19c2822d",
-    "semantic_hash": "9193c69371d1efc463aaa56f19c2822d"
+    "mtime": 1794339466.4117508,
+    "ast_hash": "acff67fb89da1472f5726ade2fd9d99b",
+    "semantic_hash": ""
   },
   "lib/mcp/shared.ts": {
     "mtime": 1780585461.5679543,
@@ -3355,9 +3355,9 @@
     "semantic_hash": "7ee29f13d487b1a58e9356a9780aaeae"
   },
   "docs/mcp-guia.md": {
-    "mtime": 1782934042.0147443,
-    "ast_hash": "50d0b8221582535d278e4eab632b92b9",
-    "semantic_hash": "50d0b8221582535d278e4eab632b92b9"
+    "mtime": 1794339540.3734725,
+    "ast_hash": "f60b2d0bbcd97a5a8ea203ce55b82753",
+    "semantic_hash": ""
   },
   "docs/mcp-server.md": {
     "mtime": 1782911420.5600028,
@@ -5452,6 +5452,16 @@
   "lib/shopify/blackfriday.ts": {
     "mtime": 1794337599.864065,
     "ast_hash": "bf9a5bf6874517d6ddfd0b6390195310",
+    "semantic_hash": ""
+  },
+  "lib/mcp/tools/shopify.ts": {
+    "mtime": 1794339464.902661,
+    "ast_hash": "e8f0198b04ed1a05a3c53de0a2ef62c5",
+    "semantic_hash": ""
+  },
+  "lib/shopify/consultas.ts": {
+    "mtime": 1794339422.252502,
+    "ast_hash": "281d11e56840bfb8b656b2338c26f0d9",
     "semantic_hash": ""
   }
 }

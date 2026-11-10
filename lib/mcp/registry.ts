@@ -18,6 +18,7 @@ import { registerProdutoCurvaTools } from './tools/produto-curva';
 import { registerProdutosParadosTools } from './tools/produtos-parados';
 import { registerFaturamentoTools } from './tools/faturamento';
 import { registerRelatoriosTools } from './tools/relatorios';
+import { registerShopifyTools } from './tools/shopify';
 
 /**
  * Registra todas as tools do servidor MCP do multi-dashboard.
@@ -31,6 +32,8 @@ import { registerRelatoriosTools } from './tools/relatorios';
  *         por período arbitrário) e produto_curva (curva ABC 12m + mês).
  * Fase 5: relatorio_vendas_faturamento e relatorio_vendas_historico — expõem as
  *         análises do Gerador de Relatórios (mesmo runReport, todas as colunas).
+ * Fase 6: Shopify Scarf Me / Shopify NERD (loja online em tempo real) — shopify_resumo,
+ *         shopify_pedidos, shopify_pedido, shopify_clientes, shopify_produtos.
  */
 export function registerAllTools(server: McpServer) {
   registerDiscoveryTools(server);
@@ -49,4 +52,5 @@ export function registerAllTools(server: McpServer) {
   registerProdutosParadosTools(server);
   registerFaturamentoTools(server);
   registerRelatoriosTools(server);
+  registerShopifyTools(server);
 }
