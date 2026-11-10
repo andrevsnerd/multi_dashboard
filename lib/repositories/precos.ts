@@ -344,7 +344,36 @@ export async function resolverCodigosOuBarras(entradas: string[]): Promise<Resol
   const limpos = [...new Set(entradas.map(limpar).filter(Boolean))];
   if (limpos.length === 0) return { produtos: [], naoEncontrados: [] };
 
+  return resolucaoDoMapa(limpos, await mapearCodigosOuBarras(limpos));
+}
+
+function resolucaoDoMapa(limpos: string[], mapa: Map<string, string>): ResolucaoCodigos {
+  const produtos: string[] = [];
+  const naoEncontrados: string[] = [];
+  const vistos = new Set<string>();
+  for (const entrada of limpos) {
+    const produto = mapa.get(entrada);
+    if (!produto) {
+      naoEncontrados.push(entrada);
+      continue;
+    }
+    if (vistos.has(produto)) continue;
+    vistos.add(produto);
+    produtos.push(produto);
+  }
+
+  return { produtos, naoEncontrados };
+}
+
+/**
+ * Entrada digitada (código de produto ou de barras) → código do produto. Quem precisa
+ * saber de QUAL entrada veio cada produto (lista "código; preço") usa este mapa; quem
+ * só quer a lista de produtos usa `resolverCodigosOuBarras`.
+ */
+export async function mapearCodigosOuBarras(entradas: string[]): Promise<Map<string, string>> {
+  const limpos = [...new Set(entradas.map(limpar).filter(Boolean))];
   const mapa = new Map<string, string>();
+  if (limpos.length === 0) return mapa;
 
   for (const lote of chunk(limpos, CHUNK)) {
     const encontrados = await withRequest(async (request) => {
@@ -375,21 +404,7 @@ export async function resolverCodigosOuBarras(entradas: string[]): Promise<Resol
     for (const row of encontrados) mapa.set(limpar(row.barra), limpar(row.produto));
   }
 
-  const produtos: string[] = [];
-  const naoEncontrados: string[] = [];
-  const vistos = new Set<string>();
-  for (const entrada of limpos) {
-    const produto = mapa.get(entrada);
-    if (!produto) {
-      naoEncontrados.push(entrada);
-      continue;
-    }
-    if (vistos.has(produto)) continue;
-    vistos.add(produto);
-    produtos.push(produto);
-  }
-
-  return { produtos, naoEncontrados };
+  return mapa;
 }
 
 // ───────────────────────── busca de produtos + valores ─────────────────────────
@@ -463,6 +478,11 @@ export interface PrecoProdutosResult {
   naoEncontrados: string[];
   campos: CampoAlvo[];
   tabelas: TabelaSelecionada[];
+  /**
+   * Código colado → produto (só com `codigos`). É o que liga a linha "código; preço" de
+   * uma lista colada ao produto, quando o código é de barras.
+   */
+  mapaCodigos?: Record<string, string>;
 }
 
 /** Valor de uma coluna para um produto. `existe` distingue linha ausente de coluna nula. */
@@ -621,7 +641,9 @@ export async function fetchProdutosPrecos(filtros: PrecoFiltros): Promise<PrecoP
   const incluirAvancados = !!filtros.incluirAvancados;
   const limite = Math.min(filtros.limite && filtros.limite > 0 ? filtros.limite : LIMITE_PRODUTOS, LIMITE_PRODUTOS);
 
+  let mapaCodigos: Record<string, string> | undefined;
   const vazio = (naoEncontrados: string[]): PrecoProdutosResult => ({
+    mapaCodigos,
     rows: [],
     total: 0,
     truncated: false,
@@ -634,7 +656,10 @@ export async function fetchProdutosPrecos(filtros: PrecoFiltros): Promise<PrecoP
   let naoEncontrados: string[] = [];
   const codigos = (filtros.codigos ?? []).map(limpar).filter(Boolean);
   if (codigos.length > 0) {
-    const resolucao = await resolverCodigosOuBarras(codigos);
+    const limpos = [...new Set(codigos)];
+    const mapa = await mapearCodigosOuBarras(limpos);
+    mapaCodigos = Object.fromEntries(mapa);
+    const resolucao = resolucaoDoMapa(limpos, mapa);
     produtosExplicitos = resolucao.produtos;
     naoEncontrados = resolucao.naoEncontrados;
     if (produtosExplicitos.length === 0) return vazio(naoEncontrados);
@@ -752,7 +777,7 @@ export async function fetchProdutosPrecos(filtros: PrecoFiltros): Promise<PrecoP
     };
   });
 
-  return { rows, total, truncated, naoEncontrados, campos, tabelas };
+  return { rows, total, truncated, naoEncontrados, campos, tabelas, mapaCodigos };
 }
 
 // ───────────────────────── histórico / auditoria ─────────────────────────

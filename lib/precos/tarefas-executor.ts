@@ -9,9 +9,19 @@ import "server-only";
 import { findUserByUsername } from "@/lib/auth/users-store";
 import { isReadOnlyRole, normalizeRole } from "@/lib/auth/permissions";
 import { PRECOS_VIEW_ROLES } from "@/lib/auth/precos-guard";
-import { executarAlteracaoPrecos, type ExecutarPrecosResult } from "@/lib/repositories/precos";
+import {
+  executarAlteracaoPrecos,
+  type ExecutarPrecosResult,
+  type PrecoCompany,
+} from "@/lib/repositories/precos";
 import { agendarDisparo, cancelarDisparo } from "@/lib/precos/agendador-qstash";
-import { atualizarTarefa, type PrecoTarefa } from "@/lib/precos/tarefas-store";
+import {
+  atualizarTarefa,
+  excluirTarefa,
+  obterTarefa,
+  reivindicarExecucao,
+  type PrecoTarefa,
+} from "@/lib/precos/tarefas-store";
 
 /** Antecedência mínima: abaixo disso é "aplicar agora", não agendamento. */
 const ANTECEDENCIA_MINIMA_MS = 60 * 1000;
@@ -108,4 +118,55 @@ export async function executarTarefa(
   });
 
   return { tarefa: atualizada ?? tarefa, resultado };
+}
+
+/** Erro de regra com o status HTTP que a rota deve devolver (o MCP só usa a mensagem). */
+export class TarefaErro extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+    this.name = "TarefaErro";
+  }
+}
+
+/**
+ * "Aplicar agora": reivindica a tarefa (agendada ou não), cancela o disparo agendado e
+ * aplica. Usado pela tela e pelo MCP de preços — mesmo caminho, mesmo histórico.
+ */
+export async function aplicarTarefaAgora(
+  id: string,
+  company: PrecoCompany,
+  usuario: string
+): Promise<{ tarefa: PrecoTarefa; resultado: ExecutarPrecosResult }> {
+  const existente = await obterTarefa(id);
+  if (!existente || existente.company !== company) {
+    throw new TarefaErro("Tarefa não encontrada.", 404);
+  }
+
+  const tarefa = await reivindicarExecucao(id, { usuario });
+  if (!tarefa) {
+    throw new TarefaErro("A tarefa já foi aplicada ou está sendo aplicada agora.", 409);
+  }
+  // Aplicou na mão: o disparo agendado (se havia) não tem mais o que fazer.
+  await cancelarDisparo(existente.qstashMessageId);
+
+  try {
+    return await executarTarefa(tarefa, usuario);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    await atualizarTarefa(id, { status: "erro", erro: msg.slice(0, 1000), qstashMessageId: null });
+    throw new TarefaErro(`Falha ao aplicar: ${msg}`, 500);
+  }
+}
+
+/** Exclui a tarefa e cancela o disparo, se estava agendada. Não mexe em preço nenhum. */
+export async function excluirTarefaComDisparo(id: string, company: PrecoCompany): Promise<void> {
+  const tarefa = await obterTarefa(id);
+  if (!tarefa || tarefa.company !== company) {
+    throw new TarefaErro("Tarefa não encontrada.", 404);
+  }
+  if (tarefa.status === "executando") {
+    throw new TarefaErro("A tarefa está sendo aplicada agora.", 409);
+  }
+  await excluirTarefa(id);
+  await cancelarDisparo(tarefa.qstashMessageId);
 }

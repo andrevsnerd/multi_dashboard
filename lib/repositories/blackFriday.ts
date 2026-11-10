@@ -119,7 +119,7 @@ export async function fetchItensBlackFriday(company: PrecoCompany): Promise<Blac
         AND h.ORIGEM = 'PRODUTOS_PRECOS'
         AND h.CAMPO = 'PRECO1'
         AND h.REVERTE_LOTE IS NULL
-        AND h.OBS LIKE @bfObs
+        AND (h.OBS LIKE @bfObs OR h.PRODUTO IN ('13.B1.0093', '13.B1.0094', '13.B1.0095'))
       ORDER BY h.ID
     `);
     return r.recordset;

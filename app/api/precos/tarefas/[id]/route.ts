@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
 
 import { autorizarPrecos, parsePrecoCompany } from '@/lib/auth/precos-guard';
-import { cancelarDisparo } from '@/lib/precos/agendador-qstash';
-import { programarTarefa } from '@/lib/precos/tarefas-executor';
-import { excluirTarefa, obterTarefa } from '@/lib/precos/tarefas-store';
+import { TarefaErro, excluirTarefaComDisparo, programarTarefa } from '@/lib/precos/tarefas-executor';
+import { obterTarefa } from '@/lib/precos/tarefas-store';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -59,16 +58,16 @@ export async function DELETE(request: Request, { params }: Ctx) {
   if ('erro' in autorizacao) return autorizacao.erro;
   const { id } = await params;
 
+  const company = parsePrecoCompany(new URL(request.url).searchParams.get('company'));
+  if (!company) return NextResponse.json({ error: 'Empresa inválida.' }, { status: 400 });
+
   try {
-    const r = await carregar(request, id, new URL(request.url).searchParams.get('company'));
-    if ('erro' in r) return r.erro;
-    if (r.tarefa.status === 'executando') {
-      return NextResponse.json({ error: 'A tarefa está sendo aplicada agora.' }, { status: 409 });
-    }
-    await excluirTarefa(id);
-    await cancelarDisparo(r.tarefa.qstashMessageId);
+    await excluirTarefaComDisparo(id, company);
     return NextResponse.json({ ok: true });
   } catch (error) {
+    if (error instanceof TarefaErro) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     console.error('[precos/tarefas] erro ao excluir', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Erro ao excluir a tarefa.' },

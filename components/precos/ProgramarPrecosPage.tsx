@@ -38,6 +38,15 @@ interface RespostaProdutos {
   total: number;
   truncated: boolean;
   naoEncontrados: string[];
+  /** Código colado → produto (liga a linha "código preço" ao produto, se o código é de barras). */
+  mapaCodigos?: Record<string, string>;
+}
+
+/** Preços vindos de uma lista "código preço", já ligados ao produto. */
+interface ListaPrecos {
+  porProduto: Record<string, number>;
+  /** Produto pedido com preços diferentes (ex.: dois códigos de barras dele): fica de fora. */
+  conflitos: string[];
 }
 
 type TarefaStatus = "pendente" | "agendada" | "executando" | "aplicada" | "erro";
@@ -135,6 +144,73 @@ function parseNumero(texto: string): number | null {
   const normalizado = t.includes(",") ? t.replace(/\./g, "").replace(",", ".") : t;
   const n = Number(normalizado);
   return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Preço na 2ª coluna de uma linha: "119,90", "119.90", "1.299,90", "R$ 89", "89".
+ * Inteiro sem vírgula só até 5 dígitos — senão é um 2º código de barras na mesma linha.
+ */
+const PRECO_LINHA_RE = /^(?:R\$)?(\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?|\d{1,5}(?:[.,]\d{1,2})?)$/i;
+
+/**
+ * Lê o que foi colado. Linha "código preço" (tab do Excel, ";" ou espaço) vira preço
+ * próprio daquele produto; o resto continua como lista de códigos, como sempre foi.
+ */
+function lerLista(texto: string): { codigos: string[]; precos: Record<string, number> } {
+  const codigos: string[] = [];
+  const precos: Record<string, number> = {};
+  for (const bruta of texto.split(/\r?\n/)) {
+    const linha = bruta.trim();
+    if (!linha) continue;
+    const m = /^(\S+?)[\t; ]+(.+)$/.exec(linha);
+    const precoTxt = m ? m[2].trim().replace(/\s+/g, "") : "";
+    if (m && PRECO_LINHA_RE.test(precoTxt)) {
+      const semMoeda = precoTxt.replace(/^R\$/i, "");
+      // "1.299" é mil duzentos e noventa e nove (milhar BR), não 1,299.
+      const valor = parseNumero(/^\d{1,3}(?:\.\d{3})+$/.test(semMoeda) ? semMoeda.replace(/\./g, "") : semMoeda);
+      if (valor !== null && valor >= 0) {
+        codigos.push(m[1]);
+        precos[m[1]] = Math.round(valor * 100) / 100;
+        continue;
+      }
+    }
+    codigos.push(...separarCodigos(linha));
+  }
+  return { codigos, precos };
+}
+
+function precosPorProduto(resp: RespostaProdutos, porEntrada: Record<string, number>): ListaPrecos {
+  const porProduto: Record<string, number> = {};
+  const conflitos = new Set<string>();
+  for (const [entrada, preco] of Object.entries(porEntrada)) {
+    const produto = resp.mapaCodigos?.[entrada];
+    if (!produto) continue;
+    const ja = porProduto[produto];
+    if (ja !== undefined && !mesmoValor(ja, preco)) conflitos.add(produto);
+    else porProduto[produto] = preco;
+  }
+  for (const p of conflitos) delete porProduto[p];
+  return { porProduto, conflitos: [...conflitos] };
+}
+
+/** Preço da lista em cada tabela pedida, só onde o produto tem linha na tabela. */
+function novosDaLista(
+  resp: RespostaProdutos,
+  porProduto: Record<string, number>,
+  tabelas: string[]
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const cod of tabelas) {
+    const ck = `T::${cod}::PRECO1`;
+    const i = resp.campos.findIndex((c) => c.key === ck);
+    if (i < 0) continue;
+    for (const row of resp.rows) {
+      const preco = porProduto[row.produto];
+      if (preco === undefined || row.sr.includes(i)) continue;
+      out[`${row.produto}||${ck}`] = preco;
+    }
+  }
+  return out;
 }
 
 /**
@@ -251,6 +327,8 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [nome, setNome] = useState("");
   const [codigosTexto, setCodigosTexto] = useState("");
+  /** Lista "código preço" do último carregamento (null = lista só de códigos). */
+  const [listaPrecos, setListaPrecos] = useState<ListaPrecos | null>(null);
   const [dados, setDados] = useState<RespostaProdutos | null>(null);
   const [codigosLidos, setCodigosLidos] = useState(0);
   const [carregando, setCarregando] = useState(false);
@@ -345,6 +423,7 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
     setEditandoId(null);
     setNome("");
     setCodigosTexto("");
+    setListaPrecos(null);
     setDados(null);
     setTabelasMarcadas([]);
     setNovos({});
@@ -356,7 +435,11 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
   }, []);
 
   const carregarProdutos = useCallback(
-    async (codigos: string[], preset?: { novos: Record<string, number>; marcadas: string[] }) => {
+    async (
+      codigos: string[],
+      preset?: { novos: Record<string, number>; marcadas: string[] },
+      precosEntrada?: Record<string, number>
+    ) => {
       if (codigos.length === 0) {
         setErro("Cole pelo menos um código de barras ou código de produto.");
         return;
@@ -374,14 +457,21 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
           setErro(json?.error ?? "Erro ao carregar os produtos.");
           return;
         }
-        setDados(json as RespostaProdutos);
+        const resp = json as RespostaProdutos;
+        const marcadas = preset?.marcadas ?? [];
+        // Lista com preço: cada produto leva o seu. Nas tabelas já marcadas (Recarregar)
+        // entra na hora; nas outras, ao marcar.
+        const lista =
+          precosEntrada && Object.keys(precosEntrada).length > 0 ? precosPorProduto(resp, precosEntrada) : null;
+        setDados(resp);
+        setListaPrecos(lista);
         setCodigosLidos(new Set(codigos).size);
         setRemovidos([]);
         setTextos({});
         setGruposAbertos([]);
         setVerTodosGrupos(false);
-        setNovos(preset?.novos ?? {});
-        setTabelasMarcadas(preset?.marcadas ?? []);
+        setNovos({ ...(preset?.novos ?? {}), ...(lista ? novosDaLista(resp, lista.porProduto, marcadas) : {}) });
+        setTabelasMarcadas(marcadas);
       } catch {
         setErro("Falha de conexão ao carregar os produtos.");
       } finally {
@@ -870,7 +960,12 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
 
   // ───────── render ─────────
 
-  const totalColados = separarCodigos(codigosTexto).length;
+  const colados = lerLista(codigosTexto);
+  const totalColados = colados.codigos.length;
+  const totalComPreco = Object.keys(colados.precos).length;
+  const semPrecoNaLista = listaPrecos
+    ? rowsAtivas.filter((r) => listaPrecos.porProduto[r.produto] === undefined).length
+    : 0;
   const gruposMostrados = verTodosGrupos ? grupos : grupos.slice(0, GRUPOS_VISIVEIS);
   const minAgenda = paraInputLocal(new Date(Date.now() + 2 * 60 * 1000));
 
@@ -934,14 +1029,15 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
         <div className={base.codigosBox}>
           <label className={base.campoTexto}>
             <span className={base.campoLabel}>
-              Códigos de barras ou de produto — um por linha (ou separados por vírgula/espaço)
+              Códigos de barras ou de produto — um por linha. Para um preço diferente em cada produto, cole
+              código e preço na mesma linha (dá para colar direto do Excel).
             </span>
             <textarea
               className={base.textarea}
               value={codigosTexto}
               onChange={(e) => setCodigosTexto(e.target.value)}
               rows={5}
-              placeholder={"7891234567890\n7891234567891\nN1.3.0018"}
+              placeholder={"7891234567890\n7891234567891\nN1.3.0018\n\nou com preço por produto:\n7891234567890  119,90\nN1.3.0018  89,90"}
             />
           </label>
         </div>
@@ -952,7 +1048,7 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
               ? `${codigosLidos} código(s) → ${rows.length} produto(s) reconhecido(s)` +
                 (dados.naoEncontrados.length > 0 ? ` · ${dados.naoEncontrados.length} não encontrado(s)` : "")
               : totalColados > 0
-                ? `${totalColados} código(s) colado(s)`
+                ? `${totalColados} código(s) colado(s)` + (totalComPreco > 0 ? ` · ${totalComPreco} com preço` : "")
                 : "Cole a lista e clique em Carregar."}
           </span>
           <div className={styles.acoesLinha}>
@@ -965,7 +1061,13 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
               type="button"
               className={base.btnPrimario}
               disabled={carregando || totalColados === 0}
-              onClick={() => void carregarProdutos(separarCodigos(codigosTexto), dados ? { novos, marcadas: tabelasMarcadas } : undefined)}
+              onClick={() =>
+                void carregarProdutos(
+                  colados.codigos,
+                  dados ? { novos, marcadas: tabelasMarcadas } : undefined,
+                  colados.precos
+                )
+              }
             >
               {carregando ? "Carregando…" : dados ? "Recarregar" : "Carregar produtos"}
             </button>
@@ -976,6 +1078,37 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
           <div className={base.avisoBox}>
             Não encontrados ({dados.naoEncontrados.length}): {dados.naoEncontrados.slice(0, 20).join(", ")}
             {dados.naoEncontrados.length > 20 && "…"}
+          </div>
+        )}
+        {dados && listaPrecos && (
+          <div className={base.avisoBox}>
+            <strong>Lista com preço por produto:</strong> {Object.keys(listaPrecos.porProduto).length} produto(s) com
+            preço próprio. Marque as tabelas abaixo — cada produto recebe o preço da lista em cada tabela marcada.
+            {semPrecoNaLista > 0 && <> {semPrecoNaLista} produto(s) vieram sem preço na lista (defina nos grupos).</>}
+            {listaPrecos.conflitos.length > 0 && (
+              <>
+                {" "}
+                <span className={base.textoErro}>
+                  Ficaram de fora por terem preços diferentes na lista: {listaPrecos.conflitos.slice(0, 20).join(", ")}
+                  {listaPrecos.conflitos.length > 20 && "…"}
+                </span>
+              </>
+            )}
+            {tabelasMarcadas.length > 0 && (
+              <>
+                {" "}
+                <button
+                  type="button"
+                  className={base.btnTexto}
+                  onClick={() =>
+                    setNovos((prev) => ({ ...prev, ...novosDaLista(dados, listaPrecos.porProduto, tabelasMarcadas) }))
+                  }
+                  title="Volta os preços da lista nas tabelas marcadas, desfazendo o que foi mudado nos grupos"
+                >
+                  reaplicar preços da lista
+                </button>
+              </>
+            )}
           </div>
         )}
         {dados?.truncated && (
@@ -1016,11 +1149,15 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
                           <input
                             type="checkbox"
                             checked={marcada}
-                            onChange={() =>
+                            onChange={() => {
+                              if (!marcada && listaPrecos && dados) {
+                                const daLista = novosDaLista(dados, listaPrecos.porProduto, [t.codigo]);
+                                setNovos((prev) => ({ ...prev, ...daLista }));
+                              }
                               setTabelasMarcadas((prev) =>
                                 prev.includes(t.codigo) ? prev.filter((c) => c !== t.codigo) : [...prev, t.codigo]
-                              )
-                            }
+                              );
+                            }}
                             aria-label={`Alterar a tabela ${t.descricao}`}
                           />
                         </td>
