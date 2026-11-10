@@ -1431,3 +1431,274 @@
   color: #c4b5fd;
   border-color: rgba(139, 92, 246, 0.35);
 }
+
+/* ── observação do item (mesmo visual da Curva ABC) ── */
+
+.table th.obsHeader {
+  text-align: left;
+  min-width: 180px;
+}
+
+.table td.obsCell {
+  min-width: 180px;
+  max-width: 260px;
+  text-align: left;
+  cursor: default;
+}
+
+.obsTrigger {
+  width: 100%;
+  min-height: 44px;
+  position: relative;
+  display: block;
+  padding: 8px 32px 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--b-200);
+  background: var(--s-white);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.obsTrigger:hover:not(:disabled) {
+  border-color: var(--t-400);
+  background: var(--s-50);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+}
+
+.obsTrigger:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.obsTriggerEmpty {
+  border-style: dashed;
+}
+
+.obsTriggerError {
+  border-color: rgba(208, 59, 59, 0.55);
+  background: var(--bf-crit-bg);
+}
+
+.obsTriggerText {
+  display: block;
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--t-600);
+  font-style: italic;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.obsTriggerTextMuted {
+  color: var(--t-400);
+}
+
+.obsTriggerIcon {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  border: 1px solid var(--b-200);
+  background: var(--s-white);
+  color: var(--t-500);
+  font-size: 10px;
+  line-height: 1;
+}
+
+.obsModalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(2px);
+}
+
+.obsModal {
+  width: min(560px, 100%);
+  background: var(--s-white);
+  color: var(--t-900);
+  border-radius: 16px;
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.28);
+  overflow: hidden;
+}
+
+.obsModalHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--b-200);
+}
+
+.obsModalTitle {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--t-900);
+}
+
+.obsModalMeta {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  color: var(--t-500);
+}
+
+.obsModalClose {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--t-500);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.obsModalClose:hover {
+  background: var(--s-100);
+  color: var(--t-900);
+}
+
+.obsModalBody {
+  padding: 18px 20px 14px;
+}
+
+.obsInput {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border: 1px solid var(--b-300);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--t-900);
+  background: var(--s-white);
+  outline: none;
+  resize: none;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.obsInput:focus {
+  border-color: var(--bf-blue);
+  box-shadow: 0 0 0 3px var(--bf-blue-bg);
+}
+
+.obsInput::placeholder {
+  color: var(--t-400);
+}
+
+.obsModalHint {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--t-500);
+  text-align: right;
+}
+
+.obsModalError {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--bf-crit-text);
+}
+
+.obsModalFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 20px 18px;
+  border-top: 1px solid var(--b-200);
+}
+
+.obsModalButtonGhost,
+.obsModalButtonSecondary,
+.obsModalButtonPrimary {
+  border: none;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.obsModalButtonGhost {
+  margin-right: auto;
+  background: transparent;
+  color: var(--t-500);
+  border: 1px solid var(--b-200);
+}
+
+.obsModalButtonGhost:hover:not(:disabled) {
+  background: var(--s-50);
+  color: var(--t-700);
+}
+
+.obsModalButtonSecondary {
+  background: var(--b-200);
+  color: var(--t-700);
+}
+
+.obsModalButtonSecondary:hover {
+  background: var(--b-300);
+}
+
+.obsModalButtonPrimary {
+  background: #2563eb;
+  color: #fff;
+}
+
+.obsModalButtonPrimary:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.obsModalButtonPrimary:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.obsModalButtonGhost:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+:global(:root[data-theme="dark"]) .obsTrigger,
+:global(:root[data-theme="dark"]) .obsTriggerIcon {
+  background: var(--s-50);
+  border-color: var(--b-300);
+}
+
+:global(:root[data-theme="dark"]) .obsTrigger:hover:not(:disabled) {
+  background: var(--s-100);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+:global(:root[data-theme="dark"]) .obsModal {
+  background: var(--s-100);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+}
+
+:global(:root[data-theme="dark"]) .obsInput {
+  background: var(--s-50);
+}
+
+:global(:root[data-theme="dark"]) .obsModalButtonPrimary {
+  background: #4d7fff;
+}

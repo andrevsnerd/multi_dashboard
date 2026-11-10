@@ -288,6 +288,9 @@ type Ordem =
 
 const PAGINA = 80;
 
+/** Chave da observação: produto + cor ('' = produto inteiro). */
+const chaveObs = (produto: string, cor: string) => `${produto}||${cor}`;
+
 export default function BlackFridayPage({ companyKey, companyName }: Props) {
   const { user } = useAuth();
   const username = user?.username ?? "";
@@ -352,6 +355,60 @@ export default function BlackFridayPage({ companyKey, companyName }: Props) {
       ativo = false;
     };
   }, [companyKey, username, recarga]);
+
+  /* ── observações por item (mesmo funcionamento da Curva ABC) ── */
+
+  /** chave `produto||cor` (cor '' = observação do produto, visão "Por produto"). */
+  const [observacoes, setObservacoes] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (!username) return;
+    let ativo = true;
+    fetch(`/api/black-friday/observacoes?company=${companyKey}`, {
+      cache: "no-store",
+      headers: { "x-auth-username": username },
+    })
+      .then((r) => r.json())
+      .then((json: { data?: Array<{ produto: string; cor: string; observacao: string }> }) => {
+        if (!ativo) return;
+        const mapa: Record<string, string> = {};
+        for (const row of json.data ?? []) mapa[chaveObs(row.produto, row.cor)] = row.observacao ?? "";
+        setObservacoes(mapa);
+      })
+      .catch(() => {
+        if (ativo) setObservacoes({});
+      });
+    return () => {
+      ativo = false;
+    };
+  }, [companyKey, username]);
+
+  const salvarObservacao = useCallback(
+    async (produto: string, cor: string, valor: string): Promise<{ ok: boolean; error?: string }> => {
+      const chave = chaveObs(produto, cor);
+      const texto = valor.trim();
+      if (texto === (observacoes[chave] ?? "").trim()) return { ok: true };
+      try {
+        const res = await fetch("/api/black-friday/observacoes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-auth-username": username },
+          body: JSON.stringify({ company: companyKey, produto, cor, observacao: texto }),
+        });
+        const json = (await res.json().catch(() => ({}))) as { data?: { observacao: string } | null; error?: string };
+        if (!res.ok || json.error) throw new Error(json.error || "Erro ao salvar observação.");
+        const novo = json.data?.observacao ?? "";
+        setObservacoes((prev) => {
+          const n = { ...prev };
+          if (novo) n[chave] = novo;
+          else delete n[chave];
+          return n;
+        });
+        return { ok: true };
+      } catch (e) {
+        return { ok: false, error: e instanceof Error ? e.message : "Erro ao salvar observação." };
+      }
+    },
+    [observacoes, companyKey, username]
+  );
 
   /* ── derivados ── */
 
@@ -855,6 +912,7 @@ export default function BlackFridayPage({ companyKey, companyName }: Props) {
                       <Th o="sobra" atual={ordem} desc={desc} onClick={ordenarPor} dica="Sobra prevista: peças que sobram no fim da Black no ritmo atual (valor a custo)">
                         Sobra
                       </Th>
+                      <th className={styles.obsHeader}>Obs.</th>
                       {podeExecutar && <th />}
                     </tr>
                   </thead>
@@ -914,6 +972,16 @@ export default function BlackFridayPage({ companyKey, companyName }: Props) {
                               <span className={styles.ok}>zera</span>
                             )}
                           </td>
+                          <td className={styles.obsCell} onClick={(e) => e.stopPropagation()}>
+                            <ObservacaoCell
+                              produto={it.produto}
+                              cor={it.cor}
+                              titulo={it.descricao}
+                              corLabel={it.cor ? it.corDesc : null}
+                              observacao={observacoes[chaveObs(it.produto, it.cor)] ?? ""}
+                              onSave={salvarObservacao}
+                            />
+                          </td>
                           {podeExecutar && (
                             <td onClick={(e) => e.stopPropagation()}>
                               <button
@@ -930,7 +998,7 @@ export default function BlackFridayPage({ companyKey, companyName }: Props) {
                         </tr>
                         {aberto === it.chave && (
                           <tr className={styles.detailRow}>
-                            <td colSpan={podeExecutar ? 11 : 9}>
+                            <td colSpan={podeExecutar ? 12 : 10}>
                               <DetalheProduto item={it} dias={painel!.dias} lojas={painel!.lojas} baseDias={baseDias} />
                             </td>
                           </tr>
@@ -1124,6 +1192,167 @@ function FiltroSituacao({
           limpar filtro
         </button>
       )}
+    </div>
+  );
+}
+
+/* ── observação do item (cópia do funcionamento da Curva ABC, sem escopo de filial) ── */
+
+const OBS_MAX = 240;
+
+function ObservacaoCell({
+  produto,
+  cor,
+  titulo,
+  corLabel,
+  observacao,
+  onSave,
+}: {
+  produto: string;
+  cor: string;
+  titulo: string;
+  corLabel: string | null;
+  observacao: string;
+  onSave: (produto: string, cor: string, valor: string) => Promise<{ ok: boolean; error?: string }>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | undefined>(undefined);
+  const preenchida = observacao.trim().length > 0;
+
+  async function salvar(valor: string) {
+    setSaving(true);
+    setError(undefined);
+    const r = await onSave(produto, cor, valor);
+    setSaving(false);
+    if (r.ok) setOpen(false);
+    else setError(r.error || "Erro ao salvar observação.");
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        className={`${styles.obsTrigger} ${preenchida ? "" : styles.obsTriggerEmpty} ${error ? styles.obsTriggerError : ""}`}
+        disabled={saving}
+        title={error ? `Erro ao salvar: ${error}` : preenchida ? observacao : "Adicionar observação"}
+        onClick={() => {
+          setError(undefined);
+          setOpen(true);
+        }}
+      >
+        <span className={`${styles.obsTriggerText} ${preenchida ? "" : styles.obsTriggerTextMuted}`}>
+          {saving ? "Salvando..." : preenchida ? observacao.trim() : "Sem observação"}
+        </span>
+        <span className={styles.obsTriggerIcon} aria-hidden>
+          ✎
+        </span>
+      </button>
+      {open && (
+        <ObservacaoModal
+          titulo={titulo}
+          codigo={produto}
+          corLabel={corLabel}
+          initialValue={observacao}
+          saving={saving}
+          error={error}
+          onClose={() => {
+            if (!saving) setOpen(false);
+          }}
+          onSave={(v) => void salvar(v)}
+        />
+      )}
+    </>
+  );
+}
+
+function ObservacaoModal({
+  titulo,
+  codigo,
+  corLabel,
+  initialValue,
+  saving,
+  error,
+  onClose,
+  onSave,
+}: {
+  titulo: string;
+  codigo: string;
+  corLabel: string | null;
+  initialValue: string;
+  saving: boolean;
+  error?: string;
+  onClose: () => void;
+  onSave: (valor: string) => void;
+}) {
+  const [draft, setDraft] = useState(initialValue);
+
+  useEffect(() => {
+    const overflowAntes = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = overflowAntes;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
+
+  return (
+    <div className={styles.obsModalOverlay} onClick={onClose}>
+      <div className={styles.obsModal} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+        <div className={styles.obsModalHeader}>
+          <div>
+            <h3 className={styles.obsModalTitle}>Observação do item</h3>
+            <div className={styles.obsModalMeta}>
+              <strong>{titulo}</strong>
+              <span>Cód. {codigo}</span>
+              {corLabel ? <span>Cor: {corLabel}</span> : <span>Produto (todas as cores)</span>}
+            </div>
+          </div>
+          <button type="button" className={styles.obsModalClose} onClick={onClose} aria-label="Fechar modal de observação">
+            ×
+          </button>
+        </div>
+        <div className={styles.obsModalBody}>
+          <textarea
+            className={styles.obsInput}
+            value={draft}
+            maxLength={OBS_MAX}
+            rows={7}
+            autoFocus
+            placeholder="Escreva uma observação para este item"
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (!(e.key === "Enter" && (e.metaKey || e.ctrlKey))) return;
+              e.preventDefault();
+              onSave(draft);
+            }}
+          />
+          <div className={styles.obsModalHint}>
+            {draft.trim().length}/{OBS_MAX} caracteres · Ctrl+Enter salva
+          </div>
+          {error && <div className={styles.obsModalError}>{error}</div>}
+        </div>
+        <div className={styles.obsModalFooter}>
+          <button
+            type="button"
+            className={styles.obsModalButtonGhost}
+            disabled={saving || draft.length === 0}
+            onClick={() => setDraft("")}
+          >
+            Limpar
+          </button>
+          <button type="button" className={styles.obsModalButtonSecondary} onClick={onClose}>
+            Cancelar
+          </button>
+          <button type="button" className={styles.obsModalButtonPrimary} disabled={saving} onClick={() => onSave(draft)}>
+            {saving ? "Salvando..." : "Salvar"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
