@@ -1425,8 +1425,8 @@
     "semantic_hash": "7a672d31b6ac254cb25f6a420501049d"
   },
   "components/layout/Sidebar.tsx": {
-    "mtime": 1794314138.043854,
-    "ast_hash": "7f227c5724d42cde987c936f470349d1",
+    "mtime": 1794319226.8476427,
+    "ast_hash": "11182e73d5197553df72222420afeb6d",
     "semantic_hash": ""
   },
   "components/layout/SidebarContext.tsx": {
@@ -2150,8 +2150,8 @@
     "semantic_hash": "29590f1b0f773ebbcd60e9dc314eec58"
   },
   "lib/config/page-permissions.ts": {
-    "mtime": 1794314138.043854,
-    "ast_hash": "eb070915ecaf89931a6ba0759a066174",
+    "mtime": 1794319224.3981612,
+    "ast_hash": "f5608b5057b38e7cbd012187edf36545",
     "semantic_hash": ""
   },
   "lib/constants/columns.ts": {
@@ -2180,8 +2180,8 @@
     "semantic_hash": ""
   },
   "lib/mcp/auth.ts": {
-    "mtime": 1792679239.9909024,
-    "ast_hash": "ebed3c3b065ac4b0008619f503eef88f",
+    "mtime": 1794315133.3232298,
+    "ast_hash": "cc40ed49aacfaa90f22549dfdbb5af21",
     "semantic_hash": ""
   },
   "lib/mcp/registry.ts": {
@@ -4000,8 +4000,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/precos.ts": {
-    "mtime": 1793707711.4449573,
-    "ast_hash": "a09957d503570856740d55f8bf17b295",
+    "mtime": 1794315133.3321314,
+    "ast_hash": "f5eaa8a29de0ea3ba65a54f3a18fe01a",
     "semantic_hash": ""
   },
   "lib/repositories/topProdutosPresentation.ts": {
@@ -5210,13 +5210,13 @@
     "semantic_hash": ""
   },
   "app/api/precos/tarefas/[id]/executar/route.ts": {
-    "mtime": 1793366953.0127242,
-    "ast_hash": "b11eaf537c271187dc0005b7795b0e71",
+    "mtime": 1794315133.3149333,
+    "ast_hash": "77099e34cecf2b47d3b9efe0b2fff569",
     "semantic_hash": ""
   },
   "app/api/precos/tarefas/[id]/route.ts": {
-    "mtime": 1793366952.183651,
-    "ast_hash": "e204a6cba7634ebe304647df9c1ddcd9",
+    "mtime": 1794315133.317105,
+    "ast_hash": "e75793f8d3d9cd1eeddbba5541d352fc",
     "semantic_hash": ""
   },
   "app/api/precos/tarefas/disparar/route.ts": {
@@ -5230,13 +5230,13 @@
     "semantic_hash": ""
   },
   "app/api/precos/tarefas/route.ts": {
-    "mtime": 1793392847.8723161,
-    "ast_hash": "d92515b6e13b506381bc5e346fa6c710",
+    "mtime": 1794315133.3181913,
+    "ast_hash": "f34ab5ade93f6e085a5cb002de2b220f",
     "semantic_hash": ""
   },
   "components/precos/ProgramarPrecosPage.tsx": {
-    "mtime": 1793707752.8303463,
-    "ast_hash": "bbbd1cb3f6d6d675a00ead83ec66921f",
+    "mtime": 1794315133.320865,
+    "ast_hash": "28af32d2fecb5a2a1aedc4db2633abb7",
     "semantic_hash": ""
   },
   "lib/precos/agendador-qstash.ts": {
@@ -5245,8 +5245,8 @@
     "semantic_hash": ""
   },
   "lib/precos/tarefas-executor.ts": {
-    "mtime": 1793392847.8789444,
-    "ast_hash": "92533a5877fc4d59a7673f80a4506f69",
+    "mtime": 1794315133.3270621,
+    "ast_hash": "15858c7bb5119cbea2ff0e395d653127",
     "semantic_hash": ""
   },
   "lib/precos/tarefas-store.ts": {
@@ -5290,8 +5290,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/blackFriday.ts": {
-    "mtime": 1793885619.9209824,
-    "ast_hash": "aaad16240cdc42820e175ac1968c8a8b",
+    "mtime": 1794315133.3299048,
+    "ast_hash": "581b8cee8b7816ad08ebe624ce7cc667",
     "semantic_hash": ""
   },
   "app/(companies)/[company]/produto-aposta/page.tsx": {
@@ -5317,6 +5317,76 @@
   "lib/utils/produtos-aposta.ts": {
     "mtime": 1794314031.494519,
     "ast_hash": "67e58675f5bdaa0341fc5971ef09339c",
+    "semantic_hash": ""
+  },
+  "app/(companies)/[company]/shopify/page.tsx": {
+    "mtime": 1794319204.1154878,
+    "ast_hash": "ff23b84b7152ab81dab9f4bbb4cef782",
+    "semantic_hash": ""
+  },
+  "app/api/mcp-precos/[transport]/route.ts": {
+    "mtime": 1794315133.3124688,
+    "ast_hash": "71a672d154de662fe45d87e3d9c09022",
+    "semantic_hash": ""
+  },
+  "app/api/shopify/resumo/route.ts": {
+    "mtime": 1794319099.4596603,
+    "ast_hash": "2593c468793f51d6bee811035b5917c3",
+    "semantic_hash": ""
+  },
+  "app/api/shopify/sync/route.ts": {
+    "mtime": 1794319100.3112235,
+    "ast_hash": "279fd1c1630b157324677622c6fb0d61",
+    "semantic_hash": ""
+  },
+  "app/api/shopify/webhook/route.ts": {
+    "mtime": 1794319101.1375177,
+    "ast_hash": "19b89540fbd4f7cf5459ad9f25849207",
+    "semantic_hash": ""
+  },
+  "components/shopify/ShopifyPage.tsx": {
+    "mtime": 1794319549.7538464,
+    "ast_hash": "b903d3f3dbc6c237145c862c6f3e7f94",
+    "semantic_hash": ""
+  },
+  "lib/mcp/precos.ts": {
+    "mtime": 1794315133.3232298,
+    "ast_hash": "60c183a8585ab8ef16c35525a9318e83",
+    "semantic_hash": ""
+  },
+  "lib/precos/montar-tarefa.ts": {
+    "mtime": 1794315133.3258393,
+    "ast_hash": "0a0a915a566ffcd5179b32f13f9d79d5",
+    "semantic_hash": ""
+  },
+  "lib/precos/tarefas-validacao.ts": {
+    "mtime": 1794315133.3270621,
+    "ast_hash": "aed38eb9be5eaf7d8b72ff4d0913adfa",
+    "semantic_hash": ""
+  },
+  "lib/shopify/client.ts": {
+    "mtime": 1794318912.7133608,
+    "ast_hash": "19ecabc7bb82489a6bffc1dd990f576f",
+    "semantic_hash": ""
+  },
+  "lib/shopify/config.ts": {
+    "mtime": 1794318911.8086731,
+    "ast_hash": "cc23c3546dcbe1b0cd8e6871255e9e0a",
+    "semantic_hash": ""
+  },
+  "lib/shopify/dashboard.ts": {
+    "mtime": 1794319766.5890348,
+    "ast_hash": "aa8164d922920fc4377242857b38fd40",
+    "semantic_hash": ""
+  },
+  "lib/shopify/orders-store.ts": {
+    "mtime": 1794319492.0055666,
+    "ast_hash": "a22cb8d007eaba9dc562be99154aa950",
+    "semantic_hash": ""
+  },
+  "lib/shopify/sync.ts": {
+    "mtime": 1794319766.5947683,
+    "ast_hash": "a56d3521fc3facfd823c590964c614cb",
     "semantic_hash": ""
   }
 }

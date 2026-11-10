@@ -1,6 +1,6 @@
 import "server-only";
 
-import { shopifyGraphql } from "@/lib/shopify/client";
+import { clearShopifyToken, shopifyGraphql } from "@/lib/shopify/client";
 import type { ShopifyCompany } from "@/lib/shopify/config";
 import {
   acquireShopifySyncLock,
@@ -348,6 +348,71 @@ export async function runShopifyIncrementalSync(
       error: message.slice(0, 500),
       ordersSynced: synced,
     });
+    return { ran: true, ordersSynced: synced, complete: false, error: message };
+  }
+}
+
+/**
+ * Carga do histórico COMPLETO (precisa do escopo read_all_orders): percorre todos os
+ * pedidos por created_at, com cursor próprio ("<empresa>#backfill"), em execuções curtas
+ * e retomáveis até `complete`. Não mexe no estado da varredura incremental; o upsert só
+ * grava se o updated_at for igual ou mais novo, então as duas podem rodar juntas.
+ */
+export async function runShopifyBackfill(
+  company: ShopifyCompany,
+  options: { budgetMs?: number; restart?: boolean } = {},
+): Promise<IncrementalSyncResult & { cursor?: string | null }> {
+  const key = `${company}#backfill` as const;
+  const budgetMs = options.budgetMs ?? 40_000;
+  const acquired = await acquireShopifySyncLock(key, Math.ceil(budgetMs / 1000) + 60, 0);
+  if (!acquired) return { ran: false, reason: "em-execucao", ordersSynced: 0, complete: false };
+
+  const state = await getShopifySyncState(key);
+  if (state?.last_complete_at && !options.restart) {
+    await saveShopifySyncState(key, { query_since: null, cursor: null, last_updated_at: null, complete: true, error: null, ordersSynced: 0 });
+    return { ran: false, reason: "ja-completo", ordersSynced: 0, complete: true };
+  }
+  // Token novo no começo: garante os escopos atuais (read_all_orders).
+  clearShopifyToken(company);
+
+  const startedAt = Date.now();
+  let cursor = options.restart ? null : state?.cursor ?? null;
+  let synced = 0;
+  let complete = false;
+
+  try {
+    while (Date.now() - startedAt < budgetMs) {
+      const data = await shopifyGraphql<{
+        orders: { pageInfo: { hasNextPage: boolean; endCursor: string | null }; nodes: GqlOrder[] };
+      }>(
+        company,
+        `query($first: Int!, $after: String) {
+           orders(first: $first, after: $after, sortKey: CREATED_AT) {
+             pageInfo { hasNextPage endCursor }
+             nodes { ${ORDER_FIELDS} }
+           }
+         }
+         ${LINE_FRAGMENT}`,
+        { first: ORDERS_PAGE_SIZE, after: cursor },
+      );
+      const page = data.orders;
+      if (page.nodes.length > 0) {
+        await persist(company, page.nodes);
+        synced += page.nodes.length;
+      }
+      if (page.pageInfo.hasNextPage && page.pageInfo.endCursor) {
+        cursor = page.pageInfo.endCursor;
+        continue;
+      }
+      complete = true;
+      cursor = null;
+      break;
+    }
+    await saveShopifySyncState(key, { query_since: null, cursor, last_updated_at: null, complete, error: null, ordersSynced: synced });
+    return { ran: true, ordersSynced: synced, complete, cursor };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await saveShopifySyncState(key, { query_since: null, cursor, last_updated_at: null, complete: false, error: message.slice(0, 500), ordersSynced: synced });
     return { ran: true, ordersSynced: synced, complete: false, error: message };
   }
 }

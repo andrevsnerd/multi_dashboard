@@ -65,8 +65,14 @@ export interface ShopifyRefundRow {
   shipping: number;
 }
 
+/**
+ * Chave da linha de estado: a empresa (varredura incremental) ou "<empresa>#backfill"
+ * (carga do histórico completo, cursor próprio por created_at — não interfere na outra).
+ */
+export type ShopifySyncKey = ShopifyCompany | `${ShopifyCompany}#backfill`;
+
 export interface ShopifySyncState {
-  company: ShopifyCompany;
+  company: ShopifySyncKey;
   query_since: string | null;
   cursor: string | null;
   last_updated_at: string | null;
@@ -276,7 +282,7 @@ export async function deleteShopifyOrder(company: ShopifyCompany, orderId: strin
 // Estado da sincronização (cursor + trava simples entre instâncias)
 // ---------------------------------------------------------------------------
 
-export async function getShopifySyncState(company: ShopifyCompany): Promise<ShopifySyncState | null> {
+export async function getShopifySyncState(company: ShopifySyncKey): Promise<ShopifySyncState | null> {
   await ensureShopifyTables();
   const sql = getNeonSql();
   const rows = (await sql.query(
@@ -293,7 +299,7 @@ export async function getShopifySyncState(company: ShopifyCompany): Promise<Shop
  * rodando, ou (sem force) se a última rodou há menos de `minIntervalSeconds`.
  */
 export async function acquireShopifySyncLock(
-  company: ShopifyCompany,
+  company: ShopifySyncKey,
   seconds: number,
   minIntervalSeconds: number,
 ): Promise<boolean> {
@@ -316,7 +322,7 @@ export async function acquireShopifySyncLock(
 }
 
 export async function saveShopifySyncState(
-  company: ShopifyCompany,
+  company: ShopifySyncKey,
   patch: {
     query_since: string | null;
     cursor: string | null;

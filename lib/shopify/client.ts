@@ -20,6 +20,11 @@ const tokenCache = new Map<ShopifyCompany, CachedToken>();
 const tokenInFlight = new Map<ShopifyCompany, Promise<string>>();
 
 const RENEW_MARGIN_MS = 10 * 60 * 1000;
+/**
+ * O token vale 24h, mas guardamos no máximo 1h: escopo novo aprovado na loja (ex.:
+ * read_all_orders, 10/11/2026) só aparece em token novo — assim entra em até 1h.
+ */
+const MAX_CACHE_MS = 60 * 60 * 1000;
 
 export class ShopifyError extends Error {
   constructor(
@@ -64,9 +69,14 @@ async function requestToken(company: ShopifyCompany): Promise<string> {
   }
   const json = JSON.parse(text) as { access_token?: string; expires_in?: number };
   if (!json.access_token) throw new ShopifyError(`Shopify (${company}) não devolveu access_token.`);
-  const ttlMs = (json.expires_in ?? 86_400) * 1000;
+  const ttlMs = Math.min((json.expires_in ?? 86_400) * 1000, MAX_CACHE_MS + RENEW_MARGIN_MS);
   tokenCache.set(company, { token: json.access_token, expiresAt: Date.now() + ttlMs });
   return json.access_token;
+}
+
+/** Descarta o token em cache (próxima chamada pede um novo, com os escopos atuais). */
+export function clearShopifyToken(company: ShopifyCompany): void {
+  tokenCache.delete(company);
 }
 
 async function getAccessToken(company: ShopifyCompany): Promise<string> {
