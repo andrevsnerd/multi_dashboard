@@ -151,6 +151,15 @@ interface Props {
   /** Cabeçalho opcional (descrição do produto + cor). */
   descricao?: string | null;
   cor?: string | null;
+  /** Mostra "Trânsito chega em dd/mm/aaaa" no cabeçalho (quando há trânsito com data). */
+  mostrarChegadaTransito?: boolean;
+}
+
+/** yyyy-mm-dd → dd/mm/aaaa. */
+function fullDate(iso?: string | null): string | null {
+  if (!iso) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso.trim());
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : null;
 }
 
 /**
@@ -158,8 +167,9 @@ interface Props {
  * respondidas com os números reais do item. Compartilhado por Curva ABC, Lista Loja e
  * demais telas que mostram a Compra Ideal.
  */
-export default function CompraIdealExplainCard({ ideal, descricao, cor }: Props) {
+export default function CompraIdealExplainCard({ ideal, descricao, cor, mostrarChegadaTransito }: Props) {
   const c = cenario(ideal);
+  const chegadaTransito = mostrarChegadaTransito && ideal.emTransito > 0 ? fullDate(ideal.chegaEm) : null;
   const perguntas = buildPerguntas(ideal);
   const subtitle = [
     ideal.grupoCiclo ? `${ideal.grupoCiclo} (cob ${ideal.coberturaAlvoDias} / prod ${ideal.producaoDias})` : `cobertura ${ideal.coberturaAlvoDias} / produção ${ideal.producaoDias}`,
@@ -191,6 +201,11 @@ export default function CompraIdealExplainCard({ ideal, descricao, cor }: Props)
           </div>
         ) : null}
         <div style={{ color: "#64748b", marginTop: 2 }}>{subtitle}</div>
+        {chegadaTransito ? (
+          <div style={{ color: "#2563eb", fontWeight: 700, fontSize: 11.5, marginTop: 2 }}>
+            🚚 Trânsito chega em {chegadaTransito}
+          </div>
+        ) : null}
       </div>
       <div style={{ padding: "8px 14px 12px" }}>
         {perguntas.map((q) => (

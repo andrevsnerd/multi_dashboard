@@ -3670,6 +3670,7 @@ const handleBadgeClick = (cat: string) => {
                                         cor={p.cor}
                                         company={companyKey}
                                         descontinuado={p.descontinuado}
+                                        mostrarChegadaTransito
                                       />
                                     );
                                   })()}

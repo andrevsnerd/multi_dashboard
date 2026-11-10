@@ -655,8 +655,8 @@
     "semantic_hash": "b902bf3e0fd3ad63c77c2ccd57038ec9"
   },
   "app/api/curva-abc/route.ts": {
-    "mtime": 1793283578.737131,
-    "ast_hash": "d6aeffd4ef25ae0f09f6bbbc2a016ab2",
+    "mtime": 1794314138.046183,
+    "ast_hash": "79c58bd55e169a747692a96a63dd5576",
     "semantic_hash": ""
   },
   "app/api/curva-por-produto/route.ts": {
@@ -835,8 +835,8 @@
     "semantic_hash": "7bd6310573f88283593111b6385ad273"
   },
   "app/api/products/route.ts": {
-    "mtime": 1788463027.4119928,
-    "ast_hash": "573ef46bdc8a0296a7f6c2b4775cef49",
+    "mtime": 1794314138.0469313,
+    "ast_hash": "0a6164d5ce422aee8cb0f015b6df4367",
     "semantic_hash": ""
   },
   "app/api/products/search/route.ts": {
@@ -1425,8 +1425,8 @@
     "semantic_hash": "7a672d31b6ac254cb25f6a420501049d"
   },
   "components/layout/Sidebar.tsx": {
-    "mtime": 1793884029.1401012,
-    "ast_hash": "27da432812d85aa2f1ab82bcfd700553",
+    "mtime": 1794314138.043854,
+    "ast_hash": "7f227c5724d42cde987c936f470349d1",
     "semantic_hash": ""
   },
   "components/layout/SidebarContext.tsx": {
@@ -1485,8 +1485,8 @@
     "semantic_hash": "3a1ac7d9dac7349b3338e8b433eb5031"
   },
   "components/performance/CurvaAbcPage.tsx": {
-    "mtime": 1789134489.7963204,
-    "ast_hash": "63d9b558f58a38ee9766f1673d739ad8",
+    "mtime": 1794314138.0469313,
+    "ast_hash": "ea965790dd339ff9d6bdba21a0845f2b",
     "semantic_hash": ""
   },
   "components/performance/CurvaPorProdutoPage.tsx": {
@@ -1560,8 +1560,8 @@
     "semantic_hash": ""
   },
   "components/products/ProductsTable.tsx": {
-    "mtime": 1784219431.1011875,
-    "ast_hash": "2b5912facd8835c232607faeb7cf6463",
+    "mtime": 1794314138.0469313,
+    "ast_hash": "d4909d72cccbd9957156b19f376d1501",
     "semantic_hash": ""
   },
   "components/produto-agrupado/ProdutoAgrupadoPage.tsx": {
@@ -2150,8 +2150,8 @@
     "semantic_hash": "29590f1b0f773ebbcd60e9dc314eec58"
   },
   "lib/config/page-permissions.ts": {
-    "mtime": 1793708110.1057847,
-    "ast_hash": "3f9f3da6f5df7bd1174b55996fff5c18",
+    "mtime": 1794314138.043854,
+    "ast_hash": "eb070915ecaf89931a6ba0759a066174",
     "semantic_hash": ""
   },
   "lib/constants/columns.ts": {
@@ -2510,8 +2510,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/products.ts": {
-    "mtime": 1787842083.1262012,
-    "ast_hash": "c2a4fb90db35efd37a75feedad37331c",
+    "mtime": 1794314138.0469313,
+    "ast_hash": "1091ba3e2b983b7daff9830146fa3974",
     "semantic_hash": ""
   },
   "lib/repositories/produtosNovos.ts": {
@@ -5292,6 +5292,31 @@
   "lib/repositories/blackFriday.ts": {
     "mtime": 1793885619.9209824,
     "ast_hash": "aaad16240cdc42820e175ac1968c8a8b",
+    "semantic_hash": ""
+  },
+  "app/(companies)/[company]/produto-aposta/page.tsx": {
+    "mtime": 1794314034.0147324,
+    "ast_hash": "0cf5679d39a15e446d4b3219d7c49b41",
+    "semantic_hash": ""
+  },
+  "app/api/produtos-aposta/route.ts": {
+    "mtime": 1794314033.1797776,
+    "ast_hash": "28b8c6b732306c9a4129b6a1c59c3d2b",
+    "semantic_hash": ""
+  },
+  "components/produto-aposta/ProdutoApostaPage.tsx": {
+    "mtime": 1794314044.5552871,
+    "ast_hash": "73eda4441b2cfafbb7818d6b93f50b3f",
+    "semantic_hash": ""
+  },
+  "lib/utils/produto-aposta-store.ts": {
+    "mtime": 1794314032.3364663,
+    "ast_hash": "4d69583cdb7fcc134a7abfd0d84e0a2a",
+    "semantic_hash": ""
+  },
+  "lib/utils/produtos-aposta.ts": {
+    "mtime": 1794314031.494519,
+    "ast_hash": "67e58675f5bdaa0341fc5971ef09339c",
     "semantic_hash": ""
   }
 }

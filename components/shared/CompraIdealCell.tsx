@@ -37,6 +37,8 @@ interface CompraIdealCellProps {
   company?: string | null;
   /** Produto descontinuado → nunca sugere compra; mostra "Descontinuado" no lugar da qtd. */
   descontinuado?: boolean;
+  /** Mostra a data de chegada do trânsito no cabeçalho do tooltip. */
+  mostrarChegadaTransito?: boolean;
 }
 
 /** Texto neutro (carregando / sem dados) — mesma aparência em todas as telas. */
@@ -53,7 +55,7 @@ function CellTexto({ texto }: { texto: string }) {
  * (2) `semDados` → "Sem dados" · (3) caso contrário → número/data. Nunca mostra 0 falso:
  * enquanto o dado real do ritmo não chega, fica em "Carregando...".
  */
-export default function CompraIdealCell({ ideal, loading, semDados, style, descricao, cor, company, descontinuado }: CompraIdealCellProps) {
+export default function CompraIdealCell({ ideal, loading, semDados, style, descricao, cor, company, descontinuado, mostrarChegadaTransito }: CompraIdealCellProps) {
   // Hook sempre no topo (rules-of-hooks) — antes de qualquer return condicional.
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   const { theme } = useTheme();
@@ -173,7 +175,7 @@ export default function CompraIdealCell({ ideal, loading, semDados, style, descr
         typeof document !== "undefined" &&
         createPortal(
           <div style={{ position: "fixed", left, top, zIndex: 9999, pointerEvents: "none" }}>
-            <CompraIdealExplainCard ideal={ideal} descricao={descricao} cor={cor} />
+            <CompraIdealExplainCard ideal={ideal} descricao={descricao} cor={cor} mostrarChegadaTransito={mostrarChegadaTransito} />
           </div>,
           document.body
         )}
