@@ -5345,8 +5345,8 @@
     "semantic_hash": ""
   },
   "components/shopify/ShopifyPage.tsx": {
-    "mtime": 1794329676.7285752,
-    "ast_hash": "320a924ea1a2611a676f1f6cf6933966",
+    "mtime": 1794332461.5335672,
+    "ast_hash": "ff0296c4f7a98dc6ce179a81ae3f77f3",
     "semantic_hash": ""
   },
   "lib/mcp/precos.ts": {
@@ -5390,13 +5390,13 @@
     "semantic_hash": ""
   },
   "app/api/shopify/mapa/linx/route.ts": {
-    "mtime": 1794322000.8956277,
-    "ast_hash": "f0745cb5ef987d70bc5e378a37c10723",
+    "mtime": 1794332444.4872105,
+    "ast_hash": "f6a6ab6c0d58e7e2a8cc6c9305139e35",
     "semantic_hash": ""
   },
   "app/api/shopify/mapa/route.ts": {
-    "mtime": 1794328881.0569184,
-    "ast_hash": "373361261172ae46377f6ab22cc0e73a",
+    "mtime": 1794332444.4271166,
+    "ast_hash": "5dc5e8d2bfb1e567f15004d3f34bb3aa",
     "semantic_hash": ""
   },
   "components/shopify/ShopifyMapaLinx.tsx": {
@@ -5405,8 +5405,8 @@
     "semantic_hash": ""
   },
   "lib/shopify/auth.ts": {
-    "mtime": 1794321999.19137,
-    "ast_hash": "38050d86186af07284b501d28cef7d98",
+    "mtime": 1794332442.3948855,
+    "ast_hash": "8e74c0806c532b4b161d5d90876a7845",
     "semantic_hash": ""
   },
   "lib/shopify/catalog-store.ts": {

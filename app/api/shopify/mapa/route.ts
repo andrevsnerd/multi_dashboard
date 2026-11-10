@@ -53,7 +53,7 @@ function companyOf(value: unknown): ShopifyCompany | null {
 }
 
 export async function GET(request: Request) {
-  const autorizacao = await autorizarShopify(request);
+  const autorizacao = await autorizarShopify(request, { somenteAdmin: true });
   if ("erro" in autorizacao) return autorizacao.erro;
   const params = new URL(request.url).searchParams;
   const company = companyOf(params.get("company"));
@@ -101,7 +101,7 @@ interface Body {
 }
 
 export async function POST(request: Request) {
-  const autorizacao = await autorizarShopify(request, { exigirEscrita: true });
+  const autorizacao = await autorizarShopify(request, { exigirEscrita: true, somenteAdmin: true });
   if ("erro" in autorizacao) return autorizacao.erro;
   const { username } = autorizacao.auth;
 

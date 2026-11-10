@@ -12,6 +12,7 @@ import {
   YAxis,
 } from "recharts";
 
+import { useAuth } from "@/components/auth/AuthContext";
 import { useTheme } from "@/components/theme/ThemeContext";
 import type { CompanyKey } from "@/lib/config/company";
 import type { ShopifyKpis, ShopifyResumo } from "@/lib/shopify/dashboard";
@@ -153,6 +154,9 @@ export default function ShopifyPage({
   const { theme } = useTheme();
   const toggleFrete = (value: boolean) => setComFrete(value);
   const isScarfme = companyKey === "scarfme";
+  // Aba "Mapeamento Linx" só para admin (o servidor também barra as rotas /api/shopify/mapa).
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
 
   const load = useCallback(
     async (silent = false) => {
@@ -244,7 +248,8 @@ export default function ShopifyPage({
   const kpiValor = (kp: ShopifyKpis, key: keyof ShopifyKpis) => {
     if (!comFrete) return kp[key];
     if (key === "venda") return kp.venda + kp.freteLiquido;
-    if (key === "ticketMedio") return kp.pedidos > 0 ? (kp.venda + kp.freteLiquido) / kp.pedidos : 0;
+    if (key === "ticketMedio")
+      return kp.pedidos > 0 ? (kp.venda + kp.freteLiquido) / kp.pedidos : 0;
     return kp[key];
   };
   const chartData = useMemo(
@@ -271,7 +276,11 @@ export default function ShopifyPage({
     label: string;
     format: (v: number) => string;
   }> = [
-    { key: "venda", label: comFrete ? "Venda + frete" : "Venda líquida", format: (v) => brl(v) },
+    {
+      key: "venda",
+      label: comFrete ? "Venda + frete" : "Venda líquida",
+      format: (v) => brl(v),
+    },
     { key: "pedidos", label: "Pedidos pagos", format: int },
     { key: "ticketMedio", label: "Ticket médio", format: (v) => brl(v) },
     { key: "itens", label: "Peças", format: int },
@@ -279,7 +288,9 @@ export default function ShopifyPage({
   ];
 
   return (
-    <div className={`${styles.wrapper} ${isScarfme ? styles.brandScarfme : ""}`}>
+    <div
+      className={`${styles.wrapper} ${isScarfme ? styles.brandScarfme : ""}`}
+    >
       <header className={styles.hero}>
         <div>
           <p className={styles.eyebrow}>{companyName} · loja online</p>
@@ -312,28 +323,30 @@ export default function ShopifyPage({
         </div>
       </header>
 
-      <div className={styles.tabs} role="tablist" aria-label="Seção">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={aba === "vendas"}
-          className={`${styles.tab} ${aba === "vendas" ? styles.tabActive : ""}`}
-          onClick={() => setAba("vendas")}
-        >
-          Vendas
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={aba === "mapa"}
-          className={`${styles.tab} ${aba === "mapa" ? styles.tabActive : ""}`}
-          onClick={() => setAba("mapa")}
-        >
-          Mapeamento Linx
-        </button>
-      </div>
+      {isAdmin && (
+        <div className={styles.tabs} role="tablist" aria-label="Seção">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={aba === "vendas"}
+            className={`${styles.tab} ${aba === "vendas" ? styles.tabActive : ""}`}
+            onClick={() => setAba("vendas")}
+          >
+            Vendas
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={aba === "mapa"}
+            className={`${styles.tab} ${aba === "mapa" ? styles.tabActive : ""}`}
+            onClick={() => setAba("mapa")}
+          >
+            Mapeamento Linx
+          </button>
+        </div>
+      )}
 
-      {aba === "mapa" ? (
+      {isAdmin && aba === "mapa" ? (
         <ShopifyMapaLinx companyKey={companyKey} />
       ) : (
         <>
@@ -442,11 +455,18 @@ export default function ShopifyPage({
               <strong>{k ? brl(k.descontos) : "—"}</strong>
             </div>
             <div>
-              <span>{comFrete ? "Frete (incluído na venda)" : "Frete (fora da venda)"}</span>
+              <span>
+                {comFrete
+                  ? "Frete (incluído na venda)"
+                  : "Frete (fora da venda)"}
+              </span>
               <strong>
                 {k ? brl(k.freteLiquido) : "—"}
                 {k && k.freteEstornado > 0 && (
-                  <small className={styles.subNote}> · {brl(k.freteEstornado)} estornado</small>
+                  <small className={styles.subNote}>
+                    {" "}
+                    · {brl(k.freteEstornado)} estornado
+                  </small>
                 )}
               </strong>
             </div>
@@ -660,7 +680,9 @@ export default function ShopifyPage({
                         </td>
                         <td className={styles.num}>{int(prod.qtde)}</td>
                         <td className={styles.num}>{brl(prod.venda)}</td>
-                        <td className={`${styles.num} ${styles.muted}`}>{brl(prod.frete)}</td>
+                        <td className={`${styles.num} ${styles.muted}`}>
+                          {brl(prod.frete)}
+                        </td>
                         <td className={`${styles.num} ${styles.strong}`}>
                           {brl(prod.venda + prod.frete)}
                         </td>
@@ -711,7 +733,8 @@ function Ranking({
   total: number;
   comFrete: boolean;
 }) {
-  const valor = (row: ShopifyResumo["estados"][number]) => row.venda + (comFrete ? row.frete : 0);
+  const valor = (row: ShopifyResumo["estados"][number]) =>
+    row.venda + (comFrete ? row.frete : 0);
   return (
     <section className={styles.card}>
       <div className={styles.cardHeader}>
@@ -728,7 +751,9 @@ function Ranking({
                   {brl(valor(row))}{" "}
                   <small>
                     · {int(row.pedidos)} ped. · {(share * 100).toFixed(0)}%
-                    {!comFrete && row.frete > 0 ? ` · frete ${brl(row.frete)}` : ""}
+                    {!comFrete && row.frete > 0
+                      ? ` · frete ${brl(row.frete)}`
+                      : ""}
                   </small>
                 </span>
               </div>

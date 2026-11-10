@@ -18,7 +18,7 @@ export interface ShopifyAuth {
 
 export async function autorizarShopify(
   request: Request,
-  opts: { exigirEscrita?: boolean } = {},
+  opts: { exigirEscrita?: boolean; somenteAdmin?: boolean } = {},
 ): Promise<{ auth: ShopifyAuth } | { erro: NextResponse }> {
   const username = request.headers.get("x-auth-username")?.trim();
   if (!username) {
@@ -31,6 +31,10 @@ export async function autorizarShopify(
   const session = { ...user, role } as unknown as UserSession;
   if (!userHasPagePermission(session, "shopify")) {
     return { erro: NextResponse.json({ error: "Sem permissão para a página Shopify." }, { status: 403 }) };
+  }
+  // Mapeamento Shopify ↔ Linx: só admin (pedido do dono, 10/11/2026).
+  if (opts.somenteAdmin && role !== "admin") {
+    return { erro: NextResponse.json({ error: "O mapeamento Shopify ↔ Linx é restrito ao admin." }, { status: 403 }) };
   }
   const podeEditar = !isReadOnlyRole(role);
   if (opts.exigirEscrita && !podeEditar) {

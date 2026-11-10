@@ -12,7 +12,7 @@ export const maxDuration = 120;
  * código de barras, com as cores). Reaproveita a busca do Imprimir Etiquetas.
  */
 export async function POST(request: Request) {
-  const autorizacao = await autorizarShopify(request);
+  const autorizacao = await autorizarShopify(request, { somenteAdmin: true });
   if ("erro" in autorizacao) return autorizacao.erro;
   let body: { company?: string; termo?: string };
   try {

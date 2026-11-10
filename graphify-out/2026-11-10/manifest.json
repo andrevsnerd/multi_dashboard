@@ -1255,8 +1255,8 @@
     "semantic_hash": "f14ad53955a1f58097f889108f54d206"
   },
   "components/blackfriday/BlackFridayPage.tsx": {
-    "mtime": 1793886062.7194903,
-    "ast_hash": "d4d5c53daf0fce4abe471f6bc025de82",
+    "mtime": 1794331008.364487,
+    "ast_hash": "ac7378f6cf670aae97ab0e18bfd0acfa",
     "semantic_hash": ""
   },
   "components/clientes/ClienteDetalhePage.tsx": {
@@ -5432,6 +5432,16 @@
   "app/api/controle-estoque/classificacao-produtos/route.ts": {
     "mtime": 1794330673.2094455,
     "ast_hash": "a169555ed18fd2864d3bf879a826d990",
+    "semantic_hash": ""
+  },
+  "app/api/black-friday/observacoes/route.ts": {
+    "mtime": 1794330973.812671,
+    "ast_hash": "c57fff2dc8adae47317e23c1f8e4308e",
+    "semantic_hash": ""
+  },
+  "lib/utils/black-friday-observacoes-store.ts": {
+    "mtime": 1794330964.7341514,
+    "ast_hash": "e2ee6a76bdf28f351667cdf5e6ffd45d",
     "semantic_hash": ""
   }
 }
