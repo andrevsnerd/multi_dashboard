@@ -100,6 +100,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
   const clientesHref = basePath && basePath !== "/" ? `${basePath}/clientes` : "/clientes";
   const faturamentoHref =
     basePath && basePath !== "/" ? `${basePath}/faturamento` : "/faturamento";
+  const shopifyHref = basePath && basePath !== "/" ? `${basePath}/shopify` : "/shopify";
   const filialHref =
     basePath && basePath !== "/" ? `${basePath}/filial` : "/filial";
   const exportarRelatoriosHref =
@@ -315,6 +316,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     "/vendedores",
     "/clientes",
     "/faturamento",
+    "/shopify",
     "/exportar-relatorios",
     "/gerador-relatorios",
     "/aumentos-descontos",
@@ -413,6 +415,13 @@ export default function Sidebar({ companyName }: SidebarProps) {
           href: faturamentoHref,
           permission: "faturamento",
           isActive: (currentPathname) => matchesSegment(currentPathname, "/faturamento", faturamentoHref),
+        },
+        {
+          key: "shopify",
+          label: "Shopify (tempo real)",
+          href: shopifyHref,
+          permission: "shopify",
+          isActive: (currentPathname) => matchesSegment(currentPathname, "/shopify", shopifyHref),
         },
         ...(isScarfme
           ? [

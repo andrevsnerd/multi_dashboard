@@ -1485,8 +1485,8 @@
     "semantic_hash": "3a1ac7d9dac7349b3338e8b433eb5031"
   },
   "components/performance/CurvaAbcPage.tsx": {
-    "mtime": 1794314138.0469313,
-    "ast_hash": "ea965790dd339ff9d6bdba21a0845f2b",
+    "mtime": 1794314790.6039805,
+    "ast_hash": "ebb5bf1f3aa92b605777983308714b9d",
     "semantic_hash": ""
   },
   "components/performance/CurvaPorProdutoPage.tsx": {
@@ -1620,13 +1620,13 @@
     "semantic_hash": ""
   },
   "components/shared/CompraIdealCell.tsx": {
-    "mtime": 1784831224.8993921,
-    "ast_hash": "34049145fe1bff8ebfed96c5230e7462",
+    "mtime": 1794314789.7831106,
+    "ast_hash": "1bfc72af420905a3e72e20fa8b6ae402",
     "semantic_hash": ""
   },
   "components/shared/CompraIdealExplainCard.tsx": {
-    "mtime": 1784562870.534233,
-    "ast_hash": "35050859ef2bde5d4eee08725afb000a",
+    "mtime": 1794314787.3431058,
+    "ast_hash": "de112612fbce7a0b933e784349ecfb1c",
     "semantic_hash": ""
   },
   "components/shared/MiniAreaChart.tsx": {
