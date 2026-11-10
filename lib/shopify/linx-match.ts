@@ -76,6 +76,24 @@ const tokens = (s: string) =>
     .map((t) => SYN[t] ?? t)
     .filter((t) => t.length > 0 && !STOP.has(t));
 
+/** Nomes de cor "simples" — só eles podem descartar candidato por cor diferente. */
+const CORES = new Set([
+  "AZUL", "BRANCO", "BRANCA", "PRETO", "PRETA", "VERDE", "ROSA", "ROSE", "AMARELO", "AMARELA",
+  "VERMELHO", "VERMELHA", "MARROM", "CINZA", "LARANJA", "ROXO", "ROXA", "LILAS", "BEGE",
+  "BORDEAUX", "BORDO", "VINHO", "CARAMELO", "TERRACOTA", "OFF", "WHITE", "NUDE", "DOURADO",
+  "DOURADA", "PRATA", "PINK", "MARINHO", "CORAL", "MOSTARDA", "TERRA", "CREME",
+]);
+/**
+ * Palavras de cor de um texto ("Azul/Amarelo" → {AZUL, AMARELO}). `estrito`: devolve vazio
+ * se houver qualquer palavra que não é cor (ex. "MULTICOLOR", "ESTAMPADO") — aí a cor do
+ * Linx não serve para descartar, só para desempatar.
+ */
+function coresBasicas(texto: string | null | undefined, estrito = false): Set<string> {
+  const ts = norm(texto).split(" ").filter(Boolean);
+  if (estrito && ts.some((t) => !CORES.has(t))) return new Set();
+  return new Set(ts.filter((t) => CORES.has(t)));
+}
+
 const isPersonalizacao = (name: string) => /personaliz/i.test(name);
 const isGiftCard = (title: string) => /(cart[aã]o|vale)[ -]?presente|gift ?card/i.test(title);
 
@@ -228,6 +246,7 @@ class LinxIndex {
     titulo: string,
     opcoes: string,
     padraoDaLoja: Set<string> = new Set(),
+    corOpcao: string | null = null,
   ): { produto: string; score: number; margem: number } | null {
     // Palavras de vitrine que a loja repete em dezenas de títulos ("anti-impacto
     // personalizada", "estampada") não identificam o produto: fora da conta do título.
@@ -242,6 +261,11 @@ class LinxIndex {
     const qualOpc = numericos.length > 0 ? tOpc.filter((t) => QUALIFICADORES.has(t)).sort().join(" ") : null;
     const tipo = tokens(titulo)[0];
     const tipoObrigatorio = tipo && TIPOS_OBRIGATORIOS.has(tipo) ? tipo : null;
+    // Acessório: número no nome da estampa também é obrigatório ("7 Cavalos" ≠ "CAVALOS").
+    const numerosTitulo = tipoObrigatorio ? [...new Set(tokens(titulo))].filter((t) => /\d/.test(t)) : [];
+    // Cor da variante (opção "Cor"): candidato só com cores claramente diferentes sai
+    // ("Azul" × produto do Linx só em BRANCO, 10/11/2026); cor que confere desempata.
+    const corVar = coresBasicas(corOpcao);
     const candidatos = new Set<string>();
     for (const t of tTit) for (const p of this.tokenIndex.get(t) ?? []) candidatos.add(p);
 
@@ -254,13 +278,24 @@ class LinxIndex {
       if (numericos.some((t) => !ts.has(t))) continue;
       if (qualOpc !== null && [...ts].filter((t) => QUALIFICADORES.has(t)).sort().join(" ") !== qualOpc) continue;
       if (tipoObrigatorio && !ts.has(tipoObrigatorio)) continue;
+      if (numerosTitulo.some((t) => !ts.has(t))) continue;
+      let bonusCor = 0;
+      if (corVar.size > 0) {
+        const cores = this.cores.get(p) ?? [];
+        const coresLinx = cores.map((c) => coresBasicas(c.DESC_COR, true));
+        const confere = coresLinx.some((s) => [...s].some((t) => corVar.has(t)));
+        const todasBasicas = coresLinx.length > 0 && coresLinx.every((s) => s.size > 0);
+        if (!confere && todasBasicas) continue;
+        if (confere) bonusCor = 0.03;
+      }
       let casTit = 0;
       for (const t of tTit) if (ts.has(t)) casTit += w(t);
       if (casTit / pesoTit < 0.6) continue;
       let casOpc = 0;
       for (const t of tOpc) if (ts.has(t)) casOpc += w(t);
       const total = this.tokenWeight.get(p) || 1;
-      const score = 0.7 * Math.min(1, (casTit + casOpc) / total) + 0.3 * ((casTit + casOpc) / pesoTexto);
+      const score =
+        0.7 * Math.min(1, (casTit + casOpc) / total) + 0.3 * ((casTit + casOpc) / pesoTexto) + bonusCor;
       if (score > bestScore) {
         second = bestScore;
         bestScore = score;
@@ -375,7 +410,12 @@ export async function computeAutoMaps(
   for (const v of variants) {
     if (out.has(v.variant_id)) continue;
     const extras = v.options.filter((o) => !isPersonalizacao(o.name) && !/^title$/i.test(o.name) && o.value !== "Default Title");
-    const n = idx.matchNome(v.product_title, extras.map((o) => o.value).join(" "), padraoDaLoja);
+    const n = idx.matchNome(
+      v.product_title,
+      extras.map((o) => o.value).join(" "),
+      padraoDaLoja,
+      optionValue(v, /^cor$/i),
+    );
     if (!n || n.score < 0.55) {
       row(v, { status: "pendente" });
       continue;
@@ -402,6 +442,26 @@ export async function computeAutoMaps(
       r.desc_produto = idx.descProduto(r.produto);
       r.desc_cor = idx.descCor(r.produto, r.cor_produto);
     }
+  }
+
+  // Código casou, mas o nome não tem NADA em comum com o produto nem com a cor do Linx:
+  // pode ser código reaproveitado/errado no Shopify (10/11/2026: 4 pareôs de estampas
+  // diferentes no mesmo "COCAR 10/19"). Não vincula direto — vai para conferência.
+  // (Estampa na COR do Linx — "DELICADO" cor "PRIMAVERA" — conta como nome em comum.)
+  const distintivas = (s: string | null | undefined) =>
+    new Set(tokens(s ?? "").filter((t) => t.length > 1 && !/\d/.test(t) && !padraoDaLoja.has(t) && !CORES.has(t)));
+  const byId = new Map(variants.map((v) => [v.variant_id, v]));
+  for (const r of out.values()) {
+    if (r.status !== "vinculado" || !r.produto || !r.metodo || r.componentes) continue;
+    if (!/^(código|produto)/.test(r.metodo)) continue;
+    const v = byId.get(r.variant_id);
+    if (!v) continue;
+    const titulo = distintivas(v.product_title);
+    const linx = new Set([...distintivas(r.desc_produto), ...distintivas(r.desc_cor)]);
+    if (titulo.size === 0 || linx.size === 0) continue;
+    if ([...titulo].some((t) => linx.has(t))) continue;
+    r.status = "sugerido";
+    r.metodo = `${r.metodo} · nome diferente no Linx, conferir`;
   }
   return out;
 }

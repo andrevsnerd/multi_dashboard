@@ -4247,7 +4247,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_admin_ajuste_historico_route",
-      "community": 305,
+      "community": 3,
       "norm_label": "route.ts"
     },
     {
@@ -4257,7 +4257,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "app_api_admin_ajuste_historico_route_isadmin",
-      "community": 305,
+      "community": 3,
       "norm_label": "isadmin()"
     },
     {
@@ -4267,7 +4267,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "app_api_admin_ajuste_historico_route_post",
-      "community": 305,
+      "community": 3,
       "norm_label": "post()"
     },
     {
@@ -4277,7 +4277,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_admin_ajuste_historico_seed_031100_route",
-      "community": 305,
+      "community": 504,
       "norm_label": "route.ts"
     },
     {
@@ -4287,7 +4287,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "app_api_admin_ajuste_historico_seed_031100_route_isadmin",
-      "community": 305,
+      "community": 504,
       "norm_label": "isadmin()"
     },
     {
@@ -4297,7 +4297,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "app_api_admin_ajuste_historico_seed_031100_route_get",
-      "community": 305,
+      "community": 504,
       "norm_label": "get()"
     },
     {
@@ -9817,7 +9817,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_precos_tarefas_route",
-      "community": 10,
+      "community": 231,
       "norm_label": "route.ts"
     },
     {
@@ -9827,7 +9827,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "app_api_precos_tarefas_route_get",
-      "community": 10,
+      "community": 186,
       "norm_label": "get()"
     },
     {
@@ -9847,7 +9847,7 @@
       "source_location": "L53",
       "_origin": "ast",
       "id": "app_api_precos_tarefas_route_limpar",
-      "community": 10,
+      "community": 186,
       "norm_label": "limpar()"
     },
     {
@@ -9857,7 +9857,7 @@
       "source_location": "L58",
       "_origin": "ast",
       "id": "app_api_precos_tarefas_route_post",
-      "community": 10,
+      "community": 186,
       "norm_label": "post()"
     },
     {
@@ -11827,7 +11827,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_entrada_editar_route",
-      "community": 109,
+      "community": 19,
       "norm_label": "route.ts"
     },
     {
@@ -11837,7 +11837,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_entrada_editar_route_itementrada",
-      "community": 109,
+      "community": 19,
       "norm_label": "itementrada"
     },
     {
@@ -11847,7 +11847,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_entrada_editar_route_editarentradarequest",
-      "community": 109,
+      "community": 19,
       "norm_label": "editarentradarequest"
     },
     {
@@ -11857,7 +11857,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_entrada_editar_route_usuariopodeeditar",
-      "community": 109,
+      "community": 19,
       "norm_label": "usuariopodeeditar()"
     },
     {
@@ -11867,7 +11867,7 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_entrada_editar_route_resolvernomefilial",
-      "community": 109,
+      "community": 19,
       "norm_label": "resolvernomefilial()"
     },
     {
@@ -11877,7 +11877,7 @@
       "source_location": "L87",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_entrada_editar_route_verificareditavel",
-      "community": 109,
+      "community": 19,
       "norm_label": "verificareditavel()"
     },
     {
@@ -11887,7 +11887,7 @@
       "source_location": "L136",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_entrada_editar_route_leritensdoromaneio",
-      "community": 109,
+      "community": 19,
       "norm_label": "leritensdoromaneio()"
     },
     {
@@ -11897,7 +11897,7 @@
       "source_location": "L195",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_entrada_editar_route_get",
-      "community": 109,
+      "community": 19,
       "norm_label": "get()"
     },
     {
@@ -12097,7 +12097,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_log_tipo_romaneio_filial_route",
-      "community": 305,
+      "community": 3,
       "norm_label": "route.ts"
     },
     {
@@ -12107,7 +12107,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_log_tipo_romaneio_filial_route_isadmin",
-      "community": 305,
+      "community": 3,
       "norm_label": "isadmin()"
     },
     {
@@ -12117,7 +12117,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_log_tipo_romaneio_filial_route_previewitem",
-      "community": 305,
+      "community": 3,
       "norm_label": "previewitem"
     },
     {
@@ -12127,7 +12127,7 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_log_tipo_romaneio_filial_route_leritenscomestoque",
-      "community": 305,
+      "community": 3,
       "norm_label": "leritenscomestoque()"
     },
     {
@@ -12137,7 +12137,7 @@
       "source_location": "L82",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_log_tipo_romaneio_filial_route_gradeitemromaneio",
-      "community": 305,
+      "community": 3,
       "norm_label": "gradeitemromaneio"
     },
     {
@@ -12147,7 +12147,7 @@
       "source_location": "L94",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_log_tipo_romaneio_filial_route_lergradedoromaneio",
-      "community": 305,
+      "community": 3,
       "norm_label": "lergradedoromaneio()"
     },
     {
@@ -12157,7 +12157,7 @@
       "source_location": "L134",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_log_tipo_romaneio_filial_route_compensarreversaodeestoque",
-      "community": 305,
+      "community": 3,
       "norm_label": "compensarreversaodeestoque()"
     },
     {
@@ -12167,7 +12167,7 @@
       "source_location": "L175",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_log_tipo_romaneio_filial_route_get",
-      "community": 305,
+      "community": 3,
       "norm_label": "get()"
     },
     {
@@ -12177,7 +12177,7 @@
       "source_location": "L222",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_log_tipo_romaneio_filial_route_put",
-      "community": 305,
+      "community": 3,
       "norm_label": "put()"
     },
     {
@@ -12187,7 +12187,7 @@
       "source_location": "L347",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_log_tipo_romaneio_filial_route_delete",
-      "community": 305,
+      "community": 3,
       "norm_label": "delete()"
     },
     {
@@ -12657,7 +12657,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_executar_route",
-      "community": 3,
+      "community": 19,
       "norm_label": "route.ts"
     },
     {
@@ -12667,7 +12667,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_executar_route_transferenciarequest",
-      "community": 3,
+      "community": 19,
       "norm_label": "transferenciarequest"
     },
     {
@@ -12677,7 +12677,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_executar_route_getactivefilialforrequest",
-      "community": 3,
+      "community": 19,
       "norm_label": "getactivefilialforrequest()"
     },
     {
@@ -12687,7 +12687,7 @@
       "source_location": "L57",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_executar_route_post",
-      "community": 3,
+      "community": 19,
       "norm_label": "post()"
     },
     {
@@ -12797,7 +12797,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_log_detalhes_route",
-      "community": 19,
+      "community": 508,
       "norm_label": "route.ts"
     },
     {
@@ -12807,7 +12807,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_log_detalhes_route_gradecolssql",
-      "community": 19,
+      "community": 508,
       "norm_label": "gradecolssql()"
     },
     {
@@ -12817,7 +12817,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_log_detalhes_route_logdetalheitem",
-      "community": 19,
+      "community": 508,
       "norm_label": "logdetalheitem"
     },
     {
@@ -12827,7 +12827,7 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_log_detalhes_route_get",
-      "community": 19,
+      "community": 508,
       "norm_label": "get()"
     },
     {
@@ -12837,7 +12837,7 @@
       "source_location": "L415",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_log_detalhes_route_fetchtamanhosporgrade",
-      "community": 19,
+      "community": 508,
       "norm_label": "fetchtamanhosporgrade()"
     },
     {
@@ -32206,7 +32206,7 @@
       "label": "Ranking()",
       "file_type": "code",
       "source_file": "components/shopify/ShopifyPage.tsx",
-      "source_location": "L649",
+      "source_location": "L715",
       "_origin": "ast",
       "id": "components_shopify_shopifypage_ranking",
       "community": 496,
@@ -42809,7 +42809,7 @@
       "source_location": "L210",
       "_origin": "ast",
       "id": "lib_auth_permissions_editar_saida_roles",
-      "community": 19,
+      "community": 3,
       "norm_label": "editar_saida_roles"
     },
     {
@@ -43059,7 +43059,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_auth_route_guards",
-      "community": 3,
+      "community": 19,
       "norm_label": "route-guards.ts"
     },
     {
@@ -43069,7 +43069,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "lib_auth_route_guards_readonlyblock",
-      "community": 3,
+      "community": 19,
       "norm_label": "readonlyblock()"
     },
     {
@@ -46799,7 +46799,7 @@
       "source_location": "L366",
       "_origin": "ast",
       "id": "lib_db_proxy_forwardtransfertoproxy",
-      "community": 3,
+      "community": 19,
       "norm_label": "forwardtransfertoproxy()"
     },
     {
@@ -47169,7 +47169,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "lib_etiquetas_tipos_campos_disponiveis",
-      "community": 502,
+      "community": 86,
       "norm_label": "campos_disponiveis"
     },
     {
@@ -47379,7 +47379,7 @@
       "source_location": "L452",
       "_origin": "ast",
       "id": "lib_etiquetas_tipos_larguratextomm",
-      "community": 502,
+      "community": 184,
       "norm_label": "larguratextomm()"
     },
     {
@@ -47409,7 +47409,7 @@
       "source_location": "L569",
       "_origin": "ast",
       "id": "lib_etiquetas_tipos_clonarconfig",
-      "community": 86,
+      "community": 104,
       "norm_label": "clonarconfig()"
     },
     {
@@ -47559,7 +47559,7 @@
       "source_location": "L271",
       "_origin": "ast",
       "id": "lib_etiquetas_zpl_analisartextos",
-      "community": 502,
+      "community": 104,
       "norm_label": "analisartextos()"
     },
     {
@@ -50629,7 +50629,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "lib_precos_montar_tarefa_limpar",
-      "community": 231,
+      "community": 486,
       "norm_label": "limpar()"
     },
     {
@@ -50639,7 +50639,7 @@
       "source_location": "L54",
       "_origin": "ast",
       "id": "lib_precos_montar_tarefa_mesmovalor",
-      "community": 231,
+      "community": 486,
       "norm_label": "mesmovalor()"
     },
     {
@@ -50649,7 +50649,7 @@
       "source_location": "L60",
       "_origin": "ast",
       "id": "lib_precos_montar_tarefa_calcular",
-      "community": 231,
+      "community": 486,
       "norm_label": "calcular()"
     },
     {
@@ -50659,7 +50659,7 @@
       "source_location": "L66",
       "_origin": "ast",
       "id": "lib_precos_montar_tarefa_normalizartabelas",
-      "community": 231,
+      "community": 486,
       "norm_label": "normalizartabelas()"
     },
     {
@@ -50669,7 +50669,7 @@
       "source_location": "L70",
       "_origin": "ast",
       "id": "lib_precos_montar_tarefa_montartarefaprecos",
-      "community": 231,
+      "community": 486,
       "norm_label": "montartarefaprecos()"
     },
     {
@@ -50979,7 +50979,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_precos_tarefas_validacao",
-      "community": 486,
+      "community": 231,
       "norm_label": "tarefas-validacao.ts"
     },
     {
@@ -50989,7 +50989,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "lib_precos_tarefas_validacao_limpar",
-      "community": 486,
+      "community": 231,
       "norm_label": "limpar()"
     },
     {
@@ -50999,7 +50999,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "lib_precos_tarefas_validacao_validaralteracoes",
-      "community": 486,
+      "community": 231,
       "norm_label": "validaralteracoes()"
     },
     {
@@ -52959,7 +52959,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_ajuste_historico",
-      "community": 305,
+      "community": 504,
       "norm_label": "ajuste-historico.ts"
     },
     {
@@ -52969,7 +52969,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "lib_repositories_ajuste_historico_ensureajustetableexists",
-      "community": 305,
+      "community": 504,
       "norm_label": "ensureajustetableexists()"
     },
     {
@@ -52979,7 +52979,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "lib_repositories_ajuste_historico_ajusteitem",
-      "community": 305,
+      "community": 504,
       "norm_label": "ajusteitem"
     },
     {
@@ -52989,7 +52989,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "lib_repositories_ajuste_historico_ajustepayload",
-      "community": 305,
+      "community": 3,
       "norm_label": "ajustepayload"
     },
     {
@@ -52999,7 +52999,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "lib_repositories_ajuste_historico_inserirajuste",
-      "community": 305,
+      "community": 19,
       "norm_label": "inserirajuste()"
     },
     {
@@ -53009,7 +53009,7 @@
       "source_location": "L73",
       "_origin": "ast",
       "id": "lib_repositories_ajuste_historico_ajustehistoricorow",
-      "community": 305,
+      "community": 504,
       "norm_label": "ajustehistoricorow"
     },
     {
@@ -53019,7 +53019,7 @@
       "source_location": "L86",
       "_origin": "ast",
       "id": "lib_repositories_ajuste_historico_queryajusteshistorico",
-      "community": 305,
+      "community": 504,
       "norm_label": "queryajusteshistorico()"
     },
     {
@@ -59779,7 +59779,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_logtransito",
-      "community": 504,
+      "community": 80,
       "norm_label": "logtransito.ts"
     },
     {
@@ -59789,7 +59789,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "lib_repositories_logtransito_logtransitorow",
-      "community": 504,
+      "community": 80,
       "norm_label": "logtransitorow"
     },
     {
@@ -59799,7 +59799,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "lib_repositories_logtransito_buildsearchconfig",
-      "community": 504,
+      "community": 80,
       "norm_label": "buildsearchconfig()"
     },
     {
@@ -59809,7 +59809,7 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "lib_repositories_logtransito_fetchlogtransito",
-      "community": 504,
+      "community": 80,
       "norm_label": "fetchlogtransito()"
     },
     {
@@ -66369,7 +66369,7 @@
       "source_location": "L1294",
       "_origin": "ast",
       "id": "lib_saida_entrada_executor_avisotravamovimento",
-      "community": 109,
+      "community": 19,
       "norm_label": "avisotravamovimento()"
     },
     {
@@ -67329,7 +67329,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "lib_server_grade_produto_gradeproduto",
-      "community": 19,
+      "community": 508,
       "norm_label": "gradeproduto"
     },
     {
@@ -67339,7 +67339,7 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "lib_server_grade_produto_tamanhocomestoque",
-      "community": 19,
+      "community": 508,
       "norm_label": "tamanhocomestoque"
     },
     {
@@ -67539,7 +67539,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_server_trava_confirmacao_acima_romaneio",
-      "community": 19,
+      "community": 508,
       "norm_label": "trava-confirmacao-acima-romaneio.ts"
     },
     {
@@ -67549,7 +67549,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "lib_server_trava_confirmacao_acima_romaneio_itemconfirmado",
-      "community": 19,
+      "community": 508,
       "norm_label": "itemconfirmado"
     },
     {
@@ -67559,7 +67559,7 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "lib_server_trava_confirmacao_acima_romaneio_lit",
-      "community": 19,
+      "community": 508,
       "norm_label": "lit()"
     },
     {
@@ -67569,7 +67569,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "lib_server_trava_confirmacao_acima_romaneio_verificarconfirmacaodentrodoromaneio",
-      "community": 19,
+      "community": 508,
       "norm_label": "verificarconfirmacaodentrodoromaneio()"
     },
     {
@@ -69036,7 +69036,7 @@
       "label": "ShopifySeriePoint",
       "file_type": "code",
       "source_file": "lib/shopify/dashboard.ts",
-      "source_location": "L54",
+      "source_location": "L59",
       "_origin": "ast",
       "id": "lib_shopify_dashboard_shopifyseriepoint",
       "community": 489,
@@ -69046,7 +69046,7 @@
       "label": "ShopifyPedido",
       "file_type": "code",
       "source_file": "lib/shopify/dashboard.ts",
-      "source_location": "L63",
+      "source_location": "L71",
       "_origin": "ast",
       "id": "lib_shopify_dashboard_shopifypedido",
       "community": 489,
@@ -69056,7 +69056,7 @@
       "label": "ShopifyTopProduto",
       "file_type": "code",
       "source_file": "lib/shopify/dashboard.ts",
-      "source_location": "L79",
+      "source_location": "L87",
       "_origin": "ast",
       "id": "lib_shopify_dashboard_shopifytopproduto",
       "community": 489,
@@ -69066,7 +69066,7 @@
       "label": "ShopifyRanking",
       "file_type": "code",
       "source_file": "lib/shopify/dashboard.ts",
-      "source_location": "L88",
+      "source_location": "L98",
       "_origin": "ast",
       "id": "lib_shopify_dashboard_shopifyranking",
       "community": 489,
@@ -69076,7 +69076,7 @@
       "label": "ShopifyResumo",
       "file_type": "code",
       "source_file": "lib/shopify/dashboard.ts",
-      "source_location": "L94",
+      "source_location": "L105",
       "_origin": "ast",
       "id": "lib_shopify_dashboard_shopifyresumo",
       "community": 489,
@@ -69086,7 +69086,7 @@
       "label": "num()",
       "file_type": "code",
       "source_file": "lib/shopify/dashboard.ts",
-      "source_location": "L113",
+      "source_location": "L124",
       "_origin": "ast",
       "id": "lib_shopify_dashboard_num",
       "community": 489,
@@ -69096,7 +69096,7 @@
       "label": "brtMidnight()",
       "file_type": "code",
       "source_file": "lib/shopify/dashboard.ts",
-      "source_location": "L120",
+      "source_location": "L131",
       "_origin": "ast",
       "id": "lib_shopify_dashboard_brtmidnight",
       "community": 489,
@@ -69106,7 +69106,7 @@
       "label": "brtDateString()",
       "file_type": "code",
       "source_file": "lib/shopify/dashboard.ts",
-      "source_location": "L124",
+      "source_location": "L135",
       "_origin": "ast",
       "id": "lib_shopify_dashboard_brtdatestring",
       "community": 489,
@@ -69116,7 +69116,7 @@
       "label": "todayBrt()",
       "file_type": "code",
       "source_file": "lib/shopify/dashboard.ts",
-      "source_location": "L128",
+      "source_location": "L139",
       "_origin": "ast",
       "id": "lib_shopify_dashboard_todaybrt",
       "community": 489,
@@ -69126,7 +69126,7 @@
       "label": "fetchKpis()",
       "file_type": "code",
       "source_file": "lib/shopify/dashboard.ts",
-      "source_location": "L132",
+      "source_location": "L143",
       "_origin": "ast",
       "id": "lib_shopify_dashboard_fetchkpis",
       "community": 489,
@@ -69136,7 +69136,7 @@
       "label": "fetchSerie()",
       "file_type": "code",
       "source_file": "lib/shopify/dashboard.ts",
-      "source_location": "L181",
+      "source_location": "L194",
       "_origin": "ast",
       "id": "lib_shopify_dashboard_fetchserie",
       "community": 489,
@@ -69146,7 +69146,7 @@
       "label": "fetchShopifyResumo()",
       "file_type": "code",
       "source_file": "lib/shopify/dashboard.ts",
-      "source_location": "L210",
+      "source_location": "L223",
       "_origin": "ast",
       "id": "lib_shopify_dashboard_fetchshopifyresumo",
       "community": 489,
@@ -72629,7 +72629,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics",
-      "community": 508,
+      "community": 485,
       "norm_label": "compra-transito-analytics.ts"
     },
     {
@@ -72639,7 +72639,7 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_transitawaresuggestiontype",
-      "community": 508,
+      "community": 485,
       "norm_label": "transitawaresuggestiontype"
     },
     {
@@ -72649,7 +72649,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_transitadjustmentresult",
-      "community": 508,
+      "community": 485,
       "norm_label": "transitadjustmentresult"
     },
     {
@@ -72659,7 +72659,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_transitawaresuggestionview",
-      "community": 508,
+      "community": 485,
       "norm_label": "transitawaresuggestionview"
     },
     {
@@ -72669,7 +72669,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_startoflocalday",
-      "community": 508,
+      "community": 485,
       "norm_label": "startoflocalday()"
     },
     {
@@ -72679,7 +72679,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_normalizedate",
-      "community": 508,
+      "community": 485,
       "norm_label": "normalizedate()"
     },
     {
@@ -72689,7 +72689,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_daysuntil",
-      "community": 508,
+      "community": 485,
       "norm_label": "daysuntil()"
     },
     {
@@ -72699,7 +72699,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_groupentriesbyday",
-      "community": 508,
+      "community": 485,
       "norm_label": "groupentriesbyday()"
     },
     {
@@ -72709,7 +72709,7 @@
       "source_location": "L68",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_computecoveragedeficit",
-      "community": 508,
+      "community": 485,
       "norm_label": "computecoveragedeficit()"
     },
     {
@@ -72719,7 +72719,7 @@
       "source_location": "L94",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_summarizetransitadjustment",
-      "community": 508,
+      "community": 485,
       "norm_label": "summarizetransitadjustment()"
     },
     {
@@ -72729,7 +72729,7 @@
       "source_location": "L170",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_applytransittosuggestion",
-      "community": 508,
+      "community": 485,
       "norm_label": "applytransittosuggestion()"
     },
     {
@@ -73379,7 +73379,7 @@
       "source_location": "L104",
       "_origin": "ast",
       "id": "lib_utils_controle_estoque_metricas_buildcontroleestoqueitemkey",
-      "community": 485,
+      "community": 8,
       "norm_label": "buildcontroleestoqueitemkey()"
     },
     {
@@ -77819,7 +77819,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_utils_grade_tamanhos",
-      "community": 19,
+      "community": 508,
       "norm_label": "grade-tamanhos.ts"
     },
     {
@@ -77829,7 +77829,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "lib_utils_grade_tamanhos_tamanhograde",
-      "community": 19,
+      "community": 508,
       "norm_label": "tamanhograde"
     },
     {
@@ -77839,7 +77839,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "lib_utils_grade_tamanhos_tamanhos_fashion",
-      "community": 19,
+      "community": 508,
       "norm_label": "tamanhos_fashion"
     },
     {
@@ -77849,7 +77849,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "lib_utils_grade_tamanhos_gradeehfashion",
-      "community": 19,
+      "community": 508,
       "norm_label": "gradeehfashion()"
     },
     {
@@ -87119,7 +87119,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "scripts_fix_tipos_romaneio_acento",
-      "community": 3,
+      "community": 19,
       "norm_label": "fix-tipos-romaneio-acento.mjs"
     },
     {
@@ -87129,7 +87129,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "scripts_fix_tipos_romaneio_acento_headers",
-      "community": 3,
+      "community": 19,
       "norm_label": "headers"
     },
     {
@@ -87139,7 +87139,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "scripts_fix_tipos_romaneio_acento_targets",
-      "community": 3,
+      "community": 19,
       "norm_label": "targets"
     },
     {
@@ -87149,7 +87149,7 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "scripts_fix_tipos_romaneio_acento_withaccents",
-      "community": 3,
+      "community": 19,
       "norm_label": "withaccents"
     },
     {
@@ -207085,7 +207085,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/shopify/ShopifyPage.tsx",
-      "source_location": "L649",
+      "source_location": "L715",
       "weight": 1.0,
       "source": "components_shopify_shopifypage",
       "target": "components_shopify_shopifypage_ranking",
@@ -207234,7 +207234,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/shopify/ShopifyPage.tsx",
-      "source_location": "L671",
+      "source_location": "L740",
       "weight": 1.0,
       "source": "components_shopify_shopifypage_ranking",
       "target": "components_shopify_shopifypage_brl",
@@ -207245,7 +207245,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/shopify/ShopifyPage.tsx",
-      "source_location": "L252",
+      "source_location": "L286",
       "weight": 1.0,
       "source": "components_shopify_shopifypage_shopifypage",
       "target": "components_shopify_shopifypage_brl",
@@ -207256,7 +207256,7 @@
       "context": "collection",
       "confidence": "INFERRED",
       "source_file": "components/shopify/ShopifyPage.tsx",
-      "source_location": "L253",
+      "source_location": "L287",
       "weight": 1.0,
       "source": "components_shopify_shopifypage_shopifypage",
       "target": "components_shopify_shopifypage_int",
@@ -207278,7 +207278,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/shopify/ShopifyPage.tsx",
-      "source_location": "L358",
+      "source_location": "L392",
       "weight": 1.0,
       "source": "components_shopify_shopifypage_shopifypage",
       "target": "components_shopify_shopifypage_todaybrt",
@@ -207311,7 +207311,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/shopify/ShopifyPage.tsx",
-      "source_location": "L554",
+      "source_location": "L604",
       "weight": 1.0,
       "source": "components_shopify_shopifypage_shopifypage",
       "target": "components_shopify_shopifypage_statustone",
@@ -207322,7 +207322,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/shopify/ShopifyPage.tsx",
-      "source_location": "L383",
+      "source_location": "L425",
       "weight": 1.0,
       "source": "components_shopify_shopifypage_shopifypage",
       "target": "components_shopify_shopifypage_delta",
@@ -207355,7 +207355,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/shopify/ShopifyPage.tsx",
-      "source_location": "L280",
+      "source_location": "L314",
       "weight": 1.0,
       "source": "components_shopify_shopifypage_shopifypage",
       "target": "components_shopify_shopifypage_timeago",
@@ -207366,7 +207366,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/shopify/ShopifyPage.tsx",
-      "source_location": "L543",
+      "source_location": "L593",
       "weight": 1.0,
       "source": "components_shopify_shopifypage_shopifypage",
       "target": "components_shopify_shopifypage_ordertime",
@@ -207377,7 +207377,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/shopify/ShopifyPage.tsx",
-      "source_location": "L242",
+      "source_location": "L276",
       "weight": 1.0,
       "source": "components_shopify_shopifypage_shopifypage",
       "target": "components_shopify_shopifypage_fmtdate",
@@ -207389,7 +207389,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/shopify/ShopifyPage.tsx",
-      "source_location": "L150",
+      "source_location": "L151",
       "weight": 1.0,
       "source": "components_shopify_shopifypage_shopifypage",
       "target": "components_theme_themecontext_usetheme"
@@ -254940,7 +254940,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/shopify/dashboard.ts",
-      "source_location": "L133",
+      "source_location": "L144",
       "weight": 1.0,
       "source": "lib_shopify_dashboard_fetchkpis",
       "target": "lib_db_neon_getneonsql",
@@ -254951,7 +254951,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/shopify/dashboard.ts",
-      "source_location": "L187",
+      "source_location": "L200",
       "weight": 1.0,
       "source": "lib_shopify_dashboard_fetchserie",
       "target": "lib_db_neon_getneonsql",
@@ -254963,7 +254963,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/shopify/dashboard.ts",
-      "source_location": "L216",
+      "source_location": "L229",
       "weight": 1.0,
       "source": "lib_shopify_dashboard_fetchshopifyresumo",
       "target": "lib_db_neon_getneonsql"
@@ -324052,7 +324052,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/shopify/dashboard.ts",
-      "source_location": "L124",
+      "source_location": "L135",
       "weight": 1.0,
       "source": "lib_shopify_dashboard",
       "target": "lib_shopify_dashboard_brtdatestring",
@@ -324062,7 +324062,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/shopify/dashboard.ts",
-      "source_location": "L120",
+      "source_location": "L131",
       "weight": 1.0,
       "source": "lib_shopify_dashboard",
       "target": "lib_shopify_dashboard_brtmidnight",
@@ -324072,7 +324072,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/shopify/dashboard.ts",
-      "source_location": "L132",
+      "source_location": "L143",
       "weight": 1.0,
       "source": "lib_shopify_dashboard",
       "target": "lib_shopify_dashboard_fetchkpis",
@@ -324082,7 +324082,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/shopify/dashboard.ts",
-      "source_location": "L181",
+      "source_location": "L194",
       "weight": 1.0,
       "source": "lib_shopify_dashboard",
       "target": "lib_shopify_dashboard_fetchserie",
@@ -324092,7 +324092,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/shopify/dashboard.ts",
-      "source_location": "L210",
+      "source_location": "L223",
       "weight": 1.0,
       "source": "lib_shopify_dashboard",
       "target": "lib_shopify_dashboard_fetchshopifyresumo",
@@ -324102,7 +324102,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/shopify/dashboard.ts",
-      "source_location": "L113",
+      "source_location": "L124",
       "weight": 1.0,
       "source": "lib_shopify_dashboard",
       "target": "lib_shopify_dashboard_num",
@@ -324122,7 +324122,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/shopify/dashboard.ts",
-      "source_location": "L63",
+      "source_location": "L71",
       "weight": 1.0,
       "source": "lib_shopify_dashboard",
       "target": "lib_shopify_dashboard_shopifypedido",
@@ -324132,7 +324132,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/shopify/dashboard.ts",
-      "source_location": "L88",
+      "source_location": "L98",
       "weight": 1.0,
       "source": "lib_shopify_dashboard",
       "target": "lib_shopify_dashboard_shopifyranking",
@@ -324142,7 +324142,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/shopify/dashboard.ts",
-      "source_location": "L94",
+      "source_location": "L105",
       "weight": 1.0,
       "source": "lib_shopify_dashboard",
       "target": "lib_shopify_dashboard_shopifyresumo",
@@ -324152,7 +324152,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/shopify/dashboard.ts",
-      "source_location": "L54",
+      "source_location": "L59",
       "weight": 1.0,
       "source": "lib_shopify_dashboard",
       "target": "lib_shopify_dashboard_shopifyseriepoint",
@@ -324162,7 +324162,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/shopify/dashboard.ts",
-      "source_location": "L79",
+      "source_location": "L87",
       "weight": 1.0,
       "source": "lib_shopify_dashboard",
       "target": "lib_shopify_dashboard_shopifytopproduto",
@@ -324172,7 +324172,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/shopify/dashboard.ts",
-      "source_location": "L128",
+      "source_location": "L139",
       "weight": 1.0,
       "source": "lib_shopify_dashboard",
       "target": "lib_shopify_dashboard_todaybrt",
@@ -324216,7 +324216,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/shopify/dashboard.ts",
-      "source_location": "L160",
+      "source_location": "L171",
       "weight": 1.0,
       "source": "lib_shopify_dashboard_fetchkpis",
       "target": "lib_shopify_dashboard_num",
@@ -324227,7 +324227,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/shopify/dashboard.ts",
-      "source_location": "L207",
+      "source_location": "L220",
       "weight": 1.0,
       "source": "lib_shopify_dashboard_fetchserie",
       "target": "lib_shopify_dashboard_num",
@@ -324238,7 +324238,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/shopify/dashboard.ts",
-      "source_location": "L323",
+      "source_location": "L347",
       "weight": 1.0,
       "source": "lib_shopify_dashboard_fetchshopifyresumo",
       "target": "lib_shopify_dashboard_num",
@@ -324249,7 +324249,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/shopify/dashboard.ts",
-      "source_location": "L222",
+      "source_location": "L235",
       "weight": 1.0,
       "source": "lib_shopify_dashboard_fetchshopifyresumo",
       "target": "lib_shopify_dashboard_brtmidnight",
@@ -324260,7 +324260,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/shopify/dashboard.ts",
-      "source_location": "L295",
+      "source_location": "L317",
       "weight": 1.0,
       "source": "lib_shopify_dashboard_fetchshopifyresumo",
       "target": "lib_shopify_dashboard_brtdatestring",
@@ -324271,7 +324271,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/shopify/dashboard.ts",
-      "source_location": "L129",
+      "source_location": "L140",
       "weight": 1.0,
       "source": "lib_shopify_dashboard_todaybrt",
       "target": "lib_shopify_dashboard_brtdatestring",
@@ -324282,7 +324282,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/shopify/dashboard.ts",
-      "source_location": "L218",
+      "source_location": "L231",
       "weight": 1.0,
       "source": "lib_shopify_dashboard_fetchshopifyresumo",
       "target": "lib_shopify_dashboard_todaybrt",
@@ -324293,7 +324293,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/shopify/dashboard.ts",
-      "source_location": "L237",
+      "source_location": "L250",
       "weight": 1.0,
       "source": "lib_shopify_dashboard_fetchshopifyresumo",
       "target": "lib_shopify_dashboard_fetchkpis",
@@ -324304,7 +324304,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/shopify/dashboard.ts",
-      "source_location": "L239",
+      "source_location": "L252",
       "weight": 1.0,
       "source": "lib_shopify_dashboard_fetchshopifyresumo",
       "target": "lib_shopify_dashboard_fetchserie",
@@ -324316,7 +324316,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/shopify/dashboard.ts",
-      "source_location": "L215",
+      "source_location": "L228",
       "weight": 1.0,
       "source": "lib_shopify_dashboard_fetchshopifyresumo",
       "target": "lib_shopify_orders_store_ensureshopifytables"
@@ -324327,7 +324327,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/shopify/dashboard.ts",
-      "source_location": "L277",
+      "source_location": "L297",
       "weight": 1.0,
       "source": "lib_shopify_dashboard_fetchshopifyresumo",
       "target": "lib_shopify_orders_store_getshopifysyncstate"
@@ -366002,5 +366002,5 @@
       "source_file": "tmp_scarfme_poliester_pages.txt"
     }
   ],
-  "built_at_commit": "11f095f24e727cee2df3fd3504aa8ff60180e953"
+  "built_at_commit": "9adf4e0c858c92eb239bdb50304228873949ec73"
 }
