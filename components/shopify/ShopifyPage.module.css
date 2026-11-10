@@ -541,3 +541,47 @@
   font-weight: 500;
   color: var(--t-500);
 }
+
+/* Scarf Me: cores do logo — rosa coral + grafite. Nunca verde (pedido do dono, 10/11/2026). */
+.brandScarfme {
+  --shp-accent: #e0676f;
+  --shp-accent-soft: rgba(224, 103, 111, 0.12);
+  --shp-good: #3d3839;
+}
+
+:global([data-theme="dark"]) .brandScarfme {
+  --shp-accent: #f08f96;
+  --shp-accent-soft: rgba(240, 143, 150, 0.14);
+  --shp-good: #e8dcdd;
+}
+
+.brandScarfme .hero {
+  background: linear-gradient(135deg, #3d3839 0%, #a8505a 55%, #ef9aa0 100%);
+  color: #fff7f7;
+}
+
+.brandScarfme .eyebrow,
+.brandScarfme .subtitle,
+.brandScarfme .syncBox span {
+  color: rgba(255, 247, 247, 0.88);
+}
+
+.brandScarfme .syncBox {
+  background: rgba(40, 30, 32, 0.28);
+}
+
+.brandScarfme .liveDot {
+  background: #ffd3d6;
+  animation-name: pulseScarfme;
+}
+
+.brandScarfme .refresh {
+  background: #fff7f7;
+  color: #3d3839;
+}
+
+@keyframes pulseScarfme {
+  0% { box-shadow: 0 0 0 0 rgba(255, 211, 214, 0.6); }
+  70% { box-shadow: 0 0 0 10px rgba(255, 211, 214, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 211, 214, 0); }
+}

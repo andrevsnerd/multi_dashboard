@@ -524,3 +524,14 @@
     display: none;
   }
 }
+
+/* Scarf Me: rosa coral do logo no lugar do verde; "vinculado" em grafite. */
+.brandScarfme {
+  --mp-accent: #e0676f;
+  --mp-good: #3d3839;
+}
+
+:global([data-theme="dark"]) .brandScarfme {
+  --mp-accent: #f08f96;
+  --mp-good: #e8dcdd;
+}

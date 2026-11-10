@@ -177,7 +177,7 @@ export default function ShopifyMapaLinx({ companyKey }: Props) {
   const pctAtivos = resumo && resumo.ativos.variantes > 0 ? (resumo.ativos.vinculadas / resumo.ativos.variantes) * 100 : 0;
 
   return (
-    <div className={styles.wrapper}>
+    <div className={`${styles.wrapper} ${companyKey === "scarfme" ? styles.brandScarfme : ""}`}>
       <section className={styles.intro}>
         <div>
           <h2>Mapeamento Shopify → Linx</h2>

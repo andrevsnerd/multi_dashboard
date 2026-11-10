@@ -146,26 +146,13 @@ export default function ShopifyPage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
-  const [comFrete, setComFrete] = useState(false);
+  // "Incluir frete" sempre abre marcado (pedido do dono, 10/11/2026); desmarcar vale só
+  // até sair da página.
+  const [comFrete, setComFrete] = useState(true);
   const requestId = useRef(0);
   const { theme } = useTheme();
-
-  // Preferência do checkbox lembrada só neste navegador (conveniência; falha calada).
-  useEffect(() => {
-    try {
-      setComFrete(window.localStorage.getItem("shopify:comFrete") === "1");
-    } catch {
-      /* armazenamento indisponível */
-    }
-  }, []);
-  function toggleFrete(value: boolean) {
-    setComFrete(value);
-    try {
-      window.localStorage.setItem("shopify:comFrete", value ? "1" : "0");
-    } catch {
-      /* armazenamento indisponível */
-    }
-  }
+  const toggleFrete = (value: boolean) => setComFrete(value);
+  const isScarfme = companyKey === "scarfme";
 
   const load = useCallback(
     async (silent = false) => {
@@ -234,7 +221,8 @@ export default function ShopifyPage({
       ? {
           grid: "rgba(255,255,255,0.06)",
           axis: "#8b95a6",
-          bar: "#3fb68b",
+          // Scarf Me: rosa do logo (nunca verde); NERD segue no verde.
+          bar: isScarfme ? "#f08f96" : "#3fb68b",
           prev: "#8b95a6",
           tooltipBg: "#1b1f2a",
           tooltipBorder: "rgba(255,255,255,0.1)",
@@ -243,7 +231,7 @@ export default function ShopifyPage({
       : {
           grid: "#e2e8f0",
           axis: "#64748b",
-          bar: "#0f8a5f",
+          bar: isScarfme ? "#e0676f" : "#0f8a5f",
           prev: "#94a3b8",
           tooltipBg: "#fff",
           tooltipBorder: "#e2e8f0",
@@ -291,7 +279,7 @@ export default function ShopifyPage({
   ];
 
   return (
-    <div className={styles.wrapper}>
+    <div className={`${styles.wrapper} ${isScarfme ? styles.brandScarfme : ""}`}>
       <header className={styles.hero}>
         <div>
           <p className={styles.eyebrow}>{companyName} · loja online</p>
