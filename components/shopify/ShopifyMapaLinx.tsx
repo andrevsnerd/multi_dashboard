@@ -127,8 +127,14 @@ export default function ShopifyMapaLinx({ companyKey }: Props) {
     setAviso(null);
     setError(null);
     try {
-      await post(body);
-      setAviso(sucesso);
+      const r = (await post(body)) as { aviso?: string | null; outraLoja?: { repassadas?: number } | null };
+      const repassadas = r.outraLoja?.repassadas ?? 0;
+      if (r.aviso) setError(r.aviso);
+      setAviso(
+        repassadas > 0
+          ? `${sucesso} Também aplicado a ${repassadas} variante${repassadas === 1 ? "" : "s"} equivalente${repassadas === 1 ? "" : "s"} na outra loja.`
+          : sucesso,
+      );
       await load();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Falha ao gravar.");
@@ -178,7 +184,8 @@ export default function ShopifyMapaLinx({ companyKey }: Props) {
           <p>
             Cada variante do Shopify aponta para o produto, a cor e (quando dá) o tamanho do Linx. O vínculo fica no
             dashboard — nada é alterado no Shopify. Por código é automático; por nome é só sugestão e precisa de
-            confirmação. O que você decide aqui nunca é sobrescrito pelo automático.
+            confirmação. O que você decide aqui nunca é sobrescrito pelo automático — e vale também na
+            outra loja para a mesma capa/produto (mesma estampa e modelo), marcado &quot;igual à outra loja&quot;.
           </p>
         </div>
         {podeEditar && (
@@ -381,7 +388,11 @@ export default function ShopifyMapaLinx({ companyKey }: Props) {
                         <td>
                           <span className={`${styles.badge} ${styles[`tone_${v.status}`]}`}>{STATUS_LABEL[v.status]}</span>
                           <small className={styles.metodo}>
-                            {v.origem === "manual" ? `manual${v.atualizadoPor ? ` · ${v.atualizadoPor}` : ""}` : v.metodo ?? ""}
+                            {v.metodo?.startsWith("igual à outra loja")
+                              ? `${v.metodo}${v.atualizadoPor ? ` · ${v.atualizadoPor}` : ""}`
+                              : v.origem === "manual"
+                                ? `manual${v.atualizadoPor ? ` · ${v.atualizadoPor}` : ""}`
+                                : v.metodo ?? ""}
                           </small>
                         </td>
                         {podeEditar && (
@@ -414,7 +425,7 @@ export default function ShopifyMapaLinx({ companyKey }: Props) {
                                 Não é do Linx
                               </button>
                             )}
-                            {v.origem === "manual" && (
+                            {v.origem === "manual" && !v.metodo?.startsWith("igual à outra loja") && (
                               <button
                                 type="button"
                                 className={styles.link}

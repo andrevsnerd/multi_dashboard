@@ -68,7 +68,7 @@ const QUALIFICADORES = new Set(["PRO", "MAX", "PLUS", "AIR", "ULTRA", "MINI", "F
 /** Tipo de acessório de celular: se o título começa assim, o nome do Linx também precisa ter
  *  (senão "Alça/Capa Estampada Abaporu" casava com o LENÇO Abaporu). */
 const TIPOS_OBRIGATORIOS = new Set(["CP", "ALCA", "PELICULA", "CABO", "CARREGADOR", "SUPORTE", "FONE"]);
-const tokens = (s: string) =>
+export const tokens = (s: string) =>
   norm(s)
     // "PROMAX" colado no cadastro do Linx (CP A NEGRA IP 16 PROMAX)
     .replace(/PROMAX/g, "PRO MAX")
@@ -88,13 +88,27 @@ const CORES = new Set([
  * se houver qualquer palavra que não é cor (ex. "MULTICOLOR", "ESTAMPADO") — aí a cor do
  * Linx não serve para descartar, só para desempatar.
  */
-function coresBasicas(texto: string | null | undefined, estrito = false): Set<string> {
+export function coresBasicas(texto: string | null | undefined, estrito = false): Set<string> {
   const ts = norm(texto).split(" ").filter(Boolean);
   if (estrito && ts.some((t) => !CORES.has(t))) return new Set();
   return new Set(ts.filter((t) => CORES.has(t)));
 }
 
-const isPersonalizacao = (name: string) => /personaliz/i.test(name);
+export const isPersonalizacao = (name: string) => /personaliz/i.test(name);
+
+/**
+ * "Padrão da loja" = palavra presente em ≥ 15 títulos (e ≥ 1% deles) do próprio Shopify
+ * ("anti-impacto", "personalizada", "estampada"), exceto o tipo de acessório (CP, ALCA…).
+ * Sempre calculado sobre o catálogo INTEIRO da loja (num recálculo parcial, calcular só
+ * com os títulos do produto mudava o resultado).
+ */
+export function padraoDaLoja(variants: Array<{ product_title: string }>): Set<string> {
+  const df = new Map<string, number>();
+  const titulos = new Set(variants.map((v) => v.product_title));
+  for (const t of titulos) for (const tok of new Set(tokens(t))) df.set(tok, (df.get(tok) ?? 0) + 1);
+  const limiar = Math.max(15, titulos.size * 0.01);
+  return new Set([...df].filter(([t, n]) => n >= limiar && !TIPOS_OBRIGATORIOS.has(t)).map(([t]) => t));
+}
 const isGiftCard = (title: string) => /(cart[aã]o|vale)[ -]?presente|gift ?card/i.test(title);
 
 class LinxIndex {
@@ -321,9 +335,12 @@ function codesOf(v: ShopifyVariantRow): string[] {
   return [v.barcode, v.sku].filter((x): x is string => !!x).flatMap((x) => x.split("/").map((s) => s.trim()));
 }
 
+const padraoDaLojaFn = (variants: Array<{ product_title: string }>) => padraoDaLoja(variants);
+
 /** Calcula o vínculo automático de todas as variantes (não grava). */
 export async function computeAutoMaps(
   variants: ShopifyVariantRow[],
+  options: { padrao?: Set<string> } = {},
 ): Promise<Map<string, ShopifyVariantMapRow>> {
   const idx = await LinxIndex.load(variants.flatMap(codesOf));
   const out = new Map<string, ShopifyVariantMapRow>();
@@ -400,13 +417,7 @@ export async function computeAutoMaps(
   }
 
   // 5: nome (título + opções que não são personalização/cor) — só sugere.
-  // "Padrão da loja" = palavra presente em ≥ 15 títulos (e ≥ 1% deles) do próprio Shopify,
-  // exceto o tipo de acessório (CP, ALCA…), que continua obrigatório.
-  const dfLoja = new Map<string, number>();
-  const titulos = new Set(variants.map((v) => v.product_title));
-  for (const t of titulos) for (const tok of new Set(tokens(t))) dfLoja.set(tok, (dfLoja.get(tok) ?? 0) + 1);
-  const limiar = Math.max(15, titulos.size * 0.01);
-  const padraoDaLoja = new Set([...dfLoja].filter(([t, n]) => n >= limiar && !TIPOS_OBRIGATORIOS.has(t)).map(([t]) => t));
+  const padraoDaLoja = options.padrao ?? padraoDaLojaFn(variants);
   for (const v of variants) {
     if (out.has(v.variant_id)) continue;
     const extras = v.options.filter((o) => !isPersonalizacao(o.name) && !/^title$/i.test(o.name) && o.value !== "Default Title");
@@ -484,7 +495,7 @@ export async function rematchShopifyVariants(
   const productIds = new Set(variants.map((v) => v.product_id));
   const scope = all.filter((v) => productIds.has(v.product_id));
   const existing = await listVariantMaps(company);
-  const computed = await computeAutoMaps(scope);
+  const computed = await computeAutoMaps(scope, { padrao: padraoDaLoja(all) });
   const targets = new Set(variants.map((v) => v.variant_id));
   const toSave: ShopifyVariantMapRow[] = [];
   let manuais = 0;

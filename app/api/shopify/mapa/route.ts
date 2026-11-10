@@ -11,6 +11,7 @@ import {
 } from "@/lib/shopify/catalog-store";
 import { runShopifyCatalogSync } from "@/lib/shopify/catalog-sync";
 import { getShopifyCredentials, isShopifyCompany, type ShopifyCompany } from "@/lib/shopify/config";
+import { sincronizarEquivalentes } from "@/lib/shopify/cross-store";
 import { rematchShopifyVariants, vincularManual } from "@/lib/shopify/linx-match";
 import { getShopifySyncState } from "@/lib/shopify/orders-store";
 
@@ -29,7 +30,23 @@ export const maxDuration = 300;
  *   confirmar    — { variantIds } sugestão → vínculo manual com os mesmos valores
  *   nao_linx     — { variantIds } marca como "não é produto do Linx"
  *   limpar       — { variantIds } apaga o vínculo manual e recalcula o automático
+ *
+ * Decisão manual vale também na outra loja para a variante equivalente (mesma estampa +
+ * mesmo modelo) — ver lib/shopify/cross-store.ts. Recalcular uma loja também puxa as
+ * decisões da outra.
  */
+
+const outraLoja = (c: ShopifyCompany): ShopifyCompany => (c === "nerd" ? "scarfme" : "nerd");
+
+/** Repassa para a outra loja sem derrubar a resposta se falhar (fica para o próximo recálculo). */
+async function repassar(destino: ShopifyCompany) {
+  try {
+    return await sincronizarEquivalentes(destino);
+  } catch (error) {
+    console.error("[shopify/mapa] repasse para", destino, "falhou", error);
+    return null;
+  }
+}
 
 function companyOf(value: unknown): ShopifyCompany | null {
   return isShopifyCompany(value) && getShopifyCredentials(value) ? value : null;
@@ -103,16 +120,20 @@ export async function POST(request: Request) {
       case "sincronizar": {
         const sync = await runShopifyCatalogSync(company, { budgetMs: 150_000, restart: !!body.restart });
         const rematch = sync.complete ? await rematchShopifyVariants(company) : null;
-        return NextResponse.json({ data: { sync, rematch } });
+        const outra = sync.complete ? await repassar(company) : null;
+        return NextResponse.json({ data: { sync, rematch, outraLoja: outra } });
       }
-      case "remapear":
-        return NextResponse.json({ data: { rematch: await rematchShopifyVariants(company) } });
+      case "remapear": {
+        const rematch = await rematchShopifyVariants(company);
+        return NextResponse.json({ data: { rematch, outraLoja: await repassar(company) } });
+      }
       case "vincular": {
         if (ids.length === 0 || !body.produto?.trim()) {
           return NextResponse.json({ error: "Informe as variantes e o produto do Linx." }, { status: 400 });
         }
         const cor = body.cor === undefined ? "auto" : body.cor;
-        return NextResponse.json({ data: await vincularManual(company, ids, body.produto, cor, username) });
+        const r = await vincularManual(company, ids, body.produto, cor, username);
+        return NextResponse.json({ data: { ...r, outraLoja: await repassar(outraLoja(company)) } });
       }
       case "confirmar": {
         const maps = await listVariantMaps(company);
@@ -121,7 +142,7 @@ export async function POST(request: Request) {
           .filter((m): m is ShopifyVariantMapRow => !!m && !!m.produto)
           .map((m) => ({ ...m, status: "vinculado", origem: "manual", metodo: `confirmado (${m.metodo ?? "sugestão"})` }));
         await saveVariantMaps(company, rows, { onlyAuto: false, updatedBy: username });
-        return NextResponse.json({ data: { gravadas: rows.length } });
+        return NextResponse.json({ data: { gravadas: rows.length, outraLoja: await repassar(outraLoja(company)) } });
       }
       case "nao_linx": {
         const rows: ShopifyVariantMapRow[] = ids.map((id) => ({
@@ -138,11 +159,22 @@ export async function POST(request: Request) {
           componentes: null,
         }));
         await saveVariantMaps(company, rows, { onlyAuto: false, updatedBy: username });
-        return NextResponse.json({ data: { gravadas: rows.length } });
+        return NextResponse.json({ data: { gravadas: rows.length, outraLoja: await repassar(outraLoja(company)) } });
       }
       case "limpar": {
         await deleteVariantMaps(company, ids);
-        return NextResponse.json({ data: { rematch: await rematchShopifyVariants(company, ids) } });
+        // O recálculo lê o Linx; se o Linx cair, o desfazer em si já valeu (variante fica
+        // "sem vínculo" até o próximo Recalcular) e o repasse da outra loja ainda é tirado.
+        let rematch = null;
+        let aviso: string | null = null;
+        try {
+          rematch = await rematchShopifyVariants(company, ids);
+        } catch (error) {
+          aviso = `Desfeito, mas o recálculo automático falhou (${error instanceof Error ? error.message : "Linx"}). Use "Recalcular automático" depois.`;
+        }
+        // Pode ter apagado um repasse: puxa de novo da outra loja; e tira da outra o que veio daqui.
+        await repassar(company);
+        return NextResponse.json({ data: { rematch, aviso, outraLoja: await repassar(outraLoja(company)) } });
       }
       default:
         return NextResponse.json({ error: "Ação inválida." }, { status: 400 });
