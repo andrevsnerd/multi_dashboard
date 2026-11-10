@@ -15,8 +15,9 @@ import {
  * Motor de vínculo variante Shopify → Linx (produto × cor × tamanho).
  *
  * Regras, na ordem (medidas em 10/11/2026 sobre o catálogo real):
- *   1. código de barras exato — barcode ou SKU = PRODUTOS_BARRA.CODIGO_BARRA (interno de 6
+ *   1. código exato — SKU (primeiro) ou barcode = PRODUTOS_BARRA.CODIGO_BARRA (interno de 6
  *      dígitos ou EAN). Já traz produto, cor e tamanho. Scarf Me ≈ 52% das variantes.
+ *      SKU vence o barcode: é por ele que o Linx fatura (ver o comentário no código).
  *      SKU com vários códigos separados por "/" = KIT (cada código vira um componente).
  *   2. produto + cor no SKU — "70.60.64-99" ou colado "13.23.011406" (produto 13.23.0114, cor 06).
  *   3. código de produto — SKU = PRODUTOS.PRODUTO; a cor sai da opção "Cor" da variante
@@ -381,10 +382,23 @@ export async function computeAutoMaps(
         continue;
       }
     }
-    const m = idx.matchCode(v.barcode) ?? idx.matchCode(v.sku);
+    // SKU PRIMEIRO: é o que a integração usa para faturar no Linx. Medido em 10/11/2026 nas
+    // variantes da Scarf Me com SKU e código de barras apontando p/ produtos diferentes:
+    // o Linx faturou no alvo do SKU em 182 casos × 22 no do código de barras (2.168 × 629
+    // peças). O campo código de barras do Shopify ficou com código antigo em muitas.
+    const porSku = idx.matchCode(v.sku);
+    const porBarcode = idx.matchCode(v.barcode);
+    const m = porSku ?? porBarcode;
     if (!m) continue;
     let cor = m.cor;
-    let metodo = m.metodo;
+    let metodo = porSku ? m.metodo.replace("código de barras", "SKU") : m.metodo;
+    if (
+      porSku &&
+      porBarcode &&
+      (porSku.produto !== porBarcode.produto || numKey(up(porSku.cor ?? "")) !== numKey(up(porBarcode.cor ?? "")))
+    ) {
+      metodo += ` (o código de barras aponta p/ ${porBarcode.produto}${porBarcode.cor ? ` cor ${porBarcode.cor}` : ""})`;
+    }
     if (cor == null) {
       const c = idx.corPorDescricao(m.produto, optionValue(v, /^cor$/i));
       if (c) {
@@ -464,7 +478,7 @@ export async function computeAutoMaps(
   const byId = new Map(variants.map((v) => [v.variant_id, v]));
   for (const r of out.values()) {
     if (r.status !== "vinculado" || !r.produto || !r.metodo || r.componentes) continue;
-    if (!/^(código|produto)/.test(r.metodo)) continue;
+    if (!/^(código|produto|SKU)/.test(r.metodo)) continue;
     const v = byId.get(r.variant_id);
     if (!v) continue;
     const titulo = distintivas(v.product_title);
