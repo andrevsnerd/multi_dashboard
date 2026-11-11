@@ -80,6 +80,16 @@ export function hidesEcommerceDashboard(
 }
 
 /**
+ * Quem grava a meta da Black e a meta do Shopify (metas_paineis). Diretor entra mesmo
+ * sendo somente-leitura no resto — regra do dono, 11/11/2026.
+ */
+export const META_PAINEL_ROLES: RoleKey[] = ["admin", "diretor", "logistica"];
+
+export function canEditarMetaPainel(role: RoleKey | undefined | null): boolean {
+  return !!role && META_PAINEL_ROLES.includes(role);
+}
+
+/**
  * MARKETING: funcao dedicada a area CORPORATIVO e a nada mais. Ve e opera TODA
  * a area /corporativo (gestao de clientes, catalogo da loja, pedidos, aprovacoes,
  * imagens de produto), e NAO enxerga NERD/ScarfMe — nem pelas permissoes de

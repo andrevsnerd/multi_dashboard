@@ -13,11 +13,13 @@ import {
 } from "recharts";
 
 import { useAuth } from "@/components/auth/AuthContext";
+import { canEditarMetaPainel } from "@/lib/auth/permissions";
 import { useTheme } from "@/components/theme/ThemeContext";
 import type { CompanyKey } from "@/lib/config/company";
 import type { ShopifyKpis, ShopifyResumo } from "@/lib/shopify/dashboard";
 
 import ShopifyMapaLinx from "./ShopifyMapaLinx";
+import ShopifyVendaDia from "./ShopifyVendaDia";
 import styles from "./ShopifyPage.module.css";
 
 interface ShopifyPageProps {
@@ -132,6 +134,8 @@ function orderTime(iso: string, porHora: boolean) {
       });
 }
 
+const MESES_TITULO = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+
 function fmtDate(date: string) {
   return `${date.slice(8, 10)}/${date.slice(5, 7)}`;
 }
@@ -157,6 +161,8 @@ export default function ShopifyPage({
   // Aba "Mapeamento Linx" só para admin (o servidor também barra as rotas /api/shopify/mapa).
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
+  // Quadro de venda: "Por dia" (mês × meta do dia) é o padrão; "Por hora" é o gráfico de antes.
+  const [visaoGrafico, setVisaoGrafico] = useState<"dia" | "hora">("dia");
 
   const load = useCallback(
     async (silent = false) => {
@@ -487,84 +493,124 @@ export default function ShopifyPage({
           <section className={styles.card}>
             <div className={styles.cardHeader}>
               <h2>
-                {data?.periodo.porHora ? "Venda por hora" : "Venda por dia"}
+                {visaoGrafico === "dia"
+                  ? `Venda por dia · ${MESES_TITULO[Number(range.end.slice(5, 7)) - 1]}`
+                  : data?.periodo.porHora
+                    ? "Venda por hora"
+                    : "Venda no período"}
                 {comFrete ? " (com frete)" : ""}
               </h2>
-              <div className={styles.legend}>
-                <span>
-                  <i
-                    className={styles.legendBar}
-                    style={{ background: chartColors.bar }}
-                  />{" "}
-                  Período
-                </span>
-                <span>
-                  <i
-                    className={styles.legendLine}
-                    style={{ borderColor: chartColors.prev }}
-                  />{" "}
-                  Período anterior
-                </span>
+              <div className={styles.chartTabs} role="tablist" aria-label="Visão do gráfico">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={visaoGrafico === "dia"}
+                  className={`${styles.chartTab} ${visaoGrafico === "dia" ? styles.chartTabActive : ""}`}
+                  onClick={() => setVisaoGrafico("dia")}
+                >
+                  Por dia
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={visaoGrafico === "hora"}
+                  className={`${styles.chartTab} ${visaoGrafico === "hora" ? styles.chartTabActive : ""}`}
+                  onClick={() => setVisaoGrafico("hora")}
+                  title="Gráfico do período selecionado acima (por hora quando é um dia só)"
+                >
+                  {data?.periodo.porHora ? "Por hora" : "Período"}
+                </button>
               </div>
             </div>
-            <div className={styles.chart}>
-              {data && data.serie.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart
-                    data={chartData}
-                    margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
-                  >
-                    <CartesianGrid stroke={chartColors.grid} vertical={false} />
-                    <XAxis
-                      dataKey="label"
-                      tick={{ fill: chartColors.axis, fontSize: 12 }}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <YAxis
-                      tick={{ fill: chartColors.axis, fontSize: 12 }}
-                      axisLine={false}
-                      tickLine={false}
-                      width={72}
-                      tickFormatter={(v: number) =>
-                        v >= 1000 ? `R$ ${Math.round(v / 1000)} mil` : `R$ ${v}`
-                      }
-                    />
-                    <Tooltip
-                      cursor={{ fill: chartColors.grid }}
-                      contentStyle={{
-                        background: chartColors.tooltipBg,
-                        border: `1px solid ${chartColors.tooltipBorder}`,
-                        borderRadius: 10,
-                        color: chartColors.tooltipText,
-                      }}
-                      formatter={(value, name) => [
-                        brl(Number(value)),
-                        name === "valor" ? "Período" : "Anterior",
-                      ]}
-                    />
-                    <Bar
-                      dataKey="valor"
-                      fill={chartColors.bar}
-                      radius={[4, 4, 0, 0]}
-                      maxBarSize={36}
-                    />
-                    <Line
-                      dataKey="valorAnterior"
-                      stroke={chartColors.prev}
-                      strokeDasharray="4 4"
-                      strokeWidth={2}
-                      dot={false}
-                      type="monotone"
-                    />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className={styles.empty}>
-                  {loading ? "Carregando…" : "Sem pedidos no período."}
+            {visaoGrafico === "dia" ? (
+              <ShopifyVendaDia
+                companyKey={companyKey}
+                mes={range.end.slice(0, 7)}
+                comFrete={comFrete}
+                colors={chartColors}
+                podeEditar={canEditarMetaPainel(user?.role)}
+                username={user?.username ?? null}
+              />
+            ) : (
+              <>
+                <div className={styles.cardHeader}>
+                  <div className={styles.legend}>
+                    <span>
+                      <i
+                        className={styles.legendBar}
+                        style={{ background: chartColors.bar }}
+                      />{" "}
+                      Período
+                    </span>
+                    <span>
+                      <i
+                        className={styles.legendLine}
+                        style={{ borderColor: chartColors.prev }}
+                      />{" "}
+                      Período anterior
+                    </span>
+                  </div>
                 </div>
-              )}
-            </div>
+                <div className={styles.chart}>
+                {data && data.serie.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart
+                      data={chartData}
+                      margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+                    >
+                      <CartesianGrid stroke={chartColors.grid} vertical={false} />
+                      <XAxis
+                        dataKey="label"
+                        tick={{ fill: chartColors.axis, fontSize: 12 }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        tick={{ fill: chartColors.axis, fontSize: 12 }}
+                        axisLine={false}
+                        tickLine={false}
+                        width={72}
+                        tickFormatter={(v: number) =>
+                          v >= 1000 ? `R$ ${Math.round(v / 1000)} mil` : `R$ ${v}`
+                        }
+                      />
+                      <Tooltip
+                        cursor={{ fill: chartColors.grid }}
+                        contentStyle={{
+                          background: chartColors.tooltipBg,
+                          border: `1px solid ${chartColors.tooltipBorder}`,
+                          borderRadius: 10,
+                          color: chartColors.tooltipText,
+                        }}
+                        formatter={(value, name) => [
+                          brl(Number(value)),
+                          name === "valor" ? "Período" : "Anterior",
+                        ]}
+                      />
+                      <Bar
+                        dataKey="valor"
+                        fill={chartColors.bar}
+                        radius={[4, 4, 0, 0]}
+                        maxBarSize={36}
+                      />
+                      <Line
+                        dataKey="valorAnterior"
+                        stroke={chartColors.prev}
+                        strokeDasharray="4 4"
+                        strokeWidth={2}
+                        dot={false}
+                        type="monotone"
+                      />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className={styles.empty}>
+                    {loading ? "Carregando…" : "Sem pedidos no período."}
+                  </div>
+                )}
+              </div>
+              </>
+            )}
           </section>
 
           <div className={styles.grid}>

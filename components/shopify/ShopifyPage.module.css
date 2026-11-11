@@ -590,3 +590,164 @@
   color: var(--shp-warn);
   font-weight: 600;
 }
+
+/* ── quadro de venda: abas Por dia / Por hora + meta do mês ── */
+
+.chartTabs {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--s-100);
+}
+
+.chartTab {
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--t-500);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.chartTab:hover {
+  color: var(--t-900);
+}
+
+.chartTabActive,
+.chartTabActive:hover {
+  background: var(--s-white);
+  color: var(--t-900);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+.metaBox {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--shp-accent) 35%, transparent);
+  border-radius: 12px;
+  background: var(--shp-accent-soft);
+}
+
+.metaVazia {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--b-300);
+  color: var(--t-500);
+  font-size: 0.9rem;
+}
+
+.metaTopo {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 10px 24px;
+  flex-wrap: wrap;
+}
+
+.metaNumeros {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.metaRotulo {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--t-500);
+}
+
+.metaNumeros strong {
+  font-size: 1.35rem;
+  color: var(--t-900);
+}
+
+.metaNumeros small {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--t-500);
+}
+
+.metaPct {
+  font-weight: 800;
+  color: var(--t-700);
+}
+
+.metaInfo {
+  display: flex;
+  align-items: center;
+  gap: 6px 18px;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+  color: var(--t-500);
+  font-variant-numeric: tabular-nums;
+}
+
+.metaInfo strong {
+  color: var(--t-900);
+}
+
+.metaInfo strong.metaOk,
+.metaOk {
+  color: var(--shp-good);
+}
+
+.metaEditar {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  color: var(--shp-accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.metaForm {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.metaForm label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 240px;
+  min-width: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--t-500);
+}
+
+.metaForm input {
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--b-300);
+  border-radius: 8px;
+  background: var(--s-white);
+  color: var(--t-900);
+  font: inherit;
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.metaErro {
+  font-size: 0.85rem;
+  color: var(--shp-bad);
+}

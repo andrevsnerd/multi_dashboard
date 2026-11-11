@@ -670,8 +670,8 @@
     "semantic_hash": "3926c3cc6b9df52ee62d21859b7a6cdf"
   },
   "app/api/dashboard-data/route.ts": {
-    "mtime": 1794396286.506732,
-    "ast_hash": "19c6a743783231547ea448ef8e7e463e",
+    "mtime": 1794416786.712916,
+    "ast_hash": "6a8adc961330dbe56b38a6ebbdbde5b7",
     "semantic_hash": ""
   },
   "app/api/data/route.ts": {
@@ -1255,8 +1255,8 @@
     "semantic_hash": "f14ad53955a1f58097f889108f54d206"
   },
   "components/blackfriday/BlackFridayPage.tsx": {
-    "mtime": 1794337755.0482101,
-    "ast_hash": "5ce706d335f0af669e9c04ef38a2a48d",
+    "mtime": 1794418286.6348553,
+    "ast_hash": "42ff523647eb46a03f6021a44a6bfda5",
     "semantic_hash": ""
   },
   "components/clientes/ClienteDetalhePage.tsx": {
@@ -1305,13 +1305,13 @@
     "semantic_hash": ""
   },
   "components/dashboard/CompanyDashboard.tsx": {
-    "mtime": 1794394386.9473078,
-    "ast_hash": "d701be8bb233b741efef06e63ad57b0f",
+    "mtime": 1794417139.6686454,
+    "ast_hash": "cd97ba9d6d718416df47eb5f8339458c",
     "semantic_hash": ""
   },
   "components/dashboard/CompanyRevenueLists.tsx": {
-    "mtime": 1794394292.0772552,
-    "ast_hash": "6cc86379d5c7c84050d1c6d90b0bafd8",
+    "mtime": 1794415341.5227108,
+    "ast_hash": "886d190e15b7ab4a9600b07dc2db539c",
     "semantic_hash": ""
   },
   "components/dashboard/DailyRevenueChart.tsx": {
@@ -1325,8 +1325,8 @@
     "semantic_hash": ""
   },
   "components/dashboard/GoalsModal.tsx": {
-    "mtime": 1792777402.8751469,
-    "ast_hash": "a5a51f7bd2a7ac2367a72db448550b3d",
+    "mtime": 1794416816.126407,
+    "ast_hash": "b91c4e2bfc50861bc6dc3d9a2516665f",
     "semantic_hash": ""
   },
   "components/dashboard/RevenueDashboard.tsx": {
@@ -1355,8 +1355,8 @@
     "semantic_hash": ""
   },
   "components/filters/FilialFilter.tsx": {
-    "mtime": 1794394292.0772552,
-    "ast_hash": "d45e022d3a518174fdfe87c1649e5b6b",
+    "mtime": 1794416816.126407,
+    "ast_hash": "752283d6b36c0972d7dde3573222d9c7",
     "semantic_hash": ""
   },
   "components/filters/MultiSelectFilter.tsx": {
@@ -2070,8 +2070,8 @@
     "semantic_hash": ""
   },
   "lib/auth/permissions.ts": {
-    "mtime": 1793884020.0231428,
-    "ast_hash": "b1f1b508d69e2e628f90290298a531f8",
+    "mtime": 1794416783.368725,
+    "ast_hash": "1c7fbaed3041f5861f0e4250df5196e3",
     "semantic_hash": ""
   },
   "lib/auth/users-store-neon.ts": {
@@ -5345,8 +5345,8 @@
     "semantic_hash": ""
   },
   "components/shopify/ShopifyPage.tsx": {
-    "mtime": 1794335591.321321,
-    "ast_hash": "c9c3ceea4262dc6d7092bd75be9b4b07",
+    "mtime": 1794418422.0619044,
+    "ast_hash": "512ae833b9553202aba5778a35a7594f",
     "semantic_hash": ""
   },
   "lib/mcp/precos.ts": {
@@ -5375,8 +5375,8 @@
     "semantic_hash": ""
   },
   "lib/shopify/dashboard.ts": {
-    "mtime": 1794394010.0953155,
-    "ast_hash": "8a11a4f74fed27c8fb392d7ba9bf33a3",
+    "mtime": 1794418170.0030932,
+    "ast_hash": "b9325824c3da200e36b8fbdcc2fd2e14",
     "semantic_hash": ""
   },
   "lib/shopify/orders-store.ts": {
@@ -5465,8 +5465,8 @@
     "semantic_hash": ""
   },
   "lib/shopify/dashboard-principal.ts": {
-    "mtime": 1794395160.7851222,
-    "ast_hash": "d18bcfb5b331ccbdb01ca4bef2d00cbd",
+    "mtime": 1794415354.5712912,
+    "ast_hash": "c1fbb0f5528925809726f6455e4ecec8",
     "semantic_hash": ""
   },
   "app/api/etiquetas/cores/codigos/route.ts": {
@@ -5477,6 +5477,36 @@
   "app/api/precos/custo-faltante/route.ts": {
     "mtime": 1794408838.821746,
     "ast_hash": "95a27e4326d6335dc5f89955fad0acfa",
+    "semantic_hash": ""
+  },
+  "components/shopify/ShopifyBadge.tsx": {
+    "mtime": 1794415339.751959,
+    "ast_hash": "57cfd17ceddeccc713d65ec0869c9871",
+    "semantic_hash": ""
+  },
+  "lib/shopify/produto-shopify.ts": {
+    "mtime": 1794415338.1230063,
+    "ast_hash": "1f076030204e15400017fb114ab033f6",
+    "semantic_hash": ""
+  },
+  "app/api/black-friday/meta/route.ts": {
+    "mtime": 1794418157.9721818,
+    "ast_hash": "d60ade4b675221a1a19d325bb6f4fd14",
+    "semantic_hash": ""
+  },
+  "app/api/shopify/meta/route.ts": {
+    "mtime": 1794418183.085629,
+    "ast_hash": "c0c5731ad19e0fc72edaa9d869655f61",
+    "semantic_hash": ""
+  },
+  "components/shopify/ShopifyVendaDia.tsx": {
+    "mtime": 1794418400.4595087,
+    "ast_hash": "2e4002f602cabe9ef15a29dfa4991367",
+    "semantic_hash": ""
+  },
+  "lib/utils/metas-paineis-store.ts": {
+    "mtime": 1794418157.1514108,
+    "ast_hash": "2d540c84972cbce2e1cc2d6737a483ae",
     "semantic_hash": ""
   }
 }

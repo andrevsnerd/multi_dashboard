@@ -1702,3 +1702,182 @@
 :global(:root[data-theme="dark"]) .obsModalButtonPrimary {
   background: #4d7fff;
 }
+
+/* ── meta da Black (quadro diário) ── */
+
+.metaBox {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  border: 1px solid var(--b-200);
+  border-radius: 12px;
+  background: var(--bf-good-bg);
+}
+
+.metaVazia {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  background: transparent;
+  border-style: dashed;
+  color: var(--t-500);
+  font-size: 14px;
+}
+
+.metaTopo {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px 24px;
+  flex-wrap: wrap;
+}
+
+.metaNumeros {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.metaRotulo {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--t-500);
+}
+
+.metaNumeros strong {
+  font-size: 22px;
+  color: var(--t-900);
+}
+
+.metaNumeros small {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--t-500);
+}
+
+.metaPct {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--t-700);
+}
+
+.metaOk,
+.metaOkText {
+  color: var(--bf-good-text);
+}
+
+.metaInfo {
+  display: flex;
+  align-items: center;
+  gap: 6px 18px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--t-600, var(--t-500));
+  font-variant-numeric: tabular-nums;
+}
+
+.metaInfo strong {
+  color: var(--t-900);
+}
+
+.metaInfo strong.metaOkText {
+  color: var(--bf-good-text);
+}
+
+.metaEditar {
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--bf-blue);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.metaBarra {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--b-200);
+  overflow: hidden;
+}
+
+.metaBarraFill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--bf-good);
+  transition: width 0.3s;
+}
+
+.metaForm {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.metaForm label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--t-500);
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.metaForm input {
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--b-300);
+  border-radius: 8px;
+  background: var(--s-white);
+  color: var(--t-900);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.metaForm .btnGhost {
+  height: 36px;
+}
+
+.metaErro {
+  font-size: 13px;
+  color: var(--bf-crit-text);
+}
+
+.metaDica {
+  font-size: 12px;
+  color: var(--t-500);
+}
+
+.chartMeta {
+  border-top-color: var(--bf-good);
+}
+
+.chartMeta span {
+  color: var(--bf-good-text);
+  font-weight: 600;
+}
+
+.chartBar.chartBarMeta {
+  background: var(--bf-good);
+}
+
+.chartBar.chartBarHoje.chartBarMeta,
+:global(:root[data-theme="dark"]) .chartBar.chartBarHoje.chartBarMeta {
+  background: repeating-linear-gradient(135deg, var(--bf-good) 0 6px, #067a06 6px 9px);
+}
+
+:global(:root[data-theme="dark"]) .metaBox {
+  border-color: var(--b-subtle, var(--b-200));
+}

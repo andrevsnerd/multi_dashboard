@@ -3,6 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/components/auth/AuthContext";
+import { canEditarMetaPainel } from "@/lib/auth/permissions";
 import type { CompanyKey } from "@/lib/config/company";
 
 import styles from "./BlackFridayPage.module.css";
@@ -462,6 +463,49 @@ export default function BlackFridayPage({ companyKey, companyName }: Props) {
     [observacoes, companyKey, username]
   );
 
+  /* ── meta geral da Black (R$ dos itens da Black), uma por empresa e ano ── */
+
+  const anoBlack = painelRaw ? (painelRaw.inicio ?? painelRaw.hoje).slice(0, 4) : null;
+  const [metaBlack, setMetaBlack] = useState(0);
+  useEffect(() => {
+    if (!username || !anoBlack) return;
+    let ativo = true;
+    fetch(`/api/black-friday/meta?company=${companyKey}&ano=${anoBlack}`, {
+      cache: "no-store",
+      headers: { "x-auth-username": username },
+    })
+      .then((r) => r.json())
+      .then((json: { data?: { valor: number } | null }) => {
+        if (ativo) setMetaBlack(json.data?.valor ?? 0);
+      })
+      .catch(() => {
+        if (ativo) setMetaBlack(0);
+      });
+    return () => {
+      ativo = false;
+    };
+  }, [companyKey, username, anoBlack]);
+
+  const salvarMetaBlack = useCallback(
+    async (valor: number): Promise<string | null> => {
+      if (!anoBlack) return "Campanha sem data de início.";
+      try {
+        const res = await fetch("/api/black-friday/meta", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-auth-username": username },
+          body: JSON.stringify({ company: companyKey, ano: anoBlack, valor }),
+        });
+        const json = (await res.json().catch(() => ({}))) as { data?: { valor: number } | null; error?: string };
+        if (!res.ok || json.error) throw new Error(json.error || "Erro ao salvar a meta.");
+        setMetaBlack(json.data?.valor ?? 0);
+        return null;
+      } catch (e) {
+        return e instanceof Error ? e.message : "Erro ao salvar a meta.";
+      }
+    },
+    [anoBlack, companyKey, username]
+  );
+
   /* ── derivados ── */
 
   const diasRestantes = useMemo(() => {
@@ -868,7 +912,20 @@ export default function BlackFridayPage({ companyKey, companyName }: Props) {
           </section>
 
           {/* ── curva diária ── */}
-          <GraficoDiario serie={serie} baseVendasDia={resumo.vendasBase / baseDias} baseQtdeDia={resumo.qtdeBase / baseDias} hoje={painel!.hoje} />
+          <GraficoDiario
+            serie={serie}
+            baseVendasDia={resumo.vendasBase / baseDias}
+            baseQtdeDia={resumo.qtdeBase / baseDias}
+            hoje={painel!.hoje}
+            meta={metaBlack}
+            vendido={resumo.vendas}
+            vendidoHoje={resumo.vendasHoje}
+            diasCampanha={diasEntre(painel!.inicio!, fim)}
+            diasRestantes={diasRestantes}
+            fim={fim}
+            podeEditar={canEditarMetaPainel(user?.role)}
+            onSalvarMeta={salvarMetaBlack}
+          />
 
           {/* ── abas ── */}
           <nav className={styles.tabs}>
@@ -1473,22 +1530,222 @@ function Th({
 
 /* ── gráfico diário (barras em HTML, 1 série + linha de referência) ── */
 
+/** Dias de `inicio` a `fim`, contando os dois (mínimo 1). */
+function diasEntre(inicio: string, fim: string): number {
+  const ms = (ymd: string) => {
+    const [y, m, d] = ymd.split("-").map(Number);
+    return Date.UTC(y, m - 1, d);
+  };
+  return Math.max(1, Math.round((ms(fim) - ms(inicio)) / 86_400_000) + 1);
+}
+
+/** Aceita "500000", "500.000", "500.000,50", "R$ 1.500", "1500.5" e "500 mil". NaN = inválido. */
+function parseValorBR(raw: string): number {
+  let s = raw.trim().toLowerCase().replace(/r\$|\s/g, "");
+  let mult = 1;
+  if (s.endsWith("mil")) {
+    mult = 1000;
+    s = s.slice(0, -3);
+  }
+  if (!s) return NaN;
+  let normalizado: string;
+  if (s.includes(",")) normalizado = s.replace(/\./g, "").replace(",", ".");
+  else if (/^\d{1,3}(\.\d{3})+$/.test(s)) normalizado = s.replace(/\./g, "");
+  else normalizado = s;
+  const n = Number(normalizado) * mult;
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : NaN;
+}
+
+/** Meta geral da Black: vendido × meta, meta do dia, ritmo que falta + edição. */
+function MetaBlack({
+  meta,
+  vendido,
+  vendidoHoje,
+  diasCampanha,
+  diasRestantes,
+  fim,
+  podeEditar,
+  onSalvar,
+}: {
+  meta: number;
+  vendido: number;
+  vendidoHoje: number;
+  diasCampanha: number;
+  diasRestantes: number;
+  fim: string;
+  podeEditar: boolean;
+  onSalvar: (valor: number) => Promise<string | null>;
+}) {
+  const [editando, setEditando] = useState(false);
+  const [rascunho, setRascunho] = useState("");
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  const abrir = () => {
+    setRascunho(meta > 0 ? String(Math.round(meta)) : "");
+    setErro(null);
+    setEditando(true);
+  };
+  const salvar = async (valor: number) => {
+    setSalvando(true);
+    const e = await onSalvar(valor);
+    setSalvando(false);
+    if (e) setErro(e);
+    else setEditando(false);
+  };
+  const confirmar = () => {
+    const v = parseValorBR(rascunho);
+    if (!Number.isFinite(v)) {
+      setErro("Valor inválido. Ex.: 500000 ou 500 mil.");
+      return;
+    }
+    void salvar(v);
+  };
+
+  if (editando) {
+    return (
+      <div className={styles.metaBox}>
+        <form
+          className={styles.metaForm}
+          onSubmit={(e) => {
+            e.preventDefault();
+            confirmar();
+          }}
+        >
+          <label>
+            <span>Meta da Black (R$ dos itens da Black, campanha inteira)</span>
+            <input
+              autoFocus
+              inputMode="decimal"
+              placeholder="Ex.: 500000 ou 500 mil"
+              value={rascunho}
+              onChange={(e) => setRascunho(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") setEditando(false);
+              }}
+            />
+          </label>
+          <button type="submit" className={styles.btnPrimary} disabled={salvando}>
+            {salvando ? "Salvando…" : "Salvar"}
+          </button>
+          <button type="button" className={styles.btnGhost} onClick={() => setEditando(false)} disabled={salvando}>
+            Cancelar
+          </button>
+          {meta > 0 && (
+            <button type="button" className={styles.btnGhost} onClick={() => void salvar(0)} disabled={salvando}>
+              Tirar meta
+            </button>
+          )}
+        </form>
+        {erro && <span className={styles.metaErro}>{erro}</span>}
+        <span className={styles.metaDica}>
+          Meta do dia = meta ÷ {diasCampanha} dias de campanha (do início da Black até {fmtDia(fim)}, o &quot;Fim da
+          Black&quot;).
+        </span>
+      </div>
+    );
+  }
+
+  if (meta <= 0) {
+    return (
+      <div className={`${styles.metaBox} ${styles.metaVazia}`}>
+        <span>Sem meta da Black definida.</span>
+        {podeEditar && (
+          <button type="button" className={styles.btnGhost} onClick={abrir}>
+            + Definir meta da Black
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  const pct = vendido / meta;
+  const metaDia = meta / diasCampanha;
+  const falta = Math.max(0, meta - vendido);
+  // Dias que faltam contando o resto de hoje (fração) — o mesmo número da "Sobra prevista".
+  const precisaDia = diasRestantes > 0 ? falta / diasRestantes : null;
+  const pctHoje = metaDia > 0 ? vendidoHoje / metaDia : 0;
+
+  return (
+    <div className={styles.metaBox}>
+      <div className={styles.metaTopo}>
+        <div className={styles.metaNumeros}>
+          <span className={styles.metaRotulo}>Meta da Black</span>
+          <strong>
+            {fmtR0(vendido)} <small>de {fmtR0(meta)}</small>
+          </strong>
+          <span className={`${styles.metaPct} ${pct >= 1 ? styles.metaOk : ""}`}>{fmtPct(pct, 1)}</span>
+        </div>
+        <div className={styles.metaInfo}>
+          <span>
+            Meta do dia <strong>{fmtR0(metaDia)}</strong>
+          </span>
+          <span>
+            Hoje <strong className={pctHoje >= 1 ? styles.metaOkText : undefined}>{fmtR0(vendidoHoje)}</strong> (
+            {fmtPct(pctHoje)})
+          </span>
+          <span>
+            {falta <= 0 ? (
+              <strong className={styles.metaOkText}>Meta batida</strong>
+            ) : precisaDia !== null ? (
+              <>
+                Faltam <strong>{fmtR0(falta)}</strong> → <strong>{fmtR0(precisaDia)}/dia</strong>
+              </>
+            ) : (
+              <>
+                Ficaram faltando <strong>{fmtR0(falta)}</strong>
+              </>
+            )}
+          </span>
+          {podeEditar && (
+            <button type="button" className={styles.metaEditar} onClick={abrir} title="Alterar a meta da Black">
+              Editar meta
+            </button>
+          )}
+        </div>
+      </div>
+      <div className={styles.metaBarra} aria-hidden>
+        <div className={styles.metaBarraFill} style={{ width: `${Math.min(100, pct * 100)}%` }} />
+      </div>
+    </div>
+  );
+}
+
 function GraficoDiario({
   serie,
   baseVendasDia,
   baseQtdeDia,
   hoje,
+  meta,
+  vendido,
+  vendidoHoje,
+  diasCampanha,
+  diasRestantes,
+  fim,
+  podeEditar,
+  onSalvarMeta,
 }: {
   serie: Array<{ dia: string; v: number; q: number }>;
   baseVendasDia: number;
   baseQtdeDia: number;
   hoje: string;
+  meta: number;
+  vendido: number;
+  vendidoHoje: number;
+  diasCampanha: number;
+  diasRestantes: number;
+  fim: string;
+  podeEditar: boolean;
+  onSalvarMeta: (valor: number) => Promise<string | null>;
 }) {
   const [modo, setModo] = useState<"v" | "q">("v");
   const [hover, setHover] = useState<number | null>(null);
   const valores = serie.map((s) => (modo === "v" ? s.v : s.q));
   const base = modo === "v" ? baseVendasDia : baseQtdeDia;
-  const max = Math.max(1, base * 1.15, ...valores);
+  // Em R$ com meta: a linha passa a ser a META DO DIA. Sem meta (ou em peças): média de antes.
+  const metaDia = modo === "v" && meta > 0 ? meta / diasCampanha : 0;
+  const linha = metaDia > 0 ? metaDia : base;
+  const max = Math.max(1, linha * 1.15, ...valores);
   const fmt = (n: number) => (modo === "v" ? fmtR0(n) : `${fmtQ(n)} pç`);
   const sel = hover !== null ? serie[hover] : null;
 
@@ -1498,7 +1755,9 @@ function GraficoDiario({
         <div>
           <h2 className={styles.cardTitle}>Venda dos itens da Black por dia</h2>
           <p className={styles.cardSub}>
-            Linha tracejada = média diária dos mesmos itens nos 28 dias antes da Black (preço cheio).
+            {metaDia > 0
+              ? "Linha verde = meta do dia (meta da Black ÷ dias de campanha). Barra verde = dia que bateu a meta."
+              : "Linha tracejada = média diária dos mesmos itens nos 28 dias antes da Black (preço cheio)."}
           </p>
         </div>
         <div className={styles.segmented}>
@@ -1511,6 +1770,17 @@ function GraficoDiario({
         </div>
       </div>
 
+      <MetaBlack
+        meta={meta}
+        vendido={vendido}
+        vendidoHoje={vendidoHoje}
+        diasCampanha={diasCampanha}
+        diasRestantes={diasRestantes}
+        fim={fim}
+        podeEditar={podeEditar}
+        onSalvar={onSalvarMeta}
+      />
+
       <div className={styles.chart} onMouseLeave={() => setHover(null)}>
         <div className={styles.chartTooltip} style={{ visibility: sel ? "visible" : "hidden" }}>
           {sel && (
@@ -1520,6 +1790,11 @@ function GraficoDiario({
                 {sel.dia === hoje ? " (até agora)" : ""}
               </strong>
               <span>{fmtR(sel.v)} · {fmtQ(sel.q)} pç</span>
+              {metaDia > 0 && (
+                <span className={sel.v >= metaDia ? styles.metaOkText : styles.sub}>
+                  {fmtPct(sel.v / metaDia)} da meta do dia ({fmtR0(metaDia)})
+                </span>
+              )}
               {base > 0 && (
                 <span className={styles.sub}>
                   {fmtX((modo === "v" ? sel.v : sel.q) / base)} a média de antes ({fmt(base)}/dia)
@@ -1529,14 +1804,18 @@ function GraficoDiario({
           )}
         </div>
         <div className={styles.chartPlot}>
-          {base > 0 && (
-            <div className={styles.chartBase} style={{ bottom: `${(base / max) * 100}%` }}>
-              <span>antes: {fmt(base)}/dia</span>
+          {linha > 0 && (
+            <div
+              className={`${styles.chartBase} ${metaDia > 0 ? styles.chartMeta : ""}`}
+              style={{ bottom: `${(linha / max) * 100}%` }}
+            >
+              <span>{metaDia > 0 ? `meta do dia: ${fmt(metaDia)}` : `antes: ${fmt(base)}/dia`}</span>
             </div>
           )}
           {serie.map((s, i) => {
             const v = valores[i];
             const h = Math.max(0, (v / max) * 100);
+            const bateu = metaDia > 0 && s.v >= metaDia;
             return (
               <div
                 key={s.dia}
@@ -1544,10 +1823,10 @@ function GraficoDiario({
                 onMouseEnter={() => setHover(i)}
                 onFocus={() => setHover(i)}
                 tabIndex={0}
-                aria-label={`${fmtDia(s.dia)}: ${fmt(v)}`}
+                aria-label={`${fmtDia(s.dia)}: ${fmt(v)}${bateu ? " (bateu a meta do dia)" : ""}`}
               >
                 <div
-                  className={`${styles.chartBar} ${s.dia === hoje ? styles.chartBarHoje : ""} ${hover === i ? styles.chartBarHover : ""}`}
+                  className={`${styles.chartBar} ${s.dia === hoje ? styles.chartBarHoje : ""} ${bateu ? styles.chartBarMeta : ""} ${hover === i ? styles.chartBarHover : ""}`}
                   style={{ height: `${h}%` }}
                 />
               </div>

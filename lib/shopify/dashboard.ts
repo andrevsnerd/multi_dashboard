@@ -397,3 +397,36 @@ export async function fetchShopifyResumo(
 
 /** Reuso na tela principal (dashboard): mesmas contas da página Shopify. */
 export { fetchKpis as fetchShopifyKpis, fetchSerie as fetchShopifySerie };
+
+export interface ShopifyDiaMes {
+  /** YYYY-MM-DD */
+  dia: string;
+  venda: number;
+  frete: number;
+  pedidos: number;
+  /** Dia que ainda não chegou (sem venda; aparece só para mostrar a meta). */
+  futuro: boolean;
+}
+
+/**
+ * Venda do Shopify dia a dia no mês inteiro (`YYYY-MM`), mesma regra da página (pedido pago
+ * no dia do pedido − devolução no dia do reembolso). Os dias que ainda não chegaram vêm
+ * zerados com `futuro: true` — a página usa para acompanhar o vendido × meta diária.
+ */
+export async function fetchShopifySerieMes(company: ShopifyCompany, mes: string): Promise<ShopifyDiaMes[]> {
+  if (!/^\d{4}-\d{2}$/.test(mes)) throw new Error("Mês inválido.");
+  await ensureShopifyTables();
+  const [y, m] = mes.split("-").map(Number);
+  const diasNoMes = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const from = brtMidnight(`${mes}-01`);
+  const to = new Date(from.getTime() + diasNoMes * DAY_MS);
+  const hoje = todayBrt();
+  const serie = await fetchSerie(company, from, to, false);
+  const dias: ShopifyDiaMes[] = [];
+  for (let d = 1; d <= diasNoMes; d += 1) {
+    const dia = `${mes}-${String(d).padStart(2, "0")}`;
+    const s = serie.get(dia);
+    dias.push({ dia, venda: s?.venda ?? 0, frete: s?.frete ?? 0, pedidos: s?.pedidos ?? 0, futuro: dia > hoje });
+  }
+  return dias;
+}
