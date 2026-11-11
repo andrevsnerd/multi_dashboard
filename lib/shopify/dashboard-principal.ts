@@ -5,6 +5,7 @@ import { getNeonSql } from "@/lib/db/neon";
 import type { ShopifyCompany } from "@/lib/shopify/config";
 import { fetchShopifyKpis, fetchShopifySerie } from "@/lib/shopify/dashboard";
 import { ensureShopifyTables } from "@/lib/shopify/orders-store";
+import { idProdutoShopify } from "@/lib/shopify/produto-shopify";
 import { normalizeRangeForQuery, shiftRangeByMonths } from "@/lib/utils/date";
 import type { CategoryRevenue, DateRangeInput, ProductRevenue } from "@/types/dashboard";
 
@@ -178,7 +179,7 @@ export async function fetchParteShopifyDashboard(params: {
   const cat = new Map<string, CategoryRevenue>();
   for (const l of atuais) {
     const c = l.produto ? cad.get(up(l.produto)) : undefined;
-    const id = l.produto ? l.produto : `SHOPIFY:${l.product_id ?? l.title}`;
+    const id = l.produto ? l.produto : idProdutoShopify(l.product_id ?? l.title);
     const nome = l.produto ? c?.desc || l.produto : l.title;
     const v = comF(l.net, l.f);
     const p = prod.get(id) ?? { productId: id, productName: nome, totalRevenue: 0, totalQuantity: 0, stock: 0 };
@@ -201,7 +202,7 @@ export async function fetchParteShopifyDashboard(params: {
          FROM shopify_variants WHERE company = $1 AND product_id = ANY($2::text[]) GROUP BY 1`,
       [company, semVinculo],
     )) as Array<{ product_id: string; q: number }>;
-    for (const r of rows) estoqueShopify.set(`SHOPIFY:${r.product_id}`, Number(r.q ?? 0));
+    for (const r of rows) estoqueShopify.set(idProdutoShopify(r.product_id), Number(r.q ?? 0));
   }
 
   const ultima = atuais.reduce<string | null>((m, l) => (!m || l.created_at > m ? l.created_at : m), null);

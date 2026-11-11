@@ -5,6 +5,9 @@ import { useEffect, useMemo, useState } from "react";
 import type { CategoryRevenue, ProductRevenue, FilialPerformance, MetricSummary } from "@/types/dashboard";
 import { isEcommerceFilial, SHOPIFY_VALUE, VAREJO_VALUE } from "@/lib/config/company";
 
+import { ShopifyBadge } from "@/components/shopify/ShopifyBadge";
+import { isProdutoSoShopify } from "@/lib/shopify/produto-shopify";
+
 import styles from "./RevenueDashboard.module.css";
 
 export interface CompanyRevenueListsProps {
@@ -292,9 +295,12 @@ export default function CompanyRevenueLists({
               {state.products.map((item) => (
                 <li key={item.productId} className={styles.listItem}>
                   <div className={styles.itemNameContainer}>
-                    <strong className={styles.itemName}>{item.productName}</strong>
+                    <strong className={styles.itemName}>
+                      {item.productName}
+                      {isProdutoSoShopify(item.productId) && <ShopifyBadge />}
+                    </strong>
                     <p className={styles.itemSubtitle}>
-                      {item.productId.startsWith("SHOPIFY:") ? "Shopify · sem vínculo no Linx" : item.productId}
+                      {isProdutoSoShopify(item.productId) ? "sem cadastro no Linx" : item.productId}
                     </p>
                   </div>
                   <div className={styles.itemMetrics}>

@@ -1,0 +1,18 @@
+/* Selo neutro (tokens do tema): nunca verde — a Scarf Me não usa verde. */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border: 1px solid var(--b-300);
+  border-radius: 999px;
+  background: var(--s-100);
+  color: var(--t-600);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+  white-space: nowrap;
+}

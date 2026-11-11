@@ -18,6 +18,7 @@ import {
 } from '@/lib/config/company';
 import { getShopifyCredentials, isShopifyCompany } from '@/lib/shopify/config';
 import { fetchParteShopifyDashboard, type ParteShopify } from '@/lib/shopify/dashboard-principal';
+import { isProdutoSoShopify } from '@/lib/shopify/produto-shopify';
 import { runShopifyIncrementalSync } from '@/lib/shopify/sync';
 import { readGoals } from '@/lib/utils/goals-storage';
 import { MATRIZ_FILIAIS } from '@/lib/blackfriday/datas';
@@ -231,7 +232,7 @@ export async function GET(request: Request) {
     // Itens que já vieram do Linx (lojas) mantêm o estoque que o Linx devolveu, sem mudança.
     const doLinx = new Set(topProductsLinx.map((l) => l.productId.trim().toUpperCase()));
     const soShopify = topProducts.filter((p) => !doLinx.has(p.productId.trim().toUpperCase()));
-    const vinculados = soShopify.filter((p) => !p.productId.startsWith('SHOPIFY:'));
+    const vinculados = soShopify.filter((p) => !isProdutoSoShopify(p.productId));
     if (vinculados.length > 0) {
       // Scarf Me: só os CNPJs de e-commerce do Linx. NERD (sem e-commerce no Linx): matriz.
       const mapa = await fetchMultipleProductsStock(
@@ -244,7 +245,7 @@ export async function GET(request: Request) {
       for (const p of vinculados) p.stock = Math.max(0, mapa.get(p.productId) ?? mapa.get(p.productId.trim()) ?? 0);
     }
     for (const p of soShopify) {
-      if (p.productId.startsWith('SHOPIFY:')) p.stock = parte.estoqueShopify.get(p.productId) ?? 0;
+      if (isProdutoSoShopify(p.productId)) p.stock = parte.estoqueShopify.get(p.productId) ?? 0;
     }
 
     const catMap = new Map(topCategoriesLinx.map((c) => [String(c.categoryId).trim().toUpperCase(), { ...c }]));
