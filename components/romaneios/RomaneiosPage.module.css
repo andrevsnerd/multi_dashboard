@@ -72,6 +72,17 @@
   color: #fff;
 }
 
+.tabActiveRevisao {
+  background: #ca8a04;
+  color: #fff;
+  border-color: #ca8a04;
+}
+
+.tabActiveRevisao:hover {
+  background: #a16207;
+  color: #fff;
+}
+
 .tabActiveDuplicados {
   background: #dc2626;
   color: #fff;
@@ -352,6 +363,19 @@
   white-space: nowrap;
 }
 
+/* Conferência parcial da loja esperando a logística (nada entrou ainda). */
+.badgeAguardandoLogistica {
+  font-size: 11px;
+  font-weight: 700;
+  color: #713f12;
+  background: #fde047;
+  border: 1px solid #eab308;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
 .confirmadosParcial {
   font-size: 12px;
   color: #92400e;
@@ -520,6 +544,11 @@
   color: #fecaca;
   background: rgba(239, 68, 68, 0.3);
   border: 1px solid rgba(239, 68, 68, 0.6);
+}
+:global(:root[data-theme="dark"]) .badgeAguardandoLogistica {
+  color: #fde68a;
+  background: rgba(234, 179, 8, 0.25);
+  border: 1px solid rgba(234, 179, 8, 0.6);
 }
 :global(:root[data-theme="dark"]) .confirmadosParcial {
   color: #fbbf24;

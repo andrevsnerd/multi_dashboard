@@ -21,6 +21,8 @@ import { mensagemTravaInventario, verificarTravaInventario } from '@/lib/server/
 import { mensagemTravaEstoqueNegativo, verificarSaldoSaida } from '@/lib/server/trava-estoque-negativo';
 import { montarObsOperacao } from '@/lib/server/obs-operacao';
 import { verificarConfirmacaoDentroDoRomaneio } from '@/lib/server/trava-confirmacao-acima-romaneio';
+import { verificarConferenciaIntegral } from '@/lib/server/trava-conferencia-integral';
+import { canRevisarConferencia } from '@/lib/auth/permissions';
 import {
   carregarGrades,
   preencherTamanhosPelaSaida,
@@ -439,6 +441,27 @@ export async function POST(request: Request) {
       }
       if (acima) {
         return NextResponse.json({ error: acima, code: 'ACIMA_DO_ROMANEIO' }, { status: 409 });
+      }
+    }
+
+    // TRAVA — conferência parcial da loja não vira entrada: vai para a revisão da
+    // logística, que aprova uma entrada só. Logística/admin passam (são eles que
+    // aprovam). Ver lib/server/trava-conferencia-integral.ts.
+    if (tipoOperacao === 'entrada' && ref?.romaneio && ref.filialOrigem && !canRevisarConferencia(user.role)) {
+      let parcial: string | null = null;
+      try {
+        parcial = await verificarConferenciaIntegral({
+          romaneioSaida: ref.romaneio,
+          filialOrigem: ref.filialOrigem,
+          itens: itensComTamanho,
+          grades,
+        });
+      } catch (travaError) {
+        // Fail-open, como as outras travas: a tela já manda a parcial para a revisão.
+        console.error('Erro ao verificar conferência integral', travaError);
+      }
+      if (parcial) {
+        return NextResponse.json({ error: parcial, code: 'CONFERENCIA_PARCIAL' }, { status: 409 });
       }
     }
 

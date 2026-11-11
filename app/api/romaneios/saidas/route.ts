@@ -9,6 +9,7 @@ import { getActiveFilial } from "@/lib/config/company";
 import { resolveCompanyDynamic } from "@/lib/config/company-server";
 import { getContadorConfirmadosByCompany } from "@/lib/utils/romaneio-confirmacao-store";
 import { getConferenciasDivergentes } from "@/lib/server/romaneio-conferencia";
+import { getRevisoesPendentes } from "@/lib/utils/romaneio-revisao-store";
 import {
   filiaisDeOperacao,
   normalizeFilialCmp,
@@ -69,13 +70,18 @@ export async function GET(request: NextRequest) {
 
     // Passa as filiais da empresa para a query filtrar no SQL (antes do TOP),
     // garantindo que o teto de linhas seja por empresa e nunca misture NERD + SCARFME.
-    const [saidas, destinosMap, confirmadosCounter, conferencias] = await Promise.all([
+    const [saidas, destinosMap, confirmadosCounter, conferencias, revisoes] = await Promise.all([
       fetchLogSaidas(1000, 90, search, filiaisInventory),
       getAllDestinosByCompany(companyKey),
       getContadorConfirmadosByCompany(companyKey),
       // Selo "parcialmente confirmado": gravado na confirmação, aqui só lido.
       getConferenciasDivergentes(companyKey).catch((e) => {
         console.error("Erro ao ler conferências de romaneios", e);
+        return new Map();
+      }),
+      // Selo amarelo "Aguardando logística": conferência parcial da loja em revisão.
+      getRevisoesPendentes(companyKey).catch((e) => {
+        console.error("Erro ao ler revisões de conferência", e);
         return new Map();
       }),
     ]);
@@ -104,6 +110,12 @@ export async function GET(request: NextRequest) {
         destinoCodigo,
         qtdConfirmados,
         conferencia: qtdConfirmados > 0 ? conferencia : undefined,
+        // Com item confirmado a revisão já foi resolvida (mesmo se o fechamento falhou).
+        revisaoPendente:
+          qtdConfirmados === 0 && destinoCodigo
+            ? (revisoes.get(`${s.romaneio}|${destinoCodigo}`) ??
+               (destinoOriginal ? revisoes.get(`${s.romaneio}|${destinoOriginal}`) : undefined))
+            : undefined,
       };
     });
 

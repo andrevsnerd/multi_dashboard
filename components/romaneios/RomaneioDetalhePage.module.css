@@ -1210,3 +1210,76 @@
   text-align: right;
   margin-right: 2px;
 }
+
+/* Conferência parcial da loja aguardando a logística (romaneio-revisao-store). */
+.revisaoBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background: #fef9c3;
+  color: #713f12;
+  border: 1px solid #eab308;
+  border-left: 4px solid #ca8a04;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.revisaoBannerTexto {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.revisaoCancelarBtn {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #713f12;
+  background: #fff;
+  border: 1px solid #ca8a04;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.revisaoCancelarBtn:hover:not(:disabled) {
+  background: #fef08a;
+}
+
+.revisaoCancelarBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.revisaoLojaHint {
+  font-size: 11px;
+  font-weight: 600;
+  color: #a16207;
+}
+
+:global(:root[data-theme="dark"]) .revisaoBanner {
+  background: rgba(234, 179, 8, 0.14);
+  color: #fde68a;
+  border-color: rgba(234, 179, 8, 0.5);
+  border-left-color: #eab308;
+}
+
+:global(:root[data-theme="dark"]) .revisaoCancelarBtn {
+  color: #fde68a;
+  background: transparent;
+  border-color: rgba(234, 179, 8, 0.6);
+}
+
+:global(:root[data-theme="dark"]) .revisaoCancelarBtn:hover:not(:disabled) {
+  background: rgba(234, 179, 8, 0.2);
+}
+
+:global(:root[data-theme="dark"]) .revisaoLojaHint {
+  color: #fcd34d;
+}

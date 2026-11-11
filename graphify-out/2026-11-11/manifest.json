@@ -1255,8 +1255,8 @@
     "semantic_hash": "f14ad53955a1f58097f889108f54d206"
   },
   "components/blackfriday/BlackFridayPage.tsx": {
-    "mtime": 1794418286.6348553,
-    "ast_hash": "42ff523647eb46a03f6021a44a6bfda5",
+    "mtime": 1794418671.5344505,
+    "ast_hash": "cec15d854c7107a5acc17fcff99c2098",
     "semantic_hash": ""
   },
   "components/clientes/ClienteDetalhePage.tsx": {
@@ -2070,8 +2070,8 @@
     "semantic_hash": ""
   },
   "lib/auth/permissions.ts": {
-    "mtime": 1794416783.368725,
-    "ast_hash": "1c7fbaed3041f5861f0e4250df5196e3",
+    "mtime": 1794418664.933117,
+    "ast_hash": "f325c6d22cbd3d49ff5ab64786c9d2f5",
     "semantic_hash": ""
   },
   "lib/auth/users-store-neon.ts": {
@@ -5345,8 +5345,8 @@
     "semantic_hash": ""
   },
   "components/shopify/ShopifyPage.tsx": {
-    "mtime": 1794418422.0619044,
-    "ast_hash": "512ae833b9553202aba5778a35a7594f",
+    "mtime": 1794418669.8530853,
+    "ast_hash": "e6428a902ac204a768d8fd62d32a7b54",
     "semantic_hash": ""
   },
   "lib/mcp/precos.ts": {
@@ -5490,13 +5490,13 @@
     "semantic_hash": ""
   },
   "app/api/black-friday/meta/route.ts": {
-    "mtime": 1794418157.9721818,
-    "ast_hash": "d60ade4b675221a1a19d325bb6f4fd14",
+    "mtime": 1794418666.565454,
+    "ast_hash": "10efefb461f66bca3e1e3cf84b06c616",
     "semantic_hash": ""
   },
   "app/api/shopify/meta/route.ts": {
-    "mtime": 1794418183.085629,
-    "ast_hash": "c0c5731ad19e0fc72edaa9d869655f61",
+    "mtime": 1794418668.1692033,
+    "ast_hash": "fdff70672756a7444161b70bfbc2254b",
     "semantic_hash": ""
   },
   "components/shopify/ShopifyVendaDia.tsx": {

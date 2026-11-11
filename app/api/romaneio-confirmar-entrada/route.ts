@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { findUserByUsername } from "@/lib/auth/users-store";
-import { isReadOnlyRole, canConfirmarEntradaDefeito } from "@/lib/auth/permissions";
+import { isReadOnlyRole, canConfirmarEntradaDefeito, canRevisarConferencia } from "@/lib/auth/permissions";
+import { resolverRevisao } from "@/lib/utils/romaneio-revisao-store";
 import { getPermissaoByUsername } from "@/lib/utils/transferencia-permissoes-store";
 import { operaNaFilial } from "@/lib/utils/transferencia-permissoes-filiais";
 import {
@@ -257,6 +258,12 @@ export async function POST(request: Request) {
       dataRomaneio?: string;
       /** Peça P/M/G: o que chegou em cada tamanho {posição: qtd}. */
       tamanhosConfirmados?: Record<string, number> | null;
+      /**
+       * `confirmar-lote` da logística aprovando a conferência parcial da loja
+       * (lib/utils/romaneio-revisao-store.ts). Item com 0 entra como "não chegou"
+       * (volta para a origem) e a revisão é fechada no mesmo passo.
+       */
+      aprovacaoRevisao?: boolean;
     };
 
     const { companyKey, romaneioId, filialDestino, produto, corProduto, qtdeConfirmada = 0, acao } = body;
@@ -321,6 +328,13 @@ export async function POST(request: Request) {
     }
 
     if (acao === "confirmar-lote") {
+      const aprovacao = body.aprovacaoRevisao === true;
+      if (aprovacao && !canRevisarConferencia(user.role)) {
+        return NextResponse.json(
+          { error: "Só a logística aprova conferência parcial." },
+          { status: 403 }
+        );
+      }
       // CONFIRMAR TUDO numa chamada só. Antes a tela mandava UMA requisição por
       // item, em sequência, e não olhava a resposta: a que falhava (instância
       // fria, DDL do ensureTable travando a tabela, rede) deixava o item sem
@@ -339,7 +353,9 @@ export async function POST(request: Request) {
           tamanhosConfirmados: it.tamanhosConfirmados ?? null,
           divergente: Boolean(it.divergente),
         }))
-        .filter((it) => it.produto && it.qtdeConfirmada > 0);
+        // Na aprovação da logística, 0 é decisão ("não chegou"): confirma com 0 e a
+        // falta volta para a origem. Fora dela, 0 continua sendo "não confirmado".
+        .filter((it) => it.produto && (it.qtdeConfirmada > 0 || (aprovacao && it.divergente)));
       if (itens.length === 0) {
         return NextResponse.json({ error: "Nenhum item com quantidade para confirmar." }, { status: 400 });
       }
@@ -407,6 +423,19 @@ export async function POST(request: Request) {
       });
 
       await regravarConferencia({ companyKey, romaneioId, filialDestino: filialDestinoAtiva, filialOrigem });
+
+      if (aprovacao) {
+        // Fecha a conferência que aguardava a logística. Falha aqui não desfaz nada:
+        // com itens confirmados, a tela e a listagem já não tratam como pendente.
+        await resolverRevisao({
+          companyKey,
+          romaneioId,
+          filialDestino: filialDestinoAtiva,
+          status: "aprovada",
+          resolvidoPor: username,
+          romaneioEntrada: romEnt,
+        }).catch((e) => console.error("Erro ao fechar revisão da conferência", e));
+      }
 
       return NextResponse.json({ success: true, acao, confirmados: itens.length, origens });
     }

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 
 import { useAuth } from "@/components/auth/AuthContext";
-import { isReadOnlyRole } from "@/lib/auth/permissions";
+import { canRevisarConferencia, isReadOnlyRole } from "@/lib/auth/permissions";
 import { getDefeitoFilial } from "@/lib/config/filiais-especiais";
 import { formatRomaneioDateTimeBrasilia } from "@/lib/utils/romaneios-date";
 import { planejarItensAgrupados } from "@/lib/utils/romaneio-agrupamento";
@@ -141,6 +141,8 @@ async function postConfirmacaoLote(
     filialOrigem?: string;
     romaneioEntrada?: string;
     dataRomaneio?: string;
+    /** Logística aprovando a conferência parcial da loja (item em 0 = não chegou). */
+    aprovacaoRevisao?: boolean;
   }
 ): Promise<{ ok: boolean; error?: string; origens: string[] }> {
   try {
@@ -155,6 +157,71 @@ async function postConfirmacaoLote(
   } catch {
     return { ok: false, error: "Sem resposta do servidor ao gravar as confirmações.", origens: [] };
   }
+}
+
+/**
+ * Conferência parcial da loja aguardando a logística (ver
+ * lib/utils/romaneio-revisao-store.ts). Nada vai ao Linx até a aprovação.
+ */
+interface RevisaoConferencia {
+  status: "pendente" | "aprovada" | "cancelada";
+  itens: Array<{
+    produto: string;
+    corProduto: string;
+    qtdeEnviada: number;
+    qtdeConferida: number;
+    tamanhos?: Record<number, number> | null;
+  }>;
+  pecasEnviadas: number;
+  pecasConferidas: number;
+  enviadoPor: string;
+  enviadoEm: string;
+}
+
+async function fetchRevisao(
+  companyKey: string,
+  romaneioId: string,
+  filialDestino: string
+): Promise<RevisaoConferencia | null> {
+  try {
+    const params = new URLSearchParams({ company: companyKey, romaneio: romaneioId, filialDestino });
+    const res = await fetch(`/api/romaneios/conferencia-revisao?${params.toString()}`, { cache: "no-store" });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { revisao?: RevisaoConferencia | null };
+    return json.revisao ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function postRevisao(
+  username: string,
+  body: Record<string, unknown>
+): Promise<{ ok: boolean; error?: string; revisao?: RevisaoConferencia | null }> {
+  try {
+    const res = await fetch("/api/romaneios/conferencia-revisao", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-auth-username": username },
+      body: JSON.stringify(body),
+    });
+    const json = (await res.json().catch(() => ({}))) as { error?: string; revisao?: RevisaoConferencia | null };
+    if (!res.ok) return { ok: false, error: json.error || "Erro ao gravar a conferência." };
+    return { ok: true, revisao: json.revisao ?? null };
+  } catch {
+    return { ok: false, error: "Sem resposta do servidor ao gravar a conferência." };
+  }
+}
+
+function formatarDataHora(isoValue: string): string {
+  const d = new Date(isoValue);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 /** Registra entrada de estoque em lote (todos os itens no mesmo romaneio). */
@@ -492,6 +559,18 @@ export default function RomaneioDetalhePage({
   const [devolucoesOrigem, setDevolucoesOrigem] = useState<string[]>([]);
   /** Romaneio anterior ao último inventário do destino → só consulta. */
   const [travaInventario, setTravaInventario] = useState<TravaInventarioInfo | null>(null);
+  /** Conferência parcial da loja aguardando a logística (só saídas). */
+  const [revisao, setRevisao] = useState<RevisaoConferencia | null>(null);
+  const [revisaoMsg, setRevisaoMsg] = useState<string | null>(null);
+  const [cancelandoRevisao, setCancelandoRevisao] = useState(false);
+  /** Logística/admin: aprova a conferência parcial da loja (e confirma parcial direto). */
+  const podeRevisar = canRevisarConferencia(user?.role);
+  // Com item confirmado a revisão já foi resolvida, mesmo que o fechamento tenha falhado.
+  const revisaoPendente = isSaida && revisao?.status === "pendente" && confirmados.size === 0;
+  /** Logística revisando: os números vêm da loja e a confirmação é a aprovação. */
+  const emAprovacao = revisaoPendente && podeRevisar;
+  /** Loja esperando a logística: não confirma de novo (só cancela o envio). */
+  const aguardandoLogistica = revisaoPendente && !podeRevisar;
 
   // Inicializa quantidades quando itens carregam
   useEffect(() => {
@@ -616,6 +695,32 @@ export default function RomaneioDetalhePage({
   }, [isSaida, companySlug, romaneioId, destinoSelected]);
 
   useEffect(() => {
+    if (!isSaida || !destinoSelected) {
+      setRevisao(null);
+      return;
+    }
+    let cancelled = false;
+    fetchRevisao(companySlug, romaneioId, destinoSelected).then((r) => {
+      if (!cancelled) setRevisao(r);
+    });
+    return () => { cancelled = true; };
+  }, [isSaida, companySlug, romaneioId, destinoSelected]);
+
+  // Logística revisando: as quantidades começam com o que a loja conferiu.
+  useEffect(() => {
+    if (!emAprovacao || !revisao) return;
+    const qt = new Map<string, number>();
+    const qtTam = new Map<string, Record<number, number>>();
+    for (const it of revisao.itens) {
+      const chave = `${it.produto}|${it.corProduto ?? ""}`;
+      qt.set(chave, it.qtdeConferida);
+      if (it.tamanhos && Object.keys(it.tamanhos).length > 0) qtTam.set(chave, { ...it.tamanhos });
+    }
+    setQuantidades((prev) => new Map([...prev, ...qt]));
+    setQuantidadesTam((prev) => new Map([...prev, ...qtTam]));
+  }, [emAprovacao, revisao]);
+
+  useEffect(() => {
     const fd = isSaida ? destinoSelected : filialDestino;
     if (!fd) {
       setTravaInventario(null);
@@ -646,11 +751,15 @@ export default function RomaneioDetalhePage({
       setErroConfirmacao("Este romaneio já foi confirmado. Os itens pendentes são resolvidos pela logística por ajuste.");
       return false;
     }
+    if (aguardandoLogistica) {
+      setErroConfirmacao("A conferência deste romaneio já está com a logística. Para conferir de novo, cancele o envio.");
+      return false;
+    }
 
     const qtdes = bipadas?.quantidades ?? quantidades;
     const qtdesTam = bipadas?.quantidadesTam ?? quantidadesTam;
 
-    const itensParaConfirmar = itens
+    const conferidos = itens
       .map((item) => {
         const chave = `${item.produto}|${item.corProduto ?? ""}`;
         // Peça P/M/G numa SAÍDA do dashboard: confere tamanho a tamanho. A entrada
@@ -668,6 +777,8 @@ export default function RomaneioDetalhePage({
           quantidade: qtde,
           chave,
           porTamanho,
+          qtdeEnviada: item.qtde,
+          tamanhoDivergente,
           // Conferiu menos do que o romaneio diz (ou noutro tamanho) → a saída é
           // acertada e a diferença volta para a loja. Marcado aqui para que só
           // estes itens paguem a consulta extra no servidor: numa conferência
@@ -682,8 +793,13 @@ export default function RomaneioDetalhePage({
                 ([t, q]) => q > (item.tamanhos!.find((x) => x.ordinal === Number(t))?.qtde ?? 0)
               )),
         };
-      })
-      .filter((i) => i.quantidade > 0);
+      });
+
+    // Logística aprovando a conferência da loja: item em 0 é decisão ("não chegou")
+    // e vai no lote para a falta voltar à origem. Fora disso, 0 = não confirmado.
+    const aprovacao = isSaida && emAprovacao;
+    const itensParaConfirmar = conferidos.filter((i) => i.quantidade > 0 || (aprovacao && i.divergente));
+    const itensEntrada = itensParaConfirmar.filter((i) => i.quantidade > 0);
 
     if (itensParaConfirmar.length === 0) return false;
 
@@ -694,6 +810,43 @@ export default function RomaneioDetalhePage({
           "Peça a mais ou de outro tamanho: avise a logística."
       );
       return false;
+    }
+
+    // Regra do dono (11/11/2026): a loja só lança direto quando confere TUDO como
+    // saiu. Qualquer diferença vai para a logística revisar — nada entra no
+    // estoque até ela aprovar, e aí sai uma entrada só.
+    const integral = conferidos.every((i) => i.quantidade === i.qtdeEnviada && !i.tamanhoDivergente);
+    if (isSaida && !integral && !podeRevisar) {
+      setConfirmandoTudo(true);
+      setErroConfirmacao(null);
+      try {
+        const r = await postRevisao(user.username, {
+          acao: "enviar",
+          companyKey: companySlug,
+          romaneioId,
+          filialDestino: destinoSelected,
+          filialOrigem,
+          dataRomaneio: dataEmissaoProp,
+          itens: conferidos.map((i) => ({
+            produto: i.produto,
+            corProduto: i.corProduto ?? "",
+            qtdeEnviada: i.qtdeEnviada,
+            qtdeConferida: i.quantidade,
+            tamanhos: i.porTamanho,
+          })),
+        });
+        if (!r.ok) {
+          setErroConfirmacao(r.error ?? "Erro ao enviar a conferência para a logística.");
+          return false;
+        }
+        setRevisao(r.revisao ?? (await fetchRevisao(companySlug, romaneioId, destinoSelected)));
+        setRevisaoMsg(
+          "Conferência enviada para a logística. Nada entrou no estoque ainda: a entrada é lançada quando a logística aprovar."
+        );
+        return true;
+      } finally {
+        setConfirmandoTudo(false);
+      }
     }
 
     setConfirmandoTudo(true);
@@ -726,14 +879,14 @@ export default function RomaneioDetalhePage({
           return false;
         }
         setLiberacaoTransitoMsg(`Trânsito liberado com sucesso para ${filialDestino}.`);
-      } else if (isSaida) {
+      } else if (isSaida && itensEntrada.length > 0) {
         // Registra entrada de estoque em lote (1 romaneio para todos)
         const result = await executarEntradaEstoqueLote(
           user.username,
           companySlug,
           destinoSelected,
           // Peça P/M/G entra no tamanho que chegou (uma linha por tamanho).
-          itensParaConfirmar.flatMap((i) =>
+          itensEntrada.flatMap((i) =>
             i.porTamanho
               ? Object.entries(i.porTamanho)
                   .filter(([, q]) => q > 0)
@@ -781,8 +934,13 @@ export default function RomaneioDetalhePage({
         filialOrigem: isSaida ? filialOrigem : undefined,
         romaneioEntrada: isSaida ? romaneioEntradaGerado : undefined,
         dataRomaneio: dataEmissaoProp,
+        aprovacaoRevisao: aprovacao || undefined,
       });
       devolucoes.push(...lote.origens);
+      if (aprovacao && lote.ok) {
+        setRevisao((prev) => (prev ? { ...prev, status: "aprovada" } : prev));
+        setRevisaoMsg(null);
+      }
 
       // A verdade é o que ficou gravado: relê do servidor em vez de supor. Se a
       // releitura falhar, vale o resultado do lote (tudo gravado ou nada).
@@ -818,7 +976,33 @@ export default function RomaneioDetalhePage({
     } finally {
       setConfirmandoTudo(false);
     }
-  }, [user?.username, isSaida, itens, confirmados, quantidades, quantidadesTam, isTransito, romaneioId, filialDestino, filialOrigem, companySlug, destinoSelected, responsavelPadrao, tipo, dataEmissaoProp]);
+  }, [user?.username, isSaida, itens, confirmados, quantidades, quantidadesTam, isTransito, romaneioId, filialDestino, filialOrigem, companySlug, destinoSelected, responsavelPadrao, tipo, dataEmissaoProp, aguardandoLogistica, emAprovacao, podeRevisar]);
+
+  // Loja (ou logística) desiste da conferência enviada: volta a poder conferir.
+  const handleCancelarRevisao = useCallback(async () => {
+    if (!user?.username || !destinoSelected) return;
+    setCancelandoRevisao(true);
+    setErroConfirmacao(null);
+    const r = await postRevisao(user.username, {
+      acao: "cancelar",
+      companyKey: companySlug,
+      romaneioId,
+      filialDestino: destinoSelected,
+    });
+    setCancelandoRevisao(false);
+    if (!r.ok) {
+      setErroConfirmacao(r.error ?? "Erro ao cancelar o envio.");
+      return;
+    }
+    setRevisao((prev) => (prev ? { ...prev, status: "cancelada" } : prev));
+    setRevisaoMsg(null);
+    // Volta ao ponto de partida: tudo como saiu.
+    setQuantidades(new Map());
+    setQuantidadesTam(new Map());
+    fetchDetalhes(tipo, romaneioId, filialOrigem, destinoSelected).then((data) => {
+      if (data.length > 0) setItens([...data]);
+    });
+  }, [user?.username, destinoSelected, companySlug, romaneioId, tipo, filialOrigem]);
 
   // Desconfirma item individualmente (sem reverter estoque)
   const handleDesconfirmar = useCallback(async (produto: string, corProduto: string | null) => {
@@ -1037,11 +1221,33 @@ export default function RomaneioDetalhePage({
     XLSX.writeFile(wb, filename, { compression: true });
   }, [tipo, destinoDisplay, filialDestino, filialOrigem, responsavel, dataEmissao, romaneioId, itens, confirmados, isSaida, isTransito]);
 
-  // Itens ainda não confirmados com qty > 0 (serão enviados no próximo "Confirmar Tudo")
+  // Itens ainda não confirmados com qty > 0 (serão enviados no próximo "Confirmar Tudo").
+  // Na aprovação da logística, o item em 0 também vai ("não chegou").
   const itensParaConfirmar = itens.filter((item) => {
     const chave = `${item.produto}|${item.corProduto ?? ""}`;
-    return !confirmados.has(chave) && (quantidades.get(chave) ?? item.qtde) > 0;
+    return !confirmados.has(chave) && ((quantidades.get(chave) ?? item.qtde) > 0 || emAprovacao);
   });
+
+  // Resumo do que está na tela, para o modal de confirmação: bate com o romaneio?
+  const resumoConferencia = (() => {
+    let pecasRomaneio = 0;
+    let pecasConferidas = 0;
+    let itensDiferentes = 0;
+    let itensZerados = 0;
+    for (const item of itens) {
+      const chave = `${item.produto}|${item.corProduto ?? ""}`;
+      const q = quantidades.get(chave) ?? item.qtde;
+      const porTam = isSaida && conferePorTamanho(item) ? quantidadesTam.get(chave) : undefined;
+      const tamDiferente = porTam ? item.tamanhos!.some((t) => (porTam[t.ordinal] ?? 0) !== t.qtde) : false;
+      pecasRomaneio += item.qtde;
+      pecasConferidas += q;
+      if (q !== item.qtde || tamDiferente) itensDiferentes += 1;
+      if (q === 0) itensZerados += 1;
+    }
+    return { pecasRomaneio, pecasConferidas, itensDiferentes, itensZerados };
+  })();
+  /** Loja conferindo diferente do romaneio → vai para a logística em vez de lançar. */
+  const vaiParaLogistica = isSaida && !podeRevisar && resumoConferencia.itensDiferentes > 0;
 
   const filtroItemNormalizado = normalizeSearchValue(filtroItem);
   const itensFiltrados = itens.filter((item) => {
@@ -1080,6 +1286,7 @@ export default function RomaneioDetalhePage({
     !!user &&
     !todosConfirmados &&
     !confirmacaoParcial &&
+    !aguardandoLogistica &&
     itensParaConfirmar.length > 0 &&
     !confirmandoTudo &&
     !travaInventario &&
@@ -1258,6 +1465,62 @@ export default function RomaneioDetalhePage({
         </div>
       )}
 
+      {revisaoPendente && !travaInventario && revisao && (
+        <div className={styles.revisaoBanner}>
+          <div className={styles.revisaoBannerTexto}>
+            <strong>⏳ Aguardando logística</strong>
+            {aguardandoLogistica ? (
+              <span>
+                Conferência parcial enviada por {revisao.enviadoPor}
+                {revisao.enviadoEm ? ` em ${formatarDataHora(revisao.enviadoEm)}` : ""}:{" "}
+                {revisao.pecasConferidas} de {revisao.pecasEnviadas} peças. Nada entrou no estoque ainda — a
+                logística revisa e aprova a entrada.
+              </span>
+            ) : (
+              <span>
+                A loja conferiu {revisao.pecasConferidas} de {revisao.pecasEnviadas} peças (por {revisao.enviadoPor}
+                {revisao.enviadoEm ? ` em ${formatarDataHora(revisao.enviadoEm)}` : ""}). As quantidades abaixo
+                já vêm com o que a loja conferiu — corrija o que for preciso e clique em <b>Aprovar e confirmar</b>:
+                sai uma entrada só. Item em 0 = não chegou e volta para a origem.
+              </span>
+            )}
+          </div>
+          {user && !isReadOnlyRole(user.role) && (
+            <button
+              type="button"
+              className={styles.revisaoCancelarBtn}
+              onClick={handleCancelarRevisao}
+              disabled={cancelandoRevisao || confirmandoTudo}
+              title={
+                aguardandoLogistica
+                  ? "Desiste do envio e libera a conferência de novo"
+                  : "Devolve para a loja conferir de novo"
+              }
+            >
+              {cancelandoRevisao
+                ? "Cancelando…"
+                : aguardandoLogistica
+                  ? "Cancelar envio e conferir de novo"
+                  : "Descartar e pedir nova conferência"}
+            </button>
+          )}
+        </div>
+      )}
+
+      {revisaoMsg && !emAprovacao && (
+        <div className={styles.romaneioGeradoBanner}>
+          <span>{revisaoMsg}</span>
+          <button
+            type="button"
+            className={styles.fecharBannerBtn}
+            onClick={() => setRevisaoMsg(null)}
+            title="Fechar"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {erroConfirmacao && (
         <div className={styles.erroConfirmacao}>{erroConfirmacao}</div>
       )}
@@ -1297,7 +1560,7 @@ export default function RomaneioDetalhePage({
       {user && (
         <div className={styles.confirmarTudoBar}>
           {(isSaida || isTransito) && !todosConfirmados && !confirmacaoParcial && !travaInventario && !modoBipagem &&
-            !isReadOnlyRole(user.role) && (!isSaida || !!destinoSelected) && (
+            !revisaoPendente && !isReadOnlyRole(user.role) && (!isSaida || !!destinoSelected) && (
             <button
               type="button"
               className={styles.bipagemBtn}
@@ -1308,7 +1571,8 @@ export default function RomaneioDetalhePage({
               Conferir por bipagem
             </button>
           )}
-          {(isSaida || isTransito) && !todosConfirmados && !confirmacaoParcial && !travaInventario && !modoBipagem && (
+          {(isSaida || isTransito) && !todosConfirmados && !confirmacaoParcial && !travaInventario && !modoBipagem &&
+            !aguardandoLogistica && (
             <button
               type="button"
               className={`${styles.confirmarTudoBtn} ${isTransito ? styles.confirmarTudoBtnTransit : ""}`}
@@ -1317,7 +1581,7 @@ export default function RomaneioDetalhePage({
             >
               {confirmandoTudo
                 ? "Confirmando…"
-                : `Confirmar Tudo (${itensParaConfirmar.length} produto${itensParaConfirmar.length !== 1 ? "s" : ""})`}
+                : `${emAprovacao ? "Aprovar e confirmar" : vaiParaLogistica ? "Confirmar parcialmente" : "Confirmar Tudo"} (${itensParaConfirmar.length} produto${itensParaConfirmar.length !== 1 ? "s" : ""})`}
             </button>
           )}
           {isEntrada && itens.length > 0 && (
@@ -1347,6 +1611,7 @@ export default function RomaneioDetalhePage({
           confirmados={confirmados}
           conferePorTamanho={isSaida}
           exigeIntegral={isTransito}
+          parcialVaiParaLogistica={isSaida && !podeRevisar}
           confirmando={confirmandoTudo}
           onConfirmar={handleConfirmarTudo}
           onSair={() => setModoBipagem(false)}
@@ -1503,11 +1768,28 @@ export default function RomaneioDetalhePage({
           onClick={() => { if (!confirmandoTudo) setConfirmarTudoModalAberto(false); }}
         >
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <h2 className={styles.modalTitle}>Confirmar Tudo</h2>
-            <p className={styles.modalOrigem}>
-              Tem certeza que deseja confirmar todos os{" "}
-              <strong>{itensParaConfirmar.length} produto{itensParaConfirmar.length !== 1 ? "s" : ""}</strong>?
-            </p>
+            <h2 className={styles.modalTitle}>
+              {emAprovacao ? "Aprovar conferência" : vaiParaLogistica ? "Confirmar parcialmente" : "Confirmar Tudo"}
+            </h2>
+            {emAprovacao ? (
+              <p className={styles.modalOrigem}>
+                Lançar a entrada com <strong>{resumoConferencia.pecasConferidas}</strong> de{" "}
+                {resumoConferencia.pecasRomaneio} peças?
+                {resumoConferencia.pecasConferidas < resumoConferencia.pecasRomaneio &&
+                  " As peças a menos (incluindo os itens em 0) ficam como não recebidas e voltam para a loja de origem."}
+              </p>
+            ) : vaiParaLogistica ? (
+              <p className={styles.modalOrigem}>
+                A conferência não bate com o romaneio: <strong>{resumoConferencia.pecasConferidas}</strong> de{" "}
+                {resumoConferencia.pecasRomaneio} peças ({resumoConferencia.itensDiferentes} item(ns) diferente(s)).
+                Nada entra no estoque agora — a conferência vai para a <strong>logística revisar e aprovar</strong>.
+              </p>
+            ) : (
+              <p className={styles.modalOrigem}>
+                Tem certeza que deseja confirmar todos os{" "}
+                <strong>{itensParaConfirmar.length} produto{itensParaConfirmar.length !== 1 ? "s" : ""}</strong>?
+              </p>
+            )}
             <div className={styles.modalActions}>
               <button
                 type="button"
@@ -1526,7 +1808,13 @@ export default function RomaneioDetalhePage({
                   handleConfirmarTudo();
                 }}
               >
-                {confirmandoTudo ? "Confirmando…" : "Confirmar"}
+                {confirmandoTudo
+                  ? "Confirmando…"
+                  : emAprovacao
+                    ? "Aprovar e confirmar"
+                    : vaiParaLogistica
+                      ? "Confirmar parcialmente"
+                      : "Confirmar"}
               </button>
             </div>
           </div>
@@ -1756,6 +2044,15 @@ export default function RomaneioDetalhePage({
               const qtdeAtual = quantidades.get(chave) ?? item.qtde;
               const temDivergencia = isConfirmado && qtdeConfirmada !== item.qtde;
               const temDivergenciaInput = qtdeAtual !== item.qtde;
+              // O que a loja conferiu (conferência parcial aguardando a logística).
+              const qtdeLoja = revisaoPendente
+                ? revisao?.itens.find((it) => `${it.produto}|${it.corProduto ?? ""}` === chave)?.qtdeConferida
+                : undefined;
+              const avisoZero = emAprovacao
+                ? "⚠ Não chegou — volta para a origem"
+                : isSaida && !podeRevisar
+                  ? "⚠ Não conferido — vai para a logística"
+                  : "⚠ Item será ignorado";
 
               return (
                 <tr
@@ -1857,6 +2154,10 @@ export default function RomaneioDetalhePage({
                         <span className={styles.travaInventarioCell} title="Resolvido pela logística por ajuste">
                           ⏳ pendente — ajuste
                         </span>
+                      ) : aguardandoLogistica ? (
+                        <span className={styles.travaInventarioCell} title="A logística revisa e aprova a entrada">
+                          ⏳ com a logística · loja: {qtdeLoja ?? 0}
+                        </span>
                       ) : isSaida && conferePorTamanho(item) ? (
                         /* Peça P/M/G: informa o que chegou em CADA tamanho — só os
                            tamanhos que saíram, e nunca acima do enviado neles
@@ -1901,7 +2202,10 @@ export default function RomaneioDetalhePage({
                             </div>
                           )}
                           {qtdeAtual === 0 && (
-                            <div className={styles.divergenciaAviso}>⚠ Item será ignorado</div>
+                            <div className={styles.divergenciaAviso}>{avisoZero}</div>
+                          )}
+                          {emAprovacao && qtdeLoja !== undefined && (
+                            <div className={styles.revisaoLojaHint}>loja conferiu: {qtdeLoja}</div>
                           )}
                         </div>
                       ) : (
@@ -1934,7 +2238,10 @@ export default function RomaneioDetalhePage({
                             </div>
                           )}
                           {qtdeAtual === 0 && (
-                            <div className={styles.divergenciaAviso}>⚠ Item será ignorado</div>
+                            <div className={styles.divergenciaAviso}>{avisoZero}</div>
+                          )}
+                          {emAprovacao && qtdeLoja !== undefined && (
+                            <div className={styles.revisaoLojaHint}>loja conferiu: {qtdeLoja}</div>
                           )}
                         </div>
                       )}

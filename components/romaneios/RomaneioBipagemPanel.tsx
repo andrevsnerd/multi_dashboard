@@ -90,6 +90,11 @@ interface Props {
   conferePorTamanho: boolean;
   /** Trânsito do Linx: só libera com tudo integral. */
   exigeIntegral: boolean;
+  /**
+   * Loja conferindo saída: faltando peça, nada é lançado — a conferência vai para
+   * a logística revisar e aprovar (lib/utils/romaneio-revisao-store.ts).
+   */
+  parcialVaiParaLogistica?: boolean;
   confirmando: boolean;
   onConfirmar: (dados: QuantidadesBipadas) => Promise<boolean>;
   onSair: () => void;
@@ -181,6 +186,7 @@ export default function RomaneioBipagemPanel({
   confirmados,
   conferePorTamanho,
   exigeIntegral,
+  parcialVaiParaLogistica = false,
   confirmando,
   onConfirmar,
   onSair,
@@ -976,10 +982,20 @@ export default function RomaneioBipagemPanel({
               <div className={styles.alertaFalta}>
                 <strong>⚠ Faltam {pecasFaltando} peça(s) em relação ao romaneio</strong>
 
+                {parcialVaiParaLogistica && (
+                  <p>
+                    <b>Nada entra no estoque agora.</b> A conferência vai para a logística revisar e aprovar a
+                    entrada.
+                  </p>
+                )}
+
                 {totais.parciais.length > 0 && (
                   <>
                     <p>
-                      <b>Vieram a menos</b> — confirma o que foi bipado e a diferença volta para a loja de origem:
+                      <b>Vieram a menos</b> —{" "}
+                      {parcialVaiParaLogistica
+                        ? "a logística confere a diferença:"
+                        : "confirma o que foi bipado e a diferença volta para a loja de origem:"}
                     </p>
                     <ul>
                       {totais.parciais.map((l) => (
@@ -994,8 +1010,10 @@ export default function RomaneioBipagemPanel({
                 {totais.zerados.length > 0 && (
                   <>
                     <p>
-                      <b>Não bipados</b> — NÃO são confirmados: ficam pendentes, o romaneio fica parcialmente
-                      confirmado e a logística resolve por ajuste (não dá para confirmar depois):
+                      <b>Não bipados</b> —{" "}
+                      {parcialVaiParaLogistica
+                        ? "vão para a logística junto com o resto da conferência:"
+                        : "NÃO são confirmados: ficam pendentes, o romaneio fica parcialmente confirmado e a logística resolve por ajuste (não dá para confirmar depois):"}
                     </p>
                     <ul>
                       {totais.zerados.map((l) => (
@@ -1007,7 +1025,9 @@ export default function RomaneioBipagemPanel({
 
                 <label className={styles.ciente}>
                   <input type="checkbox" checked={ciente} onChange={(e) => setCiente(e.target.checked)} />
-                  Conferi: faltam {pecasFaltando} peça(s) e quero confirmar só o que chegou.
+                  {parcialVaiParaLogistica
+                    ? `Conferi: faltam ${pecasFaltando} peça(s) e quero confirmar parcialmente.`
+                    : `Conferi: faltam ${pecasFaltando} peça(s) e quero confirmar só o que chegou.`}
                 </label>
               </div>
             )}
@@ -1022,7 +1042,11 @@ export default function RomaneioBipagemPanel({
                 disabled={confirmando || (pecasFaltando > 0 && !ciente)}
                 onClick={() => void confirmar()}
               >
-                {confirmando ? "Confirmando…" : `Confirmar ${totais.completos.length + totais.parciais.length} item(ns)`}
+                {confirmando
+                  ? "Confirmando…"
+                  : parcialVaiParaLogistica && pecasFaltando > 0
+                    ? "Confirmar parcialmente"
+                    : `Confirmar ${totais.completos.length + totais.parciais.length} item(ns)`}
               </button>
             </div>
           </div>

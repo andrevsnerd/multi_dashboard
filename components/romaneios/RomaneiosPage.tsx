@@ -35,6 +35,13 @@ export interface RomaneioListItem {
     pecasConfirmadas: number;
     pecasRomaneio: number;
   };
+  /** Conferência parcial da loja aguardando a revisão da logística (nada entrou ainda). */
+  revisaoPendente?: {
+    enviadoPor: string;
+    enviadoEm: string;
+    pecasEnviadas: number;
+    pecasConferidas: number;
+  };
 }
 
 function cleanDestinoValue(value: string | null | undefined): string {
@@ -115,7 +122,7 @@ function diaDoRomaneio(value: string): string {
   return parsed.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
 }
 
-type TabType = "saida" | "entrada" | "transito" | "divergencias" | "duplicados";
+type TabType = "saida" | "entrada" | "transito" | "revisao" | "divergencias" | "duplicados";
 
 export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
   const { user, isLoading: authLoading } = useAuth();
@@ -281,6 +288,8 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
   // Divergências = saídas com o selo "Parcialmente confirmado" (a conferência
   // gravada na confirmação não bateu com o romaneio). A logística resolve por ajuste.
   const divergencias = saidas.filter((r) => !!r.conferencia);
+  // Conferências parciais das lojas que esperam a logística aprovar a entrada.
+  const aguardandoLogistica = saidas.filter((r) => !!r.revisaoPendente);
   const romaneiosBase =
     activeTab === "saida"
       ? saidas
@@ -288,7 +297,9 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
         ? entradas
         : activeTab === "divergencias"
           ? divergencias
-          : transitos;
+          : activeTab === "revisao"
+            ? aguardandoLogistica
+            : transitos;
   const romaneios = (() => {
     const q = searchTerm.trim().toLowerCase();
     if (!q) return romaneiosBase;
@@ -330,6 +341,14 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
               onClick={() => setActiveTab("transito")}
             >
               Transito
+            </button>
+            <button
+              type="button"
+              className={`${styles.tab} ${activeTab === "revisao" ? styles.tabActiveRevisao : ""}`}
+              onClick={() => setActiveTab("revisao")}
+              title="Conferências parciais das lojas esperando a logística aprovar"
+            >
+              Aguardando logística{!loading && aguardandoLogistica.length > 0 ? ` (${aguardandoLogistica.length})` : ""}
             </button>
             <button
               type="button"
@@ -408,6 +427,8 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
           <div>
             {activeTab === "divergencias"
               ? "Nenhum romaneio parcialmente confirmado"
+              : activeTab === "revisao"
+                ? "Nenhuma conferência aguardando a logística"
               : `Nenhum romaneio de ${activeTab === "saida" ? "saida" : activeTab === "entrada" ? "entrada" : "transito"} encontrado`}
           </div>
         </div>
@@ -429,6 +450,7 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
             const podeExcluir = isAdmin && !isTransito;
             const travaInventario = getTravaInventario(rom);
             const conferencia = rom.tipo === "saida" ? rom.conferencia : undefined;
+            const revisaoPendente = rom.tipo === "saida" ? rom.revisaoPendente : undefined;
 
             return (
               <Link
@@ -475,6 +497,14 @@ export default function RomaneiosPage({ companySlug }: RomaneiosPageProps) {
                       title={`Confirmado com alterações: ${conferencia.itensOk} de ${conferencia.itensTotal} itens bateram com o romaneio · ${conferencia.pecasConfirmadas} de ${conferencia.pecasRomaneio} peças confirmadas`}
                     >
                       Parcialmente confirmado {conferencia.itensOk}/{conferencia.itensTotal}
+                    </span>
+                  )}
+                  {revisaoPendente && (
+                    <span
+                      className={styles.badgeAguardandoLogistica}
+                      title={`Conferência parcial enviada por ${revisaoPendente.enviadoPor}: ${revisaoPendente.pecasConferidas} de ${revisaoPendente.pecasEnviadas} peças. Nada entrou no estoque — a logística revisa e aprova.`}
+                    >
+                      Aguardando logística {revisaoPendente.pecasConferidas}/{revisaoPendente.pecasEnviadas}
                     </span>
                   )}
                   {isTransito ? (

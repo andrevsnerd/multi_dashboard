@@ -261,6 +261,19 @@ export function canConfirmarEntradaDefeito(
 }
 
 /**
+ * Conferencia PARCIAL de romaneio de saida (regra do dono, 11/11/2026): quando a
+ * loja confirma menos do que saiu, nada entra no estoque — a conferencia fica
+ * aguardando a logistica, que revisa os numeros e aprova a entrada (uma so).
+ * Estas funcoes confirmam parcial direto e aprovam a revisao das outras.
+ */
+export const REVISAR_CONFERENCIA_ROLES: RoleKey[] = ["admin", "logistica"];
+
+/** True se a funcao aprova conferencia parcial (e confirma parcial sem revisao). */
+export function canRevisarConferencia(role: RoleKey | undefined | null): boolean {
+  return !!role && REVISAR_CONFERENCIA_ROLES.includes(role);
+}
+
+/**
  * Tela DEFEITOS — conferencia dos romaneios que vao para a filial de defeito e
  * o custo do que entrou la. Mesmo conjunto restrito das telas de custo
  * (CUSTO_VISIBLE_ROLES): o painel de entradas e custo de ponta a ponta, entao
