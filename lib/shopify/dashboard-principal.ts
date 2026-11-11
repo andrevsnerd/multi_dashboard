@@ -39,6 +39,12 @@ export interface ParteShopify {
   /** Todos os produtos do período (sem corte), receita já com frete quando comFrete. */
   produtos: ProductRevenue[];
   categorias: CategoryRevenue[];
+  /**
+   * Estoque do SHOPIFY dos itens SEM vínculo com o Linx ("SHOPIFY:<id>" → soma das variantes,
+   * só positivos). É só o fallback: item vinculado usa o estoque do e-commerce no Linx (o real —
+   * o Shopify às vezes infla o estoque de propósito). Regra do dono, 11/11/2026.
+   */
+  estoqueShopify: Map<string, number>;
 }
 
 interface Linha {
@@ -186,6 +192,18 @@ export async function fetchParteShopifyDashboard(params: {
     cat.set(catId, k);
   }
 
+  // Estoque do Shopify só para os itens sem vínculo (fallback).
+  const semVinculo = [...new Set(atuais.filter((l) => !l.produto && l.product_id).map((l) => l.product_id as string))];
+  const estoqueShopify = new Map<string, number>();
+  if (semVinculo.length > 0) {
+    const rows = (await getNeonSql().query(
+      `SELECT product_id, SUM(GREATEST(COALESCE(inventory_qty, 0), 0))::int AS q
+         FROM shopify_variants WHERE company = $1 AND product_id = ANY($2::text[]) GROUP BY 1`,
+      [company, semVinculo],
+    )) as Array<{ product_id: string; q: number }>;
+    for (const r of rows) estoqueShopify.set(`SHOPIFY:${r.product_id}`, Number(r.q ?? 0));
+  }
+
   const ultima = atuais.reduce<string | null>((m, l) => (!m || l.created_at > m ? l.created_at : m), null);
   return {
     receita,
@@ -196,5 +214,6 @@ export async function fetchParteShopifyDashboard(params: {
     porDia,
     produtos: [...prod.values()].sort((a, b) => b.totalRevenue - a.totalRevenue),
     categorias: [...cat.values()].sort((a, b) => b.totalRevenue - a.totalRevenue),
+    estoqueShopify,
   };
 }

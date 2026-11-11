@@ -215,11 +215,26 @@ export async function GET(request: Request) {
       } else prodMap.set(k, { ...p });
     }
     const topProducts = [...prodMap.values()].sort((a, b) => b.totalRevenue - a.totalRevenue).slice(0, TOP);
-    // Estoque dos produtos do Linx que vieram só do Shopify (sem vínculo = sem estoque no Linx).
-    const semEstoque = topProducts.filter((p) => !p.productId.startsWith('SHOPIFY:') && !topProductsLinx.some((l) => l.productId.trim().toUpperCase() === p.productId.trim().toUpperCase()));
-    if (semEstoque.length > 0) {
-      const mapa = await fetchMultipleProductsStock(semEstoque.map((p) => p.productId), { company, filial: null }).catch(() => new Map<string, number>());
-      for (const p of semEstoque) p.stock = mapa.get(p.productId) ?? mapa.get(p.productId.trim()) ?? 0;
+    // Estoque dos itens que vieram só do Shopify (regra do dono, 11/11/2026):
+    //  - vinculado ao Linx → estoque do E-COMMERCE no Linx (o real; o Shopify às vezes infla);
+    //  - sem vínculo → estoque do próprio Shopify (fallback).
+    // Itens que já vieram do Linx (lojas) mantêm o estoque que o Linx devolveu, sem mudança.
+    const doLinx = new Set(topProductsLinx.map((l) => l.productId.trim().toUpperCase()));
+    const soShopify = topProducts.filter((p) => !doLinx.has(p.productId.trim().toUpperCase()));
+    const vinculados = soShopify.filter((p) => !p.productId.startsWith('SHOPIFY:'));
+    if (vinculados.length > 0) {
+      // ecommerceOnly: só os CNPJs de e-commerce do Linx (Scarf Me). A NERD não tem
+      // e-commerce no Linx — aí vale o estoque da empresa (todas as filiais).
+      const mapa = await fetchMultipleProductsStock(vinculados.map((p) => p.productId), {
+        company,
+        filial: null,
+        ecommerceOnly: true,
+      }).catch(() => new Map<string, number>());
+      // Negativo nunca conta (regra do dono: estoque soma só positivos).
+      for (const p of vinculados) p.stock = Math.max(0, mapa.get(p.productId) ?? mapa.get(p.productId.trim()) ?? 0);
+    }
+    for (const p of soShopify) {
+      if (p.productId.startsWith('SHOPIFY:')) p.stock = parte.estoqueShopify.get(p.productId) ?? 0;
     }
 
     const catMap = new Map(topCategoriesLinx.map((c) => [String(c.categoryId).trim().toUpperCase(), { ...c }]));
