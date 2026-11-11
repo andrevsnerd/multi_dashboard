@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import type { CategoryRevenue, ProductRevenue, FilialPerformance, MetricSummary } from "@/types/dashboard";
-import { isEcommerceFilial, VAREJO_VALUE } from "@/lib/config/company";
+import { isEcommerceFilial, SHOPIFY_VALUE, VAREJO_VALUE } from "@/lib/config/company";
 
 import styles from "./RevenueDashboard.module.css";
 
@@ -192,7 +192,7 @@ export default function CompanyRevenueLists({
 
     // Filtrar apenas filiais normais (não e-commerce) para o total VAREJO
     const varejoFiliais = filialPerformanceProp.filter(
-      (item) => !isEcommerceFilial(companyKey, item.filial)
+      (item) => !isEcommerceFilial(companyKey, item.filial) && item.filial !== SHOPIFY_VALUE
     );
 
     if (varejoFiliais.length === 0) {
@@ -265,6 +265,7 @@ export default function CompanyRevenueLists({
       return withoutIbirapuera.filter(
         (item) =>
           item.filial !== VAREJO_VALUE &&
+          item.filial !== SHOPIFY_VALUE &&
           !isEcommerceFilial(companyKey, item.filial)
       );
     }
@@ -292,7 +293,9 @@ export default function CompanyRevenueLists({
                 <li key={item.productId} className={styles.listItem}>
                   <div className={styles.itemNameContainer}>
                     <strong className={styles.itemName}>{item.productName}</strong>
-                    <p className={styles.itemSubtitle}>{item.productId}</p>
+                    <p className={styles.itemSubtitle}>
+                      {item.productId.startsWith("SHOPIFY:") ? "Shopify · sem vínculo no Linx" : item.productId}
+                    </p>
                   </div>
                   <div className={styles.itemMetrics}>
                     <div className={styles.metricRow}>

@@ -35,6 +35,11 @@ interface FilialFilterProps {
   showActiveGroupHint?: boolean;
   /** Botão no mesmo tamanho do DateRangeFilter (cabeçalho do dashboard). */
   compact?: boolean;
+  /**
+   * Opção da loja Shopify (ex.: "SHOPIFY SCARFME"). Opt-in: só a tela principal passa.
+   * Quando informada, ela SUBSTITUI a opção E-COMMERCE do Linx no menu.
+   */
+  shopifyOption?: { value: string; label: string } | null;
   companyConfigOverride?: Pick<
     CompanyConfig,
     "filialFilters" | "filialDisplayNames" | "filialGroups" | "activeFilials" | "ecommerceFilials"
@@ -52,6 +57,7 @@ export default function FilialFilter({
   includeFilialDefeito = false,
   showActiveGroupHint = false,
   compact = false,
+  shopifyOption = null,
   companyConfigOverride = null,
 }: FilialFilterProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -132,6 +138,8 @@ export default function FilialFilter({
 
   const displayValue = value === VAREJO_VALUE
     ? "VAREJO"
+    : shopifyOption && (value === shopifyOption.value || isEcommerceOption(value))
+    ? shopifyOption.label
     : isEcommerceOption(value)
     ? ecommerceDisplayName ?? "E-COMMERCE"
     : value
@@ -185,7 +193,19 @@ export default function FilialFilter({
                 VAREJO
               </button>
             )}
-            {isScarfme && ecommerceFilial && (
+            {shopifyOption && (
+              <button
+                type="button"
+                className={`${styles.option} ${value === shopifyOption.value ? styles.optionActive : ""}`}
+                onClick={() => {
+                  onChange(shopifyOption.value);
+                  setIsOpen(false);
+                }}
+              >
+                {shopifyOption.label}
+              </button>
+            )}
+            {isScarfme && ecommerceFilial && !shopifyOption && (
               <button
                 type="button"
                 className={`${styles.option} ${value === ecommerceFilial ? styles.optionActive : ""}`}

@@ -670,9 +670,9 @@
     "semantic_hash": "3926c3cc6b9df52ee62d21859b7a6cdf"
   },
   "app/api/dashboard-data/route.ts": {
-    "mtime": 1780073682.6162903,
-    "ast_hash": "feb02c1e1e87897496f14ac466233676",
-    "semantic_hash": "feb02c1e1e87897496f14ac466233676"
+    "mtime": 1794394254.1654305,
+    "ast_hash": "36442479905299e1e4b097d1110997aa",
+    "semantic_hash": ""
   },
   "app/api/data/route.ts": {
     "mtime": 1762989352.1931915,
@@ -1305,14 +1305,14 @@
     "semantic_hash": ""
   },
   "components/dashboard/CompanyDashboard.tsx": {
-    "mtime": 1792777707.23414,
-    "ast_hash": "de9930758fa61d521365fde4245a6e62",
+    "mtime": 1794394386.9473078,
+    "ast_hash": "d701be8bb233b741efef06e63ad57b0f",
     "semantic_hash": ""
   },
   "components/dashboard/CompanyRevenueLists.tsx": {
-    "mtime": 1780073682.686467,
-    "ast_hash": "b7aa239347828cfb6e0f57fc4d93ee4d",
-    "semantic_hash": "b7aa239347828cfb6e0f57fc4d93ee4d"
+    "mtime": 1794394292.0772552,
+    "ast_hash": "6cc86379d5c7c84050d1c6d90b0bafd8",
+    "semantic_hash": ""
   },
   "components/dashboard/DailyRevenueChart.tsx": {
     "mtime": 1784816405.2850056,
@@ -1355,8 +1355,8 @@
     "semantic_hash": ""
   },
   "components/filters/FilialFilter.tsx": {
-    "mtime": 1792777707.2312987,
-    "ast_hash": "0cffcbb3cc693d094ed148caf5620a5e",
+    "mtime": 1794394292.0772552,
+    "ast_hash": "d45e022d3a518174fdfe87c1649e5b6b",
     "semantic_hash": ""
   },
   "components/filters/MultiSelectFilter.tsx": {
@@ -2125,8 +2125,8 @@
     "semantic_hash": ""
   },
   "lib/config/company.ts": {
-    "mtime": 1786556838.653602,
-    "ast_hash": "1a604f615d5d5280a455af7e294faadc",
+    "mtime": 1794394016.824525,
+    "ast_hash": "d7d76e83f7448930bb93577455c29c71",
     "semantic_hash": ""
   },
   "lib/config/compra-ciclo.ts": {
@@ -5375,8 +5375,8 @@
     "semantic_hash": ""
   },
   "lib/shopify/dashboard.ts": {
-    "mtime": 1794335574.8933575,
-    "ast_hash": "4db83bf51dea30b09ebb67707c62a1b2",
+    "mtime": 1794394010.0953155,
+    "ast_hash": "8a11a4f74fed27c8fb392d7ba9bf33a3",
     "semantic_hash": ""
   },
   "lib/shopify/orders-store.ts": {
@@ -5462,6 +5462,11 @@
   "lib/shopify/consultas.ts": {
     "mtime": 1794339422.252502,
     "ast_hash": "281d11e56840bfb8b656b2338c26f0d9",
+    "semantic_hash": ""
+  },
+  "lib/shopify/dashboard-principal.ts": {
+    "mtime": 1794394195.2653737,
+    "ast_hash": "f9de7eaaab7fcdf1d08fcdc74ac604da",
     "semantic_hash": ""
   }
 }

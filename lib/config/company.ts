@@ -8,6 +8,15 @@ export type CompanyModule = 'sales' | 'inventory';
 // Usado apenas para scarfme
 export const VAREJO_VALUE = "__VAREJO__";
 
+// Filial virtual "SHOPIFY SCARFME" / "SHOPIFY NERD" (loja online pelo Shopify). Por enquanto
+// só a TELA PRINCIPAL (dashboard) usa: lá ela substitui o E-COMMERCE do Linx (Scarf Me) e
+// entra como filial nova na NERD. Nas outras telas o e-commerce continua vindo do Linx.
+export const SHOPIFY_VALUE = "__SHOPIFY__";
+export const SHOPIFY_LABEL: Record<"nerd" | "scarfme", string> = {
+  scarfme: "SHOPIFY SCARFME",
+  nerd: "SHOPIFY NERD",
+};
+
 export interface CompanyConfig {
   key: CompanyKey;
   name: string;

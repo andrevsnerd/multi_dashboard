@@ -394,3 +394,6 @@ export async function fetchShopifyResumo(
     },
   };
 }
+
+/** Reuso na tela principal (dashboard): mesmas contas da página Shopify. */
+export { fetchKpis as fetchShopifyKpis, fetchSerie as fetchShopifySerie };

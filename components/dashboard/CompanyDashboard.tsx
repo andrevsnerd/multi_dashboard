@@ -6,6 +6,8 @@ import {
   getFilialGroupMembers,
   normalizeFilialLookupKey,
   resolveCompany,
+  SHOPIFY_LABEL,
+  SHOPIFY_VALUE,
   VAREJO_VALUE,
 } from "@/lib/config/company";
 
@@ -63,6 +65,8 @@ interface DashboardData {
   lastAvailableDate: string | null;
   availableRange: { start: string | null; end: string | null };
   goals: Record<string, number>;
+  /** Loja Shopify (substitui o E-COMMERCE do Linx nesta tela). */
+  shopify?: { loja: string; incluiFrete: boolean; frete: { atual: number; anterior: number } | null };
 }
 
 async function fetchDashboardData(
@@ -72,6 +76,7 @@ async function fetchDashboardData(
   month: number,
   year: number,
   linhas: string[] | null,
+  comFrete = true,
 ): Promise<DashboardData> {
   const isSameDay = (a: Date, b: Date) =>
     a.getFullYear() === b.getFullYear() &&
@@ -95,6 +100,9 @@ async function fetchDashboardData(
   (linhas ?? []).forEach((linha) => {
     params.append("linha", linha);
   });
+
+  // Frete do Shopify: entra somado por padrão (checkbox "Incluir frete").
+  if (!comFrete) params.set("frete", "0");
 
   const response = await fetch(`/api/dashboard-data?${params.toString()}`, {
     cache: "no-store",
@@ -140,6 +148,15 @@ export default function CompanyDashboard({
     }
   }, [isLoadingAuth, user, companyKey]);
   const [filtrarEletronicos, setFiltrarEletronicos] = useState(companyKey === "nerd");
+  // Shopify no lugar do E-COMMERCE do Linx (Scarf Me) / filial nova (NERD) — só nesta tela.
+  const [comFrete, setComFrete] = useState(true);
+  const shopifyOption = useMemo(
+    () =>
+      companyKey === "scarfme" || companyKey === "nerd"
+        ? { value: SHOPIFY_VALUE, label: SHOPIFY_LABEL[companyKey] }
+        : null,
+    [companyKey],
+  );
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -162,8 +179,8 @@ export default function CompanyDashboard({
 
   const rangeKey = useMemo(
     () =>
-      `${range.startDate.toISOString()}::${range.endDate.toISOString()}::${effectiveFilial ?? "all"}::${(linhas ?? []).join(",")}`,
-    [range.startDate, range.endDate, effectiveFilial, linhas],
+      `${range.startDate.toISOString()}::${range.endDate.toISOString()}::${effectiveFilial ?? "all"}::${(linhas ?? []).join(",")}::${comFrete ? "frete" : "sem-frete"}`,
+    [range.startDate, range.endDate, effectiveFilial, linhas, comFrete],
   );
 
   useEffect(() => {
@@ -180,6 +197,7 @@ export default function CompanyDashboard({
           monthYear.month,
           monthYear.year,
           linhas,
+          comFrete,
         );
         if (active) {
           setDashboardData(data);
@@ -200,7 +218,7 @@ export default function CompanyDashboard({
     return () => {
       active = false;
     };
-  }, [companyKey, rangeKey, retryKey, range, effectiveFilial, monthYear.month, monthYear.year, linhas]);
+  }, [companyKey, rangeKey, retryKey, range, effectiveFilial, monthYear.month, monthYear.year, linhas, comFrete]);
 
   // Depois de salvar no modal, o card de meta já reflete o valor novo (sem recarregar
   // o dashboard) — só se o mês salvo for o mês que o dashboard está mostrando.
@@ -233,6 +251,10 @@ export default function CompanyDashboard({
         0,
       );
     };
+    if (effectiveFilial === SHOPIFY_VALUE) {
+      // Loja Shopify: na Scarf Me herda a meta do e-commerce (soma dos CNPJs); NERD não tem.
+      return sumGoals(companyConfig.ecommerceFilials ?? []);
+    }
     if (effectiveFilial && effectiveFilial !== VAREJO_VALUE) {
       // Meta de um grupo = soma das metas de TODOS os membros, independente de qual
       // é a canônica/ativa. Vale para grupos lógicos (ex.: PAULISTA, meta toda na
@@ -319,7 +341,19 @@ export default function CompanyDashboard({
                 value={selectedFilial}
                 onChange={setSelectedFilial}
                 compact
+                shopifyOption={shopifyOption}
               />
+            )}
+            {shopifyOption && !isSomenteVarejo && (
+              <label
+                className={styles.checkboxLabel}
+                title={`Soma o frete cobrado no ${shopifyOption.label} na venda${
+                  dashboardData?.shopify?.frete ? ` (R$ ${Math.round(dashboardData.shopify.frete.atual).toLocaleString("pt-BR")} no período)` : ""
+                }`}
+              >
+                <input type="checkbox" checked={comFrete} onChange={(e) => setComFrete(e.target.checked)} />
+                Incluir frete
+              </label>
             )}
             {companyKey === "nerd" && (
               <label className={styles.checkboxLabel} title="Filtra apenas produtos da linha Eletrônicos">
