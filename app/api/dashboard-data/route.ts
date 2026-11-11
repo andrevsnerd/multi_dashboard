@@ -20,11 +20,18 @@ import { getShopifyCredentials, isShopifyCompany } from '@/lib/shopify/config';
 import { fetchParteShopifyDashboard, type ParteShopify } from '@/lib/shopify/dashboard-principal';
 import { runShopifyIncrementalSync } from '@/lib/shopify/sync';
 import { readGoals } from '@/lib/utils/goals-storage';
+import { MATRIZ_FILIAIS } from '@/lib/blackfriday/datas';
 import type { FilialPerformance, MetricSummary, ProductRevenue, SalesSummary } from '@/types/dashboard';
 
 export const maxDuration = 300;
 
 const TOP = 5;
+
+/**
+ * Estoque da loja Shopify da NERD: a NERD não tem e-commerce no Linx — o site vende do
+ * estoque da MATRIZ (filial "NERD", 000069). Decisão do dono, 11/11/2026.
+ */
+const ESTOQUE_SHOPIFY_NERD = MATRIZ_FILIAIS.nerd[0];
 
 const metrica = (atual: number, anterior: number): MetricSummary => ({
   currentValue: atual,
@@ -108,7 +115,8 @@ export async function GET(request: Request) {
         ? fetchParteShopifyDashboard({ company: shopifyCompany, range, linhas, comFrete })
         : Promise.resolve(null as ParteShopify | null),
       // Estoque do card: Scarf Me "Todas" continua o estoque de TODAS as filiais (como antes);
-      // filial Shopify da Scarf Me = estoque dos CNPJs de e-commerce. NERD não muda.
+      // filial Shopify = estoque do Linx de onde o site vende (Scarf Me: CNPJs de e-commerce;
+      // NERD: matriz). NERD "Todas" não muda.
       shopifyCompany === 'scarfme' && (filialParam === null || filialShopify)
         ? fetchEstoqueKPIs({
             company,
@@ -116,7 +124,9 @@ export async function GET(request: Request) {
             linhas,
             range,
           })
-        : Promise.resolve(null),
+        : shopifyCompany === 'nerd' && filialShopify
+          ? fetchEstoqueKPIs({ company, filial: ESTOQUE_SHOPIFY_NERD, linhas, range })
+          : Promise.resolve(null),
     ]);
 
     const monthGoals: Record<string, number> =
@@ -223,13 +233,13 @@ export async function GET(request: Request) {
     const soShopify = topProducts.filter((p) => !doLinx.has(p.productId.trim().toUpperCase()));
     const vinculados = soShopify.filter((p) => !p.productId.startsWith('SHOPIFY:'));
     if (vinculados.length > 0) {
-      // ecommerceOnly: só os CNPJs de e-commerce do Linx (Scarf Me). A NERD não tem
-      // e-commerce no Linx — aí vale o estoque da empresa (todas as filiais).
-      const mapa = await fetchMultipleProductsStock(vinculados.map((p) => p.productId), {
-        company,
-        filial: null,
-        ecommerceOnly: true,
-      }).catch(() => new Map<string, number>());
+      // Scarf Me: só os CNPJs de e-commerce do Linx. NERD (sem e-commerce no Linx): matriz.
+      const mapa = await fetchMultipleProductsStock(
+        vinculados.map((p) => p.productId),
+        shopifyCompany === 'nerd'
+          ? { company, filial: ESTOQUE_SHOPIFY_NERD }
+          : { company, filial: null, ecommerceOnly: true },
+      ).catch(() => new Map<string, number>());
       // Negativo nunca conta (regra do dono: estoque soma só positivos).
       for (const p of vinculados) p.stock = Math.max(0, mapa.get(p.productId) ?? mapa.get(p.productId.trim()) ?? 0);
     }

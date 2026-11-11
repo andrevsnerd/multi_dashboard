@@ -670,8 +670,8 @@
     "semantic_hash": "3926c3cc6b9df52ee62d21859b7a6cdf"
   },
   "app/api/dashboard-data/route.ts": {
-    "mtime": 1794394254.1654305,
-    "ast_hash": "36442479905299e1e4b097d1110997aa",
+    "mtime": 1794395259.412955,
+    "ast_hash": "4426b28410342670bc5e94af40e11847",
     "semantic_hash": ""
   },
   "app/api/data/route.ts": {
@@ -5465,8 +5465,8 @@
     "semantic_hash": ""
   },
   "lib/shopify/dashboard-principal.ts": {
-    "mtime": 1794394195.2653737,
-    "ast_hash": "f9de7eaaab7fcdf1d08fcdc74ac604da",
+    "mtime": 1794395160.7851222,
+    "ast_hash": "d18bcfb5b331ccbdb01ca4bef2d00cbd",
     "semantic_hash": ""
   }
 }
