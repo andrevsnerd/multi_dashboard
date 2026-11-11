@@ -62,7 +62,7 @@ export async function GET(request: Request) {
 
   try {
     const [resumo, lista, catalogo] = await Promise.all([
-      fetchMapaResumo(company),
+      fetchMapaResumo(company, params.get("statusShopify") ?? "todos"),
       fetchMapaProdutos(company, {
         status: params.get("status") ?? undefined,
         statusShopify: params.get("statusShopify") ?? undefined,

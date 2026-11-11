@@ -484,7 +484,7 @@ export const SQL_DECLARAR_PAR_DE_CODIGOS = `
  * `@t` (ordinal do tamanho), `@g` (rótulo do tamanho), `@prefixo` (PARAMETROS.EAN_13)
  * e `@empresa` — mais as variáveis de {@link SQL_DECLARAR_PAR_DE_CODIGOS}.
  */
-export const SQL_GRAVAR_PAR_DE_CODIGOS = `
+export const SQL_GRAVAR_INTERNO = `
     /* interno (TIPO_COD_BAR = 3): sequencial PRODUTOS_BARRA.CODIGO_BARRA.
        O laço existe porque o Linx pode ter gravado à mão um código que a
        sequência ainda vai passar — nesse caso pula para o próximo. */
@@ -512,7 +512,10 @@ export const SQL_GRAVAR_PAR_DE_CODIGOS = `
     INSERT INTO PRODUTOS_BARRA (CODIGO_BARRA, PRODUTO, COR_PRODUTO, TAMANHO, GRADE,
                                 CODIGO_BARRA_PADRAO, INATIVO, TIPO_COD_BAR, LX_STATUS_REGISTRO)
     VALUES (@cod, @produtoCh, @corCh, @t, @g, 0, 0, 3, 0);
+`;
 
+/** Metade EAN-13 do par — ver {@link SQL_GRAVAR_PAR_DE_CODIGOS}. */
+export const SQL_GRAVAR_EAN = `
     /* EAN-13 (TIPO_COD_BAR = 1): prefixo do ERP + sequencial
        PRODUTOS_BARRA.CODIGO_EAN + dígito verificador.
        O DV é a única conta que fica do nosso lado — o banco não tem rotina para
@@ -554,6 +557,12 @@ export const SQL_GRAVAR_PAR_DE_CODIGOS = `
                                 CODIGO_BARRA_PADRAO, INATIVO, TIPO_COD_BAR, LX_STATUS_REGISTRO)
     VALUES (@cod, @produtoCh, @corCh, @t, @g, 0, 0, 1, 0);
 `;
+
+/**
+ * O par completo (interno + EAN-13) de um tamanho. As duas metades também
+ * existem soltas para {@link completarCodigosDaCor}, que só gera a que falta.
+ */
+export const SQL_GRAVAR_PAR_DE_CODIGOS = SQL_GRAVAR_INTERNO + SQL_GRAVAR_EAN;
 
 /**
  * Batch único, parametrizado — roda igual na conexão direta e via proxy (onde
@@ -899,4 +908,320 @@ export async function adicionarCorAoProduto(params: {
     precoPorCorCopiado,
     avisos,
   };
+}
+
+/* ═══════════════════════ completar códigos de uma cor ═══════════════════════ */
+
+export interface ResultadoCompletarCodigos {
+  ensaio: boolean;
+  lote: string | null;
+  produto: string;
+  cor: string;
+  /** Códigos que este batch gravou (o que já existia não aparece). */
+  criados: Array<{ tamanho: number; grade: string; tipo: 'interno' | 'ean'; codigo: string }>;
+}
+
+/**
+ * Cor que já existe mas ficou com o cadastro incompleto (sem código interno,
+ * sem EAN, ou sem nenhum dos dois): grava SÓ o que falta, tamanho a tamanho,
+ * com os mesmos fragmentos de {@link SQL_GRAVAR_PAR_DE_CODIGOS} — mesma
+ * alocação por LX_SEQUENCIAL, mesma conta do DV. Conta como existente só o
+ * código ATIVO. Tamanhos: os que o produto já tem em PRODUTOS_BARRA (qualquer
+ * cor); sem nenhum, a grade; sem grade, 'U' — a escada de "adicionar cor".
+ * `ensaio` roda o batch inteiro e desfaz.
+ */
+export async function completarCodigosDaCor(params: {
+  company: CorCompany;
+  usuario: string;
+  produto: string;
+  cor: string;
+  ensaio?: boolean;
+  obs?: string | null;
+}): Promise<ResultadoCompletarCodigos> {
+  const produto = limpar(params.produto).toUpperCase();
+  const cor = limpar(params.cor).toUpperCase();
+  if (!produto) throw new Error('Informe o produto.');
+  if (!cor) throw new Error('Informe a cor.');
+  const ensaio = Boolean(params.ensaio);
+  const values = Array.from({ length: MAX_TAMANHOS }, (_, i) => `(${i + 1}, pt.TAMANHO_${i + 1})`).join(', ');
+
+  const rows = await withRequest(async (request) => {
+    request.input('ccProduto', sql.VarChar, produto);
+    request.input('ccCor', sql.VarChar, cor);
+    request.input('ccEnsaio', sql.Int, ensaio ? 1 : 0);
+    const r = await request.query<{ TAMANHO: number; GRADE: string; TIPO_COD_BAR: number; CODIGO_BARRA: string }>(`
+SET NOCOUNT ON;
+SET XACT_ABORT ON;
+DECLARE @saida TABLE (TAMANHO INT, GRADE VARCHAR(8), TIPO_COD_BAR INT, CODIGO_BARRA VARCHAR(25));
+BEGIN TRANSACTION;
+BEGIN TRY
+  DECLARE @produtoCh CHAR(12) = @ccProduto;
+  DECLARE @corCh     CHAR(10) = @ccCor;
+
+  IF NOT EXISTS (SELECT 1 FROM PRODUTOS WITH (UPDLOCK, HOLDLOCK) WHERE PRODUTO = @produtoCh)
+    BEGIN ;THROW 51001, 'Produto não existe no cadastro do Linx.', 1; END
+  IF NOT EXISTS (SELECT 1 FROM PRODUTO_CORES WITH (UPDLOCK, HOLDLOCK) WHERE PRODUTO = @produtoCh AND COR_PRODUTO = @corCh)
+    BEGIN ;THROW 51003, 'O produto não tem essa cor — use "adicionar cor".', 1; END
+
+  DECLARE @tam TABLE (ORDEM INT IDENTITY(1,1), TAMANHO INT, GRADE VARCHAR(8));
+  INSERT @tam (TAMANHO, GRADE)
+  SELECT pb.TAMANHO, MIN(LEFT(LTRIM(RTRIM(pb.GRADE)), 8))
+  FROM PRODUTOS_BARRA pb WHERE pb.PRODUTO = @produtoCh GROUP BY pb.TAMANHO;
+
+  IF NOT EXISTS (SELECT 1 FROM @tam)
+    INSERT @tam (TAMANHO, GRADE)
+    SELECT v.n, LEFT(LTRIM(RTRIM(CAST(v.t AS VARCHAR(20)))), 8)
+    FROM PRODUTOS p
+    JOIN PRODUTOS_TAMANHOS pt
+      ON LTRIM(RTRIM(CAST(pt.GRADE AS VARCHAR(60)))) = LTRIM(RTRIM(CAST(p.GRADE AS VARCHAR(60))))
+    CROSS APPLY (VALUES ${values}) v(n, t)
+    WHERE p.PRODUTO = @produtoCh
+      AND LTRIM(RTRIM(ISNULL(CAST(v.t AS VARCHAR(20)), ''))) <> '';
+
+  IF NOT EXISTS (SELECT 1 FROM @tam) INSERT @tam (TAMANHO, GRADE) VALUES (1, 'U');
+
+  DECLARE @prefixo VARCHAR(10);
+  SELECT @prefixo = LTRIM(RTRIM(VALOR_ATUAL)) FROM PARAMETROS WHERE PARAMETRO = 'EAN_13';
+  IF @prefixo IS NULL OR LEN(@prefixo) = 0
+    BEGIN ;THROW 51006, 'PARAMETROS.EAN_13 (prefixo do código de barras) está vazio no Linx.', 1; END
+  DECLARE @empresa INT = (SELECT TOP 1 EMPRESA FROM PRODUTOS WHERE PRODUTO = @produtoCh);
+
+  DECLARE @idx INT = 0, @total INT = (SELECT COUNT(*) FROM @tam);
+  ${SQL_DECLARAR_PAR_DE_CODIGOS}
+  WHILE @idx < @total
+  BEGIN
+    SET @idx += 1;
+    SELECT @t = TAMANHO, @g = GRADE FROM @tam WHERE ORDEM = @idx;
+    IF NOT EXISTS (SELECT 1 FROM PRODUTOS_BARRA WHERE PRODUTO = @produtoCh AND COR_PRODUTO = @corCh AND TAMANHO = @t
+                     AND ISNULL(INATIVO, 0) = 0 AND LEN(LTRIM(RTRIM(CODIGO_BARRA))) < 13)
+    BEGIN
+      ${SQL_GRAVAR_INTERNO}
+      INSERT @saida VALUES (@t, @g, 3, @cod);
+    END
+    IF NOT EXISTS (SELECT 1 FROM PRODUTOS_BARRA WHERE PRODUTO = @produtoCh AND COR_PRODUTO = @corCh AND TAMANHO = @t
+                     AND ISNULL(INATIVO, 0) = 0 AND LEN(LTRIM(RTRIM(CODIGO_BARRA))) = 13)
+    BEGIN
+      ${SQL_GRAVAR_EAN}
+      INSERT @saida VALUES (@t, @g, 1, @cod);
+    END
+  END
+
+  IF @ccEnsaio = 1 ROLLBACK; ELSE COMMIT;
+  SELECT TAMANHO, GRADE, TIPO_COD_BAR, CODIGO_BARRA FROM @saida ORDER BY TAMANHO, TIPO_COD_BAR DESC;
+END TRY
+BEGIN CATCH
+  IF @@TRANCOUNT > 0 ROLLBACK;
+  ;THROW;
+END CATCH`);
+    return r.recordset;
+  });
+
+  const criados = rows.map((row) => ({
+    tamanho: Number(row.TAMANHO) || 1,
+    grade: limpar(row.GRADE),
+    tipo: (Number(row.TIPO_COD_BAR) === 1 ? 'ean' : 'interno') as 'interno' | 'ean',
+    codigo: limpar(row.CODIGO_BARRA),
+  }));
+  if (ensaio || criados.length === 0) return { ensaio, lote: null, produto, cor, criados };
+
+  const lote = await registrarHistoricoCadastro({
+    company: params.company,
+    usuario: params.usuario,
+    obs: params.obs ?? 'Códigos de barra que faltavam na cor',
+    linhas: [
+      {
+        escopo: 'PRODUTO',
+        acao: 'CRIAR',
+        dimensao: null,
+        alvo: produto,
+        chave: `${produto}|${cor}`,
+        pai: null,
+        campo: 'Códigos de barra da cor',
+        anterior: null,
+        novo: criados.map((c) => `${c.grade || c.tamanho} ${c.tipo}: ${c.codigo}`).join(' · ').slice(0, 300),
+        produtos: 1,
+      },
+    ],
+  });
+  return { ensaio, lote, produto, cor, criados };
+}
+
+/* ═══════════════════ inativar código de barra duplicado com histórico ═══════════════════ */
+
+/**
+ * Inativa (INATIVO = 1) um código DUPLICADO que tem registro em movimento e por
+ * isso não pode ser removido — a linha continua existindo, a referência do
+ * movimento antigo não quebra e o código sai de uso. Recusa se a cor/tamanho
+ * ficaria sem outro código ATIVO do mesmo tipo (interno ou EAN).
+ */
+export async function inativarCodigoBarra(params: {
+  company: CorCompany;
+  usuario: string;
+  codigo: string;
+  obs?: string | null;
+}): Promise<{ lote: string; codigo: string; produto: string; cor: string }> {
+  const codigo = limpar(params.codigo);
+  if (!codigo) throw new Error('Informe o código de barra.');
+  const alvo = await withRequest(async (request) => {
+    request.input('ibCodigo', sql.VarChar, codigo);
+    const r = await request.query<{ PRODUTO: string; COR_PRODUTO: string; TAMANHO: number; ROTULO_ANTES: string; ROTULO_DEPOIS: string }>(`
+SET NOCOUNT ON;
+SET XACT_ABORT ON;
+BEGIN TRANSACTION;
+BEGIN TRY
+  DECLARE @alvo TABLE (PRODUTO CHAR(12), COR_PRODUTO CHAR(10), TAMANHO INT, EAN BIT, INATIVO INT);
+  INSERT @alvo
+  SELECT PRODUTO, COR_PRODUTO, TAMANHO, CASE WHEN LEN(LTRIM(RTRIM(CODIGO_BARRA))) = 13 THEN 1 ELSE 0 END, CAST(ISNULL(INATIVO, 0) AS INT)
+  FROM PRODUTOS_BARRA WITH (UPDLOCK, HOLDLOCK) WHERE CODIGO_BARRA = @ibCodigo;
+  IF NOT EXISTS (SELECT 1 FROM @alvo) BEGIN ;THROW 51020, 'Código de barra não existe no Linx.', 1; END
+  IF EXISTS (SELECT 1 FROM @alvo WHERE INATIVO = 1) BEGIN ;THROW 51022, 'O código já está inativo.', 1; END
+  IF NOT EXISTS (
+    SELECT 1 FROM PRODUTOS_BARRA pb JOIN @alvo a ON a.PRODUTO = pb.PRODUTO AND a.COR_PRODUTO = pb.COR_PRODUTO AND a.TAMANHO = pb.TAMANHO
+    WHERE pb.CODIGO_BARRA <> @ibCodigo AND ISNULL(pb.INATIVO, 0) = 0
+      AND (CASE WHEN LEN(LTRIM(RTRIM(pb.CODIGO_BARRA))) = 13 THEN 1 ELSE 0 END) = a.EAN)
+    BEGIN ;THROW 51021, 'Esse é o único código ativo desse tipo para a cor/tamanho — inativá-lo deixaria o cadastro incompleto.', 1; END
+  /* O trigger LXU_PRODUTOS_BARRA_GRADE recusa QUALQUER update de código cujo
+     GRADE não bata com o rótulo do tamanho na grade do produto ("fora da grade").
+     Código gravado à mão com rótulo errado (ex.: '1' em vez de 'U') só sai de
+     uso se o rótulo for corrigido junto — mesma posição, mesmo produto/cor. */
+  DECLARE @rotulo VARCHAR(8) = (
+    SELECT TOP 1 LEFT(LTRIM(RTRIM(CAST(v.t AS VARCHAR(20)))), 8)
+    FROM @alvo a
+    JOIN PRODUTOS p ON p.PRODUTO = a.PRODUTO
+    JOIN PRODUTOS_TAMANHOS pt ON LTRIM(RTRIM(CAST(pt.GRADE AS VARCHAR(60)))) = LTRIM(RTRIM(CAST(p.GRADE AS VARCHAR(60))))
+    CROSS APPLY (VALUES ${Array.from({ length: MAX_TAMANHOS }, (_, i) => `(${i + 1}, pt.TAMANHO_${i + 1})`).join(', ')}) v(n, t)
+    WHERE v.n = a.TAMANHO);
+  DECLARE @rotuloAntes VARCHAR(25) = (SELECT TOP 1 LTRIM(RTRIM(GRADE)) FROM PRODUTOS_BARRA WHERE CODIGO_BARRA = @ibCodigo);
+  UPDATE PRODUTOS_BARRA SET INATIVO = 1, GRADE = COALESCE(@rotulo, GRADE) WHERE CODIGO_BARRA = @ibCodigo;
+  COMMIT;
+  SELECT LTRIM(RTRIM(PRODUTO)) AS PRODUTO, LTRIM(RTRIM(COR_PRODUTO)) AS COR_PRODUTO, TAMANHO,
+         @rotuloAntes AS ROTULO_ANTES, COALESCE(@rotulo, @rotuloAntes) AS ROTULO_DEPOIS FROM @alvo;
+END TRY
+BEGIN CATCH
+  IF @@TRANCOUNT > 0 ROLLBACK;
+  ;THROW;
+END CATCH`);
+    return r.recordset[0];
+  });
+  const lote = await registrarHistoricoCadastro({
+    company: params.company,
+    usuario: params.usuario,
+    obs: params.obs ?? 'Código de barra duplicado inativado',
+    linhas: [
+      {
+        escopo: 'PRODUTO',
+        acao: 'INATIVAR',
+        dimensao: null,
+        alvo: alvo.PRODUTO,
+        chave: `${alvo.PRODUTO}|${alvo.COR_PRODUTO}|${codigo}`,
+        pai: null,
+        campo: 'Código de barra',
+        anterior: `${codigo} ativo (grade '${limpar(alvo.ROTULO_ANTES)}')`,
+        novo: `${codigo} inativo (grade '${limpar(alvo.ROTULO_DEPOIS)}')`,
+        produtos: 1,
+      },
+    ],
+  });
+  return { lote, codigo, produto: alvo.PRODUTO, cor: alvo.COR_PRODUTO };
+}
+
+/* ═══════════════════ remover código de barra duplicado sem uso ═══════════════════ */
+
+/**
+ * Tabelas de movimento que gravam o código de barra lido (venda, troca, pedido,
+ * contagem, coletor, expedição). Código citado em qualquer uma delas está EM USO
+ * e nunca é removido.
+ */
+const TABELAS_USO_BARRA = [
+  'LOJA_VENDA_PRODUTO', 'LOJA_VENDA_TROCA', 'LOJA_VENDA_TROCA_TICKET', 'LOJA_PEDIDO_PRODUTO', 'ESTOQUE_PROD_CTG_BARRAS',
+  'VENDAS_PROD_BARRAS', 'COLETOR_PRODUTO', 'LJ_COLETOR_ITEM', 'LOJA_EXPEDICAO_CAIXA_ITEM', 'PRODUTO_BARRA_LEITURA_ITEM',
+  'B2C_OCORRENCIA_PRODUTO', 'UNICO_VITRINE_PEDIDO_ITEM', 'LJ_LF_ECF_ITEM',
+];
+
+/** Onde um código de barra aparece nos movimentos do Linx (tabela → linhas). */
+export async function fetchUsoCodigoBarra(codigoBruto: string): Promise<Record<string, number>> {
+  const codigo = limpar(codigoBruto);
+  return withRequest(async (request) => {
+    request.input('ubCodigo', sql.VarChar, codigo);
+    const partes = TABELAS_USO_BARRA.map(
+      (t) => `SELECT '${t}' AS T, COUNT(*) AS N FROM ${t} WITH (NOLOCK) WHERE CODIGO_BARRA = @ubCodigo`
+    ).join(' UNION ALL ');
+    const r = await request.query<{ T: string; N: number }>(`SET NOCOUNT ON; ${partes}`);
+    const uso: Record<string, number> = {};
+    for (const row of r.recordset) if (Number(row.N) > 0) uso[row.T] = Number(row.N);
+    return uso;
+  });
+}
+
+/**
+ * Remove um código de barra DUPLICADO e SEM USO. Recusa se: o código não existe;
+ * a mesma cor/tamanho ficaria sem outro código ATIVO do mesmo tipo (interno ou
+ * EAN) — nunca deixa o cadastro incompleto; ou o código aparece em qualquer
+ * tabela de movimento ({@link TABELAS_USO_BARRA}). O histórico guarda a linha
+ * inteira para poder recriar.
+ */
+export async function removerCodigoBarraSemUso(params: {
+  company: CorCompany;
+  usuario: string;
+  codigo: string;
+  obs?: string | null;
+}): Promise<{ lote: string; codigo: string; produto: string; cor: string; tamanho: number }> {
+  const codigo = limpar(params.codigo);
+  if (!codigo) throw new Error('Informe o código de barra.');
+  const uso = await fetchUsoCodigoBarra(codigo);
+  if (Object.keys(uso).length > 0) {
+    throw new Error(`O código ${codigo} tem uso no Linx (${Object.entries(uso).map(([t, n]) => `${t}: ${n}`).join(', ')}) — não removo.`);
+  }
+
+  const removido = await withRequest(async (request) => {
+    request.input('rbCodigo', sql.VarChar, codigo);
+    const r = await request.query<{ PRODUTO: string; COR_PRODUTO: string; TAMANHO: number; GRADE: string; TIPO_COD_BAR: number; INATIVO: number }>(`
+SET NOCOUNT ON;
+SET XACT_ABORT ON;
+BEGIN TRANSACTION;
+BEGIN TRY
+  DECLARE @alvo TABLE (PRODUTO CHAR(12), COR_PRODUTO CHAR(10), TAMANHO INT, GRADE VARCHAR(8), TIPO_COD_BAR INT, INATIVO INT, EAN BIT);
+  INSERT @alvo
+  SELECT PRODUTO, COR_PRODUTO, TAMANHO, LEFT(LTRIM(RTRIM(GRADE)), 8), TIPO_COD_BAR, CAST(ISNULL(INATIVO, 0) AS INT),
+         CASE WHEN LEN(LTRIM(RTRIM(CODIGO_BARRA))) = 13 THEN 1 ELSE 0 END
+  FROM PRODUTOS_BARRA WITH (UPDLOCK, HOLDLOCK) WHERE CODIGO_BARRA = @rbCodigo;
+  IF NOT EXISTS (SELECT 1 FROM @alvo) BEGIN ;THROW 51020, 'Código de barra não existe no Linx.', 1; END
+
+  IF NOT EXISTS (
+    SELECT 1 FROM PRODUTOS_BARRA pb JOIN @alvo a ON a.PRODUTO = pb.PRODUTO AND a.COR_PRODUTO = pb.COR_PRODUTO AND a.TAMANHO = pb.TAMANHO
+    WHERE pb.CODIGO_BARRA <> @rbCodigo AND ISNULL(pb.INATIVO, 0) = 0
+      AND (CASE WHEN LEN(LTRIM(RTRIM(pb.CODIGO_BARRA))) = 13 THEN 1 ELSE 0 END) = a.EAN)
+    BEGIN ;THROW 51021, 'Esse é o único código ativo desse tipo para a cor/tamanho — removê-lo deixaria o cadastro incompleto.', 1; END
+
+  DELETE FROM PRODUTOS_BARRA WHERE CODIGO_BARRA = @rbCodigo;
+  COMMIT;
+  SELECT LTRIM(RTRIM(PRODUTO)) AS PRODUTO, LTRIM(RTRIM(COR_PRODUTO)) AS COR_PRODUTO, TAMANHO, GRADE, TIPO_COD_BAR, INATIVO FROM @alvo;
+END TRY
+BEGIN CATCH
+  IF @@TRANCOUNT > 0 ROLLBACK;
+  ;THROW;
+END CATCH`);
+    return r.recordset[0];
+  });
+
+  const lote = await registrarHistoricoCadastro({
+    company: params.company,
+    usuario: params.usuario,
+    obs: params.obs ?? 'Código de barra duplicado e sem uso removido',
+    linhas: [
+      {
+        escopo: 'PRODUTO',
+        acao: 'EXCLUIR',
+        dimensao: null,
+        alvo: removido.PRODUTO,
+        chave: `${removido.PRODUTO}|${removido.COR_PRODUTO}|${codigo}`,
+        pai: null,
+        campo: 'Código de barra',
+        anterior: `${codigo} (cor ${removido.COR_PRODUTO}, tamanho ${removido.TAMANHO} ${removido.GRADE}, tipo ${removido.TIPO_COD_BAR}, inativo ${removido.INATIVO})`,
+        novo: null,
+        produtos: 1,
+      },
+    ],
+  });
+  return { lote, codigo, produto: removido.PRODUTO, cor: removido.COR_PRODUTO, tamanho: Number(removido.TAMANHO) };
 }

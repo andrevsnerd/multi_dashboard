@@ -245,6 +245,8 @@ export async function deleteVariantMaps(company: ShopifyCompany, variantIds: str
 // ---------------------------------------------------------------------------
 
 export interface MapaResumo {
+  /** Filtro de status do Shopify aplicado aos cartões ('todos' = sem filtro). */
+  statusShopify: string;
   variantes: number;
   produtos: number;
   porStatus: Record<MapaStatus, number>;
@@ -283,24 +285,30 @@ export interface MapaProdutoView {
   variantes: MapaVarianteView[];
 }
 
-export async function fetchMapaResumo(company: ShopifyCompany): Promise<MapaResumo> {
+export async function fetchMapaResumo(company: ShopifyCompany, statusShopify = "todos"): Promise<MapaResumo> {
   await ensureCatalogTables();
   const sql = getNeonSql();
+  // Os cartões seguem o mesmo filtro de status do Shopify da lista (padrão da tela: ativos) —
+  // rascunho antigo fora da loja não infla o "a revisar". O progresso de ativos é sempre de ativos.
+  const filtra = !!statusShopify && statusShopify !== "todos";
+  const f = (cond: string) => (filtra ? `(${cond}) AND v.product_status = $2` : cond);
   const [tot] = (await sql.query(
-    `SELECT COUNT(*)::int AS variantes, COUNT(DISTINCT v.product_id)::int AS produtos,
-            COUNT(*) FILTER (WHERE COALESCE(m.status,'pendente') = 'vinculado')::int AS vinculado,
-            COUNT(*) FILTER (WHERE m.status = 'sugerido')::int AS sugerido,
-            COUNT(*) FILTER (WHERE m.status = 'nao_linx')::int AS nao_linx,
-            COUNT(*) FILTER (WHERE COALESCE(m.status,'pendente') = 'pendente')::int AS pendente,
-            COUNT(DISTINCT v.product_id) FILTER (WHERE COALESCE(m.status,'pendente') IN ('sugerido','pendente'))::int AS revisar,
+    `SELECT COUNT(*) FILTER (WHERE ${f("TRUE")})::int AS variantes,
+            COUNT(DISTINCT v.product_id) FILTER (WHERE ${f("TRUE")})::int AS produtos,
+            COUNT(*) FILTER (WHERE ${f("COALESCE(m.status,'pendente') = 'vinculado'")})::int AS vinculado,
+            COUNT(*) FILTER (WHERE ${f("m.status = 'sugerido'")})::int AS sugerido,
+            COUNT(*) FILTER (WHERE ${f("m.status = 'nao_linx'")})::int AS nao_linx,
+            COUNT(*) FILTER (WHERE ${f("COALESCE(m.status,'pendente') = 'pendente'")})::int AS pendente,
+            COUNT(DISTINCT v.product_id) FILTER (WHERE ${f("COALESCE(m.status,'pendente') IN ('sugerido','pendente')")})::int AS revisar,
             COUNT(*) FILTER (WHERE v.product_status = 'ACTIVE')::int AS ativos,
             COUNT(*) FILTER (WHERE v.product_status = 'ACTIVE' AND m.status IN ('vinculado','nao_linx'))::int AS ativos_ok
        FROM shopify_variants v
        LEFT JOIN shopify_variant_map m ON m.company = v.company AND m.variant_id = v.variant_id
       WHERE v.company = $1`,
-    [company],
+    filtra ? [company, statusShopify] : [company],
   )) as Array<Record<string, number>>;
   return {
+    statusShopify: filtra ? statusShopify : "todos",
     variantes: tot?.variantes ?? 0,
     produtos: tot?.produtos ?? 0,
     porStatus: {

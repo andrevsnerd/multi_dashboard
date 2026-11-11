@@ -128,7 +128,7 @@ export interface HistoricoLote {
   usuario: string;
   empresa: string;
   escopo: "DIMENSAO" | "PRODUTO";
-  acao: "RENOMEAR" | "CRIAR" | "INATIVAR" | "REATIVAR" | "CAMPO";
+  acao: "RENOMEAR" | "CRIAR" | "INATIVAR" | "REATIVAR" | "CAMPO" | "EXCLUIR";
   alteracoes: number;
   alvos: number;
   resumo: string;
@@ -190,4 +190,5 @@ export const ACAO_LABEL: Record<HistoricoLote["acao"], string> = {
   INATIVAR: "Inativar",
   REATIVAR: "Reativar",
   CAMPO: "Campos do produto",
+  EXCLUIR: "Excluir",
 };

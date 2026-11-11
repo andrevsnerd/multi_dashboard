@@ -841,7 +841,7 @@ export async function ensureHistoricoTable(): Promise<void> {
 }
 
 export type EscopoHistorico = 'DIMENSAO' | 'PRODUTO';
-export type AcaoHistorico = 'RENOMEAR' | 'CRIAR' | 'INATIVAR' | 'REATIVAR' | 'CAMPO';
+export type AcaoHistorico = 'RENOMEAR' | 'CRIAR' | 'INATIVAR' | 'REATIVAR' | 'CAMPO' | 'EXCLUIR';
 
 export interface HistoricoLinha {
   id: number;
@@ -996,9 +996,10 @@ export async function fetchHistoricoLotes(
         obs: limpar(row.obs) || null,
         reverteLote: limpar(row.reverteLote) || null,
         revertidoPor: limpar(row.revertidoPor) || null,
-        // Criar é o único caso sem estorno: desfazer seria DELETE na mestre, e
-        // um DELETE arrasta filhas por CASCADE. O caminho certo é inativar.
-        reversivel: acao !== 'CRIAR',
+        // Criar não tem estorno: desfazer seria DELETE na mestre, e um DELETE
+        // arrasta filhas por CASCADE. O caminho certo é inativar. Excluir (código
+        // de barra sem uso) também não: a linha removida fica no histórico.
+        reversivel: acao !== 'CRIAR' && acao !== 'EXCLUIR',
       };
     });
   });

@@ -30,6 +30,7 @@ import sql from 'mssql';
 
 import { withRequest } from '@/lib/db/connection';
 import type { RequestLike } from '@/lib/db/proxy';
+import { registrarHistoricoCadastro } from '@/lib/repositories/cadastro';
 
 /** SQL Server aceita ~2100 parâmetros; 400 produtos (2 params cada) é folgado. */
 const CHUNK = 400;
@@ -1414,4 +1415,86 @@ export async function reverterLotePrecos(
   }
 
   return resultado;
+}
+
+/* ═══════════════════ custo de produto sem a linha da tabela de custo ═══════════════════ */
+
+/**
+ * Produto cadastrado sem a linha da tabela de CUSTO (PARAMETROS.TABELA_PRECO_CUSTO,
+ * hoje '06') — o custo de reposição fica 0 e as filhas (97/98) não existem.
+ * "Alterar custo" não resolve: só edita linha que existe. Aqui criamos a linha
+ * com o MESMO INSERT do cadastro de produto novo (produtoNovo.ts); o trigger
+ * LXI_PRODUTOS_PRECOS cria as filhas pelo % e grava CUSTO_REPOSICAO1 no produto
+ * e nas cores. Recusa se a linha já existe (aí o caminho é Alterar Custo).
+ */
+export async function criarCustoFaltante(params: {
+  company: 'nerd' | 'scarfme';
+  usuario: string;
+  produto: string;
+  custo: number;
+  obs?: string | null;
+}): Promise<{ lote: string; produto: string; custo: number; tabelas: Array<{ tabela: string; preco: number }>; custoReposicao: number | null }> {
+  const produto = limpar(params.produto).toUpperCase();
+  const custo = Math.round(Number(params.custo) * 100) / 100;
+  if (!produto) throw new Error('Informe o produto.');
+  if (!(custo > 0)) throw new Error('Informe um custo maior que zero.');
+
+  const rows = await withRequest(async (request) => {
+    request.input('cfProduto', sql.VarChar, produto);
+    request.input('cfCusto', sql.Decimal(14, 2), custo);
+    const r = await request.query<{ TABELA: string; PRECO: number; CUSTO_REPOSICAO1: number | null }>(`
+SET NOCOUNT ON;
+SET XACT_ABORT ON;
+BEGIN TRANSACTION;
+BEGIN TRY
+  DECLARE @produtoCh CHAR(12) = @cfProduto;
+  DECLARE @custo NUMERIC(14,2) = @cfCusto;
+  DECLARE @hoje DATETIME = GETDATE();
+  DECLARE @tabCusto CHAR(2) = (SELECT LEFT(LTRIM(RTRIM(VALOR_ATUAL)), 2) FROM PARAMETROS WHERE PARAMETRO = 'TABELA_PRECO_CUSTO');
+  IF @tabCusto IS NULL BEGIN ;THROW 52040, 'PARAMETROS.TABELA_PRECO_CUSTO está vazio no Linx.', 1; END
+  IF NOT EXISTS (SELECT 1 FROM PRODUTOS WITH (UPDLOCK, HOLDLOCK) WHERE PRODUTO = @produtoCh)
+    BEGIN ;THROW 52041, 'Produto não existe no cadastro do Linx.', 1; END
+  IF EXISTS (SELECT 1 FROM PRODUTOS_PRECOS WITH (UPDLOCK, HOLDLOCK) WHERE PRODUTO = @produtoCh AND CODIGO_TAB_PRECO = @tabCusto)
+    BEGIN ;THROW 52042, 'O produto já tem a tabela de custo — use Alterar Custo / Preço.', 1; END
+
+  INSERT INTO PRODUTOS_PRECOS (
+    CODIGO_TAB_PRECO, PRODUTO, PRECO1, PRECO2, PRECO3, PRECO4,
+    PRECO_LIQUIDO1, PRECO_LIQUIDO2, PRECO_LIQUIDO3, PRECO_LIQUIDO4,
+    LIMITE_DESCONTO, PROMOCAO_DESCONTO, ULT_ATUALIZACAO, MARK_UP_PREVISTO, PROMOCAO_ATACADO, LX_STATUS_REGISTRO
+  )
+  VALUES (@tabCusto, @produtoCh, @custo, 0, 0, 0, @custo, 0, 0, 0, 0, 0, @hoje, 0, 0, 0);
+  COMMIT;
+
+  SELECT LTRIM(RTRIM(pp.CODIGO_TAB_PRECO)) AS TABELA, pp.PRECO1 AS PRECO, p.CUSTO_REPOSICAO1
+  FROM PRODUTOS_PRECOS pp JOIN PRODUTOS p ON p.PRODUTO = pp.PRODUTO
+  WHERE pp.PRODUTO = @produtoCh ORDER BY pp.CODIGO_TAB_PRECO;
+END TRY
+BEGIN CATCH
+  IF @@TRANCOUNT > 0 ROLLBACK;
+  ;THROW;
+END CATCH`);
+    return r.recordset;
+  });
+
+  const custoReposicao = rows[0]?.CUSTO_REPOSICAO1 == null ? null : Number(rows[0].CUSTO_REPOSICAO1);
+  const lote = await registrarHistoricoCadastro({
+    company: params.company,
+    usuario: params.usuario,
+    obs: params.obs ?? 'Tabela de custo que faltava no produto',
+    linhas: [
+      {
+        escopo: 'PRODUTO',
+        acao: 'CRIAR',
+        dimensao: null,
+        alvo: produto,
+        chave: `${produto}|custo`,
+        pai: null,
+        campo: 'Tabela de custo',
+        anterior: 'sem tabela de custo (custo de reposição 0)',
+        novo: `custo ${custo.toFixed(2)} — tabelas: ${rows.map((x) => `${x.TABELA}=${Number(x.PRECO)}`).join(' ')}`.slice(0, 300),
+        produtos: 1,
+      },
+    ],
+  });
+  return { lote, produto, custo, tabelas: rows.map((x) => ({ tabela: x.TABELA, preco: Number(x.PRECO) })), custoReposicao };
 }

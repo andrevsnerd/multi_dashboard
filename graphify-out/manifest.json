@@ -3960,8 +3960,8 @@
     "semantic_hash": ""
   },
   "components/cadastro/types.ts": {
-    "mtime": 1785937844.5033314,
-    "ast_hash": "50bf0e9e1087996be6070f20513b570c",
+    "mtime": 1794406606.3302207,
+    "ast_hash": "637db53fdd904b9b28d2add533f3bf55",
     "semantic_hash": ""
   },
   "components/gerador-apresentacoes/TopProdutosDeck.tsx": {
@@ -3995,13 +3995,13 @@
     "semantic_hash": ""
   },
   "lib/repositories/cadastro.ts": {
-    "mtime": 1791220851.7930868,
-    "ast_hash": "68c7723bc68502577f930bcfe0fa7920",
+    "mtime": 1794406604.5774612,
+    "ast_hash": "a3bbb281f9d31d1e951d48cac411f40d",
     "semantic_hash": ""
   },
   "lib/repositories/precos.ts": {
-    "mtime": 1794315133.3321314,
-    "ast_hash": "f5eaa8a29de0ea3ba65a54f3a18fe01a",
+    "mtime": 1794408829.5939074,
+    "ast_hash": "4ff683fb3326efb870f224f5ebafd574",
     "semantic_hash": ""
   },
   "lib/repositories/topProdutosPresentation.ts": {
@@ -4150,8 +4150,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/produtoCores.ts": {
-    "mtime": 1790876432.23248,
-    "ast_hash": "cbc5090df320437b3caef176166a06f7",
+    "mtime": 1794407311.5714798,
+    "ast_hash": "461b1c21df62ce42025bbcd9c4d00b8b",
     "semantic_hash": ""
   },
   "app/api/saidas-entradas-produtos/defeito-do-dia/route.ts": {
@@ -5395,13 +5395,13 @@
     "semantic_hash": ""
   },
   "app/api/shopify/mapa/route.ts": {
-    "mtime": 1794333679.4474108,
-    "ast_hash": "11d3714809a7d985e8772b9e59105361",
+    "mtime": 1794408363.205473,
+    "ast_hash": "e79f5fb302b974122d4ab80d7a6dd2e0",
     "semantic_hash": ""
   },
   "components/shopify/ShopifyMapaLinx.tsx": {
-    "mtime": 1794333679.4474108,
-    "ast_hash": "cb5b32c1fc4d31d160236dc66b87ddd3",
+    "mtime": 1794408364.11483,
+    "ast_hash": "8f65791967b4e74fc92467c68d07fedf",
     "semantic_hash": ""
   },
   "lib/shopify/auth.ts": {
@@ -5410,8 +5410,8 @@
     "semantic_hash": ""
   },
   "lib/shopify/catalog-store.ts": {
-    "mtime": 1794335574.8897438,
-    "ast_hash": "b469a6d51684b5def7419f3233e8582b",
+    "mtime": 1794408362.308687,
+    "ast_hash": "3b89f95d0b6b02c07a4fcad82ddb41ab",
     "semantic_hash": ""
   },
   "lib/shopify/catalog-sync.ts": {
@@ -5467,6 +5467,16 @@
   "lib/shopify/dashboard-principal.ts": {
     "mtime": 1794395160.7851222,
     "ast_hash": "d18bcfb5b331ccbdb01ca4bef2d00cbd",
+    "semantic_hash": ""
+  },
+  "app/api/etiquetas/cores/codigos/route.ts": {
+    "mtime": 1794407220.1556253,
+    "ast_hash": "be8519b146847849fbf8ac1863b411ce",
+    "semantic_hash": ""
+  },
+  "app/api/precos/custo-faltante/route.ts": {
+    "mtime": 1794408838.821746,
+    "ast_hash": "95a27e4326d6335dc5f89955fad0acfa",
     "semantic_hash": ""
   }
 }

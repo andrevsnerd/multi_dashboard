@@ -239,7 +239,16 @@ export default function ShopifyMapaLinx({ companyKey }: Props) {
             >
               <span>{STATUS_LABEL[s]}</span>
               <strong>{resumo.porStatus[s].toLocaleString("pt-BR")}</strong>
-              <small>variantes (todas)</small>
+              <small>
+                variantes{" "}
+                {resumo.statusShopify === "ACTIVE"
+                  ? "ativas"
+                  : resumo.statusShopify === "DRAFT"
+                    ? "em rascunho"
+                    : resumo.statusShopify === "ARCHIVED"
+                      ? "arquivadas"
+                      : "(todas)"}
+              </small>
             </button>
           ))}
         </section>
