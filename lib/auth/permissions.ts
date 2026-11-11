@@ -63,6 +63,23 @@ export function canMutate(user: UserSession | null): boolean {
 }
 
 /**
+ * Funcoes que NAO veem o e-commerce (Shopify / E-COMMERCE do Linx) na tela inicial do
+ * dashboard: nem a filial, nem a venda somada em "Todas", nem a meta. Regra do dono,
+ * 11/11/2026. Usuario com a flag `somenteVarejo` (Scarf Me) tambem fica de fora.
+ */
+export const SEM_ECOMMERCE_DASHBOARD_ROLES: RoleKey[] = ["supervisor", "gerente"];
+
+/** True se o usuario nao pode ver o e-commerce na tela inicial desta empresa. */
+export function hidesEcommerceDashboard(
+  user: Pick<UserSession, "role" | "somenteVarejo"> | null | undefined,
+  companyKey: string | null | undefined,
+): boolean {
+  if (!user) return false;
+  if (SEM_ECOMMERCE_DASHBOARD_ROLES.includes(user.role)) return true;
+  return user.somenteVarejo === true && companyKey === "scarfme";
+}
+
+/**
  * MARKETING: funcao dedicada a area CORPORATIVO e a nada mais. Ve e opera TODA
  * a area /corporativo (gestao de clientes, catalogo da loja, pedidos, aprovacoes,
  * imagens de produto), e NAO enxerga NERD/ScarfMe — nem pelas permissoes de

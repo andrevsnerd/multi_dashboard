@@ -21,6 +21,8 @@ import { fetchParteShopifyDashboard, type ParteShopify } from '@/lib/shopify/das
 import { isProdutoSoShopify } from '@/lib/shopify/produto-shopify';
 import { runShopifyIncrementalSync } from '@/lib/shopify/sync';
 import { readGoals } from '@/lib/utils/goals-storage';
+import { findUserByUsername } from '@/lib/auth/users-store';
+import { hidesEcommerceDashboard } from '@/lib/auth/permissions';
 import { MATRIZ_FILIAIS } from '@/lib/blackfriday/datas';
 import type { FilialPerformance, MetricSummary, ProductRevenue, SalesSummary } from '@/types/dashboard';
 
@@ -53,7 +55,7 @@ const metrica = (atual: number, anterior: number): MetricSummary => ({
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const company = searchParams.get('company') ?? undefined;
-  const filialParam = searchParams.get('filial') || null;
+  const filialPedida = searchParams.get('filial') || null;
   const linhasParam = searchParams.getAll('linha');
   const linhas = linhasParam.length > 0 ? linhasParam : null;
   const startParam = searchParams.get('start');
@@ -73,11 +75,27 @@ export async function GET(request: Request) {
   const month = monthParam !== null ? parseInt(monthParam, 10) : null;
   const year = yearParam !== null ? parseInt(yearParam, 10) : null;
 
-  // ── Shopify ligado? (nerd/scarfme com credenciais) ──
-  const shopifyCompany = isShopifyCompany(company) && getShopifyCredentials(company) ? company : null;
   const companyConfig = resolveCompany(company);
   const ecomSet = new Set((companyConfig?.ecommerceFilials ?? []).map(normalizeFilialLookupKey));
   const ehEcommerceLinx = (f: string | null) => !!f && ecomSet.has(normalizeFilialLookupKey(f));
+
+  // ── Supervisor/gerente (e somenteVarejo na Scarf Me) não veem e-commerce nesta tela ──
+  // Sem Shopify, sem a filial E-COMMERCE, sem a meta dela; "Todas" = só lojas físicas.
+  const username = request.headers.get('x-auth-username')?.trim();
+  const usuario = username ? await findUserByUsername(username).catch(() => null) : null;
+  const semEcommerce = hidesEcommerceDashboard(usuario, company);
+  const pediuEcommerce = filialPedida === SHOPIFY_VALUE || ehEcommerceLinx(filialPedida);
+  const filialParam: string | null = !semEcommerce
+    ? filialPedida
+    : filialPedida === null || pediuEcommerce
+      ? company === 'scarfme'
+        ? VAREJO_VALUE
+        : null
+      : filialPedida;
+
+  // ── Shopify ligado? (nerd/scarfme com credenciais) ──
+  const shopifyCompany =
+    !semEcommerce && isShopifyCompany(company) && getShopifyCredentials(company) ? company : null;
   // Na Scarf Me, quem ainda manda o valor antigo do E-COMMERCE cai no Shopify.
   const filialShopify = !!shopifyCompany && (filialParam === SHOPIFY_VALUE || ehEcommerceLinx(filialParam));
   // Filial que vai para as funções do Linx: no "Todas" da Scarf Me = VAREJO (lojas físicas,
@@ -130,16 +148,21 @@ export async function GET(request: Request) {
           : Promise.resolve(null),
     ]);
 
-    const monthGoals: Record<string, number> =
+    const monthGoalsTodas: Record<string, number> =
       company && month !== null && year !== null && !Number.isNaN(month) && !Number.isNaN(year)
         ? ((allGoals[company]?.[String(year)]?.[String(month)] as Record<string, number>) ?? {})
         : {};
+    const monthGoals = semEcommerce
+      ? Object.fromEntries(Object.entries(monthGoalsTodas).filter(([f]) => !ehEcommerceLinx(f)))
+      : monthGoalsTodas;
 
-    // Sem Shopify: exatamente como era.
+    // Sem Shopify: exatamente como era (sem a linha do e-commerce para quem não pode vê-lo).
     if (!shopifyCompany) {
       return NextResponse.json(
         {
-          filialPerformance: filialPerformanceLinx,
+          filialPerformance: semEcommerce
+            ? filialPerformanceLinx.filter((f) => !ehEcommerceLinx(f.filial))
+            : filialPerformanceLinx,
           topProducts: topProductsLinx,
           topCategories: topCategoriesLinx,
           dailyRevenue: dailyRevenueLinx,

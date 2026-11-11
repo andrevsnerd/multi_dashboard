@@ -20,6 +20,11 @@ interface GoalsModalProps {
   monthYear: { month: number; year: number };
   /** Chamado depois de gravar, com as metas do mês como ficaram salvas (chave = filial do banco). */
   onSaved?: (monthYear: { month: number; year: number }, goals: GoalData) => void;
+  /**
+   * Supervisor/gerente: sem a linha do E-COMMERCE. As metas dela ficam como estão
+   * ao salvar (chave fora das linhas da tela é preservada).
+   */
+  hideEcommerce?: boolean;
 }
 
 interface GoalData {
@@ -42,7 +47,7 @@ type PendingAction = { type: "close" } | { type: "month"; month: number; year: n
 
 const ECOMMERCE_ROW_KEY = "E-COMMERCE";
 
-function buildRows(companyKey: CompanyKey): GoalRow[] {
+function buildRows(companyKey: CompanyKey, hideEcommerce = false): GoalRow[] {
   const company = resolveCompany(companyKey);
   if (!company) return [];
   const displayNames = company.filialDisplayNames ?? {};
@@ -68,7 +73,7 @@ function buildRows(companyKey: CompanyKey): GoalRow[] {
     });
   }
 
-  if (ecommerce.length > 0) {
+  if (ecommerce.length > 0 && !hideEcommerce) {
     rows.push({
       key: ECOMMERCE_ROW_KEY,
       label: ecommerce.map((f) => displayNames[f]).find(Boolean) ?? "E-COMMERCE",
@@ -145,6 +150,7 @@ export default function GoalsModal({
   onClose,
   monthYear,
   onSaved,
+  hideEcommerce = false,
 }: GoalsModalProps) {
   const { user } = useAuth();
   const canEdit = canMutate(user);
@@ -152,7 +158,7 @@ export default function GoalsModal({
   // Derivado só de companyKey: referência estável. (Antes, `ecommerceFilials ?? []`
   // criava um array novo a cada render na NERD — sem e-commerce — e o efeito de
   // carga entrava em loop, apagando o que era digitado.)
-  const rows = useMemo(() => buildRows(companyKey), [companyKey]);
+  const rows = useMemo(() => buildRows(companyKey, hideEcommerce), [companyKey, hideEcommerce]);
 
   const [period, setPeriod] = useState(monthYear);
   const [rawGoals, setRawGoals] = useState<GoalData>({});

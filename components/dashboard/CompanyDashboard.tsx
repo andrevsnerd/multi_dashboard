@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/AuthContext";
+import { hidesEcommerceDashboard } from "@/lib/auth/permissions";
 import {
   getFilialGroupMembers,
   normalizeFilialLookupKey,
@@ -77,6 +78,7 @@ async function fetchDashboardData(
   year: number,
   linhas: string[] | null,
   comFrete = true,
+  username: string | null = null,
 ): Promise<DashboardData> {
   const isSameDay = (a: Date, b: Date) =>
     a.getFullYear() === b.getFullYear() &&
@@ -104,8 +106,10 @@ async function fetchDashboardData(
   // Frete do Shopify: entra somado por padrão (checkbox "Incluir frete").
   if (!comFrete) params.set("frete", "0");
 
+  // O servidor usa o usuário para esconder o e-commerce de supervisor/gerente.
   const response = await fetch(`/api/dashboard-data?${params.toString()}`, {
     cache: "no-store",
+    headers: username ? { "x-auth-username": username } : undefined,
   });
 
   if (!response.ok) {
@@ -138,6 +142,10 @@ export default function CompanyDashboard({
   const [selectedFilial, setSelectedFilial] = useState<string | null>(null);
 
   const isSomenteVarejo = !isLoadingAuth && user?.somenteVarejo === true && companyKey === "scarfme";
+  // Supervisor/gerente (e somenteVarejo): sem e-commerce/Shopify nesta tela — nem filial,
+  // nem venda somada em "Todas", nem meta. O servidor aplica a mesma regra.
+  const semEcommerce = !isLoadingAuth && hidesEcommerceDashboard(user, companyKey);
+  const username = user?.username ?? null;
 
   // Aplica o padrão Varejo uma vez quando o usuário é carregado
   useEffect(() => {
@@ -175,7 +183,11 @@ export default function CompanyDashboard({
     [companyKey, filtrarEletronicos],
   );
 
-  const effectiveFilial = isSomenteVarejo ? VAREJO_VALUE : selectedFilial;
+  // Scarf Me sem e-commerce: "Todas" = VAREJO (lojas físicas).
+  const effectiveFilial =
+    isSomenteVarejo || (semEcommerce && companyKey === "scarfme" && selectedFilial === null)
+      ? VAREJO_VALUE
+      : selectedFilial;
 
   const rangeKey = useMemo(
     () =>
@@ -184,6 +196,8 @@ export default function CompanyDashboard({
   );
 
   useEffect(() => {
+    // Espera saber quem é o usuário: senão a 1ª carga vem com e-commerce para quem não pode.
+    if (isLoadingAuth) return;
     let active = true;
 
     async function load() {
@@ -198,6 +212,7 @@ export default function CompanyDashboard({
           monthYear.year,
           linhas,
           comFrete,
+          username,
         );
         if (active) {
           setDashboardData(data);
@@ -218,7 +233,7 @@ export default function CompanyDashboard({
     return () => {
       active = false;
     };
-  }, [companyKey, rangeKey, retryKey, range, effectiveFilial, monthYear.month, monthYear.year, linhas, comFrete]);
+  }, [companyKey, rangeKey, retryKey, range, effectiveFilial, monthYear.month, monthYear.year, linhas, comFrete, isLoadingAuth, username]);
 
   // Depois de salvar no modal, o card de meta já reflete o valor novo (sem recarregar
   // o dashboard) — só se o mês salvo for o mês que o dashboard está mostrando.
@@ -264,13 +279,14 @@ export default function CompanyDashboard({
       return sumGoals(getFilialGroupMembers(companyConfig, effectiveFilial));
     }
     const salesFiliais = companyConfig.filialFilters.sales;
-    if (effectiveFilial === VAREJO_VALUE) {
+    if (effectiveFilial === VAREJO_VALUE || semEcommerce) {
       // VAREJO = só lojas físicas: a meta do e-commerce fica fora, igual ao faturamento.
+      // Quem não vê e-commerce (supervisor/gerente) também nunca soma a meta dele.
       const ecommerce = new Set((companyConfig.ecommerceFilials ?? []).map(normalizeFilialLookupKey));
       return sumGoals(salesFiliais.filter((f) => !ecommerce.has(normalizeFilialLookupKey(f))));
     }
     return sumGoals(salesFiliais);
-  }, [dashboardData, effectiveFilial, companyConfig]);
+  }, [dashboardData, effectiveFilial, companyConfig, semEcommerce]);
 
   const goalLabel =
     effectiveFilial === VAREJO_VALUE
@@ -338,13 +354,14 @@ export default function CompanyDashboard({
             {!isSomenteVarejo && (
               <FilialFilter
                 companyKey={companyKey}
-                value={selectedFilial}
+                value={semEcommerce ? effectiveFilial : selectedFilial}
                 onChange={setSelectedFilial}
                 compact
-                shopifyOption={shopifyOption}
+                shopifyOption={semEcommerce ? null : shopifyOption}
+                hideEcommerce={semEcommerce}
               />
             )}
-            {shopifyOption && !isSomenteVarejo && (
+            {shopifyOption && !isSomenteVarejo && !semEcommerce && (
               <label
                 className={styles.checkboxLabel}
                 title={`Soma o frete cobrado no ${shopifyOption.label} na venda${
@@ -378,13 +395,16 @@ export default function CompanyDashboard({
               </span>
             ) : null}
           </div>
-          <button
-            type="button"
-            className={styles.goalsButton}
-            onClick={() => setIsGoalsModalOpen(true)}
-          >
-            Metas
-          </button>
+          {/* Editor de metas: escondido de supervisor/gerente (mesma regra do e-commerce). */}
+          {!isLoadingAuth && !semEcommerce && (
+            <button
+              type="button"
+              className={styles.goalsButton}
+              onClick={() => setIsGoalsModalOpen(true)}
+            >
+              Metas
+            </button>
+          )}
         </div>
 
         {loading && (
@@ -438,10 +458,11 @@ export default function CompanyDashboard({
 
       <GoalsModal
         companyKey={companyKey}
-        isOpen={isGoalsModalOpen}
+        isOpen={isGoalsModalOpen && !semEcommerce}
         onClose={() => setIsGoalsModalOpen(false)}
         monthYear={monthYear}
         onSaved={handleGoalsSaved}
+        hideEcommerce={semEcommerce}
       />
     </>
   );

@@ -40,6 +40,8 @@ interface FilialFilterProps {
    * Quando informada, ela SUBSTITUI a opção E-COMMERCE do Linx no menu.
    */
   shopifyOption?: { value: string; label: string } | null;
+  /** Esconde a opção E-COMMERCE do Linx (ex.: supervisor/gerente na tela inicial). */
+  hideEcommerce?: boolean;
   companyConfigOverride?: Pick<
     CompanyConfig,
     "filialFilters" | "filialDisplayNames" | "filialGroups" | "activeFilials" | "ecommerceFilials"
@@ -58,6 +60,7 @@ export default function FilialFilter({
   showActiveGroupHint = false,
   compact = false,
   shopifyOption = null,
+  hideEcommerce = false,
   companyConfigOverride = null,
 }: FilialFilterProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -103,7 +106,7 @@ export default function FilialFilter({
   }
 
   // Obter a primeira filial de ecommerce (se houver e se permitida)
-  let ecommerceFilial = ecommerceFilials.length > 0 ? ecommerceFilials[0] : null;
+  let ecommerceFilial = ecommerceFilials.length > 0 && !hideEcommerce ? ecommerceFilials[0] : null;
   if (allowedFiliais && allowedFiliais.length > 0 && ecommerceFilial) {
     const allowedSet = new Set(allowedFiliais.map((a) => a.trim().toUpperCase()));
     if (!allowedSet.has((ecommerceFilial || "").trim().toUpperCase())) {
