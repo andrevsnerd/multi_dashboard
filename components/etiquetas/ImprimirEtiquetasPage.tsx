@@ -117,6 +117,7 @@ function montarItem(produto: ProdutoEtiqueta, cor: CorEtiqueta): ItemEtiqueta {
     cor: cor.cor,
     descCor: cor.descCor,
     codigoBarra: cor.codigoBarra,
+    ean: cor.ean,
     grupo: produto.grupo,
     subgrupo: produto.subgrupo,
     linha: produto.linha,
@@ -166,6 +167,13 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
 
   const [fila, setFila] = useState<Record<string, ItemFila>>({});
   const [qtdPadrao, setQtdPadrao] = useState(1);
+  /**
+   * Qual código vai para as barras NESTA impressão. Padrão = o curto/interno
+   * (igual ao Linx). "ean" troca pelo EAN-13 da cor e força a simbologia EAN-13
+   * só aqui — não mexe no modelo salvo da empresa.
+   */
+  const [codigoImpressao, setCodigoImpressao] = useState<"padrao" | "ean">("padrao");
+  const usarEan = codigoImpressao === "ean";
 
   const [config, setConfig] = useState<EtiquetaConfig>(() => clonarConfig(CONFIG_PADRAO));
   const [configSalva, setConfigSalva] = useState<EtiquetaConfig>(() => clonarConfig(CONFIG_PADRAO));
@@ -426,17 +434,37 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
     return mapa;
   }, [itensFila]);
 
+  /* ── o que efetivamente sai na impressão ─────────────────────────────── */
+
+  // Modelo da impressão: o salvo, ou o salvo com as barras em EAN-13 quando o
+  // usuário escolheu imprimir o EAN. Editor e "Salvar modelo" continuam no `config`.
+  const configImpressao = useMemo<EtiquetaConfig>(
+    () =>
+      usarEan
+        ? { ...config, barcode: { ...config.barcode, simbologia: "EAN13", origem: "codigoBarra" } }
+        : config,
+    [config, usarEan]
+  );
+
+  // Itens da impressão: com EAN escolhido, o código (barras e número) vira o
+  // EAN da cor. Cor sem EAN fica sem código e cai no aviso "sem código válido".
+  const itensImpressao = useMemo(
+    () =>
+      itensFila.map(({ item, quantidade }) => ({
+        item: usarEan ? { ...item, codigoBarra: item.ean ?? "" } : item,
+        quantidade,
+      })),
+    [itensFila, usarEan]
+  );
+
   /* ── ZPL ─────────────────────────────────────────────────────────────── */
 
   const resultadoZpl = useMemo(() => {
-    if (itensFila.length === 0) return null;
-    return gerarZpl(
-      itensFila.map(({ item, quantidade }) => ({ item, quantidade })),
-      config
-    );
-  }, [itensFila, config]);
+    if (itensImpressao.length === 0) return null;
+    return gerarZpl(itensImpressao, configImpressao);
+  }, [itensImpressao, configImpressao]);
 
-  const itemExemplo: ItemEtiqueta | null = itensFila[0]?.item ?? null;
+  const itemExemplo: ItemEtiqueta | null = itensImpressao[0]?.item ?? null;
   const exemploPreview: ItemEtiqueta = itemExemplo ?? {
     produto: "N4.7H.0080",
     descProduto: "CP SILICONE IP 17 PRO MAX",
@@ -452,45 +480,28 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
   };
 
   const fileiras = useMemo(
-    () =>
-      montarFileiras(
-        itensFila.map(({ item, quantidade }) => ({ item, quantidade })),
-        config.colunas
-      ),
-    [itensFila, config.colunas]
+    () => montarFileiras(itensImpressao, config.colunas),
+    [itensImpressao, config.colunas]
   );
 
   // O código de barras cabe na largura? Simbologia larga ou módulo grande fazem
   // a Zebra cortar as barras sem avisar.
   const barras = useMemo(
-    () =>
-      analisarBarras(
-        itensFila.map(({ item, quantidade }) => ({ item, quantidade })),
-        config
-      ),
-    [itensFila, config]
+    () => analisarBarras(itensImpressao, configImpressao),
+    [itensImpressao, configImpressao]
   );
 
   // Idem para as linhas de texto: fonte alta demais ou "máx. caracteres"
   // generoso demais faz o texto invadir a etiqueta vizinha na mídia contínua.
   const linhasEstouram = useMemo(
-    () =>
-      analisarTextos(
-        itensFila.map(({ item, quantidade }) => ({ item, quantidade })),
-        config
-      ),
-    [itensFila, config]
+    () => analisarTextos(itensImpressao, configImpressao),
+    [itensImpressao, configImpressao]
   );
 
   /** Encolhe as fontes até tudo caber — sem cortar texto. */
   const ajustarParaCaber = useCallback(() => {
-    setConfig((atual) =>
-      ajustarTamanhoParaCaber(
-        itensFila.map(({ item, quantidade }) => ({ item, quantidade })),
-        atual
-      )
-    );
-  }, [itensFila]);
+    setConfig((atual) => ajustarTamanhoParaCaber(itensImpressao, atual));
+  }, [itensImpressao]);
 
   const alturaConteudo = alturaConteudoMm(config);
   const conteudoNaoCabe = alturaConteudo > config.alturaEtiquetaMm + 0.01;
@@ -738,8 +749,9 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
       <div className={styles.header}>
         <h1 className={styles.title}>Imprimir Etiquetas</h1>
         <p className={styles.subtitle}>
-          Busque o produto, escolha as cores e a quantidade. O código impresso é sempre o
-          preferencial do cadastro (o menor/interno), como no relatório do Linx.
+          Busque o produto, escolha as cores e a quantidade. O código impresso é o
+          preferencial do cadastro (o menor/interno), como no relatório do Linx — na fila
+          dá para trocar pelo EAN-13 quando precisar.
         </p>
       </div>
 
@@ -1076,7 +1088,9 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
                         </td>
                         <td>{item.descCor || item.cor || "—"}</td>
                         <td className={styles.mono}>
-                          {item.codigoBarra || <span className={styles.semCodigo}>sem código</span>}
+                          {(usarEan ? item.ean : item.codigoBarra) || (
+                            <span className={styles.semCodigo}>{usarEan ? "sem EAN" : "sem código"}</span>
+                          )}
                         </td>
                         <td className={styles.tdNum}>
                           <input
@@ -1115,6 +1129,23 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
                   </tbody>
                 </table>
 
+                <div className={styles.checkLinha}>
+                  <label className={styles.check}>
+                    Código nas barras:
+                    <select
+                      className={styles.select}
+                      value={codigoImpressao}
+                      onChange={(e) => setCodigoImpressao(e.target.value as "padrao" | "ean")}
+                    >
+                      <option value="padrao">Código curto do cadastro (padrão)</option>
+                      <option value="ean">EAN-13 (código GS1 de 13 dígitos)</option>
+                    </select>
+                  </label>
+                  {usarEan ? (
+                    <span>Só nesta impressão — o modelo salvo continua no código curto.</span>
+                  ) : null}
+                </div>
+
                 <div className={styles.totalLinha}>
                   <span className={styles.totalNumero}>{totalEtiquetas}</span>
                   <span>
@@ -1127,7 +1158,7 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
                 {semCodigo.length > 0 ? (
                   <div className={styles.aviso}>
                     {semCodigo.length} item(ns) sem código válido para{" "}
-                    {config.barcode.simbologia}: saem sem as barras.{" "}
+                    {configImpressao.barcode.simbologia}: saem sem as barras.{" "}
                     {semCodigo
                       .slice(0, 4)
                       .map((s) => `${s.produto}/${s.cor || "—"}`)
@@ -1154,7 +1185,7 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
               <div className={styles.previewEtiqueta}>
                 <EtiquetaSvg
                   item={exemploPreview}
-                  config={config}
+                  config={configImpressao}
                   comBorda
                   larguraCss={`${Math.min(360, config.larguraEtiquetaMm * 9)}px`}
                 />
@@ -1170,7 +1201,7 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
                       <EtiquetaSvg
                         key={`${item.produto}-${item.cor}-${i}`}
                         item={item}
-                        config={config}
+                        config={configImpressao}
                         comBorda
                         larguraCss={`${Math.min(150, config.larguraEtiquetaMm * 4)}px`}
                       />
@@ -1456,7 +1487,7 @@ export default function ImprimirEtiquetasPage({ companyKey }: Props) {
           {fileiras.map((fileira, i) => (
             <div key={`f-${i}`} className="fileira">
               {fileira.map((item, j) => (
-                <EtiquetaSvg key={`f-${i}-${j}`} item={item} config={config} />
+                <EtiquetaSvg key={`f-${i}-${j}`} item={item} config={configImpressao} />
               ))}
             </div>
           ))}

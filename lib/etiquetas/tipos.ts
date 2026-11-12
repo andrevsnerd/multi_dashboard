@@ -389,6 +389,12 @@ export interface ItemEtiqueta {
   cor: string;
   descCor: string;
   codigoBarra: string;
+  /**
+   * EAN-13 (GS1, 789…) da cor, quando existe. Não é o padrão da etiqueta: só vai
+   * para as barras quando o usuário escolhe "EAN-13" na fila de impressão
+   * (ex.: produto que vai para marketplace, que exige o código GS1).
+   */
+  ean?: string;
   grupo: string;
   subgrupo: string;
   linha: string;
