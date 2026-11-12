@@ -5205,8 +5205,8 @@
     "semantic_hash": ""
   },
   "app/(companies)/[company]/programar-precos/page.tsx": {
-    "mtime": 1793367205.5658143,
-    "ast_hash": "61cbcc5a65a2d21405b7a5874b170962",
+    "mtime": 1794510734.4670079,
+    "ast_hash": "6559151ba02cd31ce2339bd5d7a9cccc",
     "semantic_hash": ""
   },
   "app/api/precos/tarefas/[id]/executar/route.ts": {
@@ -5235,8 +5235,8 @@
     "semantic_hash": ""
   },
   "components/precos/ProgramarPrecosPage.tsx": {
-    "mtime": 1794507653.5341237,
-    "ast_hash": "08355621a85b4fec342cf1198ac8dd9c",
+    "mtime": 1794510734.4670079,
+    "ast_hash": "8079f77e2f776e90c1abd423c8e3db85",
     "semantic_hash": ""
   },
   "lib/precos/agendador-qstash.ts": {
@@ -5530,8 +5530,8 @@
     "semantic_hash": ""
   },
   "components/precos/AlterarPrecosAbas.tsx": {
-    "mtime": 1794507127.2219105,
-    "ast_hash": "75f9640c451df1cc5e286addc2a5d281",
+    "mtime": 1794510714.8323784,
+    "ast_hash": "1ab7c91591f0d3da5ae51e55a2c5fe01",
     "semantic_hash": ""
   },
   "components/precos/PrecoCorPanel.tsx": {
@@ -5554,9 +5554,24 @@
     "ast_hash": "7fdbe3e930ce5250bf1c8a47262102c5",
     "semantic_hash": ""
   },
-  "scripts/_tmp_bf.mjs": {
-    "mtime": 1794508646.2529094,
-    "ast_hash": "ca6f6511af334d3be0ed4c0f61e500af",
+  "app/api/precos/pacotes/route.ts": {
+    "mtime": 1794510647.1000733,
+    "ast_hash": "458606b656549f8dc76525e5f476e553",
+    "semantic_hash": ""
+  },
+  "components/precos/PacotesLojasPanel.tsx": {
+    "mtime": 1794510703.9889755,
+    "ast_hash": "866190de1ea13b3a8fe8a076bc369152",
+    "semantic_hash": ""
+  },
+  "components/precos/ProgramarPrecosAbas.tsx": {
+    "mtime": 1794510734.0034988,
+    "ast_hash": "7a3e1c362432bd23d76a8783149aad1b",
+    "semantic_hash": ""
+  },
+  "lib/repositories/pacotesLojas.ts": {
+    "mtime": 1794510666.0573666,
+    "ast_hash": "004fa8fadb67cea385ab6ee63f21841d",
     "semantic_hash": ""
   }
 }

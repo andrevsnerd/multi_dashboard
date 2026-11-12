@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { useAuth } from "@/components/auth/AuthContext";
 
@@ -121,6 +121,10 @@ type Entrada = { tipo: "abs"; valor: number } | { tipo: "pct"; pct: number };
 
 interface Props {
   companyKey: CompanyKey;
+  /** Abas da página (Tarefas / Pacotes nas lojas), sob o título. */
+  abas?: ReactNode;
+  /** "Pacotes" de uma tarefa aplicada: abre a aba de pacotes com o lote. */
+  onVerPacotes?: (lote: string) => void;
 }
 
 // ───────────────────────── helpers ─────────────────────────
@@ -312,7 +316,7 @@ const STATUS_CLASSE: Record<TarefaStatus, string> = {
 
 // ───────────────────────── componente ─────────────────────────
 
-export default function ProgramarPrecosPage({ companyKey }: Props) {
+export default function ProgramarPrecosPage({ companyKey, abas, onVerPacotes }: Props) {
   const { user } = useAuth();
   const username = user?.username ?? "";
 
@@ -1006,6 +1010,7 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
     <div className={base.wrapper}>
       <header className={base.header}>
         <h1 className={base.title}>Programar Preços</h1>
+        {abas}
         {!podeExecutar && username && (
           <div className={base.avisoTopo}>Seu perfil é somente leitura: dá para conferir, mas não para gravar.</div>
         )}
@@ -1617,6 +1622,11 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
                                 Excluir
                               </button>
                             </>
+                          )}
+                          {t.status === "aplicada" && t.lote && onVerPacotes && (
+                            <button type="button" className={base.btnTexto} onClick={() => onVerPacotes(t.lote!)}>
+                              Pacotes
+                            </button>
                           )}
                           {t.status === "aplicada" && podeExecutar && t.modo !== "cor" && (
                             <button

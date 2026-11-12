@@ -3,10 +3,11 @@
 import { useState } from "react";
 
 import AlterarPrecosPage from "./AlterarPrecosPage";
+import PacotesLojasPanel from "./PacotesLojasPanel";
 import PrecoCorPanel from "./PrecoCorPanel";
 import styles from "./AlterarPrecosPage.module.css";
 
-type Aba = "produto" | "cor";
+type Aba = "produto" | "cor" | "pacotes";
 
 /**
  * Abas do Alterar Custo / Preço. As duas ficam montadas (só a inativa some), para
@@ -35,6 +36,15 @@ export default function AlterarPrecosAbas({ companyKey }: { companyKey: "nerd" |
       >
         Por cor
       </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={aba === "pacotes"}
+        className={`${styles.tab} ${aba === "pacotes" ? styles.tabAtiva : ""}`}
+        onClick={() => setAba("pacotes")}
+      >
+        Pacotes nas lojas
+      </button>
     </div>
   );
 
@@ -45,6 +55,9 @@ export default function AlterarPrecosAbas({ companyKey }: { companyKey: "nerd" |
       </div>
       <div hidden={aba !== "cor"}>
         <PrecoCorPanel companyKey={companyKey} abas={abas} />
+      </div>
+      <div hidden={aba !== "pacotes"}>
+        <PacotesLojasPanel companyKey={companyKey} titulo="Alterar Custo / Preço" abas={abas} />
       </div>
     </>
   );

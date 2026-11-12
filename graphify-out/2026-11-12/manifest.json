@@ -3910,8 +3910,8 @@
     "semantic_hash": ""
   },
   "app/api/precos/historico/route.ts": {
-    "mtime": 1785774976.5796406,
-    "ast_hash": "af8a776d0fee2c70e74605feae63fc78",
+    "mtime": 1794509027.1738966,
+    "ast_hash": "1409543b6e1735f350d640f33c62563e",
     "semantic_hash": ""
   },
   "app/api/precos/opcoes/route.ts": {
@@ -3925,8 +3925,8 @@
     "semantic_hash": ""
   },
   "app/api/precos/reverter/route.ts": {
-    "mtime": 1793707713.078073,
-    "ast_hash": "df711110f6b42577f255199460cd3b25",
+    "mtime": 1794509027.1832907,
+    "ast_hash": "6bca16a1019f3e598653714a84c0262b",
     "semantic_hash": ""
   },
   "app/api/products/colecoes/descricoes/route.ts": {
@@ -4000,8 +4000,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/precos.ts": {
-    "mtime": 1794408829.5939074,
-    "ast_hash": "4ff683fb3326efb870f224f5ebafd574",
+    "mtime": 1794509088.667409,
+    "ast_hash": "1e4ab68d21c3b68200f279065c5d3492",
     "semantic_hash": ""
   },
   "lib/repositories/topProdutosPresentation.ts": {
@@ -5225,8 +5225,8 @@
     "semantic_hash": ""
   },
   "app/api/precos/tarefas/lote/route.ts": {
-    "mtime": 1793392847.8708932,
-    "ast_hash": "93068d6fc2fd37a8cd94e0dc582c7a72",
+    "mtime": 1794509027.18366,
+    "ast_hash": "64197935c80adb244d05f60b1a16a6c8",
     "semantic_hash": ""
   },
   "app/api/precos/tarefas/route.ts": {
@@ -5245,8 +5245,8 @@
     "semantic_hash": ""
   },
   "lib/precos/tarefas-executor.ts": {
-    "mtime": 1794507745.251557,
-    "ast_hash": "9f775074a9353113915a206a6cd59f40",
+    "mtime": 1794509088.9411035,
+    "ast_hash": "596914ae95d33984e701f93724cd2d01",
     "semantic_hash": ""
   },
   "lib/precos/tarefas-store.ts": {
@@ -5275,13 +5275,13 @@
     "semantic_hash": ""
   },
   "app/api/black-friday/painel/route.ts": {
-    "mtime": 1794338928.231527,
-    "ast_hash": "f61f89e1feed860228efc4fe1d302d33",
+    "mtime": 1794509231.5980628,
+    "ast_hash": "43baa90ee694cf15953fc47f7d34182f",
     "semantic_hash": ""
   },
   "app/api/black-friday/rebaixar/route.ts": {
-    "mtime": 1793883719.956357,
-    "ast_hash": "c48e708ad6d1c625f2c6adb55c691a2b",
+    "mtime": 1794509253.3212006,
+    "ast_hash": "2de5505c1f660f6038390c10c74bc837",
     "semantic_hash": ""
   },
   "lib/blackfriday/datas.ts": {
@@ -5290,8 +5290,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/blackFriday.ts": {
-    "mtime": 1794315133.3299048,
-    "ast_hash": "581b8cee8b7816ad08ebe624ce7cc667",
+    "mtime": 1794509188.4952815,
+    "ast_hash": "7da66bde35cdd171f03b5d239931a96f",
     "semantic_hash": ""
   },
   "app/(companies)/[company]/produto-aposta/page.tsx": {
@@ -5350,8 +5350,8 @@
     "semantic_hash": ""
   },
   "lib/mcp/precos.ts": {
-    "mtime": 1794507546.7747977,
-    "ast_hash": "f758dacb2848607a1755a03096b6e471",
+    "mtime": 1794509041.2856894,
+    "ast_hash": "48bb466d343e323ffb57e80c7116a465",
     "semantic_hash": ""
   },
   "lib/precos/montar-tarefa.ts": {
@@ -5360,8 +5360,8 @@
     "semantic_hash": ""
   },
   "lib/precos/tarefas-validacao.ts": {
-    "mtime": 1794507719.1380806,
-    "ast_hash": "b0aea630bb36461472c7558593a1c230",
+    "mtime": 1794509069.6798162,
+    "ast_hash": "74392842b1762be9535bb3780ae91e09",
     "semantic_hash": ""
   },
   "lib/shopify/client.ts": {
@@ -5540,13 +5540,23 @@
     "semantic_hash": ""
   },
   "lib/repositories/precosCor.ts": {
-    "mtime": 1794507760.3811338,
-    "ast_hash": "ffdaaf62fa7222ab8ada4a21fc706c5d",
+    "mtime": 1794508980.9223952,
+    "ast_hash": "67f206fb31025dfd3404956b43b7f8b9",
     "semantic_hash": ""
   },
   "components/precos/TarefaCorEditor.tsx": {
-    "mtime": 1794507631.1957233,
-    "ast_hash": "618b83ff69f5880f56a5679852d88505",
+    "mtime": 1794509127.3263564,
+    "ast_hash": "7d7a11a014d49db7815348b04999e54c",
+    "semantic_hash": ""
+  },
+  "lib/precos/lote-misto.ts": {
+    "mtime": 1794509025.389258,
+    "ast_hash": "7fdbe3e930ce5250bf1c8a47262102c5",
+    "semantic_hash": ""
+  },
+  "scripts/_tmp_bf.mjs": {
+    "mtime": 1794508646.2529094,
+    "ast_hash": "ca6f6511af334d3be0ed4c0f61e500af",
     "semantic_hash": ""
   }
 }

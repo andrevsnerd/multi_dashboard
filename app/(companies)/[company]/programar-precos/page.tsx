@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import PageLayout from "@/components/layout/PageLayout";
-import ProgramarPrecosPage from "@/components/precos/ProgramarPrecosPage";
+import ProgramarPrecosAbas from "@/components/precos/ProgramarPrecosAbas";
 import { resolveCompany } from "@/lib/config/company";
 
 import styles from "../page.module.css";
@@ -32,7 +32,7 @@ export default async function ProgramarPrecosPageRoute({ params }: ProgramarPrec
     <PageLayout companyName={company.name}>
       <div className={styles.page}>
         <div className={styles.content}>
-          <ProgramarPrecosPage companyKey={companyKey} />
+          <ProgramarPrecosAbas companyKey={companyKey} />
         </div>
       </div>
     </PageLayout>
