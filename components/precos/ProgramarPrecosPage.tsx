@@ -5,6 +5,7 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/AuthContext";
 
 import base from "./AlterarPrecosPage.module.css";
+import TarefaCorEditor from "./TarefaCorEditor";
 import styles from "./ProgramarPrecosPage.module.css";
 
 type CompanyKey = "nerd" | "scarfme";
@@ -58,11 +59,16 @@ interface TarefaAlteracao {
   atual: number | null;
   tabela: string;
   tabelaDesc: string;
+  /** Só nas tarefas por cor (Preço Líquido (1) da cor). */
+  cor?: string;
+  corDesc?: string;
 }
 
 interface Tarefa {
   id: string;
   nome: string;
+  /** `cor` = Preço Líquido (1) por cor (TarefaCorEditor). */
+  modo?: "produto" | "cor";
   status: TarefaStatus;
   agendadoPara: string | null;
   agendadoPor: string | null;
@@ -324,6 +330,10 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
   );
 
   // ── editor ──
+  /** Aba do card "Nova tarefa": preço por produto (tela de sempre) ou líquido por cor. */
+  const [modoNova, setModoNova] = useState<"produto" | "cor">("produto");
+  const [editandoCor, setEditandoCor] = useState<Tarefa | null>(null);
+  const [editorCorChave, setEditorCorChave] = useState(0);
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [nome, setNome] = useState("");
   const [codigosTexto, setCodigosTexto] = useState("");
@@ -729,6 +739,13 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
 
   const editarTarefa = useCallback(
     (t: Tarefa) => {
+      if (t.modo === "cor") {
+        setModoNova("cor");
+        setEditandoCor(t);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+      setModoNova("produto");
       setEditandoId(t.id);
       setNome(t.nome);
       const codigos = t.produtos.length > 0 ? t.produtos.map((p) => p.produto) : [...new Set(t.alteracoes.map((a) => a.produto))];
@@ -1024,7 +1041,55 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
 
       {/* ─── NOVA TAREFA / EDIÇÃO ─── */}
       <section className={base.card}>
-        <h2 className={base.cardTitle}>{editandoId ? "Editando tarefa" : "Nova tarefa"}</h2>
+        <h2 className={base.cardTitle}>{editandoId || editandoCor ? "Editando tarefa" : "Nova tarefa"}</h2>
+
+        <div className={base.tabs} role="tablist">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={modoNova === "produto"}
+            className={`${base.tab} ${modoNova === "produto" ? base.tabAtiva : ""}`}
+            disabled={!!editandoCor}
+            onClick={() => setModoNova("produto")}
+          >
+            Por produto
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={modoNova === "cor"}
+            className={`${base.tab} ${modoNova === "cor" ? base.tabAtiva : ""}`}
+            disabled={!!editandoId}
+            onClick={() => setModoNova("cor")}
+          >
+            Por cor
+          </button>
+        </div>
+
+        {modoNova === "cor" ? (
+          <TarefaCorEditor
+            key={editandoCor ? `edit-${editandoCor.id}` : `nova-${editorCorChave}`}
+            companyKey={companyKey}
+            api={api}
+            podeExecutar={podeExecutar}
+            agendamentoIndisponivel={agendamentoIndisponivel}
+            minAgenda={minAgenda}
+            editando={editandoCor}
+            onSalva={(mensagem) => {
+              setErro(null);
+              if (mensagem) setAviso(mensagem);
+              setEditandoCor(null);
+              setEditorCorChave((k) => k + 1);
+              void carregarTarefas();
+            }}
+            onErro={(mensagem) => setErro(mensagem)}
+            onCancelar={() => {
+              setEditandoCor(null);
+              setEditorCorChave((k) => k + 1);
+            }}
+          />
+        ) : (
+        <>
 
         <div className={base.codigosBox}>
           <label className={base.campoTexto}>
@@ -1423,6 +1488,8 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
             </div>
           </>
         )}
+        </>
+        )}
       </section>
 
       {/* ─── TAREFAS ─── */}
@@ -1458,6 +1525,7 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
                         <button type="button" className={styles.linkLinha} onClick={() => setTarefaAberta(aberta ? null : t.id)}>
                           {aberta ? "▾" : "▸"} {t.nome}
                         </button>
+                        {t.modo === "cor" && <span className={base.lote}> por cor</span>}
                         {editandoId === t.id && <span className={base.dica}> · em edição</span>}
                       </td>
                       <td>
@@ -1550,7 +1618,7 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
                               </button>
                             </>
                           )}
-                          {t.status === "aplicada" && podeExecutar && (
+                          {t.status === "aplicada" && podeExecutar && t.modo !== "cor" && (
                             <button
                               type="button"
                               className={base.btnTexto}
@@ -1766,6 +1834,12 @@ export default function ProgramarPrecosPage({ companyKey }: Props) {
               {confirmarTarefa.status === "agendada" && " e o agendamento é cancelado"}. A coluna &quot;Atual&quot; é o valor
               de quando a tarefa foi montada — na hora de gravar o sistema relê o banco.
             </p>
+            {confirmarTarefa.modo === "cor" && (
+              <p className={base.modalAviso}>
+                Tarefa por cor: grava só o Preço Líquido (1) de cada cor e liga o modo cor dos produtos que ainda
+                não estão nele (o preço do momento é copiado para todas as cores).
+              </p>
+            )}
             <div className={base.tabelaWrap}>
               <TabelaAlteracoes alteracoes={confirmarTarefa.alteracoes} descricoes={confirmarTarefa.produtos} />
             </div>
@@ -1827,6 +1901,12 @@ function TabelaAlteracoes({
                 <td className={base.tdDesc}>{desc.get(a.produto) ?? ""}</td>
                 <td className={base.tdDesc}>
                   {a.tabela} · {a.tabelaDesc}
+                  {a.cor && (
+                    <>
+                      {" "}
+                      · cor {a.cor} {a.corDesc ?? ""} (líquido)
+                    </>
+                  )}
                 </td>
                 <td className={base.thNum}>{a.atual === null ? "—" : fmt(a.atual)}</td>
                 <td className={base.thNum}>{fmt(a.valor)}</td>

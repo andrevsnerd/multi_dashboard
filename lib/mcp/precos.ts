@@ -389,6 +389,7 @@ export function registerPrecosTools(server: McpServer) {
             id: '(simulação)',
             company: input.empresa,
             nome: input.nome,
+            modo: 'produto',
             status: 'pendente',
             agendadoPara: quando?.toISOString() ?? null,
             agendadoPor: null,
@@ -420,6 +421,8 @@ export function registerPrecosTools(server: McpServer) {
           id,
           company: input.empresa,
           nome: input.nome.trim(),
+          // O MCP monta preço por produto: editar uma tarefa por cor por aqui a converte.
+          modo: 'produto',
           produtos: montagem.produtos,
           alteracoes,
           usuario: acesso.username,

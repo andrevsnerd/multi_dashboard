@@ -21,6 +21,13 @@ import type { ExecutarPrecosResult, PrecoCompany } from "@/lib/repositories/prec
 
 export type TarefaStatus = "pendente" | "agendada" | "executando" | "aplicada" | "erro";
 
+/**
+ * `produto` = PRECO1 de tabela (todas as cores); `cor` = Preço Líquido (1) por cor, que liga o
+ * modo cor do produto na execução se preciso (lib/repositories/precosCor.ts).
+ * As 4 tarefas `cor` de 30/10/2026 são do modo antigo (PRECO1 por cor) e já estão aplicadas.
+ */
+export type TarefaModo = "produto" | "cor";
+
 export interface TarefaProduto {
   produto: string;
   descricao: string;
@@ -35,12 +42,16 @@ export interface TarefaAlteracao {
   atual: number | null;
   tabela: string;
   tabelaDesc: string;
+  /** Só no modo cor. */
+  cor?: string;
+  corDesc?: string;
 }
 
 export interface PrecoTarefa {
   id: string;
   company: PrecoCompany;
   nome: string;
+  modo: TarefaModo;
   status: TarefaStatus;
   agendadoPara: string | null;
   agendadoPor: string | null;
@@ -140,6 +151,7 @@ async function runMigrations(): Promise<void> {
     )
   `);
   await ddl(() => sql`CREATE INDEX IF NOT EXISTS preco_tarefas_company_idx ON preco_tarefas (company, status)`);
+  await ddl(() => sql`ALTER TABLE preco_tarefas ADD COLUMN IF NOT EXISTS modo TEXT NOT NULL DEFAULT 'produto'`);
 }
 
 type Row = Record<string, unknown>;
@@ -155,6 +167,7 @@ function fromRow(r: Row): PrecoTarefa {
     id: String(r.id),
     company: r.company === "scarfme" ? "scarfme" : "nerd",
     nome: String(r.nome ?? ""),
+    modo: r.modo === "cor" ? "cor" : "produto",
     status: String(r.status ?? "pendente") as TarefaStatus,
     agendadoPara: iso(r.agendado_para),
     agendadoPor: (r.agendado_por as string | null) ?? null,
@@ -216,6 +229,8 @@ export interface SalvarTarefaInput {
   id?: string | null;
   company: PrecoCompany;
   nome: string;
+  /** Padrão `produto`. Numa edição, ausente mantém o modo da tarefa. */
+  modo?: TarefaModo;
   produtos: TarefaProduto[];
   alteracoes: TarefaAlteracao[];
   usuario: string;
@@ -229,10 +244,10 @@ export async function salvarTarefa(input: SalvarTarefaInput): Promise<PrecoTaref
     const todas = lerArquivo();
     const existente = input.id ? todas.find((t) => t.id === input.id) : undefined;
     const tarefa: PrecoTarefa = existente
-      ? { ...existente, nome: input.nome, produtos: input.produtos, alteracoes: input.alteracoes,
-          atualizadoPor: input.usuario, atualizadoEm: agora }
+      ? { ...existente, nome: input.nome, modo: input.modo ?? existente.modo ?? "produto",
+          produtos: input.produtos, alteracoes: input.alteracoes, atualizadoPor: input.usuario, atualizadoEm: agora }
       : {
-          id: randomUUID(), company: input.company, nome: input.nome, status: "pendente",
+          id: randomUUID(), company: input.company, nome: input.nome, modo: input.modo ?? "produto", status: "pendente",
           agendadoPara: null, agendadoPor: null, qstashMessageId: null,
           produtos: input.produtos, alteracoes: input.alteracoes,
           criadoPor: input.usuario, criadoEm: agora, atualizadoPor: null, atualizadoEm: agora,
@@ -250,7 +265,8 @@ export async function salvarTarefa(input: SalvarTarefaInput): Promise<PrecoTaref
   if (input.id) {
     const rows = (await sql`
       UPDATE preco_tarefas
-      SET nome = ${input.nome}, produtos = ${produtos}::jsonb, alteracoes = ${alteracoes}::jsonb,
+      SET nome = ${input.nome}, modo = COALESCE(${input.modo ?? null}, modo),
+          produtos = ${produtos}::jsonb, alteracoes = ${alteracoes}::jsonb,
           atualizado_por = ${input.usuario}, atualizado_em = NOW()
       WHERE id = ${input.id} AND company = ${input.company}
       RETURNING *
@@ -260,8 +276,8 @@ export async function salvarTarefa(input: SalvarTarefaInput): Promise<PrecoTaref
   }
 
   const rows = (await sql`
-    INSERT INTO preco_tarefas (id, company, nome, status, produtos, alteracoes, criado_por)
-    VALUES (${randomUUID()}, ${input.company}, ${input.nome}, 'pendente',
+    INSERT INTO preco_tarefas (id, company, nome, modo, status, produtos, alteracoes, criado_por)
+    VALUES (${randomUUID()}, ${input.company}, ${input.nome}, ${input.modo ?? "produto"}, 'pendente',
             ${produtos}::jsonb, ${alteracoes}::jsonb, ${input.usuario})
     RETURNING *
   `) as Row[];

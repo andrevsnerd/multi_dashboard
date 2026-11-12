@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import PageLayout from "@/components/layout/PageLayout";
-import AlterarPrecosPage from "@/components/precos/AlterarPrecosPage";
+import AlterarPrecosAbas from "@/components/precos/AlterarPrecosAbas";
 import { resolveCompany } from "@/lib/config/company";
 
 import styles from "../page.module.css";
@@ -33,7 +33,7 @@ export default async function AlterarPrecosPageRoute({ params }: AlterarPrecosPa
     <PageLayout companyName={company.name}>
       <div className={styles.page}>
         <div className={styles.content}>
-          <AlterarPrecosPage companyKey={companyKey} />
+          <AlterarPrecosAbas companyKey={companyKey} />
         </div>
       </div>
     </PageLayout>

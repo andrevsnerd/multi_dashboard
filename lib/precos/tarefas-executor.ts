@@ -14,6 +14,7 @@ import {
   type ExecutarPrecosResult,
   type PrecoCompany,
 } from "@/lib/repositories/precos";
+import { executarTarefaCor, parseChaveCor, type ItemTarefaCor } from "@/lib/repositories/precosCor";
 import { agendarDisparo, cancelarDisparo } from "@/lib/precos/agendador-qstash";
 import {
   atualizarTarefa,
@@ -95,15 +96,18 @@ export async function executarTarefa(
     throw new Error("A tarefa não tem alterações.");
   }
 
-  const resultado = await executarAlteracaoPrecos({
-    company: tarefa.company,
-    usuario,
-    alteracoes: tarefa.alteracoes.map((a) => ({ produto: a.produto, campoKey: a.campoKey, valor: a.valor })),
-    // Mesma regra da tela Alterar Custo / Preço: o Preço Líquido acompanha o Preço.
-    sincronizarPrecoLiquido: true,
-    sincronizarPrecoAVista: false,
-    obs: `Tarefa: ${tarefa.nome}`.slice(0, 300),
-  });
+  const resultado: ExecutarPrecosResult =
+    tarefa.modo === "cor"
+      ? await executarCor(tarefa, usuario)
+      : await executarAlteracaoPrecos({
+          company: tarefa.company,
+          usuario,
+          alteracoes: tarefa.alteracoes.map((a) => ({ produto: a.produto, campoKey: a.campoKey, valor: a.valor })),
+          // Mesma regra da tela Alterar Custo / Preço: o Preço Líquido acompanha o Preço.
+          sincronizarPrecoLiquido: true,
+          sincronizarPrecoAVista: false,
+          obs: `Tarefa: ${tarefa.nome}`.slice(0, 300),
+        });
 
   const falhouTudo = resultado.aplicados === 0 && (resultado.naoConfirmados > 0 || resultado.erros.length > 0);
 
@@ -118,6 +122,39 @@ export async function executarTarefa(
   });
 
   return { tarefa: atualizada ?? tarefa, resultado };
+}
+
+/**
+ * Tarefa por cor: Preço Líquido (1) por cor, ligando o modo cor do produto se preciso.
+ * Histórico em NERD_PRECO_COR_HISTORICO (o Reverter da tela por produto não a enxerga).
+ */
+async function executarCor(tarefa: PrecoTarefa, usuario: string): Promise<ExecutarPrecosResult> {
+  const itens: ItemTarefaCor[] = [];
+  const erros: string[] = [];
+  for (const a of tarefa.alteracoes) {
+    const chave = parseChaveCor(a.campoKey);
+    if (!chave) {
+      erros.push(`Alteração ignorada (${a.produto} · ${a.campoKey}): não é Preço Líquido por cor.`);
+      continue;
+    }
+    itens.push({ produto: a.produto, tabela: chave.tabela, cor: chave.cor, valor: a.valor });
+  }
+  const r = await executarTarefaCor({
+    company: tarefa.company,
+    usuario,
+    obs: `Tarefa: ${tarefa.nome}`.slice(0, 300),
+    itens,
+  });
+  // r.ligados (produtos que viraram modo cor) fica no histórico como VARIA_PRECO_COR 0→1.
+  return {
+    lote: r.lote,
+    aplicados: r.aplicados,
+    semMudanca: r.semMudanca,
+    semRegistro: r.semRegistro,
+    naoConfirmados: r.naoConfirmados + erros.length,
+    porCampo: [],
+    erros: [...erros, ...r.erros],
+  };
 }
 
 /** Erro de regra com o status HTTP que a rota deve devolver (o MCP só usa a mensagem). */

@@ -10,7 +10,7 @@ import {
   type TarefaAlteracao,
   type TarefaProduto,
 } from '@/lib/precos/tarefas-store';
-import { validarAlteracoes } from '@/lib/precos/tarefas-validacao';
+import { validarAlteracoes, validarAlteracoesCor } from '@/lib/precos/tarefas-validacao';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -44,6 +44,8 @@ interface Body {
   id?: string | null;
   company?: string;
   nome?: string;
+  /** `cor` = Preço Líquido (1) por cor; ausente = por produto (ou o modo atual, numa edição). */
+  modo?: 'produto' | 'cor';
   produtos?: TarefaProduto[];
   alteracoes?: TarefaAlteracao[];
   /** ISO; null deixa pendente; ausente mantém o agendamento atual. */
@@ -68,17 +70,9 @@ export async function POST(request: Request) {
     const nome = limpar(body.nome).slice(0, 120);
     if (!nome) return NextResponse.json({ error: 'Dê um nome para a tarefa.' }, { status: 400 });
 
-    const { alteracoes, erro } = validarAlteracoes(body.alteracoes);
-    if (erro) return NextResponse.json({ error: erro }, { status: 400 });
-
-    const comAlteracao = new Set(alteracoes.map((a) => a.produto));
-    const produtos: TarefaProduto[] = (Array.isArray(body.produtos) ? body.produtos : [])
-      .map((p) => ({ produto: limpar(p?.produto), descricao: limpar(p?.descricao).slice(0, 200) }))
-      .filter((p) => p.produto && comAlteracao.has(p.produto));
-
     const id = limpar(body.id) || null;
+    const existente = id ? await obterTarefa(id) : null;
     if (id) {
-      const existente = await obterTarefa(id);
       if (!existente || existente.company !== company) {
         return NextResponse.json({ error: 'Tarefa não encontrada.' }, { status: 404 });
       }
@@ -86,8 +80,17 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Esta tarefa já foi aplicada; crie outra.' }, { status: 409 });
       }
     }
+    const modo = body.modo === 'cor' || body.modo === 'produto' ? body.modo : existente?.modo ?? 'produto';
 
-    let tarefa = await salvarTarefa({ id, company, nome, produtos, alteracoes, usuario });
+    const { alteracoes, erro } = modo === 'cor' ? validarAlteracoesCor(body.alteracoes) : validarAlteracoes(body.alteracoes);
+    if (erro) return NextResponse.json({ error: erro }, { status: 400 });
+
+    const comAlteracao = new Set(alteracoes.map((a) => a.produto));
+    const produtos: TarefaProduto[] = (Array.isArray(body.produtos) ? body.produtos : [])
+      .map((p) => ({ produto: limpar(p?.produto), descricao: limpar(p?.descricao).slice(0, 200) }))
+      .filter((p) => p.produto && comAlteracao.has(p.produto));
+
+    let tarefa = await salvarTarefa({ id, company, nome, modo, produtos, alteracoes, usuario });
 
     if (body.agendadoPara !== undefined) {
       try {

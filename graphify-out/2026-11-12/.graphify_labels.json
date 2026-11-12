@@ -535,7 +535,7 @@
   "533": "page.tsx",
   "534": "page.tsx",
   "535": "page.tsx",
-  "536": "EditorOrcado.tsx",
+  "536": "linx-lotes.ts",
   "537": "page.tsx",
   "538": "page.tsx",
   "539": "matchesFilialOption",
@@ -560,10 +560,6 @@
   "558": "page.tsx",
   "559": "page.tsx",
   "560": "page.tsx",
-  "561": "calcularDiferencasLocal",
-  "562": "page.tsx",
-  "563": "fetchProductCustos",
-  "564": "fetchProductPrecos",
   "577": "page.tsx",
   "578": "fix-tipos-romaneio-acento.mjs"
 }

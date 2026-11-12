@@ -1595,8 +1595,8 @@
     "semantic_hash": "c1db24d3ffabe5b57c07dc935de08446"
   },
   "components/romaneios/RomaneioDetalhePage.tsx": {
-    "mtime": 1794421113.9981225,
-    "ast_hash": "78cfd6507944c9fa2336ebf58a8f6ce6",
+    "mtime": 1794421675.2228165,
+    "ast_hash": "caa2b750f1c9dcd64be68af477fce076",
     "semantic_hash": ""
   },
   "components/romaneios/RomaneiosDuplicadosPanel.tsx": {
@@ -3840,8 +3840,8 @@
     "semantic_hash": ""
   },
   "app/(companies)/[company]/alterar-precos/page.tsx": {
-    "mtime": 1785783836.061981,
-    "ast_hash": "399521559a18861389cedc527f6f1cd3",
+    "mtime": 1794507128.8911,
+    "ast_hash": "f5e330662cee7fbb87ac2cd9783ef1a6",
     "semantic_hash": ""
   },
   "app/(companies)/[company]/alterar-produtos-massa/page.tsx": {
@@ -3970,8 +3970,8 @@
     "semantic_hash": ""
   },
   "components/precos/AlterarPrecosPage.tsx": {
-    "mtime": 1785935184.9388816,
-    "ast_hash": "b6971f5fa8ff553a8f030e5b800647cf",
+    "mtime": 1794507072.6534078,
+    "ast_hash": "f3321560d594d44f0d44340cf9759824",
     "semantic_hash": ""
   },
   "lib/auth/cadastro-guard.ts": {
@@ -4040,8 +4040,8 @@
     "semantic_hash": ""
   },
   "components/etiquetas/ImprimirEtiquetasPage.tsx": {
-    "mtime": 1787229093.2791317,
-    "ast_hash": "af57e65d08d2f7bc7f9317dc5ee35cc7",
+    "mtime": 1794503369.8007514,
+    "ast_hash": "9dbbb110ff03572608ca077f4d69ff89",
     "semantic_hash": ""
   },
   "components/etiquetas/zebra-browser-print.ts": {
@@ -4060,8 +4060,8 @@
     "semantic_hash": ""
   },
   "lib/etiquetas/tipos.ts": {
-    "mtime": 1786546922.9391694,
-    "ast_hash": "b580b322532487f8841096be8070a28e",
+    "mtime": 1794503344.419405,
+    "ast_hash": "0a9eed0aa04fb446d8cfbec6c8d90bcd",
     "semantic_hash": ""
   },
   "lib/etiquetas/zpl.ts": {
@@ -5145,8 +5145,8 @@
     "semantic_hash": ""
   },
   "components/romaneios/RomaneioBipagemPanel.tsx": {
-    "mtime": 1794421145.276986,
-    "ast_hash": "881c5f13b40d71b362544ff396112b23",
+    "mtime": 1794421677.1431773,
+    "ast_hash": "506d6322e9b0bed9d0d52ea9004330c1",
     "semantic_hash": ""
   },
   "lib/utils/romaneio-bipagem-store.ts": {
@@ -5522,6 +5522,26 @@
   "lib/utils/romaneio-revisao-store.ts": {
     "mtime": 1794420847.5291593,
     "ast_hash": "47ed9491adc7d6f4497e2fafb113e4fb",
+    "semantic_hash": ""
+  },
+  "app/api/precos/cor/route.ts": {
+    "mtime": 1794506438.4909348,
+    "ast_hash": "121a630400299f18c55cfc2731f5f14f",
+    "semantic_hash": ""
+  },
+  "components/precos/AlterarPrecosAbas.tsx": {
+    "mtime": 1794507127.2219105,
+    "ast_hash": "75f9640c451df1cc5e286addc2a5d281",
+    "semantic_hash": ""
+  },
+  "components/precos/PrecoCorPanel.tsx": {
+    "mtime": 1794507116.9276822,
+    "ast_hash": "bba2f481ac118850a6b8a55c770aaf14",
+    "semantic_hash": ""
+  },
+  "lib/repositories/precosCor.ts": {
+    "mtime": 1794506427.693282,
+    "ast_hash": "fadab28b8cdb177bb921edac2d35673d",
     "semantic_hash": ""
   }
 }

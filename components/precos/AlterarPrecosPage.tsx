@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import MultiSelectFilter, { type MultiSelectOption } from "@/components/filters/MultiSelectFilter";
 import { useAuth } from "@/components/auth/AuthContext";
@@ -98,6 +98,8 @@ type ModoSelecao = "filtros" | "codigos";
 
 interface Props {
   companyKey: CompanyKey;
+  /** Abas da página (Por produto / Por cor), mostradas sob o título. */
+  abas?: ReactNode;
 }
 
 /** Linha da lista de tabelas de preço do produto — uma por slot (PRECO1..4). */
@@ -168,7 +170,7 @@ function dataCurta(iso: string): string {
 
 // ───────────────────────── componente ─────────────────────────
 
-export default function AlterarPrecosPage({ companyKey }: Props) {
+export default function AlterarPrecosPage({ companyKey, abas }: Props) {
   const { user } = useAuth();
   const username = user?.username ?? "";
 
@@ -728,6 +730,7 @@ export default function AlterarPrecosPage({ companyKey }: Props) {
     <div className={styles.wrapper}>
       <header className={styles.header}>
         <h1 className={styles.title}>Alterar Custo / Preço</h1>
+        {abas}
         {/* Sem texto explicativo fixo. O aviso só aparece para quem não pode gravar,
             senão os botões desabilitados ficariam sem explicação. */}
         {!podeExecutar && !carregandoOpcoes && (
