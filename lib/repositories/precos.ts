@@ -1062,6 +1062,8 @@ export interface ExecutarPrecosParams {
   sincronizarPrecoAVista: boolean;
   obs?: string | null;
   reverteLote?: string | null;
+  /** Lote já aberto por quem chama (tarefa por cor grava produto e cor no MESMO lote). */
+  lote?: string;
 }
 
 export interface ResumoCampo {
@@ -1091,7 +1093,7 @@ function mudou(atual: number | null, novo: number | null): boolean {
   return Math.abs(atual - novo) > 0.005;
 }
 
-function novoLoteId(): string {
+export function novoLoteId(): string {
   const agora = new Date();
   const stamp = agora.toISOString().replace(/[-:T.Z]/g, '').slice(0, 14);
   const rand = Math.random().toString(36).slice(2, 8).toUpperCase();
@@ -1221,7 +1223,7 @@ export async function executarAlteracaoPrecos(
     else porCampoKey.set(item.campo.key, { campo: item.campo, itens: [{ produto: item.produto, valor: item.valor }] });
   }
 
-  const lote = novoLoteId();
+  const lote = params.lote || novoLoteId();
   const resumo: ResumoCampo[] = [];
   const paraHistorico: Array<{ produto: string; campo: CampoAlvo; anterior: number | null; novo: number | null }> = [];
 
@@ -1497,4 +1499,26 @@ END CATCH`);
     ],
   });
   return { lote, produto, custo, tabelas: rows.map((x) => ({ tabela: x.TABELA, preco: Number(x.PRECO) })), custoReposicao };
+}
+
+/**
+ * Lotes em que o produto ainda tem PRECO1 em vigor numa tabela (linha não revertida e que
+ * não é estorno). Usado para estornar o produto ANTES de reaplicar num lote novo: nunca
+ * empilhar lote sobre lote (o estorno devolveria o preço do lote anterior, não o cheio).
+ */
+export async function lotesEmVigorDoProduto(produto: string, tabela: string): Promise<string[]> {
+  await ensureHistoricoTable();
+  return withRequest(async (request) => {
+    request.input('evProd', sql.VarChar, limpar(produto));
+    request.input('evTab', sql.VarChar, limpar(tabela).toUpperCase());
+    const r = await request.query<{ lote: string }>(`
+      SELECT LOTE AS lote, MIN(ID) AS primeiro
+      FROM ${TABELA_HISTORICO} WITH (NOLOCK)
+      WHERE PRODUTO = @evProd AND ORIGEM = 'PRODUTOS_PRECOS' AND CAMPO = 'PRECO1'
+        AND COD_TABELA = @evTab AND REVERTIDO_POR IS NULL AND REVERTE_LOTE IS NULL
+      GROUP BY LOTE
+      ORDER BY MIN(ID) DESC
+    `);
+    return r.recordset.map((row) => limpar(row.lote));
+  });
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { autorizarPrecos, parsePrecoCompany } from '@/lib/auth/precos-guard';
-import { fetchLoteDetalhe } from '@/lib/repositories/precosTarefas';
+import { fetchLoteDetalheMisto } from '@/lib/precos/lote-misto';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
@@ -19,7 +19,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    return NextResponse.json({ linhas: await fetchLoteDetalhe(lote, company) });
+    return NextResponse.json({ linhas: await fetchLoteDetalheMisto(lote, company) });
   } catch (error) {
     console.error('[precos/tarefas/lote] erro', error);
     return NextResponse.json(

@@ -5210,7 +5210,7 @@
     "semantic_hash": ""
   },
   "app/api/precos/tarefas/[id]/executar/route.ts": {
-    "mtime": 1794315133.3149333,
+    "mtime": 1794507745.250942,
     "ast_hash": "77099e34cecf2b47d3b9efe0b2fff569",
     "semantic_hash": ""
   },
@@ -5230,13 +5230,13 @@
     "semantic_hash": ""
   },
   "app/api/precos/tarefas/route.ts": {
-    "mtime": 1794315133.3181913,
-    "ast_hash": "f34ab5ade93f6e085a5cb002de2b220f",
+    "mtime": 1794507745.2503061,
+    "ast_hash": "a75c6507389a2db8ea87ce37f2bd52ca",
     "semantic_hash": ""
   },
   "components/precos/ProgramarPrecosPage.tsx": {
-    "mtime": 1794315133.320865,
-    "ast_hash": "28af32d2fecb5a2a1aedc4db2633abb7",
+    "mtime": 1794507653.5341237,
+    "ast_hash": "08355621a85b4fec342cf1198ac8dd9c",
     "semantic_hash": ""
   },
   "lib/precos/agendador-qstash.ts": {
@@ -5245,13 +5245,13 @@
     "semantic_hash": ""
   },
   "lib/precos/tarefas-executor.ts": {
-    "mtime": 1794315133.3270621,
-    "ast_hash": "15858c7bb5119cbea2ff0e395d653127",
+    "mtime": 1794507745.251557,
+    "ast_hash": "9f775074a9353113915a206a6cd59f40",
     "semantic_hash": ""
   },
   "lib/precos/tarefas-store.ts": {
-    "mtime": 1793392847.8809562,
-    "ast_hash": "5ecb59d5522dcd37b9de8aed43bc7fd9",
+    "mtime": 1794507484.546972,
+    "ast_hash": "d60ef92f8612ff82bc160792cc8328e7",
     "semantic_hash": ""
   },
   "lib/repositories/precosTarefas.ts": {
@@ -5350,8 +5350,8 @@
     "semantic_hash": ""
   },
   "lib/mcp/precos.ts": {
-    "mtime": 1794315133.3232298,
-    "ast_hash": "60c183a8585ab8ef16c35525a9318e83",
+    "mtime": 1794507546.7747977,
+    "ast_hash": "f758dacb2848607a1755a03096b6e471",
     "semantic_hash": ""
   },
   "lib/precos/montar-tarefa.ts": {
@@ -5360,8 +5360,8 @@
     "semantic_hash": ""
   },
   "lib/precos/tarefas-validacao.ts": {
-    "mtime": 1794315133.3270621,
-    "ast_hash": "aed38eb9be5eaf7d8b72ff4d0913adfa",
+    "mtime": 1794507719.1380806,
+    "ast_hash": "b0aea630bb36461472c7558593a1c230",
     "semantic_hash": ""
   },
   "lib/shopify/client.ts": {
@@ -5540,8 +5540,13 @@
     "semantic_hash": ""
   },
   "lib/repositories/precosCor.ts": {
-    "mtime": 1794506427.693282,
-    "ast_hash": "fadab28b8cdb177bb921edac2d35673d",
+    "mtime": 1794507760.3811338,
+    "ast_hash": "ffdaaf62fa7222ab8ada4a21fc706c5d",
+    "semantic_hash": ""
+  },
+  "components/precos/TarefaCorEditor.tsx": {
+    "mtime": 1794507631.1957233,
+    "ast_hash": "618b83ff69f5880f56a5679852d88505",
     "semantic_hash": ""
   }
 }

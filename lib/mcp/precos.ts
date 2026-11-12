@@ -15,11 +15,9 @@ import {
 } from '@/lib/precos/tarefas-executor';
 import { listarTarefas, obterTarefa, salvarTarefa, type PrecoTarefa } from '@/lib/precos/tarefas-store';
 import { validarAlteracoes } from '@/lib/precos/tarefas-validacao';
-import { fetchLoteDetalhe } from '@/lib/repositories/precosTarefas';
+import { fetchHistoricoLotesMisto, fetchLoteDetalheMisto, reverterLoteMisto } from '@/lib/precos/lote-misto';
 import {
-  fetchHistoricoLotes,
   fetchProdutosPrecos,
-  reverterLotePrecos,
   type ExecutarPrecosResult,
   type PrecoCompany,
 } from '@/lib/repositories/precos';
@@ -508,10 +506,10 @@ export function registerPrecosTools(server: McpServer) {
       rodar(async () => {
         await exigir(extra as Extra, input.empresa, false);
         if (input.lote?.trim()) {
-          const linhas = await fetchLoteDetalhe(input.lote.trim(), input.empresa);
+          const linhas = await fetchLoteDetalheMisto(input.lote.trim(), input.empresa);
           return { lote: input.lote.trim(), itens: linhas.length, linhas };
         }
-        const lotes = await fetchHistoricoLotes(input.empresa, input.limite ?? 30);
+        const lotes = await fetchHistoricoLotesMisto(input.empresa, input.limite ?? 30);
         // DATA_ALTERACAO é GETDATE() (já hora de Brasília) e o driver rotula como UTC:
         // formatar em UTC devolve o relógio gravado — mesma regra do `dataLinx` da tela.
         return {
@@ -542,7 +540,7 @@ export function registerPrecosTools(server: McpServer) {
     async (input, extra) =>
       rodar(async () => {
         const acesso = await exigir(extra as Extra, input.empresa, true);
-        const r = await reverterLotePrecos(input.lote.trim(), input.empresa, acesso.username, input.produto?.trim() || null);
+        const r = await reverterLoteMisto(input.lote.trim(), input.empresa, acesso.username, input.produto?.trim() || null);
         return { estorno: resumoResultado(r) };
       })
   );

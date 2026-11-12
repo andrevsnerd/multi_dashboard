@@ -56,6 +56,14 @@ export async function POST(request: Request) {
         rejeitados.push({ produto: pedido.produto, motivo: "não está na Black Friday" });
         continue;
       }
+      if (item.modoCor) {
+        // O PDV lê o preço de cada cor: mudar o preço do produto não chegaria ao caixa.
+        rejeitados.push({
+          produto: pedido.produto,
+          motivo: "está no modo cor — baixe pelo Programar Preços, aba Por cor",
+        });
+        continue;
+      }
       const valor = Math.round(pedido.valor * 100) / 100;
       if (!Number.isFinite(valor) || valor <= 0) {
         rejeitados.push({ produto: pedido.produto, motivo: "preço inválido" });

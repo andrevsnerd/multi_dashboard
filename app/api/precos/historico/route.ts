@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 
 import { autorizarPrecos, parsePrecoCompany } from '@/lib/auth/precos-guard';
-import { fetchHistoricoLinhas, fetchHistoricoLotes } from '@/lib/repositories/precos';
+import { fetchHistoricoLotesMisto } from '@/lib/precos/lote-misto';
+import { fetchHistoricoLinhas } from '@/lib/repositories/precos';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
@@ -24,7 +25,7 @@ export async function GET(request: Request) {
       const linhas = await fetchHistoricoLinhas(lote);
       return NextResponse.json({ linhas: linhas.filter((l) => l.empresa === company) });
     }
-    const lotes = await fetchHistoricoLotes(company, Number(searchParams.get('limite') ?? 30));
+    const lotes = await fetchHistoricoLotesMisto(company, Number(searchParams.get('limite') ?? 30));
     return NextResponse.json({ lotes, podeExecutar: autorizacao.auth.podeExecutar });
   } catch (error) {
     console.error('[precos/historico] erro', error);

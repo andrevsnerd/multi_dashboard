@@ -51,8 +51,9 @@ export function validarAlteracoes(entrada: unknown): { alteracoes: TarefaAlterac
 }
 
 /**
- * Modo cor: só Preço Líquido (1) de uma cor numa tabela. Chave `COR::<tabela>::<cor>::PRECO_LIQUIDO1`,
- * conferida pelo mesmo parser que a execução usa.
+ * Modo cor: Preço Líquido (1) de uma cor numa tabela (`COR::<tabela>::<cor>::PRECO_LIQUIDO1`) e,
+ * para produto de cor única, o PRECO1 do SKU inteiro (`T::<tabela>::PRECO1`). As chaves passam
+ * pelos mesmos parsers que a execução usa.
  */
 export function validarAlteracoesCor(entrada: unknown): { alteracoes: TarefaAlteracao[]; erro: string | null } {
   if (!Array.isArray(entrada) || entrada.length === 0) {
@@ -64,6 +65,25 @@ export function validarAlteracoesCor(entrada: unknown): { alteracoes: TarefaAlte
     const produto = limpar(raw?.produto);
     const chave = parseChaveCor(limpar(raw?.campoKey));
     const valor = Number(raw?.valor);
+    // Produto de cor única entra pelo preço do SKU inteiro (PRECO1 da tabela), como sempre.
+    const sku = chave ? null : parseCampoKey(limpar(raw?.campoKey));
+    if (produto && sku && sku.origem === "PRODUTOS_PRECOS" && sku.campo === "PRECO1") {
+      if (!Number.isFinite(valor) || valor < 0) {
+        return { alteracoes: [], erro: `Valor inválido para ${produto} na tabela ${sku.codigoTabela}.` };
+      }
+      if (vistos.has(`${produto}||${sku.key}`)) continue;
+      vistos.add(`${produto}||${sku.key}`);
+      const atualSku = raw?.atual === null || raw?.atual === undefined ? null : Number(raw.atual);
+      alteracoes.push({
+        produto,
+        campoKey: sku.key,
+        valor: Math.round(valor * 100) / 100,
+        atual: atualSku !== null && Number.isFinite(atualSku) ? atualSku : null,
+        tabela: sku.codigoTabela ?? "",
+        tabelaDesc: limpar(raw?.tabelaDesc).slice(0, 120),
+      });
+      continue;
+    }
     if (!produto || !chave) {
       return { alteracoes: [], erro: `Alteração por cor inválida (${produto || "sem produto"}).` };
     }

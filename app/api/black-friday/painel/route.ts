@@ -163,6 +163,14 @@ export async function GET(request: Request) {
     for (const item of itens) {
       descCadastro.set(item.produto, new Map(item.coresCadastro.map((c) => [chaveCor(c.cor), c.desc])));
     }
+    // Produto que entrou na Black só por algumas cores: o resto das cores não conta.
+    const soCoresDe = new Map(
+      itens.filter((i) => i.coresBlack).map((i) => [i.produto, new Set(i.coresBlack!)] as const)
+    );
+    const foraDaBlack = (produto: string, cor: string | null | undefined) => {
+      const so = soCoresDe.get(produto);
+      return !!so && !so.has(chaveCor(cor));
+    };
     const corDe = (produto: string, cor: string, descVenda?: string) => {
       let m = accCor.get(produto);
       if (!m) {
@@ -193,7 +201,7 @@ export async function GET(request: Request) {
     porDia.forEach((rows: FilialProdutoSalesRow[], idx) => {
       for (const r of rows) {
         const ap = acc.get(r.produto);
-        if (!ap) continue;
+        if (!ap || foraDaBlack(r.produto, r.cor)) continue;
         const v = Number(r.vendas ?? 0);
         const q = Number(r.qtde ?? 0);
         const label = lojaDe(r.filial ?? "");
@@ -216,7 +224,7 @@ export async function GET(request: Request) {
     });
     for (const r of base) {
       const ap = acc.get(r.produto);
-      if (!ap) continue;
+      if (!ap || foraDaBlack(r.produto, r.cor)) continue;
       const v = Number(r.vendas ?? 0);
       const q = Number(r.qtde ?? 0);
       const label = lojaDe(r.filial ?? "");
@@ -237,7 +245,7 @@ export async function GET(request: Request) {
       for (const r of shopifyRows) {
         const produto = produtoDe.get(r.produto.trim().toUpperCase());
         const ap = produto ? acc.get(produto) : undefined;
-        if (!produto || !ap) continue;
+        if (!produto || !ap || foraDaBlack(produto, r.cor)) continue;
         const idx = idxDia.get(r.ymd);
         const naBase = r.ymd >= baseInicio && r.ymd <= baseFim;
         if (idx === undefined && !naBase) continue;
@@ -261,7 +269,7 @@ export async function GET(request: Request) {
 
     for (const r of estoqueRows) {
       const ap = acc.get(r.produto);
-      if (!ap) continue;
+      if (!ap || foraDaBlack(r.produto, r.cor)) continue;
       if (!estoqueSet.has(normalizeFilialLookupKey(r.filial))) continue;
       const label = lojaDe(r.filial);
       for (const a of [ap, corDe(r.produto, r.cor)]) {
@@ -296,12 +304,26 @@ export async function GET(request: Request) {
 
     const saida = itens.map((item) => {
       // Só cores que venderam ou têm estoque; cadastro sem movimento não vira linha.
+      // Desconto por cor (tarefa por cor): a cor leva o próprio preço; produto que entrou
+      // na Black só por cor mostra só as cores da Black.
+      const soCores = item.coresBlack ? new Set(item.coresBlack) : null;
       const cores = [...(accCor.get(item.produto)?.values() ?? [])]
-        .map((c) => ({ cor: c.cor, corDesc: c.desc, ...serializar(c.a) }))
-        .filter((c) => c.qtde !== 0 || c.vendas !== 0 || c.estoque > 0 || c.qtdeBase !== 0)
+        .filter((c) => !soCores || soCores.has(chaveCor(c.cor)))
+        .map((c) => {
+          const preco = item.precosCor[chaveCor(c.cor)];
+          return {
+            cor: c.cor,
+            corDesc: c.desc,
+            ...(preco ? { precoOriginal: preco.original, precoAtual: preco.atual } : {}),
+            ...serializar(c.a),
+          };
+        })
+        .filter((c) => c.qtde !== 0 || c.vendas !== 0 || c.estoque > 0 || c.qtdeBase !== 0 || soCores)
         .sort((a, b) => b.vendas - a.vendas || b.estoque - a.estoque);
-      const { coresCadastro: _cadastro, ...resto } = item;
+      const { coresCadastro: _cadastro, precosCor: _precosCor, coresBlack: _coresBlack, ...resto } = item;
       void _cadastro;
+      void _precosCor;
+      void _coresBlack;
       return { ...resto, ...serializar(acc.get(item.produto)!), cores };
     });
 

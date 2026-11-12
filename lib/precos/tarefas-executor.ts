@@ -11,6 +11,10 @@ import { isReadOnlyRole, normalizeRole } from "@/lib/auth/permissions";
 import { PRECOS_VIEW_ROLES } from "@/lib/auth/precos-guard";
 import {
   executarAlteracaoPrecos,
+  lotesEmVigorDoProduto,
+  novoLoteId,
+  parseCampoKey,
+  reverterLotePrecos,
   type ExecutarPrecosResult,
   type PrecoCompany,
 } from "@/lib/repositories/precos";
@@ -125,36 +129,75 @@ export async function executarTarefa(
 }
 
 /**
- * Tarefa por cor: Preço Líquido (1) por cor, ligando o modo cor do produto se preciso.
- * Histórico em NERD_PRECO_COR_HISTORICO (o Reverter da tela por produto não a enxerga).
+ * Tarefa por cor: Preço Líquido (1) por cor (liga o modo cor do produto se preciso) e, para
+ * produto de cor única, o PRECO1 do SKU inteiro. As duas partes gravam o MESMO lote (cada
+ * uma no seu histórico), então o histórico e o Reverter da tela tratam como um lote só.
+ * O SKU inteiro é estornado dos lotes em vigor antes de reaplicar: nunca empilhar lotes.
  */
 async function executarCor(tarefa: PrecoTarefa, usuario: string): Promise<ExecutarPrecosResult> {
-  const itens: ItemTarefaCor[] = [];
+  const obs = `Tarefa: ${tarefa.nome}`.slice(0, 300);
+  const lote = novoLoteId();
+  const itensCor: ItemTarefaCor[] = [];
+  const itensSku: Array<{ produto: string; campoKey: string; valor: number; tabela: string }> = [];
   const erros: string[] = [];
   for (const a of tarefa.alteracoes) {
     const chave = parseChaveCor(a.campoKey);
-    if (!chave) {
-      erros.push(`Alteração ignorada (${a.produto} · ${a.campoKey}): não é Preço Líquido por cor.`);
+    if (chave) {
+      itensCor.push({ produto: a.produto, tabela: chave.tabela, cor: chave.cor, valor: a.valor });
       continue;
     }
-    itens.push({ produto: a.produto, tabela: chave.tabela, cor: chave.cor, valor: a.valor });
+    const sku = parseCampoKey(a.campoKey);
+    if (sku && sku.origem === "PRODUTOS_PRECOS" && sku.campo === "PRECO1" && sku.codigoTabela) {
+      itensSku.push({ produto: a.produto, campoKey: sku.key, valor: a.valor, tabela: sku.codigoTabela });
+      continue;
+    }
+    erros.push(`Alteração ignorada (${a.produto} · ${a.campoKey}).`);
   }
-  const r = await executarTarefaCor({
-    company: tarefa.company,
-    usuario,
-    obs: `Tarefa: ${tarefa.nome}`.slice(0, 300),
-    itens,
-  });
-  // r.ligados (produtos que viraram modo cor) fica no histórico como VARIA_PRECO_COR 0→1.
-  return {
-    lote: r.lote,
-    aplicados: r.aplicados,
-    semMudanca: r.semMudanca,
-    semRegistro: r.semRegistro,
-    naoConfirmados: r.naoConfirmados + erros.length,
-    porCampo: [],
-    erros: [...erros, ...r.erros],
+
+  const total: ExecutarPrecosResult = {
+    lote: "", aplicados: 0, semMudanca: 0, semRegistro: 0, naoConfirmados: erros.length, porCampo: [], erros,
   };
+
+  if (itensSku.length > 0) {
+    // Estorna o produto dos lotes em que ainda está (preço volta ao de antes daquele lote).
+    for (const it of itensSku) {
+      for (const anterior of await lotesEmVigorDoProduto(it.produto, it.tabela)) {
+        try {
+          await reverterLotePrecos(anterior, tarefa.company, usuario, it.produto);
+        } catch (erro) {
+          total.erros.push(`${it.produto}: não estornou o lote ${anterior} (${erro instanceof Error ? erro.message : String(erro)}).`);
+        }
+      }
+    }
+    const r = await executarAlteracaoPrecos({
+      company: tarefa.company,
+      usuario,
+      alteracoes: itensSku.map((i) => ({ produto: i.produto, campoKey: i.campoKey, valor: i.valor })),
+      sincronizarPrecoLiquido: true,
+      sincronizarPrecoAVista: false,
+      obs,
+      lote,
+    });
+    total.aplicados += r.aplicados;
+    total.semMudanca += r.semMudanca;
+    total.semRegistro += r.semRegistro;
+    total.naoConfirmados += r.naoConfirmados;
+    total.porCampo = r.porCampo;
+    total.erros.push(...r.erros);
+    if (r.lote) total.lote = r.lote;
+  }
+
+  if (itensCor.length > 0) {
+    const c = await executarTarefaCor({ company: tarefa.company, usuario, obs, itens: itensCor, lote });
+    total.aplicados += c.aplicados;
+    total.semMudanca += c.semMudanca;
+    total.semRegistro += c.semRegistro;
+    total.naoConfirmados += c.naoConfirmados;
+    total.erros.push(...c.erros);
+    if (c.lote) total.lote = c.lote;
+  }
+
+  return total;
 }
 
 /** Erro de regra com o status HTTP que a rota deve devolver (o MCP só usa a mensagem). */

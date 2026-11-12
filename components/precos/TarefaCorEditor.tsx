@@ -85,6 +85,14 @@ function chave(produto: string, cor: string): string {
   return `${produto}||${cor}`;
 }
 
+/** Chave do campo de um produto de cor única: o preço vale para o SKU inteiro. */
+const SKU = "*";
+
+/** Cor única e fora do modo cor: altera o PRECO1 do produto (SKU inteiro), como sempre. */
+function ehSkuInteiro(p: ProdutoCor): boolean {
+  return p.cores.length === 1 && !p.variaPrecoCor;
+}
+
 export default function TarefaCorEditor({
   companyKey,
   api,
@@ -101,7 +109,7 @@ export default function TarefaCorEditor({
   const [produtos, setProdutos] = useState<ProdutoCor[]>([]);
   const [novos, setNovos] = useState<Record<string, string>>(() => {
     const preset: Record<string, string> = {};
-    for (const a of editando?.alteracoes ?? []) if (a.cor) preset[chave(a.produto, a.cor)] = fmt(a.valor);
+    for (const a of editando?.alteracoes ?? []) preset[chave(a.produto, a.cor ?? SKU)] = fmt(a.valor);
     return preset;
   });
   const [naoEncontrados, setNaoEncontrados] = useState<string[]>([]);
@@ -171,6 +179,15 @@ export default function TarefaCorEditor({
   const alteracoes = useMemo(() => {
     const out: AlteracaoCor[] = [];
     for (const p of produtos) {
+      if (ehSkuInteiro(p)) {
+        const v = parseValor(novos[chave(p.produto, SKU)] ?? "");
+        if (v === null || Number.isNaN(v) || v < 0) continue;
+        const valor = Math.round(v * 100) / 100;
+        const atual = p.cores[0]?.preco1 ?? null;
+        if (atual !== null && Math.abs(atual - valor) < 0.005) continue;
+        out.push({ produto: p.produto, campoKey: `T::${tabela}::PRECO1`, valor, atual, tabela, tabelaDesc });
+        continue;
+      }
       for (const c of p.cores) {
         const v = parseValor(novos[chave(p.produto, c.cor)] ?? "");
         if (v === null || Number.isNaN(v) || v < 0) continue;
@@ -191,16 +208,14 @@ export default function TarefaCorEditor({
     return out;
   }, [produtos, novos, tabela, tabelaDesc]);
 
-  const invalidos = produtos.flatMap((p) =>
-    p.cores
-      .filter((c) => {
-        const v = parseValor(novos[chave(p.produto, c.cor)] ?? "");
-        return v !== null && (Number.isNaN(v) || v < 0);
-      })
-      .map((c) => `${p.produto} ${c.cor}`)
-  );
+  const invalidos = Object.entries(novos)
+    .filter(([, t]) => {
+      const v = parseValor(t);
+      return v !== null && (Number.isNaN(v) || v < 0);
+    })
+    .map(([k]) => k.replace("||", " ").replace(` ${SKU}`, ""));
 
-  const vaoLigar = [...new Set(alteracoes.map((a) => a.produto))].filter(
+  const vaoLigar = [...new Set(alteracoes.filter((a) => a.cor).map((a) => a.produto))].filter(
     (prod) => !produtos.find((p) => p.produto === prod)?.variaPrecoCor
   );
 
@@ -327,7 +342,11 @@ export default function TarefaCorEditor({
                 <span className={base.fichaProduto}>{p.produto}</span>
                 <span className={base.fichaDesc}>{p.descricao}</span>
                 <span className={base.lote}>
-                  {p.variaPrecoCor ? "modo cor ligado" : "modo cor desligado — liga ao aplicar"}
+                  {ehSkuInteiro(p)
+                    ? "cor única — preço do SKU inteiro"
+                    : p.variaPrecoCor
+                      ? "modo cor ligado"
+                      : "modo cor desligado — liga ao aplicar"}
                 </span>
                 <button
                   type="button"
@@ -344,13 +363,14 @@ export default function TarefaCorEditor({
                     <th>Descrição da cor</th>
                     <th className={base.thNum}>Preço (1)</th>
                     <th className={base.thNum}>Preço Líquido (1)</th>
-                    <th className={base.thNum}>Novo Preço Líquido (1)</th>
+                    <th className={base.thNum}>{ehSkuInteiro(p) ? "Novo Preço (1) do SKU" : "Novo Preço Líquido (1)"}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {p.cores.map((c) => {
-                    const k = chave(p.produto, c.cor);
-                    const alterada = alteracoes.some((a) => a.produto === p.produto && a.cor === c.cor);
+                    const sku = ehSkuInteiro(p);
+                    const k = chave(p.produto, sku ? SKU : c.cor);
+                    const alterada = alteracoes.some((a) => a.produto === p.produto && (sku || a.cor === c.cor));
                     return (
                       <tr key={c.cor} className={alterada ? base.trAlterada : undefined}>
                         <td className={base.tdCodigo}>{c.cor}</td>
@@ -378,8 +398,16 @@ export default function TarefaCorEditor({
 
           <div className={styles.salvarBox}>
             <div className={base.resumoLinha}>
-              <strong>{alteracoes.length}</strong> cor(es) com Preço Líquido (1) novo na tabela {tabela} — o Preço (1)
-              não muda.
+              <strong>{alteracoes.filter((a) => a.cor).length}</strong> cor(es) com Preço Líquido (1) novo na tabela{" "}
+              {tabela} (o Preço (1) não muda)
+              {alteracoes.some((a) => !a.cor) && (
+                <>
+                  {" "}
+                  · <strong>{alteracoes.filter((a) => !a.cor).length}</strong> produto(s) de cor única pelo preço do SKU
+                  inteiro (estornados do lote anterior antes de reaplicar)
+                </>
+              )}
+              .
             </div>
             {vaoLigar.length > 0 && (
               <div className={base.avisoBox}>

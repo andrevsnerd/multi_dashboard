@@ -13,6 +13,10 @@ import 'server-only';
  *  - Preço original  = VALOR_ANTERIOR da 1ª linha da Black do produto (antes de tudo).
  *  - Preço atual     = PRODUTOS_PRECOS.PRECO1 AO VIVO (vale o que o PDV lê hoje).
  *  - Custo (piso)    = PRODUTOS.CUSTO_REPOSICAO1 — limite do quanto o preço pode descer.
+ *  - Por COR (12/11/2026): tarefas por cor do Programar Preços gravam o Preço Líquido (1)
+ *    da cor em NERD_PRECO_COR_HISTORICO. Linha em vigor num lote "Black Friday" põe o
+ *    produto na Black (só aquelas cores, se o produto não tem desconto por produto) e o
+ *    preço de cada cor vira o líquido da cor ao vivo — é o que o PDV cobra no modo cor.
  *
  * Nada de VENDA aqui: a venda sai da função canônica `fetchFilialProdutoSales` na rota.
  * Estoque é lido de ESTOQUE_PRODUTOS (número do Linx), só os positivos.
@@ -22,6 +26,7 @@ import sql from 'mssql';
 
 import { withRequest } from '@/lib/db/connection';
 import type { PrecoCompany } from '@/lib/repositories/precos';
+import { fetchLinhasBlackCor, fetchLiquidosPorCor } from '@/lib/repositories/precosCor';
 
 /** OBS que marca os lotes da Black (tarefas do Programar Preços e rebaixas do painel). */
 const OBS_BLACK = '%Black Friday%';
@@ -85,6 +90,12 @@ export interface BlackItem {
   /** yyyy-MM-dd (Brasília) da 1ª vez que o produto entrou na Black. */
   entrada: string;
   rebaixas: BlackRebaixa[];
+  /** PDV lê o preço por cor (VARIA_PRECO_COR = 1): a rebaixa por produto não chega ao caixa. */
+  modoCor: boolean;
+  /** Preço de cada cor (chave = chaveCor), quando difere do produto ou veio de lote por cor. */
+  precosCor: Record<string, { original: number | null; atual: number | null }>;
+  /** Cores que entraram na Black por lote por cor; null = o produto inteiro está na Black. */
+  coresBlack: string[] | null;
 }
 
 export interface BlackItensResult {
@@ -125,7 +136,8 @@ export async function fetchItensBlackFriday(company: PrecoCompany): Promise<Blac
     return r.recordset;
   });
 
-  if (hist.length === 0) return { inicio: null, itens: [] };
+  const linhasCor = await fetchLinhasBlackCor(company);
+  if (hist.length === 0 && linhasCor.length === 0) return { inicio: null, itens: [] };
 
   // Início da campanha = 1º lote da Black, mesmo que depois tenha sido estornado e
   // reaplicado (a Scarfme foi refeita em 04/11, mas está na Black desde 01/11).
@@ -154,8 +166,23 @@ export async function fetchItensBlackFriday(company: PrecoCompany): Promise<Blac
     }
   }
 
-  // Só fica quem ainda tem alteração da Black em vigor.
-  const produtos = [...porProduto.entries()].filter(([, v]) => v.ativas.length > 0).map(([p]) => p);
+  // Por cor: 1ª linha em vigor de cada produto×cor dá o preço de antes daquela cor.
+  const porCorBlack = new Map<string, Map<string, { original: number | null; tabela: string; entrada: string }>>();
+  for (const l of linhasCor) {
+    if (!inicio || l.data < inicio) inicio = l.data;
+    const m = porCorBlack.get(l.produto) ?? new Map();
+    const k = chaveCor(l.cor);
+    if (!m.has(k)) m.set(k, { original: l.de, tabela: l.tabela, entrada: l.data.slice(0, 10) });
+    porCorBlack.set(l.produto, m);
+  }
+
+  // Só fica quem ainda tem alteração da Black em vigor (por produto ou por cor).
+  const produtos = [
+    ...new Set([
+      ...[...porProduto.entries()].filter(([, v]) => v.ativas.length > 0).map(([p]) => p),
+      ...porCorBlack.keys(),
+    ]),
+  ];
   if (produtos.length === 0) return { inicio: inicio?.slice(0, 10) ?? null, itens: [] };
 
   const cadastro = new Map<string, Record<string, unknown>>();
@@ -202,12 +229,26 @@ export async function fetchItensBlackFriday(company: PrecoCompany): Promise<Blac
     });
   }
 
+  const liquidos = await fetchLiquidosPorCor(produtos, '01');
+
   const itens: BlackItem[] = produtos.map((produto) => {
-    const info = porProduto.get(produto)!;
+    const corBlack = porCorBlack.get(produto);
+    const porProd = porProduto.get(produto);
+    const temProduto = !!porProd && porProd.ativas.length > 0;
+    const primeiraCor = corBlack ? [...corBlack.values()][0] : undefined;
+    const info = temProduto
+      ? porProd!
+      : {
+          tabelas: new Set([primeiraCor?.tabela || '01']),
+          original: primeiraCor?.original ?? null,
+          entrada: [...(corBlack?.values() ?? [])].map((c) => c.entrada).sort()[0] ?? '',
+          ativas: [] as HistRow[],
+        };
     const cad = cadastro.get(produto) ?? {};
     const tabelas = [...info.tabelas].sort();
     // Preço atual = o da 1ª tabela da Black (hoje só existe a 01).
     const precoAtual = tabelas.length > 0 ? precos.get(`${produto}||${tabelas[0]}`) ?? null : null;
+    const precoAtualProduto = precoAtual;
     const rebaixas: BlackRebaixa[] = info.ativas
       .filter((r) => limpar(r.COD_TABELA) === tabelas[0])
       .map((r) => ({
@@ -218,6 +259,21 @@ export async function fetchItensBlackFriday(company: PrecoCompany): Promise<Blac
         usuario: limpar(r.USUARIO),
         painel: limpar(r.OBS).startsWith(OBS_REBAIXA_PAINEL),
       }));
+    // Preço por cor: no modo cor o PDV cobra o líquido de cada cor; o original da cor é o
+    // do produto (se ele tem desconto por produto) ou o de antes do lote por cor.
+    const liq = liquidos.get(produto);
+    const precosCor: BlackItem['precosCor'] = {};
+    if (liq?.modoCor) {
+      for (const [cor, atual] of liq.porCor) {
+        const k = chaveCor(cor);
+        const daCor = corBlack?.get(k);
+        precosCor[k] = { original: temProduto ? info.original : daCor?.original ?? info.original, atual };
+      }
+    }
+    for (const [k, daCor] of corBlack ?? []) {
+      if (!precosCor[k]) precosCor[k] = { original: temProduto ? info.original : daCor.original, atual: precoAtualProduto };
+    }
+
     return {
       produto,
       descricao: limpar(cad.DESC_PRODUTO).replace(/\s+/g, ' ') || produto,
@@ -234,6 +290,9 @@ export async function fetchItensBlackFriday(company: PrecoCompany): Promise<Blac
       custo: num(cad.CUSTO) ?? 0,
       entrada: info.entrada,
       rebaixas,
+      modoCor: !!liq?.modoCor,
+      precosCor,
+      coresBlack: temProduto ? null : [...(corBlack?.keys() ?? [])],
     };
   });
 

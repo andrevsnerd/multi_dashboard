@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { autorizarPrecos, parsePrecoCompany } from '@/lib/auth/precos-guard';
-import { reverterLotePrecos } from '@/lib/repositories/precos';
+import { reverterLoteMisto } from '@/lib/precos/lote-misto';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Lote não informado.' }, { status: 400 });
     }
 
-    const resultado = await reverterLotePrecos(lote, company, autorizacao.auth.username, body.produto);
+    const resultado = await reverterLoteMisto(lote, company, autorizacao.auth.username, body.produto);
     return NextResponse.json(resultado);
   } catch (error) {
     console.error('[precos/reverter] erro', error);
