@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuth } from "@/components/auth/AuthContext";
 import type { CompanyKey } from "@/lib/config/company";
@@ -42,14 +42,19 @@ interface CorDisponivel {
   estoque: number;
 }
 
-/** Peça no rascunho, esperando o Salvar. */
+/** Peças no rascunho, esperando o Salvar. */
 interface PendenteEntrada {
   produto: string;
   cor: string;
   descricao: string;
   descCor: string;
+  /** Saldo da filial quando a peça entrou no rascunho — teto da quantidade. */
   estoque: number;
+  qtde: number;
 }
+
+/** SKU pronto para entrar no rascunho (vindo da busca ou do bipe). */
+type SkuParaRascunho = Omit<PendenteEntrada, "qtde">;
 
 interface PreviewLinha {
   direcao: "saida" | "entrada";
@@ -57,6 +62,7 @@ interface PreviewLinha {
   cor: string;
   descricao: string;
   descCor: string;
+  qtde: number;
   estoqueAtual: number;
   estoqueDepois: number;
   bloqueio: string | null;
@@ -87,6 +93,31 @@ interface Resultado {
   bloqueadas: PreviewLinha[];
 }
 
+// ─── Bipagem (mesma rota da tela Saídas e Entradas) ───────────────────────────
+interface BipeItem {
+  produto: string;
+  descProduto: string;
+  corProduto: string | null;
+  descCor: string;
+  estoque: number;
+  exigeTamanho?: boolean;
+}
+
+interface BipeResposta {
+  status: "ok" | "sem_estoque" | "ambiguo" | "nao_encontrado";
+  item: BipeItem | null;
+  opcoes: BipeItem[];
+}
+
+/** Bipe que NÃO entrou no rascunho — fica no painel até o operador resolver ou dispensar. */
+interface BipeOcorrencia {
+  id: string;
+  codigo: string;
+  titulo: string;
+  detalhe: string;
+  opcoes?: BipeItem[];
+}
+
 interface VmPageProps {
   companyKey: CompanyKey;
   companyName: string;
@@ -103,6 +134,41 @@ function dataHora(iso: string): string {
   return d.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
 
+function chaveSku(produto: string, cor: string): string {
+  return `${produto.trim().toUpperCase()}|${cor.trim().toUpperCase()}`;
+}
+
+let seqBipe = 0;
+function novoIdBipe(): string {
+  seqBipe += 1;
+  return `${Date.now()}-${seqBipe}`;
+}
+
+/**
+ * Resolve o código de barras direto no SKU + saldo da filial, numa ida só — a mesma
+ * rota que a tela Saídas e Entradas usa na bipagem. Leitura pura: repetir é seguro.
+ */
+async function biparCodigo(codigo: string, filialNome: string, companyKey: string): Promise<BipeResposta> {
+  const params = new URLSearchParams({ codigoBarras: codigo, filial: filialNome, company: companyKey });
+  let response: Response | null = null;
+  let ultimoErro: unknown = null;
+  for (const espera of [0, 400, 1200]) {
+    if (espera) await new Promise((r) => setTimeout(r, espera));
+    try {
+      response = await fetch(`/api/transferencia-produtos/bipar?${params.toString()}`, { cache: "no-store" });
+      if (response.ok || response.status < 500) break;
+    } catch (err) {
+      ultimoErro = err;
+      response = null;
+    }
+  }
+  if (!response || !response.ok) {
+    throw ultimoErro instanceof Error ? ultimoErro : new Error("Erro ao consultar o código de barras");
+  }
+  const json = (await response.json()) as BipeResposta;
+  return { status: json.status ?? "nao_encontrado", item: json.item ?? null, opcoes: json.opcoes ?? [] };
+}
+
 export default function VmPage({ companyKey, companyName }: VmPageProps) {
   const { user } = useAuth();
   const username = user?.username ?? "";
@@ -117,10 +183,14 @@ export default function VmPage({ companyKey, companyName }: VmPageProps) {
   const [produtoSelecionado, setProdutoSelecionado] = useState<ProductSearchResult | null>(null);
   const [cores, setCores] = useState<CorDisponivel[]>([]);
   const [corSelecionada, setCorSelecionada] = useState("");
+  const [qtdeSelecionada, setQtdeSelecionada] = useState(1);
   const [carregandoCores, setCarregandoCores] = useState(false);
 
   const [entrando, setEntrando] = useState<PendenteEntrada[]>([]);
-  const [saindo, setSaindo] = useState<string[]>([]); // chaves buildVmKey dos itens a remover
+  /** Espelho síncrono do rascunho: bipes em sequência decidem pelo valor mais novo, não pelo do render. */
+  const entrandoRef = useRef<PendenteEntrada[]>([]);
+  /** Itens em VM marcados para voltar ao estoque: chave buildVmKey → quantas peças. */
+  const [saindo, setSaindo] = useState<Record<string, number>>({});
 
   const [preview, setPreview] = useState<Preview | null>(null);
   const [confirmando, setConfirmando] = useState(false);
@@ -128,6 +198,21 @@ export default function VmPage({ companyKey, companyName }: VmPageProps) {
 
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // ── Bipagem ──
+  const [codigoBipado, setCodigoBipado] = useState("");
+  const [bipesEmVoo, setBipesEmVoo] = useState(0);
+  const [bipesLidos, setBipesLidos] = useState(0);
+  const [bipesAceitos, setBipesAceitos] = useState(0);
+  const [ultimoBipe, setUltimoBipe] = useState<{ ok: boolean; titulo: string; detalhe: string } | null>(null);
+  const [ocorrencias, setOcorrencias] = useState<BipeOcorrencia[]>([]);
+  const [somBipeLigado, setSomBipeLigado] = useState(true);
+  const bipeInputRef = useRef<HTMLInputElement | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  /** Bipes são processados em fila: cada um vê o rascunho já com o anterior somado. */
+  const filaBipeRef = useRef<Promise<void>>(Promise.resolve());
+  /** Filial no render atual — bipe que volta depois de trocar a filial é descartado. */
+  const filialRef = useRef("");
 
   const authHeaders = useMemo(
     () => (username ? { "x-auth-username": username } : undefined),
@@ -168,6 +253,10 @@ export default function VmPage({ companyKey, companyName }: VmPageProps) {
     if (filiaisDisponiveis.length === 1) setFilialCod(filiaisDisponiveis[0].cod);
   }, [filiaisDisponiveis, filialCod]);
 
+  useEffect(() => {
+    filialRef.current = filialCod;
+  }, [filialCod]);
+
   const filialAtual = filiaisDisponiveis.find((f) => f.cod === filialCod) ?? null;
 
   const itensDaFilial = useMemo(() => {
@@ -175,12 +264,43 @@ export default function VmPage({ companyKey, companyName }: VmPageProps) {
     return estado.items.filter((item) => item.filial.toUpperCase() === filialCod.toUpperCase());
   }, [estado, filialCod]);
 
-  const chavesNaFilial = useMemo(
-    () => new Set(itensDaFilial.map((item) => buildVmKey(item.filial, item.produto, item.cor))),
-    [itensDaFilial]
-  );
+  const pecasEmVm = useMemo(() => itensDaFilial.reduce((t, i) => t + i.qtde, 0), [itensDaFilial]);
+  const pecasEntrando = useMemo(() => entrando.reduce((t, p) => t + p.qtde, 0), [entrando]);
+  const pecasSaindo = useMemo(() => Object.values(saindo).reduce((t, n) => t + n, 0), [saindo]);
+  const totalPendencias = entrando.length + Object.keys(saindo).length;
 
-  const totalPendencias = entrando.length + saindo.length;
+  function definirEntrando(proximo: PendenteEntrada[]) {
+    entrandoRef.current = proximo;
+    setEntrando(proximo);
+  }
+
+  /**
+   * Soma `qtde` peças do SKU no rascunho (mesmo SKU = mesma linha). O teto é o saldo
+   * da filial: o que já está em VM saiu do estoque, então o saldo atual é o que sobra.
+   */
+  const somarNoRascunho = useCallback(
+    (sku: SkuParaRascunho, qtde: number): { ok: true; total: number } | { ok: false; motivo: string } => {
+      const atual = entrandoRef.current;
+      const chave = chaveSku(sku.produto, sku.cor);
+      const existente = atual.find((p) => chaveSku(p.produto, p.cor) === chave);
+      const jaNoRascunho = existente?.qtde ?? 0;
+      // Saldo mais recente que chegou (o bipe consulta de novo a cada leitura).
+      const teto = sku.estoque;
+      if (jaNoRascunho + qtde > teto) {
+        return {
+          ok: false,
+          motivo: `A filial tem ${teto} peça(s) em estoque e ${jaNoRascunho} já estão no rascunho.`,
+        };
+      }
+      const proximo = existente
+        ? atual.map((p) => (p === existente ? { ...p, qtde: p.qtde + qtde, estoque: teto } : p))
+        : [...atual, { ...sku, qtde }];
+      entrandoRef.current = proximo;
+      setEntrando(proximo);
+      return { ok: true, total: jaNoRascunho + qtde };
+    },
+    []
+  );
 
   // ─── Busca de produtos ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -215,6 +335,7 @@ export default function VmPage({ companyKey, companyName }: VmPageProps) {
       setProdutoSelecionado(result);
       setCores([]);
       setCorSelecionada("");
+      setQtdeSelecionada(1);
       setFeedback(null);
       setError(null);
       if (!filialCod) {
@@ -251,62 +372,242 @@ export default function VmPage({ companyKey, companyName }: VmPageProps) {
     [authHeaders, companyKey, filialAtual?.nome, filialCod]
   );
 
+  const corEscolhida = cores.find((c) => c.cor === corSelecionada) ?? null;
+
   function adicionarAoRascunho() {
-    if (!produtoSelecionado || !corSelecionada) return;
-    const cor = cores.find((c) => c.cor === corSelecionada);
-    const chave = buildVmKey(filialCod, produtoSelecionado.productId, corSelecionada);
-
-    if (chavesNaFilial.has(chave)) {
-      setError("Esse produto/cor já está em VM nesta filial.");
-      return;
-    }
-    if (entrando.some((p) => buildVmKey(filialCod, p.produto, p.cor) === chave)) {
-      setError("Esse produto/cor já está no rascunho.");
-      return;
-    }
-
-    setEntrando((prev) => [
-      ...prev,
+    if (!produtoSelecionado || !corEscolhida) return;
+    const resultadoSoma = somarNoRascunho(
       {
         produto: produtoSelecionado.productId,
-        cor: corSelecionada,
+        cor: corEscolhida.cor,
         descricao: produtoSelecionado.productName,
-        descCor: cor?.descCor ?? "",
-        estoque: cor?.estoque ?? 0,
+        descCor: corEscolhida.descCor,
+        estoque: corEscolhida.estoque,
       },
-    ]);
+      Math.max(1, qtdeSelecionada)
+    );
+    if (!resultadoSoma.ok) {
+      setError(resultadoSoma.motivo);
+      return;
+    }
     setProdutoSelecionado(null);
     setCores([]);
     setCorSelecionada("");
+    setQtdeSelecionada(1);
     setSearchTerm("");
     setSearchResults([]);
     setError(null);
     setFeedback("Adicionado ao rascunho. Clique em Salvar para confirmar o movimento de estoque.");
   }
 
+  function alterarQtdeRascunho(p: PendenteEntrada, qtde: number) {
+    const nova = Math.min(Math.max(1, Math.floor(qtde) || 1), Math.max(1, p.estoque));
+    definirEntrando(
+      entrandoRef.current.map((x) =>
+        chaveSku(x.produto, x.cor) === chaveSku(p.produto, p.cor) ? { ...x, qtde: nova } : x
+      )
+    );
+  }
+
+  function tirarDoRascunho(p: PendenteEntrada) {
+    definirEntrando(entrandoRef.current.filter((x) => chaveSku(x.produto, x.cor) !== chaveSku(p.produto, p.cor)));
+  }
+
   function marcarParaRemover(item: VmItem) {
     const chave = buildVmKey(item.filial, item.produto, item.cor);
-    setSaindo((prev) => (prev.includes(chave) ? prev : [...prev, chave]));
+    // Por padrão devolve tudo; com mais de uma peça, o stepper ajusta quantas voltam.
+    setSaindo((prev) => (chave in prev ? prev : { ...prev, [chave]: item.qtde }));
     setFeedback(null);
+  }
+
+  function ajustarRemocao(item: VmItem, qtde: number) {
+    const chave = buildVmKey(item.filial, item.produto, item.cor);
+    const nova = Math.min(Math.max(1, Math.floor(qtde) || 1), item.qtde);
+    setSaindo((prev) => ({ ...prev, [chave]: nova }));
   }
 
   function desmarcarRemocao(chave: string) {
-    setSaindo((prev) => prev.filter((k) => k !== chave));
+    setSaindo((prev) => {
+      const proximo = { ...prev };
+      delete proximo[chave];
+      return proximo;
+    });
   }
 
+  const limparBipagem = useCallback(() => {
+    setBipesLidos(0);
+    setBipesAceitos(0);
+    setUltimoBipe(null);
+    setOcorrencias([]);
+    setCodigoBipado("");
+  }, []);
+
   function limparRascunho() {
-    setEntrando([]);
-    setSaindo([]);
+    definirEntrando([]);
+    setSaindo({});
     setFeedback(null);
+    limparBipagem();
+  }
+
+  // ─── Bipagem ─────────────────────────────────────────────────────────────────
+  const tocarBipe = useCallback(
+    (ok: boolean) => {
+      if (!somBipeLigado) return;
+      try {
+        const Ctor =
+          window.AudioContext ||
+          (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        if (!Ctor) return;
+        if (!audioCtxRef.current) audioCtxRef.current = new Ctor();
+        const ctx = audioCtxRef.current;
+        if (ctx.state === "suspended") void ctx.resume();
+
+        const toques = ok ? 1 : 3;
+        const duracao = ok ? 0.08 : 0.16;
+        for (let i = 0; i < toques; i++) {
+          const inicio = ctx.currentTime + i * 0.22;
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = ok ? "square" : "sawtooth";
+          osc.frequency.setValueAtTime(ok ? 1200 : 240, inicio);
+          gain.gain.setValueAtTime(ok ? 0.05 : 0.07, inicio);
+          gain.gain.exponentialRampToValueAtTime(0.0001, inicio + duracao);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(inicio);
+          osc.stop(inicio + duracao);
+        }
+      } catch {
+        // Sem áudio (navegador bloqueou / sem gesto do usuário): segue sem som.
+      }
+    },
+    [somBipeLigado]
+  );
+
+  const registrarFalhaBipe = useCallback(
+    (codigo: string, titulo: string, detalhe: string, opcoes?: BipeItem[]) => {
+      setUltimoBipe({ ok: false, titulo, detalhe });
+      setOcorrencias((prev) => [...prev, { id: novoIdBipe(), codigo, titulo, detalhe, opcoes }]);
+      tocarBipe(false);
+    },
+    [tocarBipe]
+  );
+
+  /** Coloca no rascunho o SKU que o bipe resolveu. Devolve false se não entrou. */
+  const aceitarItemBipado = useCallback(
+    (codigo: string, item: BipeItem): boolean => {
+      const cor = (item.corProduto ?? "").trim();
+      const nome = item.descProduto || item.produto;
+      if (item.exigeTamanho) {
+        registrarFalhaBipe(codigo, `${nome} tem tamanho (P/M/G)`, "O VM não escolhe tamanho. Use a tela Saídas/Entradas.");
+        return false;
+      }
+      if (!cor) {
+        registrarFalhaBipe(codigo, `${nome} sem cor`, "Código de barras sem cor cadastrada — a cor é obrigatória no VM.");
+        return false;
+      }
+      if (item.estoque < 1) {
+        registrarFalhaBipe(
+          codigo,
+          `${nome} sem estoque`,
+          `${corLabel(cor, item.descCor)}: saldo ${item.estoque} nesta filial — não há peça para expor.`
+        );
+        return false;
+      }
+      const soma = somarNoRascunho(
+        { produto: item.produto, cor, descricao: nome, descCor: item.descCor, estoque: item.estoque },
+        1
+      );
+      if (!soma.ok) {
+        registrarFalhaBipe(codigo, `${nome} — estoque insuficiente`, soma.motivo);
+        return false;
+      }
+      setBipesAceitos((n) => n + 1);
+      setUltimoBipe({
+        ok: true,
+        titulo: nome,
+        detalhe: `${item.produto} · ${corLabel(cor, item.descCor)} · ${soma.total} no rascunho`,
+      });
+      tocarBipe(true);
+      return true;
+    },
+    [registrarFalhaBipe, somarNoRascunho, tocarBipe]
+  );
+
+  function submeterBipe(valor?: string) {
+    const codigo = (valor ?? codigoBipado).trim();
+    setCodigoBipado("");
+    bipeInputRef.current?.focus();
+    if (!codigo) return;
+    if (!filialAtual) {
+      setUltimoBipe({ ok: false, titulo: "Selecione a filial", detalhe: "Escolha a loja antes de bipar." });
+      tocarBipe(false);
+      return;
+    }
+
+    const filialNaHora = filialAtual.cod;
+    const filialNome = filialAtual.nome;
+    setBipesLidos((n) => n + 1);
+    setBipesEmVoo((n) => n + 1);
+
+    filaBipeRef.current = filaBipeRef.current.then(async () => {
+      try {
+        const resposta = await biparCodigo(codigo, filialNome, companyKey);
+        // Trocou de filial enquanto a consulta ia: a peça era da outra loja.
+        if (filialRef.current !== filialNaHora) return;
+
+        if (resposta.status === "nao_encontrado") {
+          registrarFalhaBipe(codigo, "Código não encontrado", `Nenhum produto com o código ${codigo}.`);
+        } else if (resposta.status === "ambiguo") {
+          registrarFalhaBipe(
+            codigo,
+            "Código em mais de um produto/cor",
+            "Escolha abaixo qual peça é esta.",
+            resposta.opcoes
+          );
+        } else if (resposta.item) {
+          aceitarItemBipado(codigo, resposta.item);
+        } else {
+          registrarFalhaBipe(codigo, "Resposta inválida", `Não foi possível resolver o código ${codigo}.`);
+        }
+      } catch (cause) {
+        if (filialRef.current !== filialNaHora) return;
+        registrarFalhaBipe(
+          codigo,
+          "Falha na consulta",
+          cause instanceof Error ? `${cause.message}. Bipe de novo.` : "Bipe de novo."
+        );
+      } finally {
+        setBipesEmVoo((n) => Math.max(0, n - 1));
+      }
+    });
+  }
+
+  function resolverOcorrencia(oc: BipeOcorrencia, opcao: BipeItem) {
+    setOcorrencias((prev) => prev.filter((o) => o.id !== oc.id));
+    aceitarItemBipado(oc.codigo, opcao);
+  }
+
+  function dispensarOcorrencia(id: string) {
+    setOcorrencias((prev) => prev.filter((o) => o.id !== id));
   }
 
   // ─── Salvar → prévia → confirmação ───────────────────────────────────────────
   const skusSaindo = useMemo(
     () =>
       itensDaFilial
-        .filter((item) => saindo.includes(buildVmKey(item.filial, item.produto, item.cor)))
-        .map((item) => ({ produto: item.produto, cor: item.cor })),
+        .filter((item) => buildVmKey(item.filial, item.produto, item.cor) in saindo)
+        .map((item) => ({
+          produto: item.produto,
+          cor: item.cor,
+          qtde: saindo[buildVmKey(item.filial, item.produto, item.cor)] ?? 1,
+        })),
     [itensDaFilial, saindo]
+  );
+
+  const skusEntrando = useMemo(
+    () => entrando.map((p) => ({ produto: p.produto, cor: p.cor, qtde: p.qtde })),
+    [entrando]
   );
 
   async function abrirPrevia() {
@@ -320,7 +621,7 @@ export default function VmPage({ companyKey, companyName }: VmPageProps) {
         body: JSON.stringify({
           company: companyKey,
           filial: filialCod,
-          entrando: entrando.map((p) => ({ produto: p.produto, cor: p.cor })),
+          entrando: skusEntrando,
           saindo: skusSaindo,
         }),
       });
@@ -345,7 +646,7 @@ export default function VmPage({ companyKey, companyName }: VmPageProps) {
         body: JSON.stringify({
           company: companyKey,
           filial: filialCod,
-          entrando: entrando.map((p) => ({ produto: p.produto, cor: p.cor })),
+          entrando: skusEntrando,
           saindo: skusSaindo,
         }),
       });
@@ -386,9 +687,9 @@ export default function VmPage({ companyKey, companyName }: VmPageProps) {
         <div className={styles.note}>
           <strong>Como funciona</strong>
           <span>
-            VM é sempre <strong>1 unidade</strong> por produto/cor/filial. Escolha a filial, busque o
-            produto, escolha a cor e clique em Salvar — o movimento de estoque só acontece depois da sua
-            confirmação, e aparece no Extrato de Produto.
+            Escolha a filial e <strong>bipe as peças</strong> (ou busque o produto e escolha a cor). Pode
+            ter mais de uma peça igual em VM: cada bipe soma 1, até o saldo da loja. Clique em Salvar — o
+            movimento de estoque só acontece depois da sua confirmação, e aparece no Extrato de Produto.
           </span>
         </div>
       </div>
@@ -443,7 +744,7 @@ export default function VmPage({ companyKey, companyName }: VmPageProps) {
               {totalPendencias} alteração(ões) no rascunho — nada saiu ou entrou no estoque ainda.
             </span>
             <span>
-              {entrando.length} entrando em VM (saída de estoque) · {saindo.length} saindo de VM
+              {pecasEntrando} peça(s) entrando em VM (saída de estoque) · {pecasSaindo} peça(s) saindo de VM
               (entrada de estoque)
             </span>
           </div>
@@ -455,7 +756,14 @@ export default function VmPage({ companyKey, companyName }: VmPageProps) {
               type="button"
               className={styles.actionButton}
               onClick={abrirPrevia}
-              disabled={!podeMutar || !filialCod}
+              disabled={!podeMutar || !filialCod || bipesEmVoo > 0 || ocorrencias.length > 0}
+              title={
+                bipesEmVoo > 0
+                  ? "Aguarde os bipes em consulta."
+                  : ocorrencias.length > 0
+                    ? "Resolva ou dispense os bipes que não entraram."
+                    : undefined
+              }
             >
               Salvar
             </button>
@@ -473,12 +781,122 @@ export default function VmPage({ companyKey, companyName }: VmPageProps) {
             <div className={styles.emptyState}>Escolha a filial para começar.</div>
           ) : (
             <>
+              <div className={styles.field}>
+                <span className={styles.label}>Bipar código de barras</span>
+                <div className={styles.bipeRow}>
+                  <input
+                    ref={bipeInputRef}
+                    className={`${styles.input} ${styles.bipeInput}`}
+                    value={codigoBipado}
+                    onChange={(event) => setCodigoBipado(event.target.value)}
+                    onKeyDown={(event) => {
+                      // Enter, ou Tab no leitor configurado com sufixo Tab.
+                      if (event.key === "Enter" || (event.key === "Tab" && event.currentTarget.value.trim())) {
+                        event.preventDefault();
+                        submeterBipe(event.currentTarget.value);
+                      }
+                    }}
+                    placeholder="Bipe a peça (ou digite o código e tecle Enter)"
+                    disabled={!podeMutar}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    autoFocus
+                    aria-label="Código de barras"
+                  />
+                  {bipesEmVoo > 0 && <span className={styles.bipeLoading}>consultando {bipesEmVoo}…</span>}
+                  <button
+                    type="button"
+                    className={styles.undoButton}
+                    onClick={() => submeterBipe()}
+                    disabled={!codigoBipado.trim() || !podeMutar}
+                  >
+                    Adicionar
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.undoButton}
+                    onClick={() => setSomBipeLigado((v) => !v)}
+                    title={somBipeLigado ? "Desligar o som do bipe" : "Ligar o som do bipe"}
+                    aria-pressed={somBipeLigado}
+                  >
+                    {somBipeLigado ? "🔊" : "🔇"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Confirmação do último bipe: o operador está olhando a peça, não a lista. */}
+              {ultimoBipe && (
+                <div className={ultimoBipe.ok ? styles.bipeOk : styles.bipeErro}>
+                  <span aria-hidden="true">{ultimoBipe.ok ? "✓" : "!"}</span>
+                  <span className={styles.bipeTexto}>
+                    <strong>{ultimoBipe.titulo}</strong>
+                    <span>{ultimoBipe.detalhe}</span>
+                  </span>
+                </div>
+              )}
+
+              {bipesLidos > 0 && (
+                <div className={styles.bipeContador}>
+                  <span>
+                    Lidos <strong>{bipesLidos}</strong>
+                  </span>
+                  <span>
+                    Entraram <strong>{bipesAceitos}</strong>
+                  </span>
+                  {ocorrencias.length > 0 && (
+                    <span className={styles.bipeContadorAlerta}>
+                      Não entraram <strong>{ocorrencias.length}</strong>
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Bipes que NÃO entraram: ficam aqui até resolver ou dispensar — o Salvar espera. */}
+              {ocorrencias.length > 0 && (
+                <div className={styles.bipeOcorrencias} role="alert">
+                  <strong>⚠ {ocorrencias.length} bipe(s) não entraram no rascunho</strong>
+                  {ocorrencias.map((oc) => (
+                    <div key={oc.id} className={styles.bipeOcorrencia}>
+                      <div className={styles.bipeTexto}>
+                        <strong>
+                          {oc.titulo} <span className={styles.itemCode}>· código {oc.codigo}</span>
+                        </strong>
+                        <span>{oc.detalhe}</span>
+                        {oc.opcoes && oc.opcoes.length > 0 && (
+                          <div className={styles.bipeOpcoes}>
+                            {oc.opcoes.map((op) => (
+                              <button
+                                key={`${op.produto}|${op.corProduto ?? ""}`}
+                                type="button"
+                                className={styles.undoButton}
+                                onClick={() => resolverOcorrencia(oc, op)}
+                              >
+                                {op.descProduto || op.produto} · {corLabel(op.corProduto ?? "", op.descCor)} ·
+                                estoque {op.estoque}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        className={styles.undoButton}
+                        onClick={() => dispensarOcorrencia(oc.id)}
+                      >
+                        Dispensar
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <label className={styles.field}>
-                <span className={styles.label}>Buscar produto</span>
+                <span className={styles.label}>Ou buscar produto</span>
                 <input
                   className={styles.input}
                   type="search"
-                  placeholder="Busque por nome, código ou código de barras"
+                  placeholder="Busque por nome ou código"
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
                   disabled={!podeMutar}
@@ -521,7 +939,10 @@ export default function VmPage({ companyKey, companyName }: VmPageProps) {
                       <select
                         className={styles.select}
                         value={corSelecionada}
-                        onChange={(event) => setCorSelecionada(event.target.value)}
+                        onChange={(event) => {
+                          setCorSelecionada(event.target.value);
+                          setQtdeSelecionada(1);
+                        }}
                         disabled={carregandoCores || cores.length === 0}
                       >
                         <option value="">
@@ -538,6 +959,23 @@ export default function VmPage({ companyKey, companyName }: VmPageProps) {
                         ))}
                       </select>
                     </label>
+                    {corEscolhida && (
+                      <label className={styles.field}>
+                        <span className={styles.label}>Quantidade (até {corEscolhida.estoque})</span>
+                        <input
+                          className={`${styles.input} ${styles.qtdeInput}`}
+                          type="number"
+                          min={1}
+                          max={corEscolhida.estoque}
+                          value={qtdeSelecionada}
+                          onChange={(event) =>
+                            setQtdeSelecionada(
+                              Math.min(Math.max(1, Math.floor(Number(event.target.value)) || 1), corEscolhida.estoque)
+                            )
+                          }
+                        />
+                      </label>
+                    )}
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     <button
@@ -555,6 +993,7 @@ export default function VmPage({ companyKey, companyName }: VmPageProps) {
                         setProdutoSelecionado(null);
                         setCores([]);
                         setCorSelecionada("");
+                        setQtdeSelecionada(1);
                       }}
                     >
                       Cancelar
@@ -566,7 +1005,7 @@ export default function VmPage({ companyKey, companyName }: VmPageProps) {
               {entrando.length > 0 && (
                 <>
                   <div className={styles.cardHeader}>
-                    <h2>No rascunho ({entrando.length})</h2>
+                    <h2>No rascunho ({pecasEntrando} peça(s))</h2>
                   </div>
                   <div className={styles.itemList}>
                     {entrando.map((p) => (
@@ -583,17 +1022,30 @@ export default function VmPage({ companyKey, companyName }: VmPageProps) {
                             {p.produto} · {corLabel(p.cor, p.descCor)} · estoque atual {p.estoque}
                           </div>
                         </div>
-                        <button
-                          type="button"
-                          className={styles.undoButton}
-                          onClick={() =>
-                            setEntrando((prev) =>
-                              prev.filter((x) => !(x.produto === p.produto && x.cor === p.cor))
-                            )
-                          }
-                        >
-                          Tirar
-                        </button>
+                        <div className={styles.rowActions}>
+                          <div className={styles.stepper} aria-label="Quantidade">
+                            <button
+                              type="button"
+                              onClick={() => alterarQtdeRascunho(p, p.qtde - 1)}
+                              disabled={p.qtde <= 1}
+                              aria-label="Menos uma"
+                            >
+                              −
+                            </button>
+                            <span>{p.qtde}</span>
+                            <button
+                              type="button"
+                              onClick={() => alterarQtdeRascunho(p, p.qtde + 1)}
+                              disabled={p.qtde >= p.estoque}
+                              aria-label="Mais uma"
+                            >
+                              +
+                            </button>
+                          </div>
+                          <button type="button" className={styles.undoButton} onClick={() => tirarDoRascunho(p)}>
+                            Tirar
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -606,7 +1058,7 @@ export default function VmPage({ companyKey, companyName }: VmPageProps) {
         <section className={styles.listCard}>
           <div className={styles.cardHeader}>
             <h2>Em VM {filialAtual ? `· ${filialAtual.nome}` : ""}</h2>
-            <span>{itensDaFilial.length} peça(s)</span>
+            <span>{pecasEmVm} peça(s)</span>
           </div>
 
           {loading ? (
@@ -619,7 +1071,8 @@ export default function VmPage({ companyKey, companyName }: VmPageProps) {
             <div className={styles.itemList}>
               {itensDaFilial.map((item) => {
                 const chave = buildVmKey(item.filial, item.produto, item.cor);
-                const marcado = saindo.includes(chave);
+                const qtdeSaindo = saindo[chave];
+                const marcado = qtdeSaindo !== undefined;
                 return (
                   <div
                     key={chave}
@@ -628,8 +1081,12 @@ export default function VmPage({ companyKey, companyName }: VmPageProps) {
                     <div>
                       <div className={styles.itemName}>
                         {item.descricao}
-                        <span className={styles.vmBadge}>VM 1</span>
-                        {marcado && <span className={styles.pendenteBadge}>vai voltar ao estoque</span>}
+                        <span className={styles.vmBadge}>VM {item.qtde}</span>
+                        {marcado && (
+                          <span className={styles.pendenteBadge}>
+                            {qtdeSaindo === item.qtde ? "vai voltar ao estoque" : `${qtdeSaindo} vai(ão) voltar ao estoque`}
+                          </span>
+                        )}
                       </div>
                       <div className={styles.itemCode}>
                         {item.produto} · {corLabel(item.cor, item.descCor)}
@@ -637,13 +1094,36 @@ export default function VmPage({ companyKey, companyName }: VmPageProps) {
                       </div>
                     </div>
                     {marcado ? (
-                      <button
-                        type="button"
-                        className={styles.undoButton}
-                        onClick={() => desmarcarRemocao(chave)}
-                      >
-                        Manter
-                      </button>
+                      <div className={styles.rowActions}>
+                        {item.qtde > 1 && (
+                          <div className={styles.stepper} aria-label="Quantas voltam ao estoque">
+                            <button
+                              type="button"
+                              onClick={() => ajustarRemocao(item, qtdeSaindo - 1)}
+                              disabled={qtdeSaindo <= 1}
+                              aria-label="Menos uma"
+                            >
+                              −
+                            </button>
+                            <span>{qtdeSaindo}</span>
+                            <button
+                              type="button"
+                              onClick={() => ajustarRemocao(item, qtdeSaindo + 1)}
+                              disabled={qtdeSaindo >= item.qtde}
+                              aria-label="Mais uma"
+                            >
+                              +
+                            </button>
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          className={styles.undoButton}
+                          onClick={() => desmarcarRemocao(chave)}
+                        >
+                          Manter
+                        </button>
+                      </div>
                     ) : (
                       <button
                         type="button"
@@ -680,7 +1160,10 @@ export default function VmPage({ companyKey, companyName }: VmPageProps) {
                   <span className={styles.movMeta}>
                     {m.direcao === "saida" ? "saída · foi para exposição" : "entrada · voltou ao estoque"}
                   </span>{" "}
-                  <strong>{m.descricao}</strong>
+                  <strong>
+                    {m.qtde > 1 ? `${m.qtde}× ` : ""}
+                    {m.descricao}
+                  </strong>
                   <div className={styles.movMeta}>
                     {m.produto} · {corLabel(m.cor, m.descCor)} · {m.filial}
                     {m.romaneio ? ` · romaneio ${m.romaneio}` : ""}
@@ -712,6 +1195,7 @@ export default function VmPage({ companyKey, companyName }: VmPageProps) {
                     <th>Movimento</th>
                     <th>Produto</th>
                     <th>Cor</th>
+                    <th className={styles.num}>Qtde</th>
                     <th className={styles.num}>Estoque</th>
                     <th className={styles.num}>Depois</th>
                   </tr>
@@ -740,6 +1224,7 @@ export default function VmPage({ companyKey, companyName }: VmPageProps) {
                         )}
                       </td>
                       <td>{corLabel(linha.cor, linha.descCor)}</td>
+                      <td className={styles.num}>{linha.qtde}</td>
                       <td className={styles.num}>{linha.estoqueAtual}</td>
                       <td className={styles.num}>{linha.bloqueio ? "—" : linha.estoqueDepois}</td>
                     </tr>

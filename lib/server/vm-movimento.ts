@@ -27,8 +27,9 @@ import {
 /**
  * Movimento de estoque do VM.
  *
- * Entrar na lista  ⇒ SAÍDA  de 1 unidade do estoque da filial (a peça foi para exposição).
- * Sair da lista    ⇒ ENTRADA de 1 unidade (a peça voltou para venda).
+ * Entrar na lista  ⇒ SAÍDA  de `qtde` unidades do estoque da filial (foram para exposição).
+ * Sair da lista    ⇒ ENTRADA de `qtde` unidades (voltaram para venda).
+ * Mais uma peça igual para o VM soma na linha do SKU; tirar pode devolver só parte.
  *
  * Mecanismo: romaneio de saída/entrada avulsa com TIPO_ROMANEIO = 'VM' (cadastrado no
  * Linx em ESTOQUE_ROMANEIO_TIPO), exatamente o que a tela Saídas e Entradas de Produtos
@@ -47,6 +48,15 @@ function esc(value: string): string {
 export interface VmSkuRef {
   produto: string;
   cor: string;
+  /** Peças do SKU nesse movimento (ausente = 1). */
+  qtde?: number;
+}
+
+/** SKU já normalizado, com quantidade inteira ≥ 1. */
+interface VmSkuQtde {
+  produto: string;
+  cor: string;
+  qtde: number;
 }
 
 export interface VmSaldoInfo {
@@ -157,6 +167,8 @@ export interface VmPreviewLinha {
   cor: string;
   descricao: string;
   descCor: string;
+  /** Peças que se movem nessa linha. */
+  qtde: number;
   estoqueAtual: number;
   estoqueDepois: number;
   /** Preenchido quando a linha NÃO pode ser executada (e o motivo aparece no widget). */
@@ -202,25 +214,24 @@ export async function montarPreviewVm(pedido: VmMovimentoPedido): Promise<VmPrev
     listVmItems(pedido.company, [filialCod]),
   ]);
 
-  const vmKeys = new Set(jaEmVm.map((item) => buildVmKey(item.filial, item.produto, item.cor)));
   const vmByKey = new Map(
     jaEmVm.map((item) => [buildVmKey(item.filial, item.produto, item.cor), item])
   );
 
   const linhas: VmPreviewLinha[] = [];
 
+  // Peça que já está em VM pode receber mais unidades iguais — o limite é o saldo da loja.
   for (const sku of entrando) {
     const info = saldos.get(`${sku.produto}|${sku.cor}`);
     const estoqueAtual = info?.estoque ?? 0;
-    const key = buildVmKey(filialCod, sku.produto, sku.cor);
     let bloqueio: string | null = null;
 
-    if (vmKeys.has(key)) {
-      bloqueio = "Já está em VM nesta filial.";
-    } else if (!sku.cor) {
+    if (!sku.cor) {
       bloqueio = "Cor é obrigatória.";
     } else if (estoqueAtual < 1) {
       bloqueio = `Sem estoque na filial (saldo ${estoqueAtual}) — não há peça para expor.`;
+    } else if (estoqueAtual < sku.qtde) {
+      bloqueio = `Estoque insuficiente: pediu ${sku.qtde}, a filial tem ${estoqueAtual}.`;
     }
 
     linhas.push({
@@ -229,8 +240,9 @@ export async function montarPreviewVm(pedido: VmMovimentoPedido): Promise<VmPrev
       cor: sku.cor,
       descricao: info?.descProduto || sku.produto,
       descCor: info?.descCor ?? "",
+      qtde: sku.qtde,
       estoqueAtual,
-      estoqueDepois: bloqueio ? estoqueAtual : estoqueAtual - 1,
+      estoqueDepois: bloqueio ? estoqueAtual : estoqueAtual - sku.qtde,
       bloqueio,
     });
   }
@@ -240,7 +252,11 @@ export async function montarPreviewVm(pedido: VmMovimentoPedido): Promise<VmPrev
     const estoqueAtual = info?.estoque ?? 0;
     const key = buildVmKey(filialCod, sku.produto, sku.cor);
     const item = vmByKey.get(key);
-    const bloqueio = item ? null : "Não está na lista de VM desta filial.";
+    const bloqueio = !item
+      ? "Não está na lista de VM desta filial."
+      : sku.qtde > item.qtde
+        ? `Só há ${item.qtde} peça(s) em VM desse produto/cor.`
+        : null;
 
     linhas.push({
       direcao: "entrada",
@@ -248,8 +264,9 @@ export async function montarPreviewVm(pedido: VmMovimentoPedido): Promise<VmPrev
       cor: sku.cor,
       descricao: info?.descProduto || item?.descricao || sku.produto,
       descCor: info?.descCor || item?.descCor || "",
+      qtde: sku.qtde,
       estoqueAtual,
-      estoqueDepois: bloqueio ? estoqueAtual : estoqueAtual + 1,
+      estoqueDepois: bloqueio ? estoqueAtual : estoqueAtual + sku.qtde,
       bloqueio,
     });
   }
@@ -264,16 +281,25 @@ export async function montarPreviewVm(pedido: VmMovimentoPedido): Promise<VmPrev
   };
 }
 
-function dedupeSkus(skus: VmSkuRef[] | null | undefined): VmSkuRef[] {
-  const map = new Map<string, VmSkuRef>();
+/** Uma linha por SKU — o mesmo SKU repetido no pedido SOMA a quantidade. */
+function dedupeSkus(skus: VmSkuRef[] | null | undefined): VmSkuQtde[] {
+  const map = new Map<string, VmSkuQtde>();
   for (const sku of skus ?? []) {
     const produto = normalizeVmValue(sku.produto);
     if (!produto) continue;
     const cor = normalizeVmValue(sku.cor);
+    const n = Math.floor(Number(sku.qtde ?? 1));
+    const qtde = Number.isFinite(n) && n >= 1 ? n : 1;
     const key = `${produto.toUpperCase()}|${cor.toUpperCase()}`;
-    if (!map.has(key)) map.set(key, { produto, cor });
+    const atual = map.get(key);
+    if (atual) atual.qtde += qtde;
+    else map.set(key, { produto, cor, qtde });
   }
   return [...map.values()];
+}
+
+function somaQtde(linhas: Array<{ qtde: number }>): number {
+  return linhas.reduce((total, l) => total + l.qtde, 0);
 }
 
 export interface VmMovimentoResultadoDirecao {
@@ -342,12 +368,12 @@ export async function executarMovimentoVm(
       linhas = [];
       for (const linha of candidatas) {
         const saldo = saldosAgora.get(`${linha.produto}|${linha.cor}`)?.estoque ?? 0;
-        if (saldo < 1) {
-          linha.bloqueio = `Saldo ficou em ${saldo} antes da confirmação — a peça não saiu.`;
+        if (saldo < linha.qtde) {
+          linha.bloqueio = `Saldo ficou em ${saldo} antes da confirmação (pedido ${linha.qtde}) — a peça não saiu.`;
           continue;
         }
         linha.estoqueAtual = saldo;
-        linha.estoqueDepois = saldo - 1;
+        linha.estoqueDepois = saldo - linha.qtde;
         linhas.push(linha);
       }
       if (linhas.length === 0) {
@@ -367,14 +393,14 @@ export async function executarMovimentoVm(
       direcao,
       filialNome: preview.filialNome,
       usuario,
-      itens: linhas.length,
+      itens: somaQtde(linhas),
     });
 
-    // VM é sempre 1 unidade por SKU.
+    // Uma linha de romaneio por SKU, com a quantidade de peças.
     const itens = linhas.map((l) => ({
       produto: l.produto,
       corProduto: l.cor || null,
-      quantidade: 1,
+      quantidade: l.qtde,
     }));
 
     try {
@@ -412,6 +438,7 @@ export async function executarMovimentoVm(
           cor: l.cor,
           descricao: l.descricao,
           descCor: l.descCor,
+          qtde: l.qtde,
           romaneio,
           criadoPor: usuario,
         }));
@@ -423,6 +450,7 @@ export async function executarMovimentoVm(
             filial: preview.filial,
             produto: l.produto,
             cor: l.cor,
+            qtde: l.qtde,
           }))
         );
       }
@@ -436,6 +464,7 @@ export async function executarMovimentoVm(
           descricao: l.descricao,
           descCor: l.descCor,
           direcao,
+          qtde: l.qtde,
           romaneio,
           usuario,
           obs,
@@ -447,7 +476,7 @@ export async function executarMovimentoVm(
         tipo: VM_TIPO_ROMANEIO,
         operacao: VM_DIRECAO_LABEL[direcao],
         romaneio,
-        itens: linhas.length,
+        itens: somaQtde(linhas),
         erro: null,
       });
     } catch (error) {
@@ -462,7 +491,7 @@ export async function executarMovimentoVm(
     }
   }
 
-  const itensEmVm = (await listVmItems(pedido.company, [preview.filial])).length;
+  const itensEmVm = somaQtde(await listVmItems(pedido.company, [preview.filial]));
 
   return {
     filial: preview.filial,

@@ -11,7 +11,9 @@ import type { CompanyKey } from "@/lib/config/company";
  * o saldo já é o real, o ritmo de venda já não conta os dias em que a loja tinha "só o
  * VM", e a Compra Ideal enxerga a ruptura naturalmente.
  *
- * VM é SEMPRE 1 unidade — a linha da lista É a unidade. Não existe quantidade.
+ * Cada linha da lista é um SKU (produto+cor) numa filial, com a QUANTIDADE de peças
+ * em exposição (`qtde`, mínimo 1). Mandar mais uma peça igual para o VM soma na mesma
+ * linha; tirar do VM pode devolver só parte.
  */
 
 /**
@@ -24,7 +26,7 @@ export function isVmCompany(company: string | null | undefined): boolean {
   return VM_COMPANIES.includes(String(company ?? "") as CompanyKey);
 }
 
-/** Uma peça em VM: sempre 1 unidade de um SKU (produto+cor) numa filial. */
+/** Peças em VM de um SKU (produto+cor) numa filial — `qtde` unidades. */
 export interface VmItem {
   company: CompanyKey;
   /** Código da filial (COD_FILIAL) — o VM é sempre por filial. */
@@ -36,7 +38,9 @@ export interface VmItem {
   cor: string;
   descricao: string;
   descCor: string;
-  /** ROMANEIO_PRODUTO da saída VM que tirou a peça do estoque. */
+  /** Peças desse SKU em exposição na filial (≥ 1). */
+  qtde: number;
+  /** ROMANEIO_PRODUTO da última saída VM que tirou peça do estoque. */
   romaneio: string | null;
   criadoPor: string | null;
   createdAt: string;
@@ -56,6 +60,8 @@ export interface VmMovimento {
   descricao: string;
   descCor: string;
   direcao: VmDirecao;
+  /** Peças movidas nessa linha do log. */
+  qtde: number;
   romaneio: string | null;
   usuario: string | null;
   obs: string | null;

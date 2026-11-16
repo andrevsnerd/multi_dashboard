@@ -504,3 +504,161 @@
   color: #fb7185;
   background: rgba(244, 63, 94, 0.12);
 }
+
+/* ── Bipagem (mesmo comportamento da tela Saídas e Entradas) ── */
+.bipeRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bipeInput {
+  flex: 1;
+  min-width: 0;
+  font-size: 1.05rem;
+  letter-spacing: 0.5px;
+}
+
+.bipeLoading {
+  font-size: 0.78rem;
+  color: var(--t-500);
+  white-space: nowrap;
+}
+
+.bipeOk,
+.bipeErro {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  font-weight: 700;
+}
+
+.bipeOk {
+  background: rgba(34, 197, 94, 0.12);
+  color: #15803d;
+}
+
+.bipeErro {
+  background: rgba(220, 38, 38, 0.1);
+  color: #b91c1c;
+}
+
+.bipeTexto {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.bipeTexto span {
+  font-weight: 500;
+}
+
+.bipeContador {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 0.82rem;
+  color: var(--t-500);
+}
+
+.bipeContadorAlerta {
+  color: #b91c1c;
+}
+
+.bipeOcorrencias {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid #fecaca;
+  border-radius: 16px;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.bipeOcorrencia {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding-top: 8px;
+  border-top: 1px solid #fecaca;
+}
+
+.bipeOpcoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+/* ── Quantidade ── */
+.qtdeInput {
+  max-width: 120px;
+}
+
+.rowActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--b-300);
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--s-white);
+}
+
+.stepper button {
+  border: none;
+  background: transparent;
+  color: var(--t-900);
+  font: inherit;
+  font-weight: 800;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+}
+
+.stepper button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.stepper span {
+  min-width: 28px;
+  text-align: center;
+  font-weight: 800;
+  color: var(--t-900);
+}
+
+:global(:root[data-theme="dark"]) .bipeOk {
+  background: rgba(34, 197, 94, 0.16);
+  color: #4ade80;
+}
+
+:global(:root[data-theme="dark"]) .bipeErro {
+  background: rgba(248, 113, 113, 0.14);
+  color: #fca5a5;
+}
+
+:global(:root[data-theme="dark"]) .bipeContadorAlerta {
+  color: #fca5a5;
+}
+
+:global(:root[data-theme="dark"]) .bipeOcorrencias {
+  background: rgba(248, 113, 113, 0.1);
+  border-color: rgba(248, 113, 113, 0.35);
+  color: #fca5a5;
+}
+
+:global(:root[data-theme="dark"]) .bipeOcorrencia {
+  border-top-color: rgba(248, 113, 113, 0.25);
+}

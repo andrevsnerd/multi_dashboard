@@ -548,7 +548,10 @@
   "546": "exportToPDF.ts",
   "547": "RealizadasPanel.tsx",
   "548": "resolveFilialExata",
+  "549": "fetchRomaneioParaEdicao",
+  "550": "formatLogDate",
   "551": "compra-transito-barcodes.ts",
-  "577": "page.tsx",
+  "552": "chaveLinha",
+  "553": "isTipoSoSaida",
   "578": "fix-tipos-romaneio-acento.mjs"
 }

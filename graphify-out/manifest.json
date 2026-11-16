@@ -3735,8 +3735,8 @@
     "semantic_hash": ""
   },
   "components/vm/VmPage.tsx": {
-    "mtime": 1785416016.6368208,
-    "ast_hash": "94e85b3c04c963f0720989b354cec4e3",
+    "mtime": 1794849028.0067616,
+    "ast_hash": "8bfb47d60685b2538f87f894a641dca5",
     "semantic_hash": ""
   },
   "lib/client/use-vm-marcadores.ts": {
@@ -3755,18 +3755,18 @@
     "semantic_hash": ""
   },
   "lib/server/vm-movimento.ts": {
-    "mtime": 1792000168.4101648,
-    "ast_hash": "7f727e0e09d1fa50fedc08d666460f68",
+    "mtime": 1794848869.7268083,
+    "ast_hash": "0780d780e4298b133b9e17ba419d0420",
     "semantic_hash": ""
   },
   "lib/utils/vm-store.ts": {
-    "mtime": 1785414250.3688674,
-    "ast_hash": "a9ff3589d7fa9841f457a401c7c43543",
+    "mtime": 1794848824.7072918,
+    "ast_hash": "bce1e44437ab814ec36c64b022ca6b34",
     "semantic_hash": ""
   },
   "lib/utils/vm.ts": {
-    "mtime": 1785415853.787849,
-    "ast_hash": "cc03337bddfb13ab854e99fa45c68653",
+    "mtime": 1794848722.1761262,
+    "ast_hash": "7f0ad94fc537b6014af34f4293f6f23f",
     "semantic_hash": ""
   },
   "scripts/corrigir-estoque-834279.mjs": {
