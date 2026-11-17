@@ -345,6 +345,9 @@ export const ROLE_RESTRICTED_PERMISSIONS: Partial<Record<PermissionKey, RoleKey[
   // Área corporativo é exclusiva do admin, diretor e do cliente_corporativo. Supervisor/gerente/logística
   // nunca acessam, pois roleAllowsPermission barra.
   "clientes-corporativos": ["admin", "diretor", "marketing", "cliente_corporativo"],
+  // Faturamento E-commerce cadastra cliente e grava NF de saída no Linx (fiscal + baixa
+  // de estoque). Quem fatura é a logística; diretor entra somente-leitura.
+  "faturamento-ecommerce": ["admin", "diretor", "logistica"],
 };
 
 /** True se a funcao do usuario pode, em tese, receber/usar essa permissao. */

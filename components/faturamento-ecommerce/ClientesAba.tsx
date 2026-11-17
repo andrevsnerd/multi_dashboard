@@ -1,0 +1,683 @@
+"use client";
+
+import { useState, type FormEvent } from "react";
+
+import { PADROES, regiaoDaUf, type EmpresaFat } from "@/lib/faturamento-ecommerce/config";
+import type {
+  ClienteFatDetalhe,
+  ClienteFatInput,
+  ClienteFatListItem,
+  EnderecoFat,
+  FatLookups,
+  Opcao,
+} from "@/lib/faturamento-ecommerce/types";
+
+import { ApiErro, fmtData, fmtDoc, useFatApi } from "./api";
+import styles from "./FaturamentoEcommerce.module.css";
+
+interface Props {
+  empresa: EmpresaFat;
+  lookups: FatLookups;
+  podeGravar: boolean;
+  onUsarCliente: (c: ClienteFatDetalhe) => void;
+}
+
+type Modo = "busca" | "novo" | "endereco";
+
+const ENDERECO_VAZIO: EnderecoFat = {
+  cep: "",
+  endereco: "",
+  numero: "",
+  complemento: "",
+  bairro: "",
+  cidade: "",
+  uf: "",
+  codMunicipioIbge: "",
+};
+
+export default function ClientesAba({ empresa, lookups, podeGravar, onUsarCliente }: Props) {
+  const api = useFatApi(empresa);
+  const [modo, setModo] = useState<Modo>("busca");
+  const [termo, setTermo] = useState("");
+  const [todos, setTodos] = useState(false);
+  const [resultados, setResultados] = useState<ClienteFatListItem[] | null>(null);
+  const [carregando, setCarregando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const [selecionado, setSelecionado] = useState<ClienteFatDetalhe | null>(null);
+
+  const buscar = async (e?: FormEvent) => {
+    e?.preventDefault();
+    if (!termo.trim()) return;
+    setCarregando(true);
+    setErro(null);
+    try {
+      setResultados(await api.get<ClienteFatListItem[]>("/clientes", { q: termo, todos: todos ? "1" : undefined }));
+    } catch (err) {
+      setErro((err as Error).message);
+    } finally {
+      setCarregando(false);
+    }
+  };
+
+  const abrir = async (codigo: string) => {
+    setErro(null);
+    try {
+      setSelecionado(await api.get<ClienteFatDetalhe>(`/clientes/${codigo}`));
+      setModo("busca");
+    } catch (err) {
+      setErro((err as Error).message);
+    }
+  };
+
+  return (
+    <div className={styles.wrapper}>
+      {modo === "busca" && (
+        <div className={styles.card}>
+          <div className={styles.cardHead}>
+            <h2 className={styles.cardTitle}>Encontrar cliente</h2>
+            {podeGravar && (
+              <button type="button" className={styles.btnPrimario} onClick={() => setModo("novo")}>
+                + Cadastrar cliente
+              </button>
+            )}
+          </div>
+          <form className={styles.linhaBusca} onSubmit={buscar}>
+            <input
+              className={styles.input}
+              placeholder="CPF/CNPJ, código do cliente ou nome"
+              value={termo}
+              onChange={(e) => setTermo(e.target.value)}
+              autoFocus
+            />
+            <label className={styles.check}>
+              <input type="checkbox" checked={todos} onChange={(e) => setTodos(e.target.checked)} />
+              incluir clientes de outras empresas
+            </label>
+            <button type="submit" className={styles.btn} disabled={carregando || !termo.trim()}>
+              {carregando ? "Buscando…" : "Buscar"}
+            </button>
+          </form>
+          <p className={styles.muted}>
+            Busque sempre pelo CPF primeiro: o Linx tem clientes cadastrados mais de uma vez. Por padrão aparecem os
+            clientes da {PADROES[empresa].nome} (cadastro na filial {PADROES[empresa].cliente.filial} ou com NF dela).
+          </p>
+          {erro && <div className={styles.erroBox}>{erro}</div>}
+          {resultados && (
+            <div className={styles.tabelaWrap}>
+              <table className={styles.tabela}>
+                <thead>
+                  <tr>
+                    <th>Código</th>
+                    <th>Nome</th>
+                    <th>CPF/CNPJ</th>
+                    <th>Cidade</th>
+                    <th>Filial do cadastro</th>
+                    <th>Cadastro</th>
+                    <th>Última NF</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {resultados.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className={styles.vazio}>
+                        Nenhum cliente encontrado.{" "}
+                        {!todos && "Tente marcar “incluir clientes de outras empresas”."}
+                      </td>
+                    </tr>
+                  )}
+                  {resultados.map((c) => (
+                    <tr
+                      key={c.codigo}
+                      className={`${styles.trClick} ${selecionado?.codigo === c.codigo ? styles.trSel : ""}`}
+                      onClick={() => abrir(c.codigo)}
+                    >
+                      <td className={styles.mono}>{c.codigo}</td>
+                      <td>
+                        {c.razaoSocial}
+                        {c.nomeClifor.trim() !== c.razaoSocial.slice(0, 25).trim() && (
+                          <div className={styles.muted}>Linx: “{c.nomeClifor}”</div>
+                        )}
+                      </td>
+                      <td className={styles.mono}>{fmtDoc(c.cpfCnpj)}</td>
+                      <td>
+                        {c.cidade}/{c.uf}
+                      </td>
+                      <td>{c.filial}</td>
+                      <td>{fmtData(c.cadastramento)}</td>
+                      <td>
+                        {c.ultimaNf ? (
+                          <>
+                            {c.ultimaNf} <span className={styles.muted}>{fmtData(c.ultimaNfEmissao)}</span>
+                            <div className={styles.muted}>{c.ultimaNfFilial}</div>
+                          </>
+                        ) : (
+                          <span className={styles.muted}>—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {modo === "busca" && selecionado && (
+        <ClienteDetalheCard
+          cliente={selecionado}
+          podeGravar={podeGravar}
+          onUsar={() => onUsarCliente(selecionado)}
+          onAtualizarEndereco={() => setModo("endereco")}
+        />
+      )}
+
+      {modo === "novo" && (
+        <NovoClienteForm
+          empresa={empresa}
+          lookups={lookups}
+          onCancelar={() => setModo("busca")}
+          onCriado={async (codigo) => {
+            await abrir(codigo);
+          }}
+          onUsarExistente={abrir}
+        />
+      )}
+
+      {modo === "endereco" && selecionado && (
+        <AtualizarEnderecoForm
+          empresa={empresa}
+          lookups={lookups}
+          cliente={selecionado}
+          onCancelar={() => setModo("busca")}
+          onSalvo={(c) => {
+            setSelecionado(c);
+            setModo("busca");
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Detalhe ─────────────────────────────────────────────────────────────────
+
+function ClienteDetalheCard({
+  cliente,
+  podeGravar,
+  onUsar,
+  onAtualizarEndereco,
+}: {
+  cliente: ClienteFatDetalhe;
+  podeGravar: boolean;
+  onUsar: () => void;
+  onAtualizarEndereco: () => void;
+}) {
+  const e = cliente.endereco;
+  return (
+    <div className={styles.card}>
+      <div className={styles.cardHead}>
+        <h2 className={styles.cardTitle}>
+          Cliente {cliente.codigo} — {cliente.razaoSocial}
+        </h2>
+        <div className={styles.acoes}>
+          {podeGravar && (
+            <button type="button" className={styles.btn} onClick={onAtualizarEndereco}>
+              Atualizar endereço / contato
+            </button>
+          )}
+          <button type="button" className={styles.btnPrimario} onClick={onUsar}>
+            Faturar para este cliente →
+          </button>
+        </div>
+      </div>
+      {cliente.enderecoEntregaDiferente && (
+        <div className={styles.avisoBox}>
+          O endereço de entrega deste cadastro é diferente do principal. Confira antes de faturar.
+        </div>
+      )}
+      <div className={styles.duasColunas}>
+        <dl className={styles.kv}>
+          <dt>Nome no Linx</dt>
+          <dd className={styles.mono}>{cliente.nomeClifor}</dd>
+          <dt>CPF/CNPJ</dt>
+          <dd>{fmtDoc(cliente.cpfCnpj)}</dd>
+          <dt>Insc. Est. / RG</dt>
+          <dd>{cliente.rgIe || "—"}</dd>
+          <dt>Endereço</dt>
+          <dd>
+            {e.endereco}, {e.numero}
+            {e.complemento ? ` — ${e.complemento}` : ""}
+            <br />
+            {e.bairro} — {e.cidade}/{e.uf} — CEP {e.cep} (IBGE {e.codMunicipioIbge || "—"})
+          </dd>
+          <dt>Telefone</dt>
+          <dd>
+            {cliente.ddd} {cliente.telefone}
+          </dd>
+          <dt>E-mail / NF-e</dt>
+          <dd>
+            {cliente.email || "—"}
+            {cliente.emailNfe && cliente.emailNfe !== cliente.email ? ` / ${cliente.emailNfe}` : ""}
+          </dd>
+        </dl>
+        <dl className={styles.kv}>
+          <dt>Filial</dt>
+          <dd>{cliente.filial}</dd>
+          <dt>Tipo / Conceito</dt>
+          <dd>
+            {cliente.tipo} / {cliente.conceito}
+          </dd>
+          <dt>Região</dt>
+          <dd>{cliente.regiao}</dd>
+          <dt>Cond. pagamento</dt>
+          <dd>{cliente.condicaoPgto}</dd>
+          <dt>Tabela de preço</dt>
+          <dd>{cliente.codigoTabPreco}</dd>
+          <dt>Transportadora</dt>
+          <dd>{cliente.transportadora}</dd>
+          <dt>Representante</dt>
+          <dd>{cliente.representante || "—"}</dd>
+          <dt>Cadastrado em</dt>
+          <dd>{fmtData(cliente.cadastramento)}</dd>
+        </dl>
+      </div>
+    </div>
+  );
+}
+
+// ── Endereço (compartilhado entre novo cadastro e atualização) ───────────────
+
+function CamposEndereco({
+  empresa,
+  endereco,
+  onChange,
+}: {
+  empresa: EmpresaFat;
+  endereco: EnderecoFat;
+  onChange: (e: EnderecoFat) => void;
+}) {
+  const api = useFatApi(empresa);
+  const [buscandoCep, setBuscandoCep] = useState(false);
+  const [erroCep, setErroCep] = useState<string | null>(null);
+  const set = (k: keyof EnderecoFat, v: string) => onChange({ ...endereco, [k]: v });
+
+  const buscarCep = async () => {
+    const cep = endereco.cep.replace(/\D/g, "");
+    if (cep.length !== 8) {
+      setErroCep("CEP precisa ter 8 dígitos.");
+      return;
+    }
+    setBuscandoCep(true);
+    setErroCep(null);
+    try {
+      const d = await api.get<{ endereco: string; bairro: string; cidade: string; uf: string; codMunicipioIbge: string }>(
+        `/cep/${cep}`
+      );
+      onChange({
+        ...endereco,
+        cep,
+        endereco: d.endereco ? d.endereco.toUpperCase() : endereco.endereco,
+        bairro: d.bairro ? d.bairro.toUpperCase() : endereco.bairro,
+        cidade: d.cidade.toUpperCase(),
+        uf: d.uf.toUpperCase(),
+        codMunicipioIbge: d.codMunicipioIbge,
+      });
+    } catch (err) {
+      setErroCep((err as Error).message);
+    } finally {
+      setBuscandoCep(false);
+    }
+  };
+
+  return (
+    <>
+      <div className={styles.grid}>
+        <div className={styles.campo}>
+          <span className={styles.label}>CEP *</span>
+          <div className={styles.linhaBusca}>
+            <input
+              className={styles.input}
+              value={endereco.cep}
+              onChange={(e) => {
+                const novo = e.target.value;
+                // CEP novo invalida cidade/UF/IBGE do anterior (seria gravado o município errado).
+                if (novo.replace(/\D/g, "") !== endereco.cep.replace(/\D/g, "")) {
+                  onChange({ ...endereco, cep: novo, cidade: "", uf: "", codMunicipioIbge: "" });
+                } else {
+                  set("cep", novo);
+                }
+              }}
+              onBlur={() => endereco.cep.replace(/\D/g, "").length === 8 && !endereco.codMunicipioIbge && buscarCep()}
+              placeholder="00000-000"
+            />
+            <button type="button" className={`${styles.btn} ${styles.btnMini}`} onClick={buscarCep} disabled={buscandoCep}>
+              {buscandoCep ? "…" : "Buscar"}
+            </button>
+          </div>
+        </div>
+        <Campo label="Endereço *" span={2} value={endereco.endereco} onChange={(v) => set("endereco", v)} />
+        <Campo label="Número *" value={endereco.numero} onChange={(v) => set("numero", v)} />
+        <Campo label="Complemento" span={2} value={endereco.complemento} onChange={(v) => set("complemento", v)} />
+        <Campo label="Bairro *" value={endereco.bairro} onChange={(v) => set("bairro", v)} />
+        <Campo label="Cidade (pelo CEP)" value={endereco.cidade} onChange={() => {}} readOnly />
+        <Campo label="UF" value={endereco.uf} onChange={() => {}} readOnly />
+        <Campo label="IBGE" value={endereco.codMunicipioIbge} onChange={() => {}} readOnly />
+      </div>
+      {erroCep && <div className={styles.erroBox}>{erroCep}</div>}
+      <p className={styles.muted}>
+        A cidade é gravada sem acento, como o Linx exige — vem do código IBGE do CEP. No site, a 1ª linha do endereço
+        costuma ter “rua, número” e a 2ª o complemento/bairro.
+      </p>
+    </>
+  );
+}
+
+function Campo({
+  label,
+  value,
+  onChange,
+  span,
+  readOnly,
+  type,
+  alterado,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  span?: 2 | 3;
+  readOnly?: boolean;
+  type?: string;
+  alterado?: boolean;
+  placeholder?: string;
+}) {
+  return (
+    <label className={`${styles.campo} ${span === 2 ? styles.span2 : span === 3 ? styles.span3 : ""}`}>
+      <span className={styles.label}>{label}</span>
+      <input
+        className={`${styles.input} ${alterado ? styles.inputAlterado : ""}`}
+        value={value}
+        type={type}
+        readOnly={readOnly}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </label>
+  );
+}
+
+function Escolha({
+  label,
+  value,
+  opcoes,
+  onChange,
+  padrao,
+}: {
+  label: string;
+  value: string;
+  opcoes: Opcao[];
+  onChange: (v: string) => void;
+  padrao?: string;
+}) {
+  const lista = opcoes.some((o) => o.value === value) || !value ? opcoes : [{ value, label: value }, ...opcoes];
+  return (
+    <label className={styles.campo}>
+      <span className={styles.label}>{label}</span>
+      <select
+        className={`${styles.select} ${padrao !== undefined && value !== padrao ? styles.inputAlterado : ""}`}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        {lista.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+// ── Novo cadastro ───────────────────────────────────────────────────────────
+
+function NovoClienteForm({
+  empresa,
+  lookups,
+  onCancelar,
+  onCriado,
+  onUsarExistente,
+}: {
+  empresa: EmpresaFat;
+  lookups: FatLookups;
+  onCancelar: () => void;
+  onCriado: (codigo: string) => void;
+  onUsarExistente: (codigo: string) => void;
+}) {
+  const api = useFatApi(empresa);
+  const padrao = PADROES[empresa].cliente;
+  const [nome, setNome] = useState("");
+  const [cpf, setCpf] = useState("");
+  const [email, setEmail] = useState("");
+  const [ddd, setDdd] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [endereco, setEndereco] = useState<EnderecoFat>(ENDERECO_VAZIO);
+  const [filial, setFilial] = useState(padrao.filial);
+  const [tipo, setTipo] = useState(padrao.tipo);
+  const [conceito, setConceito] = useState(padrao.conceito);
+  const [pontualidade, setPontualidade] = useState(padrao.pontualidade);
+  const [transportadora, setTransportadora] = useState(padrao.transportadora);
+  const [condicao, setCondicao] = useState(padrao.condicaoPgto);
+  const [tabela, setTabela] = useState(padrao.codigoTabPreco);
+  const [conta, setConta] = useState(padrao.contaContabil);
+  const [regiaoManual, setRegiaoManual] = useState<string | null>(null);
+  const [representante, setRepresentante] = useState(padrao.representante);
+  const [rgIe, setRgIe] = useState(padrao.rgIe);
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const [duplicados, setDuplicados] = useState<{ codigo: string; nome: string; filial: string }[] | null>(null);
+
+  const regiao = regiaoManual ?? regiaoDaUf(endereco.uf);
+  const nomeLinx = nome.trim().toUpperCase().slice(0, 25);
+
+  const salvar = async (forcar = false) => {
+    setSalvando(true);
+    setErro(null);
+    try {
+      const cliente: ClienteFatInput = {
+        razaoSocial: nome,
+        cpfCnpj: cpf,
+        rgIe,
+        endereco,
+        ddd,
+        telefone,
+        email,
+        filial,
+        tipo,
+        conceito,
+        pontualidade,
+        transportadora,
+        condicaoPgto: condicao,
+        codigoTabPreco: tabela,
+        contaContabil: conta,
+        regiao,
+        representante,
+        forcar,
+      };
+      const r = await api.send<{ codigo: string }>("/clientes", "POST", { cliente: cliente as unknown as Record<string, unknown> });
+      onCriado(r.codigo);
+    } catch (err) {
+      if (err instanceof ApiErro && err.status === 409) {
+        setDuplicados((err.corpo.existentes as { codigo: string; nome: string; filial: string }[]) ?? []);
+      } else {
+        setErro((err as Error).message);
+      }
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <div className={styles.card}>
+      <div className={styles.cardHead}>
+        <h2 className={styles.cardTitle}>Cadastrar cliente</h2>
+        <span className={styles.muted}>Próximo código: {lookups.proximoCodigoCliente || "—"}</span>
+      </div>
+
+      <div className={styles.grid}>
+        <Campo label="Nome completo *" span={2} value={nome} onChange={setNome} placeholder="como no pedido do site" />
+        <Campo label="CPF / CNPJ *" value={cpf} onChange={setCpf} />
+        <Campo label="E-mail (também p/ NF-e)" span={2} value={email} onChange={setEmail} type="email" />
+        <Campo label="DDD" value={ddd} onChange={setDdd} placeholder="11" />
+        <Campo label="Telefone" value={telefone} onChange={setTelefone} />
+      </div>
+      {nome.trim().length > 25 && (
+        <p className={styles.muted}>
+          O Linx guarda o nome curto com 25 letras: <strong>{nomeLinx}</strong> (o nome completo vai na razão social).
+        </p>
+      )}
+
+      <CamposEndereco empresa={empresa} endereco={endereco} onChange={setEndereco} />
+
+      <h3 className={styles.cardTitle}>Padrões do cadastro (pode alterar)</h3>
+      <div className={styles.grid}>
+        <Escolha label="Filial" value={filial} opcoes={lookups.filiaisCliente} onChange={setFilial} padrao={padrao.filial} />
+        <Escolha label="Tipo" value={tipo} opcoes={lookups.tiposCliente} onChange={setTipo} padrao={padrao.tipo} />
+        <Escolha label="Conceito" value={conceito} opcoes={lookups.conceitos} onChange={setConceito} padrao={padrao.conceito} />
+        <Escolha
+          label="Pontualidade"
+          value={pontualidade}
+          opcoes={lookups.pontualidades}
+          onChange={setPontualidade}
+          padrao={padrao.pontualidade}
+        />
+        <Escolha
+          label="Transportadora (cadastro)"
+          value={transportadora}
+          opcoes={lookups.transportadoras}
+          onChange={setTransportadora}
+          padrao={padrao.transportadora}
+        />
+        <Escolha
+          label="Condição de pagamento"
+          value={condicao}
+          opcoes={lookups.condicoesPgto}
+          onChange={setCondicao}
+          padrao={padrao.condicaoPgto}
+        />
+        <Escolha label="Tabela de preço" value={tabela} opcoes={lookups.tabelasPreco} onChange={setTabela} padrao={padrao.codigoTabPreco} />
+        <Escolha label="Região" value={regiao} opcoes={lookups.regioes} onChange={setRegiaoManual} />
+        <Escolha
+          label="Representante"
+          value={representante}
+          opcoes={lookups.representantes}
+          onChange={setRepresentante}
+          padrao={padrao.representante}
+        />
+        <Campo label="Conta contábil" value={conta} onChange={setConta} alterado={conta !== padrao.contaContabil} />
+        <Campo label="Insc. Est. / RG" value={rgIe} onChange={setRgIe} alterado={rgIe !== padrao.rgIe} />
+      </div>
+
+      {duplicados && (
+        <div className={styles.avisoBox}>
+          <strong>Este CPF/CNPJ já tem cadastro no Linx.</strong> Use o existente sempre que for a mesma pessoa:
+          <ul className={styles.lista}>
+            {duplicados.map((d) => (
+              <li key={d.codigo}>
+                {d.codigo} — {d.nome} <span className={styles.muted}>({d.filial || "sem filial"})</span>{" "}
+                <button type="button" className={`${styles.btnTexto} ${styles.btnMini}`} onClick={() => onUsarExistente(d.codigo)}>
+                  usar este
+                </button>
+              </li>
+            ))}
+          </ul>
+          <button type="button" className={`${styles.btn} ${styles.btnMini}`} onClick={() => salvar(true)} disabled={salvando}>
+            É outra pessoa — cadastrar mesmo assim
+          </button>
+        </div>
+      )}
+      {erro && <div className={styles.erroBox}>{erro}</div>}
+
+      <div className={styles.acoes}>
+        <button type="button" className={styles.btnPrimario} onClick={() => salvar(false)} disabled={salvando}>
+          {salvando ? "Gravando no Linx…" : "Cadastrar no Linx"}
+        </button>
+        <button type="button" className={styles.btnTexto} onClick={onCancelar}>
+          Cancelar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Atualizar endereço / contato ─────────────────────────────────────────────
+
+function AtualizarEnderecoForm({
+  empresa,
+  lookups,
+  cliente,
+  onCancelar,
+  onSalvo,
+}: {
+  empresa: EmpresaFat;
+  lookups: FatLookups;
+  cliente: ClienteFatDetalhe;
+  onCancelar: () => void;
+  onSalvo: (c: ClienteFatDetalhe) => void;
+}) {
+  const api = useFatApi(empresa);
+  const [endereco, setEndereco] = useState<EnderecoFat>(cliente.endereco);
+  const [ddd, setDdd] = useState(cliente.ddd.replace(/^0+/, ""));
+  const [telefone, setTelefone] = useState(cliente.telefone);
+  const [email, setEmail] = useState(cliente.email);
+  const [regiaoManual, setRegiaoManual] = useState<string | null>(null);
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const regiao = regiaoManual ?? regiaoDaUf(endereco.uf);
+
+  const salvar = async () => {
+    setSalvando(true);
+    setErro(null);
+    try {
+      onSalvo(
+        await api.send<ClienteFatDetalhe>(`/clientes/${cliente.codigo}`, "PATCH", {
+          endereco,
+          ddd,
+          telefone,
+          email,
+          emailNfe: email,
+          regiao,
+        })
+      );
+    } catch (err) {
+      setErro((err as Error).message);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <div className={styles.card}>
+      <h2 className={styles.cardTitle}>
+        Atualizar endereço — {cliente.codigo} {cliente.razaoSocial}
+      </h2>
+      <p className={styles.muted}>Grava o mesmo endereço como principal, cobrança e entrega (padrão do e-commerce).</p>
+      <CamposEndereco empresa={empresa} endereco={endereco} onChange={setEndereco} />
+      <div className={styles.grid}>
+        <Campo label="DDD" value={ddd} onChange={setDdd} />
+        <Campo label="Telefone" value={telefone} onChange={setTelefone} />
+        <Campo label="E-mail (também p/ NF-e)" span={2} value={email} onChange={setEmail} />
+        <Escolha label="Região" value={regiao} opcoes={lookups.regioes} onChange={setRegiaoManual} />
+      </div>
+      {erro && <div className={styles.erroBox}>{erro}</div>}
+      <div className={styles.acoes}>
+        <button type="button" className={styles.btnPrimario} onClick={salvar} disabled={salvando}>
+          {salvando ? "Gravando…" : "Salvar no Linx"}
+        </button>
+        <button type="button" className={styles.btnTexto} onClick={onCancelar}>
+          Cancelar
+        </button>
+      </div>
+    </div>
+  );
+}

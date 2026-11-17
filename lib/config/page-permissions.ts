@@ -23,6 +23,7 @@ export const PAGE_PERMISSION_DEFINITIONS = [
   { key: "vendedores", label: "Vendedores", routeSegments: ["vendedores"] },
   { key: "clientes", label: "Clientes", routeSegments: ["clientes"] },
   { key: "faturamento", label: "Faturamento / NFs", routeSegments: ["faturamento"] },
+  { key: "faturamento-ecommerce", label: "Faturamento E-commerce", routeSegments: ["faturamento-ecommerce"] },
   { key: "shopify", label: "Shopify (tempo real)", routeSegments: ["shopify"] },
   { key: "controle-estoque", label: "Controle de Estoque", routeSegments: ["controle-estoque"] },
   { key: "estoque-consulta", label: "Estoque Consulta", routeSegments: ["estoque-consulta"] },

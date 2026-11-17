@@ -100,6 +100,8 @@ export default function Sidebar({ companyName }: SidebarProps) {
   const clientesHref = basePath && basePath !== "/" ? `${basePath}/clientes` : "/clientes";
   const faturamentoHref =
     basePath && basePath !== "/" ? `${basePath}/faturamento` : "/faturamento";
+  const faturamentoEcommerceHref =
+    basePath && basePath !== "/" ? `${basePath}/faturamento-ecommerce` : "/faturamento-ecommerce";
   const shopifyHref = basePath && basePath !== "/" ? `${basePath}/shopify` : "/shopify";
   const filialHref =
     basePath && basePath !== "/" ? `${basePath}/filial` : "/filial";
@@ -316,6 +318,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
     "/vendedores",
     "/clientes",
     "/faturamento",
+    "/faturamento-ecommerce",
     "/shopify",
     "/exportar-relatorios",
     "/gerador-relatorios",
@@ -414,8 +417,23 @@ export default function Sidebar({ companyName }: SidebarProps) {
           label: "Faturamento / NFs",
           href: faturamentoHref,
           permission: "faturamento",
-          isActive: (currentPathname) => matchesSegment(currentPathname, "/faturamento", faturamentoHref),
+          isActive: (currentPathname) =>
+            matchesSegment(currentPathname, "/faturamento", faturamentoHref) &&
+            !currentPathname?.includes("/faturamento-ecommerce"),
         },
+        // Faturamento E-commerce (cadastro de cliente + NF no Linx + monitor de NF-e): só NERD e Scarf Me.
+        ...(isScarfme || isNerd
+          ? [
+              {
+                key: "faturamento-ecommerce",
+                label: "Faturamento E-commerce",
+                href: faturamentoEcommerceHref,
+                permission: "faturamento-ecommerce" as const,
+                isActive: (currentPathname: string | null) =>
+                  matchesSegment(currentPathname, "/faturamento-ecommerce", faturamentoEcommerceHref),
+              },
+            ]
+          : []),
         {
           key: "shopify",
           label: "Shopify (tempo real)",
