@@ -148,6 +148,7 @@ function NovaNota({
   const [simulacaoFeita, setSimulacao] = useState<(NotaCriada & { assinatura: string }) | null>(null);
   const [gravada, setGravada] = useState<NotaCriada | null>(null);
   const [confirmando, setConfirmando] = useState(false);
+  const [enviarGravada, setEnviarGravada] = useState(false);
 
   const naturezaAuto = cliente && cliente.endereco.uf && cliente.endereco.uf !== ufFilial ? padrao.naturezaForaUf : padrao.naturezaDentroUf;
   const natureza = naturezaManual ?? naturezaAuto;
@@ -243,10 +244,14 @@ function NovaNota({
           </strong>
           <div className={styles.mono}>Chave: {gravada.chave}</div>
           <div>
-            Próximo passo: no Linx, abra o <strong>Monitor de Controle da NF-e</strong>, selecione a NF {gravada.nf} e
-            clique em <strong>Envia NFe para Sefaz</strong>. O status aparece na aba Monitor NF-e.
+            Próximo passo: enviar para a SEFAZ (aqui, ou no Monitor de NF-e do Linx).
           </div>
           <div className={styles.acoes}>
+            {podeGravar && (
+              <button type="button" className={`${styles.btnPerigo} ${styles.btnMini}`} onClick={() => setEnviarGravada(true)}>
+                Enviar para SEFAZ agora
+              </button>
+            )}
             <button type="button" className={`${styles.btn} ${styles.btnMini}`} onClick={onIrParaMonitor}>
               Ver no Monitor NF-e
             </button>
@@ -530,6 +535,15 @@ function NovaNota({
         )}
         {previa && <PreviaView previa={previa} confirmarDup={confirmarDup} setConfirmarDup={setConfirmarDup} />}
       </div>
+
+      {enviarGravada && gravada && (
+        <NotaDetalheModal
+          empresa={empresa}
+          nota={{ filial: gravada.filial, nf: gravada.nf, serie: gravada.serie }}
+          onFechar={() => setEnviarGravada(false)}
+          podeGravar={podeGravar}
+        />
+      )}
 
       {confirmando && previa && (
         <div className={styles.modalOverlay} role="dialog" aria-modal="true">
@@ -976,7 +990,15 @@ function BuscarNotas({ empresa, lookups }: { empresa: EmpresaFat; lookups: FatLo
       </form>
       {erro && <div className={styles.erroBox}>{erro}</div>}
       {lista && <ListaNotas lista={lista} onAbrir={setAberta} />}
-      {aberta && <NotaDetalheModal empresa={empresa} nota={aberta} onFechar={() => setAberta(null)} />}
+      {aberta && (
+        <NotaDetalheModal
+          empresa={empresa}
+          nota={aberta}
+          onFechar={() => setAberta(null)}
+          podeGravar={Boolean(lookups.podeGravar)}
+          onAtualizado={() => void buscar()}
+        />
+      )}
     </div>
   );
 }

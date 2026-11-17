@@ -6,6 +6,7 @@ import type { EmpresaFat } from "@/lib/faturamento-ecommerce/config";
 import type { NotaDetalhe, NotaListItem } from "@/lib/faturamento-ecommerce/types";
 
 import { fmtBRL, fmtData, fmtDataHora, fmtDoc, useFatApi } from "./api";
+import SefazPainel from "./SefazPainel";
 import styles from "./FaturamentoEcommerce.module.css";
 
 /** Detalhe de uma NF (cabeçalho, itens, status da NF-e) com download do XML autorizado. */
@@ -13,15 +14,20 @@ export default function NotaDetalheModal({
   empresa,
   nota,
   onFechar,
+  podeGravar = false,
+  onAtualizado,
 }: {
   empresa: EmpresaFat;
-  nota: NotaListItem;
+  nota: Pick<NotaListItem, "filial" | "nf" | "serie">;
   onFechar: () => void;
+  podeGravar?: boolean;
+  onAtualizado?: () => void;
 }) {
   const { get, username } = useFatApi(empresa);
   const [d, setD] = useState<NotaDetalhe | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [baixando, setBaixando] = useState(false);
+  const [versao, setVersao] = useState(0);
 
   useEffect(() => {
     let vivo = true;
@@ -31,7 +37,7 @@ export default function NotaDetalheModal({
     return () => {
       vivo = false;
     };
-  }, [get, nota.filial, nota.nf, nota.serie]);
+  }, [get, nota.filial, nota.nf, nota.serie, versao]);
 
   const baixarXml = async () => {
     if (!d) return;
@@ -85,9 +91,19 @@ export default function NotaDetalheModal({
             )}
             {d.status === 1 && (
               <div className={styles.avisoBox}>
-                NF ainda não enviada. No Linx: Monitor de Controle da NF-e → selecione a NF {d.nf} → Envia NFe para Sefaz.
+                NF ainda não enviada. Envie pelo botão “Enviar para SEFAZ” abaixo (ou no Linx: Monitor de Controle da NF-e
+                → Envia NFe para Sefaz).
               </div>
             )}
+            <SefazPainel
+              empresa={empresa}
+              nota={d}
+              podeGravar={podeGravar}
+              onAtualizado={() => {
+                setVersao((v) => v + 1);
+                onAtualizado?.();
+              }}
+            />
             <div className={styles.duasColunas}>
               <dl className={styles.kv}>
                 <dt>Emissão</dt>

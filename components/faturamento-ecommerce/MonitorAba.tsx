@@ -28,6 +28,26 @@ export default function MonitorAba({ empresa, lookups, ativo }: { empresa: Empre
   const [erro, setErro] = useState<string | null>(null);
   const [aberta, setAberta] = useState<NotaListItem | null>(null);
   const [atualizadoEm, setAtualizadoEm] = useState<Date | null>(null);
+  const [teste, setTeste] = useState<{ ok: boolean; texto: string } | null>(null);
+  const [testando, setTestando] = useState(false);
+
+  const testarConexao = async () => {
+    setTestando(true);
+    setTeste(null);
+    try {
+      const r = await get<{ nfConsultada: string; verificacao: { sefazCStat: string | null; sefazMotivo: string | null; confere: boolean; observacao: string } }>(
+        "/sefaz/teste"
+      );
+      setTeste({
+        ok: r.verificacao.confere,
+        texto: `Autenticou na Fiscal Flow e consultou a NF ${r.nfConsultada} na SEFAZ: ${r.verificacao.sefazCStat ?? "—"} ${r.verificacao.sefazMotivo ?? ""}. ${r.verificacao.observacao}`,
+      });
+    } catch (err) {
+      setTeste({ ok: false, texto: (err as Error).message });
+    } finally {
+      setTestando(false);
+    }
+  };
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -68,15 +88,19 @@ export default function MonitorAba({ empresa, lookups, ativo }: { empresa: Empre
           <h2 className={styles.cardTitle}>Monitor de NF-e — {PADROES[empresa].nome}</h2>
           <div className={styles.acoes}>
             {atualizadoEm && <span className={styles.muted}>atualizado às {atualizadoEm.toLocaleTimeString("pt-BR")}</span>}
+            <button type="button" className={styles.btn} onClick={testarConexao} disabled={testando}>
+              {testando ? "Testando…" : "Testar conexão com a Fiscal Flow"}
+            </button>
             <button type="button" className={styles.btn} onClick={() => void carregar()} disabled={carregando}>
               {carregando ? "Atualizando…" : "Atualizar"}
             </button>
           </div>
         </div>
         <div className={styles.infoBox}>
-          O envio para a SEFAZ continua no Linx: <strong>Monitor de Controle da NF-e</strong> → selecione a NF →{" "}
-          <strong>Envia NFe para Sefaz</strong>. Esta aba mostra o resultado (atualiza sozinha a cada minuto).
+          Clique numa NF para <strong>enviar para a SEFAZ</strong>, consultar a situação ou baixar o XML. O envio é o mesmo do
+          Monitor de NF-e do Linx (que continua funcionando). A lista atualiza sozinha a cada minuto.
         </div>
+        {teste && <div className={teste.ok ? styles.okBox : styles.erroBox}>{teste.texto}</div>}
         <div className={styles.grid}>
           <label className={styles.campo}>
             <span className={styles.label}>Situação</span>
@@ -120,7 +144,15 @@ export default function MonitorAba({ empresa, lookups, ativo }: { empresa: Empre
         )}
         {lista && <ListaNotas lista={lista} onAbrir={setAberta} />}
       </div>
-      {aberta && <NotaDetalheModal empresa={empresa} nota={aberta} onFechar={() => setAberta(null)} />}
+      {aberta && (
+        <NotaDetalheModal
+          empresa={empresa}
+          nota={aberta}
+          onFechar={() => setAberta(null)}
+          podeGravar={Boolean(lookups.podeGravar)}
+          onAtualizado={() => void carregar()}
+        />
+      )}
     </div>
   );
 }

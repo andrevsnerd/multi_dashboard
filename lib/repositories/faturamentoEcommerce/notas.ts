@@ -599,7 +599,7 @@ const OBS_DIFAL =
  * (números formatados e texto escapado) para não estourar o limite de parâmetros.
  * `final`: commit (grava), rollback (simula e desfaz), debug (simula e devolve as linhas).
  */
-function montarBatch(p: Plano, cNF: string, final: "commit" | "rollback" | "debug"): string {
+function montarBatch(p: Plano, cNF: string, final: "commit" | "rollback" | "debug" | "xml"): string {
   // Linhas de FATURAMENTO_PROD (produto × cor) com grade
   const prods = new Map<string, { produto: string; cor: string; preco: number; qtde: number; custo: number; cfop: string; grade: Map<number, number>; item: string }>();
   for (const l of p.linhas) {
@@ -685,6 +685,13 @@ function montarBatch(p: Plano, cNF: string, final: "commit" | "rollback" | "debu
   const fim =
     final === "commit"
       ? "COMMIT;\n  SELECT LTRIM(RTRIM(@NF)) AS nf, @CHAVE AS chave, LTRIM(RTRIM(@PEDIDO)) AS pedido;"
+      : final === "xml"
+        ? // Gera o XML da NF-e com a MESMA procedure que o Linx usa no envio e desfaz tudo.
+          // Testado: LX_GERA_NFE_SEFAZ_4_00 não faz COMMIT nem altera a NF. (Nunca usar
+          // LX_EXECUTE_PROCESS aqui: ele faz COMMIT de qualquer transação aberta.)
+          `EXEC LX_GERA_NFE_SEFAZ_4_00 @NFNUM, @SERIE, @FILIAL;
+  SELECT LTRIM(RTRIM(@NF)) AS nf, @CHAVE AS chave, LTRIM(RTRIM(@PEDIDO)) AS pedido;
+  ROLLBACK;`
       : final === "rollback"
         ? "SELECT LTRIM(RTRIM(@NF)) AS nf, @CHAVE AS chave, LTRIM(RTRIM(@PEDIDO)) AS pedido;\n  ROLLBACK;"
         : `SELECT 'FATURAMENTO' AS t, * FROM FATURAMENTO WHERE FILIAL=@FILIAL AND NF_SAIDA=@NF AND SERIE_NF=@SERIE;
@@ -864,6 +871,31 @@ export async function gravarNota(input: NotaInput, opts: { simular: boolean }): 
       total: plano.total,
       simulacao: opts.simular,
     };
+  });
+}
+
+/**
+ * Simula a NF inteira e gera o XML da NF-e pela procedure do Linx, na mesma transação,
+ * e desfaz tudo. Nada fica no banco. Devolve o XML (sem assinatura) que seria enviado.
+ */
+export async function simularXmlNota(input: NotaInput): Promise<{ nf: string; chave: string; xml: string }> {
+  return withRequest(async (request) => {
+    const plano = await montarPlano(request, input);
+    if (plano.bloqueios.length > 0) throw new Error(`Não é possível gravar: ${plano.bloqueios.join(" | ")}`);
+    const req = request as Req;
+    const cNF = String(randomInt(10_000_000, 99_999_999));
+    bindCabecalho(req, plano, cNF);
+    let r;
+    try {
+      r = await req.query(montarBatch(plano, cNF, "xml"));
+    } catch (err) {
+      throw new Error(`O Linx recusou a NF ou o XML: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    const sets = (r as unknown as { recordsets: Record<string, unknown>[][] }).recordsets;
+    const xml = sets.flat().map((row) => row.XML_NFE).find((x) => typeof x === "string") as string | undefined;
+    const fim = sets.flat().find((row) => "chave" in row) as { nf: string; chave: string } | undefined;
+    if (!xml) throw new Error("A procedure do Linx não devolveu o XML.");
+    return { nf: trim(fim?.nf), chave: trim(fim?.chave), xml };
   });
 }
 

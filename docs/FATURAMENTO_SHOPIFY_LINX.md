@@ -217,7 +217,55 @@ Os "jobs" no rodapé do monitor são registros de `LX_EXECUTE_PROCESS`
 - Alertas: NFs em STATUS 1 há mais de X horas; NFs presas em 2/3; 49 com `NOTA_CANCELADA=0`.
 - O envio continua no Monitor do Linx.
 
-### Fase 2 (enviar pelo dashboard) — bloqueada por informação da Linx
+### Contrato da Fiscal Flow (descoberto em 17/11/2026, nos arquivos do Linx desktop)
+
+Fonte: textos legíveis de `C:\Linx\Recursos\lx_nfe.app` (Visual FoxPro compilado) + log
+`MIDE_NFE_LOG` (ERP.001 = corpo enviado, gzip+base64; ERP.015 = retorno). Só leitura.
+
+- **XML**: gerado pelo BANCO — `LX_EXECUTE_PROCESS 'LX_GERA_NFE_SEFAZ_4_00', '''nf'',''serie'',''filial'''`
+  (params da proc: @NOTAFISCAL, @SERIENOTA, @FILIALNOTA, @RETORNA_XML, @APP_VERSAO) devolve o cursor
+  `curXML` com `XML_NFE` (NF-e 4.00 **sem assinatura**), `CHAVE_NFE`, `status_processo`, `TAMANHO_XML`, `email_nfe`.
+- **Assinatura**: feita pela Fiscal Flow (certificado na nuvem da Linx). `INTEGRACOES_API.CERTIFICADO` vazio.
+- **Autenticação**: `{END_PRODUCAO}/Linx-TCS0101-BO-TcsAutorizacao-TcsAutorizacaoDomainService.svc/json/AuthenticateJson?userName=…&password=…&applicationId=DE02E733-A636-4C41-907F-55C8721FCCDF`
+  (USUARIO/PASSW de `INTEGRACOES_API` ID 6) → `{"AuthenticateJsonResult":[{Key:1..4, Value}]}`.
+- **Envio**: `POST {END_PRODUCAO}/api/NFWebApi/EnviaNFeXmlCompactado`, cabeçalhos `Content-Type: application/json`,
+  `ApplicationID: DE02E733-…`, `CurrentCompany`, `AutorizationToken`, `CurrentUser`, `AccessGroup` (as 4 chaves);
+  corpo = string JSON com base64(gzip(`{"Xml":"<NFe…>","DevolveXml":true,"tpAmb":1,"XmlAssinado":false}`)).
+- **Retorno**: JSON `chNFe, nProt, cStat, xMotivo, dhRetorno, XmlCompactado (nfeProc em gzip+base64), MensagemErro…`.
+- **Gravar no Linx** (o que o desktop faz depois): `LX_EXECUTE_PROCESS 'LX_XML_MIDE_NFE_ENVIADO'`,
+  `EXEC LX_PROCESSAMENTO_RETORNO_MIDe_SEFAZ @MENSAGEM=nfeProc, @TIPO_MENSAGEM='2' (nfeProc completo — inferido da
+  versão legível), @CHAVE_NFE_LINX, @DTH_RECEBIMENTO, @STATUS=cStat, @MOTIVO=xMotivo, @NUMERO_PROTOCOLO=nProt`,
+  `EXEC LX_DADOS_CADASTRO_XML_NFE @MENSAGEM, @CHAVE_NFE_LINX, @GRAVA_XML=1`,
+  `LX_EXECUTE_PROCESS 'LX_CTB_INTEGRAR_FATURAMENTO ','''filial'',''nf'',''serie'''`.
+- **Status antes do envio** (igual ao desktop): `EDI_ARQUIVO` da chave (COD_LAYOUT 9990, insere se não existe) +
+  `EDI_ARQUIVO_LOG`; erro na geração → 2/99; `LX_VALIDA_NFE_PARA_ENVIO` → 2/0; antes do POST → 3/0; falha de
+  comunicação → 1/0. Só envia NF em 1, 2/99, 3/99 ou 4/99.
+- **Outros endpoints**: `/api/NFWebApi/ConsultaNFe`, `/CancelaNFe`, `/CancelamentoEvento`, `/InutilizaNFe`,
+  `/CartaCorrecaoNFe`. Homologação: `END_HOMOLOGACAO` (evo-hml).
+
+### Envio pelo dashboard — implementado (17/11/2026)
+
+Código: `lib/faturamento-ecommerce/fiscal-flow.ts` (cliente da API) + `lib/repositories/faturamentoEcommerce/sefaz.ts`
+(fluxo) + rotas `/notas/enviar`, `/notas/verificar`, `/sefaz/teste` + `SefazPainel.tsx` (detalhe da NF).
+
+**Validações feitas (17/11/2026, sem enviar nada):**
+- `LX_GERA_NFE_SEFAZ_4_00` rodada em transação na NF pendente AKS 4511: **não faz COMMIT** (@@TRANCOUNT
+  continuou 1), não altera a NF, devolve `XML_NFE, TAMANHO_XML, CHAVE_NFE, EMAIL_NFE, EMAIL_DESTINATARIO`.
+- **XML**: (A) procedure hoje × XML que o Linx enviou (ERP.001) em 6 NFs reais — idêntico (só o telefone
+  do emitente muda quando se REGERA NF já autorizada; em NF nova sai igual ao enviado hoje). (B) NF simulada
+  pelo gravador do dashboard + XML gerado na mesma transação × XML enviado da NF real — idêntico exceto
+  chave/nº, data de pagamento (= emissão), espaços na OBS e 1 centavo de rateio de frete entre itens
+  (ordem de digitação). `simularXmlNota` faz isso sob demanda.
+- **Corpo do envio** montado pelo dashboard = corpo que o Linx enviou na NF 1559 (descompactado, igual).
+- `@TIPO_MENSAGEM = 2` confirmado na chamada montada pelo Linx (`'<xml>', 2, '<chave>', ...`).
+
+**⚠️ `LX_EXECUTE_PROCESS` faz `COMMIT` de qualquer transação aberta** (`WHILE @@TRANCOUNT>0 COMMIT`).
+Nunca chamá-lo (nem a `LX_PROCESSAMENTO_RETORNO_MIDe_SEFAZ`, que o usa por dentro) dentro de simulação
+com ROLLBACK — a simulação viraria gravação real.
+
+**Ainda não testado (precisa da credencial da Fiscal Flow; o Claude Code bloqueou o uso automático):**
+autenticação (GET/POST), cabeçalhos, `ConsultaNFe` (valor de `serie`) e o envio real. O botão
+"Testar conexão com a Fiscal Flow" (Monitor) faz autenticação + consulta de NF autorizada sem enviar nada.
 
 Exige reimplementar o cliente: gerar XML pela proc criptografada (formato do result set
 desconhecido), autenticar e enviar à API Fiscal Flow (endpoint/contrato JSON **não estão no
