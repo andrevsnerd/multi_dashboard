@@ -10,6 +10,7 @@ import type {
   NotaInput,
   NotaListItem,
   NotaPreview,
+  PedidoShopifyImport,
   ProdutoFatOpcao,
 } from "@/lib/faturamento-ecommerce/types";
 
@@ -25,6 +26,11 @@ interface Props {
   onTrocarCliente: (c: ClienteFatDetalhe | null) => void;
   onIrParaClientes: () => void;
   onIrParaMonitor: () => void;
+  /** Pedido do Shopify importado: itens, desconto, frete e OBS já preenchidos. */
+  pedido: PedidoShopifyImport | null;
+  onImportarPedido: (nome: string) => Promise<void>;
+  onDescartarPedido: () => void;
+  onNotaGravada: () => void;
 }
 
 export default function FaturamentoAba(props: Props) {
@@ -48,7 +54,7 @@ export default function FaturamentoAba(props: Props) {
         </button>
       </div>
       <div hidden={sub !== "nova"}>
-        <NovaNota {...props} />
+        <NovaNota key={props.pedido?.nome ?? "manual"} {...props} />
       </div>
       <div hidden={sub !== "buscar"}>
         <BuscarNotas empresa={props.empresa} lookups={props.lookups} />
@@ -80,7 +86,19 @@ const n = (v: string) => {
 };
 const numTxt = (v: number) => (Number.isFinite(v) ? String(v).replace(".", ",") : "");
 
-function NovaNota({ empresa, lookups, podeGravar, cliente, onTrocarCliente, onIrParaClientes, onIrParaMonitor }: Props) {
+function NovaNota({
+  empresa,
+  lookups,
+  podeGravar,
+  cliente,
+  onTrocarCliente,
+  onIrParaClientes,
+  onIrParaMonitor,
+  pedido,
+  onImportarPedido,
+  onDescartarPedido,
+  onNotaGravada,
+}: Props) {
   const api = useFatApi(empresa);
   const padrao = PADROES[empresa].nota;
 
@@ -91,17 +109,33 @@ function NovaNota({ empresa, lookups, podeGravar, cliente, onTrocarCliente, onIr
   const [tipoFrete, setTipoFrete] = useState(padrao.tipoFrete);
   const [transp, setTransp] = useState(padrao.transportadora);
   const [redesp, setRedesp] = useState(padrao.transpRedespacho);
-  const [frete, setFrete] = useState("0");
+  const [frete, setFrete] = useState(pedido ? numTxt(pedido.frete) : "0");
   const [seguro, setSeguro] = useState("0");
-  const [descModo, setDescModo] = useState<"percentual" | "valor">("percentual");
-  const [desc, setDesc] = useState("0");
+  // Do Shopify o desconto vem em R$ (soma dos descontos dos itens), como o operador digita no Linx.
+  const [descModo, setDescModo] = useState<"percentual" | "valor">(pedido ? "valor" : "percentual");
+  const [desc, setDesc] = useState(pedido ? numTxt(pedido.descontoItens) : "0");
   const [pesoLiq, setPesoLiq] = useState(numTxt(padrao.pesoLiquido));
   const [pesoBruto, setPesoBruto] = useState(numTxt(padrao.pesoBruto));
   const [volumes, setVolumes] = useState(String(padrao.volumes));
   const [tipoVolume, setTipoVolume] = useState(padrao.tipoVolume);
   const [infoPgto, setInfoPgto] = useState(padrao.infoPgto);
-  const [obs, setObs] = useState("#");
-  const [itens, setItens] = useState<ItemTela[]>([]);
+  const [obs, setObs] = useState(pedido ? pedido.nome : "#");
+  const [itens, setItens] = useState<ItemTela[]>(() =>
+    (pedido?.itens ?? []).map((i) => ({
+      chave: `${i.produto}|${i.cor}|${i.tamanho}`,
+      produto: i.produto,
+      descricao: i.descricao,
+      cor: i.cor,
+      descCor: i.descCor,
+      tamanho: i.tamanho,
+      tamanhoLabel: i.tamanhoLabel,
+      qtde: i.qtde,
+      preco: i.preco,
+      estoque: i.estoque,
+    }))
+  );
+  const [pedidoBusca, setPedidoBusca] = useState("");
+  const [importando, setImportando] = useState(false);
   const [confirmarDup, setConfirmarDup] = useState(false);
 
   const [codigoCliente, setCodigoCliente] = useState("");
@@ -191,6 +225,7 @@ function NovaNota({ empresa, lookups, podeGravar, cliente, onTrocarCliente, onIr
         setDesc("0");
         setConfirmarDup(false);
         onTrocarCliente(null);
+        onNotaGravada();
       }
     } catch (err) {
       setErro((err as Error).message);
@@ -221,6 +256,120 @@ function NovaNota({ empresa, lookups, podeGravar, cliente, onTrocarCliente, onIr
           </div>
         </div>
       )}
+
+      {/* Pedido importado */}
+      <div className={styles.card}>
+        <div className={styles.cardHead}>
+          <h2 className={styles.cardTitle}>Pedido do Shopify</h2>
+          {pedido && (
+            <button type="button" className={styles.btnTexto} onClick={onDescartarPedido}>
+              descartar e faturar manual
+            </button>
+          )}
+        </div>
+        {pedido ? (
+          <>
+            <div className={styles.clienteResumo}>
+              <span>
+                <strong>{pedido.nome}</strong> — {pedido.cliente.razaoSocial}
+              </span>
+              <span>{new Date(pedido.criadoEm).toLocaleString("pt-BR")}</span>
+              <span>{pedido.pagamento}</span>
+              <span>
+                Shopify: produtos {fmtBRL(pedido.subtotalShopify + pedido.descontoItens)} − desc. {fmtBRL(pedido.descontoItens)} +
+                frete {fmtBRL(pedido.frete)} = <strong>{fmtBRL(pedido.totalShopify)}</strong>
+              </span>
+            </div>
+            {pedido.notas.length > 0 && (
+              <div className={styles.avisoBox}>
+                Este pedido já tem NF no Linx: {pedido.notas.map((x) => `${x.nf}${x.provavel ? " (provável)" : ""}`).join(", ")}.
+              </div>
+            )}
+            {pedido.naoMapeados.length > 0 && (
+              <div className={styles.avisoBox}>
+                <strong>Itens do pedido que não entraram na NF</strong> (inclua manualmente se forem produto do Linx; o desconto
+                acima só soma os itens que entraram):
+                <ul className={styles.lista}>
+                  {pedido.naoMapeados.map((x, k) => (
+                    <li key={k}>
+                      {x.qtde}× {x.titulo} {x.sku ? `(SKU ${x.sku})` : ""} — {fmtBRL(x.preco)} — {x.motivo}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {pedido.itens.some((i) => !i.brinde && i.precoLinx !== null && Math.abs((i.precoLinx ?? 0) - i.preco) > 0.009) && (
+              <div className={styles.avisoBox}>
+                <strong>Preço do site diferente da tabela 01 do Linx</strong> — a NF vai com o preço do site (o que o cliente
+                pagou); altere no item se for o caso:
+                <ul className={styles.lista}>
+                  {pedido.itens
+                    .filter((i) => !i.brinde && i.precoLinx !== null && Math.abs((i.precoLinx ?? 0) - i.preco) > 0.009)
+                    .map((i) => (
+                      <li key={`${i.produto}|${i.cor}|${i.tamanho}`}>
+                        {i.produto} {i.descCor}: site {fmtBRL(i.preco)} · Linx {fmtBRL(i.precoLinx)}
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            )}
+            {pedido.itens.some((i) => i.brinde) && (
+              <div className={styles.infoBox}>
+                Brinde (preço zero no site) entra na NF a R$ 0,01, como o Linx faz:{" "}
+                {pedido.itens.filter((i) => i.brinde).map((i) => `${i.produto} ${i.descCor}`).join(", ")}.
+              </div>
+            )}
+            {pedido.itens.some((i) => i.origem.startsWith("lote anterior")) && (
+              <div className={styles.infoBox}>
+                Código sem estoque trocado pelo lote anterior da mesma peça:{" "}
+                {pedido.itens.filter((i) => i.origem.startsWith("lote anterior")).map((i) => `${i.tituloShopify} → ${i.produto} ${i.cor}`).join("; ")}.
+              </div>
+            )}
+            {pedido.itens.some((i) => i.conferir && !i.origem.startsWith("lote anterior")) && (
+              <div className={styles.avisoBox}>
+                Vínculo só sugerido no mapeamento:{" "}
+                {pedido.itens
+                  .filter((i) => i.conferir && !i.origem.startsWith("lote anterior"))
+                  .map((i) => `${i.tituloShopify} → ${i.produto} ${i.cor}`)
+                  .join("; ")}
+                .
+                Confira.
+              </div>
+            )}
+            {cliente && pedido.cliente.cpfCnpj && cliente.cpfCnpj !== pedido.cliente.cpfCnpj && (
+              <div className={styles.erroBox}>
+                O cliente selecionado ({fmtDoc(cliente.cpfCnpj)}) não tem o CPF do pedido ({fmtDoc(pedido.cliente.cpfCnpj)}).
+              </div>
+            )}
+          </>
+        ) : (
+          <form
+            className={styles.linhaBusca}
+            onSubmit={async (ev) => {
+              ev.preventDefault();
+              setImportando(true);
+              setErro(null);
+              try {
+                await onImportarPedido(pedidoBusca);
+              } catch (err) {
+                setErro((err as Error).message);
+              } finally {
+                setImportando(false);
+              }
+            }}
+          >
+            <input
+              className={styles.input}
+              placeholder="nº do pedido do site para importar (ex.: #1711) — ou monte a NF manualmente abaixo"
+              value={pedidoBusca}
+              onChange={(e) => setPedidoBusca(e.target.value)}
+            />
+            <button type="submit" className={styles.btn} disabled={importando || !pedidoBusca.trim()}>
+              {importando ? "Importando…" : "Importar pedido"}
+            </button>
+          </form>
+        )}
+      </div>
 
       {/* Cliente */}
       <div className={styles.card}>
@@ -369,6 +518,15 @@ function NovaNota({ empresa, lookups, podeGravar, cliente, onTrocarCliente, onIr
             Simulação OK: o Linx aceitou a NF ({simulacao.filial}, nº {simulacao.nf}, total {fmtBRL(simulacao.total)}). Nada
             foi gravado.
           </div>
+        )}
+        {previa && pedido && Math.abs(previa.total - pedido.totalShopify) > 0.01 && (
+          <div className={styles.avisoBox}>
+            Total da NF {fmtBRL(previa.total)} ≠ total do Shopify {fmtBRL(pedido.totalShopify)} (diferença{" "}
+            {fmtBRL(previa.total - pedido.totalShopify)}). Normal quando há item fora da NF (embrulho, serviço) — senão, confira.
+          </div>
+        )}
+        {previa && pedido && Math.abs(previa.total - pedido.totalShopify) <= 0.01 && (
+          <div className={styles.okBox}>Total da NF bate com o pedido do Shopify ({fmtBRL(pedido.totalShopify)}).</div>
         )}
         {previa && <PreviaView previa={previa} confirmarDup={confirmarDup} setConfirmarDup={setConfirmarDup} />}
       </div>

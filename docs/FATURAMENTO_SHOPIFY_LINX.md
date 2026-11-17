@@ -259,3 +259,28 @@ OBS tipo 7 (DIFAL zerado) quando a UF do cliente ≠ UF da filial. Tipos 4/6 pel
 frete em `MPADRAO_VALOR_ENCARGOS`, diferente do que o form grava.
 
 Pendente: envio à SEFAZ pelo dashboard (depende do contrato da API Fiscal Flow — §5) e DANFE PDF.
+
+### Fluxo contínuo + importação do Shopify (17/11/2026)
+
+- **Avançar para faturamento**: botão em cada cliente da busca, no detalhe e logo após cadastrar —
+  abre a aba Faturamento já com o cliente. Faturar direto (buscando o cliente lá) continua possível.
+- **Importar pedido** (`lib/repositories/faturamentoEcommerce/shopify.ts`, rotas `/shopify/pedidos` e
+  `/shopify/pedido`; nada grava no Linx): lista pedidos pagos da loja da empresa com a NF já emitida
+  (nº na OBS; "provável" = mesmo CPF + mesmo valor, para NF antiga sem o nº). Ao importar:
+  - cliente: CPF (`TAX_CREDENTIAL_BR`), nome, e-mail, DDD/telefone, endereço separado em
+    rua/número (1ª linha) e complemento/bairro (2ª linha + bairro do CEP), IBGE pelo CEP;
+    caracteres invisíveis do checkout (U+2060) removidos;
+  - clientes parecidos no Linx: mesmo CPF (forte; o da própria empresa primeiro) e nome parecido,
+    marcando endereço diferente → "Usar e avançar", "Atualizar endereço e avançar" ou cadastrar novo
+    já preenchido;
+  - NF: itens por `shopify_variant_map` (vinculado/sugerido), depois SKU e código de barras em
+    `PRODUTOS_BARRA`; preço = preço do site; desconto em R$ = soma das alocações dos itens; frete =
+    frete cobrado; OBS = `#pedido`. Embalagem de presente fica fora; brinde (preço 0) vai a R$ 0,01;
+    código sem estoque troca por lote anterior (`shopify_variant_linx_extra`) com estoque; aviso
+    quando o preço do site ≠ tabela 01 do Linx.
+  - Na aba Faturamento, "Importar pedido" já seleciona o cliente quando o CPF bate com um único
+    cadastro (da empresa) com o mesmo endereço; senão leva para a aba Clientes.
+- **Validação** (só leitura): pedidos já faturados importados e montados → prévia comparada com a NF
+  real do operador. NERD 15/15 iguais (valor e itens); Scarf Me 22/24 — #66295 o operador usou o
+  preço do Linx (R$ 598) em vez do pago no site (R$ 698) e #66310 o operador faturou outro lote
+  (07.A1.00B3) que o mapeamento não liga ao código do site (07.A1.00A7).

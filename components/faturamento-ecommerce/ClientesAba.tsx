@@ -10,16 +10,23 @@ import type {
   EnderecoFat,
   FatLookups,
   Opcao,
+  PedidoShopifyImport,
 } from "@/lib/faturamento-ecommerce/types";
 
 import { ApiErro, fmtData, fmtDoc, useFatApi } from "./api";
+import { ImportacaoClienteCard, PedidosShopifyCard } from "./PedidosShopify";
 import styles from "./FaturamentoEcommerce.module.css";
 
 interface Props {
   empresa: EmpresaFat;
   lookups: FatLookups;
   podeGravar: boolean;
+  /** Avança para a aba Faturamento já com este cliente. */
   onUsarCliente: (c: ClienteFatDetalhe) => void;
+  /** Pedido do Shopify importado (dados do cliente + itens para a NF). */
+  pedido: PedidoShopifyImport | null;
+  onPedidoImportado: (p: PedidoShopifyImport) => void;
+  onDescartarPedido: () => void;
 }
 
 type Modo = "busca" | "novo" | "endereco";
@@ -35,7 +42,15 @@ const ENDERECO_VAZIO: EnderecoFat = {
   codMunicipioIbge: "",
 };
 
-export default function ClientesAba({ empresa, lookups, podeGravar, onUsarCliente }: Props) {
+export default function ClientesAba({
+  empresa,
+  lookups,
+  podeGravar,
+  onUsarCliente,
+  pedido,
+  onPedidoImportado,
+  onDescartarPedido,
+}: Props) {
   const api = useFatApi(empresa);
   const [modo, setModo] = useState<Modo>("busca");
   const [termo, setTermo] = useState("");
@@ -44,6 +59,23 @@ export default function ClientesAba({ empresa, lookups, podeGravar, onUsarClient
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [selecionado, setSelecionado] = useState<ClienteFatDetalhe | null>(null);
+  const [recemCadastrado, setRecemCadastrado] = useState<string | null>(null);
+  /** Cadastro novo pré-preenchido com os dados do pedido do Shopify. */
+  const [inicialNovo, setInicialNovo] = useState<ClienteFatInput | null>(null);
+  const [avancando, setAvancando] = useState<string | null>(null);
+
+  /** Carrega o cadastro completo e vai direto para o faturamento. */
+  const avancar = async (codigo: string) => {
+    setAvancando(codigo);
+    setErro(null);
+    try {
+      onUsarCliente(await api.get<ClienteFatDetalhe>(`/clientes/${codigo}`));
+    } catch (err) {
+      setErro((err as Error).message);
+    } finally {
+      setAvancando(null);
+    }
+  };
 
   const buscar = async (e?: FormEvent) => {
     e?.preventDefault();
@@ -61,6 +93,7 @@ export default function ClientesAba({ empresa, lookups, podeGravar, onUsarClient
 
   const abrir = async (codigo: string) => {
     setErro(null);
+    setRecemCadastrado(null);
     try {
       setSelecionado(await api.get<ClienteFatDetalhe>(`/clientes/${codigo}`));
       setModo("busca");
@@ -72,11 +105,45 @@ export default function ClientesAba({ empresa, lookups, podeGravar, onUsarClient
   return (
     <div className={styles.wrapper}>
       {modo === "busca" && (
+        <PedidosShopifyCard
+          empresa={empresa}
+          filialNota={lookups.filialNotaPadrao}
+          onImportado={(p) => {
+            onPedidoImportado(p);
+            setSelecionado(null);
+          }}
+        />
+      )}
+
+      {modo === "busca" && pedido && (
+        <ImportacaoClienteCard
+          key={pedido.nome}
+          empresa={empresa}
+          pedido={pedido}
+          podeGravar={podeGravar}
+          onAvancar={onUsarCliente}
+          onDescartar={onDescartarPedido}
+          onCadastrarNovo={() => {
+            setInicialNovo({ ...pedido.cliente });
+            setModo("novo");
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
+        />
+      )}
+
+      {modo === "busca" && (
         <div className={styles.card}>
           <div className={styles.cardHead}>
             <h2 className={styles.cardTitle}>Encontrar cliente</h2>
             {podeGravar && (
-              <button type="button" className={styles.btnPrimario} onClick={() => setModo("novo")}>
+              <button
+                type="button"
+                className={styles.btnPrimario}
+                onClick={() => {
+                  setInicialNovo(null);
+                  setModo("novo");
+                }}
+              >
                 + Cadastrar cliente
               </button>
             )}
@@ -114,12 +181,13 @@ export default function ClientesAba({ empresa, lookups, podeGravar, onUsarClient
                     <th>Filial do cadastro</th>
                     <th>Cadastro</th>
                     <th>Última NF</th>
+                    <th />
                   </tr>
                 </thead>
                 <tbody>
                   {resultados.length === 0 && (
                     <tr>
-                      <td colSpan={7} className={styles.vazio}>
+                      <td colSpan={8} className={styles.vazio}>
                         Nenhum cliente encontrado.{" "}
                         {!todos && "Tente marcar “incluir clientes de outras empresas”."}
                       </td>
@@ -154,12 +222,36 @@ export default function ClientesAba({ empresa, lookups, podeGravar, onUsarClient
                           <span className={styles.muted}>—</span>
                         )}
                       </td>
+                      <td>
+                        <button
+                          type="button"
+                          className={`${styles.btnPrimario} ${styles.btnMini}`}
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                            void avancar(c.codigo);
+                          }}
+                          disabled={avancando !== null}
+                        >
+                          {avancando === c.codigo ? "…" : "Avançar →"}
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {modo === "busca" && selecionado && recemCadastrado === selecionado.codigo && (
+        <div className={styles.okBox}>
+          <strong>Cliente {selecionado.codigo} cadastrado no Linx.</strong>
+          <div className={styles.acoes}>
+            <button type="button" className={styles.btnPrimario} onClick={() => onUsarCliente(selecionado)}>
+              Avançar para faturamento →
+            </button>
+          </div>
         </div>
       )}
 
@@ -174,11 +266,15 @@ export default function ClientesAba({ empresa, lookups, podeGravar, onUsarClient
 
       {modo === "novo" && (
         <NovoClienteForm
+          key={inicialNovo ? `pedido-${pedido?.nome ?? ""}` : "manual"}
           empresa={empresa}
           lookups={lookups}
+          inicial={inicialNovo}
+          origem={inicialNovo && pedido ? `pedido ${pedido.nome} do Shopify` : null}
           onCancelar={() => setModo("busca")}
           onCriado={async (codigo) => {
             await abrir(codigo);
+            setRecemCadastrado(codigo);
           }}
           onUsarExistente={abrir}
         />
@@ -193,6 +289,7 @@ export default function ClientesAba({ empresa, lookups, podeGravar, onUsarClient
           onSalvo={(c) => {
             setSelecionado(c);
             setModo("busca");
+            window.scrollTo({ top: 0, behavior: "smooth" });
           }}
         />
       )}
@@ -227,7 +324,7 @@ function ClienteDetalheCard({
             </button>
           )}
           <button type="button" className={styles.btnPrimario} onClick={onUsar}>
-            Faturar para este cliente →
+            Avançar para faturamento →
           </button>
         </div>
       </div>
@@ -444,24 +541,28 @@ function Escolha({
 function NovoClienteForm({
   empresa,
   lookups,
+  inicial,
+  origem,
   onCancelar,
   onCriado,
   onUsarExistente,
 }: {
   empresa: EmpresaFat;
   lookups: FatLookups;
+  inicial: ClienteFatInput | null;
+  origem: string | null;
   onCancelar: () => void;
   onCriado: (codigo: string) => void;
   onUsarExistente: (codigo: string) => void;
 }) {
   const api = useFatApi(empresa);
   const padrao = PADROES[empresa].cliente;
-  const [nome, setNome] = useState("");
-  const [cpf, setCpf] = useState("");
-  const [email, setEmail] = useState("");
-  const [ddd, setDdd] = useState("");
-  const [telefone, setTelefone] = useState("");
-  const [endereco, setEndereco] = useState<EnderecoFat>(ENDERECO_VAZIO);
+  const [nome, setNome] = useState(inicial?.razaoSocial ?? "");
+  const [cpf, setCpf] = useState(inicial?.cpfCnpj ?? "");
+  const [email, setEmail] = useState(inicial?.email ?? "");
+  const [ddd, setDdd] = useState(inicial?.ddd ?? "");
+  const [telefone, setTelefone] = useState(inicial?.telefone ?? "");
+  const [endereco, setEndereco] = useState<EnderecoFat>(inicial?.endereco ?? ENDERECO_VAZIO);
   const [filial, setFilial] = useState(padrao.filial);
   const [tipo, setTipo] = useState(padrao.tipo);
   const [conceito, setConceito] = useState(padrao.conceito);
@@ -523,6 +624,11 @@ function NovoClienteForm({
         <h2 className={styles.cardTitle}>Cadastrar cliente</h2>
         <span className={styles.muted}>Próximo código: {lookups.proximoCodigoCliente || "—"}</span>
       </div>
+      {origem && (
+        <div className={styles.infoBox}>
+          Preenchido com os dados do {origem}. Confira nome, número e complemento antes de cadastrar.
+        </div>
+      )}
 
       <div className={styles.grid}>
         <Campo label="Nome completo *" span={2} value={nome} onChange={setNome} placeholder="como no pedido do site" />

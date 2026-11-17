@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { PADROES, type EmpresaFat } from "@/lib/faturamento-ecommerce/config";
-import type { ClienteFatDetalhe, FatLookups } from "@/lib/faturamento-ecommerce/types";
+import type { ClienteFatDetalhe, FatLookups, PedidoShopifyImport } from "@/lib/faturamento-ecommerce/types";
 
 import { useFatApi } from "./api";
 import ClientesAba from "./ClientesAba";
@@ -26,6 +26,7 @@ export default function FaturamentoEcommercePage({ empresa }: { empresa: Empresa
   const [lookups, setLookups] = useState<FatLookups | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [cliente, setCliente] = useState<ClienteFatDetalhe | null>(null);
+  const [pedido, setPedido] = useState<PedidoShopifyImport | null>(null);
 
   useEffect(() => {
     if (!username) return;
@@ -50,6 +51,34 @@ export default function FaturamentoEcommercePage({ empresa }: { empresa: Empresa
     setAba("faturamento");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
+
+  /** Pedido importado na aba Clientes: o cliente é escolhido/cadastrado lá. */
+  const pedidoImportado = (p: PedidoShopifyImport) => {
+    setPedido(p);
+    setCliente(null);
+  };
+
+  /**
+   * Pedido importado direto na aba Faturamento: se o CPF bate com um único cadastro
+   * (preferindo o da própria empresa) e o endereço é o mesmo, já seleciona o cliente;
+   * senão manda para a aba Clientes escolher, atualizar o endereço ou cadastrar.
+   */
+  const importarNoFaturamento = async (nome: string) => {
+    const p = await get<PedidoShopifyImport>("/shopify/pedido", { nome, filial: lookups?.filialNotaPadrao });
+    setPedido(p);
+    const fortes = p.candidatos.filter((c) => c.forte);
+    const daEmpresa = fortes.filter((c) => c.filial === padrao.cliente.filial);
+    const escolhido = daEmpresa.length === 1 ? daEmpresa[0] : fortes.length === 1 ? fortes[0] : null;
+    if (escolhido && !escolhido.enderecoDifere) {
+      setCliente(await get<ClienteFatDetalhe>(`/clientes/${escolhido.codigo}`));
+      return;
+    }
+    setCliente(null);
+    setAba("clientes");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const descartarPedido = () => setPedido(null);
 
   return (
     <div className={styles.wrapper}>
@@ -92,7 +121,15 @@ export default function FaturamentoEcommercePage({ empresa }: { empresa: Empresa
       {lookups ? (
         <>
           <div hidden={aba !== "clientes"}>
-            <ClientesAba empresa={empresa} lookups={lookups} podeGravar={podeGravar} onUsarCliente={usarCliente} />
+            <ClientesAba
+              empresa={empresa}
+              lookups={lookups}
+              podeGravar={podeGravar}
+              onUsarCliente={usarCliente}
+              pedido={pedido}
+              onPedidoImportado={pedidoImportado}
+              onDescartarPedido={descartarPedido}
+            />
           </div>
           <div hidden={aba !== "faturamento"}>
             <FaturamentoAba
@@ -103,6 +140,10 @@ export default function FaturamentoEcommercePage({ empresa }: { empresa: Empresa
               onTrocarCliente={setCliente}
               onIrParaClientes={() => setAba("clientes")}
               onIrParaMonitor={() => setAba("monitor")}
+              pedido={pedido}
+              onImportarPedido={importarNoFaturamento}
+              onDescartarPedido={descartarPedido}
+              onNotaGravada={() => setPedido(null)}
             />
           </div>
           <div hidden={aba !== "monitor"}>

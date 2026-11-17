@@ -265,3 +265,82 @@ export interface NotaDetalhe extends NotaListItem {
   temXml: boolean;
   itens: NotaDetalheItem[];
 }
+
+// ── Importação do Shopify ───────────────────────────────────────────────────
+
+export interface PedidoShopifyResumo {
+  nome: string;
+  criadoEm: string;
+  cliente: string;
+  cidade: string;
+  uf: string;
+  total: number;
+  pecas: number;
+  pagamento: string;
+  fulfillment: string;
+  /** NFs (não canceladas) com este nº de pedido na OBS; `provavel` = achada por CPF + valor. */
+  notas: { filial: string; nf: string; provavel?: boolean }[];
+}
+
+export interface ClienteCandidato {
+  codigo: string;
+  nomeClifor: string;
+  razaoSocial: string;
+  cpfCnpj: string;
+  cep: string;
+  numero: string;
+  cidade: string;
+  uf: string;
+  filial: string;
+  /** "mesmo CPF", "nome parecido e mesmo CEP", "nome parecido". */
+  motivo: string;
+  forte: boolean;
+  /** CEP ou número diferentes do endereço do pedido. */
+  enderecoDifere: boolean;
+}
+
+export interface ItemImportado {
+  produto: string;
+  cor: string;
+  tamanho: number;
+  qtde: number;
+  preco: number;
+  descricao: string;
+  descCor: string;
+  tamanhoLabel: string;
+  estoque: number | null;
+  /** De onde veio o vínculo Shopify → Linx. */
+  origem: string;
+  /** Vínculo só sugerido no mapeamento (conferir). */
+  conferir: boolean;
+  tituloShopify: string;
+  /** Preço da tabela 01 no Linx (para avisar quando difere do preço do site). */
+  precoLinx: number | null;
+  /** Item de preço zero no site (brinde): vai a R$ 0,01. */
+  brinde: boolean;
+}
+
+export interface LinhaNaoMapeada {
+  titulo: string;
+  sku: string | null;
+  qtde: number;
+  preco: number;
+  desconto: number;
+  motivo: string;
+}
+
+export interface PedidoShopifyImport {
+  nome: string;
+  criadoEm: string;
+  pagamento: string;
+  /** Dados do cliente prontos para o cadastro (endereço já enriquecido pelo CEP). */
+  cliente: ClienteFatInput & { telefoneOriginal: string; enderecoOriginal: string };
+  candidatos: ClienteCandidato[];
+  itens: ItemImportado[];
+  naoMapeados: LinhaNaoMapeada[];
+  subtotalShopify: number;
+  descontoItens: number;
+  frete: number;
+  totalShopify: number;
+  notas: { filial: string; nf: string; provavel?: boolean }[];
+}
