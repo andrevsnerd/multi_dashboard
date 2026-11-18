@@ -533,7 +533,7 @@ function NovoClienteForm({
       {ehCnpj && (
         <div className={styles.avisoBox}>
           <strong>Isto é um CNPJ.</strong> Empresa se cadastra pelo cadastro PJ, que tem inscrição estadual, indicador
-          fiscal e os padrões do corporativo.
+          fiscal e o perfil WEB ou CORPORATIVO.
           <div className={styles.acoes}>
             <button
               type="button"

@@ -158,7 +158,7 @@ interface Plano {
   serie: string;
   /** Dígitos do NF_SAIDA da filial (pernas do e-commerce 9, Matriz 7). A chave usa sempre 9. */
   larguraNf: number;
-  /** FILIAIS.TIPO_TRIBUTACAO = SIMPLES NACIONAL. Falso = regime normal (Matriz da Scarf Me). */
+  /** Simples Nacional (pernas do e-commerce). Falso = regime normal (Matriz da Scarf Me, declarado no config). */
   simples: boolean;
   /** ICMS da operação UF filial → UF cliente (regime normal, quando a exceção traz 0). */
   aliqIcmsOperacao: number;
@@ -213,8 +213,7 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
   const [fil] = await q(req, `
     SELECT LTRIM(RTRIM(FI.COD_FILIAL)) AS codFilial, FI.EMPRESA AS empresa, LTRIM(RTRIM(S.SERIE_NF)) AS serie,
            LTRIM(RTRIM(C.UF)) AS uf, LTRIM(RTRIM(C.CGC_CPF)) AS cnpj, LTRIM(RTRIM(C.COD_MUNICIPIO_IBGE)) AS ibge,
-           LTRIM(RTRIM(S.SEQUENCIAL)) AS seq, LTRIM(RTRIM(N.COD_SERIE_SINTEGRA)) AS sintegra,
-           ISNULL(LTRIM(RTRIM(FI.TIPO_TRIBUTACAO)), '') AS tributacao
+           LTRIM(RTRIM(S.SEQUENCIAL)) AS seq, LTRIM(RTRIM(N.COD_SERIE_SINTEGRA)) AS sintegra
       FROM FILIAIS FI WITH (NOLOCK)
       JOIN CADASTRO_CLI_FOR C WITH (NOLOCK) ON C.NOME_CLIFOR = FI.FILIAL
       OUTER APPLY (${sqlUltimaNfEcommerce("FI.FILIAL")}) U
@@ -226,9 +225,11 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
   // Largura do nº da NF = a do sequencial da filial (pernas do e-commerce: 9; Matriz: 7).
   const larguraNf = larguraDoSequencial(trim(fil.seq));
   const proximoNumero = String((Number(fil.seq) || 0) + 1).padStart(larguraNf, "0");
-  // Regime da filial: o Simples grava os impostos zerados; a Matriz (regime normal) calcula ICMS/PIS/COFINS.
-  const simples = /SIMPLES/i.test(trim(fil.tributacao));
+  // Regime da filial: o Simples grava os impostos zerados; a Matriz (regime normal) calcula
+  // ICMS/PIS/COFINS. Declarado no config — FILIAIS.TIPO_TRIBUTACAO está vazio em pernas do
+  // Simples (MSC, CMS), então as pernas do rodízio são sempre Simples, como sempre foram.
   const extra = padrao.nota.filiaisExtras.find((x) => x.codFilial === trim(fil.codFilial)) ?? null;
+  const simples = extra ? extra.simplesNacional : true;
 
   // Cliente
   const clifor = trim(input.clienteCodigo).replace(/\D/g, "").padStart(6, "0").slice(-6);
@@ -402,6 +403,12 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
       bloqueios.push(
         `${a.produto}: a exceção fiscal encontrada para ${ufCliente} é "${excDesc}" (${idExc}, CSOSN ${csosn}), que não é de venda. ` +
           `Falta cadastrar a exceção de venda para ${ufCliente} no Linx.`
+      );
+    } else if (!simples && csosn.length !== 2) {
+      // Regime normal usa CST (2 dígitos: 00, 20…); CSOSN (3 dígitos) é do Simples — exceção errada.
+      bloqueios.push(
+        `${a.produto}: a exceção fiscal ${idExc} ("${excDesc}") traz ${csosn ? `CSOSN ${csosn}` : "tributação vazia"}, ` +
+          `que é do Simples — não serve para ${filial} (regime normal). Fature pelo Linx.`
       );
     }
     if (!cfop) bloqueios.push(`${a.produto}: CFOP não encontrado para a natureza ${natureza}.`);
@@ -1197,6 +1204,8 @@ export async function fetchNotaFat(params: { empresa: EmpresaFat; filial: string
     const req = request as Req;
     req.input("filial", sql.VarChar(25), params.filial);
     req.input("nf", sql.VarChar(15), trim(params.nf).replace(/\D/g, "").padStart(9, "0").slice(-9));
+    // Matriz numera com 7 dígitos; pernas do e-commerce com 9.
+    req.input("nf7", sql.VarChar(15), trim(params.nf).replace(/\D/g, "").padStart(7, "0").slice(-7));
     req.input("serie", sql.VarChar(6), trim(params.serie));
     const cab = await q(req, `
       SELECT F.FILIAL AS filial, F.NF_SAIDA AS nf, F.SERIE_NF AS serie, F.EMISSAO AS emissao, F.NOME_CLIFOR AS cliente,
@@ -1219,14 +1228,14 @@ export async function fetchNotaFat(params: { empresa: EmpresaFat; filial: string
              THEN 1 ELSE 0 END AS temXml
       FROM FATURAMENTO F WITH (NOLOCK)
       LEFT JOIN CADASTRO_CLI_FOR C WITH (NOLOCK) ON C.NOME_CLIFOR = F.NOME_CLIFOR
-      WHERE F.FILIAL = @filial AND F.NF_SAIDA = @nf AND F.SERIE_NF = @serie`);
+      WHERE F.FILIAL = @filial AND F.NF_SAIDA IN (@nf, @nf7) AND F.SERIE_NF = @serie`);
     const x = cab[0];
     if (!x) return null;
     const itens = await q(req, `
       SELECT LTRIM(RTRIM(I.REFERENCIA)) AS produto, LTRIM(RTRIM(I.REFERENCIA_ITEM)) AS cor, LTRIM(RTRIM(I.DESCRICAO_ITEM)) AS descricao,
              I.QTDE_ITEM AS qtde, I.PRECO_UNITARIO AS preco, I.VALOR_ITEM AS valor, LTRIM(RTRIM(I.CODIGO_FISCAL_OPERACAO)) AS cfop
         FROM FATURAMENTO_ITEM I WITH (NOLOCK)
-       WHERE I.FILIAL = @filial AND I.NF_SAIDA = @nf AND I.SERIE_NF = @serie
+       WHERE I.FILIAL = @filial AND I.NF_SAIDA IN (@nf, @nf7) AND I.SERIE_NF = @serie
        ORDER BY I.ITEM_NFE, I.ITEM_IMPRESSAO, I.SUB_ITEM_TAMANHO`);
     const base = mapNota(x);
     return {

@@ -81,9 +81,9 @@ export interface FilialNotaExtra {
 }
 
 /**
- * Padrões do cadastro PJ (CNPJ). Fluxo à parte do cadastro de pessoa física do site:
- * segue o cadastro do CORPORATIVO (tipo CORPORATIVO, conta 1120101, IE ISENTO quando
- * não houver), mas com a filial da empresa do e-commerce e indicador fiscal 8 (ver abaixo).
+ * Padrões do cadastro PJ (CNPJ). Fluxo à parte do cadastro de pessoa física do site.
+ * Tipo, conta, tabela e transportadora vêm do perfil (PERFIS_CLIENTE_PJ, padrão WEB);
+ * o resto é comum aos dois perfis. IE ISENTO quando não houver, indicador fiscal 8.
  */
 export interface PadraoClientePj {
   filial: string;
@@ -119,21 +119,82 @@ const CLIENTE_BASE: Omit<PadraoCliente, "filial"> = {
 };
 
 /**
- * Mesmos padrões do cadastro corporativo (lib/corporativo/config + app/corporativo/novo),
- * com UMA exceção medida em 18/11/2026: o indicador fiscal padrão é 8 (não contribuinte),
- * não 1. Nem NERD nem Scarf Me têm exceção fiscal de venda para contribuinte (indicador 1):
- * a NF cai em 1117 "DEVOLUÇÃO COMPRA" (CSOSN 900) e a prévia bloqueia, em qualquer UF.
- * Com 8 sai 5102/6108 CSOSN 102, como 164 de 185 NFs de e-commerce para CNPJ desde 2024.
- * A tela troca para 1 quando o operador informa a IE (empresa contribuinte).
+ * Perfil do cliente PJ — "cada um no seu quadrado". Medido no Linx em 18/11/2026 nos CNPJs
+ * cadastrados desde 2025 (97 WEB, 87 CORPORATIVO): os dois tipos têm conjuntos fixos e
+ * diferentes de conta, indicador de venda, agrupamento, tabela e transportadora. Trocar o
+ * perfil na tela troca o conjunto inteiro — nunca metade WEB, metade corporativo.
+ *
+ * O indicador FISCAL não faz parte do perfil: é fato do cliente (tem IE ou não), e com 1
+ * a NF do e-commerce bloqueia (ver CLIENTE_PJ_BASE). Os corporativos medidos têm 1 porque
+ * saem pela Matriz.
+ */
+export type PerfilClientePj = "WEB" | "CORPORATIVO";
+
+export interface PerfilClientePjDef {
+  rotulo: string;
+  descricao: string;
+  /** CLIENTES_ATACADO.TIPO */
+  tipo: string;
+  contaContabil: string;
+  codigoTabPreco: string;
+  transportadora: string;
+  /** CLIENTES_ATACADO.INDICADOR_VENDA — não aparece na tela, vem do perfil. */
+  indicadorVenda: string;
+  /** CADASTRO_CLI_FOR.AGRUPAMENTO_ITENS — não aparece na tela, vem do perfil. */
+  agrupamentoItens: number;
+}
+
+export const PERFIS_CLIENTE_PJ: Record<PerfilClientePj, PerfilClientePjDef> = {
+  WEB: {
+    rotulo: "WEB",
+    descricao: "Empresa que comprou pelo site",
+    tipo: "WEB",
+    contaContabil: "1120302",
+    codigoTabPreco: "01",
+    transportadora: "NOSSO CARRO",
+    indicadorVenda: "V",
+    agrupamentoItens: 0,
+  },
+  CORPORATIVO: {
+    rotulo: "CORPORATIVO",
+    descricao: "Cliente da venda corporativa",
+    tipo: "CORPORATIVO",
+    contaContabil: "1120101",
+    codigoTabPreco: "05",
+    transportadora: "CORREIOS - SEDEX",
+    indicadorVenda: "",
+    agrupamentoItens: 2,
+  },
+};
+
+export const PERFIL_PJ_PADRAO: PerfilClientePj = "WEB";
+
+export function isPerfilClientePj(v: unknown): v is PerfilClientePj {
+  return v === "WEB" || v === "CORPORATIVO";
+}
+
+/** Perfil a que um TIPO de cliente pertence (null = tipo fora dos dois perfis). */
+export function perfilDoTipo(tipo: string): PerfilClientePj | null {
+  const t = String(tipo ?? "").trim().toUpperCase();
+  return isPerfilClientePj(t) ? t : null;
+}
+
+/**
+ * Padrões comuns aos dois perfis + os do perfil padrão (WEB, como o cliente do site).
+ * Indicador fiscal padrão é 8 (não contribuinte), medido em 18/11/2026: nem NERD nem
+ * Scarf Me têm exceção fiscal de venda para contribuinte (indicador 1): a NF cai em 1117
+ * "DEVOLUÇÃO COMPRA" (CSOSN 900) e a prévia bloqueia, em qualquer UF. Com 8 sai 5102/6108
+ * CSOSN 102, como 164 de 185 NFs de e-commerce para CNPJ desde 2024. A tela troca para 1
+ * quando o operador informa a IE (empresa contribuinte).
  */
 const CLIENTE_PJ_BASE: Omit<PadraoClientePj, "filial"> = {
-  tipo: "CORPORATIVO",
+  tipo: PERFIS_CLIENTE_PJ[PERFIL_PJ_PADRAO].tipo,
   conceito: "BOM",
   pontualidade: "INDEFINIDO",
-  transportadora: "NOSSO CARRO",
+  transportadora: PERFIS_CLIENTE_PJ[PERFIL_PJ_PADRAO].transportadora,
   condicaoPgto: "01",
-  codigoTabPreco: "01",
-  contaContabil: "1120101",
+  codigoTabPreco: PERFIS_CLIENTE_PJ[PERFIL_PJ_PADRAO].codigoTabPreco,
+  contaContabil: PERFIS_CLIENTE_PJ[PERFIL_PJ_PADRAO].contaContabil,
   indicadorFiscal: 8,
   representante: "SEM REPRESENTANTE",
 };

@@ -106,8 +106,20 @@ Botão próprio "Cadastrar PJ (CNPJ)" (`ClientePjForm.tsx` → `/api/faturamento
 → `clientesPj.ts`). O cadastro de pessoa física recusa CNPJ (tela, rota e repositório) e
 oferece abrir o PJ com os dados digitados; pedido do Shopify com CNPJ abre direto o PJ.
 
-- Campos e padrões do **corporativo**: tipo CORPORATIVO, conta 1120101, IE ISENTO,
-  AGRUPAMENTO_ITENS 2, INDICADOR_VENDA ' ', IE/IM/SUFRAMA/tributação, cobrança e entrega
+- **Perfil WEB (padrão) ou CORPORATIVO** — seletor no topo do formulário; trocar o Tipo
+  para WEB/CORPORATIVO troca o perfil junto. Cada perfil grava o conjunto inteiro, medido
+  nos CNPJs cadastrados desde 2025 (`PERFIS_CLIENTE_PJ` em `config.ts`):
+
+  | | WEB (97) | CORPORATIVO (87) |
+  |---|---|---|
+  | CTB_CONTA_CONTABIL | 1120302 | 1120101 |
+  | INDICADOR_VENDA | V | ' ' |
+  | AGRUPAMENTO_ITENS | 0 | 2 |
+  | CODIGO_TAB_PRECO | 01 | 05 |
+  | TRANSPORTADORA | NOSSO CARRO | CORREIOS - SEDEX |
+
+  O repositório recusa Tipo de um perfil com o outro perfil selecionado.
+- Campos do cadastro corporativo: IE ISENTO, IE/IM/SUFRAMA/tributação, cobrança e entrega
   próprias, 2º telefone, limite, OBS. Filial = a da empresa (NERD / SCARF ME - MATRIZ).
   Busca CNPJ na BrasilAPI + CEP para o IBGE. CIDADE das 3 vias vem do IBGE (sem acento).
 - **Indicador fiscal padrão = 8, não 1** (única diferença do corporativo). Medido: nem NERD
@@ -193,6 +205,36 @@ Gerado **depois**, pela autorização (não inserir): `STATUS_NFE=5`, protocolo,
 - Emissão em data fechada (`CM_DATA_FECHAMENTO`, `CTB_FECHAMENTO` tipo 03) → trigger recusa.
 - Número/estoque são consumidos no save: NF errada exige cancelamento/inutilização no monitor.
 - Usuário gravado = usuário do Linx (`resolveResponsavelLinx`), nunca o do dashboard.
+
+### Faturar pela Matriz da Scarf Me (18/11/2026)
+
+Pedido do site às vezes é faturado pela `SCARF ME - MATRIZ` (cód. 001), como o corporativo.
+Ela entra na lista de filiais da Scarf Me como **extra, fora do rodízio** (`PADROES.scarfme.nota.filiaisExtras`):
+vem por último, nunca vira a principal (a principal é só entre as pernas, por NF 100.02/100.022).
+
+- **Regime normal (CRT 3), não Simples.** Declarado no config (`simplesNacional: false`) —
+  `FILIAIS.TIPO_TRIBUTACAO` não serve (MSC e CMS, que são Simples, estão vazias). As pernas do
+  rodízio continuam sempre Simples, com o cálculo de antes intocado (`valorImposto`).
+- **Naturezas** medidas nas NFs dela: 100.05 VENDA PRIVATE (dentro e fora de SP; 1.204 NFs) e
+  100.08 REVENDA (cliente indicador 16; 2.004 NFs). Nunca usou 100.02/100.022.
+- **Impostos** (`impostosRegimeNormal`): base = item − desconto + frete/seguro (pelas flags da
+  exceção), redução da exceção (ICMS 33,33% em SP); taxa da exceção ou, se 0, a do ICMS da
+  operação (`UNIDADES_FEDERACAO_ICMS` SP→SP 18, →RJ/MG 12, →CE/BA 7); base arredondada, valor
+  truncado sobre a base exata; IBS/CBS = alíquota do tipo sobre item − ICMS − PIS − COFINS,
+  arredondado; `BASE_IMPOSTO_CALC` = base. DICMS (11/71/72/73) não é gravado (como o Linx faz
+  para contribuinte). Conferência em 18/11 contra NFs reais out–nov: base 100%; ICMS 100% em
+  NF de 1 item; PIS/COFINS 2.329/2.330; IBS/CBS ~98,6%. Em NF de **vários itens** o Linx reparte
+  o ICMS do total e ~metade dessas NFs tem alguma linha ±R$ 0,01 diferente deste cálculo.
+- **Consumidor final** = só indicador 8 (empresa 1 e revenda 16 = 0); IBPT (tributos
+  aproximados, OBS tipo 6) só para consumidor final. Sem OBS tipo 7 (DIFAL).
+- **Trava:** não contribuinte (indicador ≠ 1/16) de outra UF tem DIFAL → bloqueado (fature no
+  Linx). Também bloqueia exceção com CSOSN (3 dígitos) e imposto fora da lista conhecida.
+- **Numeração:** NF_SAIDA com a largura do sequencial da filial (Matriz 7 dígitos `0043671`;
+  pernas 9). A chave usa sempre 9. Detalhe, busca e envio procuram nas duas larguras.
+- `ENTREGA_CIF` = `TIPO_FRETE.FRETE_PAGO` (vale para todas: '2'→0, '01'→1, '04'→9, '05'→3).
+- XML gerado pela `LX_GERA_NFE_SEFAZ_4_00` numa simulação desfeita: CRT 3, CST 20, pRedBC
+  33,3333, indFinal 0. O texto legal da redução (`INFORMACAO_COMPLEMENTAR`) o Linx preenche no envio.
+- A Matriz **não aceita estoque negativo**: o trigger recusa a NF se não houver saldo.
 
 ---
 

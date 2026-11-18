@@ -81,10 +81,12 @@ async function carregarNota(empresa: EmpresaFat, filial: string, nf: string, ser
        FROM FATURAMENTO F WITH (NOLOCK)
        JOIN CADASTRO_CLI_FOR C WITH (NOLOCK) ON C.NOME_CLIFOR = F.FILIAL
        LEFT JOIN SERIES_NF N WITH (NOLOCK) ON N.SERIE_NF = F.SERIE_NF
-      WHERE F.FILIAL = @f AND F.NF_SAIDA = @n AND F.SERIE_NF = @s`,
+      WHERE F.FILIAL = @f AND F.NF_SAIDA IN (@n, @n7) AND F.SERIE_NF = @s`,
     (req) => {
       req.input("f", sql.VarChar(25), filial);
       req.input("n", sql.VarChar(15), nfNum);
+      // Matriz numera com 7 dígitos; pernas do e-commerce com 9.
+      req.input("n7", sql.VarChar(15), nfNum.slice(-7));
       req.input("s", sql.VarChar(6), trim(serie));
     }
   );

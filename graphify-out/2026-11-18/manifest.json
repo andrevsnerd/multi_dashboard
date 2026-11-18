@@ -5590,8 +5590,8 @@
     "semantic_hash": ""
   },
   "app/api/faturamento-ecommerce/clientes/route.ts": {
-    "mtime": 1794918659.1913085,
-    "ast_hash": "d69df49fe6e1882378f9d75c61ed80d7",
+    "mtime": 1795020642.5325792,
+    "ast_hash": "703d36f906e52c133b6b0ec47951df0b",
     "semantic_hash": ""
   },
   "app/api/faturamento-ecommerce/lookups/route.ts": {
@@ -5625,13 +5625,13 @@
     "semantic_hash": ""
   },
   "components/faturamento-ecommerce/ClientesAba.tsx": {
-    "mtime": 1794920684.8674252,
-    "ast_hash": "2144dbcb12ec661eb924e60131b3d5f7",
+    "mtime": 1795022934.200702,
+    "ast_hash": "8a12c7ff674951baf110fcfb15957916",
     "semantic_hash": ""
   },
   "components/faturamento-ecommerce/FaturamentoAba.tsx": {
-    "mtime": 1795007637.0532427,
-    "ast_hash": "cd7c36b075dcfa2f0729621cf1368e3c",
+    "mtime": 1795022567.4271815,
+    "ast_hash": "28b34f1f1a545f87bb0a8a73cab78cac",
     "semantic_hash": ""
   },
   "components/faturamento-ecommerce/FaturamentoEcommercePage.tsx": {
@@ -5660,28 +5660,28 @@
     "semantic_hash": ""
   },
   "lib/faturamento-ecommerce/config.ts": {
-    "mtime": 1795007779.6156251,
-    "ast_hash": "5121a5d33e1baed88a2f236ba1eeb0d0",
+    "mtime": 1795022868.5773895,
+    "ast_hash": "e9027a2c3000fb63a5a4ce568146d249",
     "semantic_hash": ""
   },
   "lib/faturamento-ecommerce/types.ts": {
-    "mtime": 1795007621.3982577,
-    "ast_hash": "0c2056dbd8cc5b0f9e8b6046a3783e24",
+    "mtime": 1795022896.9709253,
+    "ast_hash": "136f5558fb2c618cba9065169fe3d5ce",
     "semantic_hash": ""
   },
   "lib/repositories/faturamentoEcommerce/clientes.ts": {
-    "mtime": 1795007824.6542344,
-    "ast_hash": "bb6b58c897d4fee87bb6c22e92ff5784",
+    "mtime": 1795022669.8651917,
+    "ast_hash": "121f475dff83a89f3935d881560d83a7",
     "semantic_hash": ""
   },
   "lib/repositories/faturamentoEcommerce/notas.ts": {
-    "mtime": 1795007824.8641331,
-    "ast_hash": "c4a010322a3a109b1d01edffd062b2ad",
+    "mtime": 1795022819.6454012,
+    "ast_hash": "a17e190e7d8e44edf2240529b557f840",
     "semantic_hash": ""
   },
   "docs/FATURAMENTO_SHOPIFY_LINX.md": {
-    "mtime": 1794922693.33402,
-    "ast_hash": "4ee2959aee2abd3f3cadac4118cdc0d8",
+    "mtime": 1795023019.712811,
+    "ast_hash": "31570a3d5f61244ffdaefae7ac9c1f91",
     "semantic_hash": ""
   },
   "app/api/faturamento-ecommerce/shopify/pedido/route.ts": {
@@ -5735,13 +5735,43 @@
     "semantic_hash": ""
   },
   "lib/repositories/faturamentoEcommerce/sefaz.ts": {
-    "mtime": 1795007830.7442932,
-    "ast_hash": "5fc45055d8a7a526c987fae3877f1db7",
+    "mtime": 1795022802.4413464,
+    "ast_hash": "12b43bebe256bb35dbcb590b5999b9ce",
     "semantic_hash": ""
   },
   "lib/repositories/faturamentoEcommerce/filiais-nota.ts": {
-    "mtime": 1795007780.0481148,
-    "ast_hash": "32f41043a77a82ed58bd98a8eec4b7d2",
+    "mtime": 1795021671.1082604,
+    "ast_hash": "026d0a7c887b83fd56629925bbb3deaf",
+    "semantic_hash": ""
+  },
+  "app/api/faturamento-ecommerce/clientes-pj/route.ts": {
+    "mtime": 1795020578.5258038,
+    "ast_hash": "7eb26ad54231ec5550285dc66a7475f3",
+    "semantic_hash": ""
+  },
+  "app/api/faturamento-ecommerce/cnpj/[cnpj]/route.ts": {
+    "mtime": 1795020578.6031642,
+    "ast_hash": "750dc56fb6040953c91a6e97a897a73f",
+    "semantic_hash": ""
+  },
+  "components/faturamento-ecommerce/CamposCliente.tsx": {
+    "mtime": 1795020589.9280193,
+    "ast_hash": "265cfffd5bf6ece82ae40bfac7b72046",
+    "semantic_hash": ""
+  },
+  "components/faturamento-ecommerce/ClientePjForm.tsx": {
+    "mtime": 1795022944.5861354,
+    "ast_hash": "19b2efdd8cadb7db3df7dea1c1a51aaf",
+    "semantic_hash": ""
+  },
+  "lib/faturamento-ecommerce/cnpj.ts": {
+    "mtime": 1795020508.9956157,
+    "ast_hash": "f3b0987ac707806908f23af9999ee7fc",
+    "semantic_hash": ""
+  },
+  "lib/repositories/faturamentoEcommerce/clientesPj.ts": {
+    "mtime": 1795022897.93486,
+    "ast_hash": "da990d3b3977ff256efce61cc4cf9e96",
     "semantic_hash": ""
   }
 }

@@ -40,7 +40,7 @@ export interface FilialNotaOpcao {
   /** Fora do rodízio do e-commerce (ex.: Matriz da Scarf Me) — nunca vira a principal. */
   extra: boolean;
   rotulo: string | null;
-  /** FILIAIS.TIPO_TRIBUTACAO = SIMPLES NACIONAL. A Matriz é regime normal (ICMS/PIS/COFINS). */
+  /** Simples Nacional (pernas do e-commerce). A Matriz é regime normal (ICMS/PIS/COFINS), declarado no config. */
   simples: boolean;
   naturezaDentroUf: string;
   naturezaForaUf: string;
@@ -127,10 +127,13 @@ export interface ClienteFatInput {
 }
 
 /**
- * Cadastro PJ (CNPJ) — fluxo separado do cadastro de pessoa física do site, no
- * padrão do cadastro corporativo. Tudo editável; vazio = padrão de PADROES[e].clientePj.
+ * Cadastro PJ (CNPJ) — fluxo separado do cadastro de pessoa física do site, com perfil
+ * WEB ou CORPORATIVO (PERFIS_CLIENTE_PJ). Tudo editável; vazio = padrão do perfil /
+ * de PADROES[e].clientePj.
  */
 export interface ClientePjFatInput {
+  /** WEB (padrão) ou CORPORATIVO — define indicador de venda e agrupamento de itens. */
+  perfil?: string;
   cnpj: string;
   razaoSocial: string;
   /** Nome no Linx (NOME_CLIFOR, 25). Vazio = 25 primeiros caracteres da razão social. */

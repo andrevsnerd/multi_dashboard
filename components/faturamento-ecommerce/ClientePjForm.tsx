@@ -5,9 +5,13 @@ import { useEffect, useState } from "react";
 import {
   INDICADORES_FISCAIS,
   PADROES,
+  PERFIL_PJ_PADRAO,
+  PERFIS_CLIENTE_PJ,
   TIPOS_TRIBUTACAO,
+  perfilDoTipo,
   regiaoDaUf,
   type EmpresaFat,
+  type PerfilClientePj,
 } from "@/lib/faturamento-ecommerce/config";
 import type {
   ClientePjFatInput,
@@ -23,8 +27,9 @@ import styles from "./FaturamentoEcommerce.module.css";
 
 /**
  * Cadastro de cliente PJ (CNPJ) — separado do cadastro de pessoa física do site.
- * Mesmos campos e padrões do cadastro corporativo (tipo CORPORATIVO, conta 1120101,
- * IE ISENTO), todos editáveis — só o indicador fiscal padrão é 8 (ver config.ts).
+ * Perfil WEB (padrão: empresa que comprou no site) ou CORPORATIVO: o perfil aplica o
+ * conjunto inteiro (tipo, conta, tabela, transportadora + indicador de venda e agrupamento,
+ * que não aparecem). Trocar o Tipo para WEB/CORPORATIVO troca o perfil junto.
  * Grava via /api/faturamento-ecommerce/clientes-pj.
  */
 
@@ -81,15 +86,33 @@ export default function ClientePjForm({
   const [telefone2, setTelefone2] = useState("");
   const [email, setEmail] = useState(inicial?.email ?? "");
   const [emailNfe, setEmailNfe] = useState("");
-  // Comercial
+  // Comercial — tipo, conta, tabela e transportadora começam no perfil
+  const [perfil, setPerfil] = useState<PerfilClientePj>(PERFIL_PJ_PADRAO);
+  const perfilDef = PERFIS_CLIENTE_PJ[perfil];
   const [filial, setFilial] = useState(padrao.filial);
-  const [tipo, setTipo] = useState(padrao.tipo);
+  const [tipo, setTipo] = useState(PERFIS_CLIENTE_PJ[PERFIL_PJ_PADRAO].tipo);
   const [conceito, setConceito] = useState(padrao.conceito);
   const [pontualidade, setPontualidade] = useState(padrao.pontualidade);
-  const [transportadora, setTransportadora] = useState(padrao.transportadora);
+  const [transportadora, setTransportadora] = useState(PERFIS_CLIENTE_PJ[PERFIL_PJ_PADRAO].transportadora);
   const [condicao, setCondicao] = useState(padrao.condicaoPgto);
-  const [tabela, setTabela] = useState(padrao.codigoTabPreco);
-  const [conta, setConta] = useState(padrao.contaContabil);
+  const [tabela, setTabela] = useState(PERFIS_CLIENTE_PJ[PERFIL_PJ_PADRAO].codigoTabPreco);
+  const [conta, setConta] = useState(PERFIS_CLIENTE_PJ[PERFIL_PJ_PADRAO].contaContabil);
+
+  /** Troca o perfil inteiro — nunca fica metade WEB, metade corporativo. */
+  const aplicarPerfil = (p: PerfilClientePj) => {
+    const d = PERFIS_CLIENTE_PJ[p];
+    setPerfil(p);
+    setTipo(d.tipo);
+    setConta(d.contaContabil);
+    setTabela(d.codigoTabPreco);
+    setTransportadora(d.transportadora);
+  };
+
+  const mudarTipo = (v: string) => {
+    const p = perfilDoTipo(v);
+    if (p && p !== perfil) aplicarPerfil(p);
+    else setTipo(v);
+  };
   const [regiaoManual, setRegiaoManual] = useState<string | null>(null);
   const [representante, setRepresentante] = useState(padrao.representante);
   const [limite, setLimite] = useState("0");
@@ -174,6 +197,7 @@ export default function ClientePjForm({
     setErro(null);
     try {
       const cliente: ClientePjFatInput = {
+        perfil,
         cnpj,
         razaoSocial: razao,
         nomeFantasia: fantasia,
@@ -227,8 +251,32 @@ export default function ClientePjForm({
         <span className={styles.muted}>Próximo código: {lookups.proximoCodigoCliente || "—"}</span>
       </div>
       <p className={styles.muted}>
-        Cadastro de empresa no padrão do corporativo. Pessoa física continua no cadastro de pessoa física.
+        Cadastro de empresa (CNPJ). Pessoa física continua no cadastro de pessoa física.
       </p>
+
+      <div className={styles.campo}>
+        <span className={styles.label}>Perfil do cliente</span>
+        <div className={styles.tabs} role="radiogroup" aria-label="Perfil do cliente">
+          {(Object.keys(PERFIS_CLIENTE_PJ) as PerfilClientePj[]).map((p) => (
+            <button
+              key={p}
+              type="button"
+              role="radio"
+              aria-checked={perfil === p}
+              className={`${styles.tab} ${perfil === p ? styles.tabAtiva : ""}`}
+              onClick={() => aplicarPerfil(p)}
+              title={PERFIS_CLIENTE_PJ[p].descricao}
+            >
+              {PERFIS_CLIENTE_PJ[p].rotulo}
+            </button>
+          ))}
+        </div>
+        <span className={styles.muted}>
+          <strong>{perfilDef.descricao}.</strong> Grava tipo {perfilDef.tipo} · conta {perfilDef.contaContabil} · tabela{" "}
+          {perfilDef.codigoTabPreco} · {perfilDef.transportadora} · indicador de venda {perfilDef.indicadorVenda || "vazio"} ·
+          agrupamento {perfilDef.agrupamentoItens}.
+        </span>
+      </div>
       {origem && (
         <div className={styles.infoBox}>
           Preenchido com os dados do {origem}. Use “Buscar CNPJ” para trazer razão social e endereço da Receita.
@@ -356,10 +404,10 @@ export default function ClientePjForm({
         </>
       )}
 
-      <h3 className={styles.cardTitle}>Dados comerciais (padrão do corporativo — pode alterar)</h3>
+      <h3 className={styles.cardTitle}>Dados comerciais (padrão do perfil {perfilDef.rotulo} — pode alterar)</h3>
       <div className={styles.grid}>
         <Escolha label="Filial" value={filial} opcoes={lookups.filiaisCliente} onChange={setFilial} padrao={padrao.filial} />
-        <Escolha label="Tipo" value={tipo} opcoes={lookups.tiposCliente} onChange={setTipo} padrao={padrao.tipo} />
+        <Escolha label="Tipo" value={tipo} opcoes={lookups.tiposCliente} onChange={mudarTipo} padrao={perfilDef.tipo} />
         <Escolha label="Conceito" value={conceito} opcoes={lookups.conceitos} onChange={setConceito} padrao={padrao.conceito} />
         <Escolha
           label="Pontualidade"
@@ -373,7 +421,7 @@ export default function ClientePjForm({
           value={transportadora}
           opcoes={lookups.transportadoras}
           onChange={setTransportadora}
-          padrao={padrao.transportadora}
+          padrao={perfilDef.transportadora}
         />
         <Escolha
           label="Condição de pagamento"
@@ -382,7 +430,7 @@ export default function ClientePjForm({
           onChange={setCondicao}
           padrao={padrao.condicaoPgto}
         />
-        <Escolha label="Tabela de preço" value={tabela} opcoes={lookups.tabelasPreco} onChange={setTabela} padrao={padrao.codigoTabPreco} />
+        <Escolha label="Tabela de preço" value={tabela} opcoes={lookups.tabelasPreco} onChange={setTabela} padrao={perfilDef.codigoTabPreco} />
         <Escolha label="Região" value={regiao} opcoes={lookups.regioes} onChange={setRegiaoManual} />
         <Escolha
           label="Representante"
@@ -391,7 +439,7 @@ export default function ClientePjForm({
           onChange={setRepresentante}
           padrao={padrao.representante}
         />
-        <Escolha label="Conta contábil" value={conta} opcoes={contas} onChange={setConta} padrao={padrao.contaContabil} />
+        <Escolha label="Conta contábil" value={conta} opcoes={contas} onChange={setConta} padrao={perfilDef.contaContabil} />
         <Campo label="Limite de crédito" value={limite} onChange={setLimite} alterado={limite !== "0"} />
       </div>
       <label className={styles.campo}>
@@ -426,7 +474,7 @@ export default function ClientePjForm({
           onClick={() => salvar(false)}
           disabled={salvando || cnpjDigitos.length !== 14}
         >
-          {salvando ? "Gravando no Linx…" : "Cadastrar PJ no Linx"}
+          {salvando ? "Gravando no Linx…" : `Cadastrar PJ ${perfilDef.rotulo} no Linx`}
         </button>
         <button type="button" className={styles.btnTexto} onClick={onCancelar}>
           Cancelar
