@@ -9,6 +9,8 @@
  * Arquivo sem "server-only": é lido também pelos componentes da página.
  */
 
+import { getFilialGroupById } from "@/lib/config/filial-registry";
+
 export type EmpresaFat = "nerd" | "scarfme";
 
 export const EMPRESAS_FAT: EmpresaFat[] = ["nerd", "scarfme"];
@@ -33,8 +35,14 @@ export interface PadraoCliente {
 }
 
 export interface PadraoNota {
-  /** Filiais que emitem NF de e-commerce desta empresa (a 1ª é a padrão se não houver detecção). */
-  filiais: string[];
+  /**
+   * COD_FILIAL das filiais que emitem NF de e-commerce desta empresa. Sempre por código:
+   * o nome no Linx pode ter caractere invisível (a FFF usa espaço não separável em volta
+   * do hífen) — o nome vivo vem de lib/server/filial-resolver no servidor.
+   * A principal (pré-selecionada) é a que emitiu NF de e-commerce por último.
+   */
+  codFiliais: string[];
+  /** Série padrão. A de cada filial é a da última NF de e-commerce dela (a CMS usa 13). */
   serie: string;
   condicaoPgto: string;
   tipoFrete: string;
@@ -71,7 +79,7 @@ const CLIENTE_BASE: Omit<PadraoCliente, "filial"> = {
   representante: "SEM REPRESENTANTE",
 };
 
-const NOTA_BASE: Omit<PadraoNota, "filiais" | "serie"> = {
+const NOTA_BASE: Omit<PadraoNota, "codFiliais" | "serie"> = {
   condicaoPgto: "01",
   tipoFrete: "2",
   transportadora: "CORREIOS - SEDEX",
@@ -87,17 +95,24 @@ const NOTA_BASE: Omit<PadraoNota, "filiais" | "serie"> = {
   naturezaForaUf: "100.022",
 };
 
+/**
+ * Scarf Me: todas as pernas do grupo E-COMMERCE do registry (rodízio fiscal AKS ↔ MSC ↔
+ * LLL…). Vem do registry para que uma perna nova entre aqui sem editar este arquivo.
+ */
+const COD_FILIAIS_ECOMMERCE_SCARFME: string[] = getFilialGroupById("ecommerce-scarfme")?.memberIds ?? [];
+
 export const PADROES: Record<EmpresaFat, PadraoEmpresa> = {
   nerd: {
     nome: "NERD",
     cliente: { ...CLIENTE_BASE, filial: "NERD" },
-    nota: { ...NOTA_BASE, filiais: ["NERD"], serie: "001" },
+    // Só a matriz NERD (000069) fatura o e-commerce da NERD.
+    nota: { ...NOTA_BASE, codFiliais: ["000069"], serie: "001" },
   },
   scarfme: {
     nome: "SCARF ME",
     cliente: { ...CLIENTE_BASE, filial: "SCARF ME - MATRIZ" },
-    // Rodízio fiscal MSC ↔ AKS: a filial ativa é detectada pela NF mais recente.
-    nota: { ...NOTA_BASE, filiais: ["AKS COMERCIO DE LENCOS LT", "MSC COMERCIO DE LENCOS LT"], serie: "1" },
+    // Rodízio fiscal entre as pernas do e-commerce: a principal é a que emitiu por último.
+    nota: { ...NOTA_BASE, codFiliais: COD_FILIAIS_ECOMMERCE_SCARFME, serie: "1" },
   },
 };
 

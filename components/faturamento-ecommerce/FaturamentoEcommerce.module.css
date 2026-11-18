@@ -33,6 +33,22 @@
   border: 1px solid var(--b-300);
   color: var(--t-700);
 }
+a.empresaTag {
+  text-decoration: none;
+}
+a.empresaTag:hover {
+  border-color: var(--t-500);
+}
+.empresaSwitch {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.empresaTagAtiva {
+  background: var(--t-700);
+  border-color: var(--t-700);
+  color: var(--s-white);
+}
 
 /* abas */
 .tabs {

@@ -4,6 +4,7 @@ import sql from "mssql";
 import { withRequest } from "@/lib/db/connection";
 import type { RequestLike } from "@/lib/db/proxy";
 import { PADROES, type EmpresaFat } from "@/lib/faturamento-ecommerce/config";
+import { filiaisNotaDaEmpresa } from "./filiais-nota";
 import {
   AUTORIZADA,
   DENEGADA,
@@ -70,7 +71,7 @@ interface NotaEnvio {
 }
 
 async function carregarNota(empresa: EmpresaFat, filial: string, nf: string, serie: string): Promise<NotaEnvio> {
-  if (!PADROES[empresa].nota.filiais.includes(filial)) throw new Error(`A filial ${filial} não é da ${PADROES[empresa].nome}.`);
+  if (!(await filiaisNotaDaEmpresa(empresa)).includes(filial)) throw new Error(`A filial ${filial} não é da ${PADROES[empresa].nome}.`);
   const nfNum = trim(nf).replace(/\D/g, "").padStart(9, "0").slice(-9);
   const [rows] = await rodar(
     `SELECT LTRIM(RTRIM(F.FILIAL)) AS filial, LTRIM(RTRIM(F.NF_SAIDA)) AS nf, LTRIM(RTRIM(F.SERIE_NF)) AS serie,
@@ -239,7 +240,7 @@ async function aplicarRetornoAutorizado(nota: NotaEnvio, ret: FiscalFlowRetorno,
   );
   if (AUTORIZADA.has(trim(ret.cStat))) {
     // Contábil + contas a receber — o desktop chama logo depois do retorno. Só se ainda não houver lançamento.
-    const atual = await carregarNota(empresaDaFilial(nota.filial), nota.filial, nota.nf, nota.serie);
+    const atual = await carregarNota(await empresaDaFilial(nota.filial), nota.filial, nota.nf, nota.serie);
     if (!atual.ctbLancamento && atual.status === 5) {
       await executarProcesso(
         "LX_CTB_INTEGRAR_FATURAMENTO",
@@ -251,8 +252,8 @@ async function aplicarRetornoAutorizado(nota: NotaEnvio, ret: FiscalFlowRetorno,
   }
 }
 
-function empresaDaFilial(filial: string): EmpresaFat {
-  return PADROES.nerd.nota.filiais.includes(filial) ? "nerd" : "scarfme";
+async function empresaDaFilial(filial: string): Promise<EmpresaFat> {
+  return (await filiaisNotaDaEmpresa("nerd")).includes(filial) ? "nerd" : "scarfme";
 }
 
 async function aplicarRejeicao(nota: NotaEnvio, ret: FiscalFlowRetorno, comportamento: string | null) {
@@ -276,7 +277,7 @@ async function aplicarRejeicao(nota: NotaEnvio, ret: FiscalFlowRetorno, comporta
     }
   }
   // Garante o estado "Rejeitado" (4/99) mesmo que a procedure não trate o código.
-  const atual = await carregarNota(empresaDaFilial(nota.filial), nota.filial, nota.nf, nota.serie);
+  const atual = await carregarNota(await empresaDaFilial(nota.filial), nota.filial, nota.nf, nota.serie);
   if (atual.status !== 4 && atual.status !== 5) await setStatus(nota.chave, 4, 99, "AND STATUS_NFE IN (2,3)");
   void comportamento;
 }
@@ -546,7 +547,7 @@ export async function verificarNotaSefaz(params: {
 
 /** Teste de conexão: autentica e consulta a última NF autorizada da empresa (nada é enviado). */
 export async function testarConexaoFiscalFlow(empresa: EmpresaFat): Promise<{ autenticou: boolean; nfConsultada: string; verificacao: Verificacao }> {
-  const filiais = PADROES[empresa].nota.filiais;
+  const filiais = await filiaisNotaDaEmpresa(empresa);
   const [rows] = await rodar(
     `SELECT TOP 1 LTRIM(RTRIM(FILIAL)) AS filial, LTRIM(RTRIM(NF_SAIDA)) AS nf, LTRIM(RTRIM(SERIE_NF)) AS serie
        FROM FATURAMENTO WITH (NOLOCK)

@@ -14,6 +14,8 @@ import type {
   PedidoShopifyResumo,
 } from "@/lib/faturamento-ecommerce/types";
 import { shopifyGraphql } from "@/lib/shopify/client";
+import { fetchFiliaisNota } from "./clientes";
+import { filiaisNotaDaEmpresa } from "./filiais-nota";
 
 /**
  * Faturamento E-commerce — importação de pedidos do Shopify da própria empresa
@@ -44,7 +46,7 @@ async function notasPorPedido(empresa: EmpresaFat, numeros: string[], desde: Dat
   const mapa = new Map<string, { filial: string; nf: string }[]>();
   if (numeros.length === 0) return mapa;
   const alvo = new Set(numeros);
-  const filiais = PADROES[empresa].nota.filiais;
+  const filiais = await filiaisNotaDaEmpresa(empresa);
   const rows = await withRequest(async (request: sql.Request | RequestLike) => {
     const req = request as Req;
     filiais.forEach((f, i) => req.input(`f${i}`, sql.VarChar(25), f));
@@ -78,7 +80,7 @@ async function notasPorClienteValor(
   const mapa = new Map<string, { filial: string; nf: string; provavel: true }[]>();
   const comCpf = pedidos.filter((p) => p.cpf.length === 11 || p.cpf.length === 14);
   if (comCpf.length === 0) return mapa;
-  const filiais = PADROES[empresa].nota.filiais;
+  const filiais = await filiaisNotaDaEmpresa(empresa);
   const desde = new Date(Math.min(...comCpf.map((p) => new Date(p.criadoEm).getTime())) - 86_400_000);
   const rows = await withRequest(async (request: sql.Request | RequestLike) => {
     const req = request as Req;
@@ -312,8 +314,9 @@ export async function importarPedidoShopifyFat(
   );
 
   // ── Itens ──
-  const filiais = PADROES[empresa].nota.filiais;
-  const filialEstoque = filialNota && filiais.includes(filialNota) ? filialNota : filiais[0];
+  // Sem filial informada (ou de outra empresa): a principal do rodízio, não a 1ª da lista.
+  const filiais = await filiaisNotaDaEmpresa(empresa);
+  const filialEstoque = filialNota && filiais.includes(filialNota) ? filialNota : (await fetchFiliaisNota(empresa)).padrao;
   const { itens, naoMapeados } = await mapearItens(empresa, o.lineItems.nodes, filialEstoque);
   const descontoItens = round2(itens.reduce((s, i) => s + (i as ItemImportado & { _desc: number })._desc, 0));
   for (const i of itens) delete (i as Partial<ItemImportado & { _desc: number }>)._desc;

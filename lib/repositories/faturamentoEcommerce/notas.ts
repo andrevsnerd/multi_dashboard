@@ -5,6 +5,7 @@ import sql from "mssql";
 import { withRequest } from "@/lib/db/connection";
 import type { RequestLike } from "@/lib/db/proxy";
 import { PADROES, statusNfeLabel, FILTROS_STATUS, type EmpresaFat } from "@/lib/faturamento-ecommerce/config";
+import { filiaisNotaDaEmpresa, sqlUltimaNfEcommerce } from "./filiais-nota";
 import type {
   NotaCriada,
   NotaDetalhe,
@@ -193,23 +194,26 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
   if (!padrao) throw new Error("Empresa inválida.");
 
   const filial = trim(input.filial);
-  if (!padrao.nota.filiais.includes(filial)) {
+  const filiaisEmpresa = await filiaisNotaDaEmpresa(input.empresa);
+  if (!filiaisEmpresa.includes(filial)) {
     throw new Error(`A filial ${filial || "(vazia)"} não emite NF de e-commerce da ${padrao.nome}.`);
   }
 
-  // Filial emissora, série e numeração
+  // Filial emissora, série e numeração. A série é a da última NF de e-commerce da
+  // filial (as pernas do rodízio não usam a mesma); sem NF ainda, a padrão da empresa.
   req.input("pFilial", sql.VarChar(25), filial);
   req.input("pSerie", sql.VarChar(6), padrao.nota.serie);
   const [fil] = await q(req, `
-    SELECT LTRIM(RTRIM(FI.COD_FILIAL)) AS codFilial, FI.EMPRESA AS empresa,
+    SELECT LTRIM(RTRIM(FI.COD_FILIAL)) AS codFilial, FI.EMPRESA AS empresa, LTRIM(RTRIM(S.SERIE_NF)) AS serie,
            LTRIM(RTRIM(C.UF)) AS uf, LTRIM(RTRIM(C.CGC_CPF)) AS cnpj, LTRIM(RTRIM(C.COD_MUNICIPIO_IBGE)) AS ibge,
            LTRIM(RTRIM(S.SEQUENCIAL)) AS seq, LTRIM(RTRIM(N.COD_SERIE_SINTEGRA)) AS sintegra
       FROM FILIAIS FI WITH (NOLOCK)
       JOIN CADASTRO_CLI_FOR C WITH (NOLOCK) ON C.NOME_CLIFOR = FI.FILIAL
-      JOIN FATURAMENTO_SEQUENCIAIS S WITH (NOLOCK) ON S.FILIAL = FI.FILIAL AND S.SERIE_NF = @pSerie
+      OUTER APPLY (${sqlUltimaNfEcommerce("FI.FILIAL")}) U
+      JOIN FATURAMENTO_SEQUENCIAIS S WITH (NOLOCK) ON S.FILIAL = FI.FILIAL AND S.SERIE_NF = ISNULL(U.SERIE_NF, @pSerie)
       JOIN SERIES_NF N WITH (NOLOCK) ON N.SERIE_NF = S.SERIE_NF
      WHERE FI.FILIAL = @pFilial`);
-  if (!fil) throw new Error(`Filial ${filial} sem série ${padrao.nota.serie} cadastrada em FATURAMENTO_SEQUENCIAIS.`);
+  if (!fil) throw new Error(`Filial ${filial} sem série de NF cadastrada em FATURAMENTO_SEQUENCIAIS.`);
   const ufFilial = trim(fil.uf);
   const proximoNumero = String((Number(fil.seq) || 0) + 1).padStart(9, "0");
 
@@ -458,12 +462,12 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
   // Pedido do site já faturado?
   const pedidoSite = trim(input.obs).match(/#\s*(\d{3,})/)?.[1];
   if (pedidoSite) {
-    padrao.nota.filiais.forEach((f, i) => req.input(`dupF${i}`, sql.VarChar(25), f));
+    filiaisEmpresa.forEach((f, i) => req.input(`dupF${i}`, sql.VarChar(25), f));
     req.input("dupObs", sql.VarChar(40), `%#${pedidoSite}%`);
     const dup = await q(req, `
       SELECT TOP 10 LTRIM(RTRIM(FILIAL)) AS filial, LTRIM(RTRIM(NF_SAIDA)) AS nf, CAST(OBS AS VARCHAR(500)) AS obs
         FROM FATURAMENTO WITH (NOLOCK)
-       WHERE FILIAL IN (${padrao.nota.filiais.map((_, i) => `@dupF${i}`).join(",")})
+       WHERE FILIAL IN (${filiaisEmpresa.map((_, i) => `@dupF${i}`).join(",")})
          AND NOTA_CANCELADA = 0 AND OBS LIKE @dupObs
        ORDER BY EMISSAO DESC`);
     // LIKE '%#1710%' também pega #17101 — confere o número exato.
@@ -480,7 +484,7 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
   return {
     empresa: input.empresa,
     filial,
-    serie: padrao.nota.serie,
+    serie: trim(fil.serie),
     codFilial: trim(fil.codFilial),
     empresaCodigo: Number(fil.empresa),
     ufFilial,
@@ -957,8 +961,8 @@ export async function listarNotasFat(params: {
   busca?: string;
   statusGrupo?: string;
 }): Promise<NotaListItem[]> {
-  const padrao = PADROES[params.empresa].nota;
-  const filiais = params.filial && padrao.filiais.includes(params.filial) ? [params.filial] : padrao.filiais;
+  const filiaisEmpresa = await filiaisNotaDaEmpresa(params.empresa);
+  const filiais = params.filial && filiaisEmpresa.includes(params.filial) ? [params.filial] : filiaisEmpresa;
   const grupo = FILTROS_STATUS.find((f) => f.value === params.statusGrupo);
   const busca = trim(params.busca);
 
@@ -1034,8 +1038,7 @@ function extrairMotivo(conteudo: string | null): string | null {
 }
 
 export async function fetchNotaFat(params: { empresa: EmpresaFat; filial: string; nf: string; serie: string }): Promise<NotaDetalhe | null> {
-  const padrao = PADROES[params.empresa].nota;
-  if (!padrao.filiais.includes(params.filial)) return null;
+  if (!(await filiaisNotaDaEmpresa(params.empresa)).includes(params.filial)) return null;
   return withRequest(async (request) => {
     const req = request as Req;
     req.input("filial", sql.VarChar(25), params.filial);
@@ -1111,13 +1114,13 @@ export async function fetchNotaFat(params: { empresa: EmpresaFat; filial: string
 export async function fetchXmlNota(params: { empresa: EmpresaFat; chave: string }): Promise<string | null> {
   const chave = trim(params.chave).replace(/\D/g, "");
   if (chave.length !== 44) return null;
-  const padrao = PADROES[params.empresa].nota;
+  const filiais = await filiaisNotaDaEmpresa(params.empresa);
   return withRequest(async (request) => {
     const req = request as Req;
     req.input("chave", sql.VarChar(44), chave);
-    padrao.filiais.forEach((f, i) => req.input(`f${i}`, sql.VarChar(25), f));
+    filiais.forEach((f, i) => req.input(`f${i}`, sql.VarChar(25), f));
     const dono = await q(req, `SELECT TOP 1 1 AS ok FROM FATURAMENTO WITH (NOLOCK)
-      WHERE CHAVE_NFE = @chave AND FILIAL IN (${padrao.filiais.map((_, i) => `@f${i}`).join(",")})`);
+      WHERE CHAVE_NFE = @chave AND FILIAL IN (${filiais.map((_, i) => `@f${i}`).join(",")})`);
     if (!dono[0]) return null;
     const cru = await q<{ xml: string }>(req, `
       SELECT TOP 1 CAST(CONTEUDO AS NVARCHAR(MAX)) AS xml FROM MIDE_NFE_LOG WITH (NOLOCK)

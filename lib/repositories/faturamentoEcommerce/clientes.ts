@@ -4,6 +4,7 @@ import sql from "mssql";
 import { query, withRequest } from "@/lib/db/connection";
 import type { RequestLike } from "@/lib/db/proxy";
 import { PADROES, REGIOES, INFO_PGTO_OPCOES, regiaoDaUf, type EmpresaFat } from "@/lib/faturamento-ecommerce/config";
+import { filiaisNotaDaEmpresa, sqlUltimaNfEcommerce } from "./filiais-nota";
 import type {
   ClienteAtualizacaoInput,
   ClienteFatDetalhe,
@@ -43,38 +44,59 @@ async function opcoes(sqlText: string, map: (r: Record<string, string>) => Opcao
 }
 
 /**
- * Filiais emissoras da empresa + último número usado na série. A sugerida é a que
- * emitiu NF de e-commerce por último (no rodízio MSC ↔ AKS da Scarf Me só uma emite
- * por vez).
+ * Filiais emissoras da empresa, com a série e o último número usado.
+ *
+ * Regra do rodízio: a PRINCIPAL é a que emitiu NF de e-commerce por último. Ela vem
+ * primeiro na lista e já vem selecionada; se o operador faturar por outra, na próxima
+ * carga essa outra passa a ser a principal — sem configurar nada.
+ * A série de cada filial é a da última NF de e-commerce dela (ver serie.ts).
  */
 export async function fetchFiliaisNota(empresa: EmpresaFat) {
   const padrao = PADROES[empresa].nota;
+  const filiais = await filiaisNotaDaEmpresa(empresa);
   return withRequest(async (request: sql.Request | RequestLike) => {
     const req = request as sql.Request;
-    const nomes = padrao.filiais.map((f, i) => {
+    const nomes = filiais.map((f, i) => {
       req.input(`f${i}`, sql.VarChar(25), f);
       return `@f${i}`;
     });
     req.input("serie", sql.VarChar(6), padrao.serie);
     const r = await req.query(`
-      SELECT LTRIM(RTRIM(S.FILIAL)) AS filial, LTRIM(RTRIM(S.SERIE_NF)) AS serie,
+      SELECT LTRIM(RTRIM(FI.FILIAL)) AS filial, LTRIM(RTRIM(S.SERIE_NF)) AS serie,
              LTRIM(RTRIM(S.SEQUENCIAL)) AS ultimo, LTRIM(RTRIM(C.UF)) AS uf,
-             (SELECT MAX(F.EMISSAO) FROM FATURAMENTO F WITH (NOLOCK)
-               WHERE F.FILIAL = S.FILIAL AND F.NATUREZA_SAIDA IN ('100.02','100.022')) AS ultimaEmissao
-        FROM FATURAMENTO_SEQUENCIAIS S WITH (NOLOCK)
-        JOIN FILIAIS FI WITH (NOLOCK) ON FI.FILIAL = S.FILIAL
-        JOIN CADASTRO_CLI_FOR C WITH (NOLOCK) ON C.NOME_CLIFOR = S.FILIAL
-       WHERE S.FILIAL IN (${nomes.join(",")}) AND S.SERIE_NF = @serie`);
-    const rows = r.recordset as { filial: string; serie: string; ultimo: string; uf: string; ultimaEmissao: Date | null }[];
+             U.EMISSAO AS ultimaEmissao, U.DATA_PARA_TRANSFERENCIA AS ultimaGravacao
+        FROM FILIAIS FI WITH (NOLOCK)
+        JOIN CADASTRO_CLI_FOR C WITH (NOLOCK) ON C.NOME_CLIFOR = FI.FILIAL
+        OUTER APPLY (${sqlUltimaNfEcommerce("FI.FILIAL")}) U
+        JOIN FATURAMENTO_SEQUENCIAIS S WITH (NOLOCK) ON S.FILIAL = FI.FILIAL AND S.SERIE_NF = ISNULL(U.SERIE_NF, @serie)
+       WHERE FI.FILIAL IN (${nomes.join(",")})`);
+    const rows = r.recordset as {
+      filial: string;
+      serie: string;
+      ultimo: string;
+      uf: string;
+      ultimaEmissao: Date | null;
+      ultimaGravacao: Date | null;
+    }[];
+    const t = (d: Date | null) => (d ? new Date(d).getTime() : 0);
+    // Mais recente primeiro: data de emissão e, no mesmo dia, hora da gravação.
+    // Sem NF nenhuma, vale a ordem do config.
+    const ordem = (f: string) => filiais.indexOf(f);
     const ordenadas = [...rows].sort(
-      (a, b) => (b.ultimaEmissao ? new Date(b.ultimaEmissao).getTime() : 0) - (a.ultimaEmissao ? new Date(a.ultimaEmissao).getTime() : 0)
+      (a, b) =>
+        t(b.ultimaEmissao) - t(a.ultimaEmissao) ||
+        t(b.ultimaGravacao) - t(a.ultimaGravacao) ||
+        ordem(a.filial) - ordem(b.filial)
     );
     return {
-      filiais: padrao.filiais
-        .map((f) => rows.find((r) => r.filial === f))
-        .filter((r): r is NonNullable<typeof r> => Boolean(r))
-        .map((r) => ({ filial: r.filial, serie: r.serie, ultimoNumero: r.ultimo, uf: r.uf })),
-      padrao: ordenadas[0]?.filial ?? padrao.filiais[0],
+      filiais: ordenadas.map((r) => ({
+        filial: r.filial,
+        serie: r.serie,
+        ultimoNumero: r.ultimo,
+        uf: r.uf,
+        ultimaEmissao: iso(r.ultimaEmissao),
+      })),
+      padrao: ordenadas[0]?.filial ?? filiais[0],
     };
   });
 }
@@ -170,6 +192,7 @@ export async function buscarClientesFat(params: {
   const digits = onlyDigits(termo);
   const limit = Math.min(Math.max(params.limit ?? 50, 1), 200);
   const padrao = PADROES[params.empresa];
+  const filiaisNota = params.somenteEmpresa ? await filiaisNotaDaEmpresa(params.empresa) : [];
 
   return withRequest(async (request: sql.Request | RequestLike) => {
     const req = request as sql.Request;
@@ -190,7 +213,7 @@ export async function buscarClientesFat(params: {
     let escopo = "";
     if (params.somenteEmpresa) {
       req.input("filialCli", sql.VarChar(25), padrao.cliente.filial);
-      const fs = padrao.nota.filiais.map((f, i) => {
+      const fs = filiaisNota.map((f, i) => {
         req.input(`fn${i}`, sql.VarChar(25), f);
         return `@fn${i}`;
       });

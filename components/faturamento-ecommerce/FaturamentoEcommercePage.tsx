@@ -1,8 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { PADROES, type EmpresaFat } from "@/lib/faturamento-ecommerce/config";
+import { useAuth } from "@/components/auth/AuthContext";
+import { canAccessCompany } from "@/lib/auth/permissions";
+import { EMPRESAS_FAT, PADROES, type EmpresaFat } from "@/lib/faturamento-ecommerce/config";
 import type { ClienteFatDetalhe, FatLookups, PedidoShopifyImport } from "@/lib/faturamento-ecommerce/types";
 
 import { useFatApi } from "./api";
@@ -22,6 +25,9 @@ type Aba = "clientes" | "faturamento" | "monitor";
  */
 export default function FaturamentoEcommercePage({ empresa }: { empresa: EmpresaFat }) {
   const { get, username } = useFatApi(empresa);
+  const { user } = useAuth();
+  // Quem fatura as duas empresas troca daqui; quem só tem uma vê só a etiqueta dela.
+  const empresasDoUsuario = EMPRESAS_FAT.filter((e) => canAccessCompany(user, e));
   const [aba, setAba] = useState<Aba>("clientes");
   const [lookups, setLookups] = useState<FatLookups | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -89,7 +95,23 @@ export default function FaturamentoEcommercePage({ empresa }: { empresa: Empresa
             Cadastro do cliente, NF de produto acabado no Linx e acompanhamento da NF-e.
           </p>
         </div>
-        <span className={styles.empresaTag}>{padrao.nome}</span>
+        {empresasDoUsuario.length > 1 ? (
+          <div className={styles.empresaSwitch} role="group" aria-label="Empresa que vai faturar">
+            {empresasDoUsuario.map((e) =>
+              e === empresa ? (
+                <span key={e} className={`${styles.empresaTag} ${styles.empresaTagAtiva}`} aria-current="page">
+                  {PADROES[e].nome}
+                </span>
+              ) : (
+                <Link key={e} href={`/${e}/faturamento-ecommerce`} className={styles.empresaTag}>
+                  {PADROES[e].nome}
+                </Link>
+              )
+            )}
+          </div>
+        ) : (
+          <span className={styles.empresaTag}>{padrao.nome}</span>
+        )}
       </div>
 
       <div className={styles.tabs} role="tablist">

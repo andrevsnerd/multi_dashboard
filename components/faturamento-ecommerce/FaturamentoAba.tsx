@@ -420,13 +420,27 @@ function NovaNota({
         <div className={styles.grid}>
           <label className={styles.campo}>
             <span className={styles.label}>Filial emissora</span>
-            <select className={styles.select} value={filial} onChange={(e) => setFilial(e.target.value)}>
+            <select
+              className={`${styles.select} ${filial !== lookups.filialNotaPadrao ? styles.inputAlterado : ""}`}
+              value={filial}
+              onChange={(e) => setFilial(e.target.value)}
+            >
               {lookups.filiaisNota.map((f) => (
                 <option key={f.filial} value={f.filial}>
-                  {f.filial} (série {f.serie}, última NF {f.ultimoNumero})
+                  {f.filial === lookups.filialNotaPadrao ? "★ PRINCIPAL — " : ""}
+                  {f.filial} (série {f.serie}, última NF {f.ultimoNumero}
+                  {f.ultimaEmissao ? `, emitida ${new Date(f.ultimaEmissao).toLocaleDateString("pt-BR", { timeZone: "UTC" })}` : ""})
                 </option>
               ))}
             </select>
+            {lookups.filiaisNota.length > 1 &&
+              (filial === lookups.filialNotaPadrao ? (
+                <span className={styles.muted}>Principal: a filial que emitiu NF de e-commerce por último.</span>
+              ) : (
+                <span className={styles.muted}>
+                  Faturando fora da principal ({lookups.filialNotaPadrao}). Ao gravar, esta filial passa a ser a principal.
+                </span>
+              ))}
           </label>
           <label className={`${styles.campo} ${styles.span2}`}>
             <span className={styles.label}>Natureza {naturezaManual === null && cliente ? "(pela UF do cliente)" : ""}</span>

@@ -7,9 +7,12 @@ export interface Opcao {
 
 export interface FatLookups {
   empresa: EmpresaFat;
-  /** Filiais emissoras da empresa, com a série e o último número usado. */
-  filiaisNota: { filial: string; serie: string; ultimoNumero: string; uf: string }[];
-  /** Filial emissora sugerida (no rodízio da Scarf Me, a que emitiu por último). */
+  /**
+   * Filiais emissoras da empresa, com a série e o último número usado. A principal
+   * (a que emitiu NF de e-commerce por último) vem primeiro.
+   */
+  filiaisNota: { filial: string; serie: string; ultimoNumero: string; uf: string; ultimaEmissao: string | null }[];
+  /** Filial principal (regra do rodízio: a que emitiu NF de e-commerce por último). */
   filialNotaPadrao: string;
   naturezas: Opcao[];
   condicoesPgto: Opcao[];

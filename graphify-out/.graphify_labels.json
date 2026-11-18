@@ -546,18 +546,11 @@
   "544": "page.tsx",
   "545": "page.tsx",
   "546": "exportToPDF.ts",
-  "547": "RealizadasPanel.tsx",
-  "548": "resolveFilialExata",
   "549": "fetchRomaneioParaEdicao",
   "550": "formatLogDate",
   "551": "compra-transito-barcodes.ts",
   "552": "chaveLinha",
   "553": "isTipoSoSaida",
-  "554": "generateStockActionsPDF.ts",
-  "555": "migrar-destino-galeao.mjs",
   "556": "resolve",
-  "557": "ProjecaoAviamentosPanel.tsx",
-  "558": "giroCache.ts",
-  "560": "RealizadasPanel.tsx",
-  "562": "page.tsx"
+  "558": "giroCache.ts"
 }
