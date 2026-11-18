@@ -70,8 +70,7 @@ export async function fetchFiliaisNota(empresa: EmpresaFat): Promise<{ filiais: 
     const r = await req.query(`
       SELECT LTRIM(RTRIM(FI.FILIAL)) AS filial, LTRIM(RTRIM(S.SERIE_NF)) AS serie,
              LTRIM(RTRIM(S.SEQUENCIAL)) AS ultimo, LTRIM(RTRIM(C.UF)) AS uf,
-             U.EMISSAO AS ultimaEmissao, U.DATA_PARA_TRANSFERENCIA AS ultimaGravacao,
-             ISNULL(LTRIM(RTRIM(FI.TIPO_TRIBUTACAO)), ) AS tributacao
+             U.EMISSAO AS ultimaEmissao, U.DATA_PARA_TRANSFERENCIA AS ultimaGravacao
         FROM FILIAIS FI WITH (NOLOCK)
         JOIN CADASTRO_CLI_FOR C WITH (NOLOCK) ON C.NOME_CLIFOR = FI.FILIAL
         OUTER APPLY (${sqlUltimaNfEcommerce("FI.FILIAL")}) U
@@ -84,7 +83,6 @@ export async function fetchFiliaisNota(empresa: EmpresaFat): Promise<{ filiais: 
       uf: string;
       ultimaEmissao: Date | null;
       ultimaGravacao: Date | null;
-      tributacao: string;
     }[];
     const t = (d: Date | null) => (d ? new Date(d).getTime() : 0);
     // Pernas do rodízio primeiro (mais recente primeiro: emissão e, no mesmo dia, hora da
@@ -109,7 +107,7 @@ export async function fetchFiliaisNota(empresa: EmpresaFat): Promise<{ filiais: 
           ultimaEmissao: iso(r.ultimaEmissao),
           extra: x !== null,
           rotulo: x?.rotulo ?? null,
-          simples: /SIMPLES/i.test(r.tributacao),
+          simples: x ? x.simplesNacional : true,
           naturezaDentroUf: x?.naturezaDentroUf ?? padrao.naturezaDentroUf,
           naturezaForaUf: x?.naturezaForaUf ?? padrao.naturezaForaUf,
           naturezaRevenda: x?.naturezaRevenda ?? null,

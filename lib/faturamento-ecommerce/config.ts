@@ -73,6 +73,11 @@ export interface FilialNotaExtra {
   naturezaForaUf: string;
   /** Natureza para cliente revendedor (INDICADOR_FISCAL_TERCEIRO 16), se a filial usa uma própria. */
   naturezaRevenda: string | null;
+  /**
+   * Regime da filial. As pernas do rodízio são sempre Simples (o gravador zera os impostos);
+   * aqui é declarado — FILIAIS.TIPO_TRIBUTACAO não serve: MSC e CMS (Simples) estão vazias.
+   */
+  simplesNacional: boolean;
 }
 
 /**
@@ -184,11 +189,18 @@ export const PADROES: Record<EmpresaFat, PadraoEmpresa> = {
       codFiliais: COD_FILIAIS_ECOMMERCE_SCARFME,
       serie: "1",
       // Pedido do site às vezes é faturado pela Matriz (como o corporativo). A Matriz NÃO é
-      // Simples Nacional: ICMS/PIS/COFINS de verdade — o gravador calcula pelo regime da
-      // filial (FILIAIS.TIPO_TRIBUTACAO). Naturezas medidas nas NFs dela (18/11/2026):
-      // 100.05 VENDA PRIVATE (dentro e fora de SP) e 100.08 REVENDA (cliente indicador 16).
+      // Simples Nacional (CRT 3): ICMS/PIS/COFINS de verdade — o gravador calcula no regime
+      // normal. Naturezas medidas nas NFs dela (18/11/2026): 100.05 VENDA PRIVATE (dentro e
+      // fora de SP) e 100.08 REVENDA (cliente indicador 16).
       filiaisExtras: [
-        { codFilial: "001", rotulo: "MATRIZ", naturezaDentroUf: "100.05", naturezaForaUf: "100.05", naturezaRevenda: "100.08" },
+        {
+          codFilial: "001",
+          rotulo: "MATRIZ",
+          naturezaDentroUf: "100.05",
+          naturezaForaUf: "100.05",
+          naturezaRevenda: "100.08",
+          simplesNacional: false,
+        },
       ],
     },
   },

@@ -102,9 +102,15 @@ function NovaNota({
   const api = useFatApi(empresa);
   const padrao = PADROES[empresa].nota;
 
-  const [filial, setFilial] = useState(lookups.filialNotaPadrao);
-  const ufFilial = lookups.filiaisNota.find((f) => f.filial === filial)?.uf ?? "SP";
+  const [filial, setFilialEscolhida] = useState(lookups.filialNotaPadrao);
+  const filialInfo = lookups.filiaisNota.find((f) => f.filial === filial) ?? null;
+  const ufFilial = filialInfo?.uf ?? "SP";
   const [naturezaManual, setNaturezaManual] = useState<string | null>(null);
+  // Trocar de filial volta a natureza para a automática (a Matriz usa outras naturezas).
+  const setFilial = (f: string) => {
+    setFilialEscolhida(f);
+    setNaturezaManual(null);
+  };
   const [condicao, setCondicao] = useState(padrao.condicaoPgto);
   const [tipoFrete, setTipoFrete] = useState(padrao.tipoFrete);
   const [transp, setTransp] = useState(padrao.transportadora);
@@ -150,7 +156,16 @@ function NovaNota({
   const [confirmando, setConfirmando] = useState(false);
   const [enviarGravada, setEnviarGravada] = useState(false);
 
-  const naturezaAuto = cliente && cliente.endereco.uf && cliente.endereco.uf !== ufFilial ? padrao.naturezaForaUf : padrao.naturezaDentroUf;
+  // Natureza automática pela filial (e-commerce 100.02/100.022; Matriz 100.05, ou 100.08 para
+  // cliente revendedor — indicador 16) e pela UF do cliente.
+  const natDentro = filialInfo?.naturezaDentroUf ?? padrao.naturezaDentroUf;
+  const natFora = filialInfo?.naturezaForaUf ?? padrao.naturezaForaUf;
+  const naturezaAuto =
+    filialInfo?.naturezaRevenda && cliente?.indicadorFiscal === "16"
+      ? filialInfo.naturezaRevenda
+      : cliente && cliente.endereco.uf && cliente.endereco.uf !== ufFilial
+        ? natFora
+        : natDentro;
   const natureza = naturezaManual ?? naturezaAuto;
 
   const nota: NotaInput = useMemo(
@@ -428,19 +443,27 @@ function NovaNota({
               {lookups.filiaisNota.map((f) => (
                 <option key={f.filial} value={f.filial}>
                   {f.filial === lookups.filialNotaPadrao ? "★ PRINCIPAL — " : ""}
+                  {f.extra ? `${f.rotulo ?? "EXTRA"} (fora do rodízio) — ` : ""}
                   {f.filial} (série {f.serie}, última NF {f.ultimoNumero}
                   {f.ultimaEmissao ? `, emitida ${new Date(f.ultimaEmissao).toLocaleDateString("pt-BR", { timeZone: "UTC" })}` : ""})
                 </option>
               ))}
             </select>
-            {lookups.filiaisNota.length > 1 &&
+            {filialInfo?.extra ? (
+              <span className={styles.muted}>
+                {filialInfo.rotulo ?? filial}: fora do rodízio do e-commerce — a principal continua {lookups.filialNotaPadrao}.
+                {!filialInfo.simples && " Regime normal: a NF sai com ICMS/PIS/COFINS calculados (natureza 100.05; revenda 100.08)."}
+              </span>
+            ) : (
+              lookups.filiaisNota.filter((f) => !f.extra).length > 1 &&
               (filial === lookups.filialNotaPadrao ? (
                 <span className={styles.muted}>Principal: a filial que emitiu NF de e-commerce por último.</span>
               ) : (
                 <span className={styles.muted}>
                   Faturando fora da principal ({lookups.filialNotaPadrao}). Ao gravar, esta filial passa a ser a principal.
                 </span>
-              ))}
+              ))
+            )}
           </label>
           <label className={`${styles.campo} ${styles.span2}`}>
             <span className={styles.label}>Natureza {naturezaManual === null && cliente ? "(pela UF do cliente)" : ""}</span>
@@ -906,7 +929,7 @@ function PreviaView({
               <th className={styles.num}>Valor</th>
               <th>NCM</th>
               <th>CFOP</th>
-              <th>CSOSN</th>
+              <th>CST/CSOSN</th>
               <th>Exceção fiscal</th>
               <th className={styles.num}>Estoque</th>
             </tr>
