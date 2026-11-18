@@ -58,11 +58,45 @@ export interface PadraoNota {
   /** Natureza quando o cliente está na mesma UF da filial / em outra UF. */
   naturezaDentroUf: string;
   naturezaForaUf: string;
+  /**
+   * Filiais que também podem emitir NF por esta página, FORA do rodízio do e-commerce
+   * (nunca viram a principal). Cada uma com as naturezas que ela usa de fato no Linx.
+   */
+  filiaisExtras: FilialNotaExtra[];
+}
+
+export interface FilialNotaExtra {
+  codFilial: string;
+  /** Rótulo curto na tela. */
+  rotulo: string;
+  naturezaDentroUf: string;
+  naturezaForaUf: string;
+  /** Natureza para cliente revendedor (INDICADOR_FISCAL_TERCEIRO 16), se a filial usa uma própria. */
+  naturezaRevenda: string | null;
+}
+
+/**
+ * Padrões do cadastro PJ (CNPJ). Fluxo à parte do cadastro de pessoa física do site:
+ * segue o cadastro do CORPORATIVO (tipo CORPORATIVO, conta 1120101, IE ISENTO quando
+ * não houver), mas com a filial da empresa do e-commerce e indicador fiscal 8 (ver abaixo).
+ */
+export interface PadraoClientePj {
+  filial: string;
+  tipo: string;
+  conceito: string;
+  pontualidade: string;
+  transportadora: string;
+  condicaoPgto: string;
+  codigoTabPreco: string;
+  contaContabil: string;
+  indicadorFiscal: number;
+  representante: string;
 }
 
 export interface PadraoEmpresa {
   nome: string;
   cliente: PadraoCliente;
+  clientePj: PadraoClientePj;
   nota: PadraoNota;
 }
 
@@ -79,7 +113,38 @@ const CLIENTE_BASE: Omit<PadraoCliente, "filial"> = {
   representante: "SEM REPRESENTANTE",
 };
 
-const NOTA_BASE: Omit<PadraoNota, "codFiliais" | "serie"> = {
+/**
+ * Mesmos padrões do cadastro corporativo (lib/corporativo/config + app/corporativo/novo),
+ * com UMA exceção medida em 18/11/2026: o indicador fiscal padrão é 8 (não contribuinte),
+ * não 1. Nem NERD nem Scarf Me têm exceção fiscal de venda para contribuinte (indicador 1):
+ * a NF cai em 1117 "DEVOLUÇÃO COMPRA" (CSOSN 900) e a prévia bloqueia, em qualquer UF.
+ * Com 8 sai 5102/6108 CSOSN 102, como 164 de 185 NFs de e-commerce para CNPJ desde 2024.
+ * A tela troca para 1 quando o operador informa a IE (empresa contribuinte).
+ */
+const CLIENTE_PJ_BASE: Omit<PadraoClientePj, "filial"> = {
+  tipo: "CORPORATIVO",
+  conceito: "BOM",
+  pontualidade: "INDEFINIDO",
+  transportadora: "NOSSO CARRO",
+  condicaoPgto: "01",
+  codigoTabPreco: "01",
+  contaContabil: "1120101",
+  indicadorFiscal: 8,
+  representante: "SEM REPRESENTANTE",
+};
+
+/** INDICADOR_FISCAL_TERCEIRO ("Indica Tipo 30.s") — mesma lista do corporativo. */
+export const INDICADORES_FISCAIS = [
+  { value: "8", label: "8 - Não Contribuinte" },
+  { value: "1", label: "1 - Empresa (Industrial/Comercial)" },
+  { value: "2", label: "2 - Produtor Rural" },
+  { value: "6", label: "6 - Consumidor Final" },
+  { value: "7", label: "7 - Órgão Público" },
+];
+
+export const TIPOS_TRIBUTACAO = ["SIMPLES NACIONAL", "PRESUMIDO", "REAL"].map((t) => ({ value: t, label: t }));
+
+const NOTA_BASE: Omit<PadraoNota, "codFiliais" | "serie" | "filiaisExtras"> = {
   condicaoPgto: "01",
   tipoFrete: "2",
   transportadora: "CORREIOS - SEDEX",
@@ -105,14 +170,27 @@ export const PADROES: Record<EmpresaFat, PadraoEmpresa> = {
   nerd: {
     nome: "NERD",
     cliente: { ...CLIENTE_BASE, filial: "NERD" },
+    clientePj: { ...CLIENTE_PJ_BASE, filial: "NERD" },
     // Só a matriz NERD (000069) fatura o e-commerce da NERD.
-    nota: { ...NOTA_BASE, codFiliais: ["000069"], serie: "001" },
+    nota: { ...NOTA_BASE, codFiliais: ["000069"], serie: "001", filiaisExtras: [] },
   },
   scarfme: {
     nome: "SCARF ME",
     cliente: { ...CLIENTE_BASE, filial: "SCARF ME - MATRIZ" },
+    clientePj: { ...CLIENTE_PJ_BASE, filial: "SCARF ME - MATRIZ" },
     // Rodízio fiscal entre as pernas do e-commerce: a principal é a que emitiu por último.
-    nota: { ...NOTA_BASE, codFiliais: COD_FILIAIS_ECOMMERCE_SCARFME, serie: "1" },
+    nota: {
+      ...NOTA_BASE,
+      codFiliais: COD_FILIAIS_ECOMMERCE_SCARFME,
+      serie: "1",
+      // Pedido do site às vezes é faturado pela Matriz (como o corporativo). A Matriz NÃO é
+      // Simples Nacional: ICMS/PIS/COFINS de verdade — o gravador calcula pelo regime da
+      // filial (FILIAIS.TIPO_TRIBUTACAO). Naturezas medidas nas NFs dela (18/11/2026):
+      // 100.05 VENDA PRIVATE (dentro e fora de SP) e 100.08 REVENDA (cliente indicador 16).
+      filiaisExtras: [
+        { codFilial: "001", rotulo: "MATRIZ", naturezaDentroUf: "100.05", naturezaForaUf: "100.05", naturezaRevenda: "100.08" },
+      ],
+    },
   },
 };
 

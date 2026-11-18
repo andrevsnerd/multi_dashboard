@@ -40,6 +40,9 @@ export async function POST(request: Request) {
   if ("erro" in a) return a.erro;
   const cliente = body.cliente;
   if (!cliente) return NextResponse.json({ error: "Dados do cliente ausentes." }, { status: 400 });
+  if (String(cliente.cpfCnpj ?? "").replace(/\D/g, "").length === 14) {
+    return NextResponse.json({ error: "CNPJ não se cadastra aqui — use “Cadastrar PJ (CNPJ)”." }, { status: 400 });
+  }
   try {
     if (!cliente.forcar) {
       const existentes = await clientesPorDocumento(cliente.cpfCnpj);

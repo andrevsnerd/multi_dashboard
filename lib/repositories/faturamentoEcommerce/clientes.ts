@@ -4,7 +4,7 @@ import sql from "mssql";
 import { query, withRequest } from "@/lib/db/connection";
 import type { RequestLike } from "@/lib/db/proxy";
 import { PADROES, REGIOES, INFO_PGTO_OPCOES, regiaoDaUf, type EmpresaFat } from "@/lib/faturamento-ecommerce/config";
-import { filiaisNotaDaEmpresa, sqlUltimaNfEcommerce } from "./filiais-nota";
+import { filiaisExtrasDaEmpresa, filiaisNotaDaEmpresa, sqlUltimaNfEcommerce } from "./filiais-nota";
 import type {
   ClienteAtualizacaoInput,
   ClienteFatDetalhe,
@@ -12,6 +12,7 @@ import type {
   ClienteFatListItem,
   EnderecoFat,
   FatLookups,
+  FilialNotaOpcao,
   Opcao,
 } from "@/lib/faturamento-ecommerce/types";
 
@@ -46,14 +47,19 @@ async function opcoes(sqlText: string, map: (r: Record<string, string>) => Opcao
 /**
  * Filiais emissoras da empresa, com a série e o último número usado.
  *
- * Regra do rodízio: a PRINCIPAL é a que emitiu NF de e-commerce por último. Ela vem
- * primeiro na lista e já vem selecionada; se o operador faturar por outra, na próxima
- * carga essa outra passa a ser a principal — sem configurar nada.
+ * Regra do rodízio: a PRINCIPAL é a perna do e-commerce que emitiu NF de e-commerce por
+ * último. Ela vem primeiro na lista e já vem selecionada; se o operador faturar por outra
+ * perna, na próxima carga essa outra passa a ser a principal — sem configurar nada.
  * A série de cada filial é a da última NF de e-commerce dela (ver serie.ts).
+ *
+ * As filiais EXTRAS (Matriz da Scarf Me) vêm por último e nunca são a principal: não
+ * entram no rodízio, e cada uma traz as naturezas que usa de fato e o regime tributário.
  */
-export async function fetchFiliaisNota(empresa: EmpresaFat) {
+export async function fetchFiliaisNota(empresa: EmpresaFat): Promise<{ filiais: FilialNotaOpcao[]; padrao: string }> {
   const padrao = PADROES[empresa].nota;
   const filiais = await filiaisNotaDaEmpresa(empresa);
+  const extras = await filiaisExtrasDaEmpresa(empresa);
+  const extraDe = (f: string) => extras.find((x) => x.filial === f) ?? null;
   return withRequest(async (request: sql.Request | RequestLike) => {
     const req = request as sql.Request;
     const nomes = filiais.map((f, i) => {
@@ -64,7 +70,8 @@ export async function fetchFiliaisNota(empresa: EmpresaFat) {
     const r = await req.query(`
       SELECT LTRIM(RTRIM(FI.FILIAL)) AS filial, LTRIM(RTRIM(S.SERIE_NF)) AS serie,
              LTRIM(RTRIM(S.SEQUENCIAL)) AS ultimo, LTRIM(RTRIM(C.UF)) AS uf,
-             U.EMISSAO AS ultimaEmissao, U.DATA_PARA_TRANSFERENCIA AS ultimaGravacao
+             U.EMISSAO AS ultimaEmissao, U.DATA_PARA_TRANSFERENCIA AS ultimaGravacao,
+             ISNULL(LTRIM(RTRIM(FI.TIPO_TRIBUTACAO)), ) AS tributacao
         FROM FILIAIS FI WITH (NOLOCK)
         JOIN CADASTRO_CLI_FOR C WITH (NOLOCK) ON C.NOME_CLIFOR = FI.FILIAL
         OUTER APPLY (${sqlUltimaNfEcommerce("FI.FILIAL")}) U
@@ -77,26 +84,38 @@ export async function fetchFiliaisNota(empresa: EmpresaFat) {
       uf: string;
       ultimaEmissao: Date | null;
       ultimaGravacao: Date | null;
+      tributacao: string;
     }[];
     const t = (d: Date | null) => (d ? new Date(d).getTime() : 0);
-    // Mais recente primeiro: data de emissão e, no mesmo dia, hora da gravação.
-    // Sem NF nenhuma, vale a ordem do config.
+    // Pernas do rodízio primeiro (mais recente primeiro: emissão e, no mesmo dia, hora da
+    // gravação; sem NF nenhuma, vale a ordem do config); extras sempre no fim.
     const ordem = (f: string) => filiais.indexOf(f);
     const ordenadas = [...rows].sort(
       (a, b) =>
+        Number(extraDe(a.filial) !== null) - Number(extraDe(b.filial) !== null) ||
         t(b.ultimaEmissao) - t(a.ultimaEmissao) ||
         t(b.ultimaGravacao) - t(a.ultimaGravacao) ||
         ordem(a.filial) - ordem(b.filial)
     );
+    const rodizio = ordenadas.filter((r) => extraDe(r.filial) === null);
     return {
-      filiais: ordenadas.map((r) => ({
-        filial: r.filial,
-        serie: r.serie,
-        ultimoNumero: r.ultimo,
-        uf: r.uf,
-        ultimaEmissao: iso(r.ultimaEmissao),
-      })),
-      padrao: ordenadas[0]?.filial ?? filiais[0],
+      filiais: ordenadas.map((r): FilialNotaOpcao => {
+        const x = extraDe(r.filial);
+        return {
+          filial: r.filial,
+          serie: r.serie,
+          ultimoNumero: r.ultimo,
+          uf: r.uf,
+          ultimaEmissao: iso(r.ultimaEmissao),
+          extra: x !== null,
+          rotulo: x?.rotulo ?? null,
+          simples: /SIMPLES/i.test(r.tributacao),
+          naturezaDentroUf: x?.naturezaDentroUf ?? padrao.naturezaDentroUf,
+          naturezaForaUf: x?.naturezaForaUf ?? padrao.naturezaForaUf,
+          naturezaRevenda: x?.naturezaRevenda ?? null,
+        };
+      }),
+      padrao: rodizio[0]?.filial ?? filiais[0],
     };
   });
 }
@@ -387,8 +406,9 @@ export async function criarClienteFat(
 ): Promise<{ codigo: string; nomeClifor: string }> {
   const padrao = PADROES[empresa].cliente;
   const doc = onlyDigits(input.cpfCnpj);
-  if (doc.length !== 11 && doc.length !== 14) throw new Error("CPF (11 dígitos) ou CNPJ (14 dígitos) inválido.");
-  const pj = doc.length === 14;
+  // CNPJ tem cadastro próprio (clientesPj.ts): IE, indicador fiscal e padrões do corporativo.
+  if (doc.length === 14) throw new Error("CNPJ não se cadastra aqui — use “Cadastrar PJ (CNPJ)”.");
+  if (doc.length !== 11) throw new Error("CPF inválido (11 dígitos).");
   const razao = cut(input.razaoSocial, 90);
   if (!razao) throw new Error("Nome / razão social é obrigatório.");
   const nomeBase = cut(input.nomeClifor || razao, 25);
@@ -407,9 +427,9 @@ export async function criarClienteFat(
     bind("razao", sql.VarChar(90), razao);
     bind("nomeBase", sql.VarChar(25), nomeBase);
     bind("doc", sql.VarChar(19), doc);
-    bind("pjpf", sql.Bit, pj ? 1 : 0);
-    bind("rgIe", sql.VarChar(19), cut(input.rgIe, 19) || (pj ? "ISENTO" : padrao.rgIe));
-    bind("indicadorFiscal", sql.Int, pj ? 1 : padrao.indicadorFiscal);
+    bind("pjpf", sql.Bit, 0);
+    bind("rgIe", sql.VarChar(19), cut(input.rgIe, 19) || padrao.rgIe);
+    bind("indicadorFiscal", sql.Int, padrao.indicadorFiscal);
     bind("cep", sql.VarChar(9), end.cep);
     bind("endereco", sql.VarChar(90), end.endereco);
     bind("numero", sql.VarChar(10), end.numero);

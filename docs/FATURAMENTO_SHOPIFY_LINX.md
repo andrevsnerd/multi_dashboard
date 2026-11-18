@@ -100,6 +100,24 @@ CENTRO OESTE DF GO MS MT · SUDESTE ES MG RJ SP · SUL PR RS SC.
 > (BRASÍLIA, NITERÓI…). Entra porque manda o IBGE, mas qualquer edição posterior de cidade/UF
 > no Linx falha com 30002. Correção separada, sob autorização.
 
+### Cadastro PJ (CNPJ) — fluxo separado (18/11/2026)
+
+Botão próprio "Cadastrar PJ (CNPJ)" (`ClientePjForm.tsx` → `/api/faturamento-ecommerce/clientes-pj`
+→ `clientesPj.ts`). O cadastro de pessoa física recusa CNPJ (tela, rota e repositório) e
+oferece abrir o PJ com os dados digitados; pedido do Shopify com CNPJ abre direto o PJ.
+
+- Campos e padrões do **corporativo**: tipo CORPORATIVO, conta 1120101, IE ISENTO,
+  AGRUPAMENTO_ITENS 2, INDICADOR_VENDA ' ', IE/IM/SUFRAMA/tributação, cobrança e entrega
+  próprias, 2º telefone, limite, OBS. Filial = a da empresa (NERD / SCARF ME - MATRIZ).
+  Busca CNPJ na BrasilAPI + CEP para o IBGE. CIDADE das 3 vias vem do IBGE (sem acento).
+- **Indicador fiscal padrão = 8, não 1** (única diferença do corporativo). Medido: nem NERD
+  (NERD/SP) nem Scarf Me (LLL/SP) têm exceção de venda para contribuinte — com indicador 1 a
+  `FX_ID_EXCECAO_IMPOSTO` cai em 1117 "DEVOLUÇÃO COMPRA" (CSOSN 900, CFOP 5102/6102) em
+  SP, RJ e MG, e a prévia bloqueia. Com 8: 5102/6108 CSOSN 102 (exceções 1248/489 NERD).
+  Histórico: 164 de 185 NFs 100.02/100.022 para CNPJ desde 2024 saíram com indicador 8.
+  A tela troca para 1 quando o operador informa IE, com aviso de bloqueio.
+- IE gravada só com dígitos. Validado com ROLLBACK (3 tabelas + erros) em 18/11/2026.
+
 ---
 
 ## 4. Aba FATURAMENTO — gravar a NF (equivalente ao 100101SPK)

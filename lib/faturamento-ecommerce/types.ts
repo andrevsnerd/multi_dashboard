@@ -11,7 +11,7 @@ export interface FatLookups {
    * Filiais emissoras da empresa, com a série e o último número usado. A principal
    * (a que emitiu NF de e-commerce por último) vem primeiro.
    */
-  filiaisNota: { filial: string; serie: string; ultimoNumero: string; uf: string; ultimaEmissao: string | null }[];
+  filiaisNota: FilialNotaOpcao[];
   /** Filial principal (regra do rodízio: a que emitiu NF de e-commerce por último). */
   filialNotaPadrao: string;
   naturezas: Opcao[];
@@ -29,6 +29,22 @@ export interface FatLookups {
   proximoCodigoCliente: string;
   /** Função do usuário pode gravar no Linx (preenchido pela rota). */
   podeGravar?: boolean;
+}
+
+export interface FilialNotaOpcao {
+  filial: string;
+  serie: string;
+  ultimoNumero: string;
+  uf: string;
+  ultimaEmissao: string | null;
+  /** Fora do rodízio do e-commerce (ex.: Matriz da Scarf Me) — nunca vira a principal. */
+  extra: boolean;
+  rotulo: string | null;
+  /** FILIAIS.TIPO_TRIBUTACAO = SIMPLES NACIONAL. A Matriz é regime normal (ICMS/PIS/COFINS). */
+  simples: boolean;
+  naturezaDentroUf: string;
+  naturezaForaUf: string;
+  naturezaRevenda: string | null;
 }
 
 export interface EnderecoFat {
@@ -108,6 +124,64 @@ export interface ClienteFatInput {
   representante?: string;
   /** Cadastrar mesmo existindo outro cliente com o mesmo CPF. */
   forcar?: boolean;
+}
+
+/**
+ * Cadastro PJ (CNPJ) — fluxo separado do cadastro de pessoa física do site, no
+ * padrão do cadastro corporativo. Tudo editável; vazio = padrão de PADROES[e].clientePj.
+ */
+export interface ClientePjFatInput {
+  cnpj: string;
+  razaoSocial: string;
+  /** Nome no Linx (NOME_CLIFOR, 25). Vazio = 25 primeiros caracteres da razão social. */
+  nomeFantasia?: string;
+  /** Vazio = ISENTO. */
+  inscricaoEstadual?: string;
+  indicadorFiscal?: string;
+  tipoTributacao?: string;
+  inscricaoMunicipal?: string;
+  suframa?: string;
+  endereco: EnderecoFat;
+  /** null = igual ao principal. */
+  cobranca?: EnderecoFat | null;
+  entrega?: EnderecoFat | null;
+  ddd?: string;
+  telefone?: string;
+  ddd2?: string;
+  telefone2?: string;
+  email?: string;
+  emailNfe?: string;
+  filial?: string;
+  tipo?: string;
+  conceito?: string;
+  pontualidade?: string;
+  transportadora?: string;
+  condicaoPgto?: string;
+  codigoTabPreco?: string;
+  contaContabil?: string;
+  regiao?: string;
+  representante?: string;
+  limiteCredito?: number;
+  observacao?: string;
+  /** Cadastrar mesmo existindo outro cliente com o mesmo CNPJ. */
+  forcar?: boolean;
+}
+
+/** Dados da BrasilAPI para autopreencher o cadastro PJ. */
+export interface CnpjConsulta {
+  razaoSocial: string;
+  nomeFantasia: string;
+  cep: string;
+  endereco: string;
+  numero: string;
+  complemento: string;
+  bairro: string;
+  cidade: string;
+  uf: string;
+  ddd: string;
+  telefone: string;
+  email: string;
+  situacao: string;
 }
 
 export interface ClienteAtualizacaoInput {

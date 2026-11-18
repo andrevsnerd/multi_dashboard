@@ -1,7 +1,7 @@
 import "server-only";
 
-import { PADROES, type EmpresaFat } from "@/lib/faturamento-ecommerce/config";
-import { namesForIds } from "@/lib/server/filial-resolver";
+import { PADROES, type EmpresaFat, type FilialNotaExtra } from "@/lib/faturamento-ecommerce/config";
+import { nameForId, namesForIds } from "@/lib/server/filial-resolver";
 
 /**
  * Última NF de e-commerce de uma filial (naturezas 100.02/100.022), a mais recente
@@ -22,10 +22,22 @@ export function sqlUltimaNfEcommerce(filialExpr: string): string {
 }
 
 /**
- * Nomes vivos (tabela FILIAIS do Linx) das filiais que emitem NF de e-commerce da
- * empresa, resolvidos por COD_FILIAL. Toda checagem "esta filial é desta empresa?" e
- * todo filtro por FILIAL do módulo passa por aqui — nunca pelo nome do registry.
+ * Nomes vivos (tabela FILIAIS do Linx) das filiais que podem emitir NF por esta página:
+ * as pernas do rodízio do e-commerce + as extras da empresa (Matriz da Scarf Me), por
+ * COD_FILIAL. Toda checagem "esta filial é desta empresa?" e todo filtro por FILIAL do
+ * módulo passa por aqui — nunca pelo nome do registry.
  */
 export async function filiaisNotaDaEmpresa(empresa: EmpresaFat): Promise<string[]> {
-  return namesForIds(PADROES[empresa].nota.codFiliais);
+  const nota = PADROES[empresa].nota;
+  return namesForIds([...nota.codFiliais, ...nota.filiaisExtras.map((x) => x.codFilial)]);
+}
+
+/** Filiais extras (fora do rodízio) com o nome vivo no Linx. */
+export async function filiaisExtrasDaEmpresa(empresa: EmpresaFat): Promise<(FilialNotaExtra & { filial: string })[]> {
+  const out: (FilialNotaExtra & { filial: string })[] = [];
+  for (const x of PADROES[empresa].nota.filiaisExtras) {
+    const filial = await nameForId(x.codFilial);
+    if (filial) out.push({ ...x, filial });
+  }
+  return out;
 }

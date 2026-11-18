@@ -9,11 +9,12 @@ import type {
   ClienteFatListItem,
   EnderecoFat,
   FatLookups,
-  Opcao,
   PedidoShopifyImport,
 } from "@/lib/faturamento-ecommerce/types";
 
 import { ApiErro, fmtData, fmtDoc, useFatApi } from "./api";
+import { Campo, CamposEndereco, ENDERECO_VAZIO, Escolha } from "./CamposCliente";
+import ClientePjForm, { type ClientePjInicial } from "./ClientePjForm";
 import { ImportacaoClienteCard, PedidosShopifyCard } from "./PedidosShopify";
 import styles from "./FaturamentoEcommerce.module.css";
 
@@ -29,18 +30,21 @@ interface Props {
   onDescartarPedido: () => void;
 }
 
-type Modo = "busca" | "novo" | "endereco";
+type Modo = "busca" | "novo" | "novoPj" | "endereco";
 
-const ENDERECO_VAZIO: EnderecoFat = {
-  cep: "",
-  endereco: "",
-  numero: "",
-  complemento: "",
-  bairro: "",
-  cidade: "",
-  uf: "",
-  codMunicipioIbge: "",
-};
+const soDigitos = (s: string | undefined) => String(s ?? "").replace(/\D/g, "");
+
+/** Dados já digitados (ou vindos do pedido) levados para o cadastro PJ. */
+function inicialPjDe(c: ClienteFatInput): ClientePjInicial {
+  return {
+    cnpj: c.cpfCnpj,
+    razaoSocial: c.razaoSocial,
+    email: c.email ?? "",
+    ddd: c.ddd ?? "",
+    telefone: c.telefone ?? "",
+    endereco: c.endereco,
+  };
+}
 
 export default function ClientesAba({
   empresa,
@@ -62,7 +66,15 @@ export default function ClientesAba({
   const [recemCadastrado, setRecemCadastrado] = useState<string | null>(null);
   /** Cadastro novo pré-preenchido com os dados do pedido do Shopify. */
   const [inicialNovo, setInicialNovo] = useState<ClienteFatInput | null>(null);
+  /** Cadastro PJ pré-preenchido (pedido do Shopify com CNPJ ou vindo do form de pessoa física). */
+  const [inicialPj, setInicialPj] = useState<{ dados: ClientePjInicial; origem: string | null } | null>(null);
   const [avancando, setAvancando] = useState<string | null>(null);
+
+  const abrirPj = (dados: ClientePjInicial | null, origem: string | null) => {
+    setInicialPj(dados ? { dados, origem } : null);
+    setModo("novoPj");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   /** Carrega o cadastro completo e vai direto para o faturamento. */
   const avancar = async (codigo: string) => {
@@ -124,6 +136,11 @@ export default function ClientesAba({
           onAvancar={onUsarCliente}
           onDescartar={onDescartarPedido}
           onCadastrarNovo={() => {
+            // Pedido com CNPJ vai para o cadastro PJ; com CPF, para o de pessoa física.
+            if (soDigitos(pedido.cliente.cpfCnpj).length === 14) {
+              abrirPj(inicialPjDe(pedido.cliente), `pedido ${pedido.nome} do Shopify`);
+              return;
+            }
             setInicialNovo({ ...pedido.cliente });
             setModo("novo");
             window.scrollTo({ top: 0, behavior: "smooth" });
@@ -136,16 +153,21 @@ export default function ClientesAba({
           <div className={styles.cardHead}>
             <h2 className={styles.cardTitle}>Encontrar cliente</h2>
             {podeGravar && (
-              <button
-                type="button"
-                className={styles.btnPrimario}
-                onClick={() => {
-                  setInicialNovo(null);
-                  setModo("novo");
-                }}
-              >
-                + Cadastrar cliente
-              </button>
+              <div className={styles.acoes}>
+                <button
+                  type="button"
+                  className={styles.btnPrimario}
+                  onClick={() => {
+                    setInicialNovo(null);
+                    setModo("novo");
+                  }}
+                >
+                  + Cadastrar pessoa física (CPF)
+                </button>
+                <button type="button" className={styles.btn} onClick={() => abrirPj(null, null)}>
+                  + Cadastrar PJ (CNPJ)
+                </button>
+              </div>
             )}
           </div>
           <form className={styles.linhaBusca} onSubmit={buscar}>
@@ -277,6 +299,23 @@ export default function ClientesAba({
             setRecemCadastrado(codigo);
           }}
           onUsarExistente={abrir}
+          onAbrirPj={(dados) => abrirPj(dados, "cadastro de pessoa física")}
+        />
+      )}
+
+      {modo === "novoPj" && (
+        <ClientePjForm
+          key={inicialPj ? `pj-${inicialPj.origem ?? ""}-${inicialPj.dados.cnpj}` : "pj-manual"}
+          empresa={empresa}
+          lookups={lookups}
+          inicial={inicialPj?.dados ?? null}
+          origem={inicialPj?.origem ?? null}
+          onCancelar={() => setModo("busca")}
+          onCriado={async (codigo) => {
+            await abrir(codigo);
+            setRecemCadastrado(codigo);
+          }}
+          onUsarExistente={abrir}
         />
       )}
 
@@ -383,158 +422,6 @@ function ClienteDetalheCard({
   );
 }
 
-// ── Endereço (compartilhado entre novo cadastro e atualização) ───────────────
-
-function CamposEndereco({
-  empresa,
-  endereco,
-  onChange,
-}: {
-  empresa: EmpresaFat;
-  endereco: EnderecoFat;
-  onChange: (e: EnderecoFat) => void;
-}) {
-  const api = useFatApi(empresa);
-  const [buscandoCep, setBuscandoCep] = useState(false);
-  const [erroCep, setErroCep] = useState<string | null>(null);
-  const set = (k: keyof EnderecoFat, v: string) => onChange({ ...endereco, [k]: v });
-
-  const buscarCep = async () => {
-    const cep = endereco.cep.replace(/\D/g, "");
-    if (cep.length !== 8) {
-      setErroCep("CEP precisa ter 8 dígitos.");
-      return;
-    }
-    setBuscandoCep(true);
-    setErroCep(null);
-    try {
-      const d = await api.get<{ endereco: string; bairro: string; cidade: string; uf: string; codMunicipioIbge: string }>(
-        `/cep/${cep}`
-      );
-      onChange({
-        ...endereco,
-        cep,
-        endereco: d.endereco ? d.endereco.toUpperCase() : endereco.endereco,
-        bairro: d.bairro ? d.bairro.toUpperCase() : endereco.bairro,
-        cidade: d.cidade.toUpperCase(),
-        uf: d.uf.toUpperCase(),
-        codMunicipioIbge: d.codMunicipioIbge,
-      });
-    } catch (err) {
-      setErroCep((err as Error).message);
-    } finally {
-      setBuscandoCep(false);
-    }
-  };
-
-  return (
-    <>
-      <div className={styles.grid}>
-        <div className={styles.campo}>
-          <span className={styles.label}>CEP *</span>
-          <div className={styles.linhaBusca}>
-            <input
-              className={styles.input}
-              value={endereco.cep}
-              onChange={(e) => {
-                const novo = e.target.value;
-                // CEP novo invalida cidade/UF/IBGE do anterior (seria gravado o município errado).
-                if (novo.replace(/\D/g, "") !== endereco.cep.replace(/\D/g, "")) {
-                  onChange({ ...endereco, cep: novo, cidade: "", uf: "", codMunicipioIbge: "" });
-                } else {
-                  set("cep", novo);
-                }
-              }}
-              onBlur={() => endereco.cep.replace(/\D/g, "").length === 8 && !endereco.codMunicipioIbge && buscarCep()}
-              placeholder="00000-000"
-            />
-            <button type="button" className={`${styles.btn} ${styles.btnMini}`} onClick={buscarCep} disabled={buscandoCep}>
-              {buscandoCep ? "…" : "Buscar"}
-            </button>
-          </div>
-        </div>
-        <Campo label="Endereço *" span={2} value={endereco.endereco} onChange={(v) => set("endereco", v)} />
-        <Campo label="Número *" value={endereco.numero} onChange={(v) => set("numero", v)} />
-        <Campo label="Complemento" span={2} value={endereco.complemento} onChange={(v) => set("complemento", v)} />
-        <Campo label="Bairro *" value={endereco.bairro} onChange={(v) => set("bairro", v)} />
-        <Campo label="Cidade (pelo CEP)" value={endereco.cidade} onChange={() => {}} readOnly />
-        <Campo label="UF" value={endereco.uf} onChange={() => {}} readOnly />
-        <Campo label="IBGE" value={endereco.codMunicipioIbge} onChange={() => {}} readOnly />
-      </div>
-      {erroCep && <div className={styles.erroBox}>{erroCep}</div>}
-      <p className={styles.muted}>
-        A cidade é gravada sem acento, como o Linx exige — vem do código IBGE do CEP. No site, a 1ª linha do endereço
-        costuma ter “rua, número” e a 2ª o complemento/bairro.
-      </p>
-    </>
-  );
-}
-
-function Campo({
-  label,
-  value,
-  onChange,
-  span,
-  readOnly,
-  type,
-  alterado,
-  placeholder,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  span?: 2 | 3;
-  readOnly?: boolean;
-  type?: string;
-  alterado?: boolean;
-  placeholder?: string;
-}) {
-  return (
-    <label className={`${styles.campo} ${span === 2 ? styles.span2 : span === 3 ? styles.span3 : ""}`}>
-      <span className={styles.label}>{label}</span>
-      <input
-        className={`${styles.input} ${alterado ? styles.inputAlterado : ""}`}
-        value={value}
-        type={type}
-        readOnly={readOnly}
-        placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    </label>
-  );
-}
-
-function Escolha({
-  label,
-  value,
-  opcoes,
-  onChange,
-  padrao,
-}: {
-  label: string;
-  value: string;
-  opcoes: Opcao[];
-  onChange: (v: string) => void;
-  padrao?: string;
-}) {
-  const lista = opcoes.some((o) => o.value === value) || !value ? opcoes : [{ value, label: value }, ...opcoes];
-  return (
-    <label className={styles.campo}>
-      <span className={styles.label}>{label}</span>
-      <select
-        className={`${styles.select} ${padrao !== undefined && value !== padrao ? styles.inputAlterado : ""}`}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      >
-        {lista.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
 
 // ── Novo cadastro ───────────────────────────────────────────────────────────
 
@@ -546,6 +433,7 @@ function NovoClienteForm({
   onCancelar,
   onCriado,
   onUsarExistente,
+  onAbrirPj,
 }: {
   empresa: EmpresaFat;
   lookups: FatLookups;
@@ -554,6 +442,8 @@ function NovoClienteForm({
   onCancelar: () => void;
   onCriado: (codigo: string) => void;
   onUsarExistente: (codigo: string) => void;
+  /** CNPJ digitado aqui: leva os dados para o cadastro PJ. */
+  onAbrirPj: (dados: ClientePjInicial) => void;
 }) {
   const api = useFatApi(empresa);
   const padrao = PADROES[empresa].cliente;
@@ -580,8 +470,11 @@ function NovoClienteForm({
 
   const regiao = regiaoManual ?? regiaoDaUf(endereco.uf);
   const nomeLinx = nome.trim().toUpperCase().slice(0, 25);
+  // CNPJ não entra por aqui: o cadastro PJ tem IE, indicador fiscal e padrões próprios.
+  const ehCnpj = soDigitos(cpf).length === 14;
 
   const salvar = async (forcar = false) => {
+    if (ehCnpj) return;
     setSalvando(true);
     setErro(null);
     try {
@@ -632,11 +525,26 @@ function NovoClienteForm({
 
       <div className={styles.grid}>
         <Campo label="Nome completo *" span={2} value={nome} onChange={setNome} placeholder="como no pedido do site" />
-        <Campo label="CPF / CNPJ *" value={cpf} onChange={setCpf} />
+        <Campo label="CPF *" value={cpf} onChange={setCpf} />
         <Campo label="E-mail (também p/ NF-e)" span={2} value={email} onChange={setEmail} type="email" />
         <Campo label="DDD" value={ddd} onChange={setDdd} placeholder="11" />
         <Campo label="Telefone" value={telefone} onChange={setTelefone} />
       </div>
+      {ehCnpj && (
+        <div className={styles.avisoBox}>
+          <strong>Isto é um CNPJ.</strong> Empresa se cadastra pelo cadastro PJ, que tem inscrição estadual, indicador
+          fiscal e os padrões do corporativo.
+          <div className={styles.acoes}>
+            <button
+              type="button"
+              className={`${styles.btnPrimario} ${styles.btnMini}`}
+              onClick={() => onAbrirPj({ cnpj: cpf, razaoSocial: nome, email, ddd, telefone, endereco })}
+            >
+              Abrir cadastro PJ com estes dados →
+            </button>
+          </div>
+        </div>
+      )}
       {nome.trim().length > 25 && (
         <p className={styles.muted}>
           O Linx guarda o nome curto com 25 letras: <strong>{nomeLinx}</strong> (o nome completo vai na razão social).
@@ -705,7 +613,7 @@ function NovoClienteForm({
       {erro && <div className={styles.erroBox}>{erro}</div>}
 
       <div className={styles.acoes}>
-        <button type="button" className={styles.btnPrimario} onClick={() => salvar(false)} disabled={salvando}>
+        <button type="button" className={styles.btnPrimario} onClick={() => salvar(false)} disabled={salvando || ehCnpj}>
           {salvando ? "Gravando no Linx…" : "Cadastrar no Linx"}
         </button>
         <button type="button" className={styles.btnTexto} onClick={onCancelar}>
