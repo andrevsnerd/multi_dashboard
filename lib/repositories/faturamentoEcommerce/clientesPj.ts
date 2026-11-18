@@ -98,7 +98,7 @@ export async function criarClientePjFat(
   // IE só com dígitos (é como vai no XML da NF-e); vazio ou "ISENTO" = ISENTO.
   const ie = onlyDigits(input.inscricaoEstadual).slice(0, 19) || "ISENTO";
   const indicador = Number(input.indicadorFiscal);
-  const indicadorFiscal = Number.isInteger(indicador) && indicador > 0 ? indicador : padrao.indicadorFiscal;
+  const indicadorFiscal = Number.isInteger(indicador) && indicador > 0 ? indicador : perfil.indicadorFiscal;
 
   const principal = normEndereco(input.endereco, "Endereço principal");
   const cobranca = input.cobranca ? normEndereco(input.cobranca, "Endereço de cobrança") : principal;
@@ -133,10 +133,11 @@ export async function criarClientePjFat(
       bind(`${p}Uf`, sql.Char(2), e.uf);
       bind(`${p}Ibge`, sql.VarChar(7), e.ibge);
     }
-    // O Linx guarda o DDD com zero à esquerda ('011').
+    // O Linx guarda o DDD com zero à esquerda ('011'), como o cadastro modelo do dono (850797);
+    // sem 2º telefone, DDD2 repete o DDD1 (também como o modelo e o cadastro de pessoa física).
     bind("ddd", sql.VarChar(4), ddd ? `0${ddd}` : "");
     bind("tel", sql.VarChar(10), onlyDigits(input.telefone).slice(-9));
-    bind("ddd2", sql.VarChar(4), ddd2 ? `0${ddd2}` : "");
+    bind("ddd2", sql.VarChar(4), ddd2 ? `0${ddd2}` : ddd ? `0${ddd}` : "");
     bind("tel2", sql.VarChar(10), onlyDigits(input.telefone2).slice(-9));
     bind("email", sql.VarChar(100), email);
     bind("emailNfe", sql.VarChar(100), cut(input.emailNfe, 100) || email);

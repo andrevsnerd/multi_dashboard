@@ -104,6 +104,7 @@ function NovaNota({
 
   const [filial, setFilialEscolhida] = useState(lookups.filialNotaPadrao);
   const filialInfo = lookups.filiaisNota.find((f) => f.filial === filial) ?? null;
+  const matrizExtra = lookups.filiaisNota.find((f) => f.extra) ?? null;
   const ufFilial = filialInfo?.uf ?? "SP";
   const [naturezaManual, setNaturezaManual] = useState<string | null>(null);
   // Trocar de filial volta a natureza para a automática (a Matriz usa outras naturezas).
@@ -463,6 +464,15 @@ function NovaNota({
                   Faturando fora da principal ({lookups.filialNotaPadrao}). Ao gravar, esta filial passa a ser a principal.
                 </span>
               ))
+            )}
+            {matrizExtra && !filialInfo?.extra && (cliente?.indicadorFiscal === "1" || cliente?.indicadorFiscal === "16") && (
+              <span className={styles.avisoBox}>
+                Cliente contribuinte (indicador {cliente.indicadorFiscal}): no Linx ele sai pela {matrizExtra.filial} — as filiais
+                do e-commerce não têm exceção de venda para contribuinte.{" "}
+                <button type="button" className={`${styles.btnPrimario} ${styles.btnMini}`} onClick={() => setFilial(matrizExtra.filial)}>
+                  Usar {matrizExtra.rotulo ?? "MATRIZ"}
+                </button>
+              </span>
             )}
           </label>
           <label className={`${styles.campo} ${styles.span2}`}>

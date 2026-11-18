@@ -556,7 +556,7 @@ function NovoClienteForm({
       <h3 className={styles.cardTitle}>Padrões do cadastro (pode alterar)</h3>
       <div className={styles.grid}>
         <Escolha label="Filial" value={filial} opcoes={lookups.filiaisCliente} onChange={setFilial} padrao={padrao.filial} />
-        <Escolha label="Tipo" value={tipo} opcoes={lookups.tiposCliente} onChange={setTipo} padrao={padrao.tipo} />
+        <Escolha label="Tipo" value={tipo} opcoes={lookups.tiposCliente.filter((o) => o.value !== "CORPORATIVO")} onChange={setTipo} padrao={padrao.tipo} />
         <Escolha label="Conceito" value={conceito} opcoes={lookups.conceitos} onChange={setConceito} padrao={padrao.conceito} />
         <Escolha
           label="Pontualidade"

@@ -122,13 +122,24 @@ oferece abrir o PJ com os dados digitados; pedido do Shopify com CNPJ abre diret
 - Campos do cadastro corporativo: IE ISENTO, IE/IM/SUFRAMA/tributação, cobrança e entrega
   próprias, 2º telefone, limite, OBS. Filial = a da empresa (NERD / SCARF ME - MATRIZ).
   Busca CNPJ na BrasilAPI + CEP para o IBGE. CIDADE das 3 vias vem do IBGE (sem acento).
-- **Indicador fiscal padrão = 8, não 1** (única diferença do corporativo). Medido: nem NERD
-  (NERD/SP) nem Scarf Me (LLL/SP) têm exceção de venda para contribuinte — com indicador 1 a
-  `FX_ID_EXCECAO_IMPOSTO` cai em 1117 "DEVOLUÇÃO COMPRA" (CSOSN 900, CFOP 5102/6102) em
-  SP, RJ e MG, e a prévia bloqueia. Com 8: 5102/6108 CSOSN 102 (exceções 1248/489 NERD).
-  Histórico: 164 de 185 NFs 100.02/100.022 para CNPJ desde 2024 saíram com indicador 8.
-  A tela troca para 1 quando o operador informa IE, com aviso de bloqueio.
-- IE gravada só com dígitos. Validado com ROLLBACK (3 tabelas + erros) em 18/11/2026.
+- **Indicador fiscal pelo perfil (editável): WEB 8, CORPORATIVO 1.** As pernas do e-commerce
+  (Simples) não têm exceção de venda para contribuinte — com indicador 1/16 a
+  `FX_ID_EXCECAO_IMPOSTO` cai em 1117 "DEVOLUÇÃO COMPRA" (CSOSN 900) e a prévia bloqueia
+  com "fature pela MATRIZ". Com 8: 5102/6108 CSOSN 102. Na Matriz o 1 funciona em SP e fora
+  (100% dos corporativos têm 1 e saem pela Matriz, 100.05). Indicador 1 com IE ISENTO é aceito
+  pela SEFAZ (105 NFs da Matriz autorizadas desde jun/2025). Informar IE troca para 1.
+- IE gravada só com dígitos. DDD '011' (com zero) e DDD2 = DDD1 sem 2º telefone, como o cadastro
+  modelo do dono (850797) — o CNPJ WEB simulado bate com ele em 180 de 181 colunas (a outra é
+  PJ_PF, que o modelo, sendo CPF, tem 0).
+- Pessoa física: só WEB aqui (tipo CORPORATIVO recusado — 1 único PF corporativo no Linx; se
+  precisar, área Corporativo, que tem PF/PJ).
+
+**Validação 18/11/2026 (ROLLBACK, contra o Linx real):** padrão medido desde 2025 — PF WEB
+(12.655), PJ WEB (97), PJ CORPORATIVO (87, todos do dashboard corporativo). Os 3 cadastros
+simulados batem campo a campo (indicador, agrupamento, ind. venda, conta, tabela,
+transportadora, condição, conceito, pontualidade, filial, IE, representante, DDD). Matriz de
+faturamento (prévia com clientes reais): WEB → pernas/NERD ok, Matriz só em SP; contribuinte
+(1/16) → só Matriz (100.05/100.08), pernas/NERD bloqueiam — igual ao histórico de NFs.
 
 ---
 

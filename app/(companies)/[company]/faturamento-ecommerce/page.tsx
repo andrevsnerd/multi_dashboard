@@ -14,7 +14,9 @@ interface Props {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { company: slug } = await params;
   const company = resolveCompany(slug);
-  return { title: company ? `Faturamento E-commerce | ${company.name}` : "Faturamento E-commerce" };
+  // Só a Scarf Me fatura também pela Matriz (filiaisExtras); a NERD é só e-commerce.
+  const nome = company?.key === "scarfme" ? "Faturamento E-com / Matriz" : "Faturamento E-commerce";
+  return { title: company ? `${nome} | ${company.name}` : nome };
 }
 
 export default async function FaturamentoEcommerceRoute({ params }: Props) {

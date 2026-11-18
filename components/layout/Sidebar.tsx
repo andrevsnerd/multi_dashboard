@@ -426,7 +426,7 @@ export default function Sidebar({ companyName }: SidebarProps) {
           ? [
               {
                 key: "faturamento-ecommerce",
-                label: "Faturamento E-commerce",
+                label: isScarfme ? "Faturamento E-com / Matriz" : "Faturamento E-commerce",
                 href: faturamentoEcommerceHref,
                 permission: "faturamento-ecommerce" as const,
                 isActive: (currentPathname: string | null) =>

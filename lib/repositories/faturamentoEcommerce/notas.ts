@@ -399,6 +399,16 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
     const excDesc = trim(exc?.descr);
     if (idExc === null) {
       bloqueios.push(`${a.produto}: nenhuma exceção fiscal encontrada para ${ufCliente} — peça ao fiscal para cadastrar.`);
+    } else if ((csosn === "900" || /DEVOLU/i.test(excDesc)) && simples && (indFiscal === 1 || indFiscal === 16)) {
+      // Contribuinte (corporativo/revenda): as pernas do Simples não têm exceção de venda para
+      // ele — no Linx esses clientes saem pela Matriz (100.05/100.08).
+      const matriz = padrao.nota.filiaisExtras.length > 0;
+      bloqueios.push(
+        `Cliente contribuinte (indicador ${indFiscal}): ${filial} não tem exceção fiscal de venda para contribuinte ` +
+          (matriz
+            ? `— fature pela MATRIZ (filial emissora "MATRIZ (fora do rodízio)"), como os corporativos no Linx.`
+            : `— peça ao fiscal para cadastrar a exceção, ou cadastre o cliente como 8 - Não Contribuinte se ele compra para uso próprio.`)
+      );
     } else if (csosn === "900" || /DEVOLU/i.test(excDesc)) {
       bloqueios.push(
         `${a.produto}: a exceção fiscal encontrada para ${ufCliente} é "${excDesc}" (${idExc}, CSOSN ${csosn}), que não é de venda. ` +

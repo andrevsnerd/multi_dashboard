@@ -407,6 +407,11 @@ export async function criarClienteFat(
   // CNPJ tem cadastro próprio (clientesPj.ts): IE, indicador fiscal e padrões do corporativo.
   if (doc.length === 14) throw new Error("CNPJ não se cadastra aqui — use “Cadastrar PJ (CNPJ)”.");
   if (doc.length !== 11) throw new Error("CPF inválido (11 dígitos).");
+  // Pessoa física aqui é o cliente do site (padrão WEB). CORPORATIVO tem outro conjunto
+  // (conta, tabela, agrupamento…) — 1 único PF corporativo no Linx; se precisar, área Corporativo.
+  if (up(input.tipo) === "CORPORATIVO") {
+    throw new Error("Pessoa física não se cadastra como CORPORATIVO aqui — use a área Corporativo.");
+  }
   const razao = cut(input.razaoSocial, 90);
   if (!razao) throw new Error("Nome / razão social é obrigatório.");
   const nomeBase = cut(input.nomeClifor || razao, 25);

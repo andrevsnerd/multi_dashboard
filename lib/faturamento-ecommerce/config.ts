@@ -124,9 +124,11 @@ const CLIENTE_BASE: Omit<PadraoCliente, "filial"> = {
  * diferentes de conta, indicador de venda, agrupamento, tabela e transportadora. Trocar o
  * perfil na tela troca o conjunto inteiro — nunca metade WEB, metade corporativo.
  *
- * O indicador FISCAL não faz parte do perfil: é fato do cliente (tem IE ou não), e com 1
- * a NF do e-commerce bloqueia (ver CLIENTE_PJ_BASE). Os corporativos medidos têm 1 porque
- * saem pela Matriz.
+ * O indicador FISCAL do perfil é só o ponto de partida (a tela deixa trocar): WEB 8, como
+ * 69% dos PJ WEB (faturam pelas pernas do e-commerce, que não têm exceção para contribuinte);
+ * CORPORATIVO 1, como 100% dos corporativos — eles faturam pela MATRIZ (100.05), onde o 1
+ * funciona em SP e fora (o 8 fora de SP cai em DIFAL e bloqueia). Indicador 1 com IE
+ * ISENTO é aceito pela SEFAZ: 105 NFs da Matriz autorizadas assim desde jun/2025.
  */
 export type PerfilClientePj = "WEB" | "CORPORATIVO";
 
@@ -142,6 +144,8 @@ export interface PerfilClientePjDef {
   indicadorVenda: string;
   /** CADASTRO_CLI_FOR.AGRUPAMENTO_ITENS — não aparece na tela, vem do perfil. */
   agrupamentoItens: number;
+  /** INDICADOR_FISCAL_TERCEIRO sugerido ao escolher o perfil (editável). */
+  indicadorFiscal: number;
 }
 
 export const PERFIS_CLIENTE_PJ: Record<PerfilClientePj, PerfilClientePjDef> = {
@@ -154,6 +158,7 @@ export const PERFIS_CLIENTE_PJ: Record<PerfilClientePj, PerfilClientePjDef> = {
     transportadora: "NOSSO CARRO",
     indicadorVenda: "V",
     agrupamentoItens: 0,
+    indicadorFiscal: 8,
   },
   CORPORATIVO: {
     rotulo: "CORPORATIVO",
@@ -164,6 +169,7 @@ export const PERFIS_CLIENTE_PJ: Record<PerfilClientePj, PerfilClientePjDef> = {
     transportadora: "CORREIOS - SEDEX",
     indicadorVenda: "",
     agrupamentoItens: 2,
+    indicadorFiscal: 1,
   },
 };
 

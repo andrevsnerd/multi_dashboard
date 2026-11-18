@@ -70,7 +70,7 @@ export default function ClientePjForm({
   const [fantasia, setFantasia] = useState("");
   const [isento, setIsento] = useState(true);
   const [ie, setIe] = useState("");
-  const [indicador, setIndicador] = useState(String(padrao.indicadorFiscal));
+  const [indicador, setIndicador] = useState(String(PERFIS_CLIENTE_PJ[PERFIL_PJ_PADRAO].indicadorFiscal));
   const [tributacao, setTributacao] = useState("");
   const [im, setIm] = useState("");
   const [suframa, setSuframa] = useState("");
@@ -89,6 +89,8 @@ export default function ClientePjForm({
   // Comercial — tipo, conta, tabela e transportadora começam no perfil
   const [perfil, setPerfil] = useState<PerfilClientePj>(PERFIL_PJ_PADRAO);
   const perfilDef = PERFIS_CLIENTE_PJ[perfil];
+  /** Filial extra (Matriz) que fatura contribuinte, se a empresa tiver uma. */
+  const matrizDaEmpresa = lookups.filiaisNota.find((f) => f.extra)?.filial ?? null;
   const [filial, setFilial] = useState(padrao.filial);
   const [tipo, setTipo] = useState(PERFIS_CLIENTE_PJ[PERFIL_PJ_PADRAO].tipo);
   const [conceito, setConceito] = useState(padrao.conceito);
@@ -106,6 +108,8 @@ export default function ClientePjForm({
     setConta(d.contaContabil);
     setTabela(d.codigoTabPreco);
     setTransportadora(d.transportadora);
+    // Ponto de partida do perfil: WEB 8 (fatura pelas pernas), CORPORATIVO 1 (fatura pela Matriz).
+    setIndicador(String(d.indicadorFiscal));
   };
 
   const mudarTipo = (v: string) => {
@@ -319,9 +323,9 @@ export default function ClientePjForm({
             type="checkbox"
             checked={isento}
             onChange={(e) => {
-              // Com IE a empresa é contribuinte (1); sem IE, não contribuinte (8). Dá para trocar depois.
+              // Com IE a empresa é contribuinte (1); sem IE, volta ao do perfil. Dá para trocar depois.
               setIsento(e.target.checked);
-              setIndicador(e.target.checked ? String(padrao.indicadorFiscal) : "1");
+              setIndicador(e.target.checked ? String(perfilDef.indicadorFiscal) : "1");
             }}
           />
           Isento de IE
@@ -331,7 +335,7 @@ export default function ClientePjForm({
           value={indicador}
           opcoes={INDICADORES_FISCAIS}
           onChange={setIndicador}
-          padrao={String(padrao.indicadorFiscal)}
+          padrao={String(perfilDef.indicadorFiscal)}
         />
         <Escolha
           label="Tipo de tributação"
@@ -348,17 +352,26 @@ export default function ClientePjForm({
           irregular.
         </div>
       )}
-      {indicador === "1" ? (
-        <div className={styles.avisoBox}>
-          <strong>Indicador 1 (contribuinte):</strong> hoje a {PADROES[empresa].nome} não tem exceção fiscal de venda para
-          contribuinte no Linx — a NF para este cliente vai ficar <strong>bloqueada</strong> na prévia (cai em “DEVOLUÇÃO
-          COMPRA”) até o fiscal cadastrar a exceção. Empresa que compra para uso próprio vai como 8 - Não Contribuinte.
-          {isento && " E indicador 1 pede inscrição estadual: desmarque “Isento” e informe a IE."}
-        </div>
+      {indicador === "1" || indicador === "16" ? (
+        matrizDaEmpresa ? (
+          <p className={styles.muted}>
+            Indicador {indicador} (contribuinte): a NF deste cliente sai pela <strong>{matrizDaEmpresa}</strong> (natureza{" "}
+            {indicador === "16" ? "100.08 revenda" : "100.05"}), como os corporativos no Linx — as filiais do e-commerce não
+            têm exceção fiscal de venda para contribuinte e bloqueiam.
+          </p>
+        ) : (
+          <div className={styles.avisoBox}>
+            <strong>Indicador {indicador} (contribuinte):</strong> a {PADROES[empresa].nome} não tem exceção fiscal de venda
+            para contribuinte no Linx — a NF deste cliente vai ficar <strong>bloqueada</strong> na prévia até o fiscal
+            cadastrar a exceção. Empresa que compra para uso próprio vai como 8 - Não Contribuinte.
+          </div>
+        )
       ) : (
         <p className={styles.muted}>
-          Padrão 8 - Não Contribuinte: empresa comprando para uso próprio (como saem quase todas as NFs do site para
-          CNPJ). Se a empresa tem IE e compra para revender, desmarque “Isento” e informe a IE.
+          8 - Não Contribuinte: empresa comprando para uso próprio — fatura pelas filiais do e-commerce, como quase todas as
+          NFs do site para CNPJ
+          {matrizDaEmpresa ? ` (pela ${matrizDaEmpresa} só dentro de SP: fora de SP tem DIFAL)` : ""}. Se a empresa tem IE e
+          compra para revender, desmarque “Isento” e informe a IE.
         </p>
       )}
       {!fantasia.trim() && razao.trim().length > 25 && (
