@@ -2,7 +2,15 @@
 
 import { useState, type FormEvent } from "react";
 
-import { PADROES, regiaoDaUf, type EmpresaFat } from "@/lib/faturamento-ecommerce/config";
+import {
+  PADROES,
+  PERFIL_PF_PADRAO,
+  PERFIS_CLIENTE_PF,
+  perfilDoTipo,
+  regiaoDaUf,
+  type EmpresaFat,
+  type PerfilCliente,
+} from "@/lib/faturamento-ecommerce/config";
 import type {
   ClienteFatDetalhe,
   ClienteFatInput,
@@ -454,16 +462,36 @@ function NovoClienteForm({
   const [telefone, setTelefone] = useState(inicial?.telefone ?? "");
   const [endereco, setEndereco] = useState<EnderecoFat>(inicial?.endereco ?? ENDERECO_VAZIO);
   const [filial, setFilial] = useState(padrao.filial);
-  const [tipo, setTipo] = useState(padrao.tipo);
+  // Perfil WEB (o cliente do site) ou CORPORATIVO: tipo, conta, tabela, transportadora e RG
+  // começam no perfil; indicador de venda e agrupamento vêm dele no servidor.
+  const [perfil, setPerfil] = useState<PerfilCliente>(PERFIL_PF_PADRAO);
+  const perfilDef = PERFIS_CLIENTE_PF[perfil];
+  const [tipo, setTipo] = useState(PERFIS_CLIENTE_PF[PERFIL_PF_PADRAO].tipo);
   const [conceito, setConceito] = useState(padrao.conceito);
   const [pontualidade, setPontualidade] = useState(padrao.pontualidade);
-  const [transportadora, setTransportadora] = useState(padrao.transportadora);
+  const [transportadora, setTransportadora] = useState(PERFIS_CLIENTE_PF[PERFIL_PF_PADRAO].transportadora);
   const [condicao, setCondicao] = useState(padrao.condicaoPgto);
-  const [tabela, setTabela] = useState(padrao.codigoTabPreco);
-  const [conta, setConta] = useState(padrao.contaContabil);
+  const [tabela, setTabela] = useState(PERFIS_CLIENTE_PF[PERFIL_PF_PADRAO].codigoTabPreco);
+  const [conta, setConta] = useState(PERFIS_CLIENTE_PF[PERFIL_PF_PADRAO].contaContabil);
   const [regiaoManual, setRegiaoManual] = useState<string | null>(null);
   const [representante, setRepresentante] = useState(padrao.representante);
-  const [rgIe, setRgIe] = useState(padrao.rgIe);
+  const [rgIe, setRgIe] = useState(PERFIS_CLIENTE_PF[PERFIL_PF_PADRAO].rgIe);
+
+  /** Troca o perfil inteiro — nunca fica metade WEB, metade corporativo. */
+  const aplicarPerfil = (p: PerfilCliente) => {
+    const d = PERFIS_CLIENTE_PF[p];
+    setPerfil(p);
+    setTipo(d.tipo);
+    setConta(d.contaContabil);
+    setTabela(d.codigoTabPreco);
+    setTransportadora(d.transportadora);
+    setRgIe(d.rgIe);
+  };
+  const mudarTipo = (v: string) => {
+    const p = perfilDoTipo(v);
+    if (p && p !== perfil) aplicarPerfil(p);
+    else setTipo(v);
+  };
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [duplicados, setDuplicados] = useState<{ codigo: string; nome: string; filial: string }[] | null>(null);
@@ -479,6 +507,7 @@ function NovoClienteForm({
     setErro(null);
     try {
       const cliente: ClienteFatInput = {
+        perfil,
         razaoSocial: nome,
         cpfCnpj: cpf,
         rgIe,
@@ -514,8 +543,31 @@ function NovoClienteForm({
   return (
     <div className={styles.card}>
       <div className={styles.cardHead}>
-        <h2 className={styles.cardTitle}>Cadastrar cliente</h2>
+        <h2 className={styles.cardTitle}>Cadastrar pessoa física (CPF)</h2>
         <span className={styles.muted}>Próximo código: {lookups.proximoCodigoCliente || "—"}</span>
+      </div>
+      <div className={styles.campo}>
+        <span className={styles.label}>Perfil do cliente</span>
+        <div className={styles.tabs} role="radiogroup" aria-label="Perfil do cliente">
+          {(Object.keys(PERFIS_CLIENTE_PF) as PerfilCliente[]).map((p) => (
+            <button
+              key={p}
+              type="button"
+              role="radio"
+              aria-checked={perfil === p}
+              className={`${styles.tab} ${perfil === p ? styles.tabAtiva : ""}`}
+              onClick={() => aplicarPerfil(p)}
+              title={PERFIS_CLIENTE_PF[p].descricao}
+            >
+              {PERFIS_CLIENTE_PF[p].rotulo}
+            </button>
+          ))}
+        </div>
+        <span className={styles.muted}>
+          <strong>{perfilDef.descricao}.</strong> Grava tipo {perfilDef.tipo} · conta {perfilDef.contaContabil} · tabela{" "}
+          {perfilDef.codigoTabPreco} · {perfilDef.transportadora} · RG {perfilDef.rgIe === "ISENTO" ? "ISENTO" : "19 noves"} ·
+          indicador de venda {perfilDef.indicadorVenda || "vazio"}.
+        </span>
       </div>
       {origem && (
         <div className={styles.infoBox}>
@@ -538,7 +590,7 @@ function NovoClienteForm({
             <button
               type="button"
               className={`${styles.btnPrimario} ${styles.btnMini}`}
-              onClick={() => onAbrirPj({ cnpj: cpf, razaoSocial: nome, email, ddd, telefone, endereco })}
+              onClick={() => onAbrirPj({ cnpj: cpf, razaoSocial: nome, email, ddd, telefone, endereco, perfil })}
             >
               Abrir cadastro PJ com estes dados →
             </button>
@@ -553,10 +605,10 @@ function NovoClienteForm({
 
       <CamposEndereco empresa={empresa} endereco={endereco} onChange={setEndereco} />
 
-      <h3 className={styles.cardTitle}>Padrões do cadastro (pode alterar)</h3>
+      <h3 className={styles.cardTitle}>Dados comerciais (padrão do perfil {perfilDef.rotulo} — pode alterar)</h3>
       <div className={styles.grid}>
         <Escolha label="Filial" value={filial} opcoes={lookups.filiaisCliente} onChange={setFilial} padrao={padrao.filial} />
-        <Escolha label="Tipo" value={tipo} opcoes={lookups.tiposCliente.filter((o) => o.value !== "CORPORATIVO")} onChange={setTipo} padrao={padrao.tipo} />
+        <Escolha label="Tipo" value={tipo} opcoes={lookups.tiposCliente} onChange={mudarTipo} padrao={perfilDef.tipo} />
         <Escolha label="Conceito" value={conceito} opcoes={lookups.conceitos} onChange={setConceito} padrao={padrao.conceito} />
         <Escolha
           label="Pontualidade"
@@ -570,7 +622,7 @@ function NovoClienteForm({
           value={transportadora}
           opcoes={lookups.transportadoras}
           onChange={setTransportadora}
-          padrao={padrao.transportadora}
+          padrao={perfilDef.transportadora}
         />
         <Escolha
           label="Condição de pagamento"
@@ -579,7 +631,7 @@ function NovoClienteForm({
           onChange={setCondicao}
           padrao={padrao.condicaoPgto}
         />
-        <Escolha label="Tabela de preço" value={tabela} opcoes={lookups.tabelasPreco} onChange={setTabela} padrao={padrao.codigoTabPreco} />
+        <Escolha label="Tabela de preço" value={tabela} opcoes={lookups.tabelasPreco} onChange={setTabela} padrao={perfilDef.codigoTabPreco} />
         <Escolha label="Região" value={regiao} opcoes={lookups.regioes} onChange={setRegiaoManual} />
         <Escolha
           label="Representante"
@@ -588,8 +640,8 @@ function NovoClienteForm({
           onChange={setRepresentante}
           padrao={padrao.representante}
         />
-        <Campo label="Conta contábil" value={conta} onChange={setConta} alterado={conta !== padrao.contaContabil} />
-        <Campo label="Insc. Est. / RG" value={rgIe} onChange={setRgIe} alterado={rgIe !== padrao.rgIe} />
+        <Campo label="Conta contábil" value={conta} onChange={setConta} alterado={conta !== perfilDef.contaContabil} />
+        <Campo label="Insc. Est. / RG" value={rgIe} onChange={setRgIe} alterado={rgIe !== perfilDef.rgIe} />
       </div>
 
       {duplicados && (
@@ -614,7 +666,7 @@ function NovoClienteForm({
 
       <div className={styles.acoes}>
         <button type="button" className={styles.btnPrimario} onClick={() => salvar(false)} disabled={salvando || ehCnpj}>
-          {salvando ? "Gravando no Linx…" : "Cadastrar no Linx"}
+          {salvando ? "Gravando no Linx…" : `Cadastrar pessoa física ${perfilDef.rotulo} no Linx`}
         </button>
         <button type="button" className={styles.btnTexto} onClick={onCancelar}>
           Cancelar

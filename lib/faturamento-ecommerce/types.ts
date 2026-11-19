@@ -102,6 +102,8 @@ export interface ClienteFatDetalhe {
 }
 
 export interface ClienteFatInput {
+  /** WEB (padrão) ou CORPORATIVO — PERFIS_CLIENTE_PF. */
+  perfil?: string;
   razaoSocial: string;
   /** Opcional: nome curto (25). Vazio = 25 primeiros caracteres da razão. */
   nomeClifor?: string;

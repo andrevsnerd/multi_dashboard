@@ -185,6 +185,51 @@ export function perfilDoTipo(tipo: string): PerfilClientePj | null {
   return isPerfilClientePj(t) ? t : null;
 }
 
+/** Mesmos dois modos para pessoa física (o tipo do perfil é o mesmo do PJ). */
+export type PerfilCliente = PerfilClientePj;
+
+export interface PerfilClientePfDef extends PerfilClientePjDef {
+  /** RG_IE padrão (pessoa física não tem IE). */
+  rgIe: string;
+}
+
+/**
+ * Perfil da PESSOA FÍSICA. WEB = o cliente do site, medido em 12.655 cadastros desde 2025
+ * (CLIENTE_BASE: conta 1120302, tabela 01, NOSSO CARRO, 'V', agrupamento 0, RG 19 noves).
+ * CORPORATIVO = o conjunto do corporativo (conta 1120101, tabela 05, CORREIOS - SEDEX,
+ * indicador de venda ' ') com as regras de pessoa física que a área Corporativo grava
+ * (clienteCorporativo.ts): agrupamento 0 (o 2 é só de PJ), RG "ISENTO", indicador 8.
+ * Pessoa física é sempre não contribuinte (8) nos dois perfis.
+ */
+export const PERFIS_CLIENTE_PF: Record<PerfilCliente, PerfilClientePfDef> = {
+  WEB: {
+    rotulo: "WEB",
+    descricao: "Pessoa que comprou pelo site",
+    tipo: CLIENTE_BASE.tipo,
+    contaContabil: CLIENTE_BASE.contaContabil,
+    codigoTabPreco: CLIENTE_BASE.codigoTabPreco,
+    transportadora: CLIENTE_BASE.transportadora,
+    indicadorVenda: "V",
+    agrupamentoItens: 0,
+    indicadorFiscal: CLIENTE_BASE.indicadorFiscal,
+    rgIe: CLIENTE_BASE.rgIe,
+  },
+  CORPORATIVO: {
+    rotulo: "CORPORATIVO",
+    descricao: "Pessoa da venda corporativa",
+    tipo: PERFIS_CLIENTE_PJ.CORPORATIVO.tipo,
+    contaContabil: PERFIS_CLIENTE_PJ.CORPORATIVO.contaContabil,
+    codigoTabPreco: PERFIS_CLIENTE_PJ.CORPORATIVO.codigoTabPreco,
+    transportadora: PERFIS_CLIENTE_PJ.CORPORATIVO.transportadora,
+    indicadorVenda: PERFIS_CLIENTE_PJ.CORPORATIVO.indicadorVenda,
+    agrupamentoItens: 0,
+    indicadorFiscal: 8,
+    rgIe: "ISENTO",
+  },
+};
+
+export const PERFIL_PF_PADRAO: PerfilCliente = "WEB";
+
 /**
  * Padrões comuns aos dois perfis + os do perfil padrão (WEB, como o cliente do site).
  * Indicador fiscal padrão é 8 (não contribuinte), medido em 18/11/2026: nem NERD nem

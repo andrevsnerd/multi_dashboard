@@ -566,7 +566,19 @@
   "564": "page.tsx",
   "565": "page.tsx",
   "566": "page.tsx",
+  "567": "page.tsx",
   "568": "page.tsx",
+  "569": "page.tsx",
+  "570": "page.tsx",
+  "571": "TransferenciaConfirmModal.tsx",
+  "572": "calcularDiferencasLocal",
   "573": "page.tsx",
-  "575": "page.tsx"
+  "574": "fix-tipos-romaneio-acento.mjs",
+  "575": "page.tsx",
+  "576": "fmtNum",
+  "577": "pecasDe",
+  "578": "fetchRomaneioParaEdicao",
+  "579": "formatLogDate",
+  "580": "chaveLinha",
+  "581": "isTipoSoSaida"
 }

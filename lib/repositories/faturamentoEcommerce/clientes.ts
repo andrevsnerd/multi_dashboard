@@ -3,7 +3,17 @@ import "server-only";
 import sql from "mssql";
 import { query, withRequest } from "@/lib/db/connection";
 import type { RequestLike } from "@/lib/db/proxy";
-import { PADROES, REGIOES, INFO_PGTO_OPCOES, regiaoDaUf, type EmpresaFat } from "@/lib/faturamento-ecommerce/config";
+import {
+  PADROES,
+  PERFIL_PF_PADRAO,
+  PERFIS_CLIENTE_PF,
+  REGIOES,
+  INFO_PGTO_OPCOES,
+  isPerfilClientePj,
+  perfilDoTipo,
+  regiaoDaUf,
+  type EmpresaFat,
+} from "@/lib/faturamento-ecommerce/config";
 import { filiaisExtrasDaEmpresa, filiaisNotaDaEmpresa, sqlUltimaNfEcommerce } from "./filiais-nota";
 import type {
   ClienteAtualizacaoInput,
@@ -17,7 +27,9 @@ import type {
 } from "@/lib/faturamento-ecommerce/types";
 
 /**
- * Faturamento E-commerce — cadastro de cliente final (pessoa física do site) no Linx.
+ * Faturamento E-com / Matriz — cadastro de PESSOA FÍSICA no Linx, perfil WEB (o cliente do
+ * site, padrão) ou CORPORATIVO (PERFIS_CLIENTE_PF). O que segue é o padrão WEB; o perfil
+ * CORPORATIVO troca conta, tabela, transportadora, tipo, indicador de venda e RG.
  *
  * Mesmo mecanismo do cadastro corporativo (CADASTRO_CLI_FOR + CLIENTES_ATACADO +
  * CLIENTE_REPRE numa transação, código de SEQUENCIAIS), com o padrão medido no
@@ -407,10 +419,17 @@ export async function criarClienteFat(
   // CNPJ tem cadastro próprio (clientesPj.ts): IE, indicador fiscal e padrões do corporativo.
   if (doc.length === 14) throw new Error("CNPJ não se cadastra aqui — use “Cadastrar PJ (CNPJ)”.");
   if (doc.length !== 11) throw new Error("CPF inválido (11 dígitos).");
-  // Pessoa física aqui é o cliente do site (padrão WEB). CORPORATIVO tem outro conjunto
-  // (conta, tabela, agrupamento…) — 1 único PF corporativo no Linx; se precisar, área Corporativo.
-  if (up(input.tipo) === "CORPORATIVO") {
-    throw new Error("Pessoa física não se cadastra como CORPORATIVO aqui — use a área Corporativo.");
+  // Perfil WEB (padrão, o cliente do site) ou CORPORATIVO — PERFIS_CLIENTE_PF. O perfil
+  // decide indicador de venda e agrupamento (não aparecem na tela) e o padrão de tipo,
+  // conta, tabela, transportadora e RG. Nunca metade WEB, metade corporativo.
+  const perfilInformado = up(input.perfil);
+  if (perfilInformado && !isPerfilClientePj(perfilInformado)) throw new Error("Perfil do cliente inválido.");
+  const perfilId = isPerfilClientePj(perfilInformado) ? perfilInformado : PERFIL_PF_PADRAO;
+  const perfil = PERFIS_CLIENTE_PF[perfilId];
+  const tipo = cut(input.tipo, 25) || perfil.tipo;
+  const perfilTipo = perfilDoTipo(tipo);
+  if (perfilTipo && perfilTipo !== perfilId) {
+    throw new Error(`Tipo ${tipo} não combina com o perfil ${perfilId}. Escolha o perfil ${perfilTipo}.`);
   }
   const razao = cut(input.razaoSocial, 90);
   if (!razao) throw new Error("Nome / razão social é obrigatório.");
@@ -431,8 +450,10 @@ export async function criarClienteFat(
     bind("nomeBase", sql.VarChar(25), nomeBase);
     bind("doc", sql.VarChar(19), doc);
     bind("pjpf", sql.Bit, 0);
-    bind("rgIe", sql.VarChar(19), cut(input.rgIe, 19) || padrao.rgIe);
-    bind("indicadorFiscal", sql.Int, padrao.indicadorFiscal);
+    bind("rgIe", sql.VarChar(19), cut(input.rgIe, 19) || perfil.rgIe);
+    bind("indicadorFiscal", sql.Int, perfil.indicadorFiscal);
+    bind("indicadorVenda", sql.VarChar(1), perfil.indicadorVenda || " ");
+    bind("agrupamento", sql.Int, perfil.agrupamentoItens);
     bind("cep", sql.VarChar(9), end.cep);
     bind("endereco", sql.VarChar(90), end.endereco);
     bind("numero", sql.VarChar(10), end.numero);
@@ -445,13 +466,13 @@ export async function criarClienteFat(
     bind("email", sql.VarChar(100), contato.email);
     bind("emailNfe", sql.VarChar(100), contato.emailNfe);
     bind("filial", sql.VarChar(25), cut(input.filial, 25) || padrao.filial);
-    bind("tipo", sql.VarChar(25), cut(input.tipo, 25) || padrao.tipo);
+    bind("tipo", sql.VarChar(25), tipo);
     bind("conceito", sql.VarChar(25), cut(input.conceito, 25) || padrao.conceito);
     bind("pontualidade", sql.VarChar(25), cut(input.pontualidade, 25) || padrao.pontualidade);
-    bind("transportadora", sql.VarChar(25), cut(input.transportadora, 25) || padrao.transportadora);
+    bind("transportadora", sql.VarChar(25), cut(input.transportadora, 25) || perfil.transportadora);
     bind("condicaoPgto", sql.VarChar(3), cut(input.condicaoPgto, 3) || padrao.condicaoPgto);
-    bind("tab", sql.VarChar(2), cut(input.codigoTabPreco, 2) || padrao.codigoTabPreco);
-    bind("conta", sql.VarChar(20), cut(input.contaContabil, 20) || padrao.contaContabil);
+    bind("tab", sql.VarChar(2), cut(input.codigoTabPreco, 2) || perfil.codigoTabPreco);
+    bind("conta", sql.VarChar(20), cut(input.contaContabil, 20) || perfil.contaContabil);
     bind("regiao", sql.VarChar(25), cut(input.regiao, 25) || regiaoDaUf(end.uf));
     bind("representante", sql.VarChar(25), cut(input.representante, 25) || padrao.representante);
 
@@ -519,7 +540,7 @@ BEGIN TRY
     0, 1, 0, 0,
     0, 0, 0, 0, 0, 0,
     0, 0, 0,
-    @indicadorFiscal, 0, 0
+    @indicadorFiscal, 0, @agrupamento
   );
 
   INSERT INTO CLIENTES_ATACADO (
@@ -531,7 +552,7 @@ BEGIN TRY
     @nome, @codigo, @codigo, @doc,
     @condicaoPgto, @regiao, @filial, @pontualidade, @transportadora, @conceito, @tipo, 'INDEFINIDO',
     @nome, 'R$', @tab, 0, 0, 0,
-    0, 0, 'V', GETDATE(), @conta
+    0, 0, @indicadorVenda, GETDATE(), @conta
   );
 
   INSERT INTO CLIENTE_REPRE (REPRESENTANTE, CLIENTE_ATACADO, DATA_PARA_TRANSFERENCIA, COMISSAO, REPRESENTANTE_PRINCIPAL)

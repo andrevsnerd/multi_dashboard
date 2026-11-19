@@ -40,6 +40,8 @@ export interface ClientePjInicial {
   ddd: string;
   telefone: string;
   endereco: EnderecoFat;
+  /** Modo já escolhido antes (ex.: veio do cadastro de pessoa física). */
+  perfil?: PerfilClientePj;
 }
 
 const soDigitos = (s: string) => String(s ?? "").replace(/\D/g, "");
@@ -70,7 +72,8 @@ export default function ClientePjForm({
   const [fantasia, setFantasia] = useState("");
   const [isento, setIsento] = useState(true);
   const [ie, setIe] = useState("");
-  const [indicador, setIndicador] = useState(String(PERFIS_CLIENTE_PJ[PERFIL_PJ_PADRAO].indicadorFiscal));
+  const perfilInicial: PerfilClientePj = inicial?.perfil ?? PERFIL_PJ_PADRAO;
+  const [indicador, setIndicador] = useState(String(PERFIS_CLIENTE_PJ[perfilInicial].indicadorFiscal));
   const [tributacao, setTributacao] = useState("");
   const [im, setIm] = useState("");
   const [suframa, setSuframa] = useState("");
@@ -87,18 +90,18 @@ export default function ClientePjForm({
   const [email, setEmail] = useState(inicial?.email ?? "");
   const [emailNfe, setEmailNfe] = useState("");
   // Comercial — tipo, conta, tabela e transportadora começam no perfil
-  const [perfil, setPerfil] = useState<PerfilClientePj>(PERFIL_PJ_PADRAO);
+  const [perfil, setPerfil] = useState<PerfilClientePj>(perfilInicial);
   const perfilDef = PERFIS_CLIENTE_PJ[perfil];
   /** Filial extra (Matriz) que fatura contribuinte, se a empresa tiver uma. */
   const matrizDaEmpresa = lookups.filiaisNota.find((f) => f.extra)?.filial ?? null;
   const [filial, setFilial] = useState(padrao.filial);
-  const [tipo, setTipo] = useState(PERFIS_CLIENTE_PJ[PERFIL_PJ_PADRAO].tipo);
+  const [tipo, setTipo] = useState(PERFIS_CLIENTE_PJ[perfilInicial].tipo);
   const [conceito, setConceito] = useState(padrao.conceito);
   const [pontualidade, setPontualidade] = useState(padrao.pontualidade);
-  const [transportadora, setTransportadora] = useState(PERFIS_CLIENTE_PJ[PERFIL_PJ_PADRAO].transportadora);
+  const [transportadora, setTransportadora] = useState(PERFIS_CLIENTE_PJ[perfilInicial].transportadora);
   const [condicao, setCondicao] = useState(padrao.condicaoPgto);
-  const [tabela, setTabela] = useState(PERFIS_CLIENTE_PJ[PERFIL_PJ_PADRAO].codigoTabPreco);
-  const [conta, setConta] = useState(PERFIS_CLIENTE_PJ[PERFIL_PJ_PADRAO].contaContabil);
+  const [tabela, setTabela] = useState(PERFIS_CLIENTE_PJ[perfilInicial].codigoTabPreco);
+  const [conta, setConta] = useState(PERFIS_CLIENTE_PJ[perfilInicial].contaContabil);
 
   /** Troca o perfil inteiro — nunca fica metade WEB, metade corporativo. */
   const aplicarPerfil = (p: PerfilClientePj) => {

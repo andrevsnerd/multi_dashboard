@@ -90,7 +90,7 @@ export default function FaturamentoEcommercePage({ empresa }: { empresa: Empresa
     <div className={styles.wrapper}>
       <div className={styles.header}>
         <div>
-          <h1 className={styles.title}>{PADROES[empresa].nota.filiaisExtras.length > 0 ? "Faturamento E-commerce / Matriz" : "Faturamento E-commerce"}</h1>
+          <h1 className={styles.title}>Faturamento E-commerce / Matriz</h1>
           <p className={styles.subtitle}>
             Cadastro do cliente, NF de produto acabado no Linx e acompanhamento da NF-e.
           </p>

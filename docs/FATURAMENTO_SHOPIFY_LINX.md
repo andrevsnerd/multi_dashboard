@@ -131,8 +131,13 @@ oferece abrir o PJ com os dados digitados; pedido do Shopify com CNPJ abre diret
 - IE gravada só com dígitos. DDD '011' (com zero) e DDD2 = DDD1 sem 2º telefone, como o cadastro
   modelo do dono (850797) — o CNPJ WEB simulado bate com ele em 180 de 181 colunas (a outra é
   PJ_PF, que o modelo, sendo CPF, tem 0).
-- Pessoa física: só WEB aqui (tipo CORPORATIVO recusado — 1 único PF corporativo no Linx; se
-  precisar, área Corporativo, que tem PF/PJ).
+- **Os 4 modos na própria página (19/11/2026, pedido do dono):** pessoa física e CNPJ, cada um
+  com perfil WEB ou CORPORATIVO (`PERFIS_CLIENTE_PF` / `PERFIS_CLIENTE_PJ`). Trocar o perfil
+  troca o conjunto inteiro; Tipo de um perfil com o outro selecionado é recusado (tela e
+  servidor). PF CORPORATIVO = conjunto do corporativo (1120101, tabela 05, CORREIOS - SEDEX,
+  ind. venda ' ') com as regras de PF da área Corporativo (agrupamento 0, RG ISENTO, indicador 8).
+  A área Corporativo continua como está. Página chama "Faturamento E-com / Matriz" nas duas
+  empresas (a NERD não tem filial extra; o nome é o mesmo).
 
 **Validação 18/11/2026 (ROLLBACK, contra o Linx real):** padrão medido desde 2025 — PF WEB
 (12.655), PJ WEB (97), PJ CORPORATIVO (87, todos do dashboard corporativo). Os 3 cadastros
