@@ -44,7 +44,6 @@ export interface FilialNotaOpcao {
   simples: boolean;
   naturezaDentroUf: string;
   naturezaForaUf: string;
-  naturezaRevenda: string | null;
 }
 
 export interface EnderecoFat {

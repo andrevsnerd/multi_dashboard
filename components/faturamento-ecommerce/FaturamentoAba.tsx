@@ -157,16 +157,10 @@ function NovaNota({
   const [confirmando, setConfirmando] = useState(false);
   const [enviarGravada, setEnviarGravada] = useState(false);
 
-  // Natureza automática pela filial (e-commerce 100.02/100.022; Matriz 100.05, ou 100.08 para
-  // cliente revendedor — indicador 16) e pela UF do cliente.
+  // Natureza automática pela filial (e-commerce 100.02/100.022; Matriz 100.05) e pela UF do cliente.
   const natDentro = filialInfo?.naturezaDentroUf ?? padrao.naturezaDentroUf;
   const natFora = filialInfo?.naturezaForaUf ?? padrao.naturezaForaUf;
-  const naturezaAuto =
-    filialInfo?.naturezaRevenda && cliente?.indicadorFiscal === "16"
-      ? filialInfo.naturezaRevenda
-      : cliente && cliente.endereco.uf && cliente.endereco.uf !== ufFilial
-        ? natFora
-        : natDentro;
+  const naturezaAuto = cliente && cliente.endereco.uf && cliente.endereco.uf !== ufFilial ? natFora : natDentro;
   const natureza = naturezaManual ?? naturezaAuto;
 
   const nota: NotaInput = useMemo(
@@ -453,7 +447,7 @@ function NovaNota({
             {filialInfo?.extra ? (
               <span className={styles.muted}>
                 {filialInfo.rotulo ?? filial}: fora do rodízio do e-commerce — a principal continua {lookups.filialNotaPadrao}.
-                {!filialInfo.simples && " Regime normal: a NF sai com ICMS/PIS/COFINS calculados (natureza 100.05; revenda 100.08)."}
+                {!filialInfo.simples && " Regime normal: a NF sai com ICMS/PIS/COFINS calculados, natureza 100.05 (venda a cliente)."}
               </span>
             ) : (
               lookups.filiaisNota.filter((f) => !f.extra).length > 1 &&

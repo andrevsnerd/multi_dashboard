@@ -71,8 +71,6 @@ export interface FilialNotaExtra {
   rotulo: string;
   naturezaDentroUf: string;
   naturezaForaUf: string;
-  /** Natureza para cliente revendedor (INDICADOR_FISCAL_TERCEIRO 16), se a filial usa uma própria. */
-  naturezaRevenda: string | null;
   /**
    * Regime da filial. As pernas do rodízio são sempre Simples (o gravador zera os impostos);
    * aqui é declarado — FILIAIS.TIPO_TRIBUTACAO não serve: MSC e CMS (Simples) estão vazias.
@@ -302,15 +300,15 @@ export const PADROES: Record<EmpresaFat, PadraoEmpresa> = {
       serie: "1",
       // Pedido do site às vezes é faturado pela Matriz (como o corporativo). A Matriz NÃO é
       // Simples Nacional (CRT 3): ICMS/PIS/COFINS de verdade — o gravador calcula no regime
-      // normal. Naturezas medidas nas NFs dela (18/11/2026): 100.05 VENDA PRIVATE (dentro e
-      // fora de SP) e 100.08 REVENDA (cliente indicador 16).
+      // normal. Pela página ela fatura SÓ 100.05 VENDA PRIVATE (venda a cliente, dentro e fora
+      // de SP) — reproduzida centavo a centavo. A 100.08 dela é só abastecimento das lojas do
+      // próprio grupo (100% das NFs 100.08 desde jun/2025), feito por outra rotina do Linx.
       filiaisExtras: [
         {
           codFilial: "001",
           rotulo: "MATRIZ",
           naturezaDentroUf: "100.05",
           naturezaForaUf: "100.05",
-          naturezaRevenda: "100.08",
           simplesNacional: false,
         },
       ],

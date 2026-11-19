@@ -238,13 +238,19 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
     SELECT LTRIM(RTRIM(cf.CLIFOR)) AS codigo, RTRIM(cf.NOME_CLIFOR) AS nome, LTRIM(RTRIM(cf.RAZAO_SOCIAL)) AS razao,
            LTRIM(RTRIM(cf.UF)) AS uf, LTRIM(RTRIM(cf.CIDADE)) AS cidade, cf.INDICADOR_FISCAL_TERCEIRO AS indFiscal,
            LTRIM(RTRIM(cf.COD_MUNICIPIO_IBGE)) AS ibge, LTRIM(RTRIM(ca.CODIGO_TAB_PRECO)) AS tab,
-           CASE WHEN ca.CLIENTE_ATACADO IS NULL THEN 0 ELSE 1 END AS atacado, ISNULL(ca.INATIVO,0) AS inativo
+           CASE WHEN ca.CLIENTE_ATACADO IS NULL THEN 0 ELSE 1 END AS atacado, ISNULL(ca.INATIVO,0) AS inativo,
+           CASE WHEN EXISTS (SELECT 1 FROM FILIAIS FX WITH (NOLOCK) WHERE FX.FILIAL = cf.NOME_CLIFOR) THEN 1 ELSE 0 END AS ehFilial
       FROM CADASTRO_CLI_FOR cf WITH (NOLOCK)
       LEFT JOIN CLIENTES_ATACADO ca WITH (NOLOCK) ON ca.CLIENTE_ATACADO = cf.NOME_CLIFOR
      WHERE cf.CLIFOR = @pClifor`);
   if (!cli) throw new Error(`Cliente ${clifor} não encontrado.`);
   if (!Number(cli.atacado)) bloqueios.push("O cliente não tem cadastro de cliente (CLIENTES_ATACADO) — cadastre pela aba Clientes.");
   if (Number(cli.inativo)) bloqueios.push("O cliente está inativo no Linx.");
+  if (Number(cli.ehFilial)) {
+    // NF para uma filial do próprio grupo é abastecimento/transferência (100.08 da Matriz),
+    // feito por outra rotina do Linx — não é venda a cliente, que é o que esta página faz.
+    bloqueios.push(`${trim(cli.nome)} é filial do grupo: NF para loja/filial própria é feita pela rotina do Linx, não por esta página.`);
+  }
   if (!trim(cli.ibge)) bloqueios.push("O cliente está sem código IBGE do município — atualize o endereço na aba Clientes.");
   const ufCliente = trim(cli.uf);
 
@@ -259,18 +265,21 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
   const interestadual = ufCliente !== ufFilial;
   const indFiscal = Number(cli.indFiscal) || 8;
   const naturezaEsperada = extra
-    ? indFiscal === 16 && extra.naturezaRevenda
-      ? extra.naturezaRevenda
-      : interestadual
-        ? extra.naturezaForaUf
-        : extra.naturezaDentroUf
+    ? interestadual
+      ? extra.naturezaForaUf
+      : extra.naturezaDentroUf
     : interestadual
       ? padrao.nota.naturezaForaUf
       : padrao.nota.naturezaDentroUf;
-  const naturezasUsuais = extra
-    ? [extra.naturezaDentroUf, extra.naturezaForaUf, extra.naturezaRevenda].filter(Boolean)
-    : [naturezaEsperada];
-  if (!naturezasUsuais.includes(natureza)) {
+  if (extra && natureza !== extra.naturezaDentroUf && natureza !== extra.naturezaForaUf) {
+    // A filial extra (Matriz) só fatura aqui a natureza que o gravador reproduz centavo a centavo.
+    bloqueios.push(
+      `Pela ${filial} esta página fatura só a natureza ${extra.naturezaDentroUf} (venda a cliente). ` +
+        (natureza === "100.08"
+          ? "A 100.08 da Matriz é o abastecimento das lojas do grupo, feito pela rotina do Linx."
+          : "Outras naturezas, faça pelo Linx.")
+    );
+  } else if (natureza !== naturezaEsperada) {
     avisos.push(
       `Cliente em ${ufCliente} e filial em ${ufFilial}: a natureza usual é ${naturezaEsperada} (selecionada: ${natureza}).`
     );
@@ -401,7 +410,7 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
       bloqueios.push(`${a.produto}: nenhuma exceção fiscal encontrada para ${ufCliente} — peça ao fiscal para cadastrar.`);
     } else if ((csosn === "900" || /DEVOLU/i.test(excDesc)) && simples && (indFiscal === 1 || indFiscal === 16)) {
       // Contribuinte (corporativo/revenda): as pernas do Simples não têm exceção de venda para
-      // ele — no Linx esses clientes saem pela Matriz (100.05/100.08).
+      // ele — no Linx esses clientes saem pela Matriz (100.05).
       const matriz = padrao.nota.filiaisExtras.length > 0;
       bloqueios.push(
         `Cliente contribuinte (indicador ${indFiscal}): ${filial} não tem exceção fiscal de venda para contribuinte ` +
@@ -695,10 +704,11 @@ const IMPOSTOS_REFORMA = new Set([92, 93, 94]);
 
 /**
  * Impostos da linha numa filial de REGIME NORMAL (Matriz da Scarf Me), reproduzindo as NFs
- * que o Linx grava para ela (validado em 18/11/2026 contra NFs reais 100.05/100.08 de out–nov:
- * base 100%; ICMS 100% em NF de 1 item; PIS/COFINS 2.329 de 2.330 linhas; IBS/CBS ~98,6%.
- * Em NF de VÁRIOS itens o Linx reparte o ICMS do total e ~metade das NFs tem alguma linha
- * com ±R$ 0,01 de diferença para este cálculo — dentro da tolerância da SEFAZ):
+ * que o Linx grava para ela. Validado em 19/11/2026: TODAS as NFs 100.05 (venda a cliente) da
+ * Matriz gravadas desde a atualização do Linx de 24/10 — 24 NFs, 57 itens, com 1 e com vários
+ * itens, com frete — batem centavo a centavo em ICMS, IPI, PIS, COFINS, IBS e CBS (base e valor).
+ * (A 100.08, abastecimento das lojas do grupo, usa outra rotina do Linx que reparte base e ICMS
+ * pelo total da NF — por isso a página bloqueia 100.08 e cliente que é filial do grupo.)
  *  - base do imposto = item − desconto (se agrega após desconto) + frete/seguro (se após encargo),
  *    com a redução da exceção (ICMS 33,33% dentro de SP); base arredondada, valor TRUNCADO
  *    calculado sobre a base sem arredondar;

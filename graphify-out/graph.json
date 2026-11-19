@@ -1337,7 +1337,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_companies_company_compras_salvas_id_page",
-      "community": 538,
+      "community": 3,
       "norm_label": "page.tsx"
     },
     {
@@ -1347,7 +1347,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "app_companies_company_compras_salvas_id_page_props",
-      "community": 538,
+      "community": 3,
       "norm_label": "props"
     },
     {
@@ -1357,7 +1357,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "app_companies_company_compras_salvas_id_page_comprasalvaoperacoesdetalheroute",
-      "community": 538,
+      "community": 3,
       "norm_label": "comprasalvaoperacoesdetalheroute()"
     },
     {
@@ -1447,7 +1447,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_companies_company_controle_estoque_estoquedetalhado01_produto_page",
-      "community": 538,
+      "community": 3,
       "norm_label": "page.tsx"
     },
     {
@@ -1457,7 +1457,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "app_companies_company_controle_estoque_estoquedetalhado01_produto_page_companypageprops",
-      "community": 538,
+      "community": 3,
       "norm_label": "companypageprops"
     },
     {
@@ -1467,7 +1467,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "app_companies_company_controle_estoque_estoquedetalhado01_produto_page_estoquedetalhado01produtopageroute",
-      "community": 538,
+      "community": 3,
       "norm_label": "estoquedetalhado01produtopageroute()"
     },
     {
@@ -1477,7 +1477,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_companies_company_controle_estoque_estoquedetalhado01_page",
-      "community": 538,
+      "community": 3,
       "norm_label": "page.tsx"
     },
     {
@@ -1487,7 +1487,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "app_companies_company_controle_estoque_estoquedetalhado01_page_companypageprops",
-      "community": 538,
+      "community": 3,
       "norm_label": "companypageprops"
     },
     {
@@ -1497,7 +1497,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "app_companies_company_controle_estoque_estoquedetalhado01_page_estoquedetalhado01pageroute",
-      "community": 538,
+      "community": 3,
       "norm_label": "estoquedetalhado01pageroute()"
     },
     {
@@ -1507,7 +1507,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_companies_company_controle_estoque_estoquedetalhado02_page",
-      "community": 538,
+      "community": 3,
       "norm_label": "page.tsx"
     },
     {
@@ -1517,7 +1517,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "app_companies_company_controle_estoque_estoquedetalhado02_page_companypageprops",
-      "community": 538,
+      "community": 3,
       "norm_label": "companypageprops"
     },
     {
@@ -1527,7 +1527,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "app_companies_company_controle_estoque_estoquedetalhado02_page_estoquedetalhado02pageroute",
-      "community": 538,
+      "community": 3,
       "norm_label": "estoquedetalhado02pageroute()"
     },
     {
@@ -1537,7 +1537,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_companies_company_controle_estoque_page",
-      "community": 538,
+      "community": 3,
       "norm_label": "page.tsx"
     },
     {
@@ -1547,7 +1547,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "app_companies_company_controle_estoque_page_companypageprops",
-      "community": 538,
+      "community": 3,
       "norm_label": "companypageprops"
     },
     {
@@ -1557,7 +1557,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "app_companies_company_controle_estoque_page_controleestoquepageroute",
-      "community": 538,
+      "community": 3,
       "norm_label": "controleestoquepageroute()"
     },
     {
@@ -1567,7 +1567,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_companies_company_controle_estoque_projecao_lista_compra_compras_salvas_id_page",
-      "community": 538,
+      "community": 3,
       "norm_label": "page.tsx"
     },
     {
@@ -1577,7 +1577,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "app_companies_company_controle_estoque_projecao_lista_compra_compras_salvas_id_page_props",
-      "community": 538,
+      "community": 3,
       "norm_label": "props"
     },
     {
@@ -1587,7 +1587,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "app_companies_company_controle_estoque_projecao_lista_compra_compras_salvas_id_page_comprasalvadetalheroute",
-      "community": 538,
+      "community": 3,
       "norm_label": "comprasalvadetalheroute()"
     },
     {
@@ -1627,7 +1627,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_companies_company_controle_estoque_projecao_page",
-      "community": 538,
+      "community": 3,
       "norm_label": "page.tsx"
     },
     {
@@ -1637,7 +1637,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "app_companies_company_controle_estoque_projecao_page_companypageprops",
-      "community": 538,
+      "community": 3,
       "norm_label": "companypageprops"
     },
     {
@@ -1647,7 +1647,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "app_companies_company_controle_estoque_projecao_page_projecaoestoquepageroute",
-      "community": 538,
+      "community": 3,
       "norm_label": "projecaoestoquepageroute()"
     },
     {
@@ -1727,7 +1727,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_companies_company_controle_movimento_page",
-      "community": 538,
+      "community": 3,
       "norm_label": "page.tsx"
     },
     {
@@ -1737,7 +1737,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "app_companies_company_controle_movimento_page_companypageprops",
-      "community": 538,
+      "community": 3,
       "norm_label": "companypageprops"
     },
     {
@@ -1747,7 +1747,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "app_companies_company_controle_movimento_page_controlemovimentopageroute",
-      "community": 538,
+      "community": 3,
       "norm_label": "controlemovimentopageroute()"
     },
     {
@@ -1857,7 +1857,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_companies_company_curva_abc_page",
-      "community": 538,
+      "community": 3,
       "norm_label": "page.tsx"
     },
     {
@@ -1867,7 +1867,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "app_companies_company_curva_abc_page_props",
-      "community": 538,
+      "community": 3,
       "norm_label": "props"
     },
     {
@@ -1877,7 +1877,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "app_companies_company_curva_abc_page_curvaabcroute",
-      "community": 538,
+      "community": 3,
       "norm_label": "curvaabcroute()"
     },
     {
@@ -1887,7 +1887,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_companies_company_curva_por_produto_page",
-      "community": 538,
+      "community": 3,
       "norm_label": "page.tsx"
     },
     {
@@ -1897,7 +1897,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "app_companies_company_curva_por_produto_page_props",
-      "community": 538,
+      "community": 3,
       "norm_label": "props"
     },
     {
@@ -1907,7 +1907,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "app_companies_company_curva_por_produto_page_curvaporprodutoroute",
-      "community": 538,
+      "community": 3,
       "norm_label": "curvaporprodutoroute()"
     },
     {
@@ -2077,7 +2077,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_companies_company_estoque_consulta_page",
-      "community": 538,
+      "community": 3,
       "norm_label": "page.tsx"
     },
     {
@@ -2087,7 +2087,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "app_companies_company_estoque_consulta_page_props",
-      "community": 538,
+      "community": 3,
       "norm_label": "props"
     },
     {
@@ -2097,7 +2097,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "app_companies_company_estoque_consulta_page_generatemetadata",
-      "community": 538,
+      "community": 3,
       "norm_label": "generatemetadata()"
     },
     {
@@ -2107,7 +2107,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "app_companies_company_estoque_consulta_page_estoqueconsultaroute",
-      "community": 538,
+      "community": 3,
       "norm_label": "estoqueconsultaroute()"
     },
     {
@@ -2277,7 +2277,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_companies_company_faturamento_page",
-      "community": 538,
+      "community": 3,
       "norm_label": "page.tsx"
     },
     {
@@ -2287,7 +2287,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "app_companies_company_faturamento_page_faturamentopageprops",
-      "community": 538,
+      "community": 3,
       "norm_label": "faturamentopageprops"
     },
     {
@@ -2297,7 +2297,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "app_companies_company_faturamento_page_generatemetadata",
-      "community": 538,
+      "community": 3,
       "norm_label": "generatemetadata()"
     },
     {
@@ -2307,7 +2307,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "app_companies_company_faturamento_page_faturamentopageroute",
-      "community": 538,
+      "community": 3,
       "norm_label": "faturamentopageroute()"
     },
     {
@@ -2427,7 +2427,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_companies_company_filial_page",
-      "community": 538,
+      "community": 3,
       "norm_label": "page.tsx"
     },
     {
@@ -2437,7 +2437,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "app_companies_company_filial_page_filialpageprops",
-      "community": 538,
+      "community": 3,
       "norm_label": "filialpageprops"
     },
     {
@@ -2447,7 +2447,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "app_companies_company_filial_page_generatemetadata",
-      "community": 538,
+      "community": 3,
       "norm_label": "generatemetadata()"
     },
     {
@@ -2457,7 +2457,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "app_companies_company_filial_page_filialpageroute",
-      "community": 538,
+      "community": 3,
       "norm_label": "filialpageroute()"
     },
     {
@@ -2467,7 +2467,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_companies_company_fornecedores_page",
-      "community": 538,
+      "community": 3,
       "norm_label": "page.tsx"
     },
     {
@@ -2477,7 +2477,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "app_companies_company_fornecedores_page_props",
-      "community": 538,
+      "community": 3,
       "norm_label": "props"
     },
     {
@@ -2487,7 +2487,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "app_companies_company_fornecedores_page_fornecedoresroute",
-      "community": 538,
+      "community": 3,
       "norm_label": "fornecedoresroute()"
     },
     {
@@ -2537,7 +2537,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_companies_company_gerador_apresentacoes_page",
-      "community": 538,
+      "community": 3,
       "norm_label": "page.tsx"
     },
     {
@@ -2547,7 +2547,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "app_companies_company_gerador_apresentacoes_page_allowed_companies",
-      "community": 538,
+      "community": 3,
       "norm_label": "allowed_companies"
     },
     {
@@ -2557,7 +2557,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "app_companies_company_gerador_apresentacoes_page_geradorapresentacoespageprops",
-      "community": 538,
+      "community": 3,
       "norm_label": "geradorapresentacoespageprops"
     },
     {
@@ -2567,7 +2567,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "app_companies_company_gerador_apresentacoes_page_generatemetadata",
-      "community": 538,
+      "community": 3,
       "norm_label": "generatemetadata()"
     },
     {
@@ -2577,7 +2577,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "app_companies_company_gerador_apresentacoes_page_geradorapresentacoespageroute",
-      "community": 538,
+      "community": 3,
       "norm_label": "geradorapresentacoespageroute()"
     },
     {
@@ -2667,7 +2667,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_companies_company_imprimir_etiquetas_page",
-      "community": 538,
+      "community": 3,
       "norm_label": "page.tsx"
     },
     {
@@ -2677,7 +2677,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "app_companies_company_imprimir_etiquetas_page_imprimiretiquetasrouteprops",
-      "community": 538,
+      "community": 3,
       "norm_label": "imprimiretiquetasrouteprops"
     },
     {
@@ -2687,7 +2687,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "app_companies_company_imprimir_etiquetas_page_generatemetadata",
-      "community": 538,
+      "community": 3,
       "norm_label": "generatemetadata()"
     },
     {
@@ -2697,7 +2697,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "app_companies_company_imprimir_etiquetas_page_imprimiretiquetasroute",
-      "community": 538,
+      "community": 3,
       "norm_label": "imprimiretiquetasroute()"
     },
     {
@@ -2817,7 +2817,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_companies_company_loja_raio_x_page",
-      "community": 538,
+      "community": 3,
       "norm_label": "page.tsx"
     },
     {
@@ -2827,7 +2827,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "app_companies_company_loja_raio_x_page_lojaraioxpageprops",
-      "community": 538,
+      "community": 3,
       "norm_label": "lojaraioxpageprops"
     },
     {
@@ -2837,7 +2837,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "app_companies_company_loja_raio_x_page_generatemetadata",
-      "community": 538,
+      "community": 3,
       "norm_label": "generatemetadata()"
     },
     {
@@ -2847,7 +2847,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "app_companies_company_loja_raio_x_page_lojaraioxpageroute",
-      "community": 538,
+      "community": 3,
       "norm_label": "lojaraioxpageroute()"
     },
     {
@@ -2897,7 +2897,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_companies_company_nova_filial_page",
-      "community": 538,
+      "community": 3,
       "norm_label": "page.tsx"
     },
     {
@@ -2907,7 +2907,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "app_companies_company_nova_filial_page_props",
-      "community": 538,
+      "community": 3,
       "norm_label": "props"
     },
     {
@@ -2917,7 +2917,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "app_companies_company_nova_filial_page_novafilialroute",
-      "community": 538,
+      "community": 3,
       "norm_label": "novafilialroute()"
     },
     {
@@ -3207,7 +3207,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_companies_company_produto_giro_page",
-      "community": 538,
+      "community": 3,
       "norm_label": "page.tsx"
     },
     {
@@ -3217,7 +3217,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "app_companies_company_produto_giro_page_companypageprops",
-      "community": 538,
+      "community": 3,
       "norm_label": "companypageprops"
     },
     {
@@ -3227,7 +3227,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "app_companies_company_produto_giro_page_produtogiropageroute",
-      "community": 538,
+      "community": 3,
       "norm_label": "produtogiropageroute()"
     },
     {
@@ -3477,7 +3477,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_companies_company_projecao_compra_page",
-      "community": 538,
+      "community": 3,
       "norm_label": "page.tsx"
     },
     {
@@ -3487,7 +3487,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "app_companies_company_projecao_compra_page_companypageprops",
-      "community": 538,
+      "community": 3,
       "norm_label": "companypageprops"
     },
     {
@@ -3497,7 +3497,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "app_companies_company_projecao_compra_page_projecaocomprapageroute",
-      "community": 538,
+      "community": 3,
       "norm_label": "projecaocomprapageroute()"
     },
     {
@@ -3867,7 +3867,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_companies_company_vendedores_detalhe_page",
-      "community": 538,
+      "community": 3,
       "norm_label": "page.tsx"
     },
     {
@@ -3877,7 +3877,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "app_companies_company_vendedores_detalhe_page_vendedordetalhepagerouteprops",
-      "community": 538,
+      "community": 3,
       "norm_label": "vendedordetalhepagerouteprops"
     },
     {
@@ -3887,7 +3887,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "app_companies_company_vendedores_detalhe_page_generatemetadata",
-      "community": 538,
+      "community": 3,
       "norm_label": "generatemetadata()"
     },
     {
@@ -3897,7 +3897,7 @@
       "source_location": "L34",
       "_origin": "ast",
       "id": "app_companies_company_vendedores_detalhe_page_vendedordetalhepageroute",
-      "community": 538,
+      "community": 3,
       "norm_label": "vendedordetalhepageroute()"
     },
     {
@@ -4287,7 +4287,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_admin_ajuste_historico_route",
-      "community": 18,
+      "community": 82,
       "norm_label": "route.ts"
     },
     {
@@ -4297,7 +4297,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "app_api_admin_ajuste_historico_route_isadmin",
-      "community": 18,
+      "community": 82,
       "norm_label": "isadmin()"
     },
     {
@@ -4307,7 +4307,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "app_api_admin_ajuste_historico_route_post",
-      "community": 18,
+      "community": 82,
       "norm_label": "post()"
     },
     {
@@ -4317,7 +4317,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_admin_ajuste_historico_seed_031100_route",
-      "community": 18,
+      "community": 512,
       "norm_label": "route.ts"
     },
     {
@@ -4327,7 +4327,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "app_api_admin_ajuste_historico_seed_031100_route_isadmin",
-      "community": 18,
+      "community": 512,
       "norm_label": "isadmin()"
     },
     {
@@ -4337,7 +4337,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "app_api_admin_ajuste_historico_seed_031100_route_get",
-      "community": 18,
+      "community": 512,
       "norm_label": "get()"
     },
     {
@@ -5477,7 +5477,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_cadastro_produtos_route",
-      "community": 512,
+      "community": 146,
       "norm_label": "route.ts"
     },
     {
@@ -5487,7 +5487,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "app_api_cadastro_produtos_route_body",
-      "community": 512,
+      "community": 146,
       "norm_label": "body"
     },
     {
@@ -5497,7 +5497,7 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "app_api_cadastro_produtos_route_lista",
-      "community": 512,
+      "community": 146,
       "norm_label": "lista()"
     },
     {
@@ -5507,7 +5507,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "app_api_cadastro_produtos_route_post",
-      "community": 512,
+      "community": 146,
       "norm_label": "post()"
     },
     {
@@ -10557,7 +10557,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_product_detail_rename_route",
-      "community": 512,
+      "community": 146,
       "norm_label": "route.ts"
     },
     {
@@ -10567,7 +10567,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "app_api_product_detail_rename_route_produtonomes",
-      "community": 512,
+      "community": 146,
       "norm_label": "produtonomes"
     },
     {
@@ -10577,7 +10577,7 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "app_api_product_detail_rename_route_autorizar",
-      "community": 512,
+      "community": 146,
       "norm_label": "autorizar()"
     },
     {
@@ -10587,7 +10587,7 @@
       "source_location": "L72",
       "_origin": "ast",
       "id": "app_api_product_detail_rename_route_normalizarnome",
-      "community": 512,
+      "community": 146,
       "norm_label": "normalizarnome()"
     },
     {
@@ -10597,7 +10597,7 @@
       "source_location": "L79",
       "_origin": "ast",
       "id": "app_api_product_detail_rename_route_lernomes",
-      "community": 512,
+      "community": 146,
       "norm_label": "lernomes()"
     },
     {
@@ -10607,7 +10607,7 @@
       "source_location": "L89",
       "_origin": "ast",
       "id": "app_api_product_detail_rename_route_get",
-      "community": 512,
+      "community": 146,
       "norm_label": "get()"
     },
     {
@@ -10617,7 +10617,7 @@
       "source_location": "L118",
       "_origin": "ast",
       "id": "app_api_product_detail_rename_route_patch",
-      "community": 512,
+      "community": 146,
       "norm_label": "patch()"
     },
     {
@@ -10857,7 +10857,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_products_search_route",
-      "community": 18,
+      "community": 512,
       "norm_label": "route.ts"
     },
     {
@@ -10867,7 +10867,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "app_api_products_search_route_get",
-      "community": 18,
+      "community": 512,
       "norm_label": "get()"
     },
     {
@@ -12107,7 +12107,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_romaneios_bipagem_codigos_route",
-      "community": 18,
+      "community": 512,
       "norm_label": "route.ts"
     },
     {
@@ -12117,7 +12117,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "app_api_romaneios_bipagem_codigos_route_lit",
-      "community": 18,
+      "community": 512,
       "norm_label": "lit()"
     },
     {
@@ -12127,7 +12127,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "app_api_romaneios_bipagem_codigos_route_post",
-      "community": 18,
+      "community": 512,
       "norm_label": "post()"
     },
     {
@@ -12757,7 +12757,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_log_tipo_romaneio_filial_route",
-      "community": 82,
+      "community": 512,
       "norm_label": "route.ts"
     },
     {
@@ -12767,7 +12767,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_log_tipo_romaneio_filial_route_isadmin",
-      "community": 82,
+      "community": 512,
       "norm_label": "isadmin()"
     },
     {
@@ -12777,7 +12777,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_log_tipo_romaneio_filial_route_previewitem",
-      "community": 82,
+      "community": 512,
       "norm_label": "previewitem"
     },
     {
@@ -12787,7 +12787,7 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_log_tipo_romaneio_filial_route_leritenscomestoque",
-      "community": 82,
+      "community": 512,
       "norm_label": "leritenscomestoque()"
     },
     {
@@ -12797,7 +12797,7 @@
       "source_location": "L82",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_log_tipo_romaneio_filial_route_gradeitemromaneio",
-      "community": 82,
+      "community": 512,
       "norm_label": "gradeitemromaneio"
     },
     {
@@ -12807,7 +12807,7 @@
       "source_location": "L94",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_log_tipo_romaneio_filial_route_lergradedoromaneio",
-      "community": 82,
+      "community": 512,
       "norm_label": "lergradedoromaneio()"
     },
     {
@@ -12817,7 +12817,7 @@
       "source_location": "L134",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_log_tipo_romaneio_filial_route_compensarreversaodeestoque",
-      "community": 82,
+      "community": 512,
       "norm_label": "compensarreversaodeestoque()"
     },
     {
@@ -12827,7 +12827,7 @@
       "source_location": "L175",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_log_tipo_romaneio_filial_route_get",
-      "community": 82,
+      "community": 512,
       "norm_label": "get()"
     },
     {
@@ -12837,7 +12837,7 @@
       "source_location": "L222",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_log_tipo_romaneio_filial_route_put",
-      "community": 82,
+      "community": 512,
       "norm_label": "put()"
     },
     {
@@ -12847,7 +12847,7 @@
       "source_location": "L347",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_log_tipo_romaneio_filial_route_delete",
-      "community": 82,
+      "community": 512,
       "norm_label": "delete()"
     },
     {
@@ -13697,7 +13697,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_responsaveis_route",
-      "community": 18,
+      "community": 512,
       "norm_label": "route.ts"
     },
     {
@@ -13707,7 +13707,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_responsaveis_route_get",
-      "community": 18,
+      "community": 512,
       "norm_label": "get()"
     },
     {
@@ -13747,7 +13747,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_transferencias_pendentes_contadores_route",
-      "community": 489,
+      "community": 555,
       "norm_label": "route.ts"
     },
     {
@@ -13757,7 +13757,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "app_api_transferencias_pendentes_contadores_route_get",
-      "community": 489,
+      "community": 555,
       "norm_label": "get()"
     },
     {
@@ -13767,7 +13767,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_transferencias_pendentes_cooldown_route",
-      "community": 489,
+      "community": 555,
       "norm_label": "route.ts"
     },
     {
@@ -13777,7 +13777,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "app_api_transferencias_pendentes_cooldown_route_get",
-      "community": 489,
+      "community": 555,
       "norm_label": "get()"
     },
     {
@@ -13787,7 +13787,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_transferencias_pendentes_detectar_route",
-      "community": 18,
+      "community": 582,
       "norm_label": "route.ts"
     },
     {
@@ -13797,7 +13797,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "app_api_transferencias_pendentes_detectar_route_parsedias",
-      "community": 18,
+      "community": 582,
       "norm_label": "parsedias()"
     },
     {
@@ -13807,7 +13807,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "app_api_transferencias_pendentes_detectar_route_post",
-      "community": 18,
+      "community": 582,
       "norm_label": "post()"
     },
     {
@@ -13817,7 +13817,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_transferencias_pendentes_route",
-      "community": 489,
+      "community": 555,
       "norm_label": "route.ts"
     },
     {
@@ -13827,7 +13827,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "app_api_transferencias_pendentes_route_get",
-      "community": 489,
+      "community": 555,
       "norm_label": "get()"
     },
     {
@@ -13837,7 +13837,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_transferencias_quantidade_real_route",
-      "community": 491,
+      "community": 583,
       "norm_label": "route.ts"
     },
     {
@@ -13847,7 +13847,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "app_api_transferencias_quantidade_real_route_get",
-      "community": 491,
+      "community": 583,
       "norm_label": "get()"
     },
     {
@@ -13857,7 +13857,7 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "app_api_transferencias_quantidade_real_route_post",
-      "community": 491,
+      "community": 583,
       "norm_label": "post()"
     },
     {
@@ -15027,7 +15027,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_exportar_relatorios_page",
-      "community": 538,
+      "community": 3,
       "norm_label": "page.tsx"
     },
     {
@@ -15037,7 +15037,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "app_exportar_relatorios_page_metadata",
-      "community": 538,
+      "community": 3,
       "norm_label": "metadata"
     },
     {
@@ -15047,7 +15047,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "app_exportar_relatorios_page_exportarrelatoriosrootpage",
-      "community": 538,
+      "community": 3,
       "norm_label": "exportarrelatoriosrootpage()"
     },
     {
@@ -21446,7 +21446,7 @@
       "label": "Sel()",
       "file_type": "code",
       "source_file": "components/faturamento-ecommerce/FaturamentoAba.tsx",
-      "source_location": "L625",
+      "source_location": "L619",
       "_origin": "ast",
       "id": "components_faturamento_ecommerce_faturamentoaba_sel",
       "community": 116,
@@ -21456,7 +21456,7 @@
       "label": "Num()",
       "file_type": "code",
       "source_file": "components/faturamento-ecommerce/FaturamentoAba.tsx",
-      "source_location": "L657",
+      "source_location": "L651",
       "_origin": "ast",
       "id": "components_faturamento_ecommerce_faturamentoaba_num",
       "community": 116,
@@ -21466,7 +21466,7 @@
       "label": "ItensCard()",
       "file_type": "code",
       "source_file": "components/faturamento-ecommerce/FaturamentoAba.tsx",
-      "source_location": "L668",
+      "source_location": "L662",
       "_origin": "ast",
       "id": "components_faturamento_ecommerce_faturamentoaba_itenscard",
       "community": 116,
@@ -21476,7 +21476,7 @@
       "label": "PreviaView()",
       "file_type": "code",
       "source_file": "components/faturamento-ecommerce/FaturamentoAba.tsx",
-      "source_location": "L880",
+      "source_location": "L874",
       "_origin": "ast",
       "id": "components_faturamento_ecommerce_faturamentoaba_previaview",
       "community": 116,
@@ -21486,7 +21486,7 @@
       "label": "Total()",
       "file_type": "code",
       "source_file": "components/faturamento-ecommerce/FaturamentoAba.tsx",
-      "source_location": "L970",
+      "source_location": "L964",
       "_origin": "ast",
       "id": "components_faturamento_ecommerce_faturamentoaba_total",
       "community": 116,
@@ -21496,7 +21496,7 @@
       "label": "BuscarNotas()",
       "file_type": "code",
       "source_file": "components/faturamento-ecommerce/FaturamentoAba.tsx",
-      "source_location": "L981",
+      "source_location": "L975",
       "_origin": "ast",
       "id": "components_faturamento_ecommerce_faturamentoaba_buscarnotas",
       "community": 116,
@@ -21506,7 +21506,7 @@
       "label": "ListaNotas()",
       "file_type": "code",
       "source_file": "components/faturamento-ecommerce/FaturamentoAba.tsx",
-      "source_location": "L1053",
+      "source_location": "L1047",
       "_origin": "ast",
       "id": "components_faturamento_ecommerce_faturamentoaba_listanotas",
       "community": 116,
@@ -24229,7 +24229,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_layout_pagelayout",
-      "community": 538,
+      "community": 3,
       "norm_label": "pagelayout.tsx"
     },
     {
@@ -24239,7 +24239,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "components_layout_pagelayout_pagelayoutprops",
-      "community": 538,
+      "community": 3,
       "norm_label": "pagelayoutprops"
     },
     {
@@ -24249,7 +24249,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "components_layout_pagelayout_pagelayout",
-      "community": 538,
+      "community": 3,
       "norm_label": "pagelayout()"
     },
     {
@@ -24319,7 +24319,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_layout_sidebarcontext",
-      "community": 538,
+      "community": 3,
       "norm_label": "sidebarcontext.tsx"
     },
     {
@@ -24329,7 +24329,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "components_layout_sidebarcontext_sidebarcontexttype",
-      "community": 538,
+      "community": 3,
       "norm_label": "sidebarcontexttype"
     },
     {
@@ -24339,7 +24339,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "components_layout_sidebarcontext_sidebarcontext",
-      "community": 538,
+      "community": 3,
       "norm_label": "sidebarcontext"
     },
     {
@@ -24349,7 +24349,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "components_layout_sidebarcontext_sidebarprovider",
-      "community": 538,
+      "community": 3,
       "norm_label": "sidebarprovider()"
     },
     {
@@ -30909,7 +30909,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_produto_descontinuado_produtodescontinuadopage",
-      "community": 520,
+      "community": 143,
       "norm_label": "produtodescontinuadopage.tsx"
     },
     {
@@ -30919,7 +30919,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "components_produto_descontinuado_produtodescontinuadopage_productsearchresult",
-      "community": 520,
+      "community": 143,
       "norm_label": "productsearchresult"
     },
     {
@@ -30929,7 +30929,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "components_produto_descontinuado_produtodescontinuadopage_produtodescontinuadopageprops",
-      "community": 520,
+      "community": 143,
       "norm_label": "produtodescontinuadopageprops"
     },
     {
@@ -30939,7 +30939,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "components_produto_descontinuado_produtodescontinuadopage_produtodescontinuadopage",
-      "community": 520,
+      "community": 143,
       "norm_label": "produtodescontinuadopage()"
     },
     {
@@ -48669,7 +48669,7 @@
       "source_location": "L174",
       "_origin": "ast",
       "id": "lib_db_connection_query",
-      "community": 18,
+      "community": 512,
       "norm_label": "query()"
     },
     {
@@ -49836,7 +49836,7 @@
       "label": "PadraoClientePj",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L88",
+      "source_location": "L86",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_config_padraoclientepj",
       "community": 448,
@@ -49846,7 +49846,7 @@
       "label": "PadraoEmpresa",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L101",
+      "source_location": "L99",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_config_padraoempresa",
       "community": 448,
@@ -49856,7 +49856,7 @@
       "label": "CLIENTE_BASE",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L108",
+      "source_location": "L106",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_config_cliente_base",
       "community": 448,
@@ -49866,7 +49866,7 @@
       "label": "PerfilClientePj",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L133",
+      "source_location": "L131",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_config_perfilclientepj",
       "community": 448,
@@ -49876,7 +49876,7 @@
       "label": "PerfilClientePjDef",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L135",
+      "source_location": "L133",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_config_perfilclientepjdef",
       "community": 448,
@@ -49886,7 +49886,7 @@
       "label": "PERFIS_CLIENTE_PJ",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L151",
+      "source_location": "L149",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_config_perfis_cliente_pj",
       "community": 448,
@@ -49896,7 +49896,7 @@
       "label": "isPerfilClientePj()",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L178",
+      "source_location": "L176",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_config_isperfilclientepj",
       "community": 448,
@@ -49906,7 +49906,7 @@
       "label": "perfilDoTipo()",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L183",
+      "source_location": "L181",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_config_perfildotipo",
       "community": 448,
@@ -49916,7 +49916,7 @@
       "label": "PerfilCliente",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L189",
+      "source_location": "L187",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_config_perfilcliente",
       "community": 448,
@@ -49926,7 +49926,7 @@
       "label": "PerfilClientePfDef",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L191",
+      "source_location": "L189",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_config_perfilclientepfdef",
       "community": 448,
@@ -49936,7 +49936,7 @@
       "label": "PERFIS_CLIENTE_PF",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L204",
+      "source_location": "L202",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_config_perfis_cliente_pf",
       "community": 448,
@@ -49946,7 +49946,7 @@
       "label": "CLIENTE_PJ_BASE",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L241",
+      "source_location": "L239",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_config_cliente_pj_base",
       "community": 448,
@@ -49956,7 +49956,7 @@
       "label": "INDICADORES_FISCAIS",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L254",
+      "source_location": "L252",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_config_indicadores_fiscais",
       "community": 448,
@@ -49966,7 +49966,7 @@
       "label": "TIPOS_TRIBUTACAO",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L262",
+      "source_location": "L260",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_config_tipos_tributacao",
       "community": 448,
@@ -49976,7 +49976,7 @@
       "label": "NOTA_BASE",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L264",
+      "source_location": "L262",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_config_nota_base",
       "community": 448,
@@ -49986,7 +49986,7 @@
       "label": "PADROES",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L286",
+      "source_location": "L284",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_config_padroes",
       "community": 448,
@@ -49996,7 +49996,7 @@
       "label": "REGIAO_POR_UF",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L322",
+      "source_location": "L320",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_config_regiao_por_uf",
       "community": 448,
@@ -50006,7 +50006,7 @@
       "label": "regiaoDaUf()",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L331",
+      "source_location": "L329",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_config_regiaodauf",
       "community": 448,
@@ -50016,7 +50016,7 @@
       "label": "REGIOES",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L335",
+      "source_location": "L333",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_config_regioes",
       "community": 448,
@@ -50026,7 +50026,7 @@
       "label": "INFO_PGTO_OPCOES",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L338",
+      "source_location": "L336",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_config_info_pgto_opcoes",
       "community": 448,
@@ -50036,7 +50036,7 @@
       "label": "statusNfeLabel()",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L349",
+      "source_location": "L347",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_config_statusnfelabel",
       "community": 159,
@@ -50046,7 +50046,7 @@
       "label": "FILTROS_STATUS",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L386",
+      "source_location": "L384",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_config_filtros_status",
       "community": 159,
@@ -50276,7 +50276,7 @@
       "label": "EnderecoFat",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L50",
+      "source_location": "L49",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_types_enderecofat",
       "community": 448,
@@ -50286,7 +50286,7 @@
       "label": "ClienteFatListItem",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L61",
+      "source_location": "L60",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_types_clientefatlistitem",
       "community": 116,
@@ -50296,7 +50296,7 @@
       "label": "ClienteFatDetalhe",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L77",
+      "source_location": "L76",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_types_clientefatdetalhe",
       "community": 116,
@@ -50306,7 +50306,7 @@
       "label": "ClienteFatInput",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L104",
+      "source_location": "L103",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_types_clientefatinput",
       "community": 116,
@@ -50316,7 +50316,7 @@
       "label": "ClientePjFatInput",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L136",
+      "source_location": "L135",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_types_clientepjfatinput",
       "community": 116,
@@ -50326,7 +50326,7 @@
       "label": "CnpjConsulta",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L176",
+      "source_location": "L175",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_types_cnpjconsulta",
       "community": 24,
@@ -50336,7 +50336,7 @@
       "label": "ClienteAtualizacaoInput",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L192",
+      "source_location": "L191",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_types_clienteatualizacaoinput",
       "community": 449,
@@ -50346,7 +50346,7 @@
       "label": "ProdutoFatOpcao",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L201",
+      "source_location": "L200",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_types_produtofatopcao",
       "community": 116,
@@ -50356,7 +50356,7 @@
       "label": "NotaItemInput",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L214",
+      "source_location": "L213",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_types_notaiteminput",
       "community": 116,
@@ -50366,7 +50366,7 @@
       "label": "NotaInput",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L222",
+      "source_location": "L221",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_types_notainput",
       "community": 116,
@@ -50376,7 +50376,7 @@
       "label": "NotaPreviewItem",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L249",
+      "source_location": "L248",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_types_notapreviewitem",
       "community": 116,
@@ -50386,7 +50386,7 @@
       "label": "NotaPreview",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L268",
+      "source_location": "L267",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_types_notapreview",
       "community": 116,
@@ -50396,7 +50396,7 @@
       "label": "NotaCriada",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L289",
+      "source_location": "L288",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_types_notacriada",
       "community": 116,
@@ -50406,7 +50406,7 @@
       "label": "NotaListItem",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L299",
+      "source_location": "L298",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_types_notalistitem",
       "community": 116,
@@ -50416,7 +50416,7 @@
       "label": "NotaDetalheItem",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L321",
+      "source_location": "L320",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_types_notadetalheitem",
       "community": 116,
@@ -50426,7 +50426,7 @@
       "label": "NotaDetalhe",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L331",
+      "source_location": "L330",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_types_notadetalhe",
       "community": 116,
@@ -50436,7 +50436,7 @@
       "label": "PedidoShopifyResumo",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L353",
+      "source_location": "L352",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_types_pedidoshopifyresumo",
       "community": 116,
@@ -50446,7 +50446,7 @@
       "label": "ClienteCandidato",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L367",
+      "source_location": "L366",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_types_clientecandidato",
       "community": 116,
@@ -50456,7 +50456,7 @@
       "label": "ItemImportado",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L384",
+      "source_location": "L383",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_types_itemimportado",
       "community": 116,
@@ -50466,7 +50466,7 @@
       "label": "LinhaNaoMapeada",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L405",
+      "source_location": "L404",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_types_linhanaomapeada",
       "community": 116,
@@ -50476,7 +50476,7 @@
       "label": "PedidoShopifyImport",
       "file_type": "code",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L414",
+      "source_location": "L413",
       "_origin": "ast",
       "id": "lib_faturamento_ecommerce_types_pedidoshopifyimport",
       "community": 116,
@@ -52739,7 +52739,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_mcp_tools_produto",
-      "community": 20,
+      "community": 34,
       "norm_label": "produto.ts"
     },
     {
@@ -52749,7 +52749,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "lib_mcp_tools_produto_resolvecores",
-      "community": 20,
+      "community": 34,
       "norm_label": "resolvecores()"
     },
     {
@@ -52759,7 +52759,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "lib_mcp_tools_produto_registerprodutotools",
-      "community": 20,
+      "community": 34,
       "norm_label": "registerprodutotools()"
     },
     {
@@ -54249,7 +54249,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_presentations_palettes",
-      "community": 490,
+      "community": 90,
       "norm_label": "palettes.ts"
     },
     {
@@ -54269,7 +54269,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "lib_presentations_palettes_palettes",
-      "community": 490,
+      "community": 90,
       "norm_label": "palettes"
     },
     {
@@ -54279,7 +54279,7 @@
       "source_location": "L84",
       "_origin": "ast",
       "id": "lib_presentations_palettes_coral_palette",
-      "community": 490,
+      "community": 90,
       "norm_label": "coral_palette"
     },
     {
@@ -54309,7 +54309,7 @@
       "source_location": "L139",
       "_origin": "ast",
       "id": "lib_presentations_palettes_deckpaletteoption",
-      "community": 490,
+      "community": 90,
       "norm_label": "deckpaletteoption"
     },
     {
@@ -54319,7 +54319,7 @@
       "source_location": "L145",
       "_origin": "ast",
       "id": "lib_presentations_palettes_deck_palette_options",
-      "community": 490,
+      "community": 90,
       "norm_label": "deck_palette_options"
     },
     {
@@ -54329,7 +54329,7 @@
       "source_location": "L151",
       "_origin": "ast",
       "id": "lib_presentations_palettes_deckpalettebyid",
-      "community": 490,
+      "community": 90,
       "norm_label": "deckpalettebyid()"
     },
     {
@@ -54349,7 +54349,7 @@
       "source_location": "L173",
       "_origin": "ast",
       "id": "lib_presentations_palettes_parsehex",
-      "community": 490,
+      "community": 90,
       "norm_label": "parsehex()"
     },
     {
@@ -54359,7 +54359,7 @@
       "source_location": "L180",
       "_origin": "ast",
       "id": "lib_presentations_palettes_tohex",
-      "community": 490,
+      "community": 90,
       "norm_label": "tohex()"
     },
     {
@@ -54369,7 +54369,7 @@
       "source_location": "L185",
       "_origin": "ast",
       "id": "lib_presentations_palettes_mix",
-      "community": 490,
+      "community": 90,
       "norm_label": "mix()"
     },
     {
@@ -54379,7 +54379,7 @@
       "source_location": "L207",
       "_origin": "ast",
       "id": "lib_presentations_palettes_deckthemevars",
-      "community": 490,
+      "community": 90,
       "norm_label": "deckthemevars()"
     },
     {
@@ -54389,7 +54389,7 @@
       "source_location": "L225",
       "_origin": "ast",
       "id": "lib_presentations_palettes_deckpapercolor",
-      "community": 490,
+      "community": 90,
       "norm_label": "deckpapercolor()"
     },
     {
@@ -55999,7 +55999,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_ajuste_historico",
-      "community": 18,
+      "community": 512,
       "norm_label": "ajuste-historico.ts"
     },
     {
@@ -56009,7 +56009,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "lib_repositories_ajuste_historico_ensureajustetableexists",
-      "community": 18,
+      "community": 512,
       "norm_label": "ensureajustetableexists()"
     },
     {
@@ -56019,7 +56019,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "lib_repositories_ajuste_historico_ajusteitem",
-      "community": 18,
+      "community": 512,
       "norm_label": "ajusteitem"
     },
     {
@@ -56029,7 +56029,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "lib_repositories_ajuste_historico_ajustepayload",
-      "community": 18,
+      "community": 82,
       "norm_label": "ajustepayload"
     },
     {
@@ -56049,7 +56049,7 @@
       "source_location": "L73",
       "_origin": "ast",
       "id": "lib_repositories_ajuste_historico_ajustehistoricorow",
-      "community": 18,
+      "community": 512,
       "norm_label": "ajustehistoricorow"
     },
     {
@@ -56059,7 +56059,7 @@
       "source_location": "L86",
       "_origin": "ast",
       "id": "lib_repositories_ajuste_historico_queryajusteshistorico",
-      "community": 18,
+      "community": 512,
       "norm_label": "queryajusteshistorico()"
     },
     {
@@ -57379,7 +57379,7 @@
       "source_location": "L1712",
       "_origin": "ast",
       "id": "lib_repositories_cadastro_cadastrofiltros",
-      "community": 512,
+      "community": 146,
       "norm_label": "cadastrofiltros"
     },
     {
@@ -57419,7 +57419,7 @@
       "source_location": "L1796",
       "_origin": "ast",
       "id": "lib_repositories_cadastro_selectcampos",
-      "community": 512,
+      "community": 146,
       "norm_label": "selectcampos()"
     },
     {
@@ -57439,7 +57439,7 @@
       "source_location": "L1816",
       "_origin": "ast",
       "id": "lib_repositories_cadastro_fetchprodutocadastro",
-      "community": 512,
+      "community": 146,
       "norm_label": "fetchprodutocadastro()"
     },
     {
@@ -57469,7 +57469,7 @@
       "source_location": "L1933",
       "_origin": "ast",
       "id": "lib_repositories_cadastro_likeliteral",
-      "community": 146,
+      "community": 48,
       "norm_label": "likeliteral()"
     },
     {
@@ -57479,7 +57479,7 @@
       "source_location": "L1938",
       "_origin": "ast",
       "id": "lib_repositories_cadastro_desccolapsada",
-      "community": 146,
+      "community": 48,
       "norm_label": "desccolapsada()"
     },
     {
@@ -57489,7 +57489,7 @@
       "source_location": "L1961",
       "_origin": "ast",
       "id": "lib_repositories_cadastro_buscarprodutoscadastro",
-      "community": 146,
+      "community": 48,
       "norm_label": "buscarprodutoscadastro()"
     },
     {
@@ -61559,7 +61559,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_detecttransferenciasexternas",
-      "community": 18,
+      "community": 582,
       "norm_label": "detecttransferenciasexternas.ts"
     },
     {
@@ -61569,7 +61569,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "lib_repositories_detecttransferenciasexternas_transferenciaexternadetectada",
-      "community": 18,
+      "community": 582,
       "norm_label": "transferenciaexternadetectada"
     },
     {
@@ -61579,7 +61579,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "lib_repositories_detecttransferenciasexternas_fetchtransferenciasexternaslinx",
-      "community": 18,
+      "community": 582,
       "norm_label": "fetchtransferenciasexternaslinx()"
     },
     {
@@ -62366,7 +62366,7 @@
       "label": "fetchFatLookups()",
       "file_type": "code",
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L133",
+      "source_location": "L132",
       "_origin": "ast",
       "id": "lib_repositories_faturamentoecommerce_clientes_fetchfatlookups",
       "community": 24,
@@ -62376,7 +62376,7 @@
       "label": "buscarClientesFat()",
       "file_type": "code",
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L213",
+      "source_location": "L212",
       "_origin": "ast",
       "id": "lib_repositories_faturamentoecommerce_clientes_buscarclientesfat",
       "community": 449,
@@ -62386,7 +62386,7 @@
       "label": "fetchClienteFat()",
       "file_type": "code",
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L286",
+      "source_location": "L285",
       "_origin": "ast",
       "id": "lib_repositories_faturamentoecommerce_clientes_fetchclientefat",
       "community": 449,
@@ -62396,7 +62396,7 @@
       "label": "clientesPorDocumento()",
       "file_type": "code",
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L357",
+      "source_location": "L356",
       "_origin": "ast",
       "id": "lib_repositories_faturamentoecommerce_clientes_clientespordocumento",
       "community": 24,
@@ -62406,7 +62406,7 @@
       "label": "normEndereco()",
       "file_type": "code",
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L374",
+      "source_location": "L373",
       "_origin": "ast",
       "id": "lib_repositories_faturamentoecommerce_clientes_normendereco",
       "community": 449,
@@ -62416,7 +62416,7 @@
       "label": "normContato()",
       "file_type": "code",
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L386",
+      "source_location": "L385",
       "_origin": "ast",
       "id": "lib_repositories_faturamentoecommerce_clientes_normcontato",
       "community": 449,
@@ -62426,7 +62426,7 @@
       "label": "criarClienteFat()",
       "file_type": "code",
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L412",
+      "source_location": "L411",
       "_origin": "ast",
       "id": "lib_repositories_faturamentoecommerce_clientes_criarclientefat",
       "community": 449,
@@ -62436,7 +62436,7 @@
       "label": "atualizarClienteFat()",
       "file_type": "code",
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L587",
+      "source_location": "L586",
       "_origin": "ast",
       "id": "lib_repositories_faturamentoecommerce_clientes_atualizarclientefat",
       "community": 449,
@@ -62696,7 +62696,7 @@
       "label": "ratear()",
       "file_type": "code",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L605",
+      "source_location": "L614",
       "_origin": "ast",
       "id": "lib_repositories_faturamentoecommerce_notas_ratear",
       "community": 159,
@@ -62706,7 +62706,7 @@
       "label": "paraPreview()",
       "file_type": "code",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L619",
+      "source_location": "L628",
       "_origin": "ast",
       "id": "lib_repositories_faturamentoecommerce_notas_parapreview",
       "community": 24,
@@ -62716,7 +62716,7 @@
       "label": "previaNota()",
       "file_type": "code",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L659",
+      "source_location": "L668",
       "_origin": "ast",
       "id": "lib_repositories_faturamentoecommerce_notas_previanota",
       "community": 24,
@@ -62726,7 +62726,7 @@
       "label": "valorImposto()",
       "file_type": "code",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L666",
+      "source_location": "L675",
       "_origin": "ast",
       "id": "lib_repositories_faturamentoecommerce_notas_valorimposto",
       "community": 159,
@@ -62736,7 +62736,7 @@
       "label": "larguraDoSequencial()",
       "file_type": "code",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L681",
+      "source_location": "L690",
       "_origin": "ast",
       "id": "lib_repositories_faturamentoecommerce_notas_larguradosequencial",
       "community": 159,
@@ -62746,7 +62746,7 @@
       "label": "IMPOSTOS_DIFAL",
       "file_type": "code",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L692",
+      "source_location": "L701",
       "_origin": "ast",
       "id": "lib_repositories_faturamentoecommerce_notas_impostos_difal",
       "community": 159,
@@ -62756,7 +62756,7 @@
       "label": "IMPOSTOS_REGIME_NORMAL",
       "file_type": "code",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L693",
+      "source_location": "L702",
       "_origin": "ast",
       "id": "lib_repositories_faturamentoecommerce_notas_impostos_regime_normal",
       "community": 159,
@@ -62766,7 +62766,7 @@
       "label": "IMPOSTOS_REFORMA",
       "file_type": "code",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L694",
+      "source_location": "L703",
       "_origin": "ast",
       "id": "lib_repositories_faturamentoecommerce_notas_impostos_reforma",
       "community": 159,
@@ -62776,7 +62776,7 @@
       "label": "ImpostoCalculado",
       "file_type": "code",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L709",
+      "source_location": "L719",
       "_origin": "ast",
       "id": "lib_repositories_faturamentoecommerce_notas_impostocalculado",
       "community": 159,
@@ -62786,7 +62786,7 @@
       "label": "impostosRegimeNormal()",
       "file_type": "code",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L711",
+      "source_location": "L721",
       "_origin": "ast",
       "id": "lib_repositories_faturamentoecommerce_notas_impostosregimenormal",
       "community": 159,
@@ -62796,7 +62796,7 @@
       "label": "montarBatch()",
       "file_type": "code",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L743",
+      "source_location": "L753",
       "_origin": "ast",
       "id": "lib_repositories_faturamentoecommerce_notas_montarbatch",
       "community": 159,
@@ -62806,7 +62806,7 @@
       "label": "bindCabecalho()",
       "file_type": "code",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L980",
+      "source_location": "L990",
       "_origin": "ast",
       "id": "lib_repositories_faturamentoecommerce_notas_bindcabecalho",
       "community": 159,
@@ -62816,7 +62816,7 @@
       "label": "consumidorFinal()",
       "file_type": "code",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1013",
+      "source_location": "L1023",
       "_origin": "ast",
       "id": "lib_repositories_faturamentoecommerce_notas_consumidorfinal",
       "community": 159,
@@ -62826,7 +62826,7 @@
       "label": "gravarNota()",
       "file_type": "code",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1021",
+      "source_location": "L1031",
       "_origin": "ast",
       "id": "lib_repositories_faturamentoecommerce_notas_gravarnota",
       "community": 159,
@@ -62836,7 +62836,7 @@
       "label": "simularXmlNota()",
       "file_type": "code",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1054",
+      "source_location": "L1064",
       "_origin": "ast",
       "id": "lib_repositories_faturamentoecommerce_notas_simularxmlnota",
       "community": 159,
@@ -62846,7 +62846,7 @@
       "label": "depurarNota()",
       "file_type": "code",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1079",
+      "source_location": "L1089",
       "_origin": "ast",
       "id": "lib_repositories_faturamentoecommerce_notas_depurarnota",
       "community": 159,
@@ -62856,7 +62856,7 @@
       "label": "mapNota()",
       "file_type": "code",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1094",
+      "source_location": "L1104",
       "_origin": "ast",
       "id": "lib_repositories_faturamentoecommerce_notas_mapnota",
       "community": 159,
@@ -62866,7 +62866,7 @@
       "label": "listarNotasFat()",
       "file_type": "code",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1125",
+      "source_location": "L1135",
       "_origin": "ast",
       "id": "lib_repositories_faturamentoecommerce_notas_listarnotasfat",
       "community": 159,
@@ -62876,7 +62876,7 @@
       "label": "extrairMotivo()",
       "file_type": "code",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1201",
+      "source_location": "L1211",
       "_origin": "ast",
       "id": "lib_repositories_faturamentoecommerce_notas_extrairmotivo",
       "community": 159,
@@ -62886,7 +62886,7 @@
       "label": "fetchNotaFat()",
       "file_type": "code",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1211",
+      "source_location": "L1221",
       "_origin": "ast",
       "id": "lib_repositories_faturamentoecommerce_notas_fetchnotafat",
       "community": 159,
@@ -62896,7 +62896,7 @@
       "label": "fetchXmlNota()",
       "file_type": "code",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1287",
+      "source_location": "L1297",
       "_origin": "ast",
       "id": "lib_repositories_faturamentoecommerce_notas_fetchxmlnota",
       "community": 159,
@@ -63729,7 +63729,7 @@
       "source_location": "L65",
       "_origin": "ast",
       "id": "lib_repositories_logentradas_fetchproductentries",
-      "community": 20,
+      "community": 34,
       "norm_label": "fetchproductentries()"
     },
     {
@@ -64709,7 +64709,7 @@
       "source_location": "L370",
       "_origin": "ast",
       "id": "lib_repositories_performance_fetchfilialprodutosales",
-      "community": 34,
+      "community": 136,
       "norm_label": "fetchfilialprodutosales()"
     },
     {
@@ -71849,7 +71849,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_server_detectar_transferencias_externas",
-      "community": 18,
+      "community": 582,
       "norm_label": "detectar-transferencias-externas.ts"
     },
     {
@@ -71859,7 +71859,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "lib_server_detectar_transferencias_externas_coletarescopofiliais",
-      "community": 18,
+      "community": 582,
       "norm_label": "coletarescopofiliais()"
     },
     {
@@ -71869,7 +71869,7 @@
       "source_location": "L39",
       "_origin": "ast",
       "id": "lib_server_detectar_transferencias_externas_detectarresultado",
-      "community": 18,
+      "community": 582,
       "norm_label": "detectarresultado"
     },
     {
@@ -71879,7 +71879,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "lib_server_detectar_transferencias_externas_detectareregistrartransferenciasexternas",
-      "community": 18,
+      "community": 582,
       "norm_label": "detectareregistrartransferenciasexternas()"
     },
     {
@@ -73179,7 +73179,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "lib_services_salestotals_salestotalsparams",
-      "community": 136,
+      "community": 459,
       "norm_label": "salestotalsparams"
     },
     {
@@ -75779,7 +75779,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_utils_ajuste_estoque_kpis_store",
-      "community": 555,
+      "community": 489,
       "norm_label": "ajuste-estoque-kpis-store.ts"
     },
     {
@@ -75789,7 +75789,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "lib_utils_ajuste_estoque_kpis_store_ajustekpissnapshot",
-      "community": 555,
+      "community": 489,
       "norm_label": "ajustekpissnapshot"
     },
     {
@@ -75799,7 +75799,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "lib_utils_ajuste_estoque_kpis_store_data_file",
-      "community": 555,
+      "community": 489,
       "norm_label": "data_file"
     },
     {
@@ -75809,7 +75809,7 @@
       "source_location": "L35",
       "_origin": "ast",
       "id": "lib_utils_ajuste_estoque_kpis_store_readfile",
-      "community": 555,
+      "community": 489,
       "norm_label": "readfile()"
     },
     {
@@ -75819,7 +75819,7 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "lib_utils_ajuste_estoque_kpis_store_writefile",
-      "community": 555,
+      "community": 489,
       "norm_label": "writefile()"
     },
     {
@@ -75829,7 +75829,7 @@
       "source_location": "L54",
       "_origin": "ast",
       "id": "lib_utils_ajuste_estoque_kpis_store_ensuretable",
-      "community": 555,
+      "community": 489,
       "norm_label": "ensuretable()"
     },
     {
@@ -75839,7 +75839,7 @@
       "source_location": "L77",
       "_origin": "ast",
       "id": "lib_utils_ajuste_estoque_kpis_store_chave",
-      "community": 555,
+      "community": 489,
       "norm_label": "chave()"
     },
     {
@@ -75849,7 +75849,7 @@
       "source_location": "L81",
       "_origin": "ast",
       "id": "lib_utils_ajuste_estoque_kpis_store_salvarkpisajuste",
-      "community": 555,
+      "community": 489,
       "norm_label": "salvarkpisajuste()"
     },
     {
@@ -75859,7 +75859,7 @@
       "source_location": "L104",
       "_origin": "ast",
       "id": "lib_utils_ajuste_estoque_kpis_store_obterkpisajuste",
-      "community": 555,
+      "community": 489,
       "norm_label": "obterkpisajuste()"
     },
     {
@@ -79089,7 +79089,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_utils_date",
-      "community": 136,
+      "community": 496,
       "norm_label": "date.ts"
     },
     {
@@ -79099,7 +79099,7 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "lib_utils_date_normalizedrange",
-      "community": 136,
+      "community": 459,
       "norm_label": "normalizedrange"
     },
     {
@@ -79109,7 +79109,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "lib_utils_date_startofcurrentmonth",
-      "community": 136,
+      "community": 496,
       "norm_label": "startofcurrentmonth()"
     },
     {
@@ -79119,7 +79119,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "lib_utils_date_endofcurrentmonth",
-      "community": 136,
+      "community": 496,
       "norm_label": "endofcurrentmonth()"
     },
     {
@@ -79169,7 +79169,7 @@
       "source_location": "L84",
       "_origin": "ast",
       "id": "lib_utils_date_toutcstartofday",
-      "community": 136,
+      "community": 496,
       "norm_label": "toutcstartofday()"
     },
     {
@@ -79179,7 +79179,7 @@
       "source_location": "L92",
       "_origin": "ast",
       "id": "lib_utils_date_toutcexclusiveend",
-      "community": 136,
+      "community": 496,
       "norm_label": "toutcexclusiveend()"
     },
     {
@@ -79199,7 +79199,7 @@
       "source_location": "L108",
       "_origin": "ast",
       "id": "lib_utils_date_addmonthsutc",
-      "community": 136,
+      "community": 496,
       "norm_label": "addmonthsutc()"
     },
     {
@@ -79209,7 +79209,7 @@
       "source_location": "L144",
       "_origin": "ast",
       "id": "lib_utils_date_lastdayofmonthutc",
-      "community": 136,
+      "community": 496,
       "norm_label": "lastdayofmonthutc()"
     },
     {
@@ -86129,7 +86129,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_utils_produtos_descontinuados",
-      "community": 520,
+      "community": 143,
       "norm_label": "produtos-descontinuados.ts"
     },
     {
@@ -86139,7 +86139,7 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "lib_utils_produtos_descontinuados_produtodescontinuadoitem",
-      "community": 520,
+      "community": 143,
       "norm_label": "produtodescontinuadoitem"
     },
     {
@@ -88349,7 +88349,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_utils_transferencia_pendente_store",
-      "community": 489,
+      "community": 555,
       "norm_label": "transferencia-pendente-store.ts"
     },
     {
@@ -88359,7 +88359,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "lib_utils_transferencia_pendente_store_transferenciapendenteinsert",
-      "community": 489,
+      "community": 555,
       "norm_label": "transferenciapendenteinsert"
     },
     {
@@ -88369,7 +88369,7 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "lib_utils_transferencia_pendente_store_transferenciapendenterow",
-      "community": 489,
+      "community": 555,
       "norm_label": "transferenciapendenterow"
     },
     {
@@ -88379,7 +88379,7 @@
       "source_location": "L57",
       "_origin": "ast",
       "id": "lib_utils_transferencia_pendente_store_ensuretable",
-      "community": 489,
+      "community": 555,
       "norm_label": "ensuretable()"
     },
     {
@@ -88389,7 +88389,7 @@
       "source_location": "L88",
       "_origin": "ast",
       "id": "lib_utils_transferencia_pendente_store_normcompany",
-      "community": 489,
+      "community": 555,
       "norm_label": "normcompany()"
     },
     {
@@ -88399,7 +88399,7 @@
       "source_location": "L96",
       "_origin": "ast",
       "id": "lib_utils_transferencia_pendente_store_inserttransferenciaspendentes",
-      "community": 489,
+      "community": 555,
       "norm_label": "inserttransferenciaspendentes()"
     },
     {
@@ -88409,7 +88409,7 @@
       "source_location": "L143",
       "_origin": "ast",
       "id": "lib_utils_transferencia_pendente_store_transferenciadetectadaregistro",
-      "community": 18,
+      "community": 582,
       "norm_label": "transferenciadetectadaregistro"
     },
     {
@@ -88419,7 +88419,7 @@
       "source_location": "L175",
       "_origin": "ast",
       "id": "lib_utils_transferencia_pendente_store_registrartransferenciasdetectadas",
-      "community": 489,
+      "community": 555,
       "norm_label": "registrartransferenciasdetectadas()"
     },
     {
@@ -88429,7 +88429,7 @@
       "source_location": "L331",
       "_origin": "ast",
       "id": "lib_utils_transferencia_pendente_store_getcooldownkeys",
-      "community": 489,
+      "community": 555,
       "norm_label": "getcooldownkeys()"
     },
     {
@@ -88439,7 +88439,7 @@
       "source_location": "L363",
       "_origin": "ast",
       "id": "lib_utils_transferencia_pendente_store_listartransferenciasfiltros",
-      "community": 489,
+      "community": 555,
       "norm_label": "listartransferenciasfiltros"
     },
     {
@@ -88449,7 +88449,7 @@
       "source_location": "L373",
       "_origin": "ast",
       "id": "lib_utils_transferencia_pendente_store_listartransferencias",
-      "community": 489,
+      "community": 555,
       "norm_label": "listartransferencias()"
     },
     {
@@ -88459,7 +88459,7 @@
       "source_location": "L491",
       "_origin": "ast",
       "id": "lib_utils_transferencia_pendente_store_contadorespororigemdestino",
-      "community": 489,
+      "community": 555,
       "norm_label": "contadorespororigemdestino()"
     },
     {
@@ -88469,7 +88469,7 @@
       "source_location": "L520",
       "_origin": "ast",
       "id": "lib_utils_transferencia_pendente_store_countbydestino",
-      "community": 489,
+      "community": 555,
       "norm_label": "countbydestino()"
     },
     {
@@ -89049,7 +89049,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_utils_transferencias_quantidade_real_storage",
-      "community": 491,
+      "community": 583,
       "norm_label": "transferencias-quantidade-real-storage.ts"
     },
     {
@@ -89059,7 +89059,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "lib_utils_transferencias_quantidade_real_storage_ensuretable",
-      "community": 491,
+      "community": 583,
       "norm_label": "ensuretable()"
     },
     {
@@ -89069,7 +89069,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "lib_utils_transferencias_quantidade_real_storage_quantidadesreaismap",
-      "community": 491,
+      "community": 583,
       "norm_label": "quantidadesreaismap"
     },
     {
@@ -89079,7 +89079,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "lib_utils_transferencias_quantidade_real_storage_readquantidadesreais",
-      "community": 491,
+      "community": 583,
       "norm_label": "readquantidadesreais()"
     },
     {
@@ -89089,7 +89089,7 @@
       "source_location": "L57",
       "_origin": "ast",
       "id": "lib_utils_transferencias_quantidade_real_storage_writequantidadesreais",
-      "community": 491,
+      "community": 583,
       "norm_label": "writequantidadesreais()"
     },
     {
@@ -96262,7 +96262,7 @@
       "label": "5. Aba SEFAZ \u2014 monitor e envio",
       "file_type": "document",
       "source_file": "docs/FATURAMENTO_SHOPIFY_LINX.md",
-      "source_location": "L257",
+      "source_location": "L261",
       "_origin": "ast",
       "id": "docs_faturamento_shopify_linx_5_aba_sefaz_monitor_e_envio",
       "community": 507,
@@ -96272,7 +96272,7 @@
       "label": "Como o Linx envia de verdade",
       "file_type": "document",
       "source_file": "docs/FATURAMENTO_SHOPIFY_LINX.md",
-      "source_location": "L259",
+      "source_location": "L263",
       "_origin": "ast",
       "id": "docs_faturamento_shopify_linx_como_o_linx_envia_de_verdade",
       "community": 507,
@@ -96282,7 +96282,7 @@
       "label": "STATUS_NFE",
       "file_type": "document",
       "source_file": "docs/FATURAMENTO_SHOPIFY_LINX.md",
-      "source_location": "L272",
+      "source_location": "L276",
       "_origin": "ast",
       "id": "docs_faturamento_shopify_linx_status_nfe",
       "community": 507,
@@ -96292,7 +96292,7 @@
       "label": "Fase 1 (fazer j\u00e1, seguro)",
       "file_type": "document",
       "source_file": "docs/FATURAMENTO_SHOPIFY_LINX.md",
-      "source_location": "L286",
+      "source_location": "L290",
       "_origin": "ast",
       "id": "docs_faturamento_shopify_linx_fase_1_fazer_j\u00e1_seguro",
       "community": 507,
@@ -96302,7 +96302,7 @@
       "label": "Contrato da Fiscal Flow (descoberto em 17/11/2026, nos arquivos do Linx desktop)",
       "file_type": "document",
       "source_file": "docs/FATURAMENTO_SHOPIFY_LINX.md",
-      "source_location": "L296",
+      "source_location": "L300",
       "_origin": "ast",
       "id": "docs_faturamento_shopify_linx_contrato_da_fiscal_flow_descoberto_em_17_11_2026_nos_arquivos_do_linx_desktop",
       "community": 507,
@@ -96312,7 +96312,7 @@
       "label": "Envio pelo dashboard \u2014 implementado (17/11/2026)",
       "file_type": "document",
       "source_file": "docs/FATURAMENTO_SHOPIFY_LINX.md",
-      "source_location": "L322",
+      "source_location": "L326",
       "_origin": "ast",
       "id": "docs_faturamento_shopify_linx_envio_pelo_dashboard_implementado_17_11_2026",
       "community": 507,
@@ -96322,7 +96322,7 @@
       "label": "6. Implementado (17/11/2026)",
       "file_type": "document",
       "source_file": "docs/FATURAMENTO_SHOPIFY_LINX.md",
-      "source_location": "L358",
+      "source_location": "L362",
       "_origin": "ast",
       "id": "docs_faturamento_shopify_linx_6_implementado_17_11_2026",
       "community": 507,
@@ -96332,7 +96332,7 @@
       "label": "Fluxo cont\u00ednuo + importa\u00e7\u00e3o do Shopify (17/11/2026)",
       "file_type": "document",
       "source_file": "docs/FATURAMENTO_SHOPIFY_LINX.md",
-      "source_location": "L387",
+      "source_location": "L391",
       "_origin": "ast",
       "id": "docs_faturamento_shopify_linx_fluxo_cont\u00ednuo_importa\u00e7\u00e3o_do_shopify_17_11_2026",
       "community": 507,
@@ -107046,7 +107046,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1167",
+      "source_location": "L1177",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_listarnotasfat",
       "target": "app_companies_company_filial_filialconsultaclient_digits"
@@ -186751,7 +186751,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/faturamento-ecommerce/FaturamentoAba.tsx",
-      "source_location": "L981",
+      "source_location": "L975",
       "weight": 1.0,
       "source": "components_faturamento_ecommerce_faturamentoaba",
       "target": "components_faturamento_ecommerce_faturamentoaba_buscarnotas",
@@ -186781,7 +186781,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/faturamento-ecommerce/FaturamentoAba.tsx",
-      "source_location": "L668",
+      "source_location": "L662",
       "weight": 1.0,
       "source": "components_faturamento_ecommerce_faturamentoaba",
       "target": "components_faturamento_ecommerce_faturamentoaba_itenscard",
@@ -186791,7 +186791,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/faturamento-ecommerce/FaturamentoAba.tsx",
-      "source_location": "L1053",
+      "source_location": "L1047",
       "weight": 1.0,
       "source": "components_faturamento_ecommerce_faturamentoaba",
       "target": "components_faturamento_ecommerce_faturamentoaba_listanotas",
@@ -186821,7 +186821,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/faturamento-ecommerce/FaturamentoAba.tsx",
-      "source_location": "L657",
+      "source_location": "L651",
       "weight": 1.0,
       "source": "components_faturamento_ecommerce_faturamentoaba",
       "target": "components_faturamento_ecommerce_faturamentoaba_num",
@@ -186841,7 +186841,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/faturamento-ecommerce/FaturamentoAba.tsx",
-      "source_location": "L880",
+      "source_location": "L874",
       "weight": 1.0,
       "source": "components_faturamento_ecommerce_faturamentoaba",
       "target": "components_faturamento_ecommerce_faturamentoaba_previaview",
@@ -186861,7 +186861,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/faturamento-ecommerce/FaturamentoAba.tsx",
-      "source_location": "L625",
+      "source_location": "L619",
       "weight": 1.0,
       "source": "components_faturamento_ecommerce_faturamentoaba",
       "target": "components_faturamento_ecommerce_faturamentoaba_sel",
@@ -186871,7 +186871,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/faturamento-ecommerce/FaturamentoAba.tsx",
-      "source_location": "L970",
+      "source_location": "L964",
       "weight": 1.0,
       "source": "components_faturamento_ecommerce_faturamentoaba",
       "target": "components_faturamento_ecommerce_faturamentoaba_total",
@@ -187102,7 +187102,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/faturamento-ecommerce/FaturamentoAba.tsx",
-      "source_location": "L733",
+      "source_location": "L727",
       "weight": 1.0,
       "source": "components_faturamento_ecommerce_faturamentoaba_itenscard",
       "target": "components_faturamento_ecommerce_faturamentoaba_n",
@@ -187113,7 +187113,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/faturamento-ecommerce/FaturamentoAba.tsx",
-      "source_location": "L182",
+      "source_location": "L176",
       "weight": 1.0,
       "source": "components_faturamento_ecommerce_faturamentoaba_novanota",
       "target": "components_faturamento_ecommerce_faturamentoaba_n",
@@ -187279,7 +187279,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L448",
+      "source_location": "L447",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes_criarclientefat",
       "target": "components_faturamento_ecommerce_faturamentoaba_n"
@@ -187487,7 +187487,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/faturamento-ecommerce/FaturamentoAba.tsx",
-      "source_location": "L841",
+      "source_location": "L835",
       "weight": 1.0,
       "source": "components_faturamento_ecommerce_faturamentoaba_itenscard",
       "target": "components_faturamento_ecommerce_faturamentoaba_numtxt",
@@ -187510,7 +187510,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/faturamento-ecommerce/FaturamentoAba.tsx",
-      "source_location": "L259",
+      "source_location": "L253",
       "weight": 1.0,
       "source": "components_faturamento_ecommerce_faturamentoaba_novanota",
       "target": "components_faturamento_ecommerce_api_fmtbrl"
@@ -187521,7 +187521,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/faturamento-ecommerce/FaturamentoAba.tsx",
-      "source_location": "L362",
+      "source_location": "L356",
       "weight": 1.0,
       "source": "components_faturamento_ecommerce_faturamentoaba_novanota",
       "target": "components_faturamento_ecommerce_api_fmtdoc"
@@ -187543,7 +187543,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "components/faturamento-ecommerce/FaturamentoAba.tsx",
-      "source_location": "L234",
+      "source_location": "L228",
       "weight": 1.0,
       "source": "components_faturamento_ecommerce_faturamentoaba_novanota",
       "target": "tmp_test_calculo_6_51_simular"
@@ -187554,7 +187554,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/faturamento-ecommerce/FaturamentoAba.tsx",
-      "source_location": "L784",
+      "source_location": "L778",
       "weight": 1.0,
       "source": "components_faturamento_ecommerce_faturamentoaba_itenscard",
       "target": "components_faturamento_ecommerce_api_fmtbrl"
@@ -187565,7 +187565,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/faturamento-ecommerce/FaturamentoAba.tsx",
-      "source_location": "L681",
+      "source_location": "L675",
       "weight": 1.0,
       "source": "components_faturamento_ecommerce_faturamentoaba_itenscard",
       "target": "components_faturamento_ecommerce_api_usefatapi"
@@ -187576,7 +187576,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/faturamento-ecommerce/FaturamentoAba.tsx",
-      "source_location": "L918",
+      "source_location": "L912",
       "weight": 1.0,
       "source": "components_faturamento_ecommerce_faturamentoaba_previaview",
       "target": "components_faturamento_ecommerce_api_fmtbrl"
@@ -187587,7 +187587,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/faturamento-ecommerce/FaturamentoAba.tsx",
-      "source_location": "L984",
+      "source_location": "L978",
       "weight": 1.0,
       "source": "components_faturamento_ecommerce_faturamentoaba_buscarnotas",
       "target": "components_faturamento_ecommerce_api_datalocal"
@@ -187598,7 +187598,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/faturamento-ecommerce/FaturamentoAba.tsx",
-      "source_location": "L982",
+      "source_location": "L976",
       "weight": 1.0,
       "source": "components_faturamento_ecommerce_faturamentoaba_buscarnotas",
       "target": "components_faturamento_ecommerce_api_usefatapi"
@@ -187609,7 +187609,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/faturamento-ecommerce/FaturamentoAba.tsx",
-      "source_location": "L1090",
+      "source_location": "L1084",
       "weight": 1.0,
       "source": "components_faturamento_ecommerce_faturamentoaba_listanotas",
       "target": "components_faturamento_ecommerce_api_fmtbrl"
@@ -187620,7 +187620,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/faturamento-ecommerce/FaturamentoAba.tsx",
-      "source_location": "L1086",
+      "source_location": "L1080",
       "weight": 1.0,
       "source": "components_faturamento_ecommerce_faturamentoaba_listanotas",
       "target": "components_faturamento_ecommerce_api_fmtdata"
@@ -265407,7 +265407,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L600",
+      "source_location": "L599",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes_atualizarclientefat",
       "target": "lib_db_connection_withrequest"
@@ -265418,7 +265418,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L226",
+      "source_location": "L225",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes_buscarclientesfat",
       "target": "lib_db_connection_withrequest"
@@ -265429,7 +265429,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L360",
+      "source_location": "L359",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes_clientespordocumento",
       "target": "lib_db_connection_withrequest"
@@ -265440,7 +265440,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L446",
+      "source_location": "L445",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes_criarclientefat",
       "target": "lib_db_connection_withrequest"
@@ -265451,7 +265451,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L289",
+      "source_location": "L288",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes_fetchclientefat",
       "target": "lib_db_connection_withrequest"
@@ -265517,7 +265517,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1080",
+      "source_location": "L1090",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_depurarnota",
       "target": "lib_db_connection_withrequest"
@@ -265528,7 +265528,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1213",
+      "source_location": "L1223",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_fetchnotafat",
       "target": "lib_db_connection_withrequest"
@@ -265539,7 +265539,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1291",
+      "source_location": "L1301",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_fetchxmlnota",
       "target": "lib_db_connection_withrequest"
@@ -265550,7 +265550,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1022",
+      "source_location": "L1032",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_gravarnota",
       "target": "lib_db_connection_withrequest"
@@ -265561,7 +265561,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1138",
+      "source_location": "L1148",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_listarnotasfat",
       "target": "lib_db_connection_withrequest"
@@ -265572,7 +265572,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L660",
+      "source_location": "L669",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_previanota",
       "target": "lib_db_connection_withrequest"
@@ -265583,7 +265583,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1055",
+      "source_location": "L1065",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_simularxmlnota",
       "target": "lib_db_connection_withrequest"
@@ -275758,7 +275758,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1081",
+      "source_location": "L1091",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_depurarnota",
       "target": "lib_db_proxy_proxypool_request"
@@ -275769,7 +275769,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1023",
+      "source_location": "L1033",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_gravarnota",
       "target": "lib_db_proxy_proxypool_request"
@@ -275780,7 +275780,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L660",
+      "source_location": "L669",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_previanota",
       "target": "lib_db_proxy_proxypool_request"
@@ -275791,7 +275791,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1056",
+      "source_location": "L1066",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_simularxmlnota",
       "target": "lib_db_proxy_proxypool_request"
@@ -278691,7 +278691,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L108",
+      "source_location": "L106",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_config",
       "target": "lib_faturamento_ecommerce_config_cliente_base",
@@ -278701,7 +278701,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L241",
+      "source_location": "L239",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_config",
       "target": "lib_faturamento_ecommerce_config_cliente_pj_base",
@@ -278741,7 +278741,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L386",
+      "source_location": "L384",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_config",
       "target": "lib_faturamento_ecommerce_config_filtros_status",
@@ -278751,7 +278751,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L254",
+      "source_location": "L252",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_config",
       "target": "lib_faturamento_ecommerce_config_indicadores_fiscais",
@@ -278761,7 +278761,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L338",
+      "source_location": "L336",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_config",
       "target": "lib_faturamento_ecommerce_config_info_pgto_opcoes",
@@ -278781,7 +278781,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L178",
+      "source_location": "L176",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_config",
       "target": "lib_faturamento_ecommerce_config_isperfilclientepj",
@@ -278791,7 +278791,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L264",
+      "source_location": "L262",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_config",
       "target": "lib_faturamento_ecommerce_config_nota_base",
@@ -278811,7 +278811,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L88",
+      "source_location": "L86",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_config",
       "target": "lib_faturamento_ecommerce_config_padraoclientepj",
@@ -278821,7 +278821,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L101",
+      "source_location": "L99",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_config",
       "target": "lib_faturamento_ecommerce_config_padraoempresa",
@@ -278841,7 +278841,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L286",
+      "source_location": "L284",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_config",
       "target": "lib_faturamento_ecommerce_config_padroes",
@@ -278851,7 +278851,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L189",
+      "source_location": "L187",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_config",
       "target": "lib_faturamento_ecommerce_config_perfilcliente",
@@ -278861,7 +278861,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L191",
+      "source_location": "L189",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_config",
       "target": "lib_faturamento_ecommerce_config_perfilclientepfdef",
@@ -278871,7 +278871,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L133",
+      "source_location": "L131",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_config",
       "target": "lib_faturamento_ecommerce_config_perfilclientepj",
@@ -278881,7 +278881,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L135",
+      "source_location": "L133",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_config",
       "target": "lib_faturamento_ecommerce_config_perfilclientepjdef",
@@ -278891,7 +278891,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L183",
+      "source_location": "L181",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_config",
       "target": "lib_faturamento_ecommerce_config_perfildotipo",
@@ -278901,7 +278901,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L204",
+      "source_location": "L202",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_config",
       "target": "lib_faturamento_ecommerce_config_perfis_cliente_pf",
@@ -278911,7 +278911,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L151",
+      "source_location": "L149",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_config",
       "target": "lib_faturamento_ecommerce_config_perfis_cliente_pj",
@@ -278921,7 +278921,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L322",
+      "source_location": "L320",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_config",
       "target": "lib_faturamento_ecommerce_config_regiao_por_uf",
@@ -278931,7 +278931,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L331",
+      "source_location": "L329",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_config",
       "target": "lib_faturamento_ecommerce_config_regiaodauf",
@@ -278941,7 +278941,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L335",
+      "source_location": "L333",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_config",
       "target": "lib_faturamento_ecommerce_config_regioes",
@@ -278951,7 +278951,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L349",
+      "source_location": "L347",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_config",
       "target": "lib_faturamento_ecommerce_config_statusnfelabel",
@@ -278961,7 +278961,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L262",
+      "source_location": "L260",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_config",
       "target": "lib_faturamento_ecommerce_config_tipos_tributacao",
@@ -279071,7 +279071,7 @@
       "context": "field",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L223",
+      "source_location": "L222",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_types_notainput",
       "target": "lib_faturamento_ecommerce_config_empresafat",
@@ -279170,7 +279170,7 @@
       "context": "type",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L191",
+      "source_location": "L189",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_config_perfilclientepfdef",
       "target": "lib_faturamento_ecommerce_config_perfilclientepjdef",
@@ -279192,7 +279192,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/config.ts",
-      "source_location": "L185",
+      "source_location": "L183",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_config_perfildotipo",
       "target": "lib_faturamento_ecommerce_config_isperfilclientepj",
@@ -279215,7 +279215,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L426",
+      "source_location": "L425",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes_criarclientefat",
       "target": "lib_faturamento_ecommerce_config_isperfilclientepj"
@@ -279259,7 +279259,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L430",
+      "source_location": "L429",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes_criarclientefat",
       "target": "lib_faturamento_ecommerce_config_perfildotipo"
@@ -279380,7 +279380,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L614",
+      "source_location": "L613",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes_atualizarclientefat",
       "target": "lib_faturamento_ecommerce_config_regiaodauf"
@@ -279391,7 +279391,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L476",
+      "source_location": "L475",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes_criarclientefat",
       "target": "lib_faturamento_ecommerce_config_regiaodauf"
@@ -279478,7 +279478,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1097",
+      "source_location": "L1107",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_mapnota",
       "target": "lib_faturamento_ecommerce_config_statusnfelabel",
@@ -279501,7 +279501,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1135",
+      "source_location": "L1145",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_listarnotasfat",
       "target": "lib_faturamento_ecommerce_config_filtros_status"
@@ -280098,7 +280098,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L192",
+      "source_location": "L191",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_types",
       "target": "lib_faturamento_ecommerce_types_clienteatualizacaoinput",
@@ -280108,7 +280108,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L367",
+      "source_location": "L366",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_types",
       "target": "lib_faturamento_ecommerce_types_clientecandidato",
@@ -280118,7 +280118,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L77",
+      "source_location": "L76",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_types",
       "target": "lib_faturamento_ecommerce_types_clientefatdetalhe",
@@ -280128,7 +280128,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L104",
+      "source_location": "L103",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_types",
       "target": "lib_faturamento_ecommerce_types_clientefatinput",
@@ -280138,7 +280138,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L61",
+      "source_location": "L60",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_types",
       "target": "lib_faturamento_ecommerce_types_clientefatlistitem",
@@ -280148,7 +280148,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L136",
+      "source_location": "L135",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_types",
       "target": "lib_faturamento_ecommerce_types_clientepjfatinput",
@@ -280158,7 +280158,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L176",
+      "source_location": "L175",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_types",
       "target": "lib_faturamento_ecommerce_types_cnpjconsulta",
@@ -280168,7 +280168,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L50",
+      "source_location": "L49",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_types",
       "target": "lib_faturamento_ecommerce_types_enderecofat",
@@ -280198,7 +280198,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L384",
+      "source_location": "L383",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_types",
       "target": "lib_faturamento_ecommerce_types_itemimportado",
@@ -280208,7 +280208,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L405",
+      "source_location": "L404",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_types",
       "target": "lib_faturamento_ecommerce_types_linhanaomapeada",
@@ -280218,7 +280218,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L289",
+      "source_location": "L288",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_types",
       "target": "lib_faturamento_ecommerce_types_notacriada",
@@ -280228,7 +280228,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L331",
+      "source_location": "L330",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_types",
       "target": "lib_faturamento_ecommerce_types_notadetalhe",
@@ -280238,7 +280238,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L321",
+      "source_location": "L320",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_types",
       "target": "lib_faturamento_ecommerce_types_notadetalheitem",
@@ -280248,7 +280248,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L222",
+      "source_location": "L221",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_types",
       "target": "lib_faturamento_ecommerce_types_notainput",
@@ -280258,7 +280258,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L214",
+      "source_location": "L213",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_types",
       "target": "lib_faturamento_ecommerce_types_notaiteminput",
@@ -280268,7 +280268,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L299",
+      "source_location": "L298",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_types",
       "target": "lib_faturamento_ecommerce_types_notalistitem",
@@ -280278,7 +280278,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L268",
+      "source_location": "L267",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_types",
       "target": "lib_faturamento_ecommerce_types_notapreview",
@@ -280288,7 +280288,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L249",
+      "source_location": "L248",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_types",
       "target": "lib_faturamento_ecommerce_types_notapreviewitem",
@@ -280308,7 +280308,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L414",
+      "source_location": "L413",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_types",
       "target": "lib_faturamento_ecommerce_types_pedidoshopifyimport",
@@ -280318,7 +280318,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L353",
+      "source_location": "L352",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_types",
       "target": "lib_faturamento_ecommerce_types_pedidoshopifyresumo",
@@ -280328,7 +280328,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L201",
+      "source_location": "L200",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_types",
       "target": "lib_faturamento_ecommerce_types_produtofatopcao",
@@ -280570,7 +280570,7 @@
       "context": "type",
       "confidence": "EXTRACTED",
       "source_file": "lib/faturamento-ecommerce/types.ts",
-      "source_location": "L331",
+      "source_location": "L330",
       "weight": 1.0,
       "source": "lib_faturamento_ecommerce_types_notadetalhe",
       "target": "lib_faturamento_ecommerce_types_notalistitem",
@@ -318524,7 +318524,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L587",
+      "source_location": "L586",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes",
       "target": "lib_repositories_faturamentoecommerce_clientes_atualizarclientefat",
@@ -318534,7 +318534,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L213",
+      "source_location": "L212",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes",
       "target": "lib_repositories_faturamentoecommerce_clientes_buscarclientesfat",
@@ -318544,7 +318544,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L357",
+      "source_location": "L356",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes",
       "target": "lib_repositories_faturamentoecommerce_clientes_clientespordocumento",
@@ -318554,7 +318554,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L412",
+      "source_location": "L411",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes",
       "target": "lib_repositories_faturamentoecommerce_clientes_criarclientefat",
@@ -318574,7 +318574,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L286",
+      "source_location": "L285",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes",
       "target": "lib_repositories_faturamentoecommerce_clientes_fetchclientefat",
@@ -318584,7 +318584,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L133",
+      "source_location": "L132",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes",
       "target": "lib_repositories_faturamentoecommerce_clientes_fetchfatlookups",
@@ -318614,7 +318614,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L386",
+      "source_location": "L385",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes",
       "target": "lib_repositories_faturamentoecommerce_clientes_normcontato",
@@ -318624,7 +318624,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L374",
+      "source_location": "L373",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes",
       "target": "lib_repositories_faturamentoecommerce_clientes_normendereco",
@@ -318730,7 +318730,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L592",
+      "source_location": "L591",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes_atualizarclientefat",
       "target": "lib_repositories_faturamentoecommerce_clientes_onlydigits",
@@ -318741,7 +318741,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L221",
+      "source_location": "L220",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes_buscarclientesfat",
       "target": "lib_repositories_faturamentoecommerce_clientes_onlydigits",
@@ -318752,7 +318752,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L358",
+      "source_location": "L357",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes_clientespordocumento",
       "target": "lib_repositories_faturamentoecommerce_clientes_onlydigits",
@@ -318763,7 +318763,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L418",
+      "source_location": "L417",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes_criarclientefat",
       "target": "lib_repositories_faturamentoecommerce_clientes_onlydigits",
@@ -318774,7 +318774,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L287",
+      "source_location": "L286",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes_fetchclientefat",
       "target": "lib_repositories_faturamentoecommerce_clientes_onlydigits",
@@ -318785,7 +318785,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L387",
+      "source_location": "L386",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes_normcontato",
       "target": "lib_repositories_faturamentoecommerce_clientes_onlydigits",
@@ -318796,7 +318796,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L376",
+      "source_location": "L375",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes_normendereco",
       "target": "lib_repositories_faturamentoecommerce_clientes_onlydigits",
@@ -318807,7 +318807,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L237",
+      "source_location": "L236",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes_buscarclientesfat",
       "target": "lib_repositories_faturamentoecommerce_clientes_up",
@@ -318818,7 +318818,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L425",
+      "source_location": "L424",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes_criarclientefat",
       "target": "lib_repositories_faturamentoecommerce_clientes_up",
@@ -318840,7 +318840,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L614",
+      "source_location": "L613",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes_atualizarclientefat",
       "target": "lib_repositories_faturamentoecommerce_clientes_cut",
@@ -318851,7 +318851,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L429",
+      "source_location": "L428",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes_criarclientefat",
       "target": "lib_repositories_faturamentoecommerce_clientes_cut",
@@ -318862,7 +318862,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L388",
+      "source_location": "L387",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes_normcontato",
       "target": "lib_repositories_faturamentoecommerce_clientes_cut",
@@ -318873,7 +318873,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L377",
+      "source_location": "L376",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes_normendereco",
       "target": "lib_repositories_faturamentoecommerce_clientes_cut",
@@ -318884,7 +318884,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L219",
+      "source_location": "L218",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes_buscarclientesfat",
       "target": "lib_repositories_faturamentoecommerce_clientes_trimstr",
@@ -318895,7 +318895,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L276",
+      "source_location": "L275",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes_buscarclientesfat",
       "target": "lib_repositories_faturamentoecommerce_clientes_iso",
@@ -318906,7 +318906,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L352",
+      "source_location": "L351",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes_fetchclientefat",
       "target": "lib_repositories_faturamentoecommerce_clientes_iso",
@@ -318928,7 +318928,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L136",
+      "source_location": "L135",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes_fetchfatlookups",
       "target": "lib_repositories_faturamentoecommerce_clientes_opcoes",
@@ -318939,7 +318939,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L135",
+      "source_location": "L134",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes_fetchfatlookups",
       "target": "lib_repositories_faturamentoecommerce_clientes_fetchfiliaisnota",
@@ -319006,7 +319006,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L224",
+      "source_location": "L223",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes_buscarclientesfat",
       "target": "lib_repositories_faturamentoecommerce_filiais_nota_filiaisnotadaempresa"
@@ -319016,7 +319016,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L593",
+      "source_location": "L592",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes_atualizarclientefat",
       "target": "lib_repositories_faturamentoecommerce_clientes_normendereco",
@@ -319027,7 +319027,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L438",
+      "source_location": "L437",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes_criarclientefat",
       "target": "lib_repositories_faturamentoecommerce_clientes_normendereco",
@@ -319038,7 +319038,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L598",
+      "source_location": "L597",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes_atualizarclientefat",
       "target": "lib_repositories_faturamentoecommerce_clientes_normcontato",
@@ -319049,7 +319049,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/clientes.ts",
-      "source_location": "L444",
+      "source_location": "L443",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_clientes_criarclientefat",
       "target": "lib_repositories_faturamentoecommerce_clientes_normcontato",
@@ -319359,7 +319359,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1212",
+      "source_location": "L1222",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_fetchnotafat",
       "target": "lib_repositories_faturamentoecommerce_filiais_nota_filiaisnotadaempresa"
@@ -319370,7 +319370,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1290",
+      "source_location": "L1300",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_fetchxmlnota",
       "target": "lib_repositories_faturamentoecommerce_filiais_nota_filiaisnotadaempresa"
@@ -319381,7 +319381,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1133",
+      "source_location": "L1143",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_listarnotasfat",
       "target": "lib_repositories_faturamentoecommerce_filiais_nota_filiaisnotadaempresa"
@@ -319500,7 +319500,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L980",
+      "source_location": "L990",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas",
       "target": "lib_repositories_faturamentoecommerce_notas_bindcabecalho",
@@ -319520,7 +319520,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1013",
+      "source_location": "L1023",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas",
       "target": "lib_repositories_faturamentoecommerce_notas_consumidorfinal",
@@ -319530,7 +319530,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1079",
+      "source_location": "L1089",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas",
       "target": "lib_repositories_faturamentoecommerce_notas_depurarnota",
@@ -319540,7 +319540,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1201",
+      "source_location": "L1211",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas",
       "target": "lib_repositories_faturamentoecommerce_notas_extrairmotivo",
@@ -319550,7 +319550,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1211",
+      "source_location": "L1221",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas",
       "target": "lib_repositories_faturamentoecommerce_notas_fetchnotafat",
@@ -319560,7 +319560,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1287",
+      "source_location": "L1297",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas",
       "target": "lib_repositories_faturamentoecommerce_notas_fetchxmlnota",
@@ -319570,7 +319570,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1021",
+      "source_location": "L1031",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas",
       "target": "lib_repositories_faturamentoecommerce_notas_gravarnota",
@@ -319580,7 +319580,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L709",
+      "source_location": "L719",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas",
       "target": "lib_repositories_faturamentoecommerce_notas_impostocalculado",
@@ -319590,7 +319590,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L692",
+      "source_location": "L701",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas",
       "target": "lib_repositories_faturamentoecommerce_notas_impostos_difal",
@@ -319600,7 +319600,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L694",
+      "source_location": "L703",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas",
       "target": "lib_repositories_faturamentoecommerce_notas_impostos_reforma",
@@ -319610,7 +319610,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L693",
+      "source_location": "L702",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas",
       "target": "lib_repositories_faturamentoecommerce_notas_impostos_regime_normal",
@@ -319620,7 +319620,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L711",
+      "source_location": "L721",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas",
       "target": "lib_repositories_faturamentoecommerce_notas_impostosregimenormal",
@@ -319640,7 +319640,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L681",
+      "source_location": "L690",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas",
       "target": "lib_repositories_faturamentoecommerce_notas_larguradosequencial",
@@ -319660,7 +319660,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1125",
+      "source_location": "L1135",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas",
       "target": "lib_repositories_faturamentoecommerce_notas_listarnotasfat",
@@ -319680,7 +319680,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1094",
+      "source_location": "L1104",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas",
       "target": "lib_repositories_faturamentoecommerce_notas_mapnota",
@@ -319690,7 +319690,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L743",
+      "source_location": "L753",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas",
       "target": "lib_repositories_faturamentoecommerce_notas_montarbatch",
@@ -319720,7 +319720,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L619",
+      "source_location": "L628",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas",
       "target": "lib_repositories_faturamentoecommerce_notas_parapreview",
@@ -319740,7 +319740,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L659",
+      "source_location": "L668",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas",
       "target": "lib_repositories_faturamentoecommerce_notas_previanota",
@@ -319760,7 +319760,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L605",
+      "source_location": "L614",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas",
       "target": "lib_repositories_faturamentoecommerce_notas_ratear",
@@ -319790,7 +319790,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1054",
+      "source_location": "L1064",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas",
       "target": "lib_repositories_faturamentoecommerce_notas_simularxmlnota",
@@ -319820,7 +319820,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L666",
+      "source_location": "L675",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas",
       "target": "lib_repositories_faturamentoecommerce_notas_valorimposto",
@@ -319831,7 +319831,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L993",
+      "source_location": "L1003",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_bindcabecalho",
       "target": "lib_repositories_faturamentoecommerce_notas_trim",
@@ -319853,7 +319853,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1204",
+      "source_location": "L1214",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_extrairmotivo",
       "target": "lib_repositories_faturamentoecommerce_notas_trim",
@@ -319864,7 +319864,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1216",
+      "source_location": "L1226",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_fetchnotafat",
       "target": "lib_repositories_faturamentoecommerce_notas_trim",
@@ -319875,7 +319875,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1288",
+      "source_location": "L1298",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_fetchxmlnota",
       "target": "lib_repositories_faturamentoecommerce_notas_trim",
@@ -319886,7 +319886,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1040",
+      "source_location": "L1050",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_gravarnota",
       "target": "lib_repositories_faturamentoecommerce_notas_trim",
@@ -319897,7 +319897,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L682",
+      "source_location": "L691",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_larguradosequencial",
       "target": "lib_repositories_faturamentoecommerce_notas_trim",
@@ -319908,7 +319908,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1136",
+      "source_location": "L1146",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_listarnotasfat",
       "target": "lib_repositories_faturamentoecommerce_notas_trim",
@@ -319919,7 +319919,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1099",
+      "source_location": "L1109",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_mapnota",
       "target": "lib_repositories_faturamentoecommerce_notas_trim",
@@ -319941,7 +319941,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1071",
+      "source_location": "L1081",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_simularxmlnota",
       "target": "lib_repositories_faturamentoecommerce_notas_trim",
@@ -319952,7 +319952,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L720",
+      "source_location": "L730",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_impostosregimenormal",
       "target": "lib_repositories_faturamentoecommerce_notas_round2",
@@ -319963,7 +319963,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L768",
+      "source_location": "L778",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_montarbatch",
       "target": "lib_repositories_faturamentoecommerce_notas_round2",
@@ -319974,7 +319974,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L310",
+      "source_location": "L319",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_montarplano",
       "target": "lib_repositories_faturamentoecommerce_notas_round2",
@@ -319985,7 +319985,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L611",
+      "source_location": "L620",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_ratear",
       "target": "lib_repositories_faturamentoecommerce_notas_round2",
@@ -319996,7 +319996,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L674",
+      "source_location": "L683",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_valorimposto",
       "target": "lib_repositories_faturamentoecommerce_notas_round2",
@@ -320007,7 +320007,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L720",
+      "source_location": "L730",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_impostosregimenormal",
       "target": "lib_repositories_faturamentoecommerce_notas_trunc2",
@@ -320018,7 +320018,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L670",
+      "source_location": "L679",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_valorimposto",
       "target": "lib_repositories_faturamentoecommerce_notas_trunc2",
@@ -320029,7 +320029,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1102",
+      "source_location": "L1112",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_mapnota",
       "target": "lib_repositories_faturamentoecommerce_notas_iso",
@@ -320040,7 +320040,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L772",
+      "source_location": "L782",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_montarbatch",
       "target": "lib_repositories_faturamentoecommerce_notas_lit",
@@ -320051,7 +320051,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L758",
+      "source_location": "L768",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_montarbatch",
       "target": "lib_repositories_faturamentoecommerce_notas_num",
@@ -320062,7 +320062,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1220",
+      "source_location": "L1230",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_fetchnotafat",
       "target": "lib_repositories_faturamentoecommerce_notas_q",
@@ -320073,7 +320073,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1295",
+      "source_location": "L1305",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_fetchxmlnota",
       "target": "lib_repositories_faturamentoecommerce_notas_q",
@@ -320139,7 +320139,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1081",
+      "source_location": "L1091",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_depurarnota",
       "target": "lib_repositories_faturamentoecommerce_notas_montarplano",
@@ -320150,7 +320150,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1023",
+      "source_location": "L1033",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_gravarnota",
       "target": "lib_repositories_faturamentoecommerce_notas_montarplano",
@@ -320162,7 +320162,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L452",
+      "source_location": "L461",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_montarplano",
       "target": "lib_repositories_faturamentoecommerce_notas_impostos_regime_normal"
@@ -320172,7 +320172,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L554",
+      "source_location": "L563",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_montarplano",
       "target": "lib_repositories_faturamentoecommerce_notas_impostosregimenormal",
@@ -320194,7 +320194,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L525",
+      "source_location": "L534",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_montarplano",
       "target": "lib_repositories_faturamentoecommerce_notas_ratear",
@@ -320205,7 +320205,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L660",
+      "source_location": "L669",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_previanota",
       "target": "lib_repositories_faturamentoecommerce_notas_montarplano",
@@ -320216,7 +320216,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1056",
+      "source_location": "L1066",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_simularxmlnota",
       "target": "lib_repositories_faturamentoecommerce_notas_montarplano",
@@ -320227,7 +320227,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L660",
+      "source_location": "L669",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_previanota",
       "target": "lib_repositories_faturamentoecommerce_notas_parapreview",
@@ -320238,7 +320238,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L817",
+      "source_location": "L827",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_montarbatch",
       "target": "lib_repositories_faturamentoecommerce_notas_valorimposto",
@@ -320250,7 +320250,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L716",
+      "source_location": "L726",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_impostosregimenormal",
       "target": "lib_repositories_faturamentoecommerce_notas_impostos_difal"
@@ -320261,7 +320261,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L716",
+      "source_location": "L726",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_impostosregimenormal",
       "target": "lib_repositories_faturamentoecommerce_notas_impostos_reforma"
@@ -320271,7 +320271,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L826",
+      "source_location": "L836",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_montarbatch",
       "target": "lib_repositories_faturamentoecommerce_notas_impostosregimenormal",
@@ -320282,7 +320282,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1085",
+      "source_location": "L1095",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_depurarnota",
       "target": "lib_repositories_faturamentoecommerce_notas_montarbatch",
@@ -320293,7 +320293,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1032",
+      "source_location": "L1042",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_gravarnota",
       "target": "lib_repositories_faturamentoecommerce_notas_montarbatch",
@@ -320304,7 +320304,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L792",
+      "source_location": "L802",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_montarbatch",
       "target": "lib_repositories_faturamentoecommerce_notas_consumidorfinal",
@@ -320315,7 +320315,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1063",
+      "source_location": "L1073",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_simularxmlnota",
       "target": "lib_repositories_faturamentoecommerce_notas_montarbatch",
@@ -320326,7 +320326,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1006",
+      "source_location": "L1016",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_bindcabecalho",
       "target": "lib_repositories_faturamentoecommerce_notas_consumidorfinal",
@@ -320337,7 +320337,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1084",
+      "source_location": "L1094",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_depurarnota",
       "target": "lib_repositories_faturamentoecommerce_notas_bindcabecalho",
@@ -320348,7 +320348,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1029",
+      "source_location": "L1039",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_gravarnota",
       "target": "lib_repositories_faturamentoecommerce_notas_bindcabecalho",
@@ -320359,7 +320359,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1060",
+      "source_location": "L1070",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_simularxmlnota",
       "target": "lib_repositories_faturamentoecommerce_notas_bindcabecalho",
@@ -320370,7 +320370,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1250",
+      "source_location": "L1260",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_fetchnotafat",
       "target": "lib_repositories_faturamentoecommerce_notas_mapnota",
@@ -320381,7 +320381,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1190",
+      "source_location": "L1200",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_listarnotasfat",
       "target": "lib_repositories_faturamentoecommerce_notas_mapnota",
@@ -320392,7 +320392,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1191",
+      "source_location": "L1201",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_listarnotasfat",
       "target": "lib_repositories_faturamentoecommerce_notas_extrairmotivo",
@@ -320403,7 +320403,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "lib/repositories/faturamentoEcommerce/notas.ts",
-      "source_location": "L1253",
+      "source_location": "L1263",
       "weight": 1.0,
       "source": "lib_repositories_faturamentoecommerce_notas_fetchnotafat",
       "target": "lib_repositories_faturamentoecommerce_notas_extrairmotivo",
@@ -390985,7 +390985,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "docs/FATURAMENTO_SHOPIFY_LINX.md",
-      "source_location": "L257",
+      "source_location": "L261",
       "weight": 1.0,
       "source": "docs_faturamento_shopify_linx_faturamento_shopify_linx_nf_e_de_e_commerce",
       "target": "docs_faturamento_shopify_linx_5_aba_sefaz_monitor_e_envio",
@@ -390995,7 +390995,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "docs/FATURAMENTO_SHOPIFY_LINX.md",
-      "source_location": "L358",
+      "source_location": "L362",
       "weight": 1.0,
       "source": "docs_faturamento_shopify_linx_faturamento_shopify_linx_nf_e_de_e_commerce",
       "target": "docs_faturamento_shopify_linx_6_implementado_17_11_2026",
@@ -391095,7 +391095,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "docs/FATURAMENTO_SHOPIFY_LINX.md",
-      "source_location": "L259",
+      "source_location": "L263",
       "weight": 1.0,
       "source": "docs_faturamento_shopify_linx_5_aba_sefaz_monitor_e_envio",
       "target": "docs_faturamento_shopify_linx_como_o_linx_envia_de_verdade",
@@ -391105,7 +391105,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "docs/FATURAMENTO_SHOPIFY_LINX.md",
-      "source_location": "L296",
+      "source_location": "L300",
       "weight": 1.0,
       "source": "docs_faturamento_shopify_linx_5_aba_sefaz_monitor_e_envio",
       "target": "docs_faturamento_shopify_linx_contrato_da_fiscal_flow_descoberto_em_17_11_2026_nos_arquivos_do_linx_desktop",
@@ -391115,7 +391115,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "docs/FATURAMENTO_SHOPIFY_LINX.md",
-      "source_location": "L322",
+      "source_location": "L326",
       "weight": 1.0,
       "source": "docs_faturamento_shopify_linx_5_aba_sefaz_monitor_e_envio",
       "target": "docs_faturamento_shopify_linx_envio_pelo_dashboard_implementado_17_11_2026",
@@ -391125,7 +391125,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "docs/FATURAMENTO_SHOPIFY_LINX.md",
-      "source_location": "L286",
+      "source_location": "L290",
       "weight": 1.0,
       "source": "docs_faturamento_shopify_linx_5_aba_sefaz_monitor_e_envio",
       "target": "docs_faturamento_shopify_linx_fase_1_fazer_j\u00e1_seguro",
@@ -391135,7 +391135,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "docs/FATURAMENTO_SHOPIFY_LINX.md",
-      "source_location": "L272",
+      "source_location": "L276",
       "weight": 1.0,
       "source": "docs_faturamento_shopify_linx_5_aba_sefaz_monitor_e_envio",
       "target": "docs_faturamento_shopify_linx_status_nfe",
@@ -391145,7 +391145,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "docs/FATURAMENTO_SHOPIFY_LINX.md",
-      "source_location": "L387",
+      "source_location": "L391",
       "weight": 1.0,
       "source": "docs_faturamento_shopify_linx_6_implementado_17_11_2026",
       "target": "docs_faturamento_shopify_linx_fluxo_cont\u00ednuo_importa\u00e7\u00e3o_do_shopify_17_11_2026",
@@ -394018,5 +394018,5 @@
       "source_file": "tmp_scarfme_poliester_pages.txt"
     }
   ],
-  "built_at_commit": "756e3dba8cddd89a3edef4dcecc9e741c4c7d092"
+  "built_at_commit": "341c6782cecb84ab65004b8ba300de8523881733"
 }

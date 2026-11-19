@@ -580,5 +580,7 @@
   "578": "fetchRomaneioParaEdicao",
   "579": "formatLogDate",
   "580": "chaveLinha",
-  "581": "isTipoSoSaida"
+  "581": "isTipoSoSaida",
+  "582": "detectar-transferencias-externas.ts",
+  "583": "transferencias-quantidade-real-storage.ts"
 }

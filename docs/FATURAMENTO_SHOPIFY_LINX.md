@@ -144,7 +144,7 @@ oferece abrir o PJ com os dados digitados; pedido do Shopify com CNPJ abre diret
 simulados batem campo a campo (indicador, agrupamento, ind. venda, conta, tabela,
 transportadora, condição, conceito, pontualidade, filial, IE, representante, DDD). Matriz de
 faturamento (prévia com clientes reais): WEB → pernas/NERD ok, Matriz só em SP; contribuinte
-(1/16) → só Matriz (100.05/100.08), pernas/NERD bloqueiam — igual ao histórico de NFs.
+(1/16) → só Matriz (100.05), pernas/NERD bloqueiam — igual ao histórico de NFs.
 
 ---
 
@@ -232,15 +232,19 @@ vem por último, nunca vira a principal (a principal é só entre as pernas, por
   `FILIAIS.TIPO_TRIBUTACAO` não serve (MSC e CMS, que são Simples, estão vazias). As pernas do
   rodízio continuam sempre Simples, com o cálculo de antes intocado (`valorImposto`).
 - **Naturezas** medidas nas NFs dela: 100.05 VENDA PRIVATE (dentro e fora de SP; 1.204 NFs) e
-  100.08 REVENDA (cliente indicador 16; 2.004 NFs). Nunca usou 100.02/100.022.
+  100.08 (2.004 NFs) — mas a 100.08 é **só abastecimento das lojas do próprio grupo** (100% dos
+  destinatários são filiais), feito por outra rotina do Linx que reparte base e ICMS pelo total
+  da NF. **Pela página a Matriz fatura só 100.05**; 100.08 e cliente que é filial do grupo são
+  bloqueados (19/11/2026). Nunca usou 100.02/100.022.
 - **Impostos** (`impostosRegimeNormal`): base = item − desconto + frete/seguro (pelas flags da
   exceção), redução da exceção (ICMS 33,33% em SP); taxa da exceção ou, se 0, a do ICMS da
   operação (`UNIDADES_FEDERACAO_ICMS` SP→SP 18, →RJ/MG 12, →CE/BA 7); base arredondada, valor
   truncado sobre a base exata; IBS/CBS = alíquota do tipo sobre item − ICMS − PIS − COFINS,
   arredondado; `BASE_IMPOSTO_CALC` = base. DICMS (11/71/72/73) não é gravado (como o Linx faz
-  para contribuinte). Conferência em 18/11 contra NFs reais out–nov: base 100%; ICMS 100% em
-  NF de 1 item; PIS/COFINS 2.329/2.330; IBS/CBS ~98,6%. Em NF de **vários itens** o Linx reparte
-  o ICMS do total e ~metade dessas NFs tem alguma linha ±R$ 0,01 diferente deste cálculo.
+  para contribuinte). **Conferência 19/11 com o código do gravador** sobre todas as NFs 100.05
+  gravadas desde a atualização do Linx de 24/10 (24 NFs, 57 itens, 1 e vários itens, com frete):
+  **336 de 336 linhas de imposto iguais** (taxa, base e valor). As diferenças de centavo vistas
+  antes eram só da 100.08 (outra rotina) e de NFs até 23/10 (versão anterior do Linx).
 - **Consumidor final** = só indicador 8 (empresa 1 e revenda 16 = 0); IBPT (tributos
   aproximados, OBS tipo 6) só para consumidor final. Sem OBS tipo 7 (DIFAL).
 - **Trava:** não contribuinte (indicador ≠ 1/16) de outra UF tem DIFAL → bloqueado (fature no

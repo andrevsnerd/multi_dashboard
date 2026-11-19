@@ -5630,8 +5630,8 @@
     "semantic_hash": ""
   },
   "components/faturamento-ecommerce/FaturamentoAba.tsx": {
-    "mtime": 1795023675.0468194,
-    "ast_hash": "0cd902df45875f8273a2b43d54113adc",
+    "mtime": 1795089344.9739501,
+    "ast_hash": "70840c00f3920052e56eebeb731fc18f",
     "semantic_hash": ""
   },
   "components/faturamento-ecommerce/FaturamentoEcommercePage.tsx": {
@@ -5660,28 +5660,28 @@
     "semantic_hash": ""
   },
   "lib/faturamento-ecommerce/config.ts": {
-    "mtime": 1795088625.7934775,
-    "ast_hash": "e0091d0d72526874cb980830bb888c49",
+    "mtime": 1795089313.6443698,
+    "ast_hash": "d4a4893b80f793a3e6aa4df46c460c2c",
     "semantic_hash": ""
   },
   "lib/faturamento-ecommerce/types.ts": {
-    "mtime": 1795088629.9775624,
-    "ast_hash": "fe3b28e4c934dd03f64a1ec96f0d15e2",
+    "mtime": 1795089313.650881,
+    "ast_hash": "b807000ce022bda066001bca575b65a5",
     "semantic_hash": ""
   },
   "lib/repositories/faturamentoEcommerce/clientes.ts": {
-    "mtime": 1795088656.2333193,
-    "ast_hash": "b95d2cdcecd2e0cf8d13166c864f173b",
+    "mtime": 1795089313.6520805,
+    "ast_hash": "12a0cb4dfe9ab43eb7caee1a0e1e21cc",
     "semantic_hash": ""
   },
   "lib/repositories/faturamentoEcommerce/notas.ts": {
-    "mtime": 1795023663.9251285,
-    "ast_hash": "08e55e8f5fa896f57df3cffb22433aee",
+    "mtime": 1795089344.9739501,
+    "ast_hash": "ea409a2fcd5d8aef6e69199bb37d5cd2",
     "semantic_hash": ""
   },
   "docs/FATURAMENTO_SHOPIFY_LINX.md": {
-    "mtime": 1795088857.3672898,
-    "ast_hash": "39afd4f4e1f6aa7f6db1cfd30f55cb8d",
+    "mtime": 1795089493.69948,
+    "ast_hash": "18a4a4b3cd13e4aca169816ef11d7e8a",
     "semantic_hash": ""
   },
   "app/api/faturamento-ecommerce/shopify/pedido/route.ts": {
@@ -5760,8 +5760,8 @@
     "semantic_hash": ""
   },
   "components/faturamento-ecommerce/ClientePjForm.tsx": {
-    "mtime": 1795088750.0239716,
-    "ast_hash": "6377f053444e03fc144320b4a5273c7a",
+    "mtime": 1795089344.9739501,
+    "ast_hash": "b918e9b64750ed107d03511f1d27cedc",
     "semantic_hash": ""
   },
   "lib/faturamento-ecommerce/cnpj.ts": {

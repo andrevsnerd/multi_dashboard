@@ -359,7 +359,7 @@ export default function ClientePjForm({
         matrizDaEmpresa ? (
           <p className={styles.muted}>
             Indicador {indicador} (contribuinte): a NF deste cliente sai pela <strong>{matrizDaEmpresa}</strong> (natureza{" "}
-            {indicador === "16" ? "100.08 revenda" : "100.05"}), como os corporativos no Linx — as filiais do e-commerce não
+            100.05), como os corporativos no Linx — as filiais do e-commerce não
             têm exceção fiscal de venda para contribuinte e bloqueiam.
           </p>
         ) : (

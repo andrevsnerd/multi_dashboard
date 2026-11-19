@@ -122,7 +122,6 @@ export async function fetchFiliaisNota(empresa: EmpresaFat): Promise<{ filiais: 
           simples: x ? x.simplesNacional : true,
           naturezaDentroUf: x?.naturezaDentroUf ?? padrao.naturezaDentroUf,
           naturezaForaUf: x?.naturezaForaUf ?? padrao.naturezaForaUf,
-          naturezaRevenda: x?.naturezaRevenda ?? null,
         };
       }),
       padrao: rodizio[0]?.filial ?? filiais[0],
