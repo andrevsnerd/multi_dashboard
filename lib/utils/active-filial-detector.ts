@@ -25,7 +25,8 @@ function normUpper(s: string): string {
 async function queryLastSaleVarejo(
   request: Parameters<Parameters<typeof withRequest>[0]>[0],
   members: string[],
-  suffix: string
+  suffix: string,
+  sinceByMember: Map<string, string>
 ): Promise<string | null> {
   // Busca COD_FILIAL de cada membro pelo nome e pega a venda mais recente
   const inParams = members.map((_, i) => `@m${suffix}_${i}`).join(', ');
@@ -33,11 +34,23 @@ async function queryLastSaleVarejo(
     request.input(`m${suffix}_${i}`, sql.NVarChar, normUpper(m));
   }
 
+  // Papel por período (FilialDef.since): venda de um membro ANTES do início do papel
+  // dele não é desta loja e não pode elegê-lo como ativo.
+  const sinceConds = members
+    .map((m, i) => {
+      const since = sinceByMember.get(normUpper(m));
+      if (!since || !/^\d{4}-\d{2}-\d{2}$/.test(since)) return null;
+      return `AND NOT (UPPER(RTRIM(LTRIM(fil.FILIAL))) = @m${suffix}_${i} AND v.DATA_VENDA < '${since.replace(/-/g, '')}')`;
+    })
+    .filter(Boolean)
+    .join('\n      ');
+
   const result = await request.query<{ FILIAL: string }>(`
     SELECT TOP 1 RTRIM(LTRIM(fil.FILIAL)) AS FILIAL
     FROM FILIAIS fil WITH (NOLOCK)
     INNER JOIN LOJA_VENDA v WITH (NOLOCK) ON v.CODIGO_FILIAL = fil.COD_FILIAL
     WHERE UPPER(RTRIM(LTRIM(fil.FILIAL))) IN (${inParams})
+      ${sinceConds}
     ORDER BY v.DATA_VENDA DESC
   `);
 
@@ -73,15 +86,19 @@ async function queryLastSaleEcommerce(
  *
  * @param grupos        Lista de grupos da empresa
  * @param ecommerceFilials  Nomes das filiais de e-commerce (usam FATURAMENTO)
+ * @param filialSince   Início do papel atual por nome (CompanyConfig.filialSince): venda
+ *                      anterior a ele não conta para eleger a ativa.
  * @returns Map de groupId → nome da filial ativa detectada
  */
 export async function detectActiveFilials(
   grupos: FilialGrupo[],
-  ecommerceFilials: string[]
+  ecommerceFilials: string[],
+  filialSince: Record<string, string> = {}
 ): Promise<Map<string, string>> {
   const result = new Map<string, string>();
 
   const ecommerceSet = new Set(ecommerceFilials.map(normUpper));
+  const sinceByMember = new Map(Object.entries(filialSince).map(([n, d]) => [normUpper(n), d]));
 
   // Grupos que precisam de detecção (mais de um membro)
   const toDetect = grupos.filter((g) => g.members.length > 1);
@@ -111,7 +128,7 @@ export async function detectActiveFilials(
           try {
             detected = isEcommerce
               ? await queryLastSaleEcommerce(request, grupo.members, `${i}`)
-              : await queryLastSaleVarejo(request, grupo.members, `${i}`);
+              : await queryLastSaleVarejo(request, grupo.members, `${i}`, sinceByMember);
           } catch {
             // falha individual: usa active configurado
           }

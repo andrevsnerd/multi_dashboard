@@ -3,7 +3,13 @@ import sql from "mssql";
 import { withRequest } from "@/lib/db/connection";
 import type { RequestLike } from "@/lib/db/proxy";
 import { resolveCompanyLive, liveNameForIncoming } from "@/lib/server/company-live";
-import { getFilialLabelForDisplay, isEcommerceFilial, VAREJO_VALUE } from "@/lib/config/company";
+import {
+  buildEcommerceFaturamentoFilialSql,
+  ecommerceFaturamentoDisplayName,
+  getFilialLabelForDisplay,
+  isEcommerceFilial,
+  VAREJO_VALUE,
+} from "@/lib/config/company";
 import { normalizeRangeForQuery } from "@/lib/utils/date";
 import { applyColecaoLabels } from "@/lib/repositories/colecao";
 import { ROW_COR_FIELD } from "@/lib/reports/keys";
@@ -70,6 +76,8 @@ interface RawRow {
   GRADE: string | null;
   TIPO: string | null;
   TOTAL_ROWS: number | null;
+  /** 'E' = linha do FATURAMENTO (e-commerce); 'P' = POS. */
+  CANAL: string | null;
 }
 
 /**
@@ -117,9 +125,20 @@ export async function fetchVendasHistorico(filters: ReportFilters): Promise<Repo
       posFilialClause = `AND f.FILIAL IN (${posFiliais.map((_, i) => `@vhPosF${i}`).join(", ")})`;
     }
     let ecomFilialClause = "";
-    if (includeEcom && ecommerce.length > 0) {
-      ecommerce.forEach((f, i) => request.input(`vhEcomF${i}`, sql.VarChar, f));
-      ecomFilialClause = `AND f.FILIAL IN (${ecommerce.map((_, i) => `@vhEcomF${i}`).join(", ")})`;
+    // Pernas atuais + históricas com corte de EMISSAO (papel por período: MSC foi e-commerce
+    // até 19/11/2026 e hoje é Higienópolis).
+    const ecomClause = includeEcom
+      ? buildEcommerceFaturamentoFilialSql(company, {
+          filialColumn: "f.FILIAL",
+          dateColumn: "f.EMISSAO",
+          bind: (f, i) => {
+            request.input(`vhEcomF${i}`, sql.VarChar, f);
+            return `@vhEcomF${i}`;
+          },
+        })
+      : "";
+    if (includeEcom && ecomClause) {
+      ecomFilialClause = `AND ${ecomClause}`;
     } else if (includeEcom) {
       includeEcom = false; // empresa sem filiais de e-commerce
     }
@@ -175,7 +194,8 @@ export async function fetchVendasHistorico(filters: ReportFilters): Promise<Repo
           UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, '')))) AS GRUPO,
           UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) AS SUBGRUPO,
           UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), '')))) AS GRADE,
-          UPPER(LTRIM(RTRIM(ISNULL(p.TIPO_PRODUTO, '')))) AS TIPO
+          UPPER(LTRIM(RTRIM(ISNULL(p.TIPO_PRODUTO, '')))) AS TIPO,
+          'P' AS CANAL
         FROM LOJA_VENDA_PRODUTO vp WITH (NOLOCK)
         INNER JOIN LOJA_VENDA v WITH (NOLOCK)
           ON v.CODIGO_FILIAL = vp.CODIGO_FILIAL AND v.TICKET = vp.TICKET
@@ -220,7 +240,8 @@ export async function fetchVendasHistorico(filters: ReportFilters): Promise<Repo
           UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, '')))) AS GRUPO,
           UPPER(LTRIM(RTRIM(ISNULL(p.SUBGRUPO_PRODUTO, '')))) AS SUBGRUPO,
           UPPER(LTRIM(RTRIM(ISNULL(CONVERT(VARCHAR, p.GRADE), '')))) AS GRADE,
-          UPPER(LTRIM(RTRIM(ISNULL(p.TIPO_PRODUTO, '')))) AS TIPO
+          UPPER(LTRIM(RTRIM(ISNULL(p.TIPO_PRODUTO, '')))) AS TIPO,
+          'E' AS CANAL
         FROM FATURAMENTO f WITH (NOLOCK)
         JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
           ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
@@ -264,9 +285,13 @@ export async function fetchVendasHistorico(filters: ReportFilters): Promise<Repo
 
   const rows: ReportRow[] = recordset.map((r) => {
     const corCode = (r.COR_PRODUTO ?? "").trim();
-    const filialLabel = company
-      ? getFilialLabelForDisplay(company, (r.FILIAL_RAW ?? "").trim())
-      : (r.FILIAL_RAW ?? "").trim();
+    const filialRaw = (r.FILIAL_RAW ?? "").trim();
+    // Nota de e-commerce de perna histórica (MSC) sai como E-COMMERCE, não Higienópolis.
+    const filialLabel = !company
+      ? filialRaw
+      : r.CANAL === "E" && (company.ecommerceHistory ?? []).some((h) => h.filial.trim() === filialRaw)
+        ? ecommerceFaturamentoDisplayName(company, filialRaw)
+        : getFilialLabelForDisplay(company, filialRaw);
     return {
       [ROW_COR_FIELD]: corCode, // código cru da cor (join entre análises / código de barra)
       DATA_VENDA: toIsoDate(r.DATA_VENDA),

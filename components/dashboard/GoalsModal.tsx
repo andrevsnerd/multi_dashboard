@@ -5,7 +5,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/AuthContext";
 import { canMutate } from "@/lib/auth/permissions";
 import {
+  getEcommerceSalesFilials,
   getFilialGroupMembers,
+  getGoalMembers,
   normalizeFilialLookupKey,
   resolveCompany,
   type CompanyKey,
@@ -39,7 +41,14 @@ interface GoalData {
 interface GoalRow {
   key: string;
   label: string;
+  /** Onde a meta é GRAVADA (e-commerce: dividida entre as pernas ATUAIS). */
   members: string[];
+  /**
+   * De quem a meta gravada é SOMADA na leitura. Difere de `members` pelo papel por
+   * período: fatia antiga gravada sob perna histórica do e-commerce (ex.: MSC) soma no
+   * E-COMMERCE e não na loja que ela virou. Ao salvar, essas chaves são reescritas.
+   */
+  sumMembers: string[];
   isEcommerce: boolean;
 }
 
@@ -69,6 +78,7 @@ function buildRows(companyKey: CompanyKey, hideEcommerce = false): GoalRow[] {
       key: canonical,
       label: displayNames[canonical] ?? displayNames[filial] ?? filial,
       members,
+      sumMembers: getGoalMembers(company, canonical),
       isEcommerce: false,
     });
   }
@@ -78,6 +88,7 @@ function buildRows(companyKey: CompanyKey, hideEcommerce = false): GoalRow[] {
       key: ECOMMERCE_ROW_KEY,
       label: ecommerce.map((f) => displayNames[f]).find(Boolean) ?? "E-COMMERCE",
       members: ecommerce,
+      sumMembers: getEcommerceSalesFilials(company),
       isEcommerce: true,
     });
   }
@@ -94,7 +105,7 @@ function rowValuesFromGoals(rows: GoalRow[], goals: GoalData): Record<string, nu
   }
   const result: Record<string, number> = {};
   for (const row of rows) {
-    result[row.key] = row.members.reduce(
+    result[row.key] = row.sumMembers.reduce(
       (sum, m) => sum + (byKey.get(normalizeFilialLookupKey(m)) ?? 0),
       0,
     );
@@ -234,7 +245,14 @@ export default function GoalsModal({
     try {
       // Parte do que está gravado e troca só os membros das linhas da tela: chave
       // que o modal não conhece (loja antiga/desativada) fica como estava.
-      const managed = new Set(rows.flatMap((r) => r.members.map(normalizeFilialLookupKey)));
+      // Loja: canônica + membros que somam nela (a perna histórica do e-commerce NÃO —
+      // a chave dela é do e-commerce e só a linha do e-commerce pode reescrevê-la; sem
+      // essa linha na tela, ex. supervisor, ela fica intacta).
+      const managed = new Set(
+        rows
+          .flatMap((r) => (r.isEcommerce ? [...r.members, ...r.sumMembers] : [r.key, ...r.sumMembers]))
+          .map(normalizeFilialLookupKey),
+      );
       const payload: GoalData = {};
       for (const [filial, value] of Object.entries(rawGoals)) {
         if (!managed.has(normalizeFilialLookupKey(filial))) payload[filial] = value;

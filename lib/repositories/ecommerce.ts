@@ -1,6 +1,6 @@
 import sql from 'mssql';
 
-import { type CompanyModule } from '@/lib/config/company';
+import { type CompanyModule, buildEcommerceFaturamentoFilialSql, ecommerceFaturamentoDisplayName } from '@/lib/config/company';
 import { resolveCompanyLive, liveNameForIncoming } from '@/lib/server/company-live';
 import { withRequest } from '@/lib/db/connection';
 import { RequestLike } from '@/lib/db/proxy';
@@ -49,18 +49,25 @@ export async function buildEcommerceFilialFilter(
 
   const ecommerceFilials = company.ecommerceFilials ?? [];
 
+  // Pernas atuais + pernas históricas com corte de EMISSAO (papel por período: ex.: MSC
+  // foi e-commerce até 19/11/2026 e hoje é Higienópolis).
+  const bindEcom = (filial: string, index: number) => {
+    request.input(`ecommerceFilial${index}`, sql.VarChar, filial);
+    return `@ecommerceFilial${index}`;
+  };
+  const ecommerceGroupFilter = () => {
+    const clause = buildEcommerceFaturamentoFilialSql(company, {
+      filialColumn: `${tableAlias}.FILIAL`,
+      dateColumn: `${tableAlias}.EMISSAO`,
+      bind: bindEcom,
+    });
+    return clause ? `AND ${clause}` : '';
+  };
+
   // Se uma filial específica foi selecionada
   if (specificFilial) {
     if (ecommerceFilials.includes(specificFilial)) {
-      ecommerceFilials.forEach((filial, index) => {
-        request.input(`ecommerceFilial${index}`, sql.VarChar, filial);
-      });
-
-      const placeholders = ecommerceFilials
-        .map((_, index) => `@ecommerceFilial${index}`)
-        .join(', ');
-
-      const filter = `AND ${tableAlias}.FILIAL IN (${placeholders})`;
+      const filter = ecommerceGroupFilter();
       console.log('[buildEcommerceFilialFilter] DEBUG - Grupo e-commerce selecionado:', specificFilial, 'Filter:', filter);
       return filter;
     }
@@ -80,15 +87,7 @@ export async function buildEcommerceFilialFilter(
     return '';
   }
 
-  ecommerceFilials.forEach((filial, index) => {
-    request.input(`ecommerceFilial${index}`, sql.VarChar, filial);
-  });
-
-  const placeholders = ecommerceFilials
-    .map((_, index) => `@ecommerceFilial${index}`)
-    .join(', ');
-
-  const filter = `AND ${tableAlias}.FILIAL IN (${placeholders})`;
+  const filter = ecommerceGroupFilter();
   console.log('[buildEcommerceFilialFilter] DEBUG - Filtro gerado:', filter);
   return filter;
 }
@@ -1285,11 +1284,15 @@ export async function fetchEcommerceFilialPerformance({
       return [];
     }
 
-    // Criar filtro para todas as filiais de e-commerce da empresa
-    ecommerceFilials.forEach((filial, index) => {
-      request.input(`ecommerceFilial${index}`, sql.VarChar, filial);
+    // Filtro de todas as pernas de e-commerce (atuais + históricas com corte de EMISSAO).
+    const ecommerceClause = buildEcommerceFaturamentoFilialSql(companyConfig, {
+      filialColumn: 'f.FILIAL',
+      dateColumn: 'f.EMISSAO',
+      bind: (filial, index) => {
+        request.input(`ecommerceFilial${index}`, sql.VarChar, filial);
+        return `@ecommerceFilial${index}`;
+      },
     });
-    const placeholders = ecommerceFilials.map((_, index) => `@ecommerceFilial${index}`).join(', ');
 
     const query = `
       WITH filial_revenue AS (
@@ -1304,7 +1307,7 @@ export async function fetchEcommerceFilialPerformance({
           AND CAST(f.EMISSAO AS DATE) < CAST(@endDate AS DATE)
           AND f.NOTA_CANCELADA = 0
           AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
-          AND f.FILIAL IN (${placeholders})
+          AND ${ecommerceClause}
         GROUP BY f.FILIAL
 
         UNION ALL
@@ -1320,7 +1323,7 @@ export async function fetchEcommerceFilialPerformance({
         AND CAST(f.EMISSAO AS DATE) < CAST(@prevEndDate AS DATE)
           AND f.NOTA_CANCELADA = 0
           AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
-          AND f.FILIAL IN (${placeholders})
+          AND ${ecommerceClause}
         GROUP BY f.FILIAL
       )
       SELECT
@@ -1338,8 +1341,6 @@ export async function fetchEcommerceFilialPerformance({
       previousRevenue: number | null;
     }>(query);
 
-    const displayNames = companyConfig.filialDisplayNames ?? {};
-
     return result.recordset.map((row) => {
       const current = Number(row.currentRevenue ?? 0);
       const previous = Number(row.previousRevenue ?? 0);
@@ -1356,7 +1357,8 @@ export async function fetchEcommerceFilialPerformance({
 
       return {
         filial: filial,
-        filialDisplayName: displayNames[filial] ?? filial,
+        // Perna histórica (ex.: MSC até 19/11/2026) aparece como E-COMMERCE, não pelo papel atual.
+        filialDisplayName: ecommerceFaturamentoDisplayName(companyConfig, filial),
         currentRevenue: current,
         previousRevenue: previous,
         changePercentage,

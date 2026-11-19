@@ -1,6 +1,6 @@
 import sql from 'mssql';
 
-import { isEcommerceFilial, type CompanyModule, VAREJO_VALUE } from '@/lib/config/company';
+import { isEcommerceFilial, type CompanyModule, VAREJO_VALUE, buildEcommerceFaturamentoFilialSql } from '@/lib/config/company';
 import { resolveCompanyLive, liveNameForIncoming } from '@/lib/server/company-live';
 import { withRequest } from '@/lib/db/connection';
 import { RequestLike } from '@/lib/db/proxy';
@@ -180,19 +180,18 @@ async function buildScarfmeEcommerceFilialFilterForProducts(
     return 'AND 1=0';
   }
 
-  if (ecommerceFilials.length === 0) {
-    return '';
-  }
-
-  ecommerceFilials.forEach((filialNome, index) => {
-    request.input(`${paramBase}${index}`, sql.VarChar, filialNome);
+  // Grupo e-commerce inteiro, por PERÍODO: pernas atuais + pernas históricas com corte de
+  // EMISSAO (ex.: MSC foi e-commerce até 19/11/2026 e hoje é Higienópolis).
+  const clause = buildEcommerceFaturamentoFilialSql(company, {
+    filialColumn: `${tableAlias}.FILIAL`,
+    dateColumn: `${tableAlias}.EMISSAO`,
+    bind: (value, index) => {
+      request.input(`${paramBase}${index}`, sql.VarChar, value);
+      return `@${paramBase}${index}`;
+    },
   });
 
-  const placeholders = ecommerceFilials
-    .map((_, index) => `@${paramBase}${index}`)
-    .join(', ');
-
-  return `AND ${tableAlias}.FILIAL IN (${placeholders})`;
+  return clause ? `AND ${clause}` : '';
 }
 
 async function buildFilialFilter(
@@ -1336,27 +1335,29 @@ async function fetchProductsWithDetailsEcommerce({
     if (company) {
       const companyConfig = await resolveCompanyLive(company);
       const ecommerceFilials = companyConfig?.ecommerceFilials ?? [];
-      
+      // Grupo e-commerce inteiro, por PERÍODO: pernas atuais + pernas históricas com corte
+      // de EMISSAO (ex.: MSC foi e-commerce até 19/11/2026 e hoje é Higienópolis).
+      // Só usa `f.` — o `.replace(/f\./g, 'f_check.')` abaixo continua valendo.
+      const ecommerceGroupFilter = () => {
+        const clause = buildEcommerceFaturamentoFilialSql(companyConfig, {
+          filialColumn: 'f.FILIAL',
+          dateColumn: 'f.EMISSAO',
+          bind: (value, index) => {
+            request.input(`filial${index}`, sql.VarChar, value);
+            return `@filial${index}`;
+          },
+        });
+        return clause ? `AND ${clause}` : '';
+      };
+
       if (filial && filial !== VAREJO_VALUE) {
         if (!ecommerceFilials.includes(filial)) {
           filialFilter = 'AND 1=0';
         } else {
-          ecommerceFilials.forEach((ecommerceFilial, index) => {
-            request.input(`filial${index}`, sql.VarChar, ecommerceFilial);
-          });
-          const placeholders = ecommerceFilials
-            .map((_, index) => `@filial${index}`)
-            .join(', ');
-          filialFilter = `AND f.FILIAL IN (${placeholders})`;
+          filialFilter = ecommerceGroupFilter();
         }
-      } else if (ecommerceFilials.length > 0) {
-        ecommerceFilials.forEach((filial, index) => {
-          request.input(`filial${index}`, sql.VarChar, filial);
-        });
-        const placeholders = ecommerceFilials
-          .map((_, index) => `@filial${index}`)
-          .join(', ');
-        filialFilter = `AND f.FILIAL IN (${placeholders})`;
+      } else {
+        filialFilter = ecommerceGroupFilter();
       }
     }
 

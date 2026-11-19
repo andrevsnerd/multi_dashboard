@@ -6,7 +6,12 @@ import { fetchSalesTotals } from "@/lib/services/salesTotals";
 import { fetchCollectionComparativeExtras } from "@/lib/repositories/collectionReport";
 import { getColecaoDescMap, getColecaoInicioMatrizMap } from "@/lib/repositories/colecao";
 import { resolveCompanyLive } from "@/lib/server/company-live";
-import { VAREJO_VALUE, type CompanyKey } from "@/lib/config/company";
+import {
+  buildEcommerceFaturamentoFilialSql,
+  VAREJO_VALUE,
+  type CompanyConfig,
+  type CompanyKey,
+} from "@/lib/config/company";
 import { PAINEL_COLECOES, type PainelColecaoConfig } from "@/lib/config/painel-colecoes";
 import { normalizeRangeForQuery, type NormalizedRange } from "@/lib/utils/date";
 
@@ -174,7 +179,8 @@ async function fetchSkusCadastradosPorCodigo(
 async function fetchEcommerceVendasPorColecao(
   codes: string[],
   ecommerceFilials: string[],
-  range: NormalizedRange
+  range: NormalizedRange,
+  companyConfig: CompanyConfig | null
 ): Promise<Map<string, { vendas: number; qtd: number }>> {
   const out = new Map<string, { vendas: number; qtd: number }>();
   if (codes.length === 0 || ecommerceFilials.length === 0) return out;
@@ -183,10 +189,19 @@ async function fetchEcommerceVendasPorColecao(
     req.input("ecStart", sql.DateTime, range.start);
     req.input("ecEnd", sql.DateTime, range.end);
     codes.forEach((c, i) => req.input(`ecCol${i}`, sql.VarChar, c));
-    ecommerceFilials.forEach((f, i) => req.input(`ecFil${i}`, sql.VarChar, f));
 
     const colPlaceholders = codes.map((_, i) => `@ecCol${i}`).join(", ");
-    const filPlaceholders = ecommerceFilials.map((_, i) => `@ecFil${i}`).join(", ");
+    // Pernas atuais do escopo + históricas com corte de EMISSAO (papel por período: MSC foi
+    // e-commerce até 19/11/2026 e hoje é Higienópolis).
+    const filClause = buildEcommerceFaturamentoFilialSql(companyConfig, {
+      filialColumn: "f.FILIAL",
+      dateColumn: "f.EMISSAO",
+      current: ecommerceFilials,
+      bind: (f, i) => {
+        req.input(`ecFil${i}`, sql.VarChar, f);
+        return `@ecFil${i}`;
+      },
+    });
 
     const result = await req.query<{
       colecao: string;
@@ -205,7 +220,7 @@ async function fetchEcommerceVendasPorColecao(
          AND CAST(f.EMISSAO AS DATE) < CAST(@ecEnd AS DATE)
          AND f.NOTA_CANCELADA = 0
          AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
-         AND f.FILIAL IN (${filPlaceholders})
+         AND ${filClause}
          AND UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, '')))) IN (${colPlaceholders})
        GROUP BY UPPER(LTRIM(RTRIM(ISNULL(p.COLECAO, ''))))`
     );
@@ -297,7 +312,8 @@ export async function GET(request: Request) {
       const ecomByCode = await fetchEcommerceVendasPorColecao(
         uniqueCodes,
         ecomFilials,
-        normRange
+        normRange,
+        companyLive
       ).catch((err) => {
         console.error("painel-colecoes: falha e-commerce", err);
         return new Map<string, { vendas: number; qtd: number }>();

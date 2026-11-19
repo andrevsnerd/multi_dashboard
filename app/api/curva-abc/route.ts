@@ -17,7 +17,7 @@ import { buildDescontinuadoKeySet, isProdutoDescontinuado } from '@/lib/utils/pr
 import { listProdutosAposta } from '@/lib/utils/produto-aposta-store';
 import { buildApostaKeySet, isProdutoAposta } from '@/lib/utils/produtos-aposta';
 import { readGoals } from '@/lib/utils/goals-storage';
-import { type CompanyKey, VAREJO_VALUE } from '@/lib/config/company';
+import { type CompanyKey, VAREJO_VALUE, getGoalMembers, getVarejoGoalFilials } from '@/lib/config/company';
 import { resolveCompanyDynamic } from '@/lib/config/company-server';
 import { normalizeRangeForQuery, formatDateForQuery } from '@/lib/utils/date';
 import { fetchSalesTotals } from '@/lib/services/salesTotals';
@@ -492,7 +492,9 @@ export async function GET(request: Request) {
     const vendas = globalTotals.vendas;
     const vendasPrevious = globalTotals.vendasPrevious;
     const qtde = globalTotals.qtde;
-    const meta = groupMembers.reduce((s, f) => s + (monthGoals[f] ?? 0), 0);
+    // Meta: papel por período (fatia antiga da MSC soma no e-commerce, não na Higienópolis).
+    const metaKeys = isVarejo ? getVarejoGoalFilials(company) : getGoalMembers(company, selectedFilialKey);
+    const meta = metaKeys.reduce((s, f) => s + (monthGoals[f] ?? 0), 0);
     const projecao = daysElapsed > 0 ? (vendas / daysElapsed) * totalDaysInMonth : vendas;
     const projecaoPct = meta > 0 ? (projecao / meta) * 100 : null;
 

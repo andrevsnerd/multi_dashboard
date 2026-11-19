@@ -5,7 +5,7 @@ import type { RequestLike } from "@/lib/db/proxy";
 import { buildFilialFilter } from "@/lib/repositories/clientes";
 import { buildEcommerceFilialFilter } from "@/lib/repositories/ecommerce";
 import { liveNameForIncoming, resolveCompanyLive } from "@/lib/server/company-live";
-import { getFilialLabelForDisplay, VAREJO_VALUE } from "@/lib/config/company";
+import { ecommerceFaturamentoDisplayName, getFilialLabelForDisplay, VAREJO_VALUE } from "@/lib/config/company";
 import { MAX_TAMANHOS_GRADE } from "@/lib/utils/grade-tamanhos";
 import { normalizeRangeForQuery } from "@/lib/utils/date";
 import type {
@@ -754,7 +754,14 @@ export async function fetchTickets(filters: ReportFilters): Promise<ReportResult
         key,
         canal: item.canal,
         codigoFilial: item.codigoFilial,
-        filialLabel: company ? getFilialLabelForDisplay(company, item.filial) : item.filial,
+        // Nota de e-commerce de perna histórica (ex.: MSC até 19/11/2026) sai como E-COMMERCE,
+        // não pelo papel atual da filial (Higienópolis).
+        filialLabel: !company
+          ? item.filial
+          : item.canal === "ECOMMERCE" &&
+              (company.ecommerceHistory ?? []).some((h) => h.filial.trim() === item.filial.trim())
+            ? ecommerceFaturamentoDisplayName(company, item.filial)
+            : getFilialLabelForDisplay(company, item.filial),
         ticket: item.ticket,
         dataVenda: item.dataVenda,
         vendedor: item.vendedor,

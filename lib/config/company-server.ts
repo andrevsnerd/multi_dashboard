@@ -29,7 +29,11 @@ async function applyGruposToConfig(
   );
 
   // Detecta a filial ativa de cada grupo pela venda mais recente
-  const detectedActives = await detectActiveFilials(gruposVivos, base.ecommerceFilials ?? []);
+  const detectedActives = await detectActiveFilials(
+    gruposVivos,
+    base.ecommerceFilials ?? [],
+    base.filialSince ?? {}
+  );
 
   // Substitui o campo active de cada grupo pelo detectado
   const gruposComAtivo = gruposVivos.map((g) => ({
@@ -127,7 +131,8 @@ export async function detectActiveFilialIdsByCompany(
 
   const detectedActives = await detectActiveFilials(
     gruposVivos,
-    base.ecommerceFilials ?? []
+    base.ecommerceFilials ?? [],
+    base.filialSince ?? {}
   );
 
   // detectActiveFilials devolve NOMES vivos; converte de volta para COD_FILIAL.

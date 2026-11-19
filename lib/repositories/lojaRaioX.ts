@@ -15,6 +15,7 @@
 import sql from "mssql";
 
 import {
+  buildEcommerceFaturamentoFilialSql,
   getFilialGroupMembers,
   getFilialLabelForDisplay,
   getOperationalFilials,
@@ -458,13 +459,25 @@ export async function fetchFaturamentoMensalLoja(params: {
   const end = monthRange(meses[meses.length - 1].ym).end;
   const ecom = isEcommerceFilial(company, filial);
   const names = await filiaisEscopo(company, filial);
+  const cfg = ecom ? await resolveCompanyLive(company) : null;
 
   const rows = await withRequest(async (request) => {
     request.input("lxStart", sql.DateTime, start);
     request.input("lxEnd", sql.DateTime, end);
 
     if (ecom) {
-      const filialFilter = buildFilialIn(request, names, "f", "lxEf");
+      // Grupo e-commerce inteiro: pernas atuais + históricas com corte de EMISSAO
+      // (MSC foi e-commerce até 19/11/2026 e hoje é Higienópolis).
+      const ecomClause = buildEcommerceFaturamentoFilialSql(cfg, {
+        filialColumn: "f.FILIAL",
+        dateColumn: "f.EMISSAO",
+        current: names,
+        bind: (value, index) => {
+          request.input(`lxEf${index}`, sql.VarChar, value);
+          return `@lxEf${index}`;
+        },
+      });
+      const filialFilter = ecomClause ? `AND ${ecomClause}` : "";
       const query = `
         SELECT
           YEAR(f.EMISSAO) AS y,

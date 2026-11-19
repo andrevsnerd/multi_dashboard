@@ -37,6 +37,22 @@ export interface FilialDef {
   group?: string;
   /** Override de lead time de reposição (dias). Ausente = usa default da empresa. */
   leadTimeDays?: number;
+  /**
+   * PAPEL POR PERÍODO — início (YYYY-MM-DD, inclusive) do papel descrito nesta entrada
+   * (display/group/ecommerce). Venda anterior a esta data NÃO é desta loja. Hoje garantido
+   * pelo detector de filial ativa (só conta venda ≥ since) e pelo fato de a filial não ter
+   * LOJA_VENDA antes da data — confira com `node scripts/conferir-filiais-por-periodo.mjs`.
+   */
+  since?: string;
+  /**
+   * PAPEL ANTERIOR de e-commerce: a filial foi perna do e-commerce ATÉ esta data
+   * (YYYY-MM-DD, EXCLUSIVE). As NFs 100.02/100.022 dela com EMISSAO < ecommerceUntil
+   * continuam somando como E-COMMERCE (histórico, só leitura); dali em diante ela não é
+   * mais e-commerce — não entra no rodízio, na emissão de NF nem no estoque do e-commerce.
+   * Todo filtro de FATURAMENTO de e-commerce aplica o corte via
+   * `buildEcommerceFaturamentoFilialSql` (lib/config/company.ts).
+   */
+  ecommerceUntil?: string;
 }
 
 export interface FilialGroupDef {
@@ -75,8 +91,16 @@ export const FILIAIS: FilialDef[] = [
   { id: '000079', company: 'scarfme', display: 'GUARULHOS',    dbNameFallback: 'GUARULHOS - RSR',            modules: ['sales', 'inventory'] },
   { id: '000059', company: 'scarfme', display: 'IGUATEMI',     dbNameFallback: 'IGUATEMI SP - JJJ',          modules: ['sales', 'inventory'] },
   { id: '000055', company: 'scarfme', display: 'MORUMBI',      dbNameFallback: 'MORUMBI - JJJ',              modules: ['sales', 'inventory'] },
-  { id: '000062', company: 'scarfme', display: 'OSCAR FREIRE', dbNameFallback: 'OSCAR FREIRE - FSZ',         modules: ['sales', 'inventory'] },
-  { id: '000038', company: 'scarfme', display: 'HIGIENÓPOLIS', dbNameFallback: 'SCARF ME - HIGIENOPOLIS 2',  modules: ['sales', 'inventory'] },
+  { id: '000062', company: 'scarfme', display: 'OSCAR FREIRE', dbNameFallback: 'OSCAR FREIRE - FSZ',         modules: ['sales', 'inventory'], group: 'oscar-freire' },
+  // FFFR: passa a faturar a OSCAR FREIRE a partir de 19/11/2026 (zerada pelo dono no mesmo
+  // dia). Vira a ativa do grupo sozinha quando a 1ª venda dela cair (detector por venda).
+  { id: '000110', company: 'scarfme', display: 'OSCAR FREIRE', dbNameFallback: 'FFFR COMERCIO DE LENCOS L',  modules: ['sales', 'inventory'], group: 'oscar-freire', since: '2026-11-19' },
+  { id: '000038', company: 'scarfme', display: 'HIGIENÓPOLIS', dbNameFallback: 'SCARF ME - HIGIENOPOLIS 2',  modules: ['sales', 'inventory'], group: 'higienopolis-scarfme' },
+  // MSC: foi perna do E-COMMERCE (rodízio MSC↔AKS, NFs 100.02/100.022 de 02/02 a 30/06/2026)
+  // e a partir de 19/11/2026 é a HIGIENÓPOLIS da Scarf Me. Histórico de e-commerce (EMISSAO
+  // < 19/11/2026) continua E-COMMERCE via `ecommerceUntil`; tudo vendido dali em diante é
+  // Higienópolis. NÃO é mais membro do grupo ecommerce-scarfme: fora do rodízio e da emissão.
+  { id: '000111', company: 'scarfme', display: 'HIGIENÓPOLIS', dbNameFallback: 'MSC COMERCIO DE LENCOS LT',  modules: ['sales', 'inventory'], group: 'higienopolis-scarfme', since: '2026-11-19', ecommerceUntil: '2026-11-19' },
   // IBIRAPUERA: loja DESATIVADA. Entrada mantida só para o histórico resolver o nome
   // pelo ID; modules vazio = fora de todos os filtros operacionais (sales E inventory),
   // some das listas, colunas por filial, KPIs e queries (FILIAL IN ... não a inclui).
@@ -90,9 +114,9 @@ export const FILIAIS: FilialDef[] = [
   { id: '000083', company: 'scarfme', display: 'E-COMMERCE',   dbNameFallback: 'SCARF ME - MATRIZ LLL',      modules: ['sales', 'inventory'], ecommerce: true, group: 'ecommerce-scarfme', leadTimeDays: 2 },
   { id: '000082', company: 'scarfme', display: 'E-COMMERCE',   dbNameFallback: 'SCARF ME MATRIZ - FFF',      modules: ['sales', 'inventory'], ecommerce: true, group: 'ecommerce-scarfme', leadTimeDays: 2 },
   { id: '000085', company: 'scarfme', display: 'VILLA LOBOS',  dbNameFallback: 'VILLA LOBOS - LLL',          modules: ['sales', 'inventory'] },
-  { id: '000111', company: 'scarfme', display: 'E-COMMERCE',   dbNameFallback: 'MSC COMERCIO DE LENCOS LT',  modules: ['sales', 'inventory'], ecommerce: true, group: 'ecommerce-scarfme' },
-  // AKS alterna com a MSC a cada ~15 dias (rodízio fiscal). Só uma emite por vez;
+  // AKS alterna com as outras pernas (rodízio fiscal). Só uma emite por vez;
   // a filial ativa do grupo é detectada por EMISSAO mais recente (active-filial-detector).
+  // (A MSC 000111 saiu do rodízio em 19/11/2026 — virou Higienópolis, ver acima.)
   { id: '000118', company: 'scarfme', display: 'E-COMMERCE',   dbNameFallback: 'AKS COMERCIO DE LENCOS LT',  modules: ['sales', 'inventory'], ecommerce: true, group: 'ecommerce-scarfme' },
   { id: '000109', company: 'scarfme', display: 'GALEÃO RJ',    dbNameFallback: 'SCARFME LLL -  GALEAO RJ',   modules: ['sales', 'inventory'] },
 ];
@@ -114,11 +138,17 @@ export const FILIAL_GROUPS: FilialGroupDef[] = [
   { id: 'morumbi-1',         company: 'nerd',    display: 'MORUMBI 1',  memberIds: ['000099', '000116'],                     activeId: '000099' },
   { id: 'morumbi-2',         company: 'nerd',    display: 'MORUMBI 2',  memberIds: ['000115'],                               activeId: '000115' },
   { id: 'paulista',          company: 'scarfme', display: 'PAULISTA',   memberIds: ['000088', '000046', '000112', '000117'], activeId: '000117' },
+  // Troca de CNPJ em 19/11/2026: a nova (000110 FFFR / 000111 MSC) vira a ativa sozinha na
+  // 1ª venda (detector por LOJA_VENDA ≥ since); até lá segue a antiga. Fallback = a antiga.
+  { id: 'oscar-freire',         company: 'scarfme', display: 'OSCAR FREIRE', memberIds: ['000062', '000110'], activeId: '000062' },
+  { id: 'higienopolis-scarfme', company: 'scarfme', display: 'HIGIENÓPOLIS', memberIds: ['000038', '000111'], activeId: '000038' },
   // activeId aqui é só o FALLBACK (usado quando a detecção viva falha) — a canônica
   // real vem de active-filial-detector por EMISSAO mais recente, porque MSC↔AKS
   // alternam a cada ~15 dias. Mantenha em dia com a perna que está faturando: um
   // fallback defasado faz o estoque do grupo cair para o CNPJ parado.
-  { id: 'ecommerce-scarfme', company: 'scarfme', display: 'E-COMMERCE', memberIds: ['000108', '000083', '000082', '000111', '000118'], activeId: '000118' },
+  // 000111 (MSC) saiu em 19/11/2026 — virou Higienópolis; o histórico de e-commerce dela
+  // entra pelo `ecommerceUntil` da FilialDef, não por ser membro daqui.
+  { id: 'ecommerce-scarfme', company: 'scarfme', display: 'E-COMMERCE', memberIds: ['000108', '000083', '000082', '000118'], activeId: '000118' },
 ];
 
 // ── Configurações por empresa ──────────────────────────────────────────────────

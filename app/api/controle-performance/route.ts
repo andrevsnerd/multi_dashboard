@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { fetchPerformanceData } from '@/lib/repositories/performance';
 import { readGoals } from '@/lib/utils/goals-storage';
-import { type CompanyKey } from '@/lib/config/company';
+import { type CompanyKey, getGoalMembers } from '@/lib/config/company';
 import { resolveCompanyLive } from '@/lib/server/company-live';
 import { normalizeRangeForQuery, formatDateForQuery } from '@/lib/utils/date';
 
@@ -228,7 +228,8 @@ export async function GET(request: Request) {
 
       // Sum goals for all members of the group
       const groupMembers = canonicalToMembers.get(filial) ?? [filial];
-      const meta = groupMembers.reduce((s, f) => s + (monthGoals[f] ?? 0), 0);
+    // Meta: papel por período (fatia antiga da MSC soma no e-commerce, não na Higienópolis).
+      const meta = getGoalMembers(company, filial).reduce((s, f) => s + (monthGoals[f] ?? 0), 0);
 
       const projecao = daysElapsed > 0 ? (vendas / daysElapsed) * totalDaysInMonth : vendas;
       const projecaoPct = meta > 0 ? (projecao / meta) * 100 : null;

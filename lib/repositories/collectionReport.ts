@@ -1,6 +1,7 @@
 import sql from "mssql";
 
 import {
+  buildEcommerceFaturamentoFilialSql,
   getFilialLabelForDisplay,
   isEcommerceFilial,
   VAREJO_VALUE,
@@ -190,24 +191,25 @@ async function buildEcommerceFilialFilter(
 
   const ecommerceFiliais = company.ecommerceFilials ?? [];
 
-  if (filial) {
+  // Filial específica que NÃO é perna de e-commerce: recorte exato, como sempre.
+  if (filial && !ecommerceFiliais.includes(filial)) {
     request.input(`${paramPrefix}Filial`, sql.VarChar, filial);
     return `AND ${tableAlias}.FILIAL = @${paramPrefix}Filial`;
   }
 
-  if (ecommerceFiliais.length === 0) {
-    return "";
-  }
-
-  ecommerceFiliais.forEach((value, index) => {
-    request.input(`${paramPrefix}Filial${index}`, sql.VarChar, value);
+  // E-commerce inteiro (sem filial ou uma perna do grupo — mesma semântica de
+  // `fetchProductsWithDetails`), por PERÍODO: pernas atuais + históricas com corte de
+  // EMISSAO (ex.: MSC foi e-commerce até 19/11/2026 e hoje é Higienópolis).
+  const clause = buildEcommerceFaturamentoFilialSql(company, {
+    filialColumn: `${tableAlias}.FILIAL`,
+    dateColumn: `${tableAlias}.EMISSAO`,
+    bind: (value, index) => {
+      request.input(`${paramPrefix}Filial${index}`, sql.VarChar, value);
+      return `@${paramPrefix}Filial${index}`;
+    },
   });
 
-  const placeholders = ecommerceFiliais
-    .map((_, index) => `@${paramPrefix}Filial${index}`)
-    .join(", ");
-
-  return `AND ${tableAlias}.FILIAL IN (${placeholders})`;
+  return clause ? `AND ${clause}` : "";
 }
 
 /**
@@ -543,6 +545,8 @@ export async function fetchCollectionReport({
       const skuK = canonicalKey(r.produto, r.cor || null);
       const meta = skuMeta.get(skuK);
       if (!meta) continue; // fora desta coleção
+      // Linha de FATURAMENTO de perna histórica (ex.: MSC até 19/11/2026) já volta de
+      // `fetchProdutoQtdePorFilial` rotulada com a perna de e-commerce atual.
       const isEcom = ecommerceFilials.has(r.filial);
       const channel: ReportChannel = isEcom ? "E-commerce" : "Varejo";
       const origin = getFilialLabelForDisplay(companyLive, r.filial) || channel;

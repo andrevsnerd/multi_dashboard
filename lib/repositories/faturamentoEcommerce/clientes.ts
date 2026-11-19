@@ -14,6 +14,7 @@ import {
   regiaoDaUf,
   type EmpresaFat,
 } from "@/lib/faturamento-ecommerce/config";
+import { fetchCatalogoNotas } from "./catalogo";
 import { filiaisExtrasDaEmpresa, filiaisNotaDaEmpresa, sqlUltimaNfEcommerce } from "./filiais-nota";
 import type {
   ClienteAtualizacaoInput,
@@ -199,6 +200,7 @@ export async function fetchFatLookups(empresa: EmpresaFat): Promise<FatLookups> 
     regioes: REGIOES.map((r) => ({ value: r, label: r })),
     infoPgto: INFO_PGTO_OPCOES,
     proximoCodigoCliente: prox[0]?.prox ? String(prox[0].prox).padStart(6, "0") : "",
+    catalogo: await fetchCatalogoNotas(empresa),
   };
 }
 
@@ -306,7 +308,8 @@ export async function fetchClienteFat(codigo: string): Promise<ClienteFatDetalhe
         LTRIM(RTRIM(ca.CTB_CONTA_CONTABIL)) AS conta, LTRIM(RTRIM(ca.REGIAO)) AS regiao,
         (SELECT TOP 1 LTRIM(RTRIM(cr.REPRESENTANTE)) FROM CLIENTE_REPRE cr WITH (NOLOCK)
           WHERE cr.CLIENTE_ATACADO = ca.CLIENTE_ATACADO ORDER BY cr.REPRESENTANTE_PRINCIPAL DESC) AS representante,
-        cf.CADASTRAMENTO AS cadastramento
+        cf.CADASTRAMENTO AS cadastramento,
+        CASE WHEN EXISTS (SELECT 1 FROM FILIAIS fx WITH (NOLOCK) WHERE fx.FILIAL = cf.NOME_CLIFOR) THEN 1 ELSE 0 END AS ehFilial
       FROM CADASTRO_CLI_FOR cf WITH (NOLOCK)
       LEFT JOIN CLIENTES_ATACADO ca WITH (NOLOCK) ON ca.CLIENTE_ATACADO = cf.NOME_CLIFOR
       WHERE cf.CLIFOR = @cod`);
@@ -349,6 +352,7 @@ export async function fetchClienteFat(codigo: string): Promise<ClienteFatDetalhe
     regiao: s("regiao"),
     representante: s("representante"),
     cadastramento: iso(x.cadastramento as Date | null),
+    ehFilial: Number(x.ehFilial) === 1,
   };
 }
 

@@ -2,6 +2,7 @@
 
 import { useMemo, useState, type FormEvent } from "react";
 
+import { consumidorFinalPadrao, naturezaPadrao, naturezasDoDestino } from "@/lib/faturamento-ecommerce/catalogo";
 import { PADROES, type EmpresaFat } from "@/lib/faturamento-ecommerce/config";
 import type {
   ClienteFatDetalhe,
@@ -76,6 +77,8 @@ interface ItemTela {
   qtde: number;
   preco: number;
   estoque: number | null;
+  /** Observação do item (FATURAMENTO_PROD.DESC_VENDA_CLIENTE / FATURAMENTO_ITEM.OBS_ITEM), por produto × cor. */
+  obs?: string;
 }
 
 /** "1.234,56" e "1234,56" → vírgula decimal; "198.00" → ponto decimal. */
@@ -121,6 +124,9 @@ function NovaNota({
   // Do Shopify o desconto vem em R$ (soma dos descontos dos itens), como o operador digita no Linx.
   const [descModo, setDescModo] = useState<"percentual" | "valor">(pedido ? "valor" : "percentual");
   const [desc, setDesc] = useState(pedido ? numTxt(pedido.descontoItens) : "0");
+  // 2º desconto do form do Linx: "desconto na condição de pagamento" (sobre o valor já com o 1º).
+  const [descCondModo, setDescCondModo] = useState<"percentual" | "valor">("percentual");
+  const [descCond, setDescCond] = useState("0");
   const [pesoLiq, setPesoLiq] = useState(numTxt(padrao.pesoLiquido));
   const [pesoBruto, setPesoBruto] = useState(numTxt(padrao.pesoBruto));
   const [volumes, setVolumes] = useState(String(padrao.volumes));
@@ -144,6 +150,8 @@ function NovaNota({
   const [pedidoBusca, setPedidoBusca] = useState("");
   const [importando, setImportando] = useState(false);
   const [confirmarDup, setConfirmarDup] = useState(false);
+  // Agrupamento dos itens na NF (opção do form do Linx): 2 = por tamanho é o de ~99% das NFs.
+  const [agrupamento, setAgrupamento] = useState<0 | 1 | 2 | 3 | 4 | 5>(2);
 
   const [codigoCliente, setCodigoCliente] = useState("");
   const [erroCliente, setErroCliente] = useState<string | null>(null);
@@ -157,11 +165,42 @@ function NovaNota({
   const [confirmando, setConfirmando] = useState(false);
   const [enviarGravada, setEnviarGravada] = useState(false);
 
-  // Natureza automática pela filial (e-commerce 100.02/100.022; Matriz 100.05) e pela UF do cliente.
+  // Catálogo: as naturezas que esta filial já emitiu no Linx (desde 2025). A sugerida é a mais
+  // usada para o indicador fiscal e a UF do cliente; as outras ficam disponíveis.
+  // NF para loja/filial do grupo (abastecimento) tem catálogo próprio; cliente comum, o outro.
+  const destino: "cliente" | "filial" = cliente?.ehFilial ? "filial" : "cliente";
+  const catalogoFilial = naturezasDoDestino(lookups.catalogo?.[filial] ?? [], destino);
+  const dentroUf = !(cliente && cliente.endereco.uf && cliente.endereco.uf !== ufFilial);
+  const indCliente = cliente?.indicadorFiscal || "8";
   const natDentro = filialInfo?.naturezaDentroUf ?? padrao.naturezaDentroUf;
   const natFora = filialInfo?.naturezaForaUf ?? padrao.naturezaForaUf;
-  const naturezaAuto = cliente && cliente.endereco.uf && cliente.endereco.uf !== ufFilial ? natFora : natDentro;
+  const naturezaAuto = naturezaPadrao(catalogoFilial, indCliente, dentroUf, destino) ?? (dentroUf ? natDentro : natFora);
   const natureza = naturezaManual ?? naturezaAuto;
+  const naturezaInfo = catalogoFilial.find((x) => x.natureza === natureza);
+
+  // Consumidor final: o mais comum no histórico para a natureza e o indicador do cliente; editável.
+  const [cfManual, setCfManual] = useState<boolean | null>(null);
+  const cfAuto = consumidorFinalPadrao(naturezaInfo, indCliente) ?? (filialInfo?.simples !== false || indCliente === "8");
+  const consumidorFinal = cfManual ?? cfAuto;
+
+  // Trocou filial/natureza: o cabeçalho volta aos padrões dessa natureza (o mais comum nas NFs
+  // reais dela). Ajuste de estado durante o render — padrão do React para "estado derivado".
+  const chavePadroes = `${filial}|${natureza}`;
+  const [chaveAplicada, setChaveAplicada] = useState<string | null>(null);
+  if (chavePadroes !== chaveAplicada) {
+    setChaveAplicada(chavePadroes);
+    const pd = naturezaInfo?.padroes;
+    if (pd) {
+      setCondicao(pd.condicaoPgto || padrao.condicaoPgto);
+      setTipoFrete(pd.tipoFrete || padrao.tipoFrete);
+      setTransp(pd.transportadora || padrao.transportadora);
+      setRedesp(pd.transpRedespacho || pd.transportadora || padrao.transpRedespacho);
+      setInfoPgto(pd.infoPgto || padrao.infoPgto);
+      setTipoVolume(pd.tipoVolume || padrao.tipoVolume);
+    }
+    setCfManual(null);
+  }
+  const pd = naturezaInfo?.padroes;
 
   const nota: NotaInput = useMemo(
     () => ({
@@ -178,16 +217,21 @@ function NovaNota({
       descontoModo: descModo,
       descontoPercentual: descModo === "percentual" ? n(desc) : 0,
       descontoValor: descModo === "valor" ? n(desc) : 0,
+      descontoCondModo: n(descCond) > 0 ? descCondModo : undefined,
+      descontoCondPercentual: descCondModo === "percentual" ? n(descCond) : 0,
+      descontoCondValor: descCondModo === "valor" ? n(descCond) : 0,
       pesoLiquido: n(pesoLiq),
       pesoBruto: n(pesoBruto),
       volumes: Math.round(n(volumes)),
       tipoVolume,
       infoPgto,
       obs: obs === "#" ? "" : obs,
-      itens: itens.map((i) => ({ produto: i.produto, cor: i.cor, tamanho: i.tamanho, qtde: i.qtde, preco: i.preco })),
+      itens: itens.map((i) => ({ produto: i.produto, cor: i.cor, tamanho: i.tamanho, qtde: i.qtde, preco: i.preco, obs: i.obs ?? "" })),
       confirmarDuplicidade: confirmarDup,
+      consumidorFinal,
+      agrupamento,
     }),
-    [empresa, filial, natureza, cliente, condicao, tipoFrete, transp, redesp, frete, seguro, descModo, desc, pesoLiq, pesoBruto, volumes, tipoVolume, infoPgto, obs, itens, confirmarDup]
+    [empresa, filial, natureza, cliente, condicao, tipoFrete, transp, redesp, frete, seguro, descModo, desc, descCondModo, descCond, pesoLiq, pesoBruto, volumes, tipoVolume, infoPgto, obs, itens, confirmarDup, consumidorFinal, agrupamento]
   );
   const assinatura = JSON.stringify(nota);
   const previaValida = previa !== null && previaAssinatura === assinatura;
@@ -459,35 +503,67 @@ function NovaNota({
                 </span>
               ))
             )}
-            {matrizExtra && !filialInfo?.extra && (cliente?.indicadorFiscal === "1" || cliente?.indicadorFiscal === "16") && (
-              <span className={styles.avisoBox}>
-                Cliente contribuinte (indicador {cliente.indicadorFiscal}): no Linx ele sai pela {matrizExtra.filial} — as filiais
-                do e-commerce não têm exceção de venda para contribuinte.{" "}
-                <button type="button" className={`${styles.btnPrimario} ${styles.btnMini}`} onClick={() => setFilial(matrizExtra.filial)}>
-                  Usar {matrizExtra.rotulo ?? "MATRIZ"}
-                </button>
-              </span>
-            )}
+            {cliente &&
+              cliente.indicadorFiscal !== "8" &&
+              (natureza === "100.02" || natureza === "100.022") &&
+              (() => {
+                // Contribuinte com natureza de venda a NÃO contribuinte: não há exceção fiscal. No Linx
+                // ele sai pela 100.01 nesta filial ou pela Matriz (100.05) — o que o catálogo tiver.
+                const v10001 = catalogoFilial.find((x) => x.natureza === "100.01" && x.validada);
+                if (!v10001 && !matrizExtra) return null;
+                return (
+                  <span className={styles.avisoBox}>
+                    Cliente contribuinte (indicador {cliente.indicadorFiscal}): a {natureza} é venda a não contribuinte. No
+                    Linx esse cliente sai por {v10001 ? "100.01 nesta filial" : ""}
+                    {v10001 && matrizExtra ? " ou " : ""}
+                    {matrizExtra ? `pela ${matrizExtra.filial}` : ""}.{" "}
+                    {v10001 && (
+                      <button type="button" className={`${styles.btnPrimario} ${styles.btnMini}`} onClick={() => setNaturezaManual("100.01")}>
+                        Usar 100.01
+                      </button>
+                    )}{" "}
+                    {matrizExtra && !filialInfo?.extra && (
+                      <button type="button" className={`${styles.btn} ${styles.btnMini}`} onClick={() => setFilial(matrizExtra.filial)}>
+                        Usar {matrizExtra.rotulo ?? "MATRIZ"}
+                      </button>
+                    )}
+                  </span>
+                );
+              })()}
           </label>
           <label className={`${styles.campo} ${styles.span2}`}>
-            <span className={styles.label}>Natureza {naturezaManual === null && cliente ? "(pela UF do cliente)" : ""}</span>
+            <span className={styles.label}>
+              Natureza {naturezaManual === null && cliente ? "(a mais usada para este cliente)" : ""}
+            </span>
             <select
               className={`${styles.select} ${natureza !== naturezaAuto ? styles.inputAlterado : ""}`}
               value={natureza}
               onChange={(e) => setNaturezaManual(e.target.value)}
             >
-              {lookups.naturezas.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
+              {!naturezaInfo && <option value={natureza}>{natureza}</option>}
+              {catalogoFilial.map((o) => (
+                <option key={o.natureza} value={o.natureza}>
+                  {o.natureza} - {o.descricao} · {o.nfs} NF{o.nfs === 1 ? "" : "s"}
+                  {o.validada ? "" : " · em validação"}
                 </option>
               ))}
             </select>
+            {naturezaInfo && !naturezaInfo.validada && (
+              <span className={styles.muted}>
+                Esta natureza existe no Linx para esta filial, mas a página ainda não reproduz as NFs dela centavo a
+                centavo — não grava até ser validada.
+              </span>
+            )}
           </label>
-          <Sel label="Cond. pagamento" value={condicao} onChange={setCondicao} opcoes={lookups.condicoesPgto} padrao={padrao.condicaoPgto} />
-          <Sel label="Tipo de frete" value={tipoFrete} onChange={setTipoFrete} opcoes={lookups.tiposFrete} padrao={padrao.tipoFrete} />
-          <Sel label="Transportadora" value={transp} onChange={setTransp} opcoes={lookups.transportadoras} padrao={padrao.transportadora} />
-          <Sel label="Transp. redespacho" value={redesp} onChange={setRedesp} opcoes={lookups.transportadoras} padrao={padrao.transpRedespacho} />
-          <Sel label="Info. pagamento" value={infoPgto} onChange={setInfoPgto} opcoes={lookups.infoPgto} padrao={padrao.infoPgto} />
+          <label className={styles.check}>
+            <input type="checkbox" checked={consumidorFinal} onChange={(e) => setCfManual(e.target.checked)} />
+            Consumidor final {cfManual === null ? "(o mais comum nesta natureza)" : ""}
+          </label>
+          <Sel label="Cond. pagamento" value={condicao} onChange={setCondicao} opcoes={lookups.condicoesPgto} padrao={pd?.condicaoPgto || padrao.condicaoPgto} />
+          <Sel label="Tipo de frete" value={tipoFrete} onChange={setTipoFrete} opcoes={lookups.tiposFrete} padrao={pd?.tipoFrete || padrao.tipoFrete} />
+          <Sel label="Transportadora" value={transp} onChange={setTransp} opcoes={lookups.transportadoras} padrao={pd?.transportadora || padrao.transportadora} />
+          <Sel label="Transp. redespacho" value={redesp} onChange={setRedesp} opcoes={lookups.transportadoras} padrao={pd?.transpRedespacho || padrao.transpRedespacho} />
+          <Sel label="Info. pagamento" value={infoPgto} onChange={setInfoPgto} opcoes={lookups.infoPgto} padrao={pd?.infoPgto || padrao.infoPgto} />
           <Num label="Frete (R$)" value={frete} onChange={setFrete} />
           <Num label="Seguro (R$)" value={seguro} onChange={setSeguro} />
           <label className={styles.campo}>
@@ -505,12 +581,42 @@ function NovaNota({
               <input className={`${styles.input} ${styles.inputNum}`} value={desc} onChange={(e) => setDesc(e.target.value)} />
             </div>
           </label>
+          <label className={styles.campo}>
+            <span className={styles.label}>Desconto na cond. de pagamento</span>
+            <div className={styles.linhaBusca}>
+              <select
+                className={styles.select}
+                style={{ width: 70, flex: "0 0 70px" }}
+                value={descCondModo}
+                onChange={(e) => setDescCondModo(e.target.value as "percentual" | "valor")}
+              >
+                <option value="percentual">%</option>
+                <option value="valor">R$</option>
+              </select>
+              <input className={`${styles.input} ${styles.inputNum}`} value={descCond} onChange={(e) => setDescCond(e.target.value)} />
+            </div>
+          </label>
           <Num label="Peso líquido" value={pesoLiq} onChange={setPesoLiq} />
           <Num label="Peso bruto" value={pesoBruto} onChange={setPesoBruto} />
           <Num label="Volumes" value={volumes} onChange={setVolumes} />
           <label className={styles.campo}>
             <span className={styles.label}>Tipo de volume</span>
             <input className={styles.input} value={tipoVolume} onChange={(e) => setTipoVolume(e.target.value)} />
+          </label>
+          <label className={styles.campo}>
+            <span className={styles.label}>Agrupamento dos itens</span>
+            <select
+              className={`${styles.select} ${agrupamento !== 2 ? styles.inputAlterado : ""}`}
+              value={agrupamento}
+              onChange={(e) => setAgrupamento(Number(e.target.value) as 0 | 1 | 2 | 3 | 4 | 5)}
+            >
+              <option value={2}>Produto × cor × tamanho (padrão)</option>
+              <option value={1}>Produto × cor</option>
+              <option value={0}>Só produto</option>
+              <option value={5}>Nº do pedido + produto × cor × tamanho</option>
+              <option value={4}>Nº do pedido + produto × cor</option>
+              <option value={3}>Nº do pedido + produto</option>
+            </select>
           </label>
           <label className={`${styles.campo} ${styles.span2}`}>
             <span className={styles.label}>OBS — nº do pedido do site</span>
@@ -523,7 +629,7 @@ function NovaNota({
       </div>
 
       {/* Itens */}
-      <ItensCard empresa={empresa} filial={filial} itens={itens} setItens={setItens} tabela={cliente?.codigoTabPreco || "01"} />
+      <ItensCard empresa={empresa} filial={filial} itens={itens} setItens={setItens} tabela={cliente?.codigoTabPreco || pd?.tabPreco || "01"} />
 
       {/* Conferência */}
       <div className={styles.card}>
@@ -800,13 +906,14 @@ function ItensCard({
               <th className={styles.num}>Preço unit.</th>
               <th className={styles.num}>Valor</th>
               <th className={styles.num}>Estoque</th>
+              <th title="Vai na NF como informação do produto (uma por produto × cor, até 80 caracteres)">Obs. do item</th>
               <th />
             </tr>
           </thead>
           <tbody>
             {itens.length === 0 && (
               <tr>
-                <td colSpan={8} className={styles.vazio}>
+                <td colSpan={9} className={styles.vazio}>
                   Nenhum item. Busque pelo SKU do pedido do site (é o código de barras no Linx).
                 </td>
               </tr>
@@ -839,6 +946,15 @@ function ItensCard({
                 <td className={styles.num}>{fmtBRL(i.qtde * i.preco)}</td>
                 <td className={styles.num}>{i.estoque ?? "—"}</td>
                 <td>
+                  <input
+                    className={styles.input}
+                    style={{ width: 160 }}
+                    maxLength={80}
+                    value={i.obs ?? ""}
+                    onChange={(e) => setItens((prev) => prev.map((x) => (x.chave === i.chave ? { ...x, obs: e.target.value } : x)))}
+                  />
+                </td>
+                <td>
                   <button
                     type="button"
                     className={`${styles.btnTexto} ${styles.btnMini}`}
@@ -859,7 +975,7 @@ function ItensCard({
                 <td className={styles.num}>
                   <strong>{fmtBRL(subtotal)}</strong>
                 </td>
-                <td colSpan={2} />
+                <td colSpan={3} />
               </tr>
             </tfoot>
           )}
@@ -914,6 +1030,12 @@ function PreviaView({
           label={`Desconto (${previa.descontoPercentual.toLocaleString("pt-BR", { maximumFractionDigits: 4 })}%)`}
           valor={`− ${fmtBRL(previa.desconto)}`}
         />
+        {previa.descontoCond > 0 && (
+          <Total
+            label={`Desc. cond. pagamento (${previa.descontoCondPercentual.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%)`}
+            valor={`− ${fmtBRL(previa.descontoCond)}`}
+          />
+        )}
         <Total label="Frete" valor={fmtBRL(previa.frete)} />
         {previa.seguro > 0 && <Total label="Seguro" valor={fmtBRL(previa.seguro)} />}
         <Total label="Total da NF" valor={fmtBRL(previa.total)} destaque />

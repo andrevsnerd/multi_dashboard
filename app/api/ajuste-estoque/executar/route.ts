@@ -5,7 +5,11 @@ import { shouldUseProxy, ProxyPool } from '@/lib/db/proxy';
 import { findUserByUsername } from '@/lib/auth/users-store';
 import { isReadOnlyRole } from '@/lib/auth/permissions';
 import { resolverNomeFilial } from '@/lib/repositories/ajusteEstoque';
-import { executarAjusteContagem, type AjusteContagemItem } from '@/lib/ajuste-estoque-executor';
+import {
+  acertarGradeZerada,
+  executarAjusteContagem,
+  type AjusteContagemItem,
+} from '@/lib/ajuste-estoque-executor';
 import { resolveResponsavelLinx } from '@/lib/server/responsavel-linx';
 import { salvarKpisAjuste } from '@/lib/utils/ajuste-estoque-kpis-store';
 
@@ -82,14 +86,35 @@ export async function POST(request: Request) {
 
     const pool = shouldUseProxy() ? new ProxyPool() : await getConnectionPool();
 
-    const resultado = await executarAjusteContagem(pool as unknown as { request: () => unknown }, {
+    const poolLike = pool as unknown as { request: () => unknown };
+    const responsavel = await resolveResponsavelLinx(username);
+    const resultado = await executarAjusteContagem(poolLike, {
       filialNome,
       nomeContagem: nomeContagem.trim(),
       emissao: `${dataContagem} 00:00:00`,
-      responsavel: await resolveResponsavelLinx(username),
+      responsavel,
       obs: obs ?? null,
       itens,
     });
+
+    // Zerar = total E tamanhos (regra do dono): a contagem zera o total; a sobra de
+    // grade das linhas sujas (total ≠ soma dos tamanhos) sai aqui, na filial inteira.
+    let gradesAcertadas = 0;
+    let avisoGrade: string | null = null;
+    if (modo === 'zerar') {
+      try {
+        gradesAcertadas = await acertarGradeZerada(poolLike, {
+          filialNome,
+          nomeContagem: resultado.nomeContagem,
+          responsavel,
+        });
+      } catch (err) {
+        console.error('[ajuste-estoque/executar] acerto de grade', err);
+        avisoGrade = `O total foi zerado, mas o acerto dos tamanhos falhou (nada dele foi gravado): ${
+          err instanceof Error ? err.message : String(err)
+        }`;
+      }
+    }
 
     // Best-effort: o ajuste já está no Linx; falhar aqui só tira os quadros do histórico.
     if (resumo) {
@@ -108,7 +133,7 @@ export async function POST(request: Request) {
       }).catch((err) => console.error('[ajuste-estoque/executar] snapshot KPIs', err));
     }
 
-    return NextResponse.json(resultado);
+    return NextResponse.json({ ...resultado, gradesAcertadas, avisoGrade });
   } catch (error) {
     console.error('[ajuste-estoque/executar] erro', error);
     return NextResponse.json(

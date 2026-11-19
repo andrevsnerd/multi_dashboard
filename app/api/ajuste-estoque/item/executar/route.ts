@@ -8,6 +8,7 @@ import { resolveCompany } from '@/lib/config/company';
 import { resolveResponsavelLinx } from '@/lib/server/responsavel-linx';
 import { resolverFilialAlvo } from '@/lib/repositories/ajusteEstoque';
 import {
+  acertarGradeZerada,
   executarAjusteContagem,
   encontrarNomeContagemLivre,
 } from '@/lib/ajuste-estoque-executor';
@@ -113,14 +114,35 @@ export async function POST(request: Request) {
       `AJ${codCompact}${dd ?? ''}${mm ?? ''}`
     );
 
+    const responsavel = await resolveResponsavelLinx(username);
     const resultado = await executarAjusteContagem(poolLike, {
       filialNome: filial.nome,
       nomeContagem,
       emissao: `${body.dataContagem} 00:00:00`,
-      responsavel: await resolveResponsavelLinx(username),
+      responsavel,
       obs: body.obs?.trim() || `AJUSTE ITEM (${itens.length} SKU)`,
       itens,
     });
+
+    // Item zerado (quantidade 0) = total E tamanhos em zero (regra do dono).
+    const zerados = itens.filter((it) => it.contagem === 0);
+    let gradesAcertadas = 0;
+    let avisoGrade: string | null = null;
+    if (zerados.length > 0) {
+      try {
+        gradesAcertadas = await acertarGradeZerada(poolLike, {
+          filialNome: filial.nome,
+          nomeContagem: resultado.nomeContagem,
+          responsavel,
+          itens: zerados,
+        });
+      } catch (err) {
+        console.error('[ajuste-estoque/item/executar] acerto de grade', err);
+        avisoGrade = `O total foi zerado, mas o acerto dos tamanhos falhou (nada dele foi gravado): ${
+          err instanceof Error ? err.message : String(err)
+        }`;
+      }
+    }
 
     return NextResponse.json({
       cod: filial.cod,
@@ -129,6 +151,8 @@ export async function POST(request: Request) {
       itensAjustados: resultado.itensAjustados,
       somaDelta: resultado.somaDelta,
       semDiferenca: resultado.semDiferenca,
+      gradesAcertadas,
+      avisoGrade,
     });
   } catch (error) {
     console.error('[ajuste-estoque/item/executar] erro', error);

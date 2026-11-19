@@ -41,6 +41,8 @@ interface DetalheExecucao {
   itensAjustados: number;
   somaDelta: number;
   semDiferenca: number;
+  /** Linhas zeradas que tinham sobra no tamanho e tiveram a grade zerada. */
+  gradesAcertadas: number;
 }
 
 interface ResultadoAjuste {
@@ -364,7 +366,9 @@ export default function AjustarItemPanel({ companyKey, username, onExecuted }: P
             itensAjustados: Number(d.itensAjustados) || 0,
             somaDelta: Number(d.somaDelta) || 0,
             semDiferenca: Number(d.semDiferenca) || 0,
+            gradesAcertadas: Number(d.gradesAcertadas) || 0,
           });
+          if (d.avisoGrade) falhas.push({ filial: grupo.nome, erro: String(d.avisoGrade) });
           itensAjustados += Number(d.itensAjustados) || 0;
           somaDelta += Number(d.somaDelta) || 0;
         }
@@ -766,6 +770,14 @@ export default function AjustarItemPanel({ companyKey, username, onExecuted }: P
             Cada filial gerou uma contagem registrada (aparece no extrato dos produtos e em
             “Ajustes recentes”, onde pode ser desfeita individualmente).
           </p>
+          {resultado.detalhes.some((d) => d.gradesAcertadas > 0) && (
+            <p className={styles.fileHintMuted}>
+              Zerar é total e tamanhos:{" "}
+              <strong>{resultado.detalhes.reduce((s, d) => s + d.gradesAcertadas, 0)}</strong>{" "}
+              linha(s) tinham sobra antiga no tamanho e tiveram a grade zerada (registrado como
+              “ACERTO DE GRADE” no extrato).
+            </p>
+          )}
           <div className={styles.tableScroll}>
             <table className={styles.table}>
               <thead>

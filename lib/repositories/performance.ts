@@ -1,6 +1,6 @@
 import sql from 'mssql';
 import { withRequest } from '@/lib/db/connection';
-import { type CompanyKey } from '@/lib/config/company';
+import { type CompanyKey, type CompanyConfig, buildEcommerceFaturamentoFilialSql } from '@/lib/config/company';
 import { resolveCompanyLive } from '@/lib/server/company-live';
 import { shiftRangeByMonths, type NormalizedRange } from '@/lib/utils/date';
 import {
@@ -57,6 +57,55 @@ function buildNormalizedFilialSqlExpr(column: string): string {
       )
     )
   `;
+}
+
+type PerfDbRequest = Parameters<Parameters<typeof withRequest>[0]>[0];
+
+/**
+ * Escopo do FATURAMENTO de e-commerce com PAPEL POR PERÍODO (ex.: MSC foi e-commerce até
+ * 19/11/2026 e hoje é Higienópolis). As funções daqui recebem do chamador a lista de pernas
+ * de e-commerce do recorte (`ecommerceFilialNames`, papel ATUAL). Quando essa lista traz o
+ * e-commerce (alguma perna atual ou histórica), as pernas históricas entram também, só com
+ * `EMISSAO < corte`. Lista vazia = o chamador não quer e-commerce → nada muda.
+ *
+ * - `clause(request, prefix)`: filtro pronto (sem AND na frente) ou '' se não sobrar filial.
+ * - `relabel(filial)`: linha de FATURAMENTO de perna histórica volta rotulada como a 1ª perna
+ *   de e-commerce do recorte — assim quem agrupa por filial soma em E-COMMERCE, não na loja
+ *   física que a filial virou (e não mistura com o LOJA_VENDA dela).
+ */
+function buildEcomFaturamentoScope(
+  company: CompanyConfig | null,
+  ecommerceFilialNames: string[]
+): {
+  clause: (request: PerfDbRequest, prefix: string) => string;
+  relabel: (filial: string) => string;
+} {
+  const historySet = new Set((company?.ecommerceHistory ?? []).map((h) => h.filial.trim()));
+  const currentSet = new Set((company?.ecommerceFilials ?? []).map((f) => f.trim()));
+  const names = ecommerceFilialNames.map((f) => f.trim()).filter(Boolean);
+  const current = names.filter((n) => !historySet.has(n));
+  const includeHistory = names.some((n) => currentSet.has(n) || historySet.has(n));
+  const label = current[0] ?? company?.ecommerceFilials?.[0] ?? null;
+
+  return {
+    clause: (request, prefix) => {
+      if (names.length === 0) return '';
+      return buildEcommerceFaturamentoFilialSql(company, {
+        filialColumn: 'f.FILIAL',
+        dateColumn: 'f.EMISSAO',
+        current,
+        includeHistory,
+        bind: (value, index) => {
+          request.input(`${prefix}${index}`, sql.VarChar, value);
+          return `@${prefix}${index}`;
+        },
+      });
+    },
+    relabel: (filial) => {
+      const name = filial.trim();
+      return historySet.has(name) && label ? label : name;
+    },
+  };
 }
 
 export async function fetchPerformanceData(
@@ -263,16 +312,16 @@ export async function fetchPerformanceData(
   };
 
   // Query Ecommerce (FATURAMENTO + W_FATURAMENTO_PROD_02)
+  // Papel por período: pernas atuais + históricas (ex.: MSC até 19/11/2026) com corte de EMISSAO.
+  const ecomScope = buildEcomFaturamentoScope(company, ecommerceFilials);
   const runEcommerceQuery = (start: Date, end: Date, prefix: string): Promise<PerformanceCategoryRow[]> => {
     if (ecommerceFilials.length === 0) return Promise.resolve([]);
     return withRequest(async (request) => {
       request.input(`${prefix}ecomStart`, sql.DateTime, start);
       request.input(`${prefix}ecomEnd`, sql.DateTime, end);
 
-      ecommerceFilials.forEach((filial, i) => {
-        request.input(`${prefix}ecomF${i}`, sql.VarChar, filial);
-      });
-      const filialPlaceholders = ecommerceFilials.map((_, i) => `@${prefix}ecomF${i}`).join(', ');
+      const ecomFilialClause = ecomScope.clause(request, `${prefix}ecomF`);
+      if (!ecomFilialClause) return [];
 
       const query = `
         SELECT
@@ -290,18 +339,29 @@ export async function fetchPerformanceData(
           AND f.NOTA_CANCELADA = 0
           AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
           AND fp.QTDE > 0
-          AND f.FILIAL IN (${filialPlaceholders})
+          AND ${ecomFilialClause}
         GROUP BY f.FILIAL, ${categoriaExpr}
         ORDER BY f.FILIAL, VENDAS DESC
       `;
 
       const result = await request.query(query);
-      return (result.recordset as Record<string, unknown>[]).map(row => ({
-        filial: String(row.FILIAL ?? '').trim(),
-        categoria: String(row.CATEGORIA ?? '').trim(),
-        vendas: Number(row.VENDAS ?? 0),
-        qtde: Number(row.QTDE ?? 0),
-      })).filter(row => row.filial);
+      // Perna histórica soma no E-COMMERCE (não na loja física que ela virou); como o
+      // rótulo pode coincidir com o de outra perna, junta (filial, categoria) de novo.
+      const merged = new Map<string, PerformanceCategoryRow>();
+      for (const row of result.recordset as Record<string, unknown>[]) {
+        const filial = ecomScope.relabel(String(row.FILIAL ?? ''));
+        if (!filial) continue;
+        const categoria = String(row.CATEGORIA ?? '').trim();
+        const key = `${filial}||${categoria}`;
+        const existing = merged.get(key);
+        if (existing) {
+          existing.vendas += Number(row.VENDAS ?? 0);
+          existing.qtde += Number(row.QTDE ?? 0);
+        } else {
+          merged.set(key, { filial, categoria, vendas: Number(row.VENDAS ?? 0), qtde: Number(row.QTDE ?? 0) });
+        }
+      }
+      return Array.from(merged.values());
     });
   };
 
@@ -432,6 +492,13 @@ export async function fetchFilialProdutoSales(
   const prev = shiftRangeByMonths(range, comparisonMode === 'year' ? -12 : -1);
   const startPrev = prev.start;
   const endPrev = prev.end;
+
+  // Papel por período: com e-commerce no recorte, as pernas históricas (ex.: MSC até
+  // 19/11/2026) entram no FATURAMENTO com corte de EMISSAO.
+  const ecomScope = buildEcomFaturamentoScope(
+    ecommerceFilialNames.length > 0 ? await resolveCompanyLive(companyKey) : null,
+    ecommerceFilialNames
+  );
 
   const categoriaExpr = companyKey === 'nerd'
     ? `UPPER(LTRIM(RTRIM(ISNULL(p.GRUPO_PRODUTO, ''))))`
@@ -746,8 +813,8 @@ export async function fetchFilialProdutoSales(
     return withRequest(async (request) => {
       request.input(`${prefix}EcomStart`, sql.DateTime, s);
       request.input(`${prefix}EcomEnd`, sql.DateTime, e);
-      ecommerceFilialNames.forEach((f, i) => request.input(`${prefix}EcomF${i}`, sql.VarChar, f));
-      const placeholders = ecommerceFilialNames.map((_, i) => `@${prefix}EcomF${i}`).join(', ');
+      const ecomFilialClause = ecomScope.clause(request, `${prefix}EcomF`);
+      if (!ecomFilialClause) return [];
       const corSelect = groupByCor
         ? `ISNULL(fp.COR_PRODUTO, '') AS COR_PRODUTO,
           MAX(ISNULL(cor_ref.DESC_COR, '')) AS COR_DESCRICAO,`
@@ -823,7 +890,7 @@ export async function fetchFilialProdutoSales(
           AND CAST(f.EMISSAO AS DATE) < CAST(@${prefix}EcomEnd AS DATE)
           AND f.NOTA_CANCELADA = 0
           AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
-          AND f.FILIAL IN (${placeholders})
+          AND ${ecomFilialClause}
           ${linhaEcomClause}
           ${produtoFpClause}
           ${dimEcomClauses}
@@ -831,7 +898,12 @@ export async function fetchFilialProdutoSales(
         ORDER BY VENDAS DESC
       `;
       const result = await request.query<RawRow>(query);
-      return result.recordset.map(mapRow).filter(r => r.produto !== '');
+      // groupByFilial: perna histórica sai rotulada como e-commerce (o merge abaixo junta as
+      // linhas que passam a ter a mesma chave).
+      return result.recordset
+        .map(mapRow)
+        .map(r => (r.filial !== undefined ? { ...r, filial: ecomScope.relabel(r.filial) } : r))
+        .filter(r => r.produto !== '');
     });
   };
 
@@ -883,7 +955,7 @@ export interface ProdutoQtdePorFilialRow {
  * Usado para popular tooltips de "onde vendeu" na visão geral.
  */
 export async function fetchProdutoQtdePorFilial(
-  _companyKey: CompanyKey,
+  companyKey: CompanyKey,
   posFilialNames: string[],
   ecommerceFilialNames: string[],
   range: NormalizedRange,
@@ -892,6 +964,12 @@ export async function fetchProdutoQtdePorFilial(
   const groupByCor = options?.groupByCor === true;
   const start = range.start;
   const end = range.end;
+  // Papel por período: pernas históricas (ex.: MSC até 19/11/2026) entram no FATURAMENTO
+  // com corte de EMISSAO e voltam rotuladas como e-commerce.
+  const ecomScope = buildEcomFaturamentoScope(
+    ecommerceFilialNames.length > 0 ? await resolveCompanyLive(companyKey) : null,
+    ecommerceFilialNames
+  );
 
   type RawRow = { PRODUTO: string; FILIAL: string; QTDE: number; VENDAS?: number; COR_PRODUTO?: string };
 
@@ -1044,8 +1122,8 @@ export async function fetchProdutoQtdePorFilial(
     return withRequest(async (request) => {
       request.input('qtdEcomStart', sql.DateTime, start);
       request.input('qtdEcomEnd', sql.DateTime, end);
-      ecommerceFilialNames.forEach((f, i) => request.input(`qtdEcomF${i}`, sql.VarChar, f));
-      const placeholders = ecommerceFilialNames.map((_, i) => `@qtdEcomF${i}`).join(', ');
+      const ecomFilialClause = ecomScope.clause(request, 'qtdEcomF');
+      if (!ecomFilialClause) return [];
       const corSelect = groupByCor ? 'ISNULL(fp.COR_PRODUTO, \'\') AS COR_PRODUTO,' : '';
       const corGroup = groupByCor ? ', ISNULL(fp.COR_PRODUTO, \'\')' : '';
       const query = `
@@ -1062,7 +1140,7 @@ export async function fetchProdutoQtdePorFilial(
           AND CAST(f.EMISSAO AS DATE) < CAST(@qtdEcomEnd AS DATE)
           AND f.NOTA_CANCELADA = 0
           AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
-          AND f.FILIAL IN (${placeholders})
+          AND ${ecomFilialClause}
         GROUP BY ISNULL(fp.PRODUTO, ''), ISNULL(f.FILIAL, '')${corGroup}
       `;
       const result = await request.query<RawRow>(query);
@@ -1070,7 +1148,8 @@ export async function fetchProdutoQtdePorFilial(
         .map(r => ({
           produto: r.PRODUTO?.trim() ?? '',
           cor: groupByCor ? (r.COR_PRODUTO?.trim() ?? '') : '',
-          filial: r.FILIAL?.trim() ?? '',
+          // Perna histórica → rótulo de e-commerce (o merge abaixo junta pela chave).
+          filial: ecomScope.relabel(r.FILIAL ?? ''),
           qtde: Number(r.QTDE ?? 0),
           vendas: Number(r.VENDAS ?? 0),
         }))
@@ -1293,6 +1372,13 @@ export async function fetchFilialProdutoVendedorSales(
     : `''`;
   const gradeGroupBy = gradeExpr === `''` ? '' : `, ${gradeExpr}`;
 
+  // Papel por período: pernas históricas (ex.: MSC até 19/11/2026) entram no FATURAMENTO
+  // de e-commerce com corte de EMISSAO (as linhas já saem como vendedor "ECOMMERCE").
+  const ecomScope = buildEcomFaturamentoScope(
+    ecommerceFilialNames.length > 0 ? await resolveCompanyLive(companyKey) : null,
+    ecommerceFilialNames
+  );
+
   type RawRow = {
     VENDEDOR: string;
     VENDEDOR_APELIDO: string;
@@ -1375,8 +1461,8 @@ export async function fetchFilialProdutoVendedorSales(
     return withRequest(async (request) => {
       request.input(`${prefix}EcomStart`, sql.DateTime, s);
       request.input(`${prefix}EcomEnd`, sql.DateTime, e);
-      ecommerceFilialNames.forEach((f, i) => request.input(`${prefix}EcomF${i}`, sql.VarChar, f));
-      const placeholders = ecommerceFilialNames.map((_, i) => `@${prefix}EcomF${i}`).join(', ');
+      const ecomFilialClause = ecomScope.clause(request, `${prefix}EcomF`);
+      if (!ecomFilialClause) return [];
 
       const query = `
         SELECT TOP 5000
@@ -1395,7 +1481,7 @@ export async function fetchFilialProdutoVendedorSales(
           AND f.NOTA_CANCELADA = 0
           AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
           AND fp.QTDE > 0
-          AND f.FILIAL IN (${placeholders})
+          AND ${ecomFilialClause}
         GROUP BY ISNULL(fp.PRODUTO, ''), UPPER(LTRIM(RTRIM(ISNULL(p.DESC_PRODUTO, '')))), ${categoriaExpr}${gradeGroupBy}
         HAVING SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) > 0
         ORDER BY VENDAS DESC

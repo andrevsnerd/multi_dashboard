@@ -222,6 +222,87 @@ Gerado **depois**, pela autorização (não inserir): `STATUS_NFE=5`, protocolo,
 - Número/estoque são consumidos no save: NF errada exige cancelamento/inutilização no monitor.
 - Usuário gravado = usuário do Linx (`resolveResponsavelLinx`), nunca o do dashboard.
 
+### Liberdade igual ao Linx — catálogo de notas (fase 1, 19/11/2026)
+
+Pedido do dono: tudo pela página (só o envio à SEFAZ fica no Linx); as opções vêm das NFs reais —
+a mais comum por padrão, as outras disponíveis. Fases: 1 vendas sem pedido · 2 remessas ·
+3 (a definir) · 4 100.08 p/ lojas do grupo e devoluções.
+
+- **Catálogo** (`catalogo.ts`, cache 15 min): por filial emissora (pernas do rodízio juntas; cada
+  extra separada), as naturezas emitidas desde 01/01/2025 (sem NF p/ filial do grupo), contagem
+  por indicador fiscal × dentro/fora da UF, e por natureza o valor mais comum de condição,
+  frete, transportadora, redespacho, info. pagamento, volume, COD_TRANSACAO e consumidor final.
+- **Tela**: natureza = lista do catálogo da filial (padrão = a venda mais usada para o indicador
+  e a UF do cliente; remessa/devolução só por escolha); trocar natureza aplica os padrões dela;
+  campo "Consumidor final" (padrão do histórico — na 100.01 é escolha de quem emite).
+- **Gravação**: só natureza que a filial já emitiu E que está em `NATUREZAS_VALIDADAS`
+  (simples: 100.02, 100.022, 100.01; normal: 100.05). COD_TRANSACAO do catálogo.
+- **Regras medidas nas NFs reais** (desde a atualização do Linx de 24/10 — NFs anteriores seguem
+  regras fiscais antigas, não usar como referência):
+  - rateio: desconto = proporção do valor, sobra 1 centavo por item a partir do 1º (385/385);
+    frete/seguro = % de rateio, sobra inteira no 1º item (235/235); % com sobra no 1º;
+  - ordem dos itens fiscais (ITEM_NFE), da qual o rateio depende: código do produto (ordem de
+    texto) → ordem digitada da linha → tamanho (576/582; as 6 de fora foram editadas no Linx);
+    FATURAMENTO_PROD fica na ordem digitada;
+  - desconto digitado em R$: PORC_DESCONTO com 4 casas; em %: o % digitado;
+  - desconto na condição de pagamento: em % → (subtotal − desconto) × % truncado; em R$ → % =
+    valor ÷ base arredondado a 2 casas; rateado junto com o 1º desconto (88/88);
+  - VENDAS (NF sem pedido): valor entregue = Σ por linha de round2(valor × (1 − descontos ÷ subtotal));
+  - DESCONTO_SOBRE_4 = % digitado sem desconto na condição, conforme costume da filial (pernas sim,
+    NERD não) — campo informativo, o operador às vezes deixa 0;
+  - **exceção fiscal**: a tela do Linx usa `FX_LOCALIZA_EXCECAO_IMPOSTO` (parâmetros em JSON; lê o
+    cadastro por filtro `CTB_EXCECAO_IMPOSTO_FILTRO`), passando o CFOP da característica
+    (`CTB_LX_CARACTERISTICA_CFOP`: tipo de operação × indicador CFOP × indicador fiscal do cliente).
+    100% dos itens desde 24/10 (Matriz 56/56, pernas 1038/1038, NERD 14/14). A antiga
+    `FX_ID_EXCECAO_IMPOSTO` ignora os filtros — na Matriz acertava 14 de 57;
+  - CFOP: FATURAMENTO_PROD = o da característica; FATURAMENTO_ITEM = CFOP obrigatório da exceção, ou o
+    da característica (100%);
+  - representante/gerente = representante do cliente (`CLIENTE_REPRE`, principal primeiro); sem
+    cadastro, o padrão da empresa (100%);
+  - VENDAS ("NF SEM PEDIDO").CONDICAO_PGTO = a condição da NF (1.129 de 1.133 desde 24/10, todas as
+    naturezas); VENDAS_PRODUTO = uma linha por produto × cor (linhas repetidas da NF somam);
+    CODIGO_TAB_PRECO = a do cliente, ou a mais usada na natureza (100.08 → 97);
+  - Simples: OBS 7 (DIFAL zerado) e linhas 71/72/73 só com consumidor final; BASE_IMPOSTO_CALC = base;
+  - Simples: FECP-destino (70) não é gravado desde 24/10, mesmo que a exceção traga (NERD 1542);
+  - consumidor final na 100.01 varia por NF (escolha); contribuinte sai pela 100.01 nas pernas.
+  - **AGRUPAMENTO_ITENS** (opção do form, 52/52 NFs 0/1 e 40 NFs 3–5 desde 2025): 2 = item fiscal por
+    produto × cor × tamanho; 1 = por produto × cor (código produto+cor, descrição com a cor, sem
+    tamanho, SUB_ITEM 1); 0 = por produto (código = produto, REFERENCIA_ITEM nulo); 3/4/5 = 0/1/2 com o
+    **nº do pedido** na frente do código e da descrição, REFERENCIA_PEDIDO = pedido (no 5 a
+    REFERENCIA_ITEM é cor+tamanho). 0/1: ordem pelo código. Linhas repetidas do mesmo produto × cor ×
+    tamanho viram um item fiscal só, e as linhas de FATURAMENTO_PROD apontam para a 1ª (ITEM_IMPRESSAO);
+  - **observação do item**: é da linha (produto × cor) — FATURAMENTO_PROD.DESC_VENDA_CLIENTE (80,
+    completado com espaços) e OBS_ITEM (254) de cada item fiscal dela;
+  - NF_FATURA: natureza tipo V (venda) ou D (devolução) = 1; R/O/E (remessa, outras, retorno) = 0;
+  - remessa (tipo R) grava QTDE_RETORNAR_BENEFICIAMENTO = quantidade do item;
+  - COD_TRANSACAO = o do form de produto (FATURAMENTO_022); NF de material/item avulso usa outro
+    (_026/_027/_042) — o catálogo só conta NF de produto para esse padrão;
+  - **exportação** (cliente UF EX, 100.71): CFOP = CODIGO_FISCAL_EXTERIOR da característica (7101/7102);
+    ICMS não incide (sem alíquota SP→EX); UF/local de embarque no cabeçalho (padrão SP / Aeroporto
+    Internacional de Guarulhos). 4/4 NFs desde 24/10;
+  - **sem exceção fiscal** (Matriz, regime normal: 131.01, 133.01, 135.01, 100.08…): impostos padrão —
+    ICMS pela alíquota da operação, IPI 0, PIS 1,65, COFINS 7,6 (CTB_LX_IMPOSTO_TIPO), CST 00, sem
+    IBS/CBS. A não contribuinte de outra UF o Linx soma DIFAL — a página bloqueia;
+  - regime normal a não contribuinte de outra UF: só bloqueia se a exceção tiver DIFAL (11/71/72/73);
+    bonificação 128.01 → RJ não tem (só ICMS 12% + OBS 7 de DIFAL zerado, que vale p/ qualquer regime
+    com consumidor final interestadual).
+- **Naturezas além da venda** (19/11/2026): liberadas 100.71, 109.01, 128.01, 131.01, 137.01 (NFs
+  desde 24/10 idênticas) e 107.01, 133.01, 135.01, 145.10, 199.02, 199.10, 134.20 (só NFs antigas:
+  tudo o que não depende da exceção fiscal bateu; a prévia pede conferência no Linx antes da SEFAZ).
+  **Fora da página**: remessa de **material** (130.01, parte da 199.10 — sai de ESTOQUE_SAI1_MAT,
+  estoque de materiais), **devoluções** (117.11/150.01/150.02 — saem de romaneio ESTOQUE_PROD_SAI,
+  FIN_EMISSAO 4, FATURAMENTO_ENTRADA_DEVOLUCAO ligando cada item à NF de compra) e **100.08**
+  (abastecimento das lojas: tudo bate menos o ICMS de alguns itens em 24 de 60 NFs, que difere 1–2
+  centavos da conta item a item sem regra única encontrada — catálogo "destino filial" e tabela 97
+  já prontos, liberação em NATUREZAS_VALIDADAS_FILIAL quando fechar).
+- **Conferência em massa** (replay pelo código, ROLLBACK; no teste o estoque negativo é liberado
+  dentro da transação): diferenças restantes são (a) dado de produto alterado depois da NF
+  (indicador CFOP por filial criado depois; versão/alíquota da tabela IBPT atualizada), (b) recálculo
+  manual no Linx
+  (BASE_IMPOSTO_CALC/72=100 em poucas NFs). Em NF anterior a 24/10 a exceção da época foi
+  INATIVADA (não datada) — `validar.mjs` com ANTIGA=1 confere tudo menos exceção/impostos/IBPT.
+  Replay 19/11 (100.022 pernas): 58/60 idênticas; as 2 restantes só em DESCONTO_SOBRE_4.
+
 ### Faturar pela Matriz da Scarf Me (18/11/2026)
 
 Pedido do site às vezes é faturado pela `SCARF ME - MATRIZ` (cód. 001), como o corporativo.

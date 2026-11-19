@@ -23,6 +23,8 @@ export interface DerivedFilialConfig {
   filialDisplayNames: Record<string, string>;
   estoqueFilialOrder: string[];
   ecommerceFilials?: string[];
+  ecommerceHistory?: Array<{ filial: string; until: string }>;
+  filialSince?: Record<string, string>;
   filialGroups: Record<string, string[]>;
   activeFilials: Record<string, string>;
   leadTimeDays: { default: number; byFilial: Record<string, number> };
@@ -41,6 +43,8 @@ export function buildDerivedFilialConfig(company: CompanyKey, nameOf: NameOf): D
   const inventory: string[] = [];
   const filialDisplayNames: Record<string, string> = {};
   const ecommerce: string[] = [];
+  const ecommerceHistory: Array<{ filial: string; until: string }> = [];
+  const filialSince: Record<string, string> = {};
   const byFilial: Record<string, number> = {};
 
   for (const d of defs) {
@@ -49,6 +53,10 @@ export function buildDerivedFilialConfig(company: CompanyKey, nameOf: NameOf): D
     if (d.modules.includes('inventory')) inventory.push(name);
     filialDisplayNames[name] = d.display;
     if (d.ecommerce) ecommerce.push(name);
+    // Papel por período: perna de e-commerce que deixou de ser (histórico com corte de
+    // data) e início do papel atual. Ver FilialDef.since / ecommerceUntil.
+    if (d.ecommerceUntil && !d.ecommerce) ecommerceHistory.push({ filial: name, until: d.ecommerceUntil });
+    if (d.since) filialSince[name] = d.since;
     if (d.leadTimeDays != null) byFilial[name] = d.leadTimeDays;
   }
 
@@ -90,6 +98,8 @@ export function buildDerivedFilialConfig(company: CompanyKey, nameOf: NameOf): D
     leadTimeDays: { default: COMPANY_LEAD_TIME_DEFAULT[company], byFilial },
   };
   if (ecommerce.length > 0) result.ecommerceFilials = ecommerce;
+  if (ecommerceHistory.length > 0) result.ecommerceHistory = ecommerceHistory;
+  if (Object.keys(filialSince).length > 0) result.filialSince = filialSince;
 
   return result;
 }

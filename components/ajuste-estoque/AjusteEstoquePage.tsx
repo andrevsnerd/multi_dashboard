@@ -282,7 +282,7 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
   const [confirmCheck, setConfirmCheck] = useState(false);
   const [executando, setExecutando] = useState(false);
   const [resultado, setResultado] = useState<
-    { nomeContagem: string; itensAjustados: number; somaDelta: number; semDiferenca: number } | null
+    { nomeContagem: string; itensAjustados: number; somaDelta: number; semDiferenca: number; gradesAcertadas: number; avisoGrade: string | null } | null
   >(null);
 
   const [recentes, setRecentes] = useState<AjusteRecente[]>([]);
@@ -572,6 +572,8 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
         itensAjustados: data.itensAjustados,
         somaDelta: data.somaDelta,
         semDiferenca: data.semDiferenca,
+        gradesAcertadas: Number(data.gradesAcertadas) || 0,
+        avisoGrade: data.avisoGrade ?? null,
       });
       setConfirmando(false);
       setPreview(null);
@@ -788,6 +790,14 @@ export default function AjusteEstoquePage({ companyKey, companyName }: Props) {
           <p className={styles.fileHintMuted}>
             Já aparece no extrato dos produtos (CONTAGEM/AJUSTE) com sua descrição e responsável.
           </p>
+          {resultado.gradesAcertadas > 0 && (
+            <p className={styles.fileHintMuted}>
+              Zerar é total e tamanhos: <strong>{resultado.gradesAcertadas}</strong> linha(s)
+              tinham sobra antiga no tamanho e tiveram a grade zerada (registrado como “ACERTO DE
+              GRADE” no extrato).
+            </p>
+          )}
+          {resultado.avisoGrade && <div className={styles.avisos}>⚠ {resultado.avisoGrade}</div>}
           {podeDesfazer && (
             <div className={styles.actionsRow}>
               <button

@@ -25,6 +25,15 @@ export interface CompanyConfig {
   /** Ordem fixa dos cards "Estoque por Filial" (por nome de exibição) */
   estoqueFilialOrder?: string[];
   ecommerceFilials?: string[];
+  /**
+   * Pernas que FORAM e-commerce até uma data (exclusive) e hoje têm outro papel (ex.: MSC
+   * 000111 → Higienópolis em 19/11/2026). NÃO estão em `ecommerceFilials` (que é o papel
+   * ATUAL: rodízio, estoque, exclusão do VAREJO). Só entram no FATURAMENTO de e-commerce
+   * com `EMISSAO < until` — use sempre `buildEcommerceFaturamentoFilialSql`.
+   */
+  ecommerceHistory?: Array<{ filial: string; until: string }>;
+  /** Início (YYYY-MM-DD, inclusive) do papel atual da filial. Ver FilialDef.since. */
+  filialSince?: Record<string, string>;
   excludedLines?: string[]; // Linhas excluídas de cálculos de estoque e vendas
   /**
    * Grupos de filiais que devem ser tratados como uma só filial lógica.
@@ -114,6 +123,121 @@ export function getFilialGroupMembers(company: CompanyConfig, filial: string): s
     return ecommerce;
   }
   return [filial];
+}
+
+// ── E-commerce por PERÍODO ────────────────────────────────────────────────────
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** 'YYYY-MM-DD' → literal SQL 'YYYYMMDD' (formato que o SQL Server lê igual em qualquer idioma). */
+function sqlDateLiteral(iso: string): string {
+  if (!ISO_DATE.test(iso)) throw new Error(`Data de corte de filial inválida: ${iso}`);
+  return `'${iso.replace(/-/g, '')}'`;
+}
+
+/**
+ * Todos os nomes cujo FATURAMENTO 100.02/100.022 conta como E-COMMERCE em algum período:
+ * pernas atuais + históricas. Serve só para CLASSIFICAR/rotular linhas de FATURAMENTO
+ * como "E-COMMERCE" — nunca para listas de loja, estoque ou exclusão do VAREJO (essas usam
+ * `ecommerceFilials`, o papel atual).
+ */
+export function getEcommerceSalesFilials(company: CompanyConfig | null | undefined): string[] {
+  if (!company) return [];
+  return [...(company.ecommerceFilials ?? []), ...(company.ecommerceHistory ?? []).map((h) => h.filial)];
+}
+
+function isEcommerceHistoryLeg(company: CompanyConfig | null | undefined, filial: string): boolean {
+  const key = normalizeFilialLookupKey(filial);
+  return (company?.ecommerceHistory ?? []).some((h) => normalizeFilialLookupKey(h.filial) === key);
+}
+
+/**
+ * Filiais cujas METAS gravadas somam para a linha da filial selecionada.
+ *
+ * Meta gravada sob uma perna histórica de e-commerce (ex.: MSC) é a fatia que o modal de
+ * metas dividiu entre os CNPJs do rodízio quando ela ainda era e-commerce — então conta
+ * SEMPRE para o E-COMMERCE e nunca para a loja que ela virou (meta de loja é gravada na
+ * canônica estática do grupo, não nela).
+ */
+export function getGoalMembers(company: CompanyConfig, filial: string): string[] {
+  const members = getFilialGroupMembers(company, filial);
+  const isEcom = members.some((m) =>
+    (company.ecommerceFilials ?? []).some((e) => normalizeFilialLookupKey(e) === normalizeFilialLookupKey(m))
+  );
+  if (isEcom) return getEcommerceSalesFilials(company);
+  return members.filter((m) => !isEcommerceHistoryLeg(company, m));
+}
+
+/** Lojas físicas para a META do VAREJO: sem e-commerce atual nem perna histórica dele. */
+export function getVarejoGoalFilials(company: CompanyConfig): string[] {
+  const ecommerce = new Set((company.ecommerceFilials ?? []).map(normalizeFilialLookupKey));
+  return company.filialFilters.sales.filter(
+    (f) => !ecommerce.has(normalizeFilialLookupKey(f)) && !isEcommerceHistoryLeg(company, f)
+  );
+}
+
+/**
+ * Rótulo de uma linha de FATURAMENTO de e-commerce. Perna histórica (ex.: MSC) mostra o
+ * papel DA ÉPOCA da nota — "E-COMMERCE" —, não o atual (que seria "HIGIENÓPOLIS").
+ * Para as demais, devolve o `filialDisplayNames` de sempre.
+ */
+export function ecommerceFaturamentoDisplayName(
+  company: CompanyConfig | null | undefined,
+  filial: string
+): string {
+  const name = (filial || '').trim();
+  const display = company?.filialDisplayNames ?? {};
+  const isHistory = (company?.ecommerceHistory ?? []).some((h) => h.filial.trim() === name);
+  if (isHistory) {
+    const firstCurrent = company?.ecommerceFilials?.[0];
+    return (firstCurrent && display[firstCurrent]) || 'E-COMMERCE';
+  }
+  return display[name] ?? name;
+}
+
+/**
+ * Filtro de filial do FATURAMENTO de e-commerce, respeitando o PAPEL POR PERÍODO.
+ *
+ * Pernas atuais entram sem data; pernas históricas (ex.: MSC até 19/11/2026) só com
+ * `EMISSAO < corte`. Gera, por exemplo:
+ *   (f.FILIAL IN (@e0, @e1) OR (f.FILIAL = @e2 AND f.EMISSAO < '20261119'))
+ *
+ * - `bind(valor, i)` registra o parâmetro no request do chamador e devolve o placeholder
+ *   (use sql.VarChar — NVarChar mata o index seek no proxy).
+ * - `current`: pernas atuais a incluir (default: todas as `ecommerceFilials`). Passe a lista
+ *   que o chamador já usava (ex.: escopo da tela) para não mudar o recorte atual.
+ * - `includeHistory`: default true. Passe false só quando o recorte NÃO é o e-commerce
+ *   inteiro (ex.: o usuário filtrou uma perna específica que não é a histórica).
+ *
+ * Devolve '' quando não sobra nenhuma filial (mesmo contrato de "lista vazia" dos chamadores).
+ * Sem `AND` na frente: o chamador compõe.
+ */
+export function buildEcommerceFaturamentoFilialSql(
+  company: CompanyConfig | null | undefined,
+  opts: {
+    filialColumn: string;
+    dateColumn: string;
+    bind: (value: string, index: number) => string;
+    current?: string[];
+    includeHistory?: boolean;
+  }
+): string {
+  const current = opts.current ?? company?.ecommerceFilials ?? [];
+  const currentSet = new Set(current);
+  const history = opts.includeHistory === false
+    ? []
+    : (company?.ecommerceHistory ?? []).filter((h) => !currentSet.has(h.filial));
+
+  let i = 0;
+  const parts: string[] = [];
+  if (current.length > 0) {
+    parts.push(`${opts.filialColumn} IN (${current.map((f) => opts.bind(f, i++)).join(', ')})`);
+  }
+  for (const h of history) {
+    parts.push(`(${opts.filialColumn} = ${opts.bind(h.filial, i++)} AND ${opts.dateColumn} < ${sqlDateLiteral(h.until)})`);
+  }
+  if (parts.length === 0) return '';
+  return parts.length === 1 ? parts[0] : `(${parts.join(' OR ')})`;
 }
 
 export function isEcommerceFilial(

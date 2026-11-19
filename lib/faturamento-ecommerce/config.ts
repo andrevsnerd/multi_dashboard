@@ -248,6 +248,69 @@ const CLIENTE_PJ_BASE: Omit<PadraoClientePj, "filial"> = {
   representante: "SEM REPRESENTANTE",
 };
 
+/**
+ * Naturezas que o gravador já reproduz centavo a centavo, por regime da filial emissora, com a
+ * evidência. A tela mostra todas as naturezas que a filial já emitiu (catálogo do histórico),
+ * mas só grava as daqui — as outras aparecem "em validação". Para liberar uma natureza: rodar a
+ * conferência contra NFs reais dela (replay coluna a coluna) e só então incluir aqui.
+ */
+export const NATUREZAS_VALIDADAS: Record<"simples" | "normal", Record<string, string>> = {
+  simples: {
+    "100.02": "replay de NFs reais NERD/AKS/MSC (17–19/11/2026)",
+    "100.022": "replay de NFs reais NERD/AKS/MSC (17–19/11/2026)",
+    "100.01": "replay das NFs 100.01 das pernas desde 24/10 (19/11/2026)",
+    "100.71": "exportação: 2/2 NFs das pernas desde 24/10 idênticas (19/11/2026)",
+    "134.20": "remessa p/ conserto NERD: 2/2 NFs (antigas) idênticas fora a exceção fiscal",
+    "199.02": "remessa p/ troca NERD: 2/2 NFs (antigas) idênticas fora a exceção fiscal",
+  },
+  normal: {
+    "100.05": "336/336 linhas de imposto das NFs da Matriz desde 24/10 (19/11/2026)",
+    "100.71": "exportação: 2/2 NFs da Matriz desde 24/10 idênticas (19/11/2026)",
+    "109.01": "venda c/ entrega à ordem: 1/1 NF desde 24/10 idêntica (19/11/2026)",
+    "128.01": "bonificação/brinde: 5/5 NFs desde 24/10 idênticas (19/11/2026)",
+    "131.01": "amostra grátis (sem exceção fiscal): 1/1 NF desde 24/10, só indicador CFOP alterado depois",
+    "137.01": "remessa em venda à ordem: 2/2 NFs desde 24/10 (1 com indicador CFOP alterado depois)",
+    "133.01": "demonstração: NFs antigas idênticas fora a exceção fiscal (a não contribuinte de outra UF: DIFAL, bloqueado)",
+    "135.01": "consignação: NFs antigas idênticas fora a exceção fiscal",
+    "145.10": "retorno de conserto: 2/2 NFs (antigas) idênticas",
+    "199.02": "remessa p/ troca: NF de produto (antiga) idêntica fora a exceção fiscal",
+    "199.10": "simples remessa de produto: 15/15 NFs (antigas) idênticas fora a exceção fiscal",
+    "107.01": "venda de consignação: 6/7 NFs (antigas) de produto idênticas fora a exceção fiscal",
+  },
+};
+
+/**
+ * Naturezas liberadas só com NFs ANTERIORES à atualização do Linx de 24/10/2026 (não houve NF
+ * delas depois). Tudo o que não depende da regra fiscal bateu; a exceção fiscal e os impostos são
+ * os de hoje (mesmo cálculo das vendas validadas), mas sem NF recente para provar o centavo — a
+ * prévia avisa para conferir a NF no Linx antes de enviar à SEFAZ.
+ */
+export const NATUREZAS_SO_NF_ANTIGA: Record<"simples" | "normal", string[]> = {
+  simples: ["134.20", "199.02"],
+  normal: ["133.01", "135.01", "145.10", "199.02", "199.10", "107.01"],
+};
+
+export function naturezaValidada(simplesNacional: boolean, natureza: string): boolean {
+  return Boolean(NATUREZAS_VALIDADAS[simplesNacional ? "simples" : "normal"][String(natureza ?? "").trim()]);
+}
+
+/**
+ * NF para loja/filial do PRÓPRIO grupo (abastecimento). Só as naturezas daqui aceitam destinatário
+ * filial — o resto da página continua bloqueando filial como cliente.
+ */
+export const NATUREZAS_VALIDADAS_FILIAL: Record<"simples" | "normal", Record<string, string>> = {
+  simples: {},
+  normal: {},
+};
+
+export function naturezaValidadaFilial(simplesNacional: boolean, natureza: string): boolean {
+  return Boolean(NATUREZAS_VALIDADAS_FILIAL[simplesNacional ? "simples" : "normal"][String(natureza ?? "").trim()]);
+}
+
+export function naturezaSoNfAntiga(simplesNacional: boolean, natureza: string): boolean {
+  return NATUREZAS_SO_NF_ANTIGA[simplesNacional ? "simples" : "normal"].includes(String(natureza ?? "").trim());
+}
+
 /** INDICADOR_FISCAL_TERCEIRO ("Indica Tipo 30.s") — mesma lista do corporativo. */
 export const INDICADORES_FISCAIS = [
   { value: "8", label: "8 - Não Contribuinte" },

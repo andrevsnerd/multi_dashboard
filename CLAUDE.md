@@ -89,6 +89,13 @@ mexer só em `QTDE` deixa o romaneio mentindo e a exclusão dele reverte errado.
 - Item novo: `INSERT` com `QTDE` **e** `SA_n`/`EN_n` (tamanho base) — ver `executeSaidaLote`/`executeEntradaLote`.
 - Corrigir quantidade: `executeItemQtdeSet` (QTDE + grade no mesmo UPDATE, por delta).
 - Ajustar saldo: contagem (`executarAjusteContagem`), que o trigger aplica por tamanho.
+- **Zerar (filial ou item) = total E tamanhos em zero — padrão do dono (19/11/2026).** A contagem
+  zera o total, mas linha antiga com `ESTOQUE ≠ soma(ES)` fica com sobra no tamanho. Depois da
+  contagem, `acertarGradeZerada` ([lib/ajuste-estoque-executor.ts](lib/ajuste-estoque-executor.ts))
+  zera só `ES1..ES48` das linhas com `ESTOQUE = 0`, numa transação, com registro
+  `ACERTO DE GRADE` em `NERD_AJUSTE_HISTORICO`. É a **única** exceção a esta regra — já ligada
+  no Zerar filial e no Zerar item (quantidade 0) do Ajuste de Estoque. Não tem aviso nem pergunta:
+  zerar é sempre completo.
 
 Foi o que fizeram o antigo `romaneios/editar-qtd` e o `transfer-executor` (rota desativada em
 14/10/2026): 977 linhas com total ≠ grade em 15 filiais. Desde 14/10/2026 a NERD matriz tem

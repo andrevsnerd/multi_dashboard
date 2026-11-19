@@ -38,13 +38,15 @@ export const LOJAS_INVENTARIO: LojaInventarioDef[] = [
   { slug: "scarfme-guarulhos", company: "scarfme", display: "GUARULHOS", cods: ["000079", "000075", "000058", "000057", "000027"] },
   { slug: "scarfme-iguatemi", company: "scarfme", display: "IGUATEMI", cods: ["000059", "000060", "000052", "000045", "000005"] },
   { slug: "scarfme-morumbi", company: "scarfme", display: "MORUMBI", cods: ["000055", "000078", "000041", "000039", "100010"] },
-  { slug: "scarfme-oscar-freire", company: "scarfme", display: "OSCAR FREIRE", cods: ["000062", "000064"] },
-  { slug: "scarfme-higienopolis", company: "scarfme", display: "HIGIENÓPOLIS", cods: ["000038", "000077", "000004"] },
+  // 000110 (FFFR) fatura a Oscar Freire desde 19/11/2026 (since no registry).
+  { slug: "scarfme-oscar-freire", company: "scarfme", display: "OSCAR FREIRE", cods: ["000062", "000110", "000064"] },
+  // 000111 (MSC) é a Higienópolis desde 19/11/2026 — antes era perna do e-commerce.
+  { slug: "scarfme-higienopolis", company: "scarfme", display: "HIGIENÓPOLIS", cods: ["000038", "000111", "000077", "000004"] },
   { slug: "scarfme-paulista", company: "scarfme", display: "PAULISTA", cods: ["000117", "000088", "000046", "000112"] },
   { slug: "scarfme-villa-lobos", company: "scarfme", display: "VILLA LOBOS", cods: ["000085", "800562"] },
   { slug: "scarfme-galeao", company: "scarfme", display: "GALEÃO RJ", cods: ["000109"] },
   { slug: "scarfme-matriz", company: "scarfme", display: "MATRIZ", cods: ["001"] },
-  { slug: "scarfme-ecommerce", company: "scarfme", display: "E-COMMERCE", cods: ["000118", "000111", "000108", "000083", "000082"] },
+  { slug: "scarfme-ecommerce", company: "scarfme", display: "E-COMMERCE", cods: ["000118", "000108", "000083", "000082"] },
 ];
 
 /** Lojas exibidas na tela da empresa. Corporativo (sem lojas próprias) vê todas. */

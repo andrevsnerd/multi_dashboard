@@ -86,6 +86,9 @@ export async function GET(request: Request) {
         companyKey,
         posFilialNames: filiais.filter((f) => !ecommerceFilials.has(f)),
         ecommerceFilialNames: filiais.filter((f) => ecommerceFilials.has(f)),
+        // Leva o `ecommerceHistory`: com e-commerce no escopo, notas da perna histórica
+        // (MSC até 19/11/2026) também contam como site.
+        company,
         base: baseParam,
       }),
       carregarEstoqueEmbalagens(companyKey),

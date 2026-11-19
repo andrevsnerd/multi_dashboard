@@ -27,6 +27,8 @@ export interface FatLookups {
   regioes: Opcao[];
   infoPgto: Opcao[];
   proximoCodigoCliente: string;
+  /** Naturezas que cada filial emissora já usou, com contagens e padrões (catalogo.ts). */
+  catalogo: CatalogoNotas;
   /** Função do usuário pode gravar no Linx (preenchido pela rota). */
   podeGravar?: boolean;
 }
@@ -98,6 +100,8 @@ export interface ClienteFatDetalhe {
   regiao: string;
   representante: string;
   cadastramento: string | null;
+  /** O cliente é uma filial/loja do grupo (NF de abastecimento: 100.08 da Matriz). */
+  ehFilial?: boolean;
 }
 
 export interface ClienteFatInput {
@@ -216,6 +220,14 @@ export interface NotaItemInput {
   tamanho: number;
   qtde: number;
   preco: number;
+  /**
+   * Linha da NF (como foi digitada no form do Linx: uma linha = um produto × cor com seus
+   * tamanhos). Itens com o mesmo número formam uma linha só. Vazio = uma linha por produto × cor
+   * (como saem 99% das NFs).
+   */
+  linha?: number;
+  /** FATURAMENTO_ITEM.OBS_ITEM — observação do item (vai no XML como informação adicional do produto). */
+  obs?: string;
 }
 
 export interface NotaInput {
@@ -233,6 +245,13 @@ export interface NotaInput {
   descontoModo: "percentual" | "valor";
   descontoPercentual: number;
   descontoValor: number;
+  /**
+   * Desconto na condição de pagamento (2º desconto do form do Linx, sobre o valor já com o 1º):
+   * em % (valor = base × % truncado) ou em R$ (% gravado = valor ÷ base, arredondado).
+   */
+  descontoCondModo?: "percentual" | "valor";
+  descontoCondPercentual?: number;
+  descontoCondValor?: number;
   pesoLiquido: number;
   pesoBruto: number;
   volumes: number;
@@ -243,7 +262,61 @@ export interface NotaInput {
   itens: NotaItemInput[];
   /** Faturar mesmo havendo NF com o mesmo nº de pedido do site na OBS. */
   confirmarDuplicidade?: boolean;
+  /**
+   * FATURAMENTO.INDICA_CONSUMIDOR_FINAL. Vazio = o mais comum no histórico para a natureza e o
+   * indicador fiscal do cliente (catálogo). Na 100.01 é escolha de quem emite.
+   */
+  consumidorFinal?: boolean;
+  /**
+   * FATURAMENTO.AGRUPAMENTO_ITENS (opção do form do Linx): 2 = um item fiscal por produto × cor ×
+   * tamanho (padrão, ~99% das NFs); 1 = por produto × cor; 0 = por produto; 3/4/5 = 0/1/2 com o nº
+   * do pedido na frente do código e da descrição do item.
+   */
+  agrupamento?: 0 | 1 | 2 | 3 | 4 | 5;
+  /** Exportação (cliente UF EX, 100.71): UF e local de embarque. Vazio = SP / Aeroporto de Guarulhos. */
+  ufEmbarque?: string;
+  localEmbarque?: string;
 }
+
+/** Padrões de cabeçalho de uma natureza (o valor mais comum nas NFs reais). */
+export interface PadroesNatureza {
+  condicaoPgto: string | null;
+  tipoFrete: string | null;
+  transportadora: string | null;
+  transpRedespacho: string | null;
+  infoPgto: string | null;
+  tipoVolume: string | null;
+  codTransacao: string | null;
+  /** Tabela de preço do pedido quando o cliente não tem a dele (100.08 → 97, a de transferência). */
+  tabPreco: string | null;
+}
+
+/**
+ * Uma natureza que a filial já emitiu (desde 01/01/2025, sem contar NF para filial do grupo).
+ * A tela oferece só estas; `validada` = o gravador já reproduziu NFs reais dela centavo a centavo.
+ */
+export interface NaturezaCatalogo {
+  natureza: string;
+  descricao: string;
+  /** NATUREZAS_SAIDAS.TIPO_OPERACAO: V venda, R remessa, O outras. O padrão automático é sempre venda. */
+  tipoOperacao: string;
+  nfs: number;
+  validada: boolean;
+  /**
+   * NF para loja/filial do próprio grupo (abastecimento, 100.08) ou para cliente. A mesma natureza
+   * pode aparecer nos dois destinos, cada um com seus padrões; o padrão do cliente nunca é
+   * escolhido entre as de filial, e vice-versa.
+   */
+  destino: "cliente" | "filial";
+  /** Contagem por "indicador fiscal|dentro|fora" do cliente — escolhe o padrão para o cliente. */
+  porClasse: Record<string, number>;
+  /** Consumidor final mais comum por indicador fiscal ("8": true…) e no geral ("*"). */
+  consumidorFinal: Record<string, boolean>;
+  padroes: PadroesNatureza;
+}
+
+/** Catálogo por filial emissora (nome vivo no Linx). */
+export type CatalogoNotas = Record<string, NaturezaCatalogo[]>;
 
 export interface NotaPreviewItem {
   produto: string;
@@ -275,6 +348,9 @@ export interface NotaPreview {
   subtotal: number;
   descontoPercentual: number;
   desconto: number;
+  /** Desconto na condição de pagamento (2º desconto) e o % gravado. */
+  descontoCond: number;
+  descontoCondPercentual: number;
   frete: number;
   seguro: number;
   total: number;

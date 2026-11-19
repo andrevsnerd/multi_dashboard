@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { fetchPerformanceData, fetchFilialProdutoSales } from '@/lib/repositories/performance';
 import { readGoals } from '@/lib/utils/goals-storage';
-import { type CompanyKey } from '@/lib/config/company';
+import { type CompanyKey, getGoalMembers } from '@/lib/config/company';
 import { resolveCompanyLive } from '@/lib/server/company-live';
 import { normalizeRangeForQuery, formatDateForQuery } from '@/lib/utils/date';
 
@@ -231,7 +231,8 @@ export async function GET(request: Request) {
       const qtde = Array.from(currentData.values()).reduce((s, d) => s + d.qtde, 0);
 
       const rowGroupMembers = canonicalToMembers.get(filial) ?? [filial];
-      const meta = rowGroupMembers.reduce((s, f) => s + (monthGoals[f] ?? 0), 0);
+      // Meta: papel por período (fatia antiga da MSC soma no e-commerce, não na Higienópolis).
+      const meta = getGoalMembers(company, filial).reduce((s, f) => s + (monthGoals[f] ?? 0), 0);
 
       const projecao = daysElapsed > 0 ? (vendas / daysElapsed) * totalDaysInMonth : vendas;
       const projecaoPct = meta > 0 ? (projecao / meta) * 100 : null;
@@ -263,7 +264,7 @@ export async function GET(request: Request) {
     const selectedFilialRow = filialRows.find(row => row.filial === selectedFilialKey) ?? {
       filial: selectedFilialKey,
       displayName: company.filialDisplayNames?.[selectedFilialKey] ?? selectedFilialKey,
-      meta: groupMembers.reduce((s, f) => s + (monthGoals[f] ?? 0), 0),
+      meta: getGoalMembers(company, selectedFilialKey).reduce((s, f) => s + (monthGoals[f] ?? 0), 0),
       vendas: 0,
       vendasPrevious: 0,
       qtde: 0,

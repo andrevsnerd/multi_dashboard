@@ -10,6 +10,7 @@ import {
 import { fetchEstoqueKPIs } from '@/lib/repositories/controleEstoque';
 import { fetchMultipleProductsStock } from '@/lib/repositories/inventory';
 import {
+  getEcommerceSalesFilials,
   normalizeFilialLookupKey,
   resolveCompany,
   SHOPIFY_LABEL,
@@ -78,6 +79,10 @@ export async function GET(request: Request) {
   const companyConfig = resolveCompany(company);
   const ecomSet = new Set((companyConfig?.ecommerceFilials ?? []).map(normalizeFilialLookupKey));
   const ehEcommerceLinx = (f: string | null) => !!f && ecomSet.has(normalizeFilialLookupKey(f));
+  // Meta: chave de perna HISTÓRICA do e-commerce (ex.: MSC, hoje Higienópolis) também é
+  // fatia do e-commerce — some junto para quem não vê e-commerce.
+  const metaEcomSet = new Set(getEcommerceSalesFilials(companyConfig).map(normalizeFilialLookupKey));
+  const ehMetaEcommerce = (f: string) => metaEcomSet.has(normalizeFilialLookupKey(f));
 
   // ── Supervisor/gerente (e somenteVarejo na Scarf Me) não veem e-commerce nesta tela ──
   // Sem Shopify, sem a filial E-COMMERCE, sem a meta dela; "Todas" = só lojas físicas.
@@ -153,7 +158,7 @@ export async function GET(request: Request) {
         ? ((allGoals[company]?.[String(year)]?.[String(month)] as Record<string, number>) ?? {})
         : {};
     const monthGoals = semEcommerce
-      ? Object.fromEntries(Object.entries(monthGoalsTodas).filter(([f]) => !ehEcommerceLinx(f)))
+      ? Object.fromEntries(Object.entries(monthGoalsTodas).filter(([f]) => !ehMetaEcommerce(f)))
       : monthGoalsTodas;
 
     // Sem Shopify: exatamente como era (sem a linha do e-commerce para quem não pode vê-lo).

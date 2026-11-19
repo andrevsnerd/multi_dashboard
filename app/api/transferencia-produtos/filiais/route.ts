@@ -134,6 +134,7 @@ export async function GET(request: Request) {
            OR FILIAL LIKE '%SCARF%'
            OR FILIAL LIKE '%SCARFME%'
            OR FILIAL LIKE '%MSC COMERCIO%LENCOS%'
+           OR FILIAL LIKE '%FFFR COMERCIO%LENCOS%'
         ORDER BY FILIAL
       `;
 

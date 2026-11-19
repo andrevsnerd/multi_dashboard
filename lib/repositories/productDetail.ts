@@ -6,7 +6,10 @@ import {
   getActiveFilial,
   filterStockCarryingFilials,
   type CompanyModule,
+  type CompanyConfig,
   VAREJO_VALUE,
+  buildEcommerceFaturamentoFilialSql,
+  ecommerceFaturamentoDisplayName,
 } from '@/lib/config/company';
 import { resolveCompanyLive, liveNameForIncoming } from '@/lib/server/company-live';
 import { resolveCompanyDynamic } from '@/lib/config/company-server';
@@ -60,22 +63,32 @@ async function buildEcommerceFilialFilter(
     return `AND ${tableAlias}.FILIAL = @ecommerceFilial`;
   }
 
-  // Caso contrário, usar todas as filiais de e-commerce da empresa
-  const ecommerceFilials = company.ecommerceFilials ?? [];
-  
-  if (ecommerceFilials.length === 0) {
-    return '';
-  }
-
-  ecommerceFilials.forEach((filial, index) => {
-    request.input(`ecommerceFilial${index}`, sql.VarChar, filial);
+  // Caso contrário, o grupo e-commerce inteiro, por PERÍODO: pernas atuais + pernas
+  // históricas com corte de EMISSAO (ex.: MSC foi e-commerce até 19/11/2026 e hoje é
+  // Higienópolis). Filial específica (acima) continua só ela — é o recorte de estoque
+  // da perna na série de progresso.
+  const clause = buildEcommerceFaturamentoFilialSql(company, {
+    filialColumn: `${tableAlias}.FILIAL`,
+    dateColumn: `${tableAlias}.EMISSAO`,
+    bind: (value, index) => {
+      request.input(`ecommerceFilial${index}`, sql.VarChar, value);
+      return `@ecommerceFilial${index}`;
+    },
   });
 
-  const placeholders = ecommerceFilials
-    .map((_, index) => `@ecommerceFilial${index}`)
-    .join(', ');
+  return clause ? `AND ${clause}` : '';
+}
 
-  return `AND ${tableAlias}.FILIAL IN (${placeholders})`;
+/**
+ * Chave de agregação de uma linha de FATURAMENTO de e-commerce. Perna histórica (ex.: MSC,
+ * hoje Higienópolis) vira a perna atual do grupo, para somar no "E-COMMERCE" e não colidir
+ * com a venda física da mesma filial (LOJA_VENDA usa o mesmo nome cru).
+ */
+function ecommerceFaturamentoKey(company: CompanyConfig | null | undefined, filial: string): string {
+  const name = (filial || '').trim();
+  const isHistory = (company?.ecommerceHistory ?? []).some((h) => h.filial.trim() === name);
+  if (!isHistory) return name;
+  return company?.ecommerceFilials?.[0] ?? ecommerceFaturamentoDisplayName(company, name);
 }
 
 async function buildFilialFilter(
@@ -746,6 +759,7 @@ async function fetchProductDetailEcommerce({
 
     const filialFilter = await buildEcommerceFilialFilter(request, company, filial, 'f');
     const colorFilterFp = buildColorFilter(request, colors)('fp');
+    const companyConfig = company ? await resolveCompanyLive(company) : null;
 
     // Buscar vendas do período atual (com filtro de cor)
     const currentSalesQuery = `
@@ -810,7 +824,8 @@ async function fetchProductDetailEcommerce({
     currentSalesResult.recordset.forEach((row) => {
       const revenue = Number(row.totalRevenue ?? 0);
       const quantity = Number(row.totalQuantity ?? 0);
-      const filial = (row.FILIAL || '').trim();
+      // Perna histórica (ex.: MSC até 19/11/2026) soma no E-COMMERCE, não na loja física atual.
+      const filial = ecommerceFaturamentoKey(companyConfig, row.FILIAL);
       const cor = row.COR_PRODUTO || 'SEM COR';
 
       totalRevenue += revenue;
@@ -1412,15 +1427,17 @@ async function fetchProductStockByFilialEcommerce({
           .join(', ');
         estoqueFilialFilter = `AND e.FILIAL IN (${placeholders})`;
       }
-      if (ecommerceFilials.length > 0) {
-        ecommerceFilials.forEach((filialName, index) => {
-          request.input(`ecommerceFilial${index}`, sql.VarChar, filialName);
-        });
-        const placeholders = ecommerceFilials
-          .map((_, index) => `@ecommerceFilial${index}`)
-          .join(', ');
-        vendasFilialFilter = `AND f.FILIAL IN (${placeholders})`;
-      }
+      // Vendas: grupo inteiro por PERÍODO (pernas atuais + históricas com corte de EMISSAO,
+      // ex.: MSC até 19/11/2026). O estoque acima segue só a perna ativa — não muda.
+      const vendasClause = buildEcommerceFaturamentoFilialSql(companyConfig, {
+        filialColumn: 'f.FILIAL',
+        dateColumn: 'f.EMISSAO',
+        bind: (value, index) => {
+          request.input(`ecommerceFilial${index}`, sql.VarChar, value);
+          return `@ecommerceFilial${index}`;
+        },
+      });
+      vendasFilialFilter = vendasClause ? `AND ${vendasClause}` : '';
     }
 
     // Buscar estoque por filial (com filtro de cor)
@@ -1520,9 +1537,14 @@ async function fetchProductStockByFilialEcommerce({
     const displayNames = companyConfig.filialDisplayNames ?? {};
     const aggByDisplayName = new Map<string, { stock: number; revenue: number; quantity: number; previousRevenue: number }>();
 
+    const historyFilials = new Set((companyConfig.ecommerceHistory ?? []).map((h) => h.filial.trim()));
     allFiliais.forEach((filial) => {
       const normalizedFilial = filial.trim();
-      const filialDisplayName = displayNames[normalizedFilial] ?? displayNames[filial] ?? filial;
+      // Perna histórica (ex.: MSC) aparece como E-COMMERCE — o papel da época da nota —,
+      // não como a loja física que ela é hoje (Higienópolis).
+      const filialDisplayName = historyFilials.has(normalizedFilial)
+        ? ecommerceFaturamentoDisplayName(companyConfig, normalizedFilial)
+        : displayNames[normalizedFilial] ?? displayNames[filial] ?? filial;
       const existing = aggByDisplayName.get(filialDisplayName) ?? { stock: 0, revenue: 0, quantity: 0, previousRevenue: 0 };
       existing.stock += stockMap.get(filial) ?? 0;
       existing.revenue += currentRevenueMap.get(filial) ?? 0;
@@ -1946,6 +1968,7 @@ async function fetchProductSaleHistoryEcommerce({
     }>(query);
 
     const displayNames = companyConfig.filialDisplayNames ?? {};
+    const historyFilials = new Set((companyConfig.ecommerceHistory ?? []).map((h) => h.filial.trim()));
 
     return result.recordset.map((row) => {
       const date = row.date instanceof Date ? row.date : new Date(row.date);
@@ -1958,6 +1981,10 @@ async function fetchProductSaleHistoryEcommerce({
         filial: row.FILIAL,
         filialDisplayName: (() => {
           const normalizedFilial = (row.FILIAL || '').trim();
+          // Perna histórica (ex.: MSC) → E-COMMERCE, não a loja física de hoje.
+          if (historyFilials.has(normalizedFilial)) {
+            return ecommerceFaturamentoDisplayName(companyConfig, normalizedFilial);
+          }
           return displayNames[normalizedFilial] ?? displayNames[row.FILIAL] ?? row.FILIAL;
         })(),
         quantity: Number(row.quantity ?? 0),
@@ -2192,12 +2219,17 @@ async function fetchProductSaleHistoryComparisonEcommerce({
     }>(query);
 
     const displayNames = companyConfig.filialDisplayNames ?? {};
+    const historyFilials = new Set((companyConfig.ecommerceHistory ?? []).map((h) => h.filial.trim()));
 
     return result.recordset.map((row) => ({
       date: row.date instanceof Date ? row.date : new Date(row.date),
       filial: row.FILIAL,
       filialDisplayName: (() => {
         const normalizedFilial = (row.FILIAL || '').trim();
+        // Perna histórica (ex.: MSC) → E-COMMERCE, não a loja física de hoje.
+        if (historyFilials.has(normalizedFilial)) {
+          return ecommerceFaturamentoDisplayName(companyConfig, normalizedFilial);
+        }
         return displayNames[normalizedFilial] ?? displayNames[row.FILIAL] ?? row.FILIAL;
       })(),
       quantity: Number(row.quantity ?? 0),

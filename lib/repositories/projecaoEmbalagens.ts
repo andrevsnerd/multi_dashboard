@@ -1,6 +1,7 @@
 import sql from "mssql";
 
 import { withRequest } from "@/lib/db/connection";
+import { buildEcommerceFaturamentoFilialSql, type CompanyConfig } from "@/lib/config/company";
 import {
   CATEGORIAS,
   CATEGORIA_KEYS,
@@ -74,6 +75,12 @@ export interface ProjecaoEmbalagensParams {
   posFilialNames: string[];
   /** Nomes VIVOS das filiais de e-commerce no escopo. */
   ecommerceFilialNames: string[];
+  /**
+   * Config da empresa — de onde sai o `ecommerceHistory` (pernas que FORAM e-commerce até
+   * uma data, ex.: MSC até 19/11/2026). Com e-commerce no escopo, as notas delas anteriores
+   * ao corte também contam como site.
+   */
+  company?: CompanyConfig | null;
   /** Data base 'yyyy-MM-dd'. As janelas fecham no dia anterior a ela. */
   base: string;
 }
@@ -347,6 +354,7 @@ async function consultarPos(
 
 async function consultarEcommerce(
   filiais: string[],
+  company: CompanyConfig | null | undefined,
   inicio: Date,
   fim: Date,
   base: Date
@@ -356,8 +364,16 @@ async function consultarEcommerce(
     request.input("inicio", sql.DateTime, inicio);
     request.input("fim", sql.DateTime, fim);
     inputJanelas(request, base);
-    filiais.forEach((f, i) => request.input(`ef${i}`, sql.VarChar, f));
-    const placeholders = filiais.map((_, i) => `@ef${i}`).join(", ");
+    // Pernas atuais do escopo + históricas com corte de EMISSAO (papel por período).
+    const filialClause = buildEcommerceFaturamentoFilialSql(company, {
+      filialColumn: "f.FILIAL",
+      dateColumn: "f.EMISSAO",
+      current: filiais,
+      bind: (f, i) => {
+        request.input(`ef${i}`, sql.VarChar, f);
+        return `@ef${i}`;
+      },
+    });
 
     // O "ticket" do site é a nota: FILIAL + NF + série identificam o pedido.
     const movCte = `
@@ -376,7 +392,7 @@ async function consultarEcommerce(
         AND f.EMISSAO < @fim
         AND f.NOTA_CANCELADA = 0
         AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
-        AND f.FILIAL IN (${placeholders})`;
+        AND ${filialClause}`;
 
     const res = await request.query<LinhaAssinatura>(montarQuery(movCte));
     return res.recordset ?? [];
@@ -404,7 +420,7 @@ function ymdToUtc(ymd: string): Date {
 export async function fetchProjecaoEmbalagens(
   params: ProjecaoEmbalagensParams
 ): Promise<EmbalagemSerie[]> {
-  const { posFilialNames, ecommerceFilialNames, base } = params;
+  const { posFilialNames, ecommerceFilialNames, company, base } = params;
   const anoBase = Number(base.slice(0, 4));
   const mesBase = Number(base.slice(5, 7));
   const baseDate = ymdToUtc(base);
@@ -425,7 +441,7 @@ export async function fetchProjecaoEmbalagens(
       consultarPos(posFilialNames, corte.inicio, corte.fim, baseDate).then(
         (linhas) => ({ canal: "loja" as EmbalagemCanal, linhas })
       ),
-      consultarEcommerce(ecommerceFilialNames, corte.inicio, corte.fim, baseDate).then(
+      consultarEcommerce(ecommerceFilialNames, company, corte.inicio, corte.fim, baseDate).then(
         (linhas) => ({ canal: "site" as EmbalagemCanal, linhas })
       ),
     ])

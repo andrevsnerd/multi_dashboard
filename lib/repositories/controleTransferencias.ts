@@ -1,6 +1,8 @@
 import sql from 'mssql';
 
 import {
+  buildEcommerceFaturamentoFilialSql,
+  getEcommerceSalesFilials,
   getActiveFilial,
   getFilialGroupMembers,
   filterStockCarryingFilials,
@@ -205,15 +207,18 @@ export async function fetchControleTransferencias({
     const ecommerceFilials = companyConfig?.ecommerceFilials ?? [];
     
     // Criar filtro de filial para e-commerce
+    // Papel por período: pernas atuais + históricas (ex.: MSC até 19/11/2026) com corte de EMISSAO.
     let ecommerceFilialFilter = '';
     if (shouldIncludeEcommerce && ecommerceFilials.length > 0) {
-      ecommerceFilials.forEach((filialName, index) => {
-        request.input(`ecommerceFilial${index}`, sql.VarChar, filialName);
+      const clause = buildEcommerceFaturamentoFilialSql(companyConfig, {
+        filialColumn: 'f.FILIAL',
+        dateColumn: 'f.EMISSAO',
+        bind: (value, index) => {
+          request.input(`ecommerceFilial${index}`, sql.VarChar, value);
+          return `@ecommerceFilial${index}`;
+        },
       });
-      const placeholders = ecommerceFilials
-        .map((_, index) => `@ecommerceFilial${index}`)
-        .join(', ');
-      ecommerceFilialFilter = `AND f.FILIAL IN (${placeholders})`;
+      ecommerceFilialFilter = clause ? `AND ${clause}` : '';
     }
 
     // Query otimizada: busca estoque agrupado por produto+cor+filial
@@ -668,12 +673,26 @@ export async function fetchControleTransferencias({
 
     // Processar vendas de e-commerce combinadas (período, 30d, 60d e 12m)
     if (shouldIncludeEcommerce) {
+      // Perna HISTÓRICA de e-commerce (ex.: MSC até 19/11/2026, hoje Higienópolis): a nota de
+      // e-commerce dela é venda do E-COMMERCE, não da loja que a filial virou. Sem isto o
+      // getFilialCanonico jogaria essas vendas no grupo de Higienópolis.
+      const ecommerceAtualSet = new Set(ecommerceFilials.map(normalizeFilial));
+      const ecommerceHistoricoSet = new Set(
+        getEcommerceSalesFilials(companyConfig)
+          .map(normalizeFilial)
+          .filter((f) => !ecommerceAtualSet.has(f))
+      );
+      const ecommerceCanonicoVendas = ecommerceFilials[0] ? getFilialCanonico(ecommerceFilials[0]) : null;
+
       ecommerceCombinedResult.recordset.forEach(row => {
         const produto = row.produto?.trim() || '';
         if (!produto) return;
 
         const chave = getChaveStable(produto, row.corProduto);
-        const filial = getFilialCanonico(row.filial);
+        const filial =
+          ecommerceCanonicoVendas && ecommerceHistoricoSet.has(normalizeFilial(row.filial))
+            ? ecommerceCanonicoVendas
+            : getFilialCanonico(row.filial);
 
         acumular(vendasMap,           chave, filial, Number(row.vendasPeriodo   ?? 0));
         acumular(vendasLast30DaysMap, chave, filial, Number(row.vendasLast30Days ?? 0));

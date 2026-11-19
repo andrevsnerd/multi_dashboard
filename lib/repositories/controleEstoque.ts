@@ -7,6 +7,7 @@ import {
   getFilialGroupMembers,
   getActiveFilial,
   filterStockCarryingFilials,
+  buildEcommerceFaturamentoFilialSql,
 } from '@/lib/config/company';
 import { resolveCompanyLive, liveNameForIncoming, liveNamesForIncoming } from '@/lib/server/company-live';
 import { resolveCompanyDynamic } from '@/lib/config/company-server';
@@ -396,12 +397,18 @@ async function buildScarfmeEcommerceFaturamentoFilialFilter(
       // buildVendasFilialFilter / buildEntradaFilialFilter / buildFilialFilter. O e-commerce ScarfMe
       // faz rodízio entre filiais (MSC↔AKS) a cada ~15d; escopar a UMA filial fazia o ritmo/qtde60d
       // perderem as vendas do outro membro do rodízio (medido na filial errada → consumo 0 →
-      // "Suficiente" com estoque 0). Agrega todas as e-commerce (já restritas às permitidas acima).
-      ecommerceFilials.forEach((filialNome, index) => {
-        request.input(`${paramPrefix}Grp${index}`, sql.VarChar, filialNome);
+      // "Suficiente" com estoque 0). Agrega todas as e-commerce (já restritas às permitidas acima),
+      // mais as pernas históricas (ex.: MSC até 19/11/2026) com corte de EMISSAO.
+      const grpClause = buildEcommerceFaturamentoFilialSql(companyConfig, {
+        filialColumn: 'f.FILIAL',
+        dateColumn: 'f.EMISSAO',
+        current: ecommerceFilials,
+        bind: (value, i) => {
+          request.input(`${paramPrefix}Grp${i}`, sql.VarChar, value);
+          return `@${paramPrefix}Grp${i}`;
+        },
       });
-      const placeholders = ecommerceFilials.map((_, i) => `@${paramPrefix}Grp${i}`).join(', ');
-      return `AND f.FILIAL IN (${placeholders})`;
+      return `AND ${grpClause}`;
     }
     return `AND 1=0`;
   }
@@ -414,11 +421,17 @@ async function buildScarfmeEcommerceFaturamentoFilialFilter(
     return '';
   }
 
-  ecommerceFilials.forEach((filialNome, index) => {
-    request.input(`${paramPrefix}${index}`, sql.VarChar, filialNome);
+  // Todas as filiais = e-commerce inteiro: pernas atuais + históricas com corte de EMISSAO.
+  const allClause = buildEcommerceFaturamentoFilialSql(companyConfig, {
+    filialColumn: 'f.FILIAL',
+    dateColumn: 'f.EMISSAO',
+    current: ecommerceFilials,
+    bind: (value, i) => {
+      request.input(`${paramPrefix}${i}`, sql.VarChar, value);
+      return `@${paramPrefix}${i}`;
+    },
   });
-  const placeholders = ecommerceFilials.map((_, i) => `@${paramPrefix}${i}`).join(', ');
-  return `AND f.FILIAL IN (${placeholders})`;
+  return `AND ${allClause}`;
 }
 
 function buildGrupoFilter(
@@ -585,6 +598,30 @@ function buildGradeFilter(
 }
 
 /**
+ * `AND (...)` de filial para FATURAMENTO de e-commerce (venda 100.02/100.022), respeitando o
+ * papel por período: pernas atuais + históricas (ex.: MSC até 19/11/2026) com corte de EMISSAO.
+ * Parâmetros: `@${paramPrefix}0..n` (VarChar). Devolve '' quando não há filial de e-commerce.
+ * Use só quando o recorte é o e-commerce INTEIRO (todas as filiais / grupo e-commerce).
+ */
+function buildEcomFaturamentoFilialAnd(
+  request: sql.Request | RequestLike,
+  companyConfig: Parameters<typeof buildEcommerceFaturamentoFilialSql>[0],
+  paramPrefix: string,
+  opts: { filialColumn?: string; dateColumn?: string; current?: string[] } = {}
+): string {
+  const clause = buildEcommerceFaturamentoFilialSql(companyConfig, {
+    filialColumn: opts.filialColumn ?? 'f.FILIAL',
+    dateColumn: opts.dateColumn ?? 'f.EMISSAO',
+    current: opts.current,
+    bind: (value, i) => {
+      request.input(`${paramPrefix}${i}`, sql.VarChar, value.trim());
+      return `@${paramPrefix}${i}`;
+    },
+  });
+  return clause ? `AND ${clause}` : '';
+}
+
+/**
  * Para SCARFME: constrói o filtro de filial para a fonte de e-commerce (FATURAMENTO).
  * Retorna `include: true` quando o UNION com FATURAMENTO deve ser adicionado.
  * Retorna `include: false` para NERD (sem e-commerce), filial varejo específica, ou VAREJO_VALUE.
@@ -613,12 +650,17 @@ async function buildEcomVendasFilter(
     return { filterSql: '', include: false };
   }
 
-  // null (todas as filiais) ou uma filial de e-commerce específica → inclui FATURAMENTO
-  ecommerceFilials.forEach((f, i) => {
-    request.input(`ecomVendasFilial${i}`, sql.VarChar, f);
+  // null (todas as filiais) ou uma filial de e-commerce específica → inclui FATURAMENTO.
+  // Papel por período: pernas atuais + históricas (ex.: MSC até 19/11/2026) com corte de EMISSAO.
+  const clause = buildEcommerceFaturamentoFilialSql(company, {
+    filialColumn: 'f.FILIAL',
+    dateColumn: 'f.EMISSAO',
+    bind: (value, i) => {
+      request.input(`ecomVendasFilial${i}`, sql.VarChar, value);
+      return `@ecomVendasFilial${i}`;
+    },
   });
-  const placeholders = ecommerceFilials.map((_, i) => `@ecomVendasFilial${i}`).join(', ');
-  return { filterSql: `AND f.FILIAL IN (${placeholders})`, include: true };
+  return { filterSql: `AND ${clause}`, include: true };
 }
 
 /**
@@ -1535,14 +1577,8 @@ export async function fetchEstoqueKPIs({
     
     if (shouldIncludeEcommerce) {
       // Para "Todas as filiais" (null), buscar todas as filiais de e-commerce
-      const ecommerceFilials = companyConfig?.ecommerceFilials ?? [];
-      if (ecommerceFilials.length > 0) {
-        ecommerceFilials.forEach((filialEcommerce, index) => {
-          request.input(`ecommerceFilialKPI${index}`, sql.VarChar, filialEcommerce);
-        });
-        const placeholders = ecommerceFilials.map((_, i) => `@ecommerceFilialKPI${i}`).join(', ');
-        ecommerceFilialFilter = `AND f.FILIAL IN (${placeholders})`;
-      }
+      // (atuais + históricas com corte de EMISSAO).
+      ecommerceFilialFilter = buildEcomFaturamentoFilialAnd(request, companyConfig, 'ecommerceFilialKPI');
 
       if (ecommerceFilialFilter) {
         const ecommerceVendasQuery = `
@@ -1790,13 +1826,8 @@ export async function fetchEstoqueKPIs({
           ecommerceFilialFilterKPI = `AND 1=0`; // Sempre falso
         } else if (filial === null) {
           // Se for "Todas as filiais", incluir todas as filiais de e-commerce
-          if (ecommerceFilials.length > 0) {
-            ecommerceFilials.forEach((f, index) => {
-              request.input(`ecommercePeriodoFilialKPI${index}`, sql.VarChar, f);
-            });
-            const placeholders = ecommerceFilials.map((_, i) => `@ecommercePeriodoFilialKPI${i}`).join(', ');
-            ecommerceFilialFilterKPI = `AND f.FILIAL IN (${placeholders})`;
-          }
+          // (atuais + históricas com corte de EMISSAO).
+          ecommerceFilialFilterKPI = buildEcomFaturamentoFilialAnd(request, companyConfig, 'ecommercePeriodoFilialKPI');
         }
         
         if (ecommerceFilialFilterKPI && !ecommerceFilialFilterKPI.includes('1=0')) {
@@ -2089,25 +2120,19 @@ export async function fetchEstoquePorCategoria({
       let ecommercePeriodoFilialFilter = '';
       const companyConfig = await resolveCompanyLive(company);
       if (companyConfig) {
-        const ecommerceFilials = companyConfig.ecommerceFilials ?? [];
-        if (ecommerceFilials.length > 0) {
-          ecommerceFilials.forEach((f, index) => {
-            request.input(`ecommercePeriodoFilial${index}`, sql.VarChar, f);
-          });
-          const placeholders = ecommerceFilials.map((_, i) => `@ecommercePeriodoFilial${i}`).join(', ');
-          ecommercePeriodoFilialFilter = `AND f.FILIAL IN (${placeholders})`;
-        }
+        // Atuais + históricas com corte de EMISSAO (papel por período).
+        ecommercePeriodoFilialFilter = buildEcomFaturamentoFilialAnd(request, companyConfig, 'ecommercePeriodoFilial');
       }
 
       const ecommercePeriodoQuery = `
-        SELECT 
+        SELECT
           ${categoriaField} AS categoria
           ${camposVendasAdicionais},
           YEAR(f.EMISSAO) AS ano,
           MONTH(f.EMISSAO) AS mes,
           SUM(CAST(fp.QTDE AS FLOAT)) AS vendas
         FROM FATURAMENTO f WITH (NOLOCK)
-        JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK) 
+        JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
           ON f.FILIAL = fp.FILIAL AND f.NF_SAIDA = fp.NF_SAIDA AND f.SERIE_NF = fp.SERIE_NF
         LEFT JOIN PRODUTOS p WITH (NOLOCK) ON p.PRODUTO = fp.PRODUTO
         WHERE f.EMISSAO >= @periodoStart
@@ -2442,6 +2467,18 @@ export async function fetchEstoquePorCategoria({
             });
             const placeholders = normalFiliais.map((_, i) => `@ecommerceSemanaFilial${i}`).join(', ');
             ecommerceFilialFilter = `AND f.FILIAL IN (${placeholders})`;
+            // Papel por período: perna que FOI e-commerce (ex.: MSC até 19/11/2026, hoje loja física)
+            // está em normalFiliais, mas as notas dela antes do corte são e-commerce → fora do VAREJO.
+            const historicoEcom = buildEcommerceFaturamentoFilialSql(companyConfig, {
+              filialColumn: 'f.FILIAL',
+              dateColumn: 'f.EMISSAO',
+              current: [],
+              bind: (value, i) => {
+                request.input(`ecommerceSemanaHistFilial${i}`, sql.VarChar, value);
+                return `@ecommerceSemanaHistFilial${i}`;
+              },
+            });
+            if (historicoEcom) ecommerceFilialFilter += ` AND NOT ${historicoEcom}`;
           }
         }
         // Para scarfme: se for "Todas as filiais" (null), incluir também ecommerce
@@ -3178,13 +3215,10 @@ export async function fetchDetalhesVendasSemana({
           }
         } else {
           // Apenas e-commerce quando filial é VAREJO ou undefined
-          if (ecommerceFilials.length > 0) {
-            ecommerceFilials.forEach((f, index) => {
-              request.input(`ecommerceDetalheFilial${index}`, sql.VarChar, f);
-            });
-            const placeholders = ecommerceFilials.map((_, i) => `@ecommerceDetalheFilial${i}`).join(', ');
-            ecommerceFilialFilter = `AND f.FILIAL IN (${placeholders})`;
-          }
+          // (atuais + históricas com corte de EMISSAO).
+          ecommerceFilialFilter = buildEcomFaturamentoFilialAnd(request, companyConfig, 'ecommerceDetalheFilial', {
+            current: ecommerceFilials,
+          });
         }
       }
     }
@@ -3400,13 +3434,10 @@ export async function fetchDetalhesEcommerceSemana({
         }
       } else {
         // Apenas e-commerce quando filial é VAREJO ou undefined
-        if (ecommerceFilials.length > 0) {
-          ecommerceFilials.forEach((f, index) => {
-            request.input(`ecommerceDetalheFilial${index}`, sql.VarChar, f);
-          });
-          const placeholders = ecommerceFilials.map((_, i) => `@ecommerceDetalheFilial${i}`).join(', ');
-          ecommerceFilialFilter = `AND f.FILIAL IN (${placeholders})`;
-        }
+        // (atuais + históricas com corte de EMISSAO).
+        ecommerceFilialFilter = buildEcomFaturamentoFilialAnd(request, companyConfig, 'ecommerceDetalheFilial', {
+          current: ecommerceFilials,
+        });
       }
     }
 
@@ -3565,11 +3596,8 @@ export async function fetchVendasPorCategoria({
     // E-commerce do período: mesma regra dos cards (ScarfMe quando "Todas as filiais")
     const shouldIncludeEcommerce = company === 'scarfme' && (filial === null || filial === undefined) && companyConfig && (companyConfig.ecommerceFilials?.length ?? 0) > 0;
     if (shouldIncludeEcommerce) {
-      const ecommerceFilials = companyConfig!.ecommerceFilials ?? [];
-      ecommerceFilials.forEach((f, index) => {
-        request.input(`ecommerceVendasCatFilial${index}`, sql.VarChar, f);
-      });
-      const placeholders = ecommerceFilials.map((_, i) => `@ecommerceVendasCatFilial${i}`).join(', ');
+      // Atuais + históricas com corte de EMISSAO (papel por período).
+      const ecommerceVendasCatFilialFilter = buildEcomFaturamentoFilialAnd(request, companyConfig, 'ecommerceVendasCatFilial');
       const ecommerceQuery = `
         SELECT 
           ${categoriaField} AS categoria,
@@ -3583,7 +3611,7 @@ export async function fetchVendasPorCategoria({
           AND f.NOTA_CANCELADA = 0
           AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
           AND CAST(fp.QTDE AS FLOAT) > 0
-          AND f.FILIAL IN (${placeholders})
+          ${ecommerceVendasCatFilialFilter}
           ${grupoFilter}
           ${linhaFilter}
           ${colecaoFilter}
@@ -3821,13 +3849,8 @@ export async function fetchVendasPorCategoriaGiro({
         }
         // Para scarfme: se for "Todas as filiais" (null), incluir todas as filiais de e-commerce
         else if (isScarfme && filial === null) {
-          if (ecommerceFilials.length > 0) {
-            ecommerceFilials.forEach((f, index) => {
-              request.input(`ecommerceGiroFilial${index}`, sql.VarChar, f);
-            });
-            const placeholders = ecommerceFilials.map((_, i) => `@ecommerceGiroFilial${i}`).join(', ');
-            ecommerceFilialFilter = `AND f.FILIAL IN (${placeholders})`;
-          }
+          // Atuais + históricas com corte de EMISSAO (papel por período).
+          ecommerceFilialFilter = buildEcomFaturamentoFilialAnd(request, companyConfig, 'ecommerceGiroFilial');
         }
       }
     }
@@ -4103,18 +4126,12 @@ export async function fetchPrevisoesEstoque({
       let ecommercePeriodoFilialFilter = '';
       const companyConfig = await resolveCompanyLive(company);
       if (companyConfig) {
-        const ecommerceFilials = companyConfig.ecommerceFilials ?? [];
-        if (ecommerceFilials.length > 0) {
-          ecommerceFilials.forEach((f, index) => {
-            request.input(`ecommercePeriodoFilial${index}`, sql.VarChar, f);
-          });
-          const placeholders = ecommerceFilials.map((_, i) => `@ecommercePeriodoFilial${i}`).join(', ');
-          ecommercePeriodoFilialFilter = `AND f.FILIAL IN (${placeholders})`;
-        }
+        // Atuais + históricas com corte de EMISSAO (papel por período).
+        ecommercePeriodoFilialFilter = buildEcomFaturamentoFilialAnd(request, companyConfig, 'ecommercePeriodoFilial');
       }
 
       const ecommercePeriodoQuery = `
-        SELECT 
+        SELECT
           ${categoriaField} AS categoria
           ${camposVendasAdicionais},
           SUM(CAST(fp.QTDE AS FLOAT)) AS vendas
@@ -5435,16 +5452,10 @@ export async function fetchProjecaoMensal({
     if (includeEcommerce) {
       const companyConfig = await resolveCompanyLive(company);
       if (companyConfig) {
-        const ecommerceFilials = companyConfig.ecommerceFilials ?? [];
-        let ecommerceAnoPassadoFilialFilter = '';
-        
-        if (ecommerceFilials.length > 0) {
-          ecommerceFilials.forEach((f, index) => {
-            request.input(`ecommerceAnoPassadoFilial${index}`, sql.VarChar, f.trim());
-          });
-          const placeholders = ecommerceFilials.map((_, i) => `@ecommerceAnoPassadoFilial${i}`).join(', ');
-          ecommerceAnoPassadoFilialFilter = `AND REPLACE(REPLACE(LTRIM(RTRIM(f.FILIAL)), NCHAR(0x00A0), ' '), CHAR(9), ' ') IN (${placeholders})`;
-        }
+        // Atuais + históricas com corte de EMISSAO (papel por período).
+        const ecommerceAnoPassadoFilialFilter = buildEcomFaturamentoFilialAnd(request, companyConfig, 'ecommerceAnoPassadoFilial', {
+          filialColumn: `REPLACE(REPLACE(LTRIM(RTRIM(f.FILIAL)), NCHAR(0x00A0), ' '), CHAR(9), ' ')`,
+        });
 
         if (ecommerceAnoPassadoFilialFilter) {
           // Usar data de entrega (fp.ENTREGA) quando existir, senao emissao - para bater com vendas por mes de entrega
@@ -5584,10 +5595,10 @@ export async function fetchProjecaoMensal({
     if (includeEcommerce) {
       const companyConfig = await resolveCompanyLive(company);
       if (companyConfig?.ecommerceFilials?.length) {
-        const ecommerceFilials = companyConfig.ecommerceFilials;
-        ecommerceFilials.forEach((f, idx) => request.input(`ecommercePrev30Filial${idx}`, sql.VarChar, f.trim()));
-        const placeholders = ecommerceFilials.map((_, i) => `@ecommercePrev30Filial${i}`).join(', ');
-        const ecommercePrev30FilialFilter = `AND REPLACE(REPLACE(LTRIM(RTRIM(f.FILIAL)), NCHAR(0x00A0), ' '), CHAR(9), ' ') IN (${placeholders})`;
+        // Atuais + históricas com corte de EMISSAO (papel por período).
+        const ecommercePrev30FilialFilter = buildEcomFaturamentoFilialAnd(request, companyConfig, 'ecommercePrev30Filial', {
+          filialColumn: `REPLACE(REPLACE(LTRIM(RTRIM(f.FILIAL)), NCHAR(0x00A0), ' '), CHAR(9), ' ')`,
+        });
         const ecommercePrev30Query = `
           SELECT
             ${categoriaField} AS categoria
@@ -5621,16 +5632,10 @@ export async function fetchProjecaoMensal({
     if (includeEcommerce) {
       const companyConfig = await resolveCompanyLive(company);
       if (companyConfig) {
-        const ecommerceFilials = companyConfig.ecommerceFilials ?? [];
-        let ecommerceMesAtualFilialFilter = '';
-        
-        if (ecommerceFilials.length > 0) {
-          ecommerceFilials.forEach((f, index) => {
-            request.input(`ecommerceMesAtualFilial${index}`, sql.VarChar, f.trim());
-          });
-          const placeholders = ecommerceFilials.map((_, i) => `@ecommerceMesAtualFilial${i}`).join(', ');
-          ecommerceMesAtualFilialFilter = `AND REPLACE(REPLACE(LTRIM(RTRIM(f.FILIAL)), NCHAR(0x00A0), ' '), CHAR(9), ' ') IN (${placeholders})`;
-        }
+        // Atuais + históricas com corte de EMISSAO (papel por período).
+        const ecommerceMesAtualFilialFilter = buildEcomFaturamentoFilialAnd(request, companyConfig, 'ecommerceMesAtualFilial', {
+          filialColumn: `REPLACE(REPLACE(LTRIM(RTRIM(f.FILIAL)), NCHAR(0x00A0), ' '), CHAR(9), ' ')`,
+        });
 
         if (ecommerceMesAtualFilialFilter) {
           const ecommerceMesAtualQuery = `
@@ -5712,10 +5717,10 @@ export async function fetchProjecaoMensal({
     if (includeEcommerce) {
       const companyConfig = await resolveCompanyLive(company);
       if (companyConfig?.ecommerceFilials?.length) {
-        const ecommerceFilials = companyConfig.ecommerceFilials;
-        ecommerceFilials.forEach((f, index) => request.input(`ecommerceAnoAtualFilial${index}`, sql.VarChar, f.trim()));
-        const placeholders = ecommerceFilials.map((_, i) => `@ecommerceAnoAtualFilial${i}`).join(', ');
-        const ecommerceAnoAtualFilialFilter = `AND REPLACE(REPLACE(LTRIM(RTRIM(f.FILIAL)), NCHAR(0x00A0), ' '), CHAR(9), ' ') IN (${placeholders})`;
+        // Atuais + históricas com corte de EMISSAO (papel por período).
+        const ecommerceAnoAtualFilialFilter = buildEcomFaturamentoFilialAnd(request, companyConfig, 'ecommerceAnoAtualFilial', {
+          filialColumn: `REPLACE(REPLACE(LTRIM(RTRIM(f.FILIAL)), NCHAR(0x00A0), ' '), CHAR(9), ' ')`,
+        });
         const dataEcommerce = `COALESCE(CAST(fp.ENTREGA AS DATE), CAST(f.EMISSAO AS DATE))`;
         const ecommerceAnoAtualPorMesQuery = `
           SELECT

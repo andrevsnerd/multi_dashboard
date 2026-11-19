@@ -7,7 +7,7 @@ import {
   resolveCanaisTicket,
 } from "@/lib/repositories/reportTickets";
 import { resolveCompanyLive } from "@/lib/server/company-live";
-import { getFilialLabelForDisplay } from "@/lib/config/company";
+import { ecommerceFaturamentoDisplayName, getFilialLabelForDisplay } from "@/lib/config/company";
 import type {
   ReportFilters,
   ReportResult,
@@ -112,7 +112,14 @@ export async function fetchVendasPorPreco(filters: ReportFilters): Promise<Repor
     CANAL: t.canal === "ECOMMERCE" ? "E-commerce" : "Loja",
     TICKET: t.ticket,
     DATA_VENDA: t.dataVenda,
-    FILIAL: company ? getFilialLabelForDisplay(company, t.filial) : t.filial,
+    // Nota de e-commerce de perna histórica (MSC até 19/11/2026) sai como E-COMMERCE,
+    // não pelo papel atual da filial (Higienópolis).
+    FILIAL: !company
+      ? t.filial
+      : t.canal === "ECOMMERCE" &&
+          (company.ecommerceHistory ?? []).some((h) => h.filial.trim() === t.filial.trim())
+        ? ecommerceFaturamentoDisplayName(company, t.filial)
+        : getFilialLabelForDisplay(company, t.filial),
     VENDEDOR: t.canal === "ECOMMERCE" ? "E-COMMERCE" : t.vendedor || "SEM VENDEDOR",
     CLIENTE: t.cliente,
     CPF: t.cpf,

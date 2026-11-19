@@ -1,6 +1,7 @@
 import sql from "mssql";
 
 import { withRequest } from "@/lib/db/connection";
+import { getFilialById } from "@/lib/config/filial-registry";
 import type { InventarioLojaResumo, LojaInventarioDef } from "@/lib/reports/estoque-inventario";
 
 /**
@@ -106,8 +107,14 @@ async function detectarFilialAtiva(cods: string[], nomes: Map<string, string>): 
       ) M ON M.COD_FILIAL = F.COD_FILIAL
       GROUP BY F.COD_FILIAL
     `);
+    // Papel por período: movimento de um CNPJ ANTES do início do papel dele nesta loja
+    // (FilialDef.since — ex.: MSC era e-commerce até 19/11/2026) não o elege como ativo.
+    const antesDoPapel = (r: { COD_FILIAL: string; ULTIMA: Date | null }) => {
+      const since = getFilialById(String(r.COD_FILIAL).trim())?.since;
+      return Boolean(since && r.ULTIMA && new Date(r.ULTIMA).toISOString().slice(0, 10) < since);
+    };
     const comData = recordset
-      .filter((r) => r.ULTIMA != null)
+      .filter((r) => r.ULTIMA != null && !antesDoPapel(r))
       .sort((a, b) => new Date(b.ULTIMA as Date).getTime() - new Date(a.ULTIMA as Date).getTime());
     const ativo = comData.length > 0 ? String(comData[0].COD_FILIAL).trim() : cods[0];
     return nomeFilial(nomes, ativo);

@@ -1,6 +1,6 @@
 import sql from "mssql";
 
-import { VAREJO_VALUE, type CompanyConfig } from "@/lib/config/company";
+import { buildEcommerceFaturamentoFilialSql, VAREJO_VALUE, type CompanyConfig } from "@/lib/config/company";
 import { resolveCompanyLive } from "@/lib/server/company-live";
 import { withRequest } from "@/lib/db/connection";
 import { RequestLike } from "@/lib/db/proxy";
@@ -797,11 +797,17 @@ async function querySalesRows(
       ? withRequest(async (request) => {
           request.input("ecomStart", sql.DateTime, range.start);
           request.input("ecomEnd", sql.DateTime, range.end);
-          ecommerceMembers.forEach((filial, index) => {
-            request.input(`ecomFilial${index}`, sql.VarChar, filial);
+          // Pernas atuais do escopo + históricas com corte de EMISSAO (papel por período:
+          // MSC foi e-commerce até 19/11/2026 e hoje é Higienópolis).
+          const ecomFilialClause = buildEcommerceFaturamentoFilialSql(company, {
+            filialColumn: "f.FILIAL",
+            dateColumn: "f.EMISSAO",
+            current: ecommerceMembers,
+            bind: (filial, index) => {
+              request.input(`ecomFilial${index}`, sql.VarChar, filial);
+              return `@ecomFilial${index}`;
+            },
           });
-
-          const filialPlaceholders = ecommerceMembers.map((_, index) => `@ecomFilial${index}`).join(", ");
           const colecaoFilter = addArrayFilter(
             request,
             filters.colecoes,
@@ -870,7 +876,7 @@ async function querySalesRows(
               AND f.NOTA_CANCELADA = 0
               AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
               AND fp.QTDE > 0
-              AND f.FILIAL IN (${filialPlaceholders})
+              AND ${ecomFilialClause}
               ${colecaoFilter}
               ${subgrupoFilter}
               ${grupoFilter}

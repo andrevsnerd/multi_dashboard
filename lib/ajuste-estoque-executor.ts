@@ -493,6 +493,68 @@ export async function executarAjusteContagem(
 }
 
 /**
+ * Zeragem completa = total E tamanhos em zero (regra do dono, 19/11/2026).
+ *
+ * A contagem zera o total, mas a linha que já tinha `ESTOQUE ≠ soma(ES)` (sujeira antiga
+ * do Linx) fica com a diferença no tamanho (ex.: total 0, ES1 −2) — o trigger move total
+ * e tamanho pelo mesmo número. Nenhuma contagem resolve isso; o único acerto é zerar só
+ * as colunas ES1..ES48 dessas linhas. É a ÚNICA exceção autorizada à regra "estoque só
+ * pelo trigger" do CLAUDE.md, e vale só aqui: linha com ESTOQUE = 0 (o total não muda).
+ *
+ * Grava, numa transação, um registro 'ACERTO DE GRADE' (QTDE_AJUSTE = 0, OBS com o
+ * antes) em NERD_AJUSTE_HISTORICO por linha e depois zera as ES. Sem `itens`, varre a
+ * filial inteira (zerar filial); com `itens`, só aqueles produto×cor (zerar item).
+ */
+export async function acertarGradeZerada(
+  pool: PoolLike,
+  params: {
+    filialNome: string;
+    /** Contagem que zerou o total — vai em ROMANEIO_REF e na OBS. */
+    nomeContagem: string;
+    responsavel: string;
+    itens?: Array<{ produto: string; cor: string }>;
+  }
+): Promise<number> {
+  const filialNome = params.filialNome.trim();
+  const esCols = Array.from({ length: TAMANHOS }, (_, i) => `ES${i + 1}`);
+  const temTamanho = esCols.map((c) => `ISNULL(${c},0) <> 0`).join(' OR ');
+
+  let filtroItens = '';
+  if (params.itens) {
+    const pares = [...new Set(params.itens.map((i) => `${i.produto.trim()}|${(i.cor ?? '').trim()}`))];
+    if (pares.length === 0) return 0;
+    filtroItens = `AND (${pares
+      .map((p) => {
+        const [produto, cor] = p.split('|');
+        return `(RTRIM(LTRIM(PRODUTO)) = '${escapeLike(produto)}' AND RTRIM(LTRIM(ISNULL(COR_PRODUTO,''))) = '${escapeLike(cor)}')`;
+      })
+      .join(' OR ')})`;
+  }
+  const onde = `RTRIM(LTRIM(FILIAL)) = RTRIM(LTRIM(@filial)) AND ESTOQUE = 0 AND (${temTamanho}) ${filtroItens}`;
+  const antes = esCols
+    .map((c, i) => `CASE WHEN ISNULL(${c},0) <> 0 THEN ' T${i + 1}=' + CAST(${c} AS VARCHAR(20)) END`)
+    .join(', ');
+
+  const req = pool.request();
+  req.input('filial', filialNome);
+  req.input('nome', params.nomeContagem.trim());
+  req.input('responsavel', (params.responsavel || '').trim().slice(0, 25) || 'AJUSTE');
+  const res = await req.query(`
+    SET XACT_ABORT ON;
+    BEGIN TRANSACTION;
+    INSERT INTO NERD_AJUSTE_HISTORICO (FILIAL, PRODUTO, COR_PRODUTO, QTDE_AJUSTE, ROMANEIO_REF, TIPO_AJUSTE, RESPONSAVEL, OBS)
+    SELECT RTRIM(FILIAL), RTRIM(PRODUTO), RTRIM(ISNULL(COR_PRODUTO,'')), 0, @nome, 'ACERTO DE GRADE', @responsavel,
+           LEFT('ACERTO DE GRADE (total 0 inalterado). Antes:' + CONCAT(${antes}) + '. Depois: zero. Item zerado em ' + @nome, 500)
+    FROM ESTOQUE_PRODUTOS WITH (UPDLOCK, HOLDLOCK) WHERE ${onde};
+    UPDATE ESTOQUE_PRODUTOS SET ${esCols.map((c) => `${c} = 0`).join(', ')} WHERE ${onde};
+    DECLARE @acertadas INT = @@ROWCOUNT;
+    COMMIT TRANSACTION;
+    SELECT @acertadas AS ACERTADAS;
+  `);
+  return Number(res.recordset?.[0]?.ACERTADAS ?? 0);
+}
+
+/**
  * Desfaz (estorna) uma contagem: lê os deltas originais (por tamanho) e cria uma nova
  * contagem com eles invertidos. Nada é apagado — original e estorno ficam no histórico.
  */

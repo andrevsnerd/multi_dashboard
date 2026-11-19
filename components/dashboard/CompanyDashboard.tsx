@@ -4,7 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/AuthContext";
 import { hidesEcommerceDashboard } from "@/lib/auth/permissions";
 import {
-  getFilialGroupMembers,
+  getEcommerceSalesFilials,
+  getGoalMembers,
+  getVarejoGoalFilials,
   normalizeFilialLookupKey,
   resolveCompany,
   SHOPIFY_LABEL,
@@ -268,7 +270,7 @@ export default function CompanyDashboard({
     };
     if (effectiveFilial === SHOPIFY_VALUE) {
       // Loja Shopify: na Scarf Me herda a meta do e-commerce (soma dos CNPJs); NERD não tem.
-      return sumGoals(companyConfig.ecommerceFilials ?? []);
+      return sumGoals(getEcommerceSalesFilials(companyConfig));
     }
     if (effectiveFilial && effectiveFilial !== VAREJO_VALUE) {
       // Meta de um grupo = soma das metas de TODOS os membros, independente de qual
@@ -276,16 +278,17 @@ export default function CompanyDashboard({
       // canônica) E para e-commerce (meta dividida entre os membros) — somar cobre
       // os dois esquemas de gravação. getFilialGroupMembers devolve [filial] quando
       // não é grupo, e qualquer grupo futuro entra aqui sem mudança.
-      return sumGoals(getFilialGroupMembers(companyConfig, effectiveFilial));
+      // getGoalMembers ainda respeita o papel por período: meta gravada sob perna
+      // histórica do e-commerce (MSC) soma no E-COMMERCE, não na Higienópolis.
+      return sumGoals(getGoalMembers(companyConfig, effectiveFilial));
     }
     const salesFiliais = companyConfig.filialFilters.sales;
     if (effectiveFilial === VAREJO_VALUE || semEcommerce) {
       // VAREJO = só lojas físicas: a meta do e-commerce fica fora, igual ao faturamento.
       // Quem não vê e-commerce (supervisor/gerente) também nunca soma a meta dele.
-      const ecommerce = new Set((companyConfig.ecommerceFilials ?? []).map(normalizeFilialLookupKey));
-      return sumGoals(salesFiliais.filter((f) => !ecommerce.has(normalizeFilialLookupKey(f))));
+      return sumGoals(getVarejoGoalFilials(companyConfig));
     }
-    return sumGoals(salesFiliais);
+    return sumGoals([...salesFiliais, ...getEcommerceSalesFilials(companyConfig)]);
   }, [dashboardData, effectiveFilial, companyConfig, semEcommerce]);
 
   const goalLabel =

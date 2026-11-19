@@ -4,7 +4,9 @@ import { randomInt } from "crypto";
 import sql from "mssql";
 import { withRequest } from "@/lib/db/connection";
 import type { RequestLike } from "@/lib/db/proxy";
-import { PADROES, statusNfeLabel, FILTROS_STATUS, type EmpresaFat } from "@/lib/faturamento-ecommerce/config";
+import { PADROES, statusNfeLabel, FILTROS_STATUS, naturezaSoNfAntiga, type EmpresaFat } from "@/lib/faturamento-ecommerce/config";
+import { consumidorFinalPadrao, naturezaPadrao, naturezasDoDestino } from "@/lib/faturamento-ecommerce/catalogo";
+import { fetchCatalogoNotas, fetchCostumeDescontoSobre4 } from "./catalogo";
 import { filiaisNotaDaEmpresa, sqlUltimaNfEcommerce } from "./filiais-nota";
 import type {
   NotaCriada,
@@ -117,8 +119,21 @@ export async function buscarProdutosFat(params: {
 // ── Planejamento (prévia + plano de gravação) ───────────────────────────────
 
 interface LinhaFiscal {
+  /** Linha da NF (FATURAMENTO_PROD / VENDAS_PRODUTO) a que este tamanho pertence. */
+  linha: string;
+  /** Ordem digitada da linha (ITEM_IMPRESSAO de FATURAMENTO_PROD), 1 = primeira. */
+  ordemLinha: number;
+  /** ITEM_IMPRESSAO do item fiscal (e da linha de FATURAMENTO_PROD que ele agrupa). */
+  itemImpressao: string;
+  /** SUB_ITEM_TAMANHO do item fiscal: o tamanho (agrupamento 2) ou 1 (agrupamentos 0 e 1). */
+  subItem: number;
+  /** FATURAMENTO_ITEM.REFERENCIA_ITEM: a cor; NULL no agrupamento 0 (um item por produto). */
+  referenciaItem: string | null;
+  /** FATURAMENTO_ITEM.OBS_ITEM (vazio = NULL). */
+  obsItem: string;
   produto: string;
   cor: string;
+  descNf: string;
   descCor: string;
   tamanho: number;
   tamanhoLabel: string;
@@ -134,6 +149,8 @@ interface LinhaFiscal {
   indicadorCfop: number;
   idCest: number | null;
   cfop: string;
+  /** CFOP da característica, antes da exceção — é o que o Linx grava em FATURAMENTO_PROD. */
+  cfopProd: string;
   csosn: string;
   excecao: number | null;
   excecaoDescricao: string;
@@ -163,6 +180,17 @@ interface Plano {
   /** ICMS da operação UF filial → UF cliente (regime normal, quando a exceção traz 0). */
   aliqIcmsOperacao: number;
   indFiscal: number;
+  /** FATURAMENTO.INDICA_CONSUMIDOR_FINAL (escolhido na tela; padrão = o mais comum no histórico). */
+  consumidorFinal: boolean;
+  /** COD_TRANSACAO mais comum da natureza nesta filial (FATURAMENTO_022, _026…). */
+  codTransacao: string;
+  /** FATURAMENTO.NF_FATURA: natureza de venda/devolução gera fatura; remessa/outras não. */
+  nfFatura: boolean;
+  /** NATUREZAS_SAIDAS.TIPO_OPERACAO: V venda, R remessa, O outras, E retorno, D devolução. */
+  tipoNatureza: string;
+  /** Exportação (cliente UF EX): UF e local de embarque; vazios nas demais. */
+  ufEmbarque: string;
+  localEmbarque: string;
   codFilial: string;
   empresaCodigo: number;
   ufFilial: string;
@@ -172,12 +200,22 @@ interface Plano {
   proximoNumero: string;
   natureza: string;
   naturezaDescricao: string;
-  cliente: { codigo: string; nome: string; razao: string; uf: string; cidade: string; tabPreco: string };
+  cliente: { codigo: string; nome: string; razao: string; uf: string; cidade: string; tabPreco: string; indicadorVenda: string; representante: string | null; condicaoPgto: string | null };
+  /** Produto × cor × tamanho como digitado (FATURAMENTO_PROD / VENDAS_PRODUTO e a prévia). */
   linhas: LinhaFiscal[];
+  /** FATURAMENTO.AGRUPAMENTO_ITENS: 0 por produto, 1 por produto × cor, 2 por produto × cor × tamanho. */
+  agrupamento: 0 | 1 | 2 | 3 | 4 | 5;
+  /** Itens fiscais (FATURAMENTO_ITEM/IMPOSTO), na ordem da NF; no agrupamento 2 são as próprias linhas. */
+  fiscais: LinhaFiscal[];
   subtotal: number;
   porcDesconto: number;
   porcDigitado: boolean;
   desconto: number;
+  /** Desconto na condição de pagamento (2º desconto) e o % gravado. */
+  descontoCond: number;
+  porcDescontoCond: number;
+  /** FATURAMENTO.DESCONTO_SOBRE_4 (onde o form registra o % digitado). */
+  descontoSobre4: number;
   frete: number;
   seguro: number;
   total: number;
@@ -238,7 +276,9 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
     SELECT LTRIM(RTRIM(cf.CLIFOR)) AS codigo, RTRIM(cf.NOME_CLIFOR) AS nome, LTRIM(RTRIM(cf.RAZAO_SOCIAL)) AS razao,
            LTRIM(RTRIM(cf.UF)) AS uf, LTRIM(RTRIM(cf.CIDADE)) AS cidade, cf.INDICADOR_FISCAL_TERCEIRO AS indFiscal,
            LTRIM(RTRIM(cf.COD_MUNICIPIO_IBGE)) AS ibge, LTRIM(RTRIM(ca.CODIGO_TAB_PRECO)) AS tab,
-           CASE WHEN ca.CLIENTE_ATACADO IS NULL THEN 0 ELSE 1 END AS atacado, ISNULL(ca.INATIVO,0) AS inativo,
+           CASE WHEN ca.CLIENTE_ATACADO IS NULL THEN 0 ELSE 1 END AS atacado, ISNULL(ca.INATIVO,0) AS inativo, ISNULL(ca.INDICADOR_VENDA, 'V') AS indicadorVenda, LTRIM(RTRIM(ca.CONDICAO_PGTO)) AS condCli,
+           (SELECT TOP 1 RTRIM(CR.REPRESENTANTE) FROM CLIENTE_REPRE CR WITH (NOLOCK)
+             WHERE CR.CLIENTE_ATACADO = cf.NOME_CLIFOR ORDER BY CR.REPRESENTANTE_PRINCIPAL DESC, CR.REPRESENTANTE) AS representante,
            CASE WHEN EXISTS (SELECT 1 FROM FILIAIS FX WITH (NOLOCK) WHERE FX.FILIAL = cf.NOME_CLIFOR) THEN 1 ELSE 0 END AS ehFilial
       FROM CADASTRO_CLI_FOR cf WITH (NOLOCK)
       LEFT JOIN CLIENTES_ATACADO ca WITH (NOLOCK) ON ca.CLIENTE_ATACADO = cf.NOME_CLIFOR
@@ -246,11 +286,9 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
   if (!cli) throw new Error(`Cliente ${clifor} não encontrado.`);
   if (!Number(cli.atacado)) bloqueios.push("O cliente não tem cadastro de cliente (CLIENTES_ATACADO) — cadastre pela aba Clientes.");
   if (Number(cli.inativo)) bloqueios.push("O cliente está inativo no Linx.");
-  if (Number(cli.ehFilial)) {
-    // NF para uma filial do próprio grupo é abastecimento/transferência (100.08 da Matriz),
-    // feito por outra rotina do Linx — não é venda a cliente, que é o que esta página faz.
-    bloqueios.push(`${trim(cli.nome)} é filial do grupo: NF para loja/filial própria é feita pela rotina do Linx, não por esta página.`);
-  }
+  // NF para uma filial do grupo (abastecimento, 100.08 da Matriz) usa o catálogo "destino filial":
+  // só as naturezas que a filial já usou para lojas, e só as validadas para esse destino.
+  const destino: "cliente" | "filial" = Number(cli.ehFilial) ? "filial" : "cliente";
   if (!trim(cli.ibge)) bloqueios.push("O cliente está sem código IBGE do município — atualize o endereço na aba Clientes.");
   const ufCliente = trim(cli.uf);
 
@@ -258,42 +296,51 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
   const natureza = trim(input.natureza);
   req.input("pNat", sql.VarChar(7), natureza);
   const [nat] = await q(req, `
-    SELECT LTRIM(RTRIM(DESC_NATUREZA)) AS descr, CTB_TIPO_OPERACAO AS tipoOp, ISNULL(INATIVO,0) AS inativo
+    SELECT LTRIM(RTRIM(DESC_NATUREZA)) AS descr, CTB_TIPO_OPERACAO AS tipoOp, LTRIM(RTRIM(TIPO_OPERACAO)) AS tipoNat, ISNULL(INATIVO,0) AS inativo
       FROM NATUREZAS_SAIDAS WITH (NOLOCK) WHERE NATUREZA_SAIDA = @pNat`);
   if (!nat) throw new Error(`Natureza ${natureza} não existe.`);
   if (Number(nat.inativo)) bloqueios.push(`A natureza ${natureza} está inativa.`);
   const interestadual = ufCliente !== ufFilial;
   const indFiscal = Number(cli.indFiscal) || 8;
-  const naturezaEsperada = extra
-    ? interestadual
-      ? extra.naturezaForaUf
-      : extra.naturezaDentroUf
-    : interestadual
-      ? padrao.nota.naturezaForaUf
-      : padrao.nota.naturezaDentroUf;
-  if (extra && natureza !== extra.naturezaDentroUf && natureza !== extra.naturezaForaUf) {
-    // A filial extra (Matriz) só fatura aqui a natureza que o gravador reproduz centavo a centavo.
+  // Catálogo: só naturezas que esta filial já emitiu no Linx, e entre elas só as que o gravador
+  // já reproduz centavo a centavo (NATUREZAS_VALIDADAS). A mais comum para o cliente é a sugerida.
+  const catalogo = (await fetchCatalogoNotas(input.empresa))[filial] ?? [];
+  const doDestino = naturezasDoDestino(catalogo, destino);
+  const noCatalogo = doDestino.find((n) => n.natureza === natureza) ?? null;
+  const naturezaSugerida = naturezaPadrao(catalogo, indFiscal, !interestadual, destino);
+  if (!noCatalogo) {
     bloqueios.push(
-      `Pela ${filial} esta página fatura só a natureza ${extra.naturezaDentroUf} (venda a cliente). ` +
-        (natureza === "100.08"
-          ? "A 100.08 da Matriz é o abastecimento das lojas do grupo, feito pela rotina do Linx."
-          : "Outras naturezas, faça pelo Linx.")
+      (destino === "filial"
+        ? `${trim(cli.nome)} é filial do grupo e ${filial} nunca emitiu a natureza ${natureza} para loja (desde 2025). `
+        : `${filial} nunca emitiu a natureza ${natureza} (desde 2025). `) +
+        `As opções são as que ela já usa: ` + (doDestino.slice(0, 6).map((n) => n.natureza).join(", ") || "nenhuma") + "."
     );
-  } else if (natureza !== naturezaEsperada) {
+  } else if (!noCatalogo.validada) {
+    bloqueios.push(
+      `A natureza ${natureza} (${noCatalogo.descricao}) ainda está em validação: o gravador só libera depois de ` +
+        `reproduzir NFs reais dela centavo a centavo.`
+    );
+  } else if (naturezaSugerida && natureza !== naturezaSugerida) {
     avisos.push(
-      `Cliente em ${ufCliente} e filial em ${ufFilial}: a natureza usual é ${naturezaEsperada} (selecionada: ${natureza}).`
+      `Para cliente indicador ${indFiscal} ${interestadual ? "de outra UF" : "da mesma UF"} o mais comum nesta filial é ` +
+        `${naturezaSugerida} (selecionada: ${natureza}).`
     );
   }
-  if (!simples) {
-    // Regime normal (Matriz): o gravador calcula ICMS/PIS/COFINS/IBS/CBS como o Linx, mas
-    // não o DIFAL de venda a não contribuinte de outra UF — essa NF continua no Linx.
-    if (interestadual && indFiscal !== 1 && indFiscal !== 16) {
-      bloqueios.push(
-        `${filial} é regime normal: NF para não contribuinte (indicador ${indFiscal}) em ${ufCliente} tem DIFAL, ` +
-          `que esta página não calcula. Fature pelo Linx, ou por uma filial do e-commerce.`
-      );
-    }
+  if (noCatalogo?.validada && naturezaSoNfAntiga(simples, natureza)) {
+    avisos.push(
+      `${natureza} (${noCatalogo.descricao}) não teve NF no Linx desde a atualização de 24/10/2026: a NF foi conferida ` +
+        `com as antigas e os impostos seguem a exceção fiscal de hoje. Confira a NF no Linx antes de enviar à SEFAZ.`
+    );
   }
+  const consumidorFinal =
+    typeof input.consumidorFinal === "boolean"
+      ? input.consumidorFinal
+      : (consumidorFinalPadrao(noCatalogo ?? undefined, indFiscal) ?? (simples || indFiscal === 8));
+  const codTransacao = noCatalogo?.padroes.codTransacao || COD_TRANSACAO;
+  // NF_FATURA (gera fatura/duplicata): venda e devolução sim; remessa, bonificação e outras
+  // não (todas as NFs desde 06/2025, por NATUREZAS_SAIDAS.TIPO_OPERACAO).
+  const tipoNatureza = trim(nat.tipoNat).toUpperCase();
+  const nfFatura = tipoNatureza === "V" || tipoNatureza === "D";
 
   // Alíquota interna do ICMS na UF de destino (imposto 73 — ICMS-DESTINO informativo).
   req.input("pUfDest", sql.Char(2), ufCliente);
@@ -307,38 +354,53 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
     SELECT TOP 1 ICMS_SAIDA AS aliq FROM UNIDADES_FEDERACAO_ICMS WITH (NOLOCK)
      WHERE UF = @pUfOrig AND UF_DESTINO = @pUfDest AND ISNULL(INATIVO,0) = 0`);
   const aliqIcmsOperacao = Number(aliqOp?.aliq) || 0;
-  if (!simples && !aliqIcmsOperacao) bloqueios.push(`Alíquota de ICMS ${ufFilial}→${ufCliente} não encontrada no Linx.`);
+  // Exportação (cliente UF "EX", 100.71): ICMS não incide (exceção CST 41, taxa 0) — não há
+  // alíquota SP→EX; o CFOP é o "exterior" da característica (7101/7102).
+  const exportacao = ufCliente === "EX";
+  if (!simples && !aliqIcmsOperacao && !exportacao) bloqueios.push(`Alíquota de ICMS ${ufFilial}→${ufCliente} não encontrada no Linx.`);
+  const ufEmbarque = exportacao ? trim(input.ufEmbarque).toUpperCase() || "SP" : "";
+  const localEmbarque = exportacao ? trim(input.localEmbarque).toUpperCase() || "AEROPORTO INTERNACIONAL DE GUARULHOS" : "";
+  if (exportacao && (ufEmbarque.length !== 2 || localEmbarque.length > 60)) bloqueios.push("Exportação: informe a UF (2 letras) e o local de embarque (até 60).");
 
   // Itens (agrupa linhas repetidas do mesmo produto/cor/tamanho)
-  const agrupados = new Map<string, { produto: string; cor: string; tamanho: number; qtde: number; preco: number }>();
+  const agrupados = new Map<string, { produto: string; cor: string; tamanho: number; qtde: number; preco: number; linha: string; obs: string }>();
   for (const it of input.itens ?? []) {
     const produto = trim(it.produto).toUpperCase();
     const cor = trim(it.cor).toUpperCase();
     const tamanho = Math.round(Number(it.tamanho) || 1);
     const qtde = Math.round(Number(it.qtde) || 0);
     const preco = round2(Number(it.preco) || 0);
+    const obsItem = trim(it.obs).replace(/\s+/g, " ");
     if (!produto) continue;
+    if (obsItem.length > 80) bloqueios.push(`Observação do item ${produto} ${cor} passa de 80 caracteres.`);
     if (qtde <= 0) bloqueios.push(`Quantidade inválida em ${produto} ${cor}.`);
     if (preco <= 0) bloqueios.push(`Preço inválido em ${produto} ${cor}.`);
     if (tamanho < 1 || tamanho > MAX_GRADE) bloqueios.push(`Tamanho inválido em ${produto} ${cor}.`);
-    const k = `${produto}|${cor}|${tamanho}`;
+    // Linha da NF: a informada (estrutura digitada) ou uma por produto × cor.
+    const linha = it.linha !== undefined && it.linha !== null ? `L${Number(it.linha)}` : `${produto}|${cor}`;
+    const k = `${linha}|${tamanho}`;
     const atual = agrupados.get(k);
     if (atual) {
       if (atual.preco !== preco) bloqueios.push(`${produto} ${cor} aparece com preços diferentes.`);
       atual.qtde += qtde;
+      if (!atual.obs) atual.obs = obsItem;
     } else {
-      agrupados.set(k, { produto, cor, tamanho, qtde, preco });
+      agrupados.set(k, { produto, cor, tamanho, qtde, preco, linha, obs: obsItem });
     }
   }
   if (agrupados.size === 0) bloqueios.push("Inclua ao menos um produto.");
+  // Observação do item é da LINHA (produto × cor) no form do Linx: vai em FATURAMENTO_PROD.
+  // DESC_VENDA_CLIENTE (80) e no OBS_ITEM de cada item fiscal dela (3 NFs desde 2025).
+  const obsDaLinha = new Map<string, string>();
+  for (const a of agrupados.values()) if (a.obs && !obsDaLinha.has(a.linha)) obsDaLinha.set(a.linha, a.obs);
 
-  // Um produto × cor tem um único PRECO em FATURAMENTO_PROD.
-  const precoPorProdCor = new Map<string, number>();
+  // Uma linha da NF tem um só produto × cor e um só PRECO em FATURAMENTO_PROD.
+  const daLinha = new Map<string, { produto: string; cor: string; preco: number }>();
   for (const a of agrupados.values()) {
-    const k = `${a.produto}|${a.cor}`;
-    const p = precoPorProdCor.get(k);
-    if (p !== undefined && p !== a.preco) bloqueios.push(`${a.produto} ${a.cor}: tamanhos com preços diferentes na mesma NF.`);
-    precoPorProdCor.set(k, a.preco);
+    const p = daLinha.get(a.linha);
+    if (p && (p.produto !== a.produto || p.cor !== a.cor)) bloqueios.push(`A linha de ${p.produto} ${p.cor} tem outro produto/cor.`);
+    if (p && p.preco !== a.preco) bloqueios.push(`${a.produto} ${a.cor}: tamanhos com preços diferentes na mesma linha da NF.`);
+    if (!p) daLinha.set(a.linha, { produto: a.produto, cor: a.cor, preco: a.preco });
   }
 
   req.input("pMatriz", sql.VarChar(25), filial);
@@ -382,15 +444,29 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
     req.input(`iOrig${idx}`, sql.Char(3), origem);
     req.input(`iInd${idx}`, sql.Int, indCfop);
     req.input(`iNcm${idx}`, sql.VarChar(10), trim(p.ncm).replace(/\D/g, ""));
+    // Exceção fiscal como a tela do Linx localiza (medido em 19/11/2026, NFs desde 24/10: 100% dos
+    // itens em Matriz, pernas e NERD): FX_LOCALIZA_EXCECAO_IMPOSTO — que lê também o cadastro por
+    // filtro (CTB_EXCECAO_IMPOSTO_FILTRO) — recebendo o CFOP da característica (tipo de operação ×
+    // indicador CFOP × indicador fiscal do cliente), ainda antes da exceção. A FX_ID_EXCECAO_IMPOSTO
+    // ignora os filtros: na Matriz acertava 14 de 57 itens (escolhia 1164/1174/1216 em vez de
+    // 1131/1137/1122). O CFOP da característica vai em FATURAMENTO_PROD; o do item é o obrigatório
+    // da exceção, quando houver.
     const [exc] = await q(req, `
-      DECLARE @idExc INT = dbo.FX_ID_EXCECAO_IMPOSTO(@pTipoOp, @pClifor, @iInd${idx}, 'S', @pMatriz, @pFilial,
-                          CAST(GETDATE() AS DATE), @iOrig${idx}, NULL, @iCod${idx}, @pNomeCli, 'P', @pNat, @pCodFilial);
+      DECLARE @cfopCarac VARCHAR(4) = (
+        SELECT TOP 1 LTRIM(RTRIM(CASE WHEN @pUfDest = 'EX' THEN CODIGO_FISCAL_EXTERIOR
+                                      WHEN @pUfDest = (SELECT UF FROM CADASTRO_CLI_FOR WHERE NOME_CLIFOR = @pFilial)
+                                      THEN CODIGO_FISCAL_OPERACAO ELSE CODIGO_FISCAL_INTERESTADUAL END))
+          FROM CTB_LX_CARACTERISTICA_CFOP WITH (NOLOCK)
+         WHERE CTB_TIPO_OPERACAO = @pTipoOp AND INDICADOR_CFOP = @iInd${idx} AND INDICADOR_FISCAL_TERCEIRO = @pIndFiscal);
+      DECLARE @idExc INT = dbo.FX_LOCALIZA_EXCECAO_IMPOSTO(CONCAT(
+        '{"CTB_TIPO_OPERACAO":"', @pTipoOp, '","CLIFOR":"', RTRIM(@pClifor), '","INDICADOR_CFOP":"', @iInd${idx},
+        '","ENTRADA_SAIDA":"S","MATRIZ_FISCAL":"', RTRIM(@pMatriz), '","FILIAL":"', RTRIM(@pFilial),
+        '","EMISSAO_RECEBIMENTO":"', CONVERT(VARCHAR(10), GETDATE(), 120), '","TRIBUT_ORIGEM":"', RTRIM(@iOrig${idx}),
+        '","CODIGO_FISCAL_OPERACAO":"', @cfopCarac, '","REFERENCIA":"', RTRIM(@iCod${idx}),
+        '","COD_FILHA":"P","NATUREZA":"', RTRIM(@pNat), '","COD_FILIAL":"', RTRIM(@pCodFilial), '"}'));
       SELECT @idExc AS id, LTRIM(RTRIM(X.TRIBUT_ICMS)) AS csosn, LTRIM(RTRIM(X.CFOP_OBRIGATORIO)) AS cfopObrig,
              LTRIM(RTRIM(X.DESC_EXCECAO)) AS descr, LTRIM(RTRIM(X.CST_IBS_CBS)) AS cstIbs, LTRIM(RTRIM(X.CCLASSTRIB)) AS cclass,
-             (SELECT TOP 1 LTRIM(RTRIM(CASE WHEN @pUfDest = (SELECT UF FROM CADASTRO_CLI_FOR WHERE NOME_CLIFOR = @pFilial)
-                                            THEN CODIGO_FISCAL_OPERACAO ELSE CODIGO_FISCAL_INTERESTADUAL END))
-                FROM CTB_LX_CARACTERISTICA_CFOP WITH (NOLOCK)
-               WHERE CTB_TIPO_OPERACAO = @pTipoOp AND INDICADOR_CFOP = @iInd${idx} AND INDICADOR_FISCAL_TERCEIRO = @pIndFiscal) AS cfopCarac,
+             @cfopCarac AS cfopCarac,
              (SELECT TOP 1 ALIQNAC_FEDERAL FROM TABELA_ALIQUOTA_IMPOSTO_ITEM WITH (NOLOCK)
                WHERE NCM_NBS = @iNcm${idx} AND UF = (SELECT UF FROM CADASTRO_CLI_FOR WHERE NOME_CLIFOR = @pFilial)
                  AND CONVERT(VARCHAR(8), GETDATE(), 112) BETWEEN CONVERT(VARCHAR(8), INICIO_VIGENCIA, 112) AND CONVERT(VARCHAR(8), FIM_VIGENCIA, 112)) AS ibptFed,
@@ -403,20 +479,38 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
         FROM (SELECT 1 AS x) d
         LEFT JOIN CTB_EXCECAO_IMPOSTO X WITH (NOLOCK) ON X.ID_EXCECAO_IMPOSTO = @idExc`);
     const idExc = exc?.id === null || exc?.id === undefined ? null : Number(exc.id);
-    const csosn = trim(exc?.csosn);
+    // Sem exceção fiscal, o Linx da Matriz (regime normal) grava os impostos padrão: ICMS pela
+    // alíquota da operação, IPI 0, PIS 1,65 e COFINS 7,6 (CTB_LX_IMPOSTO_TIPO), CST 00, sem IBS/CBS
+    // (100.08/131.01 desde 24/10; 133.01/135.01/100.09 antes). Só para contribuinte ou mesma UF: a
+    // não contribuinte de outra UF ele soma DIFAL (133.01 → RJ), que a página não calcula.
+    const semExcecaoPadrao = idExc === null && !simples && !(interestadual && consumidorFinal);
+    const csosn = semExcecaoPadrao ? "00" : trim(exc?.csosn);
     const cfop = trim(exc?.cfopObrig) || trim(exc?.cfopCarac);
     const excDesc = trim(exc?.descr);
-    if (idExc === null) {
+    if (idExc === null && semExcecaoPadrao) {
+      avisos.push(`${a.produto}: sem exceção fiscal para ${natureza} → ${ufCliente}; impostos padrão do Linx (ICMS da UF, PIS, COFINS).`);
+    } else if (idExc === null && !simples) {
+      bloqueios.push(
+        `${a.produto}: sem exceção fiscal para ${natureza} a consumidor final em ${ufCliente} — o Linx calcula DIFAL, que esta página não faz.`
+      );
+    } else if (idExc === null) {
       bloqueios.push(`${a.produto}: nenhuma exceção fiscal encontrada para ${ufCliente} — peça ao fiscal para cadastrar.`);
     } else if ((csosn === "900" || /DEVOLU/i.test(excDesc)) && simples && (indFiscal === 1 || indFiscal === 16)) {
-      // Contribuinte (corporativo/revenda): as pernas do Simples não têm exceção de venda para
-      // ele — no Linx esses clientes saem pela Matriz (100.05).
+      // Contribuinte (corporativo/revenda) com natureza de venda a NÃO contribuinte (100.02/022):
+      // não há exceção de venda. No Linx esse cliente sai pela 100.01 nas próprias pernas, ou
+      // pela Matriz (100.05) — as opções que o catálogo desta empresa tiver.
+      const tem10001 = catalogo.some((n) => n.natureza === "100.01");
       const matriz = padrao.nota.filiaisExtras.length > 0;
+      const opcoes = [
+        tem10001 ? `a natureza 100.01 (venda de mercadoria) nesta filial` : null,
+        matriz ? `a MATRIZ (100.05)` : null,
+      ].filter(Boolean);
       bloqueios.push(
-        `Cliente contribuinte (indicador ${indFiscal}): ${filial} não tem exceção fiscal de venda para contribuinte ` +
-          (matriz
-            ? `— fature pela MATRIZ (filial emissora "MATRIZ (fora do rodízio)"), como os corporativos no Linx.`
-            : `— peça ao fiscal para cadastrar a exceção, ou cadastre o cliente como 8 - Não Contribuinte se ele compra para uso próprio.`)
+        `Cliente contribuinte (indicador ${indFiscal}): a natureza ${natureza} é de venda a não contribuinte e não tem ` +
+          `exceção fiscal para ele. ` +
+          (opcoes.length
+            ? `No Linx esse cliente sai por ${opcoes.join(" ou por ")}.`
+            : `Peça ao fiscal para cadastrar a exceção, ou cadastre o cliente como 8 - Não Contribuinte se ele compra para uso próprio.`)
       );
     } else if (csosn === "900" || /DEVOLU/i.test(excDesc)) {
       bloqueios.push(
@@ -436,7 +530,24 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
     }
 
     let impostos: LinhaFiscal["impostos"] = [];
-    if (idExc !== null) {
+    if (semExcecaoPadrao) {
+      impostos = (
+        await q(req, `
+          SELECT ID_IMPOSTO AS id, CASE WHEN ISNULL(ALIQUOTA_FIXA,0) = 1 THEN ISNULL(ALIQUOTA,0) ELSE 0 END AS taxa,
+                 INCIDENCIA AS inc, AGREGA_APOS_DESCONTO AS agDesc, AGREGA_APOS_ENCARGO AS agEnc,
+                 ISNULL(ALIQUOTA,0) AS aliqTipo, ISNULL(ALIQUOTA_FIXA,0) AS fixa
+            FROM CTB_LX_IMPOSTO_TIPO WITH (NOLOCK) WHERE ID_IMPOSTO IN (1, 2, 5, 6) ORDER BY ID_IMPOSTO`)
+      ).map((t) => ({
+        id: Number(t.id),
+        taxa: Number(t.taxa) || 0,
+        incidencia: Number(t.inc) || 0,
+        agregaDesconto: Boolean(t.agDesc),
+        agregaEncargo: Boolean(t.agEnc),
+        reducao: 0,
+        aliquotaTipo: Number(t.aliqTipo) || 0,
+        fixa: Boolean(t.fixa),
+      }));
+    } else if (idExc !== null) {
       req.input(`iExc${idx}`, sql.Int, idExc);
       impostos = (
         await q(req, `
@@ -459,6 +570,15 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
         fixa: Boolean(t.fixa),
       }));
       const fora = impostos.filter((t) => !IMPOSTOS_REGIME_NORMAL.has(t.id));
+      // Regime normal: o Linx não grava DIFAL para contribuinte, e a exceção de bonificação a não
+      // contribuinte de outra UF nem traz o imposto (128.01 → RJ: só ICMS 12%, NFs 43629/43687).
+      // Só a exceção COM DIFAL para não contribuinte de outra UF a página não calcula.
+      if (!simples && interestadual && indFiscal !== 1 && indFiscal !== 16 && impostos.some((t) => IMPOSTOS_DIFAL.has(t.id))) {
+        bloqueios.push(
+          `${filial} é regime normal: a exceção fiscal ${idExc} tem DIFAL para não contribuinte (indicador ${indFiscal}) ` +
+            `em ${ufCliente}, que esta página não calcula. Fature por uma filial do e-commerce.`
+        );
+      }
       if (!simples && fora.length > 0) {
         bloqueios.push(
           `${a.produto}: a exceção fiscal ${idExc} tem imposto(s) ${fora.map((t) => t.id).join(", ")} que o cálculo do ` +
@@ -477,8 +597,15 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
     const descNf = trim(p.descNf);
     const descCor = trim(p.descCor);
     linhas.push({
+      linha: a.linha,
+      ordemLinha: 0,
+      itemImpressao: "",
+      subItem: a.tamanho,
+      referenciaItem: a.cor,
+      obsItem: obsDaLinha.get(a.linha) ?? "",
       produto: a.produto,
       cor: a.cor,
+      descNf,
       descCor,
       tamanho: a.tamanho,
       tamanhoLabel: tamLabel,
@@ -494,6 +621,7 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
       indicadorCfop: indCfop,
       idCest: p.cest === null || p.cest === undefined ? null : Number(p.cest),
       cfop,
+      cfopProd: trim(exc?.cfopCarac) || cfop,
       csosn,
       excecao: idExc,
       excecaoDescricao: excDesc,
@@ -512,6 +640,82 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
     });
   }
 
+  // Ordem das linhas fiscais (ITEM_NFE), medida em 19/11/2026 nas NFs desde 24/10 (576 de 582
+  // com mais de um item; as 6 de fora foram editadas no Linx e tiveram ITEM_IMPRESSAO renumerado):
+  // código do produto (ordem de texto) → ordem digitada da linha → tamanho. O rateio do desconto
+  // e do frete depende dela (o centavo de sobra vai a partir do 1º item).
+  const ordemDigitada = new Map<string, number>();
+  for (const l of linhas) if (!ordemDigitada.has(l.linha)) ordemDigitada.set(l.linha, ordemDigitada.size + 1);
+  for (const l of linhas) l.ordemLinha = ordemDigitada.get(l.linha)!;
+  const cmpTexto = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+  linhas.sort((a, b) => cmpTexto(a.produto, b.produto) || a.ordemLinha - b.ordemLinha || a.tamanho - b.tamanho);
+
+  // Agrupamento dos itens fiscais (FATURAMENTO.AGRUPAMENTO_ITENS, opção do form). Medido em
+  // 19/11/2026 nas 52 NFs com agrupamento 0/1 desde 2025 (52/52): 0 = um item por produto
+  // (código = produto, descrição = a da NF sem cor, REFERENCIA_ITEM nulo); 1 = um item por
+  // produto × cor (código = produto + cor, descrição com a cor, sem tamanho); nos dois o
+  // SUB_ITEM_TAMANHO é 1 e a ordem é a do código. FATURAMENTO_PROD continua produto × cor com a
+  // grade, apontando (ITEM_IMPRESSAO) para o item fiscal que a contém.
+  // 3, 4 e 5 = 0, 1 e 2 "por pedido": o nº do pedido vai na frente do código e da descrição do
+  // item (no agrupamento 5 a REFERENCIA_ITEM é cor + tamanho) — 60 NFs desde 2025, prefixo =
+  // FATURAMENTO_PROD.PEDIDO em todas. O nº do pedido nasce no batch, então o prefixo é posto lá.
+  const agrupamento: Plano["agrupamento"] = [0, 1, 2, 3, 4, 5].includes(Number(input.agrupamento))
+    ? (Number(input.agrupamento) as Plano["agrupamento"])
+    : 2;
+  const base = agrupamento % 3;
+  // ITEM_IMPRESSAO: agrupamentos 0/1 numeram os grupos em sequência; no 2 é o nº da 1ª linha do
+  // produto × cor — linhas repetidas do mesmo produto × cor apontam para ela (NF 0043673 da Matriz).
+  const chaveNumero = (l: LinhaFiscal) => (base === 0 ? l.produto : `${l.produto}|${l.cor}`);
+  const numeroFiscal = new Map<string, string>();
+  for (const l of [...linhas].sort((a, b) => a.ordemLinha - b.ordemLinha)) {
+    const k = chaveNumero(l);
+    if (!numeroFiscal.has(k)) {
+      numeroFiscal.set(k, String(base === 2 ? l.ordemLinha : numeroFiscal.size + 1).padStart(4, "0"));
+    }
+  }
+  for (const l of linhas) l.itemImpressao = numeroFiscal.get(chaveNumero(l))!;
+  // Item fiscal: 0 = produto; 1 = produto × cor; 2 = produto × cor × tamanho — linhas repetidas do
+  // mesmo produto × cor × tamanho viram UM item fiscal (0043673: 1 + 4 peças → item de 5).
+  const chaveFiscal = (l: LinhaFiscal) =>
+    base === 0 ? l.produto : base === 1 ? `${l.produto}|${l.cor}` : `${l.produto}|${l.cor}|${l.tamanho}`;
+  let fiscais: LinhaFiscal[] = linhas;
+  if (agrupamento === 5) for (const l of linhas) l.referenciaItem = `${l.cor}${l.tamanhoLabel}`;
+  const repetidos = base === 2 && new Set(linhas.map(chaveFiscal)).size !== linhas.length;
+  if (base !== 2 || repetidos) {
+    const porChave = new Map<string, LinhaFiscal>();
+    for (const l of linhas) {
+      const k = chaveFiscal(l);
+      const f = porChave.get(k);
+      if (!f) {
+        porChave.set(
+          k,
+          base === 2
+            ? { ...l }
+            : {
+                ...l,
+                codigoItem: base === 0 ? l.produto : `${l.produto}${l.cor}`,
+                descricao: (base === 0 ? l.descNf : `${l.descNf} ${l.descCor}`).replace(/\s+/g, " ").trim().slice(0, 80),
+                referenciaItem: base === 0 ? null : l.cor,
+                subItem: 1,
+              }
+        );
+        continue;
+      }
+      if (f.preco !== l.preco) {
+        bloqueios.push(`${l.produto}${base === 1 ? ` ${l.cor}` : ""}: preços diferentes não podem ser agrupados num item só — use o agrupamento por tamanho.`);
+      }
+      if (f.excecao !== l.excecao || f.cfop !== l.cfop) {
+        bloqueios.push(`${l.produto}: itens com tributação diferente não podem ser agrupados num item só.`);
+      }
+      f.qtde += l.qtde;
+      f.valor = round2(f.valor + l.valor);
+      if (!f.obsItem) f.obsItem = l.obsItem;
+    }
+    fiscais = [...porChave.values()];
+    // 0/1: ordem do código; 2 (linhas repetidas fundidas): a mesma ordem de sempre (já ordenadas).
+    if (base !== 2) fiscais.sort((a, b) => cmpTexto(a.codigoItem, b.codigoItem));
+  }
+
   // Totais e desconto (sempre no cabeçalho, como o Linx faz)
   const subtotal = round2(linhas.reduce((s, l) => s + l.valor, 0));
   const frete = round2(Math.max(0, Number(input.frete) || 0));
@@ -524,16 +728,34 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
     desconto = round2((subtotal * porcDesconto) / 100);
   } else {
     desconto = round2(Math.max(0, Number(input.descontoValor) || 0));
-    porcDesconto = subtotal > 0 ? Math.round((desconto / subtotal) * 100 * 1e10) / 1e10 : 0;
+    // Desconto digitado em R$: o Linx grava o % com 4 casas (NFs de 100.022 desde 24/10).
+    porcDesconto = subtotal > 0 ? Math.round((desconto / subtotal) * 100 * 1e4) / 1e4 : 0;
   }
   if (desconto > subtotal) bloqueios.push("O desconto é maior que o valor dos produtos.");
-  const total = round2(subtotal - desconto + frete + seguro);
+  // 2º desconto do form: "desconto na condição de pagamento", sobre o valor já com o 1º.
+  // Medido nas 88 NFs desde 24/10: em % → base × % TRUNCADO; em R$ → % = valor ÷ base, arredondado.
+  const baseCond = round2(subtotal - desconto);
+  let porcDescontoCond = 0;
+  let descontoCond = 0;
+  if (input.descontoCondModo === "valor") {
+    descontoCond = round2(Math.max(0, Number(input.descontoCondValor) || 0));
+    porcDescontoCond = baseCond > 0 ? round2((descontoCond / baseCond) * 100) : 0;
+  } else if (input.descontoCondModo === "percentual") {
+    porcDescontoCond = Math.max(0, Number(input.descontoCondPercentual) || 0);
+    descontoCond = trunc2((baseCond * porcDescontoCond) / 100);
+  }
+  if (descontoCond > baseCond) bloqueios.push("O desconto na condição de pagamento é maior que o valor a pagar.");
+  const total = round2(subtotal - desconto - descontoCond + frete + seguro);
   const qtdeTotal = linhas.reduce((s, l) => s + l.qtde, 0);
+  // "Desconto sobre 4" é onde o form registra o % digitado; o Linx só preenche sem desconto na
+  // condição e conforme o costume da filial (pernas da Scarf Me sim, NERD não) — catálogo.
+  const descontoSobre4 =
+    porcDigitado && descontoCond === 0 && (await fetchCostumeDescontoSobre4(input.empresa))[filial] ? porcDesconto : 0;
 
-  // Rateio por item (a diferença de arredondamento vai para o último, como o form)
-  ratear(linhas, desconto, "desconto", subtotal);
-  ratear(linhas, frete, "frete", subtotal);
-  ratear(linhas, seguro, "seguro", subtotal);
+  // Rateio por item: os dois descontos juntos (regra do centavo a partir do 1º, 88/88 NFs).
+  ratear(fiscais, round2(desconto + descontoCond), "desconto", subtotal);
+  ratear(fiscais, frete, "frete", subtotal);
+  ratear(fiscais, seguro, "seguro", subtotal);
 
   // Pedido do site já faturado?
   const pedidoSite = trim(input.obs).match(/#\s*(\d{3,})/)?.[1];
@@ -557,9 +779,9 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
     avisos.push("OBS sem o nº do pedido do site (#1234) — fica mais difícil conferir depois.");
   }
 
-  if (!simples && linhas.length > 0) {
+  if (!simples && fiscais.length > 0) {
     const tot = new Map<number, number>();
-    for (const l of linhas) {
+    for (const l of fiscais) {
       for (const v of impostosRegimeNormal(l, aliqIcmsOperacao)) if (v) tot.set(v.id, round2((tot.get(v.id) ?? 0) + v.valor));
     }
     const nome: Record<number, string> = { 1: "ICMS", 2: "IPI", 5: "PIS", 6: "COFINS", 92: "IBS-UF", 93: "CBS", 94: "IBS-MUN" };
@@ -578,6 +800,12 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
     simples,
     aliqIcmsOperacao,
     indFiscal,
+    consumidorFinal,
+    codTransacao,
+    nfFatura,
+    tipoNatureza,
+    ufEmbarque,
+    localEmbarque,
     codFilial: trim(fil.codFilial),
     empresaCodigo: Number(fil.empresa),
     ufFilial,
@@ -593,12 +821,25 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
       razao: trim(cli.razao),
       uf: ufCliente,
       cidade: trim(cli.cidade),
-      tabPreco: trim(cli.tab) || "01",
+      tabPreco: trim(cli.tab) || noCatalogo?.padroes.tabPreco || "01",
+      // VENDAS.INDICADOR_VENDA = o do cliente (CLIENTES_ATACADO): WEB 'V', corporativo ' '.
+      indicadorVenda: String(cli.indicadorVenda ?? "V").slice(0, 1) || " ",
+      // Representante (e gerente) da NF = o do cadastro do cliente, o principal primeiro; sem
+      // cadastro, o padrão da empresa (100% das NFs desde 24/10/2026, medido em 19/11).
+      representante: trim(cli.representante) || null,
+      // Condição do cadastro do cliente (informativa). O pedido "NF SEM PEDIDO" leva a da NF:
+      // 1.129 de 1.133 NFs desde 24/10/2026, em todas as naturezas (medido em 19/11).
+      condicaoPgto: trim(cli.condCli) || null,
     },
     linhas,
+    agrupamento,
+    fiscais,
     subtotal,
     porcDesconto,
     porcDigitado,
+    descontoCond,
+    porcDescontoCond,
+    descontoSobre4,
     desconto,
     frete,
     seguro,
@@ -611,18 +852,32 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
   };
 }
 
+/**
+ * Rateio do cabeçalho pelos itens, como o form do Linx grava — regras medidas em 19/11/2026 nas
+ * NFs reais (ordem = ITEM_NFE, a ordem das linhas):
+ *  - % de rateio: cada item com 10 casas; a sobra para fechar 100 vai no PRIMEIRO item;
+ *  - desconto: cada item = valor × desconto ÷ subtotal, arredondado; a sobra vai UM CENTAVO por
+ *    item a partir do primeiro (385 de 385 NFs);
+ *  - frete/seguro: cada item = encargo × % de rateio, arredondado; a sobra INTEIRA no primeiro
+ *    item (235 de 235 NFs).
+ */
 function ratear(linhas: LinhaFiscal[], totalValor: number, campo: "desconto" | "frete" | "seguro", subtotal: number) {
   if (linhas.length === 0) return;
-  let acumulado = 0;
-  linhas.forEach((l, i) => {
-    l.pct = subtotal > 0 ? Math.round((l.valor / subtotal) * 100 * 1e10) / 1e10 : 0;
-    if (i === linhas.length - 1) {
-      l[campo] = round2(totalValor - acumulado);
-    } else {
-      l[campo] = round2((totalValor * l.pct) / 100);
-      acumulado = round2(acumulado + l[campo]);
+  const r10 = (n: number) => Math.round(n * 1e10) / 1e10;
+  for (const l of linhas) l.pct = subtotal > 0 ? r10((l.valor / subtotal) * 100) : 0;
+  if (subtotal > 0) linhas[0].pct = r10(linhas[0].pct + (100 - linhas.reduce((s, l) => s + l.pct, 0)));
+  if (campo === "desconto") {
+    for (const l of linhas) l.desconto = subtotal > 0 ? round2((totalValor * l.valor) / subtotal) : 0;
+    let centavos = Math.round((totalValor - linhas.reduce((s, l) => s + l.desconto, 0)) * 100);
+    for (let i = 0; centavos !== 0 && i < linhas.length; i++) {
+      const passo = centavos > 0 ? 1 : -1;
+      linhas[i].desconto = round2(linhas[i].desconto + passo / 100);
+      centavos -= passo;
     }
-  });
+  } else {
+    for (const l of linhas) l[campo] = round2((totalValor * l.pct) / 100);
+    linhas[0][campo] = round2(linhas[0][campo] + (totalValor - linhas.reduce((s, l) => s + l[campo], 0)));
+  }
 }
 
 function paraPreview(p: Plano): NotaPreview {
@@ -656,6 +911,8 @@ function paraPreview(p: Plano): NotaPreview {
     subtotal: p.subtotal,
     descontoPercentual: p.porcDesconto,
     desconto: p.desconto,
+    descontoCond: p.descontoCond,
+    descontoCondPercentual: p.porcDescontoCond,
     frete: p.frete,
     seguro: p.seguro,
     total: p.total,
@@ -752,12 +1009,13 @@ const OBS_DIFAL =
  */
 function montarBatch(p: Plano, cNF: string, final: "commit" | "rollback" | "debug" | "xml"): string {
   // Linhas de FATURAMENTO_PROD (produto × cor) com grade
-  const prods = new Map<string, { produto: string; cor: string; preco: number; qtde: number; custo: number; cfop: string; grade: Map<number, number>; item: string }>();
-  for (const l of p.linhas) {
-    const k = `${l.produto}|${l.cor}`;
+  const prods = new Map<string, { produto: string; cor: string; preco: number; qtde: number; custo: number; cfop: string; grade: Map<number, number>; item: string; obs: string }>();
+  // FATURAMENTO_PROD segue a ordem digitada (ITEM_IMPRESSAO); FATURAMENTO_ITEM, a ordem fiscal.
+  for (const l of [...p.linhas].sort((a, b) => a.ordemLinha - b.ordemLinha)) {
+    const k = l.linha;
     let g = prods.get(k);
     if (!g) {
-      g = { produto: l.produto, cor: l.cor, preco: l.preco, qtde: 0, custo: l.custo, cfop: l.cfop, grade: new Map(), item: String(prods.size + 1).padStart(4, "0") };
+      g = { produto: l.produto, cor: l.cor, preco: l.preco, qtde: 0, custo: l.custo, cfop: l.cfopProd, grade: new Map(), item: l.itemImpressao, obs: l.obsItem };
       prods.set(k, g);
     }
     g.qtde += l.qtde;
@@ -767,39 +1025,57 @@ function montarBatch(p: Plano, cNF: string, final: "commit" | "rollback" | "debu
   const tsExpr = (preco: number) =>
     `REPLICATE(NCHAR(198), 17 - LEN(dbo.FX_PRODUCAO_PRECO(CAST(${num(preco)} AS NUMERIC(14,2)),'T'))) + dbo.FX_PRODUCAO_PRECO(CAST(${num(preco)} AS NUMERIC(14,2)),'T') + '111'`;
 
+  // VENDAS_PRODUTO: uma linha por produto × cor (é a chave dela) — linhas repetidas da NF somam
+  // (NF 0043673 da Matriz: 2 linhas de 13.46.0129/10 → 1 item do pedido com 5 peças).
+  const pedidoProds = new Map<string, { produto: string; cor: string; preco: number; qtde: number; grade: Map<number, number> }>();
+  for (const g of prods.values()) {
+    const k = `${g.produto}|${g.cor}`;
+    const v = pedidoProds.get(k) ?? { produto: g.produto, cor: g.cor, preco: g.preco, qtde: 0, grade: new Map<number, number>() };
+    v.qtde += g.qtde;
+    for (const [t, q] of g.grade) v.grade.set(t, (v.grade.get(t) ?? 0) + q);
+    pedidoProds.set(k, v);
+  }
   const vendasProd: string[] = [];
+  for (const v of pedidoProds.values()) {
+    const valor = round2(v.preco * v.qtde);
+    vendasProd.push(`
+  INSERT INTO VENDAS_PRODUTO (PEDIDO, PRODUTO, COR_PRODUTO, ENTREGA, ITEM_PEDIDO, QTDE_ORIGINAL, QTDE_ENTREGAR, QTDE_ENTREGUE,
+    PRECO1, VALOR_ORIGINAL, VALOR_ENTREGAR, VALOR_ENTREGUE, ENTREGUE_MOEDA_PADRAO, DATA_PARA_TRANSFERENCIA, ${[...v.grade.keys()].map((n) => `VO${n}`).join(", ")})
+  VALUES (@PEDIDO, ${lit(v.produto)}, ${lit(v.cor)}, @HOJE, '0000', ${v.qtde}, 0, ${v.qtde},
+    ${num(v.preco)}, ${num(valor)}, 0, ${num(valor)}, ${num(valor)}, @AGORA, ${[...v.grade.values()].join(", ")});`);
+  }
   const fatProd: string[] = [];
   let seqItem = 0;
   for (const g of prods.values()) {
     seqItem += 1;
-    const voCols = [...g.grade.keys()].flatMap((n) => [`VO${n}`]);
-    const voVals = [...g.grade.values()].map((v) => String(v));
     const fCols = [...g.grade.keys()].map((n) => `F${n}`);
     const valor = round2(g.preco * g.qtde);
-    vendasProd.push(`
-  INSERT INTO VENDAS_PRODUTO (PEDIDO, PRODUTO, COR_PRODUTO, ENTREGA, ITEM_PEDIDO, QTDE_ORIGINAL, QTDE_ENTREGAR, QTDE_ENTREGUE,
-    PRECO1, VALOR_ORIGINAL, VALOR_ENTREGAR, VALOR_ENTREGUE, ENTREGUE_MOEDA_PADRAO, DATA_PARA_TRANSFERENCIA, ${voCols.join(", ")})
-  VALUES (@PEDIDO, ${lit(g.produto)}, ${lit(g.cor)}, @HOJE, '0000', ${g.qtde}, 0, ${g.qtde},
-    ${num(g.preco)}, ${num(valor)}, 0, ${num(valor)}, ${num(valor)}, @AGORA, ${voVals.join(", ")});`);
     fatProd.push(`
   INSERT INTO FATURAMENTO_PROD (FILIAL, NF_SAIDA, SERIE_NF, PRODUTO, COR_PRODUTO, ITEM, PEDIDO, PEDIDO_PRODUTO, PEDIDO_COR, ENTREGA,
     IPI, ICMS, DESCONTO_ITEM, QTDE, PRECO, VALOR, MATA_SALDO, ${fCols.join(", ")}, FAIXA, ORIGEM, CUSTO_NA_DATA, TIMESTAMP,
     MOEDA, CAMBIO_NA_DATA, DATA_PARA_TRANSFERENCIA, CODIGO_FISCAL_OPERACAO, COD_FILIAL_ESTOQUE,
     CUSTO_NA_DATA_2, CUSTO_NA_DATA_3, CUSTO_NA_DATA_4, ITEM_IMPRESSAO, ITEM_IMPRESSAO_FATURA, ITEM_PEDIDO,
-    PRECO_2, PRECO_3, PRECO_4, VALOR_DIFERENCA_GUIA_FATURA_ITEM, LICENCIADO_ROYALTIES)
+    PRECO_2, PRECO_3, PRECO_4, VALOR_DIFERENCA_GUIA_FATURA_ITEM, LICENCIADO_ROYALTIES, DESC_VENDA_CLIENTE)
   VALUES (@FILIAL, @NF, @SERIE, ${lit(g.produto)}, ${lit(g.cor)}, ${lit(String(seqItem).padStart(6, "0"))}, @PEDIDO, ${lit(g.produto)}, ${lit(g.cor)}, @HOJE,
     0, 0, 0, ${g.qtde}, ${num(g.preco)}, ${num(valor)}, 0, ${[...g.grade.values()].join(", ")}, '1', 'S', ${num(g.custo)}, ${tsExpr(g.preco)},
     'R$', 1, @AGORA, ${lit(g.cfop)}, @COD_FILIAL,
     0, 0, 0, ${lit(g.item)}, ${lit(g.item)}, '0000',
-    0, 0, 0, 0, 0);`);
+    0, 0, 0, 0, 0, ${g.obs ? `LEFT(${lit(g.obs)} + SPACE(80), 80)` : "NULL"});`);
   }
 
+  // Remessa (tipo R: demonstração, consignação, conserto, simples remessa, troca) grava a quantidade
+  // a retornar = a do item (QTDE_RETORNAR_BENEFICIAMENTO; todas as NFs desde 2025, menos 4 editadas).
+  const qtdeRetornar = (l: LinhaFiscal) => (p.tipoNatureza === "R" ? l.qtde : 0);
+  // Agrupamentos 3–5 ("por pedido"): nº do pedido (gerado aqui no batch) na frente do código e da descrição.
+  const porPedido = p.agrupamento >= 3;
+  const codigoItemSql = (l: LinhaFiscal) => (porPedido ? `RTRIM(@PEDIDO) + ${lit(l.codigoItem)}` : lit(l.codigoItem));
+  const descricaoItemSql = (l: LinhaFiscal) =>
+    porPedido ? `LEFT(RTRIM(@PEDIDO) + ' ' + ${lit(l.descricao)}, 80)` : lit(l.descricao);
   const fatItem: string[] = [];
   const fatImp: string[] = [];
-  p.linhas.forEach((l, i) => {
-    const g = prods.get(`${l.produto}|${l.cor}`)!;
+  p.fiscais.forEach((l, i) => {
     // Tributos aproximados (IBPT) só vão para consumidor final — a Matriz grava 0 para empresa.
-    const fatorIbpt = consumidorFinal(p) ? 1 : 0;
+    const fatorIbpt = p.consumidorFinal ? 1 : 0;
     const ibptFed = round2((l.valor * l.ibptFederal * fatorIbpt) / 100);
     const ibptEst = round2((l.valor * l.ibptEstadual * fatorIbpt) / 100);
     const ibptMun = round2((l.valor * l.ibptMunicipal * fatorIbpt) / 100);
@@ -811,25 +1087,32 @@ function montarBatch(p: Plano, cNF: string, final: "commit" | "rollback" | "debu
     UNIDADE, VALOR_ITEM, REFERENCIA, REFERENCIA_ITEM, TIMESTAMP, MPADRAO_VALOR_DESCONTOS, MPADRAO_VALOR_ENCARGOS, NAO_SOMA_VALOR,
     ITEM_NFE, MPADRAO_SEGURO_ITEM, MPADRAO_FRETE_ITEM, MPADRAO_ENCARGO_ITEM, VALOR_IMPOSTO_ITEM, ORIGEM_ITEM, RATEIO_FILIAL,
     RATEIO_CENTRO_CUSTO, INDICA_PRODUTO_PROCESSO, PRECO_UNITARIO_ORIGINAL, VALOR_IMPOSTO_ITEM_MUNICIPAL, VALOR_IMPOSTO_ITEM_ESTADUAL, ID_CEST_NCM,
-    CST_IBS_CBS, CCLASSTRIB)
-  VALUES (@FILIAL, @NF, @SERIE, ${lit(g.item)}, ${l.tamanho}, ${lit(l.ncm)}, ${lit(l.cfop)},
-    ${lit(l.codigoItem)}, 'P', 0, 0, ${lit(l.contaContabil || null)}, 0, ${lit(l.descricao)}, '1',
+    CST_IBS_CBS, CCLASSTRIB, OBS_ITEM, REFERENCIA_PEDIDO)
+  VALUES (@FILIAL, @NF, @SERIE, ${lit(l.itemImpressao)}, ${l.subItem}, ${lit(l.ncm)}, ${lit(l.cfop)},
+    ${codigoItemSql(l)}, 'P', 0, 0, ${lit(l.contaContabil || null)}, 0, ${descricaoItemSql(l)}, '1',
     ${l.excecao ?? "NULL"}, ${l.indicadorCfop}, 0, ${num(l.preco)}, ${num(l.valor)}, 0,
-    ${num(l.pct, 10)}, ${num(l.preco)}, 0, ${l.qtde}, 0, ${lit(l.csosn)}, ${lit(l.origem)},
-    ${lit(l.unidade)}, ${num(l.valor)}, ${lit(l.produto)}, ${lit(l.cor)}, ${tsExpr(l.preco)}, ${num(l.desconto)}, 0, 0,
+    ${num(l.pct, 10)}, ${num(l.preco)}, 0, ${l.qtde}, ${qtdeRetornar(l)}, ${lit(l.csosn)}, ${lit(l.origem)},
+    ${lit(l.unidade)}, ${num(l.valor)}, ${lit(l.produto)}, ${lit(l.referenciaItem)}, ${tsExpr(l.preco)}, ${num(l.desconto)}, 0, 0,
     ${i + 1}, ${num(l.seguro)}, ${num(l.frete)}, 0, ${num(ibptFed)}, 'P', @COD_FILIAL,
     @CENTRO_CUSTO, 0, ${num(l.preco)}, ${num(ibptMun)}, ${num(ibptEst)}, ${l.idCest ?? "NULL"},
-    ${lit(l.cstIbsCbs || null)}, ${lit(l.cClassTrib || null)});`);
+    ${lit(l.cstIbsCbs || null)}, ${lit(l.cClassTrib || null)},
+    ${l.obsItem ? `LEFT(${lit(l.obsItem)} + SPACE(254), 254)` : "NULL"}, ${porPedido ? "@PEDIDO" : "NULL"});`);
     if (p.simples) {
       for (const t of l.impostos) {
         // DICMS (11) o Linx só grava em operação interestadual.
         if (t.id === 11 && p.cliente.uf === p.ufFilial) continue;
+        // Partilha do DIFAL (71/72) e ICMS-DESTINO (73) só existem para consumidor final: na
+        // 100.01 a contribuinte o Linx não grava essas linhas (NFs desde 24/10/2026).
+        if ((t.id === 71 || t.id === 72 || t.id === 73) && !p.consumidorFinal) continue;
+        // FECP-destino (70): desde a atualização de 24/10/2026 o Linx não grava a linha no Simples,
+        // mesmo com a exceção trazendo o imposto (NERD 1542, 06/11; antes de 24/10 gravava).
+        if (t.id === 70) continue;
         const v = valorImposto(l, t, p.icmsDestinoAliq);
         fatImp.push(`
   INSERT INTO FATURAMENTO_IMPOSTO (FILIAL, NF_SAIDA, SERIE_NF, ITEM_IMPRESSAO, SUB_ITEM_TAMANHO, ID_IMPOSTO, TAXA_IMPOSTO,
-    BASE_IMPOSTO, VALOR_IMPOSTO, VALOR_IMPOSTO_CALCULADO, INCIDENCIA, AGREGA_APOS_ENCARGO, AGREGA_APOS_DESCONTO)
-  VALUES (@FILIAL, @NF, @SERIE, ${lit(g.item)}, ${l.tamanho}, ${t.id}, ${num(v.taxa)}, ${num(v.base)}, ${num(v.valor)}, ${num(v.valor)},
-    ${t.incidencia}, ${t.agregaEncargo ? 1 : 0}, ${t.agregaDesconto ? 1 : 0});`);
+    BASE_IMPOSTO, VALOR_IMPOSTO, VALOR_IMPOSTO_CALCULADO, BASE_IMPOSTO_CALC, INCIDENCIA, AGREGA_APOS_ENCARGO, AGREGA_APOS_DESCONTO)
+  VALUES (@FILIAL, @NF, @SERIE, ${lit(l.itemImpressao)}, ${l.subItem}, ${t.id}, ${num(v.taxa)}, ${num(v.base)}, ${num(v.valor)}, ${num(v.valor)},
+    ${num(v.base)}, ${t.incidencia}, ${t.agregaEncargo ? 1 : 0}, ${t.agregaDesconto ? 1 : 0});`);
       }
     } else {
       // Regime normal (Matriz): impostos calculados; BASE_IMPOSTO_CALC = base, como o Linx grava.
@@ -840,16 +1123,19 @@ function montarBatch(p: Plano, cNF: string, final: "commit" | "rollback" | "debu
         fatImp.push(`
   INSERT INTO FATURAMENTO_IMPOSTO (FILIAL, NF_SAIDA, SERIE_NF, ITEM_IMPRESSAO, SUB_ITEM_TAMANHO, ID_IMPOSTO, TAXA_IMPOSTO,
     BASE_IMPOSTO, VALOR_IMPOSTO, VALOR_IMPOSTO_CALCULADO, BASE_IMPOSTO_CALC, INCIDENCIA, AGREGA_APOS_ENCARGO, AGREGA_APOS_DESCONTO)
-  VALUES (@FILIAL, @NF, @SERIE, ${lit(g.item)}, ${l.tamanho}, ${t.id}, ${num(v.taxa)}, ${num(v.base)}, ${num(v.valor)}, ${num(v.valor)},
+  VALUES (@FILIAL, @NF, @SERIE, ${lit(l.itemImpressao)}, ${l.subItem}, ${t.id}, ${num(v.taxa)}, ${num(v.base)}, ${num(v.valor)}, ${num(v.valor)},
     ${num(v.base)}, ${t.incidencia}, ${t.agregaEncargo ? 1 : 0}, ${t.agregaDesconto ? 1 : 0});`);
       });
     }
   });
 
-  // OBS tipo 7 (DIFAL zerado) é do Simples; no regime normal a Matriz não grava (e o
-  // caso com DIFAL de verdade — não contribuinte de outra UF — é bloqueado no plano).
-  const interestadual = p.cliente.uf !== p.ufFilial && p.simples;
-  const valorEntregue = round2(p.subtotal - p.desconto);
+  // OBS tipo 7 (DIFAL zerado): só em operação interestadual COM consumidor final (Simples 100.022:
+  // 2.557 de 2.561; Matriz 128.01 → RJ também grava). Venda a contribuinte de outra UF não tem.
+  const interestadual = p.cliente.uf !== p.ufFilial && p.consumidorFinal;
+  // VENDAS: valor entregue = Σ por linha de valor × (1 − desconto total ÷ subtotal), arredondado
+  // (1.112 de 1.112 NFs "sem pedido" desde 24/10/2026 — com e sem desconto na condição).
+  const fatorLiquido = p.subtotal > 0 ? 1 - (p.desconto + p.descontoCond) / p.subtotal : 1;
+  const valorEntregue = round2([...pedidoProds.values()].reduce((s, g) => s + round2(round2(g.preco * g.qtde) * fatorLiquido), 0));
 
   const fim =
     final === "commit"
@@ -926,11 +1212,11 @@ BEGIN TRY
     TOT_VALOR_ORIGINAL, TOT_VALOR_ENTREGUE, TOT_VALOR_ENTREGAR, APROVADO_POR, TABELA_FILHA, TOT_BRUTO_ENTREGUE,
     ACEITA_PECAS_PEQUENAS, ACEITA_PECAS_COM_CORTE, DATA_PARA_TRANSFERENCIA, TOT_ENTREGUE_MOEDA_PADRAO,
     NOME_CLIFOR_ENTREGA, TIPO_RATEIO, TRANSP_REDESPACHO, VALOR_SUB_ITENS, INDICADOR_VENDA)
-  VALUES (@PEDIDO, '${COLECAO_PEDIDO}', @TAB_PRECO, 'VENDA ATACADO', @COND_PGTO, @FILIAL, @CLIENTE, @TRANSP, 'R$',
+  VALUES (@PEDIDO, '${COLECAO_PEDIDO}', @TAB_PRECO, 'VENDA ATACADO', @COND_PGTO_PEDIDO, @FILIAL, @CLIENTE, @TRANSP, 'R$',
     @REPRESENTANTE, @REPRESENTANTE, @HOJE, @HOJE, ${p.qtdeTotal}, ${p.qtdeTotal}, 0,
     ${num(p.subtotal)}, ${num(valorEntregue)}, 0, 'NF SEM PEDIDO', 'VENDAS_PRODUTO', ${num(p.subtotal)},
     100, 100, @AGORA, ${num(valorEntregue)},
-    @CLIENTE, 0, @TRANSP_REDESP, ${num(p.subtotal)}, 'V');
+    @CLIENTE, 0, @TRANSP_REDESP, ${num(p.subtotal)}, @INDICADOR_VENDA);
 ${vendasProd.join("\n")}
 
   INSERT INTO FATURAMENTO (FILIAL, NF_SAIDA, SERIE_NF, TIPO_FATURAMENTO, NOME_CLIFOR, CONDICAO_PGTO, NATUREZA_SAIDA,
@@ -950,25 +1236,27 @@ ${vendasProd.join("\n")}
     CHAVE_NFE, GERAR_AUTOMATICO, STATUS_NFE, LOG_STATUS_NFE, ITEM_NFE, PRIORIZACAO, REGISTRO_DPEC, DATA_REGISTRO_DPEC,
     TIPO_EMISSAO_NFE, FIN_EMISSAO_NFE, VALOR_DESPACHO, VALOR_IMPOSTO_INCIDENCIA, MPADRAO_VALOR_IMPOSTO_INCIDENCIA,
     DATA_HORA_EMISSAO, INDICA_PRESENCA_COMPRADOR, UTC_DATA_SAIDA, UTC_EMISSAO, INDICA_ENDERECO_ENTREGA, INFO_PGTO,
-    USA_VALOR_MEDIO, TP_NF_CREDITO, TP_NF_DEBITO, TP_ENTE_GOVERNO, REDUTOR_COMPRA_GOVERNO, TP_OPER_GOVERNO, PREVISAO_ENTREGA)
+    USA_VALOR_MEDIO, TP_NF_CREDITO, TP_NF_DEBITO, TP_ENTE_GOVERNO, REDUTOR_COMPRA_GOVERNO, TP_OPER_GOVERNO, PREVISAO_ENTREGA,
+    UF_EMBARQUE_EXPORTACAO, LOCAL_EMBARQUE_EXPORTACAO)
   VALUES (@FILIAL, @NF, @SERIE, 'PADRAO', @CLIENTE, @COND_PGTO, @NATUREZA,
-    @TRANSP, @TRANSP_REDESP, @TIPO_FRETE, '${COD_TRANSACAO}', @HOJE, @HOJE, ${num(p.frete)}, ${num(p.seguro)}, ${num(p.desconto)},
-    0, 0, 0, 0, ${num(p.total)}, ${p.qtdeTotal}, 1, 0, 0,
+    @TRANSP, @TRANSP_REDESP, @TIPO_FRETE, @COD_TRANSACAO, @HOJE, @HOJE, ${num(p.frete)}, ${num(p.seguro)}, ${num(p.desconto)},
+    ${num(p.descontoCond)}, 0, 0, 0, ${num(p.total)}, ${p.qtdeTotal}, ${p.nfFatura ? 1 : 0}, 0, 0,
     'FATURAMENTO_PROD', NULLIF(@OBS, ''), @PESO_LIQ, @PESO_BRUTO, @VOLUMES, @TIPO_VOLUME, 0, @ENTREGA_CIF, 0, 0,
     0, 0, @REPRESENTANTE, 0, 0, @REPRESENTANTE, 0, 0,
     0, 0, 0, 'R$', 1, 1, 0,
-    @AGORA, @CLIENTE, 0, 2, 0, 0,
+    @AGORA, @CLIENTE, 0, ${p.agrupamento}, 0, 0,
     0, 0, 0, 0,
-    0, 0, 0, 0, @EMPRESA, 0, 0,
-    ${num(p.desconto)}, 0, 0, ${num(p.frete)}, 0, ${num(p.seguro)},
+    0, 0, 0, ${num(p.descontoSobre4, 10)}, @EMPRESA, 0, 0,
+    ${num(p.desconto)}, ${num(p.descontoCond)}, 0, ${num(p.frete)}, 0, ${num(p.seguro)},
     ${num(p.subtotal)}, ${num(p.total)}, 0, ${num(p.porcDesconto, 10)}, 0,
-    0, ${p.porcDigitado ? 1 : 0}, 0, @CENTRO_CUSTO, @COD_FILIAL,
+    ${num(p.porcDescontoCond, 10)}, ${p.porcDigitado ? 1 : 0}, 0, @CENTRO_CUSTO, @COD_FILIAL,
     0, 0, ${num(p.subtotal)}, 0,
     @CONS_FINAL, 0, 0, 0, 0,
     @CHAVE, 0, 1, 0, 0, 0, 0, '19000101',
     1, 1, 0, 0, 0,
     CAST(@AGORA AS SMALLDATETIME), 0, 3, 3, 0, @INFO_PGTO,
-    0, 0, 0, 0, 0, 0, @HOJE);
+    0, 0, 0, 0, 0, 0, @HOJE,
+    NULLIF(@UF_EMBARQUE, ''), NULLIF(@LOCAL_EMBARQUE, ''));
 ${fatProd.join("\n")}
 ${fatItem.join("\n")}
 ${fatImp.join("\n")}
@@ -1000,12 +1288,14 @@ function bindCabecalho(req: Req, p: Plano, cNF: string) {
   req.input("CNF_SUGERIDO", sql.Char(8), cNF);
   req.input("CLIENTE", sql.VarChar(25), p.cliente.nome);
   req.input("TAB_PRECO", sql.Char(2), p.cliente.tabPreco.slice(0, 2));
+  req.input("INDICADOR_VENDA", sql.Char(1), p.cliente.indicadorVenda);
   req.input("COND_PGTO", sql.Char(3), trim(i.condicaoPgto) || padrao.condicaoPgto);
+  req.input("COND_PGTO_PEDIDO", sql.Char(3), trim(i.condicaoPgto) || padrao.condicaoPgto);
   req.input("NATUREZA", sql.Char(7), p.natureza);
   req.input("TRANSP", sql.VarChar(25), trim(i.transportadora) || padrao.transportadora);
   req.input("TRANSP_REDESP", sql.VarChar(25), trim(i.transpRedespacho) || trim(i.transportadora) || padrao.transpRedespacho);
   req.input("TIPO_FRETE", sql.Char(2), trim(i.tipoFrete) || padrao.tipoFrete);
-  req.input("REPRESENTANTE", sql.VarChar(25), padrao.representante);
+  req.input("REPRESENTANTE", sql.VarChar(25), p.cliente.representante ?? padrao.representante);
   req.input("CENTRO_CUSTO", sql.VarChar(6), padrao.centroCusto);
   req.input("OBS", sql.VarChar(sql.MAX), trim(i.obs));
   req.input("PESO_LIQ", sql.Numeric(9, 3), Number(i.pesoLiquido) || 0);
@@ -1013,16 +1303,12 @@ function bindCabecalho(req: Req, p: Plano, cNF: string) {
   req.input("VOLUMES", sql.Int, Math.max(0, Math.round(Number(i.volumes) || 0)));
   req.input("TIPO_VOLUME", sql.VarChar(25), trim(i.tipoVolume).toUpperCase() || padrao.tipoVolume);
   req.input("INFO_PGTO", sql.Char(2), trim(i.infoPgto) || padrao.infoPgto);
-  req.input("CONS_FINAL", sql.Bit, consumidorFinal(p) ? 1 : 0);
+  req.input("CONS_FINAL", sql.Bit, p.consumidorFinal ? 1 : 0);
+  req.input("COD_TRANSACAO", sql.VarChar(20), p.codTransacao);
+  req.input("UF_EMBARQUE", sql.Char(2), p.ufEmbarque);
+  req.input("LOCAL_EMBARQUE", sql.VarChar(60), p.localEmbarque);
 }
 
-/**
- * Simples (e-commerce): sempre consumidor final, como o form grava. Regime normal (Matriz):
- * só o não contribuinte (indicador 8) — empresa (1) e revenda (16) não (medido nas NFs dela).
- */
-function consumidorFinal(p: Plano): boolean {
-  return p.simples || p.indFiscal === 8;
-}
 
 /**
  * Grava a NF (ou só simula, desfazendo tudo no fim). Recalcula o plano no servidor —

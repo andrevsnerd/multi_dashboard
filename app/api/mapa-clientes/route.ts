@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import sql from 'mssql';
 
+import { getEcommerceSalesFilials } from '@/lib/config/company';
 import { withRequest } from '@/lib/db/connection';
 import { resolveCompanyLive } from '@/lib/server/company-live';
 import { normalizeRangeForQuery } from '@/lib/utils/date';
@@ -31,10 +32,12 @@ export async function GET(request: Request) {
 
   // Usa todas as filiais conhecidas da empresa (vendas + ecommerce), sem duplicatas.
   // O filtro de e-commerce é feito via NATUREZA_SAIDA, igual ao exportar_todos_relatorios.py.
+  // E-commerce = pernas atuais + históricas (ex.: MSC, e-commerce até 19/11/2026): o recorte
+  // aqui é a empresa inteira, então a perna histórica entra sem corte de data.
   const allFilials = Array.from(
     new Set([
       ...(companyConfig.filialFilters?.sales ?? []),
-      ...(companyConfig.ecommerceFilials ?? []),
+      ...getEcommerceSalesFilials(companyConfig),
     ])
   );
 
