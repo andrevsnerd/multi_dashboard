@@ -140,6 +140,7 @@ export async function fetchCatalogoNotas(empresa: EmpresaFat, opts: { semCache?:
           // materiais usa outro (130.01/199.10: FATURAMENTO_026), mesmo na mesma natureza.
           codTransacao: moda(ls.filter((l) => Number(l.prod) === 1).map((l) => [l.trans, l.n])) ?? moda(ls.map((l) => [l.trans, l.n])),
           tabPreco: moda(ls.map((l) => [l.tab, l.n])),
+          codTransacaoMaterial: moda(ls.filter((l) => Number(l.prod) === 0).map((l) => [l.trans, l.n])),
         };
         return {
           natureza: nat,

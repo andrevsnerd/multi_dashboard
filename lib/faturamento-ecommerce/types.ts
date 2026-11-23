@@ -276,6 +276,83 @@ export interface NotaInput {
   /** Exportação (cliente UF EX, 100.71): UF e local de embarque. Vazio = SP / Aeroporto de Guarulhos. */
   ufEmbarque?: string;
   localEmbarque?: string;
+  /**
+   * Devolução de compra (natureza tipo D: 117.11, 150.01): a NF sai a partir de uma NF de entrada
+   * do fornecedor (o cliente da NF). Os itens vêm da entrada (`itens` é ignorado), o estoque sai por
+   * romaneio "DEVOLUCAO ENTRADA" e os impostos são os da NF do fornecedor, informados por item.
+   */
+  devolucao?: DevolucaoInput;
+  /**
+   * NF de material (remessa p/ industrialização 130.01, simples remessa 199.10…): itens avulsos do
+   * cadastro de materiais, sem estoque — `itens` é ignorado. Quantidade com até 3 casas.
+   */
+  materiais?: MaterialItemInput[];
+  /**
+   * Usuário do Linx que grava (RESPONSAVEL do romaneio). Preenchido SÓ pelo servidor, a partir do
+   * login (resolveResponsavelLinx) — o que vier da tela é ignorado.
+   */
+  responsavel?: string;
+}
+
+/** Material de uma NF de material (código do cadastro MATERIAIS). */
+export interface MaterialItemInput {
+  material: string;
+  /** Descrição na NF; vazio = a do cadastro (DESC_NF). */
+  descricao?: string;
+  qtde: number;
+  preco: number;
+}
+
+/** Item da NF de entrada a devolver. */
+export interface DevolucaoItemInput {
+  /** ENTRADAS_ITEM.ITEM_IMPRESSAO */
+  itemImpressaoEntrada: string;
+  /** ENTRADAS_ITEM.SUB_ITEM_TAMANHO */
+  subItem: number;
+  qtde: number;
+}
+
+/** Imposto de um item fiscal, como sai na NF (na devolução: o da NF do fornecedor). */
+export interface ImpostoInformado {
+  id: number;
+  base: number;
+  taxa: number;
+  valor: number;
+}
+
+export interface DevolucaoInput {
+  /** NOME_CLIFOR do fornecedor (o mesmo cliente da NF). */
+  fornecedor: string;
+  nfEntrada: string;
+  serieEntrada: string;
+  itens: DevolucaoItemInput[];
+  /**
+   * Alíquotas da NF do fornecedor por imposto ({"1": 4, "2": 5, ...}), aplicadas a todos os itens com as
+   * bases que o Linx usa. Imposto que a exceção não traz entra se a alíquota for > 0 (ex.: IBS/CBS).
+   */
+  taxas?: Record<string, number>;
+  /** Ajuste fino por código do item fiscal (CODIGO_ITEM): substitui a sugestão daquele item. */
+  impostos?: Record<string, ImpostoInformado[]>;
+}
+
+/** NF de entrada que pode ser devolvida (busca da aba Devolução). */
+export interface EntradaDevolvivel {
+  fornecedor: string;
+  clifor: string;
+  nfEntrada: string;
+  serieEntrada: string;
+  emissao: string | null;
+  valorTotal: number;
+  itens: {
+    itemImpressao: string;
+    subItem: number;
+    produto: string;
+    cor: string;
+    descricao: string;
+    qtde: number;
+    devolvida: number;
+    preco: number;
+  }[];
 }
 
 /** Padrões de cabeçalho de uma natureza (o valor mais comum nas NFs reais). */
@@ -287,6 +364,8 @@ export interface PadroesNatureza {
   infoPgto: string | null;
   tipoVolume: string | null;
   codTransacao: string | null;
+  /** Cód. de transação das NFs de material (itens avulsos) da natureza. */
+  codTransacaoMaterial: string | null;
   /** Tabela de preço do pedido quando o cliente não tem a dele (100.08 → 97, a de transferência). */
   tabPreco: string | null;
 }
@@ -337,6 +416,15 @@ export interface NotaPreviewItem {
   estoque: number | null;
 }
 
+/** Item fiscal da devolução com os impostos que vão na NF (editáveis na tela). */
+export interface DevolucaoPreviewItem {
+  codigoItem: string;
+  descricao: string;
+  qtde: number;
+  valor: number;
+  impostos: (ImpostoInformado & { nome: string })[];
+}
+
 export interface NotaPreview {
   filial: string;
   serie: string;
@@ -355,6 +443,8 @@ export interface NotaPreview {
   seguro: number;
   total: number;
   qtdeTotal: number;
+  /** Devolução: itens fiscais com os impostos (da NF do fornecedor) e o IPI somado ao total. */
+  devolucao?: { itens: DevolucaoPreviewItem[]; impostoAgregar: number; romaneio: string | null };
   /** Impedem a gravação. */
   bloqueios: string[];
   /** Só avisam. */

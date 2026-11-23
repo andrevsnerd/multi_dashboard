@@ -434,6 +434,29 @@ async function buildScarfmeEcommerceFaturamentoFilialFilter(
   return `AND ${allClause}`;
 }
 
+/**
+ * Expressão SQL do rótulo de filial numa linha de FATURAMENTO de e-commerce (100.02/100.022).
+ *
+ * Perna histórica (ex.: MSC 000111, e-commerce até 19/11/2026 e HIGIENÓPOLIS depois) sai com o
+ * nome da perna ATUAL do e-commerce: a nota é venda do E-COMMERCE, e com o nome cru o front
+ * (getFilialLabelForDisplay) a jogava na loja que o CNPJ virou. Toda linha de e-commerce de
+ * uma perna histórica é anterior ao corte por construção (buildEcommerceFaturamentoFilialSql),
+ * então trocar pelo nome basta. Use no SELECT e no GROUP BY. Nomes vêm do registry/FILIAIS
+ * (literal escapado, VarChar — sem parâmetro para poder repetir no mesmo request).
+ */
+async function ecomFaturamentoFilialLabelSql(
+  companySlug: string | undefined,
+  column = 'f.FILIAL'
+): Promise<string> {
+  if (companySlug !== 'scarfme') return column;
+  const companyConfig = await resolveCompanyLive('scarfme');
+  const history = (companyConfig?.ecommerceHistory ?? []).map((h) => h.filial.trim()).filter(Boolean);
+  const current = (companyConfig?.ecommerceFilials ?? []).map((f) => f.trim()).find(Boolean);
+  if (history.length === 0 || !current) return column;
+  const lit = (s: string) => `'${s.replace(/'/g, "''")}'`;
+  return `CASE WHEN LTRIM(RTRIM(${column})) IN (${history.map(lit).join(', ')}) THEN ${lit(current)} ELSE ${column} END`;
+}
+
 function buildGrupoFilter(
   request: sql.Request | RequestLike,
   company: string | undefined,
@@ -3158,6 +3181,8 @@ export async function fetchDetalhesVendasSemana({
   grades?: string[];
   range?: { start?: Date | string; end?: Date | string };
 }): Promise<DetalheVendaSemana[]> {
+  // Perna histórica do e-commerce (MSC até 19/11/2026) sai rotulada como e-commerce, não como a loja que virou.
+  const ecomFilialLbl = await ecomFaturamentoFilialLabelSql(company);
   return withRequest(async (request) => {
     // Calcular período baseado no range selecionado
     // Usar normalizeRangeForQuery para garantir tratamento correto de timezone e inclusão do último dia
@@ -3284,7 +3309,7 @@ export async function fetchDetalhesVendasSemana({
         ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade,
         ISNULL(p.COLECAO, '') AS colecao,
         CAST(fp.QTDE AS FLOAT) AS quantidade,
-        f.FILIAL AS filial,
+        ${ecomFilialLbl} AS filial,
         ISNULL(fp.VALOR_LIQUIDO, 0) AS valorLiquido
       FROM FATURAMENTO f WITH (NOLOCK)
       JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
@@ -3384,6 +3409,8 @@ export async function fetchDetalhesEcommerceSemana({
   grades?: string[];
   range?: { start?: Date | string; end?: Date | string };
 }): Promise<DetalheEcommerceSemana[]> {
+  // Perna histórica do e-commerce (MSC até 19/11/2026) sai rotulada como e-commerce, não como a loja que virou.
+  const ecomFilialLbl = await ecomFaturamentoFilialLabelSql(company);
   return withRequest(async (request) => {
     // E-commerce só existe para ScarfMe
     if (company !== 'scarfme') {
@@ -3456,7 +3483,7 @@ export async function fetchDetalhesEcommerceSemana({
         ISNULL(CONVERT(VARCHAR, p.GRADE), '') AS grade,
         ISNULL(p.COLECAO, '') AS colecao,
         CAST(fp.QTDE AS FLOAT) AS quantidade,
-        f.FILIAL AS filial,
+        ${ecomFilialLbl} AS filial,
         ISNULL(fp.VALOR_LIQUIDO, 0) AS valorLiquido
       FROM FATURAMENTO f WITH (NOLOCK)
       JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
@@ -7144,6 +7171,8 @@ export async function fetchVendasProdutoPorFilial({
     ritmoGapDias: number;
   };
 }> {
+  // Perna histórica do e-commerce (MSC até 19/11/2026) sai rotulada como e-commerce, não como a loja que virou.
+  const ecomFilialLbl = await ecomFaturamentoFilialLabelSql(company);
   return withRequest(async (request) => {
     const filialSel = filial ?? null;
     const now = new Date();
@@ -7259,7 +7288,7 @@ export async function fetchVendasProdutoPorFilial({
     if (mergeScarfmeEcommerce) {
       const queryEcommerce = `
         SELECT
-          f.FILIAL AS filial,
+          ${ecomFilialLbl} AS filial,
           SUM(CAST(fp.QTDE AS FLOAT)) AS qtde12m,
           SUM(CASE WHEN f.EMISSAO >= @vf_inicio60d THEN CAST(fp.QTDE AS FLOAT) ELSE 0 END) AS qtde60d,
           SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS valor12m,
@@ -7277,7 +7306,7 @@ export async function fetchVendasProdutoPorFilial({
           AND LTRIM(RTRIM(ISNULL(fp.PRODUTO, ''))) = @vf_produto
           ${corFilterFp}
           ${ecommerceFatFilialFilter}
-        GROUP BY f.FILIAL
+        GROUP BY ${ecomFilialLbl}
       `;
       const ecRes = await request.query<{ filial: string; qtde12m: number; qtde60d: number; valor12m: number | null; custoUnitario: number | null; ultimaVenda: Date | null }>(queryEcommerce);
       for (const r of ecRes.recordset) {
@@ -7340,7 +7369,7 @@ export async function fetchVendasProdutoPorFilial({
     if (mergeScarfmeEcommerce) {
       const queryEcommerceMesAtual = `
         SELECT
-          f.FILIAL AS filial,
+          ${ecomFilialLbl} AS filial,
           SUM(CAST(fp.QTDE AS FLOAT)) AS qtdeMesAtual
         FROM FATURAMENTO f WITH (NOLOCK)
         JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
@@ -7353,7 +7382,7 @@ export async function fetchVendasProdutoPorFilial({
           AND LTRIM(RTRIM(ISNULL(fp.PRODUTO, ''))) = @vf_produto
           ${corFilterFp}
           ${ecommerceFatFilialFilter}
-        GROUP BY f.FILIAL
+        GROUP BY ${ecomFilialLbl}
       `;
 
       const ecommerceMesAtualRes = await request.query<{ filial: string; qtdeMesAtual: number | null }>(queryEcommerceMesAtual);
@@ -7399,7 +7428,7 @@ export async function fetchVendasProdutoPorFilial({
           UNION ALL
 
           SELECT
-            f.FILIAL AS filial,
+            ${ecomFilialLbl} AS filial,
             f.EMISSAO AS primeiraVendaFilial
           FROM FATURAMENTO f WITH (NOLOCK)
           JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
@@ -7630,7 +7659,7 @@ export async function fetchVendasProdutoPorFilial({
     const ecommerceSalesDailyQuery = `
       SELECT
         CAST(f.EMISSAO AS DATE) AS d,
-        f.FILIAL AS filial,
+        ${ecomFilialLbl} AS filial,
         SUM(CAST(fp.QTDE AS FLOAT)) AS qty
       FROM FATURAMENTO f WITH (NOLOCK)
       JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
@@ -7643,7 +7672,7 @@ export async function fetchVendasProdutoPorFilial({
         AND CAST(fp.QTDE AS FLOAT) > 0
         ${corFilterFp}
         ${ecommerceFatFilialFilter}
-      GROUP BY CAST(f.EMISSAO AS DATE), f.FILIAL
+      GROUP BY CAST(f.EMISSAO AS DATE), ${ecomFilialLbl}
     `;
 
     const [entriesDailyRes, exitsDailyRes, retailSalesDailyRes, ecommerceSalesDailyRes] =
@@ -8160,6 +8189,8 @@ export async function fetchVendasProdutoPorFilialLote({
   includeHistoricoRows?: boolean;
   itens: Array<{ produto: string; corProduto?: string | null }>;
 }): Promise<Map<string, ReturnType<typeof computeDisponibilidade>>> {
+  // Perna histórica do e-commerce (MSC até 19/11/2026) sai rotulada como e-commerce, não como a loja que virou.
+  const ecomFilialLbl = await ecomFaturamentoFilialLabelSql(company);
   const out = new Map<string, ReturnType<typeof computeDisponibilidade>>();
   const norm = loteNormalizeItens(itens);
   if (norm.length === 0) return out;
@@ -8251,7 +8282,7 @@ export async function fetchVendasProdutoPorFilialLote({
           SELECT
             LTRIM(RTRIM(ISNULL(fp.PRODUTO, ''))) AS produto,
             LTRIM(RTRIM(ISNULL(fp.COR_PRODUTO, ''))) AS cor,
-            f.FILIAL AS filial,
+            ${ecomFilialLbl} AS filial,
             SUM(CAST(fp.QTDE AS FLOAT)) AS qtde12m,
             SUM(CASE WHEN f.EMISSAO >= @vf_inicio60d THEN CAST(fp.QTDE AS FLOAT) ELSE 0 END) AS qtde60d,
             SUM(ISNULL(fp.VALOR_LIQUIDO, 0)) AS valor12m,
@@ -8268,7 +8299,7 @@ export async function fetchVendasProdutoPorFilialLote({
             AND CAST(fp.QTDE AS FLOAT) > 0
             AND LTRIM(RTRIM(ISNULL(fp.PRODUTO, ''))) IN (${inClause})
             ${ecommerceFatFilialFilter}
-          GROUP BY LTRIM(RTRIM(ISNULL(fp.PRODUTO, ''))), LTRIM(RTRIM(ISNULL(fp.COR_PRODUTO, ''))), f.FILIAL
+          GROUP BY LTRIM(RTRIM(ISNULL(fp.PRODUTO, ''))), LTRIM(RTRIM(ISNULL(fp.COR_PRODUTO, ''))), ${ecomFilialLbl}
         `;
       })
     : [];
@@ -8299,7 +8330,7 @@ export async function fetchVendasProdutoPorFilialLote({
           SELECT
             LTRIM(RTRIM(ISNULL(fp.PRODUTO, ''))) AS produto,
             LTRIM(RTRIM(ISNULL(fp.COR_PRODUTO, ''))) AS cor,
-            f.FILIAL AS filial,
+            ${ecomFilialLbl} AS filial,
             SUM(CAST(fp.QTDE AS FLOAT)) AS qtdeMesAtual
           FROM FATURAMENTO f WITH (NOLOCK)
           JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
@@ -8311,7 +8342,7 @@ export async function fetchVendasProdutoPorFilialLote({
             AND CAST(fp.QTDE AS FLOAT) > 0
             AND LTRIM(RTRIM(ISNULL(fp.PRODUTO, ''))) IN (${inClause})
             ${ecommerceFatFilialFilter}
-          GROUP BY LTRIM(RTRIM(ISNULL(fp.PRODUTO, ''))), LTRIM(RTRIM(ISNULL(fp.COR_PRODUTO, ''))), f.FILIAL
+          GROUP BY LTRIM(RTRIM(ISNULL(fp.PRODUTO, ''))), LTRIM(RTRIM(ISNULL(fp.COR_PRODUTO, ''))), ${ecomFilialLbl}
         `;
       })
     : [];
@@ -8342,7 +8373,7 @@ export async function fetchVendasProdutoPorFilialLote({
             SELECT
               LTRIM(RTRIM(ISNULL(fp.PRODUTO, ''))) AS produto,
               LTRIM(RTRIM(ISNULL(fp.COR_PRODUTO, ''))) AS cor,
-              f.FILIAL AS filial,
+              ${ecomFilialLbl} AS filial,
               f.EMISSAO AS primeiraVendaFilial
             FROM FATURAMENTO f WITH (NOLOCK)
             JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
@@ -8535,7 +8566,7 @@ export async function fetchVendasProdutoPorFilialLote({
             LTRIM(RTRIM(ISNULL(fp.PRODUTO, ''))) AS produto,
             LTRIM(RTRIM(ISNULL(fp.COR_PRODUTO, ''))) AS cor,
             CAST(f.EMISSAO AS DATE) AS d,
-            f.FILIAL AS filial,
+            ${ecomFilialLbl} AS filial,
             SUM(CAST(fp.QTDE AS FLOAT)) AS qty
           FROM FATURAMENTO f WITH (NOLOCK)
           JOIN W_FATURAMENTO_PROD_02 fp WITH (NOLOCK)
@@ -8547,7 +8578,7 @@ export async function fetchVendasProdutoPorFilialLote({
             AND f.NATUREZA_SAIDA IN ('100.02', '100.022')
             AND CAST(fp.QTDE AS FLOAT) > 0
             ${ecommerceFatFilialFilter}
-          GROUP BY LTRIM(RTRIM(ISNULL(fp.PRODUTO, ''))), LTRIM(RTRIM(ISNULL(fp.COR_PRODUTO, ''))), CAST(f.EMISSAO AS DATE), f.FILIAL
+          GROUP BY LTRIM(RTRIM(ISNULL(fp.PRODUTO, ''))), LTRIM(RTRIM(ISNULL(fp.COR_PRODUTO, ''))), CAST(f.EMISSAO AS DATE), ${ecomFilialLbl}
         `;
       })
     : [];

@@ -1,0 +1,149 @@
+
+> multi-dashboard@0.1.0 dev
+> next dev -H 0.0.0.0
+
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+   ▲ Next.js 16.0.10 (Turbopack)
+   - Local:         http://localhost:3000
+   - Network:       http://0.0.0.0:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 3.7s
+ POST /api/controle-estoque/metricas-itens 200 in 3.7s (compile: 3.7s, render: 72ms)
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+ POST /api/controle-estoque/metricas-itens 200 in 7.1s (compile: 9ms, render: 7.1s)
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+ POST /api/controle-estoque/metricas-itens 200 in 6.5s (compile: 1098ms, render: 5.4s)
+ POST /api/controle-estoque/metricas-itens 200 in 3.8s (compile: 8ms, render: 3.7s)
+ GET /api/curva-abc?company=scarfme&limite=0 400 in 1314ms (compile: 1295ms, render: 19ms)
+[goals-storage] Verificando Redis: {
+  hasUrl: false,
+  hasToken: false,
+  usingRedis: false,
+  envKeys: [ 'UPSTASH_API_KEY', 'UPSTASH_EMAIL' ]
+}
+[goals-storage] Usando fallback para arquivo local
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'AKS COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND (f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3) OR (f.FILIAL = @ecommerceFilial4 AND f.EMISSAO < '20261119'))
+[fetchEcommerceSummary] DEBUG - Parâmetros: {
+  company: 'scarfme',
+  filial: null,
+  startDate: '2026-11-01T00:00:00.000Z',
+  endDate: '2026-12-01T00:00:00.000Z',
+  linha: undefined,
+  linhas: null,
+  colecao: undefined,
+  colecoes: null,
+  subgrupo: undefined,
+  subgrupos: null,
+  grade: undefined,
+  grades: null
+}
+[fetchEcommerceSummary] DEBUG - Filtros SQL: {
+  filialFilter: "AND (f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3) OR (f.FILIAL = @ecommerceFilial4 AND f.EMISSAO < '20261119'))",
+  linhaFilter: '',
+  colecaoFilter: '',
+  subgrupoFilter: '',
+  gradeFilter: '',
+  produtoJoin: ''
+}
+[buildEcommerceFilialFilter] DEBUG - Filiais de e-commerce: [
+  'SCARFME MATRIZ CMS',
+  'SCARF ME - MATRIZ LLL',
+  'SCARF ME MATRIZ - FFF',
+  'AKS COMERCIO DE LENCOS LT'
+]
+[buildEcommerceFilialFilter] DEBUG - Filtro gerado: AND (f.FILIAL IN (@ecommerceFilial0, @ecommerceFilial1, @ecommerceFilial2, @ecommerceFilial3) OR (f.FILIAL = @ecommerceFilial4 AND f.EMISSAO < '20261119'))
+ GET /api/curva-abc?company=scarfme&month=10&year=2026&limite=0 200 in 27.3s (compile: 6ms, render: 27.3s)
+[goals-storage] Verificando Redis: {
+  hasUrl: false,
+  hasToken: false,
+  usingRedis: false,
+  envKeys: [ 'UPSTASH_API_KEY', 'UPSTASH_EMAIL' ]
+}
+[goals-storage] Usando fallback para arquivo local
+ GET /api/curva-abc?company=scarfme&month=10&year=2026&limite=0&filial=SCARF%20ME%20-%20HIGIENOPOLIS%202 200 in 22.3s (compile: 6ms, render: 22.2s)
+[goals-storage] Verificando Redis: {
+  hasUrl: false,
+  hasToken: false,
+  usingRedis: false,
+  envKeys: [ 'UPSTASH_API_KEY', 'UPSTASH_EMAIL' ]
+}
+[goals-storage] Usando fallback para arquivo local
+ GET /api/curva-abc?company=scarfme&month=10&year=2026&limite=0&filial=MSC%20COMERCIO%20DE%20LENCOS%20LT 200 in 22.1s (compile: 5ms, render: 22.0s)
+[goals-storage] Verificando Redis: {
+  hasUrl: false,
+  hasToken: false,
+  usingRedis: false,
+  envKeys: [ 'UPSTASH_API_KEY', 'UPSTASH_EMAIL' ]
+}
+[goals-storage] Usando fallback para arquivo local
+ GET /api/curva-abc?company=scarfme&month=10&year=2026&limite=0&filial=OSCAR%20FREIRE%20-%20FSZ 200 in 22.0s (compile: 8ms, render: 21.9s)
+C:\NERD\multi_dashboard\.next\dev\server\chunks\[root-of-the-server]__a79a7be2._.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\NERD\multi_dashboard\node_modules\next\dist\compiled\next-server\app-route-turbo.runtime.dev.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\NERD\multi_dashboard\.next\dev\server\chunks\node_modules_next_9cc8942c._.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\NERD\multi_dashboard\node_modules\next\dist\server\base-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\NERD\multi_dashboard\node_modules\next\dist\server\next-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\NERD\multi_dashboard\node_modules\next\dist\server\dev\next-dev-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\NERD\multi_dashboard\node_modules\next\dist\trace\trace.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\NERD\multi_dashboard\node_modules\next\dist\server\lib\router-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\NERD\multi_dashboard\node_modules\next\dist\server\lib\start-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+[ajuste-estoque/filiais] erro TypeError: (0 , __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$config$2f$filial$2d$registry$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__.filialPapelIniciado) is not a function
+    at listarFiliaisParaAjuste (C:\NERD\multi_dashboard\.next\dev\server\chunks\[root-of-the-server]__a79a7be2._.js:1343:218)
+    at async GET (C:\NERD\multi_dashboard\.next\dev\server\chunks\[root-of-the-server]__a79a7be2._.js:2584:38)
+ GET /api/ajuste-estoque/filiais?company=scarfme 500 in 1557ms (compile: 952ms, render: 605ms)
+C:\NERD\multi_dashboard\.next\dev\server\chunks\[root-of-the-server]__a79a7be2._.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\NERD\multi_dashboard\node_modules\next\dist\compiled\next-server\app-route-turbo.runtime.dev.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\NERD\multi_dashboard\.next\dev\server\chunks\node_modules_next_9cc8942c._.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\NERD\multi_dashboard\node_modules\next\dist\server\base-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\NERD\multi_dashboard\node_modules\next\dist\server\next-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\NERD\multi_dashboard\node_modules\next\dist\server\dev\next-dev-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\NERD\multi_dashboard\node_modules\next\dist\trace\trace.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\NERD\multi_dashboard\node_modules\next\dist\server\lib\router-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\NERD\multi_dashboard\node_modules\next\dist\server\lib\start-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+[ajuste-estoque/filiais] erro TypeError: (0 , __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$config$2f$filial$2d$registry$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__.filialPapelIniciado) is not a function
+    at listarFiliaisParaAjuste (C:\NERD\multi_dashboard\.next\dev\server\chunks\[root-of-the-server]__a79a7be2._.js:1343:218)
+    at async GET (C:\NERD\multi_dashboard\.next\dev\server\chunks\[root-of-the-server]__a79a7be2._.js:2584:38)
+ GET /api/ajuste-estoque/filiais?company=scarfme 500 in 243ms (compile: 8ms, render: 235ms)
+C:\NERD\multi_dashboard\.next\dev\server\chunks\[root-of-the-server]__a79a7be2._.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\NERD\multi_dashboard\node_modules\next\dist\compiled\next-server\app-route-turbo.runtime.dev.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\NERD\multi_dashboard\.next\dev\server\chunks\node_modules_next_9cc8942c._.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\NERD\multi_dashboard\node_modules\next\dist\server\base-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\NERD\multi_dashboard\node_modules\next\dist\server\next-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\NERD\multi_dashboard\node_modules\next\dist\server\dev\next-dev-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\NERD\multi_dashboard\node_modules\next\dist\trace\trace.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\NERD\multi_dashboard\node_modules\next\dist\server\lib\router-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\NERD\multi_dashboard\node_modules\next\dist\server\lib\start-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+[ajuste-estoque/filiais] erro TypeError: (0 , __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$config$2f$filial$2d$registry$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__.filialPapelIniciado) is not a function
+    at listarFiliaisParaAjuste (C:\NERD\multi_dashboard\.next\dev\server\chunks\[root-of-the-server]__a79a7be2._.js:1343:218)
+    at async GET (C:\NERD\multi_dashboard\.next\dev\server\chunks\[root-of-the-server]__a79a7be2._.js:2584:38)
+ GET /api/ajuste-estoque/filiais?company=scarfme 500 in 351ms (compile: 5ms, render: 345ms)
+C:\NERD\multi_dashboard\.next\dev\server\chunks\[root-of-the-server]__a79a7be2._.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\NERD\multi_dashboard\node_modules\next\dist\compiled\next-server\app-route-turbo.runtime.dev.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\NERD\multi_dashboard\.next\dev\server\chunks\node_modules_next_9cc8942c._.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\NERD\multi_dashboard\node_modules\next\dist\server\base-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\NERD\multi_dashboard\node_modules\next\dist\server\next-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\NERD\multi_dashboard\node_modules\next\dist\server\dev\next-dev-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\NERD\multi_dashboard\node_modules\next\dist\trace\trace.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\NERD\multi_dashboard\node_modules\next\dist\server\lib\router-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\NERD\multi_dashboard\node_modules\next\dist\server\lib\start-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+[ajuste-estoque/filiais] erro TypeError: (0 , __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$config$2f$filial$2d$registry$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__.filialPapelIniciado) is not a function
+    at listarFiliaisParaAjuste (C:\NERD\multi_dashboard\.next\dev\server\chunks\[root-of-the-server]__a79a7be2._.js:1343:218)
+    at async GET (C:\NERD\multi_dashboard\.next\dev\server\chunks\[root-of-the-server]__a79a7be2._.js:2584:38)
+ GET /api/ajuste-estoque/filiais?company=scarfme 500 in 201ms (compile: 7ms, render: 194ms)

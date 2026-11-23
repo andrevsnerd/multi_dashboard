@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { query } from '@/lib/db/connection';
-import { getFilialById } from '@/lib/config/filial-registry';
+import { filialPapelIniciado, filialSubstituidaNoGrupo, getFilialById } from '@/lib/config/filial-registry';
 import type { CompanyKey } from '@/lib/config/company';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -104,8 +104,11 @@ export async function listarFiliaisParaAjuste(
     const vendaRecente = vendaRecenteSet.has(normNome(r.nome));
     // Depósito/MATRIZ: no registry, operacional só em inventory (não vende).
     const inventoryOnly = !!def && def.modules.length > 0 && !def.modules.includes('sales');
-    // Em uso (globalmente): vende recente OU é depósito operacional.
-    const emUso = vendaRecente || inventoryOnly;
+    // Em uso (globalmente): vende recente OU é depósito operacional OU assumiu o papel por
+    // data (troca de CNPJ: a perna nova vale desde o `since`, antes da 1ª venda). A perna
+    // que ela substituiu no grupo sai de uso mesmo que o PDV ainda venda por ela.
+    const emUso =
+      (vendaRecente || inventoryOnly || filialPapelIniciado(r.cod)) && !filialSubstituidaNoGrupo(r.cod);
 
     const item: FilialAjuste = {
       cod: r.cod,

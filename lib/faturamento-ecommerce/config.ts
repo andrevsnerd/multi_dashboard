@@ -262,6 +262,7 @@ export const NATUREZAS_VALIDADAS: Record<"simples" | "normal", Record<string, st
     "100.71": "exportação: 2/2 NFs das pernas desde 24/10 idênticas (19/11/2026)",
     "134.20": "remessa p/ conserto NERD: 2/2 NFs (antigas) idênticas fora a exceção fiscal",
     "199.02": "remessa p/ troca NERD: 2/2 NFs (antigas) idênticas fora a exceção fiscal",
+    "117.11": "devolução de compra NERD: 3/3 NFs de produto refeitas (romaneio, vínculo com a entrada, impostos informados) — só cadastro alterado depois",
   },
   normal: {
     "100.05": "336/336 linhas de imposto das NFs da Matriz desde 24/10 (19/11/2026)",
@@ -286,7 +287,7 @@ export const NATUREZAS_VALIDADAS: Record<"simples" | "normal", Record<string, st
  * prévia avisa para conferir a NF no Linx antes de enviar à SEFAZ.
  */
 export const NATUREZAS_SO_NF_ANTIGA: Record<"simples" | "normal", string[]> = {
-  simples: ["134.20", "199.02"],
+  simples: ["134.20", "199.02", "117.11"],
   normal: ["133.01", "135.01", "145.10", "199.02", "199.10", "107.01"],
 };
 

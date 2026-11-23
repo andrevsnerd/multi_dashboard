@@ -2140,8 +2140,8 @@
     "semantic_hash": ""
   },
   "lib/config/filial-registry.ts": {
-    "mtime": 1795110571.397791,
-    "ast_hash": "07fb1e760bf9de3c6c581cfa30a0fe65",
+    "mtime": 1795434953.511804,
+    "ast_hash": "cc603d8da48923213612573a686a43ad",
     "semantic_hash": ""
   },
   "lib/config/nav-route-map.ts": {
@@ -2380,8 +2380,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/ajusteEstoque.ts": {
-    "mtime": 1793195625.6217108,
-    "ast_hash": "d56b38dec0c198fbc237ae4e9a564a2a",
+    "mtime": 1795434953.5126896,
+    "ast_hash": "fc96d6e895603aa9797f6f45e750a1db",
     "semantic_hash": ""
   },
   "lib/repositories/claudeReport.ts": {
@@ -2430,8 +2430,8 @@
     "semantic_hash": "8c1d93a8e7b6ea254bb47828f9553e06"
   },
   "lib/repositories/controleEstoque.ts": {
-    "mtime": 1795111067.4110625,
-    "ast_hash": "91601e57144597e912e50673bbc2ee84",
+    "mtime": 1795434503.182417,
+    "ast_hash": "fb7ed3113bf995b8634200ed0037249f",
     "semantic_hash": ""
   },
   "lib/repositories/controleMovimento.ts": {
@@ -2655,8 +2655,8 @@
     "semantic_hash": "1ee9004e2237f1faf364e4cfb6f61d94"
   },
   "lib/utils/active-filial-detector.ts": {
-    "mtime": 1795110621.2635162,
-    "ast_hash": "28614edd86cad7c8d3338562a47aad25",
+    "mtime": 1795434245.7239635,
+    "ast_hash": "81f52cf0dcbae80de62f273bae0e5b0e",
     "semantic_hash": ""
   },
   "lib/utils/brasilia-datetime.ts": {
@@ -4735,8 +4735,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/reportEstoqueInventario.ts": {
-    "mtime": 1795110802.6293602,
-    "ast_hash": "53ed7f250ecb222f8858d3172613a845",
+    "mtime": 1795434255.3776336,
+    "ast_hash": "6a5c5025a8b6c9f70256d4ddaec4b4fd",
     "semantic_hash": ""
   },
   "lib/presentations/item-filters.ts": {
@@ -5610,8 +5610,8 @@
     "semantic_hash": ""
   },
   "app/api/faturamento-ecommerce/notas/route.ts": {
-    "mtime": 1794918663.4046028,
-    "ast_hash": "d57b142aaf2a8c11794042b35e861976",
+    "mtime": 1795117055.5694532,
+    "ast_hash": "05eaf2bb72c82407f4cce9408a0c2a0c",
     "semantic_hash": ""
   },
   "app/api/faturamento-ecommerce/notas/xml/route.ts": {
@@ -5630,8 +5630,8 @@
     "semantic_hash": ""
   },
   "components/faturamento-ecommerce/FaturamentoAba.tsx": {
-    "mtime": 1795113782.913241,
-    "ast_hash": "9f20c7701488da64c62d7448d20d5ef1",
+    "mtime": 1795117537.2364898,
+    "ast_hash": "36aed34e84af4877293145982669db77",
     "semantic_hash": ""
   },
   "components/faturamento-ecommerce/FaturamentoEcommercePage.tsx": {
@@ -5660,13 +5660,13 @@
     "semantic_hash": ""
   },
   "lib/faturamento-ecommerce/config.ts": {
-    "mtime": 1795113562.8901768,
-    "ast_hash": "2a1469f1c117d20815efc6a9a189516a",
+    "mtime": 1795117548.5740685,
+    "ast_hash": "f5c6695e58326b508bdab84e69cb45b5",
     "semantic_hash": ""
   },
   "lib/faturamento-ecommerce/types.ts": {
-    "mtime": 1795113562.8887627,
-    "ast_hash": "abedda3256816e86226763c21a389cb4",
+    "mtime": 1795118213.8919709,
+    "ast_hash": "e8bcc517c31538d7f865176eb2b4bed1",
     "semantic_hash": ""
   },
   "lib/repositories/faturamentoEcommerce/clientes.ts": {
@@ -5675,8 +5675,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/faturamentoEcommerce/notas.ts": {
-    "mtime": 1795113689.5289342,
-    "ast_hash": "db9568766a0b77408a471db00a8ea2f2",
+    "mtime": 1795118213.8906527,
+    "ast_hash": "ad5241e57f9907572d415f1f7321015c",
     "semantic_hash": ""
   },
   "docs/FATURAMENTO_SHOPIFY_LINX.md": {
@@ -5780,8 +5780,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/faturamentoEcommerce/catalogo.ts": {
-    "mtime": 1795113562.8901768,
-    "ast_hash": "e38e2d6acf4221926e234b977520ff2c",
+    "mtime": 1795118213.8929935,
+    "ast_hash": "51b3cb5d83101c12fbedf5549d372074",
     "semantic_hash": ""
   },
   "scripts/conferir-filiais-por-periodo.mjs": {
@@ -5797,6 +5797,16 @@
   "plano-oscar-fffr.json": {
     "mtime": 1795111629.1512475,
     "ast_hash": "7b82c27007569520e1cbaea3d79e91d6",
+    "semantic_hash": ""
+  },
+  "app/api/faturamento-ecommerce/devolucoes/route.ts": {
+    "mtime": 1795117384.1416967,
+    "ast_hash": "82dc2ccd7665a2cbf307ff08e37674dc",
+    "semantic_hash": ""
+  },
+  "components/faturamento-ecommerce/DevolucaoCard.tsx": {
+    "mtime": 1795117495.9535692,
+    "ast_hash": "cd1511c52a5721318f639baab76434fd",
     "semantic_hash": ""
   }
 }

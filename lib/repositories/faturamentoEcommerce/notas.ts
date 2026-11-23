@@ -9,6 +9,9 @@ import { consumidorFinalPadrao, naturezaPadrao, naturezasDoDestino } from "@/lib
 import { fetchCatalogoNotas, fetchCostumeDescontoSobre4 } from "./catalogo";
 import { filiaisNotaDaEmpresa, sqlUltimaNfEcommerce } from "./filiais-nota";
 import type {
+  DevolucaoPreviewItem,
+  EntradaDevolvivel,
+  ImpostoInformado,
   NotaCriada,
   NotaDetalhe,
   NotaInput,
@@ -162,6 +165,10 @@ interface LinhaFiscal {
   ibptEstadual: number;
   ibptMunicipal: number;
   impostos: { id: number; taxa: number; incidencia: number; agregaDesconto: boolean; agregaEncargo: boolean; reducao: number; aliquotaTipo: number; fixa: boolean }[];
+  /** Devolução: encargo (frete) rateado na NF de entrada, proporcional à quantidade devolvida. */
+  encargoEntrada: number;
+  /** Devolução: impostos que vão na NF (os da NF do fornecedor). Nulo nas demais NFs. */
+  informados: ImpostoInformado[] | null;
   /** Rateios do cabeçalho (preenchidos depois). */
   pct: number;
   desconto: number;
@@ -207,6 +214,14 @@ interface Plano {
   agrupamento: 0 | 1 | 2 | 3 | 4 | 5;
   /** Itens fiscais (FATURAMENTO_ITEM/IMPOSTO), na ordem da NF; no agrupamento 2 são as próprias linhas. */
   fiscais: LinhaFiscal[];
+  /** Devolução de compra (NF a partir da NF de entrada). Nulo nas demais NFs. */
+  devolucao: PlanoDevolucao | null;
+  /** NF de material (itens avulsos do cadastro de materiais, sem estoque). */
+  material: boolean;
+  /** Impostos que somam ao total da NF (IPI na devolução): FATURAMENTO.VALOR_IMPOSTO_AGREGAR. */
+  impostoAgregar: number;
+  /** FATURAMENTO.RESPONSAVEL do romaneio (usuário do Linx). */
+  responsavel: string;
   subtotal: number;
   porcDesconto: number;
   porcDigitado: boolean;
@@ -224,6 +239,14 @@ interface Plano {
   input: NotaInput;
   bloqueios: string[];
   avisos: string[];
+}
+
+interface PlanoDevolucao {
+  fornecedor: string;
+  nfEntrada: string;
+  serieEntrada: string;
+  /** Uma por item da entrada devolvido: a linha do plano, o item/sub da entrada e o item "de produto" da entrada. */
+  itens: { linha: string; itemImpressaoEntrada: string; subItem: number; qtde: number; itemProdutoEntrada: string; preco: number }[];
 }
 
 async function q<T = Record<string, unknown>>(req: Req, text: string): Promise<T[]> {
@@ -284,7 +307,7 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
       LEFT JOIN CLIENTES_ATACADO ca WITH (NOLOCK) ON ca.CLIENTE_ATACADO = cf.NOME_CLIFOR
      WHERE cf.CLIFOR = @pClifor`);
   if (!cli) throw new Error(`Cliente ${clifor} não encontrado.`);
-  if (!Number(cli.atacado)) bloqueios.push("O cliente não tem cadastro de cliente (CLIENTES_ATACADO) — cadastre pela aba Clientes.");
+  if (!Number(cli.atacado) && !input.devolucao) bloqueios.push("O cliente não tem cadastro de cliente (CLIENTES_ATACADO) — cadastre pela aba Clientes.");
   if (Number(cli.inativo)) bloqueios.push("O cliente está inativo no Linx.");
   // NF para uma filial do grupo (abastecimento, 100.08 da Matriz) usa o catálogo "destino filial":
   // só as naturezas que a filial já usou para lojas, e só as validadas para esse destino.
@@ -362,20 +385,46 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
   const localEmbarque = exportacao ? trim(input.localEmbarque).toUpperCase() || "AEROPORTO INTERNACIONAL DE GUARULHOS" : "";
   if (exportacao && (ufEmbarque.length !== 2 || localEmbarque.length > 60)) bloqueios.push("Exportação: informe a UF (2 letras) e o local de embarque (até 60).");
 
+  // Devolução de compra: os itens vêm da NF de entrada do fornecedor (o cliente desta NF).
+  let devolucao: PlanoDevolucao | null = null;
+  const encargoDaLinha = new Map<string, number>();
+  let itensDigitados = input.itens ?? [];
+  if (input.devolucao) {
+    const dv = await carregarDevolucao(req, input, { filial, nomeCliente: String(cli.nome).trimEnd(), tipoNatureza, bloqueios });
+    devolucao = dv.plano;
+    itensDigitados = dv.itens;
+    for (const [k, v] of dv.encargos) encargoDaLinha.set(k, v);
+  } else if (tipoNatureza === "D") {
+    bloqueios.push(`A natureza ${natureza} é de devolução: escolha a NF de entrada na aba Devolução.`);
+  }
+  // NF de material (remessa p/ industrialização 130.01, simples remessa…): itens avulsos do cadastro
+  // de materiais (COD_TABELA_FILHA T), sem pedido, sem FATURAMENTO_PROD e SEM mexer em estoque — as
+  // NFs reais não têm saída de material ligada (ESTOQUE_SAI_MAT vazio para elas).
+  const ehMaterial = !input.devolucao && (input.materiais?.length ?? 0) > 0;
+  const descricaoMaterial = new Map<string, string>();
+  if (ehMaterial) {
+    itensDigitados = (input.materiais ?? []).map((m, i) => {
+      if (trim(m.descricao)) descricaoMaterial.set(`L${i}`, trim(m.descricao).replace(/\s+/g, " ").slice(0, 80));
+      return { produto: trim(m.material), cor: "", tamanho: 0, qtde: Number(m.qtde) || 0, preco: Number(m.preco) || 0, linha: i };
+    });
+  }
+
   // Itens (agrupa linhas repetidas do mesmo produto/cor/tamanho)
   const agrupados = new Map<string, { produto: string; cor: string; tamanho: number; qtde: number; preco: number; linha: string; obs: string }>();
-  for (const it of input.itens ?? []) {
+  for (const it of itensDigitados) {
     const produto = trim(it.produto).toUpperCase();
     const cor = trim(it.cor).toUpperCase();
-    const tamanho = Math.round(Number(it.tamanho) || 1);
-    const qtde = Math.round(Number(it.qtde) || 0);
-    const preco = round2(Number(it.preco) || 0);
+    // Material: sem grade (SUB_ITEM_TAMANHO 0) e quantidade com até 3 casas (metros, quilos).
+    const tamanho = ehMaterial ? 0 : Math.round(Number(it.tamanho) || 1);
+    const qtde = ehMaterial ? Math.round((Number(it.qtde) || 0) * 1000) / 1000 : Math.round(Number(it.qtde) || 0);
+    // Devolução: preço da NF de entrada, com até 5 casas (FATURAMENTO_ITEM.PRECO_UNITARIO é 15,5).
+    const preco = input.devolucao || ehMaterial ? Math.round((Number(it.preco) || 0) * 1e5) / 1e5 : round2(Number(it.preco) || 0);
     const obsItem = trim(it.obs).replace(/\s+/g, " ");
     if (!produto) continue;
     if (obsItem.length > 80) bloqueios.push(`Observação do item ${produto} ${cor} passa de 80 caracteres.`);
     if (qtde <= 0) bloqueios.push(`Quantidade inválida em ${produto} ${cor}.`);
     if (preco <= 0) bloqueios.push(`Preço inválido em ${produto} ${cor}.`);
-    if (tamanho < 1 || tamanho > MAX_GRADE) bloqueios.push(`Tamanho inválido em ${produto} ${cor}.`);
+    if (!ehMaterial && (tamanho < 1 || tamanho > MAX_GRADE)) bloqueios.push(`Tamanho inválido em ${produto} ${cor}.`);
     // Linha da NF: a informada (estrutura digitada) ou uma por produto × cor.
     const linha = it.linha !== undefined && it.linha !== null ? `L${Number(it.linha)}` : `${produto}|${cor}`;
     const k = `${linha}|${tamanho}`;
@@ -415,7 +464,16 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
     idx += 1;
     req.input(`iProd${idx}`, sql.VarChar(12), a.produto);
     req.input(`iCor${idx}`, sql.VarChar(10), a.cor);
-    const [p] = await q(req, `
+    const [p] = ehMaterial
+      ? await q(req, `
+      SELECT LTRIM(RTRIM(M.MATERIAL)) AS produto, LTRIM(RTRIM(ISNULL(NULLIF(M.DESC_NF, ''), M.DESC_MATERIAL))) AS descNf,
+             LTRIM(RTRIM(M.CLASSIF_FISCAL)) AS ncm, LTRIM(RTRIM(M.UNID_ESTOQUE)) AS unidade,
+             LTRIM(RTRIM(M.CONTA_CONTABIL)) AS conta, LTRIM(RTRIM(M.TRIBUT_ORIGEM)) AS origem,
+             M.ID_CEST_NCM AS cest, ISNULL(M.CUSTO_REPOSICAO, 0) AS custo, M.INDICADOR_CFOP AS indCfop,
+             '' AS descCor, '' AS tamLabel, NULL AS estoque, ISNULL(M.INATIVO, 0) AS inativo
+        FROM MATERIAIS M WITH (NOLOCK)
+       WHERE M.MATERIAL = @iProd${idx}`)
+      : await q(req, `
       SELECT LTRIM(RTRIM(P.PRODUTO)) AS produto, LTRIM(RTRIM(ISNULL(P.DESC_PROD_NF, P.DESC_PRODUTO))) AS descNf,
              LTRIM(RTRIM(P.CLASSIF_FISCAL)) AS ncm, LTRIM(RTRIM(P.UNIDADE)) AS unidade,
              LTRIM(RTRIM(P.CONTA_CONTABIL)) AS conta, LTRIM(RTRIM(P.TRIBUT_ORIGEM)) AS origem,
@@ -430,12 +488,13 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
         LEFT JOIN ESTOQUE_PRODUTOS E WITH (NOLOCK) ON E.FILIAL = @pFilial AND E.PRODUTO = P.PRODUTO AND E.COR_PRODUTO = @iCor${idx}
        WHERE P.PRODUTO = @iProd${idx}`);
     if (!p) {
-      bloqueios.push(`Produto ${a.produto} não existe no Linx.`);
+      bloqueios.push(`${ehMaterial ? "Material" : "Produto"} ${a.produto} não existe no Linx.`);
       continue;
     }
-    if (p.descCor === null || p.descCor === undefined) bloqueios.push(`A cor ${a.cor} não existe no produto ${a.produto}.`);
+    if (ehMaterial && Number(p.inativo)) bloqueios.push(`O material ${a.produto} está inativo no Linx.`);
+    if (!ehMaterial && (p.descCor === null || p.descCor === undefined)) bloqueios.push(`A cor ${a.cor} não existe no produto ${a.produto}.`);
     const tamLabel = trim(p.tamLabel);
-    if (!tamLabel) bloqueios.push(`O tamanho ${a.tamanho} não existe na grade do produto ${a.produto}.`);
+    if (!ehMaterial && !tamLabel) bloqueios.push(`O tamanho ${a.tamanho} não existe na grade do produto ${a.produto}.`);
     const codigoItem = `${a.produto}${a.cor}${tamLabel}`;
     const origem = trim(p.origem) || "0";
     const indCfop = Number(p.indCfop) || 11;
@@ -463,7 +522,7 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
         '","ENTRADA_SAIDA":"S","MATRIZ_FISCAL":"', RTRIM(@pMatriz), '","FILIAL":"', RTRIM(@pFilial),
         '","EMISSAO_RECEBIMENTO":"', CONVERT(VARCHAR(10), GETDATE(), 120), '","TRIBUT_ORIGEM":"', RTRIM(@iOrig${idx}),
         '","CODIGO_FISCAL_OPERACAO":"', @cfopCarac, '","REFERENCIA":"', RTRIM(@iCod${idx}),
-        '","COD_FILHA":"P","NATUREZA":"', RTRIM(@pNat), '","COD_FILIAL":"', RTRIM(@pCodFilial), '"}'));
+        '","COD_FILHA":"${ehMaterial ? "M" : "P"}","NATUREZA":"', RTRIM(@pNat), '","COD_FILIAL":"', RTRIM(@pCodFilial), '"}'));
       SELECT @idExc AS id, LTRIM(RTRIM(X.TRIBUT_ICMS)) AS csosn, LTRIM(RTRIM(X.CFOP_OBRIGATORIO)) AS cfopObrig,
              LTRIM(RTRIM(X.DESC_EXCECAO)) AS descr, LTRIM(RTRIM(X.CST_IBS_CBS)) AS cstIbs, LTRIM(RTRIM(X.CCLASSTRIB)) AS cclass,
              @cfopCarac AS cfopCarac,
@@ -495,7 +554,7 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
       );
     } else if (idExc === null) {
       bloqueios.push(`${a.produto}: nenhuma exceção fiscal encontrada para ${ufCliente} — peça ao fiscal para cadastrar.`);
-    } else if ((csosn === "900" || /DEVOLU/i.test(excDesc)) && simples && (indFiscal === 1 || indFiscal === 16)) {
+    } else if (tipoNatureza !== "D" && (csosn === "900" || /DEVOLU/i.test(excDesc)) && simples && (indFiscal === 1 || indFiscal === 16)) {
       // Contribuinte (corporativo/revenda) com natureza de venda a NÃO contribuinte (100.02/022):
       // não há exceção de venda. No Linx esse cliente sai pela 100.01 nas próprias pernas, ou
       // pela Matriz (100.05) — as opções que o catálogo desta empresa tiver.
@@ -512,7 +571,7 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
             ? `No Linx esse cliente sai por ${opcoes.join(" ou por ")}.`
             : `Peça ao fiscal para cadastrar a exceção, ou cadastre o cliente como 8 - Não Contribuinte se ele compra para uso próprio.`)
       );
-    } else if (csosn === "900" || /DEVOLU/i.test(excDesc)) {
+    } else if (tipoNatureza !== "D" && (csosn === "900" || /DEVOLU/i.test(excDesc))) {
       bloqueios.push(
         `${a.produto}: a exceção fiscal encontrada para ${ufCliente} é "${excDesc}" (${idExc}, CSOSN ${csosn}), que não é de venda. ` +
           `Falta cadastrar a exceção de venda para ${ufCliente} no Linx.`
@@ -590,7 +649,7 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
     const estoque = p.estoque === null || p.estoque === undefined ? null : Number(p.estoque);
     if (estoque !== null && estoque < a.qtde) {
       avisos.push(`${a.produto} ${a.cor} ${tamLabel}: estoque da filial ${estoque}, NF com ${a.qtde}.`);
-    } else if (estoque === null) {
+    } else if (estoque === null && !ehMaterial) {
       avisos.push(`${a.produto} ${a.cor} ${tamLabel}: sem registro de estoque na filial ${filial}.`);
     }
 
@@ -601,7 +660,7 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
       ordemLinha: 0,
       itemImpressao: "",
       subItem: a.tamanho,
-      referenciaItem: a.cor,
+      referenciaItem: ehMaterial ? null : a.cor,
       obsItem: obsDaLinha.get(a.linha) ?? "",
       produto: a.produto,
       cor: a.cor,
@@ -610,7 +669,8 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
       tamanho: a.tamanho,
       tamanhoLabel: tamLabel,
       codigoItem,
-      descricao: `${descNf} ${descCor} ${tamLabel}`.replace(/\s+/g, " ").trim().slice(0, 80),
+      // Material: a descrição da NF do cadastro, ou a digitada (o operador costuma completar, ex. "COD 040272").
+      descricao: (descricaoMaterial.get(a.linha) ?? `${descNf} ${descCor} ${tamLabel}`).replace(/\s+/g, " ").trim().slice(0, 80),
       qtde: a.qtde,
       preco: a.preco,
       valor: round2(a.preco * a.qtde),
@@ -633,6 +693,8 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
       ibptEstadual: Number(exc?.ibptEst) || 0,
       ibptMunicipal: Number(exc?.ibptMun) || 0,
       impostos,
+      encargoEntrada: encargoDaLinha.get(a.linha) ?? 0,
+      informados: null,
       pct: 0,
       desconto: 0,
       frete: 0,
@@ -648,7 +710,9 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
   for (const l of linhas) if (!ordemDigitada.has(l.linha)) ordemDigitada.set(l.linha, ordemDigitada.size + 1);
   for (const l of linhas) l.ordemLinha = ordemDigitada.get(l.linha)!;
   const cmpTexto = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
-  linhas.sort((a, b) => cmpTexto(a.produto, b.produto) || a.ordemLinha - b.ordemLinha || a.tamanho - b.tamanho);
+  // Material: na ordem digitada (NF 0043636: P11NL… antes de P11AC…).
+  if (ehMaterial) linhas.sort((a, b) => a.ordemLinha - b.ordemLinha);
+  else linhas.sort((a, b) => cmpTexto(a.produto, b.produto) || a.ordemLinha - b.ordemLinha || a.tamanho - b.tamanho);
 
   // Agrupamento dos itens fiscais (FATURAMENTO.AGRUPAMENTO_ITENS, opção do form). Medido em
   // 19/11/2026 nas 52 NFs com agrupamento 0/1 desde 2025 (52/52): 0 = um item por produto
@@ -662,10 +726,10 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
   const agrupamento: Plano["agrupamento"] = [0, 1, 2, 3, 4, 5].includes(Number(input.agrupamento))
     ? (Number(input.agrupamento) as Plano["agrupamento"])
     : 2;
-  const base = agrupamento % 3;
+  const base = ehMaterial ? 2 : agrupamento % 3;
   // ITEM_IMPRESSAO: agrupamentos 0/1 numeram os grupos em sequência; no 2 é o nº da 1ª linha do
   // produto × cor — linhas repetidas do mesmo produto × cor apontam para ela (NF 0043673 da Matriz).
-  const chaveNumero = (l: LinhaFiscal) => (base === 0 ? l.produto : `${l.produto}|${l.cor}`);
+  const chaveNumero = (l: LinhaFiscal) => (ehMaterial ? l.linha : base === 0 ? l.produto : `${l.produto}|${l.cor}`);
   const numeroFiscal = new Map<string, string>();
   for (const l of [...linhas].sort((a, b) => a.ordemLinha - b.ordemLinha)) {
     const k = chaveNumero(l);
@@ -680,7 +744,7 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
     base === 0 ? l.produto : base === 1 ? `${l.produto}|${l.cor}` : `${l.produto}|${l.cor}|${l.tamanho}`;
   let fiscais: LinhaFiscal[] = linhas;
   if (agrupamento === 5) for (const l of linhas) l.referenciaItem = `${l.cor}${l.tamanhoLabel}`;
-  const repetidos = base === 2 && new Set(linhas.map(chaveFiscal)).size !== linhas.length;
+  const repetidos = !ehMaterial && base === 2 && new Set(linhas.map(chaveFiscal)).size !== linhas.length;
   if (base !== 2 || repetidos) {
     const porChave = new Map<string, LinhaFiscal>();
     for (const l of linhas) {
@@ -709,11 +773,22 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
       }
       f.qtde += l.qtde;
       f.valor = round2(f.valor + l.valor);
+      f.encargoEntrada = round2(f.encargoEntrada + l.encargoEntrada);
       if (!f.obsItem) f.obsItem = l.obsItem;
     }
     fiscais = [...porChave.values()];
     // 0/1: ordem do código; 2 (linhas repetidas fundidas): a mesma ordem de sempre (já ordenadas).
     if (base !== 2) fiscais.sort((a, b) => cmpTexto(a.codigoItem, b.codigoItem));
+  }
+
+  // Devolução: itens fiscais na ordem do código e numerados em sequência (ITEM_IMPRESSAO =
+  // ITEM_NFE), nas 4 devoluções de produto da NERD desde 2025.
+  if (devolucao) {
+    fiscais = fiscais === linhas ? [...linhas] : fiscais;
+    fiscais.sort((a, b) => cmpTexto(a.codigoItem, b.codigoItem));
+    const numero = new Map(fiscais.map((f, i) => [chaveFiscal(f), String(i + 1).padStart(4, "0")]));
+    for (const f of fiscais) f.itemImpressao = numero.get(chaveFiscal(f))!;
+    for (const l of linhas) l.itemImpressao = numero.get(chaveFiscal(l))!;
   }
 
   // Totais e desconto (sempre no cabeçalho, como o Linx faz)
@@ -757,8 +832,19 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
   ratear(fiscais, frete, "frete", subtotal);
   ratear(fiscais, seguro, "seguro", subtotal);
 
+  // Devolução: impostos da NF do fornecedor, por item fiscal (informados, ou a sugestão do Linx);
+  // o IPI (incidência 1) soma ao total da NF.
+  let impostoAgregar = 0;
+  if (devolucao) {
+    for (const f of fiscais) {
+      f.informados = impostosDevolucao(f, input.devolucao?.impostos?.[f.codigoItem], input.devolucao?.taxas);
+      impostoAgregar = round2(impostoAgregar + f.informados.filter((t) => t.id === 2).reduce((s2, t) => s2 + t.valor, 0));
+    }
+  }
+  const totalNf = round2(total + impostoAgregar);
+
   // Pedido do site já faturado?
-  const pedidoSite = trim(input.obs).match(/#\s*(\d{3,})/)?.[1];
+  const pedidoSite = devolucao ? undefined : trim(input.obs).match(/#\s*(\d{3,})/)?.[1];
   if (pedidoSite) {
     filiaisEmpresa.forEach((f, i) => req.input(`dupF${i}`, sql.VarChar(25), f));
     req.input("dupObs", sql.VarChar(40), `%#${pedidoSite}%`);
@@ -775,7 +861,7 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
       if (input.confirmarDuplicidade) avisos.push(msg);
       else bloqueios.push(`${msg} Marque "faturar mesmo assim" se for outra NF do mesmo pedido.`);
     }
-  } else {
+  } else if (!devolucao) {
     avisos.push("OBS sem o nº do pedido do site (#1234) — fica mais difícil conferir depois.");
   }
 
@@ -801,7 +887,8 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
     aliqIcmsOperacao,
     indFiscal,
     consumidorFinal,
-    codTransacao,
+    // NF de material usa o cód. de transação do form de material (130.01/199.10: FATURAMENTO_026).
+    codTransacao: ehMaterial ? noCatalogo?.padroes.codTransacaoMaterial || "FATURAMENTO_026" : codTransacao,
     nfFatura,
     tipoNatureza,
     ufEmbarque,
@@ -834,6 +921,10 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
     linhas,
     agrupamento,
     fiscais,
+    devolucao,
+    material: ehMaterial,
+    impostoAgregar,
+    responsavel: trim(input.responsavel) || "LOGISTICA",
     subtotal,
     porcDesconto,
     porcDigitado,
@@ -843,7 +934,7 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
     desconto,
     frete,
     seguro,
-    total,
+    total: totalNf,
     qtdeTotal,
     icmsDestinoAliq: Number(aliqDest?.aliq) || 0,
     input,
@@ -878,6 +969,219 @@ function ratear(linhas: LinhaFiscal[], totalValor: number, campo: "desconto" | "
     for (const l of linhas) l[campo] = round2((totalValor * l.pct) / 100);
     linhas[0][campo] = round2(linhas[0][campo] + (totalValor - linhas.reduce((s, l) => s + l[campo], 0)));
   }
+}
+
+// ── Devolução de compra ─────────────────────────────────────────────────────
+//
+// Medido nas 4 devoluções de produto da NERD desde 2025 (117.11 e 150.01): a NF nasce de um romaneio
+// "DEVOLUCAO ENTRADA" (ESTOQUE_PROD_SAI/PROD1_SAI — é ele que baixa o estoque, pelo trigger), sem
+// pedido nem FATURAMENTO_PROD; finalidade NF-e 4; cada item fiscal se liga ao item da NF de entrada
+// em FATURAMENTO_ENTRADA_DEVOLUCAO (o trigger dela soma ENTRADAS_ITEM.QTDE_DEVOLVIDA). Os impostos
+// são os da NF do fornecedor — o Linx não guarda o XML dele (as tabelas de importação estão vazias)
+// e a exceção de devolução zera tudo; o operador digita ICMS/IPI/PIS/COFINS da NF de compra.
+
+const NOME_IMPOSTO: Record<number, string> = { 1: "ICMS", 2: "IPI", 5: "PIS", 6: "COFINS", 92: "IBS-UF", 93: "CBS", 94: "IBS-MUN" };
+
+async function carregarDevolucao(
+  req: Req,
+  input: NotaInput,
+  ctx: { filial: string; nomeCliente: string; tipoNatureza: string; bloqueios: string[] }
+): Promise<{ plano: PlanoDevolucao; itens: NotaInput["itens"]; encargos: Map<string, number> }> {
+  const dv = input.devolucao!;
+  const { bloqueios } = ctx;
+  if (ctx.tipoNatureza !== "D") {
+    bloqueios.push(`A natureza ${trim(input.natureza)} não é de devolução — use 117.11 (devolução de compra) ou 150.01.`);
+  }
+  req.input("dvForn", sql.VarChar(25), trim(dv.fornecedor));
+  req.input("dvNf", sql.VarChar(15), trim(dv.nfEntrada));
+  req.input("dvSerie", sql.VarChar(6), trim(dv.serieEntrada));
+  const [en] = await q(req, `
+    SELECT LTRIM(RTRIM(FILIAL)) AS filial, RTRIM(NOME_CLIFOR) AS forn, LTRIM(RTRIM(NF_ENTRADA)) AS nf, LTRIM(RTRIM(SERIE_NF_ENTRADA)) AS serie
+      FROM ENTRADAS WITH (NOLOCK)
+     WHERE NOME_CLIFOR = @dvForn AND NF_ENTRADA = @dvNf AND SERIE_NF_ENTRADA = @dvSerie`);
+  if (!en) throw new Error(`NF de entrada ${trim(dv.nfEntrada)}/${trim(dv.serieEntrada)} de ${trim(dv.fornecedor)} não encontrada.`);
+  if (trim(en.filial) !== ctx.filial) bloqueios.push(`A NF de entrada ${trim(en.nf)} é da filial ${trim(en.filial)}, não de ${ctx.filial}.`);
+  if (String(en.forn).trimEnd() !== ctx.nomeCliente) {
+    bloqueios.push(`O destinatário da devolução tem de ser o fornecedor da NF de entrada (${String(en.forn).trim()}).`);
+  }
+  const ei = await q(req, `
+    SELECT ITEM_IMPRESSAO AS item, SUB_ITEM_TAMANHO AS sub, LTRIM(RTRIM(REFERENCIA)) AS produto,
+           LTRIM(RTRIM(REFERENCIA_ITEM)) AS cor, QTDE_ITEM AS qtde, ISNULL(QTDE_DEVOLVIDA, 0) AS devolvida,
+           PRECO_UNITARIO AS preco, ISNULL(VALOR_ENCARGOS, 0) AS encargo, LTRIM(RTRIM(COD_TABELA_FILHA)) AS tf
+      FROM ENTRADAS_ITEM WITH (NOLOCK)
+     WHERE NOME_CLIFOR = @dvForn AND NF_ENTRADA = @dvNf AND SERIE_NF_ENTRADA = @dvSerie
+     ORDER BY ITEM_IMPRESSAO, SUB_ITEM_TAMANHO`);
+  // ESTOQUE_PROD1_SAI.ITEM_IMPRESSAO_ENTRADA aponta para o 1º item da entrada do mesmo produto (NF 1515).
+  const primeiroDoProduto = new Map<string, string>();
+  for (const e of ei) if (!primeiroDoProduto.has(String(e.produto))) primeiroDoProduto.set(String(e.produto), trim(e.item));
+  const itens: NotaInput["itens"] = [];
+  const encargos = new Map<string, number>();
+  const planoItens: PlanoDevolucao["itens"] = [];
+  (dv.itens ?? []).forEach((sel, i) => {
+    const e = ei.find((x) => trim(x.item) === trim(sel.itemImpressaoEntrada) && Number(x.sub) === Number(sel.subItem));
+    if (!e) {
+      bloqueios.push(`O item ${trim(sel.itemImpressaoEntrada)} não existe na NF de entrada ${trim(en.nf)}.`);
+      return;
+    }
+    if (trim(e.tf) !== "P") {
+      bloqueios.push(`O item ${trim(e.item)} da entrada não é produto (material/item avulso) — devolução de material ainda não é feita aqui.`);
+      return;
+    }
+    if (!trim(e.cor)) {
+      // Entrada agrupada só por produto (sem cor no item): não dá para saber de qual cor sai o estoque.
+      bloqueios.push(`A NF de entrada ${trim(en.nf)} está agrupada por produto (item ${trim(e.item)} sem cor) — devolva pelo Linx.`);
+      return;
+    }
+    const qtde = Math.round(Number(sel.qtde) || 0);
+    const saldo = Number(e.qtde) - Number(e.devolvida);
+    if (qtde <= 0) bloqueios.push(`Quantidade inválida no item ${trim(e.item)}.`);
+    if (qtde > saldo) bloqueios.push(`${e.produto} ${e.cor}: devolvendo ${qtde}, mas restam ${saldo} da NF de entrada.`);
+    const linha = `L${i}`;
+    itens.push({ produto: String(e.produto), cor: String(e.cor), tamanho: Number(e.sub) || 1, qtde, preco: Number(e.preco), linha: i });
+    encargos.set(linha, Number(e.qtde) > 0 ? round2((Number(e.encargo) * qtde) / Number(e.qtde)) : 0);
+    planoItens.push({
+      linha,
+      itemImpressaoEntrada: trim(e.item),
+      subItem: Number(e.sub),
+      qtde,
+      itemProdutoEntrada: primeiroDoProduto.get(String(e.produto)) ?? trim(e.item),
+      preco: Number(e.preco),
+    });
+  });
+  if (planoItens.length === 0) bloqueios.push("Escolha ao menos um item da NF de entrada para devolver.");
+  return { plano: { fornecedor: String(en.forn).trimEnd(), nfEntrada: trim(en.nf), serieEntrada: trim(en.serie), itens: planoItens }, itens, encargos };
+}
+
+/**
+ * Impostos do item na devolução: os informados (da NF do fornecedor) ou a sugestão, com as bases
+ * como o Linx grava (NF 1515): ICMS e IBS/CBS = item + frete rateado na entrada; IPI = item;
+ * PIS/COFINS = base do ICMS + IPI. Taxa sugerida = a da exceção (a de devolução zera tudo — a
+ * tela pede as alíquotas da NF de compra). Valor = base × taxa, truncado.
+ */
+function impostosDevolucao(f: LinhaFiscal, informados?: ImpostoInformado[], taxas?: Record<string, number>): ImpostoInformado[] {
+  if (informados && informados.length > 0) {
+    return informados.map((t) => ({ id: Number(t.id), base: round2(Number(t.base) || 0), taxa: Number(t.taxa) || 0, valor: round2(Number(t.valor) || 0) }));
+  }
+  // Alíquota: a informada (NF do fornecedor) ou a da exceção. Impostos = os da exceção + os informados > 0.
+  const ids = [...new Set([...f.impostos.map((t) => t.id), ...Object.entries(taxas ?? {}).filter(([, v]) => Number(v) > 0).map(([k]) => Number(k))])].sort((a, b) => a - b);
+  const taxaDe = (id: number) => {
+    const inf = taxas?.[String(id)];
+    if (inf !== undefined && inf !== null && Number.isFinite(Number(inf))) return Number(inf);
+    const t = f.impostos.find((x) => x.id === id);
+    return t && t.reducao < 100 ? t.taxa : 0;
+  };
+  const baseIcms = round2(f.valor + f.encargoEntrada);
+  const ipi = ids.includes(2) ? trunc2((f.valor * taxaDe(2)) / 100) : 0;
+  return ids.map((id) => {
+    const taxa = taxaDe(id);
+    // Sem alíquota o Linx grava base 0 (devolução 1505: PIS/COFINS).
+    if (taxa === 0) return { id, base: 0, taxa: 0, valor: 0 };
+    const base = id === 2 ? f.valor : id === 5 || id === 6 ? round2(baseIcms + ipi) : baseIcms;
+    return { id, base, taxa, valor: id === 2 ? ipi : trunc2((base * taxa) / 100) };
+  });
+}
+
+/** Romaneio "DEVOLUCAO ENTRADA" (baixa o estoque pelo trigger) + vínculo de cada item com a entrada. */
+function sqlDevolucao(p: Plano): string {
+  const dv = p.devolucao!;
+  const rom: string[] = [];
+  const vinc: string[] = [];
+  for (const it of dv.itens) {
+    const l = p.linhas.find((x) => x.linha === it.linha);
+    if (!l) continue;
+    const fiscal = p.fiscais.find((f) => f.itemImpressao === l.itemImpressao && (p.agrupamento % 3 !== 2 || f.tamanho === l.tamanho));
+    // Grade (SA_n) junto com a QTDE — é por ela que o trigger move o estoque (regra do CLAUDE.md).
+    const sa = Array.from({ length: MAX_GRADE }, (_, k) => `SA_${k + 1}`);
+    const saVals = sa.map((_, k) => (k + 1 === l.tamanho ? it.qtde : 0));
+    rom.push(`
+  INSERT INTO ESTOQUE_PROD1_SAI (FILIAL, ROMANEIO_PRODUTO, PRODUTO, COR_PRODUTO, QTDE, ${sa.join(", ")},
+    CUSTO1, CUSTO2, CUSTO3, CUSTO4, VALOR, ITEM_IMPRESSAO, ITEM_IMPRESSAO_ENTRADA, DATA_PARA_TRANSFERENCIA, DESCONTO_ITEM, PEDIDO)
+  VALUES (@FILIAL, @ROMANEIO, ${lit(l.produto)}, ${lit(l.cor)}, ${it.qtde}, ${saVals.join(", ")},
+    ${num(it.preco, 5)}, 0, 0, 0, ${num(l.valor)}, ${lit(l.itemImpressao)}, ${lit(it.itemProdutoEntrada)}, @AGORA, 0, '');`);
+    vinc.push(`
+  INSERT INTO FATURAMENTO_ENTRADA_DEVOLUCAO (QTDE_DEVOLVIDA, ITEM_IMPRESSAO_SAIDA, ORIGEM_ENTRADA_SAIDA, ITEM_IMPRESSAO_ENTRADA,
+    SUB_ITEM_SAIDA, SUB_ITEM_ENTRADA, FILIAL, NF_SAIDA, SERIE_NF, NOME_CLIFOR, NF_ENTRADA, SERIE_NF_ENTRADA)
+  VALUES (${it.qtde}, ${lit(l.itemImpressao)}, 'S', ${lit(it.itemImpressaoEntrada)},
+    ${fiscal?.subItem ?? l.subItem}, ${it.subItem}, @FILIAL, @NF, @SERIE, @CLIENTE, @DEV_NF_ENTRADA, @DEV_SERIE_ENTRADA);`);
+  }
+  return `
+  -- Romaneio de devolução: nº pela sequência do Linx, pulando um nº que já exista.
+  DECLARE @romNum INT;
+  UPDATE SEQUENCIAIS WITH (UPDLOCK, HOLDLOCK)
+     SET @romNum = CAST(SEQUENCIA AS INT) + 1
+   WHERE TABELA_COLUNA = 'ESTOQUE_PROD_SAI.ROMANEIO_PRODUTO';
+  IF @romNum IS NULL BEGIN ;THROW 51110, 'Sequencial ESTOQUE_PROD_SAI.ROMANEIO_PRODUTO não encontrado.', 1; END
+  WHILE EXISTS (SELECT 1 FROM ESTOQUE_PROD_SAI WITH (UPDLOCK, HOLDLOCK) WHERE ROMANEIO_PRODUTO = RIGHT('000000' + CAST(@romNum AS VARCHAR(6)), 6))
+    SET @romNum = @romNum + 1;
+  UPDATE SEQUENCIAIS SET SEQUENCIA = RIGHT('000000' + CAST(@romNum AS VARCHAR(6)), 6) WHERE TABELA_COLUNA = 'ESTOQUE_PROD_SAI.ROMANEIO_PRODUTO';
+  DECLARE @ROMANEIO VARCHAR(8) = RIGHT('000000' + CAST(@romNum AS VARCHAR(6)), 6);
+  INSERT INTO ESTOQUE_PROD_SAI (ROMANEIO_PRODUTO, FILIAL, EMISSAO, RESPONSAVEL, SEGUNDA_QUALIDADE, TIPO_ROMANEIO, DATA_DIGITACAO,
+    NF_FILIAL, NF_SAIDA, SERIE_NF, NOME_CLIFOR, NF_ENTRADA, SERIE_NF_ENTRADA, NAO_VALIDAR_ENTRADA, CM_OPERACAO,
+    DATA_PARA_TRANSFERENCIA, MOV_INTERNA)
+  VALUES (@ROMANEIO, @FILIAL, @HOJE, @RESPONSAVEL, 0, 'DEVOLUCAO ENTRADA', @AGORA,
+    @FILIAL, @NF, @SERIE, @CLIENTE, @DEV_NF_ENTRADA, @DEV_SERIE_ENTRADA, 0, '017',
+    @AGORA, 0);
+${rom.join("\n")}
+${vinc.join("\n")}`;
+}
+
+/**
+ * NFs de entrada da filial que ainda têm saldo a devolver (para a aba Devolução): por fornecedor
+ * ou nº da NF. Só itens de produto (COD_TABELA_FILHA P).
+ */
+export async function listarEntradasDevolviveis(params: { empresa: EmpresaFat; filial: string; busca: string }): Promise<EntradaDevolvivel[]> {
+  if (!(await filiaisNotaDaEmpresa(params.empresa)).includes(params.filial)) return [];
+  const busca = trim(params.busca).toUpperCase();
+  if (busca.length < 2) return [];
+  return withRequest(async (request: sql.Request | RequestLike) => {
+    const req = request as Req;
+    req.input("fil", sql.VarChar(25), params.filial);
+    req.input("like", sql.VarChar(40), `%${busca}%`);
+    req.input("nfb", sql.VarChar(15), busca.replace(/\D/g, ""));
+    const cab = await q(req, `
+      SELECT TOP 20 RTRIM(E.NOME_CLIFOR) AS forn, LTRIM(RTRIM(C.CLIFOR)) AS clifor, LTRIM(RTRIM(E.NF_ENTRADA)) AS nf,
+             LTRIM(RTRIM(E.SERIE_NF_ENTRADA)) AS serie, E.EMISSAO AS emissao, E.VALOR_TOTAL AS total
+        FROM ENTRADAS E WITH (NOLOCK)
+        JOIN CADASTRO_CLI_FOR C WITH (NOLOCK) ON C.NOME_CLIFOR = E.NOME_CLIFOR
+       WHERE E.FILIAL = @fil
+         AND (E.NOME_CLIFOR LIKE @like OR (LEN(@nfb) > 0 AND LTRIM(RTRIM(E.NF_ENTRADA)) LIKE '%' + @nfb))
+         AND EXISTS (SELECT 1 FROM ENTRADAS_ITEM I WITH (NOLOCK)
+                      WHERE I.NOME_CLIFOR = E.NOME_CLIFOR AND I.NF_ENTRADA = E.NF_ENTRADA AND I.SERIE_NF_ENTRADA = E.SERIE_NF_ENTRADA
+                        AND I.COD_TABELA_FILHA = 'P' AND I.QTDE_ITEM > ISNULL(I.QTDE_DEVOLVIDA, 0))
+       ORDER BY E.EMISSAO DESC`);
+    const out: EntradaDevolvivel[] = [];
+    for (const [k, c] of cab.entries()) {
+      req.input(`f${k}`, sql.VarChar(25), String(c.forn));
+      req.input(`n${k}`, sql.VarChar(15), String(c.nf));
+      req.input(`s${k}`, sql.VarChar(6), String(c.serie));
+      const itens = await q(req, `
+        SELECT LTRIM(RTRIM(ITEM_IMPRESSAO)) AS item, SUB_ITEM_TAMANHO AS sub, LTRIM(RTRIM(REFERENCIA)) AS produto,
+               LTRIM(RTRIM(REFERENCIA_ITEM)) AS cor, LTRIM(RTRIM(DESCRICAO_ITEM)) AS descr, QTDE_ITEM AS qtde,
+               ISNULL(QTDE_DEVOLVIDA, 0) AS devolvida, PRECO_UNITARIO AS preco
+          FROM ENTRADAS_ITEM WITH (NOLOCK)
+         WHERE NOME_CLIFOR = @f${k} AND NF_ENTRADA = @n${k} AND SERIE_NF_ENTRADA = @s${k} AND COD_TABELA_FILHA = 'P'
+         ORDER BY ITEM_IMPRESSAO, SUB_ITEM_TAMANHO`);
+      out.push({
+        fornecedor: String(c.forn).trimEnd(),
+        clifor: trim(c.clifor),
+        nfEntrada: trim(c.nf),
+        serieEntrada: trim(c.serie),
+        emissao: iso(c.emissao),
+        valorTotal: Number(c.total) || 0,
+        itens: itens.map((x) => ({
+          itemImpressao: trim(x.item),
+          subItem: Number(x.sub),
+          produto: trim(x.produto),
+          cor: trim(x.cor),
+          descricao: trim(x.descr),
+          qtde: Number(x.qtde) || 0,
+          devolvida: Number(x.devolvida) || 0,
+          preco: Number(x.preco) || 0,
+        })),
+      });
+    }
+    return out;
+  });
 }
 
 function paraPreview(p: Plano): NotaPreview {
@@ -917,6 +1221,21 @@ function paraPreview(p: Plano): NotaPreview {
     seguro: p.seguro,
     total: p.total,
     qtdeTotal: p.qtdeTotal,
+    devolucao: p.devolucao
+      ? {
+          itens: p.fiscais.map(
+            (f): DevolucaoPreviewItem => ({
+              codigoItem: f.codigoItem,
+              descricao: f.descricao,
+              qtde: f.qtde,
+              valor: f.valor,
+              impostos: (f.informados ?? []).map((t) => ({ ...t, nome: NOME_IMPOSTO[t.id] ?? String(t.id) })),
+            })
+          ),
+          impostoAgregar: p.impostoAgregar,
+          romaneio: null,
+        }
+      : undefined,
     bloqueios: p.bloqueios,
     avisos: p.avisos,
   };
@@ -1008,6 +1327,9 @@ const OBS_DIFAL =
  * `final`: commit (grava), rollback (simula e desfaz), debug (simula e devolve as linhas).
  */
 function montarBatch(p: Plano, cNF: string, final: "commit" | "rollback" | "debug" | "xml"): string {
+  const dev = p.devolucao;
+  // Devolução e NF de material não têm pedido "NF SEM PEDIDO" nem FATURAMENTO_PROD.
+  const semPedido = Boolean(dev) || p.material;
   // Linhas de FATURAMENTO_PROD (produto × cor) com grade
   const prods = new Map<string, { produto: string; cor: string; preco: number; qtde: number; custo: number; cfop: string; grade: Map<number, number>; item: string; obs: string }>();
   // FATURAMENTO_PROD segue a ordem digitada (ITEM_IMPRESSAO); FATURAMENTO_ITEM, a ordem fiscal.
@@ -1022,8 +1344,10 @@ function montarBatch(p: Plano, cNF: string, final: "commit" | "rollback" | "debu
     g.grade.set(l.tamanho, (g.grade.get(l.tamanho) ?? 0) + l.qtde);
   }
 
+  // TIMESTAMP = preço codificado pelo Linx com 5 casas, completado à esquerda até 20 (o "111" final
+  // que se via nos preços de 2 casas é a codificação dos zeros; devolução 1505: 121,4371 → …54931).
   const tsExpr = (preco: number) =>
-    `REPLICATE(NCHAR(198), 17 - LEN(dbo.FX_PRODUCAO_PRECO(CAST(${num(preco)} AS NUMERIC(14,2)),'T'))) + dbo.FX_PRODUCAO_PRECO(CAST(${num(preco)} AS NUMERIC(14,2)),'T') + '111'`;
+    `REPLICATE(NCHAR(198), 20 - LEN(dbo.FX_PRODUCAO_PRECO(CAST(${num(preco, 5)} AS NUMERIC(14,5)),'T'))) + dbo.FX_PRODUCAO_PRECO(CAST(${num(preco, 5)} AS NUMERIC(14,5)),'T')`;
 
   // VENDAS_PRODUTO: uma linha por produto × cor (é a chave dela) — linhas repetidas da NF somam
   // (NF 0043673 da Matriz: 2 linhas de 13.46.0129/10 → 1 item do pedido com 5 peças).
@@ -1062,6 +1386,13 @@ function montarBatch(p: Plano, cNF: string, final: "commit" | "rollback" | "debu
     0, 0, 0, ${lit(g.item)}, ${lit(g.item)}, '0000',
     0, 0, 0, 0, 0, ${g.obs ? `LEFT(${lit(g.obs)} + SPACE(80), 80)` : "NULL"});`);
   }
+  // Devolução não tem pedido nem FATURAMENTO_PROD: o estoque sai pelo romaneio (sqlDevolucao).
+  if (semPedido) {
+    vendasProd.length = 0;
+    fatProd.length = 0;
+  }
+  // Preço unitário: devolução leva o da NF de entrada com até 5 casas; as demais, 2.
+  const casasPreco = dev || p.material ? 5 : 2;
 
   // Remessa (tipo R: demonstração, consignação, conserto, simples remessa, troca) grava a quantidade
   // a retornar = a do item (QTDE_RETORNAR_BENEFICIAMENTO; todas as NFs desde 2025, menos 4 editadas).
@@ -1089,15 +1420,29 @@ function montarBatch(p: Plano, cNF: string, final: "commit" | "rollback" | "debu
     RATEIO_CENTRO_CUSTO, INDICA_PRODUTO_PROCESSO, PRECO_UNITARIO_ORIGINAL, VALOR_IMPOSTO_ITEM_MUNICIPAL, VALOR_IMPOSTO_ITEM_ESTADUAL, ID_CEST_NCM,
     CST_IBS_CBS, CCLASSTRIB, OBS_ITEM, REFERENCIA_PEDIDO)
   VALUES (@FILIAL, @NF, @SERIE, ${lit(l.itemImpressao)}, ${l.subItem}, ${lit(l.ncm)}, ${lit(l.cfop)},
-    ${codigoItemSql(l)}, 'P', 0, 0, ${lit(l.contaContabil || null)}, 0, ${descricaoItemSql(l)}, '1',
-    ${l.excecao ?? "NULL"}, ${l.indicadorCfop}, 0, ${num(l.preco)}, ${num(l.valor)}, 0,
-    ${num(l.pct, 10)}, ${num(l.preco)}, 0, ${l.qtde}, ${qtdeRetornar(l)}, ${lit(l.csosn)}, ${lit(l.origem)},
-    ${lit(l.unidade)}, ${num(l.valor)}, ${lit(l.produto)}, ${lit(l.referenciaItem)}, ${tsExpr(l.preco)}, ${num(l.desconto)}, 0, 0,
-    ${i + 1}, ${num(l.seguro)}, ${num(l.frete)}, 0, ${num(ibptFed)}, 'P', @COD_FILIAL,
-    @CENTRO_CUSTO, 0, ${num(l.preco)}, ${num(ibptMun)}, ${num(ibptEst)}, ${l.idCest ?? "NULL"},
+    ${codigoItemSql(l)}, ${p.material ? "'T'" : "'P'"}, 0, 0, ${lit(l.contaContabil || null)}, 0, ${descricaoItemSql(l)}, '1',
+    ${l.excecao ?? "NULL"}, ${l.indicadorCfop}, 0, ${num(l.preco, casasPreco)}, ${num(l.valor)}, 0,
+    ${num(l.pct, 10)}, ${num(l.preco, casasPreco)}, 0, ${l.qtde}, ${qtdeRetornar(l)}, ${lit(l.csosn)}, ${lit(l.origem)},
+    ${lit(l.unidade)}, ${num(l.valor)}, ${p.material ? "NULL" : lit(l.produto)}, ${lit(l.referenciaItem)}, ${tsExpr(l.preco)}, ${num(l.desconto)}, 0, 0,
+    ${i + 1}, ${num(l.seguro)}, ${num(l.frete)}, 0, ${num(ibptFed)}, ${p.material ? "'M'" : "'P'"}, @COD_FILIAL,
+    ${p.material ? "NULL" : "@CENTRO_CUSTO"}, 0, ${num(l.preco, casasPreco)}, ${num(ibptMun)}, ${num(ibptEst)}, ${l.idCest ?? "NULL"},
     ${lit(l.cstIbsCbs || null)}, ${lit(l.cClassTrib || null)},
-    ${l.obsItem ? `LEFT(${lit(l.obsItem)} + SPACE(254), 254)` : "NULL"}, ${porPedido ? "@PEDIDO" : "NULL"});`);
-    if (p.simples) {
+    ${l.obsItem ? `LEFT(${lit(l.obsItem)} + SPACE(254), 254)` : "NULL"}, ${dev ? "@DEV_NF_ENTRADA" : porPedido ? "@PEDIDO" : "NULL"});`);
+    if (l.informados) {
+      // Devolução: os impostos da NF do fornecedor, como informados; incidência/agrega da exceção
+      // (ou do tipo do imposto). BASE_IMPOSTO_CALC: 0 no Simples (NERD), a base no regime normal.
+      for (const t of l.informados) {
+        const ex = l.impostos.find((x) => x.id === t.id);
+        const inc = ex?.incidencia ?? (t.id === 2 ? 1 : 3);
+        const agDesc = ex ? ex.agregaDesconto : t.id !== 2;
+        const agEnc = ex ? ex.agregaEncargo : t.id !== 2;
+        fatImp.push(`
+  INSERT INTO FATURAMENTO_IMPOSTO (FILIAL, NF_SAIDA, SERIE_NF, ITEM_IMPRESSAO, SUB_ITEM_TAMANHO, ID_IMPOSTO, TAXA_IMPOSTO,
+    BASE_IMPOSTO, VALOR_IMPOSTO, VALOR_IMPOSTO_CALCULADO, BASE_IMPOSTO_CALC, INCIDENCIA, AGREGA_APOS_ENCARGO, AGREGA_APOS_DESCONTO)
+  VALUES (@FILIAL, @NF, @SERIE, ${lit(l.itemImpressao)}, ${l.subItem}, ${t.id}, ${num(t.taxa)}, ${num(t.base)}, ${num(t.valor)}, ${num(t.valor)},
+    ${num(p.simples ? 0 : t.base)}, ${inc}, ${agEnc ? 1 : 0}, ${agDesc ? 1 : 0});`);
+      }
+    } else if (p.simples) {
       for (const t of l.impostos) {
         // DICMS (11) o Linx só grava em operação interestadual.
         if (t.id === 11 && p.cliente.uf === p.ufFilial) continue;
@@ -1156,6 +1501,10 @@ function montarBatch(p: Plano, cNF: string, final: "commit" | "rollback" | "debu
   SELECT 'FATURAMENTO_OBSERVACAO' AS t, * FROM FATURAMENTO_OBSERVACAO WHERE FILIAL=@FILIAL AND NF_SAIDA=@NF AND SERIE_NF=@SERIE ORDER BY TIPO_OBS;
   SELECT 'VENDAS' AS t, * FROM VENDAS WHERE PEDIDO=@PEDIDO;
   SELECT 'VENDAS_PRODUTO' AS t, * FROM VENDAS_PRODUTO WHERE PEDIDO=@PEDIDO;
+  SELECT 'ESTOQUE_PROD_SAI' AS t, * FROM ESTOQUE_PROD_SAI WHERE NF_FILIAL=@FILIAL AND NF_SAIDA=@NF AND SERIE_NF=@SERIE;
+  SELECT 'ESTOQUE_PROD1_SAI' AS t, R1.* FROM ESTOQUE_PROD1_SAI R1 JOIN ESTOQUE_PROD_SAI R ON R.ROMANEIO_PRODUTO = R1.ROMANEIO_PRODUTO AND R.FILIAL = R1.FILIAL
+    WHERE R.NF_FILIAL=@FILIAL AND R.NF_SAIDA=@NF AND R.SERIE_NF=@SERIE;
+  SELECT 'FATURAMENTO_ENTRADA_DEVOLUCAO' AS t, * FROM FATURAMENTO_ENTRADA_DEVOLUCAO WHERE FILIAL=@FILIAL AND NF_SAIDA=@NF AND SERIE_NF=@SERIE;
   SELECT 'ESTOQUE' AS t, E.* FROM ESTOQUE_PRODUTOS E JOIN FATURAMENTO_PROD P ON P.PRODUTO=E.PRODUTO AND P.COR_PRODUTO=E.COR_PRODUTO
     WHERE E.FILIAL=@FILIAL AND P.FILIAL=@FILIAL AND P.NF_SAIDA=@NF AND P.SERIE_NF=@SERIE;
   ROLLBACK;`;
@@ -1168,13 +1517,14 @@ BEGIN TRY
   DECLARE @AGORA DATETIME = GETDATE();
   DECLARE @HOJE DATETIME = CAST(CAST(@AGORA AS DATE) AS DATETIME);
 
-  -- Nº do pedido "NF SEM PEDIDO"
+  -- Nº do pedido "NF SEM PEDIDO" (devolução não tem pedido)
   DECLARE @novoPed INT;
+  ${semPedido ? "DECLARE @PEDIDO CHAR(12) = NULL;" : `
   UPDATE SEQUENCIAIS WITH (UPDLOCK, HOLDLOCK)
      SET @novoPed = CAST(SEQUENCIA AS INT) + 1, SEQUENCIA = CAST(CAST(SEQUENCIA AS INT) + 1 AS VARCHAR(12))
    WHERE TABELA_COLUNA = 'VENDAS.PEDIDO';
   IF @novoPed IS NULL BEGIN ;THROW 51100, 'Sequencial VENDAS.PEDIDO não encontrado.', 1; END
-  DECLARE @PEDIDO CHAR(12) = CAST(@novoPed AS VARCHAR(12));
+  DECLARE @PEDIDO CHAR(12) = CAST(@novoPed AS VARCHAR(12));`}
 
   -- Nº da NF (último usado + 1) na série da filial, com a largura do sequencial dela
   -- (pernas do e-commerce 9 dígitos, Matriz 7). A chave da NF-e usa sempre 9 (@NFNUM).
@@ -1207,6 +1557,7 @@ BEGIN TRY
   -- ENTREGA_CIF = TIPO_FRETE.FRETE_PAGO (conferido em todas as NFs desde 2025: '2'→0, '01'→1, '04'→9, '05'→3).
   DECLARE @ENTREGA_CIF INT = ISNULL((SELECT TOP 1 FRETE_PAGO FROM TIPO_FRETE WITH (NOLOCK) WHERE TIPO_FRETE = @TIPO_FRETE), 0);
 
+${semPedido ? "" : `
   INSERT INTO VENDAS (PEDIDO, COLECAO, CODIGO_TAB_PRECO, TIPO, CONDICAO_PGTO, FILIAL, CLIENTE_ATACADO, TRANSPORTADORA, MOEDA,
     REPRESENTANTE, GERENTE, EMISSAO, CADASTRAMENTO, TOT_QTDE_ORIGINAL, TOT_QTDE_ENTREGUE, TOT_QTDE_ENTREGAR,
     TOT_VALOR_ORIGINAL, TOT_VALOR_ENTREGUE, TOT_VALOR_ENTREGAR, APROVADO_POR, TABELA_FILHA, TOT_BRUTO_ENTREGUE,
@@ -1216,7 +1567,7 @@ BEGIN TRY
     @REPRESENTANTE, @REPRESENTANTE, @HOJE, @HOJE, ${p.qtdeTotal}, ${p.qtdeTotal}, 0,
     ${num(p.subtotal)}, ${num(valorEntregue)}, 0, 'NF SEM PEDIDO', 'VENDAS_PRODUTO', ${num(p.subtotal)},
     100, 100, @AGORA, ${num(valorEntregue)},
-    @CLIENTE, 0, @TRANSP_REDESP, ${num(p.subtotal)}, @INDICADOR_VENDA);
+    @CLIENTE, 0, @TRANSP_REDESP, ${num(p.subtotal)}, @INDICADOR_VENDA);`}
 ${vendasProd.join("\n")}
 
   INSERT INTO FATURAMENTO (FILIAL, NF_SAIDA, SERIE_NF, TIPO_FATURAMENTO, NOME_CLIFOR, CONDICAO_PGTO, NATUREZA_SAIDA,
@@ -1241,25 +1592,26 @@ ${vendasProd.join("\n")}
   VALUES (@FILIAL, @NF, @SERIE, 'PADRAO', @CLIENTE, @COND_PGTO, @NATUREZA,
     @TRANSP, @TRANSP_REDESP, @TIPO_FRETE, @COD_TRANSACAO, @HOJE, @HOJE, ${num(p.frete)}, ${num(p.seguro)}, ${num(p.desconto)},
     ${num(p.descontoCond)}, 0, 0, 0, ${num(p.total)}, ${p.qtdeTotal}, ${p.nfFatura ? 1 : 0}, 0, 0,
-    'FATURAMENTO_PROD', NULLIF(@OBS, ''), @PESO_LIQ, @PESO_BRUTO, @VOLUMES, @TIPO_VOLUME, 0, @ENTREGA_CIF, 0, 0,
-    0, 0, @REPRESENTANTE, 0, 0, @REPRESENTANTE, 0, 0,
-    0, 0, 0, 'R$', 1, 1, 0,
-    @AGORA, @CLIENTE, 0, ${p.agrupamento}, 0, 0,
+    ${dev ? "'ESTOQUE_PROD_SAI'" : p.material ? "'ESTOQUE_SAI1_MAT'" : "'FATURAMENTO_PROD'"}, NULLIF(@OBS, ''), @PESO_LIQ, @PESO_BRUTO, @VOLUMES, @TIPO_VOLUME, 0, @ENTREGA_CIF, 0, 0,
+    0, 0, ${dev ? "NULL" : "@REPRESENTANTE"}, 0, 0, ${dev ? "NULL" : "@REPRESENTANTE"}, 0, 0,
+    0, 0, 0, 'R$', 1, ${dev ? 0 : 1}, 0,
+    @AGORA, ${dev ? "NULL" : "@CLIENTE"}, 0, ${p.agrupamento}, 0, 0,
     0, 0, 0, 0,
     0, 0, 0, ${num(p.descontoSobre4, 10)}, @EMPRESA, 0, 0,
-    ${num(p.desconto)}, ${num(p.descontoCond)}, 0, ${num(p.frete)}, 0, ${num(p.seguro)},
+    ${num(p.desconto)}, ${num(p.descontoCond)}, 0, ${num(p.frete)}, ${num(p.impostoAgregar)}, ${num(p.seguro)},
     ${num(p.subtotal)}, ${num(p.total)}, 0, ${num(p.porcDesconto, 10)}, 0,
     ${num(p.porcDescontoCond, 10)}, ${p.porcDigitado ? 1 : 0}, 0, @CENTRO_CUSTO, @COD_FILIAL,
-    0, 0, ${num(p.subtotal)}, 0,
+    0, ${num(p.impostoAgregar)}, ${num(p.subtotal)}, 0,
     @CONS_FINAL, 0, 0, 0, 0,
     @CHAVE, 0, 1, 0, 0, 0, 0, '19000101',
-    1, 1, 0, 0, 0,
+    1, ${dev ? 4 : 1}, 0, 0, 0,
     CAST(@AGORA AS SMALLDATETIME), 0, 3, 3, 0, @INFO_PGTO,
-    0, 0, 0, 0, 0, 0, @HOJE,
+    0, 0, 0, 0, 0, 0, ${dev ? "NULL" : "@HOJE"},
     NULLIF(@UF_EMBARQUE, ''), NULLIF(@LOCAL_EMBARQUE, ''));
 ${fatProd.join("\n")}
 ${fatItem.join("\n")}
 ${fatImp.join("\n")}
+${dev ? sqlDevolucao(p) : ""}
 ${interestadual ? `
   INSERT INTO FATURAMENTO_OBSERVACAO (TIPO_OBS, NF_SAIDA, SERIE_NF, FILIAL, SEQUENCIA_OBS, OBS)
   VALUES (7, @NF, @SERIE, @FILIAL, 6, LEFT(${lit(OBS_DIFAL)} + SPACE(254), 254));` : ""}
@@ -1297,7 +1649,14 @@ function bindCabecalho(req: Req, p: Plano, cNF: string) {
   req.input("TIPO_FRETE", sql.Char(2), trim(i.tipoFrete) || padrao.tipoFrete);
   req.input("REPRESENTANTE", sql.VarChar(25), p.cliente.representante ?? padrao.representante);
   req.input("CENTRO_CUSTO", sql.VarChar(6), padrao.centroCusto);
-  req.input("OBS", sql.VarChar(sql.MAX), trim(i.obs));
+  // Devolução: o form do Linx escreve a NF de entrada na OBS (4/4 devoluções da NERD); o texto livre vem depois.
+  const obsDevolucao = p.devolucao
+    ? `Notas de devolução relacionada a(s) nota(s) de entrada:\r\rNF: ${p.devolucao.nfEntrada} Serie:${p.devolucao.serieEntrada}`
+    : "";
+  req.input("OBS", sql.VarChar(sql.MAX), [obsDevolucao, trim(i.obs)].filter(Boolean).join("\r\r"));
+  req.input("DEV_NF_ENTRADA", sql.Char(15), p.devolucao?.nfEntrada ?? null);
+  req.input("DEV_SERIE_ENTRADA", sql.Char(6), p.devolucao?.serieEntrada ?? null);
+  req.input("RESPONSAVEL", sql.VarChar(25), p.responsavel.slice(0, 25));
   req.input("PESO_LIQ", sql.Numeric(9, 3), Number(i.pesoLiquido) || 0);
   req.input("PESO_BRUTO", sql.Numeric(9, 3), Number(i.pesoBruto) || 0);
   req.input("VOLUMES", sql.Int, Math.max(0, Math.round(Number(i.volumes) || 0)));

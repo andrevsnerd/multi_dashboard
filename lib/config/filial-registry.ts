@@ -194,6 +194,32 @@ export function getFiliaisByCompany(company: CompanyKey): FilialDef[] {
   return FILIAIS.filter((f) => f.company === company);
 }
 
+/** Hoje em São Paulo, yyyy-mm-dd — o `since` do registry é data local da loja. */
+function hojeSaoPaulo(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+}
+
+/** O papel atual da filial (FilialDef.since) já começou. Sem `since` = false. */
+export function filialPapelIniciado(id: string | number | null | undefined): boolean {
+  const since = getFilialById(id)?.since;
+  return Boolean(since && since <= hojeSaoPaulo());
+}
+
+/**
+ * A filial foi SUBSTITUÍDA no grupo por um membro cujo papel já começou depois do dela
+ * (troca de CNPJ: em 19/11/2026 a FFFR 000110 assumiu a Oscar Freire da 000062 e a MSC 000111
+ * a Higienópolis da 000038). A perna substituída sai de uso mesmo que o PDV ainda venda por ela.
+ */
+export function filialSubstituidaNoGrupo(id: string | number | null | undefined): boolean {
+  const def = getFilialById(id);
+  if (!def?.group) return false;
+  const proprio = def.since ?? '';
+  const hoje = hojeSaoPaulo();
+  return FILIAIS.some(
+    (m) => m.group === def.group && m.id !== def.id && !!m.since && m.since <= hoje && m.since > proprio
+  );
+}
+
 export function getFilialGroupsByCompany(company: CompanyKey): FilialGroupDef[] {
   return FILIAL_GROUPS.filter((g) => g.company === company);
 }

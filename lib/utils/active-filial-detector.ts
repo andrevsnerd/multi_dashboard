@@ -79,6 +79,29 @@ async function queryLastSaleEcommerce(
   return result.recordset[0]?.FILIAL?.trim() ?? null;
 }
 
+/** Hoje em São Paulo, yyyy-mm-dd (o `since` do registry é data local da loja). */
+function hojeSaoPaulo(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+}
+
+/**
+ * Papel por período: o membro cujo `since` já chegou É a perna ativa, venda ou não.
+ * Troca de CNPJ de loja (19/11/2026: FFFR→Oscar Freire, MSC→Higienópolis) move o estoque
+ * para a perna nova no dia, mas o PDV pode seguir vendendo pela antiga por um tempo —
+ * eleger pela última venda deixava o estoque novo invisível em todas as telas de estoque.
+ * Vários membros com `since` vencido: vence o mais recente. Nenhum: null (cai na venda).
+ */
+function membroComPapelIniciado(members: string[], sinceByMember: Map<string, string>): string | null {
+  const hoje = hojeSaoPaulo();
+  let melhor: { nome: string; since: string } | null = null;
+  for (const m of members) {
+    const since = sinceByMember.get(normUpper(m));
+    if (!since || !/^\d{4}-\d{2}-\d{2}$/.test(since) || since > hoje) continue;
+    if (!melhor || since > melhor.since) melhor = { nome: m.trim(), since };
+  }
+  return melhor?.nome ?? null;
+}
+
 /**
  * Detecta a filial ativa de cada grupo consultando qual membro teve venda mais
  * recente. Grupos com um único membro retornam diretamente o active configurado.
@@ -128,7 +151,8 @@ export async function detectActiveFilials(
           try {
             detected = isEcommerce
               ? await queryLastSaleEcommerce(request, grupo.members, `${i}`)
-              : await queryLastSaleVarejo(request, grupo.members, `${i}`, sinceByMember);
+              : (membroComPapelIniciado(grupo.members, sinceByMember)
+                ?? await queryLastSaleVarejo(request, grupo.members, `${i}`, sinceByMember));
           } catch {
             // falha individual: usa active configurado
           }

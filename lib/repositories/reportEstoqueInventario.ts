@@ -87,6 +87,15 @@ function nomeFilial(nomes: Map<string, string>, cod: string): string {
 /** Entre os códigos da loja, devolve o FILIAL com movimentação mais recente. */
 async function detectarFilialAtiva(cods: string[], nomes: Map<string, string>): Promise<string> {
   if (cods.length === 1) return nomeFilial(nomes, cods[0]);
+  // Papel por período: o CNPJ cujo `since` já chegou é o ativo, venda ou não — a troca move
+  // o estoque no dia, e o PDV pode seguir vendendo pela perna antiga por um tempo.
+  // Mesma regra de membroComPapelIniciado (lib/utils/active-filial-detector.ts).
+  const hoje = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+  const papelIniciado = cods
+    .map((c) => ({ cod: c, since: getFilialById(String(c).trim())?.since }))
+    .filter((x): x is { cod: string; since: string } => Boolean(x.since && x.since <= hoje))
+    .sort((a, b) => b.since.localeCompare(a.since))[0];
+  if (papelIniciado) return nomeFilial(nomes, papelIniciado.cod);
   const nomesLoja = cods.map((c) => nomeFilial(nomes, c));
   return withRequest(async (request) => {
     const phCod = placeholders(request, "ac", cods);

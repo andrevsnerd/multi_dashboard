@@ -16,6 +16,7 @@ import type {
 } from "@/lib/faturamento-ecommerce/types";
 
 import { dataLocal, fmtBRL, fmtData, fmtDoc, useFatApi } from "./api";
+import DevolucaoCard, { DEVOLUCAO_VAZIA, chaveItemEntrada, type DevolucaoTela } from "./DevolucaoCard";
 import NotaDetalheModal from "./NotaDetalheModal";
 import styles from "./FaturamentoEcommerce.module.css";
 
@@ -152,6 +153,8 @@ function NovaNota({
   const [confirmarDup, setConfirmarDup] = useState(false);
   // Agrupamento dos itens na NF (opção do form do Linx): 2 = por tamanho é o de ~99% das NFs.
   const [agrupamento, setAgrupamento] = useState<0 | 1 | 2 | 3 | 4 | 5>(2);
+  // Devolução de compra (natureza tipo D): NF de entrada escolhida, quantidades e impostos do fornecedor.
+  const [dev, setDev] = useState<DevolucaoTela>(DEVOLUCAO_VAZIA);
 
   const [codigoCliente, setCodigoCliente] = useState("");
   const [erroCliente, setErroCliente] = useState<string | null>(null);
@@ -201,6 +204,7 @@ function NovaNota({
     setCfManual(null);
   }
   const pd = naturezaInfo?.padroes;
+  const ehDevolucao = naturezaInfo?.tipoOperacao === "D";
 
   const nota: NotaInput = useMemo(
     () => ({
@@ -226,12 +230,25 @@ function NovaNota({
       tipoVolume,
       infoPgto,
       obs: obs === "#" ? "" : obs,
-      itens: itens.map((i) => ({ produto: i.produto, cor: i.cor, tamanho: i.tamanho, qtde: i.qtde, preco: i.preco, obs: i.obs ?? "" })),
+      itens: ehDevolucao ? [] : itens.map((i) => ({ produto: i.produto, cor: i.cor, tamanho: i.tamanho, qtde: i.qtde, preco: i.preco, obs: i.obs ?? "" })),
+      devolucao:
+        ehDevolucao && dev.entrada
+          ? {
+              fornecedor: dev.entrada.fornecedor,
+              nfEntrada: dev.entrada.nfEntrada,
+              serieEntrada: dev.entrada.serieEntrada,
+              itens: dev.entrada.itens
+                .filter((i) => (dev.qtdes[chaveItemEntrada(i)] ?? 0) > 0)
+                .map((i) => ({ itemImpressaoEntrada: i.itemImpressao, subItem: i.subItem, qtde: dev.qtdes[chaveItemEntrada(i)] })),
+              taxas: Object.fromEntries(Object.entries(dev.taxas).filter(([, v]) => v.trim() !== "").map(([k, v]) => [k, n(v)])),
+              impostos: dev.impostos,
+            }
+          : undefined,
       confirmarDuplicidade: confirmarDup,
       consumidorFinal,
       agrupamento,
     }),
-    [empresa, filial, natureza, cliente, condicao, tipoFrete, transp, redesp, frete, seguro, descModo, desc, descCondModo, descCond, pesoLiq, pesoBruto, volumes, tipoVolume, infoPgto, obs, itens, confirmarDup, consumidorFinal, agrupamento]
+    [empresa, filial, natureza, cliente, condicao, tipoFrete, transp, redesp, frete, seguro, descModo, desc, descCondModo, descCond, pesoLiq, pesoBruto, volumes, tipoVolume, infoPgto, obs, itens, confirmarDup, consumidorFinal, agrupamento, ehDevolucao, dev]
   );
   const assinatura = JSON.stringify(nota);
   const previaValida = previa !== null && previaAssinatura === assinatura;
@@ -629,14 +646,25 @@ function NovaNota({
       </div>
 
       {/* Itens */}
-      <ItensCard empresa={empresa} filial={filial} itens={itens} setItens={setItens} tabela={cliente?.codigoTabPreco || pd?.tabPreco || "01"} />
+      {ehDevolucao ? (
+        <DevolucaoCard
+          empresa={empresa}
+          filial={filial}
+          valor={dev}
+          onChange={setDev}
+          onEscolherFornecedor={async (clifor) => onTrocarCliente(await api.get<ClienteFatDetalhe>(`/clientes/${clifor}`))}
+          previaItens={previa?.devolucao?.itens ?? null}
+        />
+      ) : (
+        <ItensCard empresa={empresa} filial={filial} itens={itens} setItens={setItens} tabela={cliente?.codigoTabPreco || pd?.tabPreco || "01"} />
+      )}
 
       {/* Conferência */}
       <div className={styles.card}>
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle}>Conferir e gravar</h2>
           <div className={styles.acoes}>
-            <button type="button" className={styles.btn} onClick={conferir} disabled={!cliente || itens.length === 0 || processando !== null}>
+            <button type="button" className={styles.btn} onClick={conferir} disabled={!cliente || (ehDevolucao ? !nota.devolucao?.itens.length : itens.length === 0) || processando !== null}>
               {processando === "previa" ? "Conferindo…" : "Conferir NF"}
             </button>
             {podeGravar && (
@@ -1035,6 +1063,9 @@ function PreviaView({
             label={`Desc. cond. pagamento (${previa.descontoCondPercentual.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%)`}
             valor={`− ${fmtBRL(previa.descontoCond)}`}
           />
+        )}
+        {previa.devolucao && previa.devolucao.impostoAgregar > 0 && (
+          <Total label="IPI da NF do fornecedor (soma ao total)" valor={`+ ${fmtBRL(previa.devolucao.impostoAgregar)}`} />
         )}
         <Total label="Frete" valor={fmtBRL(previa.frete)} />
         {previa.seguro > 0 && <Total label="Seguro" valor={fmtBRL(previa.seguro)} />}
