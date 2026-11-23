@@ -2140,8 +2140,8 @@
     "semantic_hash": ""
   },
   "lib/config/filial-registry.ts": {
-    "mtime": 1795110571.397791,
-    "ast_hash": "07fb1e760bf9de3c6c581cfa30a0fe65",
+    "mtime": 1795434953.511804,
+    "ast_hash": "cc603d8da48923213612573a686a43ad",
     "semantic_hash": ""
   },
   "lib/config/nav-route-map.ts": {
@@ -2380,8 +2380,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/ajusteEstoque.ts": {
-    "mtime": 1793195625.6217108,
-    "ast_hash": "d56b38dec0c198fbc237ae4e9a564a2a",
+    "mtime": 1795434953.5126896,
+    "ast_hash": "fc96d6e895603aa9797f6f45e750a1db",
     "semantic_hash": ""
   },
   "lib/repositories/claudeReport.ts": {

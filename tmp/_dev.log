@@ -147,3 +147,12 @@ C:\NERD\multi_dashboard\node_modules\next\dist\server\lib\start-server.js: Inval
     at listarFiliaisParaAjuste (C:\NERD\multi_dashboard\.next\dev\server\chunks\[root-of-the-server]__a79a7be2._.js:1343:218)
     at async GET (C:\NERD\multi_dashboard\.next\dev\server\chunks\[root-of-the-server]__a79a7be2._.js:2584:38)
  GET /api/ajuste-estoque/filiais?company=scarfme 500 in 201ms (compile: 7ms, render: 194ms)
+ ○ Compiling /[company]/compras-salvas/[id] ...
+ GET /scarfme/compras-salvas/teste 200 in 8.2s (compile: 7.1s, render: 1071ms)
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+ POST /api/controle-estoque/metricas-itens 200 in 3.1s (compile: 707ms, render: 2.4s)

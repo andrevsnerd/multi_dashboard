@@ -28,6 +28,7 @@ import {
   type DistribuicaoPorTamanho,
 } from "@/lib/utils/compra-destino-tamanho";
 import type { TamanhoGrade } from "@/lib/utils/grade-tamanhos";
+import { filialLabelCurta } from "@/lib/utils/filial-label-curta";
 import {
   calcNecessidadeMinimaQty,
   calcTotalPerFilialQty,
@@ -3163,7 +3164,9 @@ ${fmtMetros(r.metrosPorPeca)}/peça`
               <div className={styles.tooltipEstoqueFiliais}>
                 {estoqueTooltip.filiais.map((f) => (
                   <React.Fragment key={f.filial}>
-                    <span className={styles.tooltipEstoqueFilialNome}>{f.filial}</span>
+                    <span className={styles.tooltipEstoqueFilialNome} title={f.filial.trim()}>
+                      {filialLabelCurta(f.filial)}
+                    </span>
                     <span className={`${styles.tooltipEstoqueFilialQtd}${f.estoque < 0 ? ` ${styles.negative}` : ""}`}>
                       {fmt(f.estoque)}
                     </span>

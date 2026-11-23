@@ -1640,8 +1640,8 @@
     "semantic_hash": "f9f455e79710f72c6b9952301879ebc6"
   },
   "components/stock/CompraSalvaDetalhePage.tsx": {
-    "mtime": 1794330674.9728942,
-    "ast_hash": "d2e1418011163a9209cf5949ee3a8691",
+    "mtime": 1795436792.8843672,
+    "ast_hash": "9c684a23ac0c17629962ddbb3cd6efa6",
     "semantic_hash": ""
   },
   "components/stock/ComprasSalvasListPanel.tsx": {
@@ -5807,6 +5807,11 @@
   "components/faturamento-ecommerce/DevolucaoCard.tsx": {
     "mtime": 1795117495.9535692,
     "ast_hash": "cd1511c52a5721318f639baab76434fd",
+    "semantic_hash": ""
+  },
+  "lib/utils/filial-label-curta.ts": {
+    "mtime": 1795436774.9969594,
+    "ast_hash": "b78401f9b616ac1a5f2f696e17d7dc5c",
     "semantic_hash": ""
   }
 }
