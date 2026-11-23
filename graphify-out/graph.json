@@ -5127,7 +5127,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_aumentos_descontos_route",
-      "community": 521,
+      "community": 512,
       "norm_label": "route.ts"
     },
     {
@@ -5137,7 +5137,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "app_api_aumentos_descontos_route_get",
-      "community": 521,
+      "community": 512,
       "norm_label": "get()"
     },
     {
@@ -10357,7 +10357,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_precos_tarefas_id_executar_route",
-      "community": 96,
+      "community": 10,
       "norm_label": "route.ts"
     },
     {
@@ -10367,7 +10367,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "app_api_precos_tarefas_id_executar_route_post",
-      "community": 96,
+      "community": 10,
       "norm_label": "post()"
     },
     {
@@ -25439,7 +25439,7 @@
       "source_location": "L578",
       "_origin": "ast",
       "id": "components_lista_loja_listalojapage_fetchvendasitemmetricas",
-      "community": 485,
+      "community": 28,
       "norm_label": "fetchvendasitemmetricas()"
     },
     {
@@ -25809,7 +25809,7 @@
       "source_location": "L1459",
       "_origin": "ast",
       "id": "components_lista_loja_listalojapage_getnecessidademinimaqty",
-      "community": 485,
+      "community": 28,
       "norm_label": "getnecessidademinimaqty()"
     },
     {
@@ -45269,7 +45269,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "lib_auth_precos_guard_precos_view_roles",
-      "community": 10,
+      "community": 472,
       "norm_label": "precos_view_roles"
     },
     {
@@ -46719,7 +46719,7 @@
       "source_location": "L482",
       "_origin": "ast",
       "id": "lib_config_company_aggregateestoqueporfilialbydisplaylabel",
-      "community": 485,
+      "community": 28,
       "norm_label": "aggregateestoqueporfilialbydisplaylabel()"
     },
     {
@@ -52649,7 +52649,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_mcp_precos",
-      "community": 10,
+      "community": 472,
       "norm_label": "precos.ts"
     },
     {
@@ -52659,7 +52659,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "lib_mcp_precos_extra",
-      "community": 10,
+      "community": 472,
       "norm_label": "extra"
     },
     {
@@ -52679,7 +52679,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "lib_mcp_precos_acessonegado",
-      "community": 10,
+      "community": 472,
       "norm_label": "acessonegado"
     },
     {
@@ -52689,7 +52689,7 @@
       "source_location": "L54",
       "_origin": "ast",
       "id": "lib_mcp_precos_carregaracesso",
-      "community": 10,
+      "community": 472,
       "norm_label": "carregaracesso()"
     },
     {
@@ -52699,7 +52699,7 @@
       "source_location": "L83",
       "_origin": "ast",
       "id": "lib_mcp_precos_exigir",
-      "community": 10,
+      "community": 472,
       "norm_label": "exigir()"
     },
     {
@@ -52709,7 +52709,7 @@
       "source_location": "L94",
       "_origin": "ast",
       "id": "lib_mcp_precos_falha",
-      "community": 10,
+      "community": 472,
       "norm_label": "falha()"
     },
     {
@@ -52719,7 +52719,7 @@
       "source_location": "L99",
       "_origin": "ast",
       "id": "lib_mcp_precos_rodar",
-      "community": 10,
+      "community": 472,
       "norm_label": "rodar()"
     },
     {
@@ -52729,7 +52729,7 @@
       "source_location": "L108",
       "_origin": "ast",
       "id": "lib_mcp_precos_round2",
-      "community": 10,
+      "community": 472,
       "norm_label": "round2()"
     },
     {
@@ -52739,7 +52739,7 @@
       "source_location": "L110",
       "_origin": "ast",
       "id": "lib_mcp_precos_databr",
-      "community": 10,
+      "community": 472,
       "norm_label": "databr()"
     },
     {
@@ -52749,7 +52749,7 @@
       "source_location": "L121",
       "_origin": "ast",
       "id": "lib_mcp_precos_parsequando",
-      "community": 10,
+      "community": 472,
       "norm_label": "parsequando()"
     },
     {
@@ -52759,7 +52759,7 @@
       "source_location": "L129",
       "_origin": "ast",
       "id": "lib_mcp_precos_resumoresultado",
-      "community": 10,
+      "community": 472,
       "norm_label": "resumoresultado()"
     },
     {
@@ -52769,7 +52769,7 @@
       "source_location": "L141",
       "_origin": "ast",
       "id": "lib_mcp_precos_resumotarefa",
-      "community": 10,
+      "community": 472,
       "norm_label": "resumotarefa()"
     },
     {
@@ -52779,7 +52779,7 @@
       "source_location": "L175",
       "_origin": "ast",
       "id": "lib_mcp_precos_tarefadaempresa",
-      "community": 10,
+      "community": 472,
       "norm_label": "tarefadaempresa()"
     },
     {
@@ -52789,7 +52789,7 @@
       "source_location": "L181",
       "_origin": "ast",
       "id": "lib_mcp_precos_confirmarschema",
-      "community": 10,
+      "community": 472,
       "norm_label": "confirmarschema"
     },
     {
@@ -52799,7 +52799,7 @@
       "source_location": "L185",
       "_origin": "ast",
       "id": "lib_mcp_precos_itemschema",
-      "community": 10,
+      "community": 472,
       "norm_label": "itemschema"
     },
     {
@@ -52809,7 +52809,7 @@
       "source_location": "L196",
       "_origin": "ast",
       "id": "lib_mcp_precos_registerprecostools",
-      "community": 10,
+      "community": 472,
       "norm_label": "registerprecostools()"
     },
     {
@@ -54059,7 +54059,7 @@
       "source_location": "L60",
       "_origin": "ast",
       "id": "lib_precos_lote_misto_reverterlotemisto",
-      "community": 10,
+      "community": 472,
       "norm_label": "reverterlotemisto()"
     },
     {
@@ -54199,7 +54199,7 @@
       "source_location": "L204",
       "_origin": "ast",
       "id": "lib_precos_tarefas_executor_tarefaerro",
-      "community": 96,
+      "community": 10,
       "norm_label": "tarefaerro"
     },
     {
@@ -54209,7 +54209,7 @@
       "source_location": "L205",
       "_origin": "ast",
       "id": "lib_precos_tarefas_executor_tarefaerro_constructor",
-      "community": 96,
+      "community": 10,
       "norm_label": ".constructor()"
     },
     {
@@ -55299,7 +55299,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "lib_reports_enrich_server_enrichresult",
-      "community": 92,
+      "community": 468,
       "norm_label": "enrichresult"
     },
     {
@@ -56079,7 +56079,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_reports_tickets",
-      "community": 92,
+      "community": 13,
       "norm_label": "tickets.ts"
     },
     {
@@ -56119,7 +56119,7 @@
       "source_location": "L68",
       "_origin": "ast",
       "id": "lib_reports_tickets_tickets_presets",
-      "community": 92,
+      "community": 13,
       "norm_label": "tickets_presets"
     },
     {
@@ -56139,7 +56139,7 @@
       "source_location": "L132",
       "_origin": "ast",
       "id": "lib_reports_tickets_ticketsmeta",
-      "community": 92,
+      "community": 13,
       "norm_label": "ticketsmeta"
     },
     {
@@ -57029,7 +57029,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_aumentosdescontos",
-      "community": 521,
+      "community": 512,
       "norm_label": "aumentosdescontos.ts"
     },
     {
@@ -57039,7 +57039,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "lib_repositories_aumentosdescontos_aumentosdescontosfilters",
-      "community": 521,
+      "community": 512,
       "norm_label": "aumentosdescontosfilters"
     },
     {
@@ -57069,7 +57069,7 @@
       "source_location": "L87",
       "_origin": "ast",
       "id": "lib_repositories_aumentosdescontos_aumentosdescontosresult",
-      "community": 521,
+      "community": 512,
       "norm_label": "aumentosdescontosresult"
     },
     {
@@ -57079,7 +57079,7 @@
       "source_location": "L93",
       "_origin": "ast",
       "id": "lib_repositories_aumentosdescontos_up",
-      "community": 521,
+      "community": 512,
       "norm_label": "up()"
     },
     {
@@ -57089,7 +57089,7 @@
       "source_location": "L97",
       "_origin": "ast",
       "id": "lib_repositories_aumentosdescontos_normalizeset",
-      "community": 521,
+      "community": 512,
       "norm_label": "normalizeset()"
     },
     {
@@ -57099,7 +57099,7 @@
       "source_location": "L102",
       "_origin": "ast",
       "id": "lib_repositories_aumentosdescontos_round2",
-      "community": 521,
+      "community": 512,
       "norm_label": "round2()"
     },
     {
@@ -57109,7 +57109,7 @@
       "source_location": "L107",
       "_origin": "ast",
       "id": "lib_repositories_aumentosdescontos_roundint",
-      "community": 521,
+      "community": 512,
       "norm_label": "roundint()"
     },
     {
@@ -57119,7 +57119,7 @@
       "source_location": "L112",
       "_origin": "ast",
       "id": "lib_repositories_aumentosdescontos_fetchaumentosdescontos",
-      "community": 521,
+      "community": 512,
       "norm_label": "fetchaumentosdescontos()"
     },
     {
@@ -57139,7 +57139,7 @@
       "source_location": "L311",
       "_origin": "ast",
       "id": "lib_repositories_aumentosdescontos_aumentosdescontosdetalheresult",
-      "community": 521,
+      "community": 512,
       "norm_label": "aumentosdescontosdetalheresult"
     },
     {
@@ -57149,7 +57149,7 @@
       "source_location": "L320",
       "_origin": "ast",
       "id": "lib_repositories_aumentosdescontos_fetchaumentosdescontosdetalhe",
-      "community": 521,
+      "community": 512,
       "norm_label": "fetchaumentosdescontosdetalhe()"
     },
     {
@@ -57159,7 +57159,7 @@
       "source_location": "L429",
       "_origin": "ast",
       "id": "lib_repositories_aumentosdescontos_ticketitemrow",
-      "community": 521,
+      "community": 512,
       "norm_label": "ticketitemrow"
     },
     {
@@ -57189,7 +57189,7 @@
       "source_location": "L491",
       "_origin": "ast",
       "id": "lib_repositories_aumentosdescontos_aumentosdescontosporticketresult",
-      "community": 521,
+      "community": 512,
       "norm_label": "aumentosdescontosporticketresult"
     },
     {
@@ -57199,7 +57199,7 @@
       "source_location": "L498",
       "_origin": "ast",
       "id": "lib_repositories_aumentosdescontos_fetchaumentosdescontosporticket",
-      "community": 521,
+      "community": 512,
       "norm_label": "fetchaumentosdescontosporticket()"
     },
     {
@@ -60299,7 +60299,7 @@
       "source_location": "L767",
       "_origin": "ast",
       "id": "lib_repositories_controleestoque_controleestoqueparams",
-      "community": 2,
+      "community": 459,
       "norm_label": "controleestoqueparams"
     },
     {
@@ -61209,7 +61209,7 @@
       "source_location": "L311",
       "_origin": "ast",
       "id": "lib_repositories_controlemovimento_controlemovimentoparams",
-      "community": 462,
+      "community": 459,
       "norm_label": "controlemovimentoparams"
     },
     {
@@ -61229,7 +61229,7 @@
       "source_location": "L789",
       "_origin": "ast",
       "id": "lib_repositories_controlemovimento_movimentodetalhesparams",
-      "community": 462,
+      "community": 459,
       "norm_label": "movimentodetalhesparams"
     },
     {
@@ -67369,7 +67369,7 @@
       "source_location": "L2673",
       "_origin": "ast",
       "id": "lib_repositories_products_fetchprodutoscustoprecomestre",
-      "community": 468,
+      "community": 512,
       "norm_label": "fetchprodutoscustoprecomestre()"
     },
     {
@@ -78689,7 +78689,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics",
-      "community": 544,
+      "community": 485,
       "norm_label": "compra-transito-analytics.ts"
     },
     {
@@ -78699,7 +78699,7 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_transitawaresuggestiontype",
-      "community": 544,
+      "community": 485,
       "norm_label": "transitawaresuggestiontype"
     },
     {
@@ -78709,7 +78709,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_transitadjustmentresult",
-      "community": 544,
+      "community": 485,
       "norm_label": "transitadjustmentresult"
     },
     {
@@ -78719,7 +78719,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_transitawaresuggestionview",
-      "community": 544,
+      "community": 485,
       "norm_label": "transitawaresuggestionview"
     },
     {
@@ -78729,7 +78729,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_startoflocalday",
-      "community": 544,
+      "community": 485,
       "norm_label": "startoflocalday()"
     },
     {
@@ -78739,7 +78739,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_normalizedate",
-      "community": 544,
+      "community": 485,
       "norm_label": "normalizedate()"
     },
     {
@@ -78749,7 +78749,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_daysuntil",
-      "community": 544,
+      "community": 485,
       "norm_label": "daysuntil()"
     },
     {
@@ -78759,7 +78759,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_groupentriesbyday",
-      "community": 544,
+      "community": 485,
       "norm_label": "groupentriesbyday()"
     },
     {
@@ -78769,7 +78769,7 @@
       "source_location": "L68",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_computecoveragedeficit",
-      "community": 544,
+      "community": 485,
       "norm_label": "computecoveragedeficit()"
     },
     {
@@ -78779,7 +78779,7 @@
       "source_location": "L94",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_summarizetransitadjustment",
-      "community": 544,
+      "community": 485,
       "norm_label": "summarizetransitadjustment()"
     },
     {
@@ -78789,7 +78789,7 @@
       "source_location": "L170",
       "_origin": "ast",
       "id": "lib_utils_compra_transito_analytics_applytransittosuggestion",
-      "community": 544,
+      "community": 485,
       "norm_label": "applytransittosuggestion()"
     },
     {
@@ -85069,7 +85069,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_utils_necessidade_minima",
-      "community": 485,
+      "community": 28,
       "norm_label": "necessidade-minima.ts"
     },
     {
@@ -85079,7 +85079,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "lib_utils_necessidade_minima_calcnecessidademinimaqty",
-      "community": 485,
+      "community": 28,
       "norm_label": "calcnecessidademinimaqty()"
     },
     {
@@ -85089,7 +85089,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "lib_utils_necessidade_minima_suggestionbasetype",
-      "community": 485,
+      "community": 28,
       "norm_label": "suggestionbasetype"
     },
     {
@@ -85099,7 +85099,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "lib_utils_necessidade_minima_filialnecessidademinimainfo",
-      "community": 485,
+      "community": 28,
       "norm_label": "filialnecessidademinimainfo"
     },
     {
@@ -85109,7 +85109,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "lib_utils_necessidade_minima_calcnecessidademinimaporfilial",
-      "community": 485,
+      "community": 28,
       "norm_label": "calcnecessidademinimaporfilial()"
     },
     {
@@ -85119,7 +85119,7 @@
       "source_location": "L92",
       "_origin": "ast",
       "id": "lib_utils_necessidade_minima_calccoberturaporfilial",
-      "community": 485,
+      "community": 28,
       "norm_label": "calccoberturaporfilial()"
     },
     {
@@ -85139,7 +85139,7 @@
       "source_location": "L171",
       "_origin": "ast",
       "id": "lib_utils_necessidade_minima_perfilialinput",
-      "community": 485,
+      "community": 28,
       "norm_label": "perfilialinput"
     },
     {
@@ -85149,7 +85149,7 @@
       "source_location": "L186",
       "_origin": "ast",
       "id": "lib_utils_necessidade_minima_calctotalperfilialfiliais",
-      "community": 485,
+      "community": 28,
       "norm_label": "calctotalperfilialfiliais()"
     },
     {
@@ -85159,7 +85159,7 @@
       "source_location": "L193",
       "_origin": "ast",
       "id": "lib_utils_necessidade_minima_calctotalperfilialqty",
-      "community": 485,
+      "community": 28,
       "norm_label": "calctotalperfilialqty()"
     },
     {
@@ -85179,7 +85179,7 @@
       "source_location": "L227",
       "_origin": "ast",
       "id": "lib_utils_necessidade_minima_getsuggestionprincipalbadgelabel",
-      "community": 485,
+      "community": 28,
       "norm_label": "getsuggestionprincipalbadgelabel()"
     },
     {
@@ -97042,7 +97042,7 @@
       "label": "Faturar pela Matriz da Scarf Me (18/11/2026)",
       "file_type": "document",
       "source_file": "docs/FATURAMENTO_SHOPIFY_LINX.md",
-      "source_location": "L324",
+      "source_location": "L330",
       "_origin": "ast",
       "id": "docs_faturamento_shopify_linx_faturar_pela_matriz_da_scarf_me_18_11_2026",
       "community": 507,
@@ -97052,7 +97052,7 @@
       "label": "5. Aba SEFAZ \u2014 monitor e envio",
       "file_type": "document",
       "source_file": "docs/FATURAMENTO_SHOPIFY_LINX.md",
-      "source_location": "L360",
+      "source_location": "L366",
       "_origin": "ast",
       "id": "docs_faturamento_shopify_linx_5_aba_sefaz_monitor_e_envio",
       "community": 507,
@@ -97062,7 +97062,7 @@
       "label": "Como o Linx envia de verdade",
       "file_type": "document",
       "source_file": "docs/FATURAMENTO_SHOPIFY_LINX.md",
-      "source_location": "L362",
+      "source_location": "L368",
       "_origin": "ast",
       "id": "docs_faturamento_shopify_linx_como_o_linx_envia_de_verdade",
       "community": 507,
@@ -97072,7 +97072,7 @@
       "label": "STATUS_NFE",
       "file_type": "document",
       "source_file": "docs/FATURAMENTO_SHOPIFY_LINX.md",
-      "source_location": "L375",
+      "source_location": "L381",
       "_origin": "ast",
       "id": "docs_faturamento_shopify_linx_status_nfe",
       "community": 507,
@@ -97082,7 +97082,7 @@
       "label": "Fase 1 (fazer j\u00e1, seguro)",
       "file_type": "document",
       "source_file": "docs/FATURAMENTO_SHOPIFY_LINX.md",
-      "source_location": "L389",
+      "source_location": "L395",
       "_origin": "ast",
       "id": "docs_faturamento_shopify_linx_fase_1_fazer_j\u00e1_seguro",
       "community": 507,
@@ -97092,7 +97092,7 @@
       "label": "Contrato da Fiscal Flow (descoberto em 17/11/2026, nos arquivos do Linx desktop)",
       "file_type": "document",
       "source_file": "docs/FATURAMENTO_SHOPIFY_LINX.md",
-      "source_location": "L399",
+      "source_location": "L405",
       "_origin": "ast",
       "id": "docs_faturamento_shopify_linx_contrato_da_fiscal_flow_descoberto_em_17_11_2026_nos_arquivos_do_linx_desktop",
       "community": 507,
@@ -97102,7 +97102,7 @@
       "label": "Envio pelo dashboard \u2014 implementado (17/11/2026)",
       "file_type": "document",
       "source_file": "docs/FATURAMENTO_SHOPIFY_LINX.md",
-      "source_location": "L425",
+      "source_location": "L431",
       "_origin": "ast",
       "id": "docs_faturamento_shopify_linx_envio_pelo_dashboard_implementado_17_11_2026",
       "community": 507,
@@ -97112,7 +97112,7 @@
       "label": "6. Implementado (17/11/2026)",
       "file_type": "document",
       "source_file": "docs/FATURAMENTO_SHOPIFY_LINX.md",
-      "source_location": "L461",
+      "source_location": "L467",
       "_origin": "ast",
       "id": "docs_faturamento_shopify_linx_6_implementado_17_11_2026",
       "community": 507,
@@ -97122,7 +97122,7 @@
       "label": "Fluxo cont\u00ednuo + importa\u00e7\u00e3o do Shopify (17/11/2026)",
       "file_type": "document",
       "source_file": "docs/FATURAMENTO_SHOPIFY_LINX.md",
-      "source_location": "L490",
+      "source_location": "L496",
       "_origin": "ast",
       "id": "docs_faturamento_shopify_linx_fluxo_cont\u00ednuo_importa\u00e7\u00e3o_do_shopify_17_11_2026",
       "community": 507,
@@ -395499,7 +395499,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "docs/FATURAMENTO_SHOPIFY_LINX.md",
-      "source_location": "L360",
+      "source_location": "L366",
       "weight": 1.0,
       "source": "docs_faturamento_shopify_linx_faturamento_shopify_linx_nf_e_de_e_commerce",
       "target": "docs_faturamento_shopify_linx_5_aba_sefaz_monitor_e_envio",
@@ -395509,7 +395509,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "docs/FATURAMENTO_SHOPIFY_LINX.md",
-      "source_location": "L461",
+      "source_location": "L467",
       "weight": 1.0,
       "source": "docs_faturamento_shopify_linx_faturamento_shopify_linx_nf_e_de_e_commerce",
       "target": "docs_faturamento_shopify_linx_6_implementado_17_11_2026",
@@ -395569,7 +395569,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "docs/FATURAMENTO_SHOPIFY_LINX.md",
-      "source_location": "L324",
+      "source_location": "L330",
       "weight": 1.0,
       "source": "docs_faturamento_shopify_linx_4_aba_faturamento_gravar_a_nf_equivalente_ao_100101spk",
       "target": "docs_faturamento_shopify_linx_faturar_pela_matriz_da_scarf_me_18_11_2026",
@@ -395619,7 +395619,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "docs/FATURAMENTO_SHOPIFY_LINX.md",
-      "source_location": "L362",
+      "source_location": "L368",
       "weight": 1.0,
       "source": "docs_faturamento_shopify_linx_5_aba_sefaz_monitor_e_envio",
       "target": "docs_faturamento_shopify_linx_como_o_linx_envia_de_verdade",
@@ -395629,7 +395629,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "docs/FATURAMENTO_SHOPIFY_LINX.md",
-      "source_location": "L399",
+      "source_location": "L405",
       "weight": 1.0,
       "source": "docs_faturamento_shopify_linx_5_aba_sefaz_monitor_e_envio",
       "target": "docs_faturamento_shopify_linx_contrato_da_fiscal_flow_descoberto_em_17_11_2026_nos_arquivos_do_linx_desktop",
@@ -395639,7 +395639,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "docs/FATURAMENTO_SHOPIFY_LINX.md",
-      "source_location": "L425",
+      "source_location": "L431",
       "weight": 1.0,
       "source": "docs_faturamento_shopify_linx_5_aba_sefaz_monitor_e_envio",
       "target": "docs_faturamento_shopify_linx_envio_pelo_dashboard_implementado_17_11_2026",
@@ -395649,7 +395649,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "docs/FATURAMENTO_SHOPIFY_LINX.md",
-      "source_location": "L389",
+      "source_location": "L395",
       "weight": 1.0,
       "source": "docs_faturamento_shopify_linx_5_aba_sefaz_monitor_e_envio",
       "target": "docs_faturamento_shopify_linx_fase_1_fazer_j\u00e1_seguro",
@@ -395659,7 +395659,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "docs/FATURAMENTO_SHOPIFY_LINX.md",
-      "source_location": "L375",
+      "source_location": "L381",
       "weight": 1.0,
       "source": "docs_faturamento_shopify_linx_5_aba_sefaz_monitor_e_envio",
       "target": "docs_faturamento_shopify_linx_status_nfe",
@@ -395669,7 +395669,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "docs/FATURAMENTO_SHOPIFY_LINX.md",
-      "source_location": "L490",
+      "source_location": "L496",
       "weight": 1.0,
       "source": "docs_faturamento_shopify_linx_6_implementado_17_11_2026",
       "target": "docs_faturamento_shopify_linx_fluxo_cont\u00ednuo_importa\u00e7\u00e3o_do_shopify_17_11_2026",

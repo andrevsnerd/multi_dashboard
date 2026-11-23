@@ -4640,8 +4640,8 @@
     "semantic_hash": ""
   },
   "components/produto-novo/CadastrarProdutoPage.tsx": {
-    "mtime": 1790878039.3550227,
-    "ast_hash": "d2da64138e52f2fba8e5bc9f56508c22",
+    "mtime": 1795452280.5398493,
+    "ast_hash": "a65430bb26f859502f2af845a2b0f72d",
     "semantic_hash": ""
   },
   "lib/repositories/produtoNovo.ts": {
@@ -5675,8 +5675,8 @@
     "semantic_hash": ""
   },
   "lib/repositories/faturamentoEcommerce/notas.ts": {
-    "mtime": 1795450042.094069,
-    "ast_hash": "b4f65faa4c35d459c77328bfc6a67f61",
+    "mtime": 1795452062.447958,
+    "ast_hash": "d6c6a1e26a48e42b8ce6af546b3538d1",
     "semantic_hash": ""
   },
   "docs/FATURAMENTO_SHOPIFY_LINX.md": {
