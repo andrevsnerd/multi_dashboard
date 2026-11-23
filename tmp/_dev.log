@@ -156,3 +156,42 @@ C:\NERD\multi_dashboard\node_modules\next\dist\server\lib\start-server.js: Inval
 ✅ Conectado em 177.92.78.250
 ✅ Conectado em 177.92.78.250
  POST /api/controle-estoque/metricas-itens 200 in 3.1s (compile: 707ms, render: 2.4s)
+ POST /api/controle-estoque/metricas-itens 200 in 2.9s (compile: 120ms, render: 2.8s)
+ ○ Compiling /api/controle-estoque/estoque-por-tamanho-item ...
+ GET /api/controle-estoque/estoque-por-tamanho-item?company=scarfme&produto=97.94.0175&corProduto=03 200 in 3.6s (compile: 3.3s, render: 271ms)
+ GET /api/controle-estoque/estoque-por-tamanho-item?company=scarfme&produto=97.94.0175&corProduto=03 200 in 400ms (compile: 9ms, render: 391ms)
+ POST /api/controle-estoque/metricas-itens 200 in 2.5s (compile: 14ms, render: 2.5s)
+ ○ Compiling /[company]/produto-detalhado ...
+ GET /nerd/produto-detalhado 200 in 4.4s (compile: 3.7s, render: 741ms)
+ GET /nerd/alterar-precos 200 in 1941ms (compile: 1876ms, render: 65ms)
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+[DB] Servidores na rotação: 177.92.78.250 → 189.126.197.82
+🔌 Tentando conectar em 177.92.78.250...
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+✅ Conectado em 177.92.78.250
+ GET /api/precos/opcoes?company=nerd 200 in 1789ms (compile: 1029ms, render: 760ms)
+ GET /api/precos/opcoes?company=nerd 200 in 1808ms (compile: 1000ms, render: 808ms)
+ GET /api/precos/historico?company=nerd 200 in 2.0s (compile: 1132ms, render: 896ms)
+ GET /api/precos/historico?company=nerd 200 in 2.0s (compile: 1116ms, render: 923ms)
+ POST /api/precos/produtos 200 in 735ms (compile: 358ms, render: 378ms)
+ POST /api/precos/produtos 200 in 327ms (compile: 6ms, render: 321ms)
+ POST /api/precos/executar 200 in 857ms (compile: 468ms, render: 389ms)
+ GET /api/precos/historico?company=nerd 200 in 207ms (compile: 11ms, render: 195ms)
+ POST /api/precos/produtos 200 in 384ms (compile: 36ms, render: 349ms)
+ POST /api/precos/produtos 200 in 288ms (compile: 6ms, render: 282ms)
+ ○ Compiling / ...
+ GET / 200 in 5.4s (compile: 4.8s, render: 582ms)
+ POST /api/precos/executar 200 in 686ms (compile: 14ms, render: 672ms)

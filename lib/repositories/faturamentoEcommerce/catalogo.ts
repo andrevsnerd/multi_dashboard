@@ -147,6 +147,7 @@ export async function fetchCatalogoNotas(empresa: EmpresaFat, opts: { semCache?:
           descricao: ls.find((l) => l.descr)?.descr ?? "",
           tipoOperacao: ls.find((l) => l.tipoOp)?.tipoOp ?? "",
           nfs: ls.reduce((s, l) => s + l.n, 0),
+          nfsMaterial: ls.filter((l) => Number(l.prod) === 0).reduce((s, l) => s + l.n, 0),
           // NF para filial do grupo só grava quando a natureza estiver validada PARA esse destino.
           validada: destino === "filial" ? naturezaValidadaFilial(simplesDoGrupo(g), nat) : naturezaValidada(simplesDoGrupo(g), nat),
           destino,

@@ -289,12 +289,36 @@ a mais comum por padrão, as outras disponíveis. Fases: 1 vendas sem pedido · 
 - **Naturezas além da venda** (19/11/2026): liberadas 100.71, 109.01, 128.01, 131.01, 137.01 (NFs
   desde 24/10 idênticas) e 107.01, 133.01, 135.01, 145.10, 199.02, 199.10, 134.20 (só NFs antigas:
   tudo o que não depende da exceção fiscal bateu; a prévia pede conferência no Linx antes da SEFAZ).
-  **Fora da página**: remessa de **material** (130.01, parte da 199.10 — sai de ESTOQUE_SAI1_MAT,
-  estoque de materiais), **devoluções** (117.11/150.01/150.02 — saem de romaneio ESTOQUE_PROD_SAI,
-  FIN_EMISSAO 4, FATURAMENTO_ENTRADA_DEVOLUCAO ligando cada item à NF de compra) e **100.08**
-  (abastecimento das lojas: tudo bate menos o ICMS de alguns itens em 24 de 60 NFs, que difere 1–2
-  centavos da conta item a item sem regra única encontrada — catálogo "destino filial" e tabela 97
-  já prontos, liberação em NATUREZAS_VALIDADAS_FILIAL quando fechar).
+- **Arredondamento** (23/11/2026): meio centavo vai para longe do zero, como o SQL do Linx. Em JS o
+  `Math.round(x * 100)` errava casos exatos (29,625 → 29,62; Linx 29,63 — NF 10164); o gravador usa
+  `toPrecision(15)` antes de arredondar.
+- **IBS/CBS no Simples**: base = item − desconto (agrega após desconto) + frete/seguro (após encargo),
+  com a redução da exceção — quase todas as exceções do Simples têm redução 100 (zeram); as sem
+  redução (1203, 1277 criada em 18/11) gravam a base líquida (NF 10252: 128 − 6,40 + 9,90 = 131,50).
+- **Devolução de compra** (117.11, 23/11/2026): a NF nasce de um romaneio "DEVOLUCAO ENTRADA"
+  (ESTOQUE_PROD_SAI/PROD1_SAI com SA_n — é ele que baixa o estoque pelo trigger; CM_OPERACAO 017),
+  sem pedido nem FATURAMENTO_PROD; TABELA_FILHA ESTOQUE_PROD_SAI, FIN_EMISSAO_NFE 4, sem
+  representante, COD_TRANSACAO 033; OBS "Notas de devolução relacionada a(s) nota(s) de entrada…";
+  itens na ordem do código, preço da entrada com até 5 casas, REFERENCIA_PEDIDO = NF de entrada;
+  FATURAMENTO_ENTRADA_DEVOLUCAO por item (o trigger soma ENTRADAS_ITEM.QTDE_DEVOLVIDA). **Impostos
+  = os da NF do fornecedor** — o Linx não guarda o XML dele e a exceção de devolução zera tudo; a
+  tela pede as alíquotas e sugere as bases (ICMS/IBS/CBS = item + frete da entrada; IPI = item;
+  PIS/COFINS = base ICMS + IPI; alíquota 0 → base 0); o IPI soma ao total. O centavo do fornecedor
+  às vezes arredonda, às vezes trunca: dá para ajustar por item. 3/3 NFs da NERD refeitas (só
+  descrição renomeada / exceção antiga). Entrada agrupada só por produto (sem cor) fica no Linx.
+  TIMESTAMP do item = preço codificado com 5 casas (o "111" final era a codificação dos zeros).
+- **NF de material** (130.01, 199.10 de material, 23/11/2026): itens avulsos do cadastro MATERIAIS
+  (COD_TABELA_FILHA T, ORIGEM_ITEM M, SUB_ITEM 0, REFERENCIA nula, RATEIO_CENTRO_CUSTO do item nulo,
+  CEST = MATERIAIS.ID_CEST_NCM, indicador CFOP do material, COD_FILHA "M" na exceção), descrição da
+  NF editável, quantidade com até 3 casas, ordem digitada, AGRUPAMENTO 1, COD_TRANSACAO 026,
+  TABELA_FILHA ESTOQUE_SAI1_MAT — **sem estoque** (as NFs reais não têm saída de material ligada) e
+  sem pedido. 130.01: 4/4 desde 24/10, 71/80 desde 2025; 199.10: 52/54.
+- **Fora da página**: **100.08** (abastecimento das lojas). Tudo bate (tabela 97, linhas repetidas,
+  catálogo "destino filial") menos o ICMS de alguns itens em ~40% das NFs: o valor real chega a ficar
+  acima até do arredondamento da conta exata (NF 43669: 19,99 × 12% = 2,3988, gravado 2,41) — só
+  explicável por preço alterado depois do cálculo. A LX_GERA_IMPOSTOS_SAIDA (arredonda) reproduz
+  algumas, mas não todas; nenhuma regra fecha. Liberação em NATUREZAS_VALIDADAS_FILIAL se fechar.
+  Também fora: devolução de material (117.11/150.0x da Matriz) e 150.01 de produto (sem NF recente).
 - **Conferência em massa** (replay pelo código, ROLLBACK; no teste o estoque negativo é liberado
   dentro da transação): diferenças restantes são (a) dado de produto alterado depois da NF
   (indicador CFOP por filial criado depois; versão/alíquota da tabela IBPT atualizada), (b) recálculo

@@ -12,6 +12,7 @@ import type {
   DevolucaoPreviewItem,
   EntradaDevolvivel,
   ImpostoInformado,
+  MaterialFatOpcao,
   NotaCriada,
   NotaDetalhe,
   NotaInput,
@@ -45,7 +46,12 @@ const COLECAO_PEDIDO = "62";
 const MAX_GRADE = 48;
 
 const trim = (s: unknown) => String(s ?? "").trim();
-const round2 = (n: number) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+// Arredonda como o SQL/Linx: meio centavo para longe do zero. toPrecision(15) desfaz o erro do
+// ponto flutuante (29,625 × 100 = 2962,4999… em binário dava 29,62; o Linx grava 29,63 — NF 10164).
+const round2 = (n: number) => {
+  const x = Number(n);
+  return (x < 0 ? -1 : 1) * (Math.round(Number((Math.abs(x) * 100).toPrecision(15))) / 100);
+};
 const trunc2 = (n: number) => Math.floor(Number(n) * 100 + 1e-7) / 100;
 const iso = (d: unknown) => (d ? new Date(d as string).toISOString() : null);
 
@@ -65,6 +71,30 @@ type Req = sql.Request;
  * Busca por código de barras (exato), código do produto (exato) ou descrição.
  * Devolve uma opção por produto × cor × tamanho, com preço da tabela e estoque da filial.
  */
+/** Material ativo por código ou descrição (NF de material: remessa p/ industrialização etc.). */
+export async function buscarMateriaisFat(termo: string): Promise<MaterialFatOpcao[]> {
+  const t = trim(termo).toUpperCase();
+  if (t.length < 2) return [];
+  return withRequest(async (request: sql.Request | RequestLike) => {
+    const req = request as Req;
+    req.input("termo", sql.VarChar(30), t);
+    req.input("like", sql.VarChar(60), `%${t}%`);
+    const r = await req.query(`
+      SELECT TOP 40 LTRIM(RTRIM(MATERIAL)) AS material, LTRIM(RTRIM(ISNULL(NULLIF(DESC_NF, ''), DESC_MATERIAL))) AS descricao,
+             LTRIM(RTRIM(UNID_ESTOQUE)) AS unidade, LTRIM(RTRIM(CLASSIF_FISCAL)) AS ncm
+        FROM MATERIAIS WITH (NOLOCK)
+       WHERE ISNULL(INATIVO, 0) = 0
+         AND (MATERIAL = @termo OR MATERIAL LIKE @termo + '%' OR (LEN(@termo) >= 3 AND DESC_MATERIAL COLLATE Latin1_General_CI_AI LIKE @like))
+       ORDER BY CASE WHEN MATERIAL = @termo THEN 0 ELSE 1 END, MATERIAL`);
+    return (r.recordset as Record<string, unknown>[]).map((x) => ({
+      material: trim(x.material),
+      descricao: trim(x.descricao),
+      unidade: trim(x.unidade),
+      ncm: trim(x.ncm),
+    }));
+  });
+}
+
 export async function buscarProdutosFat(params: {
   termo: string;
   filial: string;
@@ -404,7 +434,7 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
   const descricaoMaterial = new Map<string, string>();
   if (ehMaterial) {
     itensDigitados = (input.materiais ?? []).map((m, i) => {
-      if (trim(m.descricao)) descricaoMaterial.set(`L${i}`, trim(m.descricao).replace(/\s+/g, " ").slice(0, 80));
+      if (trim(m.descricao)) descricaoMaterial.set(`L${i}`, trim(m.descricao).slice(0, 80));
       return { produto: trim(m.material), cor: "", tamanho: 0, qtde: Number(m.qtde) || 0, preco: Number(m.preco) || 0, linha: i };
     });
   }
@@ -468,7 +498,7 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
       ? await q(req, `
       SELECT LTRIM(RTRIM(M.MATERIAL)) AS produto, LTRIM(RTRIM(ISNULL(NULLIF(M.DESC_NF, ''), M.DESC_MATERIAL))) AS descNf,
              LTRIM(RTRIM(M.CLASSIF_FISCAL)) AS ncm, LTRIM(RTRIM(M.UNID_ESTOQUE)) AS unidade,
-             LTRIM(RTRIM(M.CONTA_CONTABIL)) AS conta, LTRIM(RTRIM(M.TRIBUT_ORIGEM)) AS origem,
+             LTRIM(RTRIM(${tipoNatureza === "V" ? "ISNULL(NULLIF(M.CONTA_CONTABIL_VENDA, ''), M.CONTA_CONTABIL)" : "M.CONTA_CONTABIL"})) AS conta, LTRIM(RTRIM(M.TRIBUT_ORIGEM)) AS origem,
              M.ID_CEST_NCM AS cest, ISNULL(M.CUSTO_REPOSICAO, 0) AS custo, M.INDICADOR_CFOP AS indCfop,
              '' AS descCor, '' AS tamLabel, NULL AS estoque, ISNULL(M.INATIVO, 0) AS inativo
         FROM MATERIAIS M WITH (NOLOCK)
@@ -670,7 +700,8 @@ async function montarPlano(request: sql.Request | RequestLike, input: NotaInput)
       tamanhoLabel: tamLabel,
       codigoItem,
       // Material: a descrição da NF do cadastro, ou a digitada (o operador costuma completar, ex. "COD 040272").
-      descricao: (descricaoMaterial.get(a.linha) ?? `${descNf} ${descCor} ${tamLabel}`).replace(/\s+/g, " ").trim().slice(0, 80),
+      // A digitada vai como está (o Linx guarda até os espaços duplos: "CAIXINHA DE  TWILLY").
+      descricao: descricaoMaterial.get(a.linha) ?? `${descNf} ${descCor} ${tamLabel}`.replace(/\s+/g, " ").trim().slice(0, 80),
       qtde: a.qtde,
       preco: a.preco,
       valor: round2(a.preco * a.qtde),
@@ -1254,9 +1285,12 @@ function valorImposto(l: LinhaFiscal, t: LinhaFiscal["impostos"][number], aliqDe
     const base = l.valor - l.desconto + l.frete + l.seguro;
     return { taxa: 0, base: 0, valor: aliqDestino > 0 ? trunc2((base * aliqDestino) / 100) : 0 };
   }
-  // IBS/CBS e afins com alíquota fixa e sem redução total: base = valor do item.
+  // IBS/CBS e afins com alíquota fixa e sem redução total: base = item − desconto (se agrega após
+  // desconto) + frete/seguro (se após encargo), como marca a exceção (1277/1203: base líquida —
+  // NF 10252 de 23/11: 128 − 6,40 + 9,90 = 131,50). As exceções do Simples com redução 100 zeram.
   if (t.reducao < 100 && t.fixa && t.aliquotaTipo > 0) {
-    const base = round2((l.valor * (100 - t.reducao)) / 100);
+    const bruta = l.valor - (t.agregaDesconto ? l.desconto : 0) + (t.agregaEncargo ? l.frete + l.seguro : 0);
+    const base = round2((bruta * (100 - t.reducao)) / 100);
     return { taxa: t.aliquotaTipo, base, valor: round2((base * t.aliquotaTipo) / 100) };
   }
   return { taxa: t.taxa, base: 0, valor: 0 };
@@ -1398,7 +1432,7 @@ function montarBatch(p: Plano, cNF: string, final: "commit" | "rollback" | "debu
   // a retornar = a do item (QTDE_RETORNAR_BENEFICIAMENTO; todas as NFs desde 2025, menos 4 editadas).
   const qtdeRetornar = (l: LinhaFiscal) => (p.tipoNatureza === "R" ? l.qtde : 0);
   // Agrupamentos 3–5 ("por pedido"): nº do pedido (gerado aqui no batch) na frente do código e da descrição.
-  const porPedido = p.agrupamento >= 3;
+  const porPedido = p.agrupamento >= 3 && !semPedido; // sem pedido (material, devolução) não há prefixo
   const codigoItemSql = (l: LinhaFiscal) => (porPedido ? `RTRIM(@PEDIDO) + ${lit(l.codigoItem)}` : lit(l.codigoItem));
   const descricaoItemSql = (l: LinhaFiscal) =>
     porPedido ? `LEFT(RTRIM(@PEDIDO) + ' ' + ${lit(l.descricao)}, 80)` : lit(l.descricao);

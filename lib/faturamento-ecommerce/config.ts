@@ -266,6 +266,7 @@ export const NATUREZAS_VALIDADAS: Record<"simples" | "normal", Record<string, st
   },
   normal: {
     "100.05": "336/336 linhas de imposto das NFs da Matriz desde 24/10 (19/11/2026)",
+    "130.01": "remessa p/ industrialização (material): 4/4 NFs desde 24/10 e 53/60 desde 2025 idênticas (23/11/2026)",
     "100.71": "exportação: 2/2 NFs da Matriz desde 24/10 idênticas (19/11/2026)",
     "109.01": "venda c/ entrega à ordem: 1/1 NF desde 24/10 idêntica (19/11/2026)",
     "128.01": "bonificação/brinde: 5/5 NFs desde 24/10 idênticas (19/11/2026)",

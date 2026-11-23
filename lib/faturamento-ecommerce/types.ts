@@ -294,6 +294,14 @@ export interface NotaInput {
   responsavel?: string;
 }
 
+/** Material encontrado na busca (cadastro MATERIAIS). */
+export interface MaterialFatOpcao {
+  material: string;
+  descricao: string;
+  unidade: string;
+  ncm: string;
+}
+
 /** Material de uma NF de material (código do cadastro MATERIAIS). */
 export interface MaterialItemInput {
   material: string;
@@ -381,6 +389,8 @@ export interface NaturezaCatalogo {
   tipoOperacao: string;
   nfs: number;
   validada: boolean;
+  /** NFs de material (itens avulsos do cadastro de materiais) desta natureza — 130.01 é só material. */
+  nfsMaterial: number;
   /**
    * NF para loja/filial do próprio grupo (abastecimento, 100.08) ou para cliente. A mesma natureza
    * pode aparecer nos dois destinos, cada um com seus padrões; o padrão do cliente nunca é

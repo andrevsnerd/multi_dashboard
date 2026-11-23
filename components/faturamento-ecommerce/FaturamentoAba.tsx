@@ -17,6 +17,7 @@ import type {
 
 import { dataLocal, fmtBRL, fmtData, fmtDoc, useFatApi } from "./api";
 import DevolucaoCard, { DEVOLUCAO_VAZIA, chaveItemEntrada, type DevolucaoTela } from "./DevolucaoCard";
+import MateriaisCard, { materialNum, type MaterialTela } from "./MateriaisCard";
 import NotaDetalheModal from "./NotaDetalheModal";
 import styles from "./FaturamentoEcommerce.module.css";
 
@@ -155,6 +156,9 @@ function NovaNota({
   const [agrupamento, setAgrupamento] = useState<0 | 1 | 2 | 3 | 4 | 5>(2);
   // Devolução de compra (natureza tipo D): NF de entrada escolhida, quantidades e impostos do fornecedor.
   const [dev, setDev] = useState<DevolucaoTela>(DEVOLUCAO_VAZIA);
+  // NF de material (itens avulsos do cadastro de materiais): escolha do tipo de item e os materiais.
+  const [materiais, setMateriais] = useState<MaterialTela[]>([]);
+  const [tipoItemManual, setTipoItemManual] = useState<"produto" | "material" | null>(null);
 
   const [codigoCliente, setCodigoCliente] = useState("");
   const [erroCliente, setErroCliente] = useState<string | null>(null);
@@ -205,6 +209,11 @@ function NovaNota({
   }
   const pd = naturezaInfo?.padroes;
   const ehDevolucao = naturezaInfo?.tipoOperacao === "D";
+  // Material: natureza que a filial já usou com materiais (130.01 só material; 199.10 os dois). Padrão =
+  // o mais comum nas NFs reais dela; dá para trocar.
+  const nfsMaterial = naturezaInfo?.nfsMaterial ?? 0;
+  const tipoItemAuto: "produto" | "material" = naturezaInfo && nfsMaterial * 2 > naturezaInfo.nfs ? "material" : "produto";
+  const ehMaterial = !ehDevolucao && (tipoItemManual ?? tipoItemAuto) === "material";
 
   const nota: NotaInput = useMemo(
     () => ({
@@ -230,7 +239,10 @@ function NovaNota({
       tipoVolume,
       infoPgto,
       obs: obs === "#" ? "" : obs,
-      itens: ehDevolucao ? [] : itens.map((i) => ({ produto: i.produto, cor: i.cor, tamanho: i.tamanho, qtde: i.qtde, preco: i.preco, obs: i.obs ?? "" })),
+      materiais: ehMaterial
+        ? materiais.map((m) => ({ material: m.material, descricao: m.descricao, qtde: materialNum(m.qtde), preco: materialNum(m.preco) }))
+        : undefined,
+      itens: ehDevolucao || ehMaterial ? [] : itens.map((i) => ({ produto: i.produto, cor: i.cor, tamanho: i.tamanho, qtde: i.qtde, preco: i.preco, obs: i.obs ?? "" })),
       devolucao:
         ehDevolucao && dev.entrada
           ? {
@@ -246,9 +258,10 @@ function NovaNota({
           : undefined,
       confirmarDuplicidade: confirmarDup,
       consumidorFinal,
-      agrupamento,
+      // NF de material: o Linx grava agrupamento 1 (187 de 206 NFs 130.01 desde 2025).
+      agrupamento: ehMaterial ? 1 : agrupamento,
     }),
-    [empresa, filial, natureza, cliente, condicao, tipoFrete, transp, redesp, frete, seguro, descModo, desc, descCondModo, descCond, pesoLiq, pesoBruto, volumes, tipoVolume, infoPgto, obs, itens, confirmarDup, consumidorFinal, agrupamento, ehDevolucao, dev]
+    [empresa, filial, natureza, cliente, condicao, tipoFrete, transp, redesp, frete, seguro, descModo, desc, descCondModo, descCond, pesoLiq, pesoBruto, volumes, tipoVolume, infoPgto, obs, itens, confirmarDup, consumidorFinal, agrupamento, ehDevolucao, dev, ehMaterial, materiais]
   );
   const assinatura = JSON.stringify(nota);
   const previaValida = previa !== null && previaAssinatura === assinatura;
@@ -656,7 +669,27 @@ function NovaNota({
           previaItens={previa?.devolucao?.itens ?? null}
         />
       ) : (
-        <ItensCard empresa={empresa} filial={filial} itens={itens} setItens={setItens} tabela={cliente?.codigoTabPreco || pd?.tabPreco || "01"} />
+        <>
+          {(nfsMaterial > 0 || tipoItemManual === "material") && (
+            <div className={styles.linhaBusca} style={{ margin: "8px 0" }}>
+              <span className={styles.label}>Itens desta NF:</span>
+              <select
+                className={styles.select}
+                style={{ maxWidth: 260 }}
+                value={ehMaterial ? "material" : "produto"}
+                onChange={(e) => setTipoItemManual(e.target.value as "produto" | "material")}
+              >
+                <option value="produto">Produtos (baixa estoque)</option>
+                <option value="material">Materiais (item avulso, sem estoque)</option>
+              </select>
+            </div>
+          )}
+          {ehMaterial ? (
+            <MateriaisCard empresa={empresa} itens={materiais} setItens={setMateriais} />
+          ) : (
+            <ItensCard empresa={empresa} filial={filial} itens={itens} setItens={setItens} tabela={cliente?.codigoTabPreco || pd?.tabPreco || "01"} />
+          )}
+        </>
       )}
 
       {/* Conferência */}
@@ -664,7 +697,7 @@ function NovaNota({
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle}>Conferir e gravar</h2>
           <div className={styles.acoes}>
-            <button type="button" className={styles.btn} onClick={conferir} disabled={!cliente || (ehDevolucao ? !nota.devolucao?.itens.length : itens.length === 0) || processando !== null}>
+            <button type="button" className={styles.btn} onClick={conferir} disabled={!cliente || (ehDevolucao ? !nota.devolucao?.itens.length : ehMaterial ? materiais.length === 0 : itens.length === 0) || processando !== null}>
               {processando === "previa" ? "Conferindo…" : "Conferir NF"}
             </button>
             {podeGravar && (

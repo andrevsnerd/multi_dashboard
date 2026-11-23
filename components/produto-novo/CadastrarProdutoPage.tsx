@@ -10,7 +10,7 @@
  *    cada campo diz de onde veio. Tudo continua editável; o que o usuário mexe
  *    à mão não é sobrescrito quando o grupo muda;
  *  • "usar como modelo" copia a ficha de um produto existente (a capa do
- *    iPhone anterior, por exemplo) — inclusive as cores e o preço;
+ *    iPhone anterior, por exemplo) — inclusive as cores; o preço NÃO (só referência);
  *  • preço: só venda (tabela padrão) e custo — as demais tabelas o próprio
  *    Linx deriva, e a tela mostra quais e com que valor;
  *  • fiscal/contábil fica recolhido: é igual em quase todo produto.
@@ -314,6 +314,8 @@ export default function CadastrarProdutoPage({ companyKey }: Props) {
 
   const [codigoModelo, setCodigoModelo] = useState("");
   const [modeloAplicado, setModeloAplicado] = useState<string | null>(null);
+  /** Preço do modelo / do produto anterior — só REFERÊNCIA ao lado do campo, nunca pré-preenchido. */
+  const [precoReferencia, setPrecoReferencia] = useState<{ origem: string; venda: number; custo: number } | null>(null);
   const [carregandoModelo, setCarregandoModelo] = useState(false);
 
   const [salvando, setSalvando] = useState<"gravar" | "ensaio" | null>(null);
@@ -490,8 +492,16 @@ export default function CadastrarProdutoPage({ companyKey }: Props) {
       setNfIgualNome(true);
       setOrigens(novasOrigens);
       setCores(modelo.cores.map((c) => ({ cor: c.cor, descCor: c.descCor })));
-      setVenda(modelo.venda ? modelo.venda.toFixed(2).replace(".", ",") : "");
-      setCusto(modelo.custo ? modelo.custo.toFixed(2).replace(".", ",") : "");
+      // Preço NÃO é copiado: produto novo herdando a venda do modelo era esquecido no
+      // cadastro e corrigido depois direto no Linx, que muda só o PRECO1 e deixa o
+      // PRECO_LIQUIDO1 (o que o caixa cobra) com o preço do modelo (VOLT, 17/11/2026).
+      setVenda("");
+      setCusto("");
+      setPrecoReferencia(
+        modelo.venda || modelo.custo
+          ? { origem: `modelo ${modelo.produto}`, venda: modelo.venda ?? 0, custo: modelo.custo ?? 0 }
+          : null
+      );
       setModeloAplicado(`${modelo.produto} ${modelo.descProduto}`);
       setResultado(null);
       setErro(null);
@@ -535,6 +545,7 @@ export default function CadastrarProdutoPage({ companyKey }: Props) {
     setCores([]);
     setVenda("");
     setCusto("");
+    setPrecoReferencia(null);
     setObs("");
     setModeloAplicado(null);
     setResultado(null);
@@ -543,12 +554,22 @@ export default function CadastrarProdutoPage({ companyKey }: Props) {
 
   /** Depois de gravar: mantém a ficha (próxima capa do mesmo jeito) e limpa o que muda. */
   const cadastrarOutroParecido = useCallback(() => {
+    const vendaAnterior = parseDinheiro(venda);
+    const custoAnterior = parseDinheiro(custo);
     setCampos((c) => ({ ...c, descProduto: "", descProdNf: "", referFabricante: "" }));
     setNfIgualNome(true);
+    // Preço é por produto: limpa e deixa o anterior só como referência (ver aplicarModelo).
+    setVenda("");
+    setCusto("");
+    setPrecoReferencia(
+      vendaAnterior || custoAnterior
+        ? { origem: "produto anterior", venda: vendaAnterior ?? 0, custo: custoAnterior ?? 0 }
+        : null
+    );
     setResultado(null);
     setErro(null);
     setObs("");
-  }, []);
+  }, [venda, custo]);
 
   /* ── opções dos selects ───────────────────────────────────────────── */
 
@@ -815,8 +836,8 @@ export default function CadastrarProdutoPage({ companyKey }: Props) {
 
       {modeloAplicado ? (
         <div className={styles.faixaModelo}>
-          Ficha copiada de <strong>{modeloAplicado}</strong> (cores e preço inclusos). Troque o nome e o que
-          mais mudar.
+          Ficha copiada de <strong>{modeloAplicado}</strong> (cores inclusas; o preço você digita). Troque o
+          nome e o que mais mudar.
           <button type="button" className={styles.btnTexto} onClick={limparTudo}>
             Começar do zero
           </button>
@@ -1234,6 +1255,13 @@ export default function CadastrarProdutoPage({ companyKey }: Props) {
             {markup !== null && markup < 1 ? <span className={styles.textoErro}>venda abaixo do custo</span> : null}
           </div>
         </div>
+
+        {precoReferencia ? (
+          <p className={styles.dica}>
+            Referência do {precoReferencia.origem}: venda {dinheiro(precoReferencia.venda)} · custo{" "}
+            {dinheiro(precoReferencia.custo)} — não é copiado, digite o preço deste produto.
+          </p>
+        ) : null}
 
         <div className={styles.derivadas}>
           <span className={styles.dica}>O Linx cria sozinho as tabelas derivadas:</span>
