@@ -2347,3 +2347,52 @@
   opacity: .5;
   cursor: not-allowed;
 }
+
+/* Lista aberta agora na tela de outra pessoa: não se assume nem descarta. */
+.rascunhoEmUsoPill {
+  padding: 2px 7px;
+  border-radius: 9px;
+  background: rgba(217, 119, 6, .16);
+  color: #b45309;
+  font-size: 12px;
+  font-weight: 700;
+}
+:global(:root[data-theme="dark"]) .rascunhoEmUsoPill {
+  background: rgba(251, 191, 36, .18);
+  color: #fcd34d;
+}
+
+/* Aviso que NÃO some sozinho: algo mudou na lista sem o operador mexer. */
+.avisoListaPersistente {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 8px 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(220, 38, 38, .45);
+  background: rgba(220, 38, 38, .08);
+  color: #991b1b;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.avisoListaPersistente span {
+  flex: 1;
+  min-width: 0;
+}
+.avisoListaPersistente button {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+:global(:root[data-theme="dark"]) .avisoListaPersistente {
+  background: rgba(248, 113, 113, .12);
+  border-color: rgba(248, 113, 113, .45);
+  color: #fecaca;
+}

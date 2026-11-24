@@ -153,6 +153,14 @@ const BIPAGEM_STORAGE_PREFIX = "saidas-entradas:bipagem:";
 /** Leitor de código de barras "digita" bem mais rápido que gente: ≥ 4 teclas com ≤ 45ms entre elas. */
 const LEITOR_MIN_CHARS = 4;
 const LEITOR_GAP_MS = 45;
+/**
+ * Fora de campo de texto (cursor num botão) ninguém digita: toda tecla ali é do
+ * leitor, por mais lento que ele seja (sem fio, PC carregado). Só um intervalo
+ * longo separa uma leitura da outra.
+ */
+const LEITOR_GAP_RELAXADO_MS = 1000;
+/** No campo de quantidade, 6+ dígitos não é quantidade: é código de barras. */
+const LEITOR_MIN_CHARS_QTD = 6;
 
 /** Consultas de bipe simultâneas — o resto espera na fila (bipar em rajada derrubava o proxy). */
 const BIPES_EM_PARALELO = 3;
@@ -219,7 +227,10 @@ function salvarBipagem(diario: BipagemDiario) {
  * Tira da lista o que acabou de ser gravado — e só isso. Peça bipada enquanto o
  * romaneio gravava continua na lista (antes a lista era zerada e ela sumia).
  */
-function descontarGravados(lista: ProdutoSelecionado[], gravados: ProdutoSelecionado[]): ProdutoSelecionado[] {
+function descontarGravados(
+  lista: ProdutoSelecionado[],
+  gravados: Array<{ produto: string; corProduto: string | null; tamanho?: number | null; quantidade: number }>
+): ProdutoSelecionado[] {
   const restante = new Map<string, number>();
   for (const g of gravados) restante.set(chaveLinha(g), (restante.get(chaveLinha(g)) ?? 0) + g.quantidade);
   return lista.flatMap((p) => {
@@ -231,6 +242,121 @@ function descontarGravados(lista: ProdutoSelecionado[], gravados: ProdutoSelecio
     const sobra = p.quantidade - usado;
     return sobra > 0 ? [{ ...p, quantidade: sobra }] : [];
   });
+}
+
+/**
+ * Junta duas listas DIFERENTES de trabalho (a da tela + uma retomada/restaurada):
+ * mesma peça soma a quantidade, peça nova entra no fim. Nada de nenhuma das duas some.
+ */
+function somarListas(base: ProdutoSelecionado[], extra: ProdutoSelecionado[]): ProdutoSelecionado[] {
+  const out = [...base];
+  for (const p of extra) {
+    const idx = out.findIndex((o) => chaveLinha(o) === chaveLinha(p));
+    if (idx === -1) out.push(p);
+    else out[idx] = { ...out[idx], quantidade: out[idx].quantidade + p.quantidade };
+  }
+  return out;
+}
+
+/** O listener do leitor avisa o campo de quantidade que o que entrou nele era um bipe. */
+const EVENTO_LEITOR_DESCARTAR = "leitor-descartar";
+
+/**
+ * Campo de quantidade da linha. O que se digita fica SÓ no campo até sair dele
+ * (ou Enter) — nunca vai direto para a lista.
+ *
+ * Antes cada tecla gravava na lista e, quando o leitor bipava com o cursor aqui,
+ * a tela "devolvia" o número de antes por cima: se um bipe anterior da mesma
+ * peça voltasse no meio da leitura (+1), essa devolução apagava a peça, calada.
+ * Agora a leitura do leitor é só descartada do campo (EVENTO_LEITOR_DESCARTAR)
+ * e a lista nunca é reescrita com número velho.
+ */
+function QtdInput({
+  value,
+  index,
+  max,
+  className,
+  onCommit,
+}: {
+  value: number;
+  index: number;
+  max?: number;
+  className?: string;
+  onCommit: (quantidade: number) => void;
+}) {
+  const [texto, setTexto] = useState<string | null>(null);
+  const descartarRef = useRef(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    const aoDescartar = () => {
+      descartarRef.current = true;
+      setTexto(null);
+    };
+    el.addEventListener(EVENTO_LEITOR_DESCARTAR, aoDescartar);
+    return () => el.removeEventListener(EVENTO_LEITOR_DESCARTAR, aoDescartar);
+  }, []);
+
+  const confirmar = () => {
+    if (descartarRef.current) {
+      descartarRef.current = false;
+      setTexto(null);
+      return;
+    }
+    if (texto === null) return;
+    setTexto(null);
+    const n = parseInt(texto, 10);
+    if (Number.isFinite(n) && n >= 1 && n !== value) onCommit(n);
+  };
+
+  return (
+    <input
+      ref={inputRef}
+      type="number"
+      className={className}
+      data-leitor-qtd={index}
+      value={texto ?? String(value)}
+      onFocus={() => {
+        descartarRef.current = false;
+      }}
+      onChange={(e) => setTexto(e.target.value)}
+      onBlur={confirmar}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          e.currentTarget.blur();
+        } else if (e.key === "Escape") {
+          setTexto(null);
+        }
+      }}
+      min={1}
+      max={max}
+    />
+  );
+}
+
+interface RascunhoItemResumo {
+  produto: string;
+  descProduto: string;
+  codigoBarra: string | null;
+  corProduto: string | null;
+  descCor: string;
+  quantidade: number;
+  estoque: number;
+  tamanho?: number | null;
+  tamanhoLabel?: string | null;
+}
+
+/** O que outra tela fez com a lista desta tela (ver o draft store). */
+interface RascunhoEvento {
+  listaId: string;
+  acao: "assumido" | "descartado";
+  por: string;
+  em: string;
+  itens: RascunhoItemResumo[];
+  observacao: string;
 }
 
 /** Rascunho persistido no Neon (ver `lib/utils/saida-entrada-draft-store.ts`). */
@@ -247,17 +373,14 @@ interface RascunhoResumo {
   observacao: string;
   /** Romaneio de entrada que este rascunho está editando (null = romaneio novo). */
   romaneioEdicao: string | null;
-  itens: Array<{
-    produto: string;
-    descProduto: string;
-    codigoBarra: string | null;
-    corProduto: string | null;
-    descCor: string;
-    quantidade: number;
-    estoque: number;
-    tamanho?: number | null;
-    tamanhoLabel?: string | null;
-  }>;
+  /** Aba do navegador dona da lista (null = rascunho de antes das telas). */
+  tela: string | null;
+  /** Identidade da lista — muda quando outra tela a assume. */
+  listaId: string | null;
+  vistoEm: string | null;
+  /** Tela dona aberta e mexendo agora: ninguém mais assume nem descarta. */
+  emUso?: boolean;
+  itens: RascunhoItemResumo[];
   createdAt: string;
   updatedAt: string;
 }
@@ -866,36 +989,165 @@ async function fetchRascunhos(companyKey: string): Promise<RascunhoResumo[]> {
  */
 async function assumirRascunhoApi(
   id: string,
-  username: string
-): Promise<{ rascunho: RascunhoResumo; deUsuario: string | null } | null> {
+  username: string,
+  tela: string
+): Promise<
+  | {
+      rascunho: RascunhoResumo;
+      deUsuario: string | null;
+      jaEraDaTela: boolean;
+      somado: boolean;
+      itensAssumidos: RascunhoItemResumo[];
+    }
+  | null
+> {
   const response = await fetch("/api/saidas-entradas-produtos/rascunhos", {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-auth-username": username },
-    body: JSON.stringify({ acao: "assumir", id }),
+    body: JSON.stringify({ acao: "assumir", id, tela }),
   });
   if (response.status === 404) return null;
   if (!response.ok) {
+    // 423 = a tela dona está mexendo agora: a mensagem diz de quem.
     const erro = (await response.json().catch(() => null)) as { error?: string } | null;
     throw new Error(erro?.error || "Erro ao retomar o rascunho");
   }
-  const json = (await response.json()) as { data: RascunhoResumo; deUsuario?: string | null };
-  return { rascunho: json.data, deUsuario: json.deUsuario ?? null };
+  const json = (await response.json()) as {
+    data: RascunhoResumo;
+    deUsuario?: string | null;
+    jaEraDaTela?: boolean;
+    somado?: boolean;
+    itensAssumidos?: RascunhoItemResumo[];
+  };
+  return {
+    rascunho: json.data,
+    deUsuario: json.deUsuario ?? null,
+    jaEraDaTela: !!json.jaEraDaTela,
+    somado: !!json.somado,
+    itensAssumidos: json.itensAssumidos ?? json.data.itens,
+  };
 }
 
 const AVISO_RASCUNHO_NAO_APAGADO =
   " · ATENÇÃO: o rascunho desta lista não pôde ser apagado — descarte-o na aba Rascunhos (ele JÁ virou romaneio).";
 
-async function salvarRascunhoApi(payload: string, username: string): Promise<void> {
+/**
+ * Identidade desta ABA do navegador. Cada tela tem o próprio rascunho: duas
+ * telas (dois computadores, duas abas) nunca gravam uma por cima da outra.
+ * `sessionStorage` sobrevive ao F5 da mesma aba; aba nova = tela nova (ela
+ * herda a lista da tela fechada pela restauração, ver o efeito de restaurar).
+ */
+const TELA_STORAGE_KEY = "saidas-entradas:tela-id";
+let telaIdMemoria: string | null = null;
+function obterTelaId(): string {
+  if (typeof window === "undefined") return "";
+  if (telaIdMemoria) return telaIdMemoria;
+  let id: string | null = null;
+  try {
+    id = sessionStorage.getItem(TELA_STORAGE_KEY);
+  } catch {
+    // sessionStorage bloqueado: fica só na memória (F5 vira tela nova, nada se perde).
+  }
+  if (!id) {
+    id = novoIdLista().slice(0, 12);
+    try {
+      sessionStorage.setItem(TELA_STORAGE_KEY, id);
+    } catch {
+      // idem
+    }
+  }
+  telaIdMemoria = id;
+  return id;
+}
+
+/** Esta aba passa a ter outra identidade (era cópia de outra aba — "duplicar aba"). */
+function trocarTelaId(): string {
+  const id = novoIdLista().slice(0, 12);
+  try {
+    sessionStorage.setItem(TELA_STORAGE_KEY, id);
+  } catch {
+    // fica só na memória
+  }
+  telaIdMemoria = id;
+  return id;
+}
+
+function novoIdLista(): string {
+  try {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+      return crypto.randomUUID().replace(/-/g, "");
+    }
+  } catch {
+    // segue para o fallback
+  }
+  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`;
+}
+
+/** Mesma chave que o servidor monta (`rascunhoId` no draft store). */
+function idRascunhoDaTela(
+  companyKey: string,
+  username: string,
+  tipoOperacao: string,
+  filial: string,
+  romaneioEdicao: string | null,
+  tela: string
+): string {
+  const base = [
+    companyKey.trim().toLowerCase(),
+    username.trim().toLowerCase(),
+    tipoOperacao.trim().toLowerCase(),
+    filial.trim().toUpperCase(),
+  ].join("::");
+  const romaneio = (romaneioEdicao ?? "").trim().toUpperCase();
+  return `${romaneio ? `${base}::R${romaneio}` : base}::T${tela}`;
+}
+
+type SalvarRascunhoResposta =
+  | { status: "ok"; rascunho: RascunhoResumo | null }
+  | { status: "evento"; evento: RascunhoEvento }
+  | { status: "conflito"; atual: RascunhoResumo };
+
+async function salvarRascunhoApi(payload: string, username: string): Promise<SalvarRascunhoResposta> {
   const response = await fetch("/api/saidas-entradas-produtos/rascunhos", {
     method: "PUT",
     headers: { "Content-Type": "application/json", "x-auth-username": username },
     body: payload,
   });
 
+  if (response.status === 409) {
+    const json = (await response.json().catch(() => null)) as
+      | { code?: string; evento?: RascunhoEvento; atual?: RascunhoResumo }
+      | null;
+    if (json?.evento) return { status: "evento", evento: json.evento };
+    if (json?.atual) return { status: "conflito", atual: json.atual };
+  }
   if (!response.ok) {
     throw new Error("Erro ao salvar rascunho");
   }
+  const json = (await response.json().catch(() => null)) as { data?: RascunhoResumo | null } | null;
+  return { status: "ok", rascunho: json?.data ?? null };
 }
+
+/**
+ * Sinal de vida da tela dona (e conferência de posse). `evento` = outra tela
+ * levou ou descartou esta lista. Falha de rede devolve null (não decide nada).
+ */
+async function marcarVistoApi(id: string, listaId: string, username: string): Promise<RascunhoEvento | null> {
+  try {
+    const response = await fetch("/api/saidas-entradas-produtos/rascunhos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-auth-username": username },
+      body: JSON.stringify({ acao: "visto", id, listaId }),
+    });
+    if (response.status !== 409) return null;
+    const json = (await response.json().catch(() => null)) as { evento?: RascunhoEvento } | null;
+    return json?.evento ?? null;
+  } catch {
+    return null;
+  }
+}
+
+class RascunhoEmUsoError extends Error {}
 
 async function removerRascunhoApi(
   params:
@@ -908,13 +1160,16 @@ async function removerRascunhoApi(
       },
   username?: string
 ): Promise<void> {
+  // `tela`: por parâmetros apaga o rascunho DESTA tela; por id diz ao servidor
+  // se a lista é desta tela (sai direto) ou de outra (só sai se estiver parada).
   const search = new URLSearchParams(
     "id" in params
-      ? { id: params.id }
+      ? { id: params.id, tela: obterTelaId() }
       : {
           company: params.companyKey,
           tipoOperacao: params.tipoOperacao,
           filial: params.filial,
+          tela: obterTelaId(),
           ...(params.romaneioEdicao ? { romaneioEdicao: params.romaneioEdicao } : {}),
         }
   );
@@ -934,8 +1189,14 @@ async function removerRascunhoApi(
         headers,
       });
       if (response.ok) return;
+      if (response.status === 423) {
+        // Lista aberta na tela de outra pessoa: recusa de propósito, não adianta repetir.
+        const erro = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new RascunhoEmUsoError(erro?.error || "Esta lista está aberta agora em outra tela.");
+      }
       ultimoErro = new Error(`Erro ao remover rascunho (HTTP ${response.status})`);
     } catch (erro) {
+      if (erro instanceof RascunhoEmUsoError) throw erro;
       ultimoErro = erro;
     }
   }
@@ -1174,6 +1435,26 @@ export default function SaidasEntradasProdutosPage({
    * que já virou romaneio: não pode reescrever os controles do autosave.
    */
   const rascunhoGeracaoRef = useRef(0);
+  /**
+   * Identidade da lista da tela, presa ao escopo. Escopo novo = lista nova. O
+   * servidor só aceita gravar a MESMA lista: se outra tela a assumiu, o PUT
+   * devolve o evento em vez de recriar a lista levada.
+   */
+  const listaRef = useRef<{ escopo: string | null; listaId: string | null }>({ escopo: null, listaId: null });
+  /** Força o autosave a reavaliar (lista mudou de identidade sem mudar de conteúdo). */
+  const [autosaveTick, setAutosaveTick] = useState(0);
+  /** Último payload que o autosave montou — "salvar agora" antes de trocar de lista. */
+  const payloadPendenteRef = useRef<string>("");
+  /** Id desta aba (ver `obterTelaId`). Estado só para a aba Rascunhos saber qual é "na tela". */
+  const [telaId, setTelaId] = useState<string | null>(null);
+  useEffect(() => {
+    setTelaId(obterTelaId());
+  }, []);
+  /**
+   * Aviso que NÃO some sozinho: outra tela mexeu na lista desta tela. Notificação
+   * de 3s não serve para isso — foi exatamente o "sem perceber".
+   */
+  const [avisoLista, setAvisoLista] = useState<string | null>(null);
 
   /**
    * Apaga o rascunho de uma lista que ACABOU de virar romaneio. Ordem importa:
@@ -1189,6 +1470,8 @@ export default function SaidasEntradasProdutosPage({
       if (rascunhoEmVooRef.current) await rascunhoEmVooRef.current;
       rascunhoSalvoRef.current = false;
       rascunhoPayloadRef.current = "";
+      // O que sobrar na tela (bipe durante a gravação) é uma lista NOVA.
+      listaRef.current = { escopo: listaRef.current.escopo, listaId: null };
       setRascunhoStatus("idle");
       setRascunhoRestauradoEm(null);
       try {
@@ -2432,10 +2715,20 @@ export default function SaidasEntradasProdutosPage({
   /**
    * LEITOR FORA DO CAMPO. O cursor sai do campo de bipe a cada clique (lixeira,
    * +/−, tamanho, Registrar…). Bipar nesse estado perdia a peça: os dígitos não
-   * iam para lugar nenhum e o Enter do leitor CLICAVA o botão focado — na lixeira,
-   * apagava a linha seguinte. Aqui a rajada do leitor (teclas a ≤45ms) é
-   * reconhecida em qualquer lugar da tela e vira bipe normal. Se ela caiu na
-   * quantidade ou na observação, o campo volta ao valor de antes.
+   * iam para lugar nenhum e o Enter do leitor CLICAVA o botão focado — no "−",
+   * tirava uma peça; na lixeira, apagava a linha. Aqui a leitura é reconhecida em
+   * qualquer lugar da tela e vira bipe normal:
+   * - cursor fora de campo de texto: toda tecla é do leitor (ninguém digita num
+   *   botão), por mais lento que ele seja. O Enter que fecha a leitura NUNCA
+   *   chega ao botão; leitura incompleta vira ocorrência ("não encontrado"),
+   *   nunca some calada;
+   * - campo de quantidade: rajada rápida ou 6+ dígitos é leitura — o campo
+   *   descarta o que entrou nele (ver QtdInput), a lista não é reescrita;
+   * - observação/outros campos: só a rajada rápida (≥4 teclas a ≤45ms), e a
+   *   observação volta ao texto de antes.
+   * Os intervalos são medidos pela hora em que a tecla foi DIGITADA
+   * (`e.timeStamp`), não pela hora em que a tela conseguiu processar: com a
+   * tela ocupada redesenhando a lista, a leitura chegava partida ao meio.
    * O modal de Adicionar Produto tem busca própria por código: lá não interfere.
    */
   useEffect(() => {
@@ -2443,6 +2736,8 @@ export default function SaidasEntradasProdutosPage({
 
     let buffer = "";
     let ultimaTecla = 0;
+    /** Maior intervalo entre teclas da leitura atual (rajada = todos ≤ LEITOR_GAP_MS). */
+    let maiorIntervalo = 0;
     let inicio: { alvo: HTMLElement | null; valor: string } | null = null;
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -2457,16 +2752,23 @@ export default function SaidasEntradasProdutosPage({
       // SELECT conta como não-editável: a busca por letra dele trocaria a filial e zeraria a lista.
       const editavel =
         !!alvo && (alvo.isContentEditable || alvo.tagName === "INPUT" || alvo.tagName === "TEXTAREA");
-      const agora = performance.now();
+      const campoQtd = editavel && alvo?.dataset.leitorQtd !== undefined;
+      const relaxado = !editavel || campoQtd;
+      const agora = e.timeStamp > 0 ? e.timeStamp : performance.now();
 
       // Espaço fica de fora: é como gente aciona botão pelo teclado.
       if (e.key.length === 1 && e.key !== " ") {
-        if (agora - ultimaTecla > LEITOR_GAP_MS || inicio?.alvo !== alvo) {
+        const intervalo = agora - ultimaTecla;
+        const limite = relaxado ? LEITOR_GAP_RELAXADO_MS : LEITOR_GAP_MS;
+        if (buffer === "" || intervalo > limite || inicio?.alvo !== alvo) {
           buffer = "";
+          maiorIntervalo = 0;
           inicio = {
             alvo,
             valor: editavel ? String((alvo as HTMLInputElement | HTMLTextAreaElement).value ?? "") : "",
           };
+        } else {
+          maiorIntervalo = Math.max(maiorIntervalo, intervalo);
         }
         buffer += e.key;
         ultimaTecla = agora;
@@ -2475,20 +2777,26 @@ export default function SaidasEntradasProdutosPage({
       }
 
       const fimDeLeitura = e.key === "Enter" || e.key === "Tab";
-      if (fimDeLeitura && buffer.length >= LEITOR_MIN_CHARS && agora - ultimaTecla <= LEITOR_GAP_MS * 3) {
+      const recente = agora - ultimaTecla <= (relaxado ? LEITOR_GAP_RELAXADO_MS : LEITOR_GAP_MS * 3);
+      const rajada = buffer.length >= LEITOR_MIN_CHARS && maiorIntervalo <= LEITOR_GAP_MS;
+      const ehLeitura =
+        fimDeLeitura &&
+        recente &&
+        buffer.length > 0 &&
+        inicio?.alvo === alvo &&
+        (!editavel ? true : campoQtd ? rajada || buffer.length >= LEITOR_MIN_CHARS_QTD : rajada);
+
+      if (ehLeitura) {
         e.preventDefault();
         e.stopPropagation();
         const codigo = buffer;
         buffer = "";
-        if (editavel && alvo && inicio?.alvo === alvo) {
-          const valorAntes = inicio.valor;
-          const idxQtd = alvo.dataset.leitorQtd;
-          if (idxQtd !== undefined) {
-            const idx = Number(idxQtd);
-            const qtd = Math.max(1, parseInt(valorAntes, 10) || 1);
-            setProdutosSelecionados((prev) => prev.map((p, i) => (i === idx ? { ...p, quantidade: qtd } : p)));
+        if (editavel && alvo && inicio) {
+          if (campoQtd) {
+            // O campo joga fora o que o leitor digitou nele; a lista fica intacta.
+            alvo.dispatchEvent(new Event(EVENTO_LEITOR_DESCARTAR));
           } else if (alvo.dataset.leitorObs !== undefined) {
-            setObservacaoAtualRef.current(valorAntes);
+            setObservacaoAtualRef.current(inicio.valor);
           }
         }
         inicio = null;
@@ -2607,23 +2915,31 @@ export default function SaidasEntradasProdutosPage({
           p.tamanho === ordinal
       );
 
+      // A quantidade NUNCA é cortada aqui. Antes, 3 peças bipadas sem tamanho
+      // viravam 1 ao escolher um tamanho com saldo 1, com um aviso que sumia em
+      // 3s — e o diário seguia dizendo "3 lidos, 3 entraram". Agora a linha fica
+      // vermelha (SEM SALDO) e o registro não sai até o operador decidir: outro
+      // tamanho, "Ajustar ao saldo" ou remover.
       let next: ProdutoSelecionado[];
+      let quantidade: number;
       if (destino !== -1) {
-        const somada = prev[destino].quantidade + linha.quantidade;
-        const quantidade = limitar ? Math.min(somada, opcao.estoque) : somada;
-        if (quantidade < somada) {
-          mostrarNotificacao(`Quantidade ajustada ao saldo do tamanho ${opcao.label} (${opcao.estoque}).`, "error");
-        }
+        quantidade = prev[destino].quantidade + linha.quantidade;
         next = prev
           .map((p, i) => (i === destino ? { ...p, quantidade, estoque: opcao.estoque } : p))
           .filter((_, i) => i !== index);
       } else {
-        const quantidade = limitar ? Math.min(linha.quantidade, opcao.estoque) : linha.quantidade;
-        if (quantidade < linha.quantidade) {
-          mostrarNotificacao(`Quantidade ajustada ao saldo do tamanho ${opcao.label} (${opcao.estoque}).`, "error");
-        }
+        quantidade = linha.quantidade;
         next = [...prev];
         next[index] = { ...linha, tamanho: ordinal, tamanhoLabel: opcao.label, estoque: opcao.estoque, quantidade };
+      }
+      if (limitar && quantidade > opcao.estoque) {
+        const chave = chaveLinha({ produto: linha.produto, corProduto: linha.corProduto, tamanho: ordinal });
+        setSemSaldoChaves((s) => (s.has(chave) ? s : new Set(s).add(chave)));
+        mostrarNotificacao(
+          `SEM SALDO: a lista tem ${quantidade} de ${linha.descProduto || linha.produto} ${opcao.label} e o saldo do tamanho é ${Math.max(0, opcao.estoque)}. ` +
+            `A linha ficou vermelha — escolha outro tamanho, use "Ajustar ao saldo" ou remova antes de registrar.`,
+          "error"
+        );
       }
       produtosSelecionadosRef.current = next;
       return next;
@@ -2674,6 +2990,72 @@ export default function SaidasEntradasProdutosPage({
     return `Escolha o tamanho (P/M/G) de: ${nomes}${sem.length > 5 ? "…" : ""}.`;
   }, []);
 
+  /**
+   * Outra tela assumiu ou descartou a lista DESTA tela (chega pelo PUT, pelo sinal
+   * de vida ou pela conferência antes de registrar). Nada se perde:
+   * - assumida: sai da tela só o que a outra pessoa levou (a foto salva); o que
+   *   foi bipado depois fica aqui, como lista nova. Sem isso a lista ficaria nas
+   *   duas telas e sairia em dobro;
+   * - descartada: a lista continua na tela e é salva de novo.
+   * Em ambos, aviso fixo até o operador fechar.
+   */
+  const tratarEventoRascunho = useCallback((evento: RascunhoEvento) => {
+    const hora = new Date(evento.em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    rascunhoGeracaoRef.current += 1;
+    listaRef.current = { escopo: listaRef.current.escopo, listaId: null };
+    rascunhoSalvoRef.current = false;
+    rascunhoPayloadRef.current = "";
+    setRascunhoRestauradoEm(null);
+
+    if (evento.acao === "assumido") {
+      const sobra = descontarGravados(produtosSelecionadosRef.current, evento.itens);
+      setProdutosSelecionados((prev) => {
+        const next = descontarGravados(prev, evento.itens);
+        produtosSelecionadosRef.current = next;
+        return next;
+      });
+      produtosSelecionadosRef.current = sobra;
+      const pecas = sobra.reduce((s, p) => s + p.quantidade, 0);
+      const levadas = evento.itens.reduce((s, i) => s + i.quantidade, 0);
+      if (sobra.length === 0) {
+        zerarBipagem();
+        setObservacaoAtual("");
+      }
+      setAvisoLista(
+        `${evento.por} assumiu esta lista às ${hora} (${levadas} peça(s)) — ela está com ${evento.por} agora.` +
+          (pecas > 0
+            ? ` ${pecas} peça(s) que você bipou depois ficaram aqui, numa lista nova.`
+            : " Sua tela foi limpa para a lista não sair em dobro.")
+      );
+    } else {
+      setAvisoLista(
+        `${evento.por} descartou esta lista às ${hora} pela aba Rascunhos. Nada foi perdido: ela continua ` +
+          `na sua tela e foi salva de novo. Se ela já foi registrada por outro caminho, descarte-a.`
+      );
+    }
+    setAutosaveTick((t) => t + 1);
+    void fetchRascunhos(companyKey).then(setRascunhos).catch(() => undefined);
+  }, [companyKey, zerarBipagem, setObservacaoAtual]);
+
+  /**
+   * Antes de registrar: a lista ainda é desta tela? Se outra pessoa a assumiu
+   * enquanto esta tela estava fechada/dormindo, registrar daqui gravaria as
+   * mesmas peças duas vezes.
+   */
+  const conferirPosse = useCallback(async (): Promise<RascunhoEvento | null> => {
+    const lista = listaRef.current;
+    if (!user?.username || !filialSelecionada || !lista.listaId || !rascunhoSalvoRef.current) return null;
+    const id = idRascunhoDaTela(
+      companyKey,
+      user.username,
+      tipoOperacao,
+      filialSelecionada.codFilial,
+      romaneioEditando?.romaneio ?? null,
+      obterTelaId()
+    );
+    return marcarVistoApi(id, lista.listaId, user.username);
+  }, [user?.username, filialSelecionada, companyKey, tipoOperacao, romaneioEditando?.romaneio]);
+
   const executarLote = useCallback(async (
     produtos: ProdutoSelecionado[],
     observacao: string,
@@ -2689,6 +3071,19 @@ export default function SaidasEntradasProdutosPage({
     };
     setProcessandoOperacao(true);
     try {
+      // Só "assumida" impede: "descartada" continua sendo desta tela e vai virar
+      // romaneio agora mesmo (o rascunho some no fim do registro, como sempre).
+      const perdeuPosse = await conferirPosse();
+      if (perdeuPosse?.acao === "assumido") {
+        tratarEventoRascunho(perdeuPosse);
+        if (produtosSelecionadosRef.current.length > 0) setObservacaoAtual(observacao);
+        mostrarNotificacao(
+          `Registro cancelado: ${perdeuPosse.por} assumiu esta lista — nada foi gravado. Confira a lista antes de registrar.`,
+          "error"
+        );
+        return;
+      }
+
       const itens = produtos.map(p => ({
         produto: p.produto,
         corProduto: p.corProduto,
@@ -2793,7 +3188,7 @@ export default function SaidasEntradasProdutosPage({
     } finally {
       setProcessandoOperacao(false);
     }
-  }, [processandoOperacao, filialSelecionada, tipoOperacao, tipoRomaneioSelecionado, responsavelFinal, user?.username, filialDestinoSaida, companyKey, mostrarNotificacao, bipagem, fecharBipagemDoRegistro, setObservacaoAtual, apagarRascunhoRegistrado]);
+  }, [processandoOperacao, filialSelecionada, tipoOperacao, tipoRomaneioSelecionado, responsavelFinal, user?.username, filialDestinoSaida, companyKey, mostrarNotificacao, bipagem, fecharBipagemDoRegistro, setObservacaoAtual, apagarRascunhoRegistrado, conferirPosse, tratarEventoRascunho]);
 
   /**
    * Abre um romaneio já gravado (saída OU entrada) para acrescentar itens. Traz
@@ -2900,6 +3295,15 @@ export default function SaidasEntradasProdutosPage({
     };
     setProcessandoOperacao(true);
     try {
+      const perdeuPosse = await conferirPosse();
+      if (perdeuPosse?.acao === "assumido") {
+        tratarEventoRascunho(perdeuPosse);
+        mostrarNotificacao(
+          `Nada foi gravado: ${perdeuPosse.por} assumiu esta lista. Confira a lista antes de salvar.`,
+          "error"
+        );
+        return;
+      }
       const resultado = await salvarItensNoRomaneio(
         romaneioEditando.tipo,
         romaneioEditando.romaneio,
@@ -2998,6 +3402,8 @@ export default function SaidasEntradasProdutosPage({
     bipagem,
     fecharBipagemDoRegistro,
     apagarRascunhoRegistrado,
+    conferirPosse,
+    tratarEventoRascunho,
   ]);
 
   /**
@@ -3296,6 +3702,11 @@ export default function SaidasEntradasProdutosPage({
     user?.username && filialSelecionada
       ? `${companyKey}|${user.username}|${tipoOperacao}|${filialSelecionada.codFilial}|${romaneioEmEdicao ?? ""}`
       : null;
+  /** Chave do rascunho DESTA tela no escopo atual (a aba Rascunhos marca "na tela"). */
+  const idRascunhoAtual =
+    user?.username && filialSelecionada && telaId
+      ? idRascunhoDaTela(companyKey, user.username, tipoOperacao, filialSelecionada.codFilial, romaneioEmEdicao, telaId)
+      : null;
 
   useEffect(() => {
     escopoBipeRef.current = escopoRascunho;
@@ -3317,57 +3728,113 @@ export default function SaidasEntradasProdutosPage({
     rascunhoSalvoRef.current = false;
     setRascunhoStatus("idle");
     setRascunhoRestauradoEm(null);
+    // Escopo novo = lista nova (a não ser que quem mudou o escopo já tenha
+    // apresentado a lista dele, como o "Retomar").
+    if (listaRef.current.escopo !== escopoRascunho) {
+      listaRef.current = { escopo: escopoRascunho, listaId: null };
+    }
 
     if (!escopoRascunho || !user?.username || !filialSelecionada) return;
 
     const username = user.username;
     const filialCod = filialSelecionada.codFilial;
+    const tela = obterTelaId();
+    const meuId = idRascunhoDaTela(companyKey, username, tipoOperacao, filialCod, romaneioEmEdicao, tela);
     let cancelado = false;
     setHidratandoRascunho(true);
 
+    const doEscopo = (r: RascunhoResumo) =>
+      r.username.toLowerCase() === username.toLowerCase() &&
+      r.tipoOperacao === tipoOperacao &&
+      r.filial.trim().toUpperCase() === filialCod.trim().toUpperCase() &&
+      // Rascunho de edição só volta para a MESMA entrada aberta; rascunho de
+      // romaneio novo só volta quando não há romaneio aberto.
+      (r.romaneioEdicao ?? null) === romaneioEmEdicao &&
+      r.itens.length > 0;
+
     (async () => {
       try {
-        const lista = await fetchRascunhos(companyKey);
+        let lista = await fetchRascunhos(companyKey);
         if (cancelado) return;
         setRascunhos(lista);
 
-        const meu = lista.find(
-          (r) =>
-            r.username.toLowerCase() === username.toLowerCase() &&
-            r.tipoOperacao === tipoOperacao &&
-            r.filial.trim().toUpperCase() === filialCod.trim().toUpperCase() &&
-            // Rascunho de edição só volta para a MESMA entrada aberta; rascunho de
-            // romaneio novo só volta quando não há romaneio aberto.
-            (r.romaneioEdicao ?? null) === romaneioEmEdicao
-        );
+        let meu: RascunhoResumo | null = lista.find((r) => r.id === meuId) ?? null;
+        let deOutraTela = false;
+        if (!meu) {
+          // Lista desta pessoa deixada numa tela que JÁ FECHOU (aba fechada, outro
+          // computador, rascunho de antes das telas): vem para esta. Transferida,
+          // nunca copiada — a tela antiga, se voltar, recebe o evento e desconta.
+          const parada = lista.find((r) => doEscopo(r) && r.id !== meuId && !r.emUso);
+          if (parada) {
+            const assumido = await assumirRascunhoApi(parada.id, username, tela).catch(() => null);
+            if (assumido) {
+              meu = assumido.rascunho;
+              deOutraTela = true;
+            } else {
+              // Outra execução deste efeito pode ter levado antes (StrictMode,
+              // troca rápida de escopo) e ainda estar gravando na chave desta
+              // tela: relê algumas vezes antes de desistir.
+              for (let tentativa = 0; tentativa < 3 && !meu && !cancelado; tentativa++) {
+                if (tentativa > 0) await new Promise((r) => setTimeout(r, 500));
+                lista = await fetchRascunhos(companyKey);
+                meu = lista.find((r) => r.id === meuId) ?? null;
+              }
+            }
+            if (cancelado) return;
+            void fetchRascunhos(companyKey).then((l) => !cancelado && setRascunhos(l)).catch(() => undefined);
+          }
+          const abertaEmOutra = lista.find((r) => doEscopo(r) && r.id !== meuId && r.emUso);
+          if (!meu && abertaEmOutra) {
+            const pecas = abertaEmOutra.itens.reduce((s, i) => s + i.quantidade, 0);
+            setAvisoLista(
+              `Você tem uma lista desta filial aberta em OUTRA tela agora (${pecas} peça(s)). ` +
+                `Ela não foi trazida para cá para não sair em dobro — termine por lá, ou feche aquela tela e retome pela aba Rascunhos.`
+            );
+          }
+        }
         if (!meu || meu.itens.length === 0) return;
 
-        // Só restaura sobre lista vazia: se o operador já começou a bipar
-        // enquanto a consulta ia e voltava, o que ele fez agora vale mais.
-        let aplicou = false;
+        // Já é a lista da tela (o "Retomar" acabou de trazê-la): nada a fazer.
+        if (listaRef.current.escopo === escopoRascunho && listaRef.current.listaId === meu.listaId) return;
+
+        const salvos: ProdutoSelecionado[] = meu.itens.map((item) => ({
+          produto: item.produto,
+          descProduto: item.descProduto,
+          codigoBarra: item.codigoBarra,
+          corProduto: item.corProduto,
+          descCor: item.descCor,
+          filial: filialCod,
+          nomeFilial: filialOptionLabel(filialSelecionada),
+          estoque: item.estoque,
+          quantidade: item.quantidade,
+          // Sem isto o F5 devolvia a peça P/M/G sem o tamanho bipado.
+          tamanho: item.tamanho ?? null,
+          tamanhoLabel: item.tamanhoLabel ?? null,
+        }));
+
+        // Lista vazia: volta a salva. Se o operador já começou a bipar enquanto a
+        // consulta ia e voltava, as duas SOMAM (antes a salva era sobrescrita pelo
+        // primeiro autosave e sumia).
+        let somou = false;
         setProdutosSelecionados((prev) => {
-          if (prev.length > 0) return prev;
-          aplicou = true;
-          return meu.itens.map((item) => ({
-            produto: item.produto,
-            descProduto: item.descProduto,
-            codigoBarra: item.codigoBarra,
-            corProduto: item.corProduto,
-            descCor: item.descCor,
-            filial: filialCod,
-            nomeFilial: filialOptionLabel(filialSelecionada),
-            estoque: item.estoque,
-            quantidade: item.quantidade,
-            // Sem isto o F5 devolvia a peça P/M/G sem o tamanho bipado.
-            tamanho: item.tamanho ?? null,
-            tamanhoLabel: item.tamanhoLabel ?? null,
-          }));
+          somou = prev.length > 0;
+          const next = somou ? somarListas(prev, salvos) : salvos;
+          produtosSelecionadosRef.current = next;
+          return next;
         });
 
-        if (!aplicou) return;
+        listaRef.current = { escopo: escopoRascunho, listaId: meu.listaId };
         rascunhoSalvoRef.current = true;
         setRascunhoRestauradoEm(meu.updatedAt);
-        if (meu.observacao) setObservacaoAtual(meu.observacao);
+        if (meu.observacao && !somou) setObservacaoAtual(meu.observacao);
+        if (somou || deOutraTela) {
+          // Força gravar a soma / a lista na chave desta tela.
+          rascunhoPayloadRef.current = "";
+          setAutosaveTick((t) => t + 1);
+        }
+        if (somou) {
+          mostrarNotificacao("A lista salva desta filial foi somada ao que você bipou agora.");
+        }
       } catch {
         // Sem rascunho recuperado: a tela segue com a lista vazia.
       } finally {
@@ -3398,10 +3865,21 @@ export default function SaidasEntradasProdutosPage({
     // vazio, que apagaria o rascunho antes da restauração terminar.
     if (produtosSelecionados.length === 0 && !rascunhoSalvoRef.current) return;
 
+    // Identidade da lista: nasce no primeiro item e vale até ela virar romaneio
+    // (ou ser levada por outra tela). O servidor só grava a MESMA lista.
+    if (listaRef.current.escopo !== escopoRascunho) {
+      listaRef.current = { escopo: escopoRascunho, listaId: null };
+    }
+    if (!listaRef.current.listaId && produtosSelecionados.length > 0) {
+      listaRef.current = { escopo: escopoRascunho, listaId: novoIdLista() };
+    }
+
     const username = user.username;
     const payload = JSON.stringify({
       company: companyKey,
       tipoOperacao,
+      tela: obterTelaId(),
+      listaId: listaRef.current.listaId,
       filial: filialSelecionada.codFilial,
       filialLabel: filialOptionLabel(filialSelecionada),
       filialDestino: filialDestinoSaida?.codFilial ?? null,
@@ -3424,6 +3902,7 @@ export default function SaidasEntradasProdutosPage({
       })),
     });
 
+    payloadPendenteRef.current = payload;
     if (payload === rascunhoPayloadRef.current) return;
 
     const timeoutId = setTimeout(async () => {
@@ -3441,12 +3920,29 @@ export default function SaidasEntradasProdutosPage({
         void emVoo.then(() => {
           if (rascunhoEmVooRef.current === emVoo) rascunhoEmVooRef.current = null;
         });
-        await envio;
+        const resposta = await envio;
         // A lista já virou romaneio enquanto este PUT ia e voltava: quem registrou
         // esperou por ele e apagou o rascunho depois — nada a marcar aqui.
         if (geracao !== rascunhoGeracaoRef.current) return;
+        if (resposta.status === "evento") {
+          // Outra tela levou/descartou esta lista: o servidor NÃO a recriou.
+          setRascunhoStatus("idle");
+          tratarEventoRascunho(resposta.evento);
+          return;
+        }
+        if (resposta.status === "conflito") {
+          // Outra aba com a mesma identidade (aba duplicada): esta ganha a sua e
+          // grava a própria lista ao lado — nenhuma das duas é sobrescrita.
+          setTelaId(trocarTelaId());
+          rascunhoPayloadRef.current = "";
+          setAutosaveTick((t) => t + 1);
+          return;
+        }
         rascunhoPayloadRef.current = payload;
         rascunhoSalvoRef.current = produtosSelecionados.length > 0;
+        if (produtosSelecionados.length === 0) {
+          listaRef.current = { escopo: listaRef.current.escopo, listaId: null };
+        }
         setRascunhoStatus("salvo");
         void carregarRascunhos();
       } catch {
@@ -3470,7 +3966,46 @@ export default function SaidasEntradasProdutosPage({
     processandoOperacao,
     carregarRascunhos,
     romaneioEmEdicao,
+    escopoRascunho,
+    autosaveTick,
+    tratarEventoRascunho,
   ]);
+
+  // Sinal de vida: enquanto esta tela está VISÍVEL com a lista salva, ela é "em
+  // uso" e ninguém mais assume nem descarta. Também é por aqui que a tela fica
+  // sabendo (em até 30s, ou na hora em que volta a ficar visível) que outra
+  // pessoa assumiu a lista enquanto ela estava fechada/minimizada.
+  const codFilialRascunho = filialSelecionada?.codFilial ?? null;
+  useEffect(() => {
+    if (!user?.username || !codFilialRascunho || !escopoRascunho) return;
+    const username = user.username;
+    let vivo = true;
+
+    const bater = async () => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      const lista = listaRef.current;
+      if (!rascunhoSalvoRef.current || !lista.listaId || lista.escopo !== escopoRascunho) return;
+      const geracao = rascunhoGeracaoRef.current;
+      const id = idRascunhoDaTela(companyKey, username, tipoOperacao, codFilialRascunho, romaneioEmEdicao, obterTelaId());
+      const evento = await marcarVistoApi(id, lista.listaId, username);
+      if (!vivo || !evento) return;
+      if (geracao !== rascunhoGeracaoRef.current || listaRef.current.listaId !== lista.listaId) return;
+      tratarEventoRascunho(evento);
+    };
+
+    const intervalo = setInterval(() => void bater(), 30_000);
+    const aoVoltar = () => {
+      if (document.visibilityState === "visible") void bater();
+    };
+    document.addEventListener("visibilitychange", aoVoltar);
+    window.addEventListener("focus", aoVoltar);
+    return () => {
+      vivo = false;
+      clearInterval(intervalo);
+      document.removeEventListener("visibilitychange", aoVoltar);
+      window.removeEventListener("focus", aoVoltar);
+    };
+  }, [user?.username, codFilialRascunho, escopoRascunho, companyKey, tipoOperacao, romaneioEmEdicao, tratarEventoRascunho]);
 
   // ── ENTRADA REPETIDA (409 ENTRADA_DIRETA_REPETIDA) ─────────────────────────
   // A lista bate com uma entrada recente. Três saídas: acrescentar só o que falta
@@ -3575,9 +4110,34 @@ Continuar mesmo assim?`
       if (!seguir) return;
     }
 
+    if (resumo.emUso) {
+      mostrarNotificacao(
+        `Esta lista está aberta agora na tela de ${resumo.username}. Peça para registrar ou fechar a tela — ou espere ela ficar parada.`,
+        "error"
+      );
+      return;
+    }
+
+    // A lista que está na tela agora precisa estar INTEIRA no servidor antes de
+    // trocar (o autosave tem 400ms de atraso; trocar de lista cancelava o último
+    // salvamento e as últimas peças bipadas sumiam com ela).
+    if (rascunhoEmVooRef.current) await rascunhoEmVooRef.current;
+    const pendente = payloadPendenteRef.current;
+    if (pendente && pendente !== rascunhoPayloadRef.current && produtosSelecionadosRef.current.length > 0) {
+      try {
+        const r = await salvarRascunhoApi(pendente, user.username);
+        if (r.status === "ok") rascunhoPayloadRef.current = pendente;
+        else if (r.status === "evento") tratarEventoRascunho(r.evento);
+      } catch {
+        mostrarNotificacao("Não deu para salvar a lista atual — tente retomar de novo em instantes.", "error");
+        return;
+      }
+    }
+
+    const escopoAtual = listaRef.current.escopo;
     let assumido: Awaited<ReturnType<typeof assumirRascunhoApi>>;
     try {
-      assumido = await assumirRascunhoApi(resumo.id, user.username);
+      assumido = await assumirRascunhoApi(resumo.id, user.username, obterTelaId());
     } catch (error) {
       mostrarNotificacao(error instanceof Error ? error.message : "Erro ao retomar o rascunho", "error");
       return;
@@ -3590,7 +4150,17 @@ Continuar mesmo assim?`
       void carregarRascunhos();
       return;
     }
-    const { rascunho, deUsuario } = assumido;
+    const { rascunho, deUsuario, jaEraDaTela, somado, itensAssumidos } = assumido;
+    if (jaEraDaTela) {
+      mostrarNotificacao("Este rascunho já é a lista desta tela.");
+      return;
+    }
+    const escopoDestino = `${companyKey}|${user.username}|${rascunho.tipoOperacao}|${filial.codFilial}|${rascunho.romaneioEdicao ?? ""}`;
+    // Mesma filial/operação da tela: a lista retomada SOMA à da tela (antes a
+    // da tela era trocada pela retomada e sumia).
+    const mesmaLista = escopoAtual === escopoDestino && produtosSelecionadosRef.current.length > 0;
+    // Toda resposta de PUT antigo passa a ser ignorada: a lista mudou de identidade.
+    rascunhoGeracaoRef.current += 1;
 
     // Neutraliza os efeitos que limpam a lista ao detectar troca de filial/tipo:
     // aqui a troca é intencional e já vem com os itens do rascunho.
@@ -3601,7 +4171,10 @@ Continuar mesmo assim?`
       ? filiaisDestinoDisponiveis.find((f) => matchesFilialOption(f, rascunho.filialDestino)) ?? null
       : null;
 
-    if (rascunho.romaneioEdicao) {
+    if (mesmaLista) {
+      // A tela já está nesta filial/operação (e neste romaneio, se edição): não
+      // reabre nada — só soma a lista retomada à da tela, logo abaixo.
+    } else if (rascunho.romaneioEdicao) {
       // Rascunho de EDIÇÃO: volta reabrindo o mesmo romaneio, não montando um
       // romaneio novo. Se o romaneio deixou de aceitar itens, a própria
       // abrirEdicaoRomaneio avisa e nada é sobrescrito na tela (o rascunho já
@@ -3625,8 +4198,11 @@ Continuar mesmo assim?`
       if (rascunho.tipoOperacao === "saida") setObservacaoSaida(rascunho.observacao);
       else setObservacaoEntrada(rascunho.observacao);
     }
+    // Só depois de a troca dar certo: a tela passa a ser dona DESTA lista (a
+    // restauração do escopo novo a reconhece e não a traz de novo).
+    listaRef.current = { escopo: escopoDestino, listaId: rascunho.listaId };
 
-    const itens = rascunho.itens.map((item) => ({
+    const paraLinha =(item: RascunhoItemResumo): ProdutoSelecionado => ({
       produto: item.produto,
       descProduto: item.descProduto,
       codigoBarra: item.codigoBarra,
@@ -3639,20 +4215,37 @@ Continuar mesmo assim?`
       // A grade (e o saldo de cada tamanho) é reconsultada ao entrar na lista.
       tamanho: item.tamanho ?? null,
       tamanhoLabel: item.tamanhoLabel ?? null,
-    }));
-    produtosSelecionadosRef.current = itens;
-    setProdutosSelecionados(itens);
+    });
+    if (mesmaLista) {
+      const trazidos = itensAssumidos.map(paraLinha);
+      setProdutosSelecionados((prev) => {
+        const next = somarListas(prev, trazidos);
+        produtosSelecionadosRef.current = next;
+        return next;
+      });
+    } else {
+      // Outra filial/operação: a lista da tela ficou salva no escopo dela (aba
+      // Rascunhos); aqui entra a retomada — somada ao que esta tela já tinha
+      // guardado nessa filial, se tinha (o servidor somou).
+      const itens = rascunho.itens.map(paraLinha);
+      produtosSelecionadosRef.current = itens;
+      setProdutosSelecionados(itens);
+    }
 
     setModalAberto(false);
     setAbaLateral("historico");
 
-    // O servidor já gravou o rascunho no MEU escopo: o autosave só atualiza.
+    // O servidor já gravou o rascunho no MEU escopo; o autosave regrava o que a
+    // tela montou (soma inclusive).
     rascunhoSalvoRef.current = true;
+    rascunhoPayloadRef.current = "";
     setRascunhoStatus("salvo");
+    setAutosaveTick((t) => t + 1);
 
     void carregarRascunhos();
     mostrarNotificacao(
-      `Rascunho retomado · ${rascunho.itens.length} produto(s)${deUsuario ? ` de ${deUsuario}` : ""}` +
+      `Rascunho retomado · ${itensAssumidos.length} produto(s)${deUsuario ? ` de ${deUsuario}` : ""}` +
+        (mesmaLista || somado ? " · SOMADO à lista que já estava nesta tela" : "") +
         (romaneioEditando && !rascunho.romaneioEdicao ? " · vai gerar um romaneio NOVO" : "")
     );
   }, [
@@ -3665,6 +4258,8 @@ Continuar mesmo assim?`
     mostrarNotificacao,
     carregarRascunhos,
     romaneioEditando,
+    companyKey,
+    tratarEventoRascunho,
   ]);
 
   const descartarRascunho = useCallback(async (rascunho: RascunhoResumo) => {
@@ -3674,14 +4269,10 @@ Continuar mesmo assim?`
     try {
       await removerRascunhoApi({ id: rascunho.id }, user?.username);
       // É o rascunho da tela? Então a lista atual também morre com ele.
-      const ehOAtual =
-        !!filialSelecionada &&
-        rascunho.tipoOperacao === tipoOperacao &&
-        rascunho.filial.trim().toUpperCase() === filialSelecionada.codFilial.trim().toUpperCase() &&
-        rascunho.username.toLowerCase() === (user?.username || "").toLowerCase() &&
-        // Editando o romaneio #X, o rascunho comum da mesma filial NÃO é o da tela.
-        (rascunho.romaneioEdicao ?? null) === (romaneioEditando?.romaneio ?? null);
+      const ehOAtual = rascunho.id === idRascunhoAtual;
       if (ehOAtual) {
+        rascunhoGeracaoRef.current += 1;
+        listaRef.current = { escopo: listaRef.current.escopo, listaId: null };
         rascunhoSalvoRef.current = false;
         rascunhoPayloadRef.current = "";
         setRascunhoRestauradoEm(null);
@@ -3692,10 +4283,12 @@ Continuar mesmo assim?`
       }
       void carregarRascunhos();
       mostrarNotificacao("Rascunho descartado");
-    } catch {
-      mostrarNotificacao("Erro ao descartar o rascunho", "error");
+    } catch (error) {
+      // 423: a lista está aberta na tela de alguém — a mensagem diz de quem.
+      mostrarNotificacao(error instanceof Error && error.message ? error.message : "Erro ao descartar o rascunho", "error");
+      void carregarRascunhos();
     }
-  }, [user?.username, filialSelecionada, tipoOperacao, romaneioEditando, carregarRascunhos, mostrarNotificacao, zerarBipagem]);
+  }, [user?.username, idRascunhoAtual, carregarRascunhos, mostrarNotificacao, zerarBipagem]);
 
   const totalItens = produtosSelecionados.reduce((sum, p) => sum + p.quantidade, 0);
   const totalProdutos = produtosSelecionados.length;
@@ -3999,13 +4592,12 @@ Continuar mesmo assim?`
                     <div className={styles.logList}>
                       {rascunhosVisiveis.map((rascunho) => {
                         const totalPecas = rascunho.itens.reduce((sum, i) => sum + i.quantidade, 0);
-                        const ehAtual =
-                          !!filialSelecionada &&
-                          rascunho.tipoOperacao === tipoOperacao &&
-                          rascunho.filial.trim().toUpperCase() ===
-                            filialSelecionada.codFilial.trim().toUpperCase() &&
-                          rascunho.username.toLowerCase() === (user?.username || "").toLowerCase() &&
-                          (rascunho.romaneioEdicao ?? null) === (romaneioEditando?.romaneio ?? null);
+                        const ehAtual = rascunho.id === idRascunhoAtual;
+                        // Aberta agora em OUTRA tela (de outra pessoa ou desta mesma
+                        // pessoa em outro computador): não se assume nem descarta.
+                        const emUsoFora = !ehAtual && !!rascunho.emUso;
+                        const minhaEmOutraTela =
+                          !ehAtual && rascunho.username.toLowerCase() === (user?.username || "").toLowerCase();
                         return (
                           <div key={rascunho.id} className={styles.rascunhoItem}>
                             <div className={styles.rascunhoTopo}>
@@ -4029,6 +4621,14 @@ Continuar mesmo assim?`
                                 {filialLabel(rascunho.filialLabel || rascunho.filial)}
                               </span>
                               {ehAtual && <span className={styles.rascunhoAtualPill}>na tela</span>}
+                              {emUsoFora && (
+                                <span
+                                  className={styles.rascunhoEmUsoPill}
+                                  title="A tela dona está aberta e mexendo nesta lista agora"
+                                >
+                                  {minhaEmOutraTela ? "aberta em outra tela" : "em uso agora"}
+                                </span>
+                              )}
                             </div>
                             <div className={styles.rascunhoMeta}>
                               {rascunho.itens.length} prod · {totalPecas}{" "}
@@ -4045,8 +4645,14 @@ Continuar mesmo assim?`
                                 type="button"
                                 className={styles.rascunhoRetomarBtn}
                                 onClick={() => void retomarRascunho(rascunho)}
-                                disabled={ehAtual || isBusy}
-                                title={ehAtual ? "Este rascunho já é a lista da tela" : "Trazer para a tela"}
+                                disabled={ehAtual || emUsoFora || isBusy}
+                                title={
+                                  ehAtual
+                                    ? "Este rascunho já é a lista da tela"
+                                    : emUsoFora
+                                      ? `Aberta agora na tela de ${rascunho.username} — só pode ser retomada quando aquela tela fechar ou ficar parada`
+                                      : "Trazer para a tela"
+                                }
                               >
                                 {ehAtual ? "Em edição" : "Retomar"}
                               </button>
@@ -4054,7 +4660,8 @@ Continuar mesmo assim?`
                                 type="button"
                                 className={styles.rascunhoDescartarBtn}
                                 onClick={() => void descartarRascunho(rascunho)}
-                                disabled={isBusy}
+                                disabled={isBusy || emUsoFora}
+                                title={emUsoFora ? `Aberta agora na tela de ${rascunho.username}` : undefined}
                               >
                                 Descartar
                               </button>
@@ -4428,6 +5035,16 @@ Continuar mesmo assim?`
                 )}
               </div>
 
+              {/* Outra tela mexeu nesta lista: aviso fixo, só some quando o operador fecha. */}
+              {avisoLista && (
+                <div className={styles.avisoListaPersistente} role="alert">
+                  <span>{avisoLista}</span>
+                  <button type="button" onClick={() => setAvisoLista(null)}>
+                    Entendi
+                  </button>
+                </div>
+              )}
+
               {/* Rascunho recuperado do banco: deixa claro que a lista não é nova. */}
               {rascunhoRestauradoEm && produtosSelecionados.length > 0 && (
                 <div className={styles.rascunhoRestauradoAviso}>
@@ -4546,7 +5163,10 @@ Continuar mesmo assim?`
                                   key={t.ordinal}
                                   type="button"
                                   className={`${styles.tamanhoChip} ${ativo ? styles.tamanhoChipAtivo : ""}`}
-                                  onClick={() => escolherTamanho(index, t.ordinal)}
+                                  onClick={() => {
+                                    escolherTamanho(index, t.ordinal);
+                                    focarCampoBipe();
+                                  }}
                                   disabled={isBusy || (semSaldo && !ativo)}
                                   title={`${t.label} — saldo ${t.estoque}`}
                                 >
@@ -4562,21 +5182,26 @@ Continuar mesmo assim?`
                         <div className={styles.qtyControl}>
                           <button
                             className={styles.qtyBtn}
-                            onClick={() => atualizarQuantidade(index, produto.quantidade - 1)}
+                            onClick={() => {
+                              atualizarQuantidade(index, produto.quantidade - 1);
+                              // O cursor não pode ficar no botão: o Enter do leitor o clicaria.
+                              focarCampoBipe();
+                            }}
                             disabled={produto.quantidade <= 1}
                           >−</button>
-                          <input
-                            type="number"
+                          <QtdInput
                             className={styles.qtyInput}
-                            data-leitor-qtd={index}
+                            index={index}
                             value={produto.quantidade}
-                            onChange={(e) => atualizarQuantidade(index, parseInt(e.target.value) || 1)}
-                            min={1}
+                            onCommit={(q) => atualizarQuantidade(index, q)}
                             max={semTetoDeEstoque ? undefined : produto.estoque}
                           />
                           <button
                             className={styles.qtyBtn}
-                            onClick={() => atualizarQuantidade(index, produto.quantidade + 1)}
+                            onClick={() => {
+                              atualizarQuantidade(index, produto.quantidade + 1);
+                              focarCampoBipe();
+                            }}
                             disabled={!semTetoDeEstoque && produto.quantidade >= produto.estoque}
                           >+</button>
                         </div>
@@ -4586,7 +5211,14 @@ Continuar mesmo assim?`
                             SEM SALDO ({Math.max(0, produto.estoque)})
                           </div>
                         )}
-                        <button className={styles.removeBtn} onClick={() => removerProduto(index)} title="Remover">🗑</button>
+                        <button
+                          className={styles.removeBtn}
+                          onClick={() => {
+                            removerProduto(index);
+                            focarCampoBipe();
+                          }}
+                          title="Remover"
+                        >🗑</button>
                       </div>
                     </div>
                   );

@@ -4287,7 +4287,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_admin_ajuste_historico_route",
-      "community": 19,
+      "community": 54,
       "norm_label": "route.ts"
     },
     {
@@ -4297,7 +4297,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "app_api_admin_ajuste_historico_route_isadmin",
-      "community": 19,
+      "community": 54,
       "norm_label": "isadmin()"
     },
     {
@@ -4307,7 +4307,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "app_api_admin_ajuste_historico_route_post",
-      "community": 19,
+      "community": 54,
       "norm_label": "post()"
     },
     {
@@ -4317,7 +4317,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_admin_ajuste_historico_seed_031100_route",
-      "community": 19,
+      "community": 20,
       "norm_label": "route.ts"
     },
     {
@@ -4327,7 +4327,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "app_api_admin_ajuste_historico_seed_031100_route_isadmin",
-      "community": 19,
+      "community": 20,
       "norm_label": "isadmin()"
     },
     {
@@ -4337,7 +4337,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "app_api_admin_ajuste_historico_seed_031100_route_get",
-      "community": 19,
+      "community": 20,
       "norm_label": "get()"
     },
     {
@@ -5817,7 +5817,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_compras_gastos_route",
-      "community": 74,
+      "community": 101,
       "norm_label": "route.ts"
     },
     {
@@ -11707,7 +11707,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_relatorios_custos_defeitos_route",
-      "community": 468,
+      "community": 512,
       "norm_label": "route.ts"
     },
     {
@@ -11717,7 +11717,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "app_api_relatorios_custos_defeitos_route_post",
-      "community": 468,
+      "community": 512,
       "norm_label": "post()"
     },
     {
@@ -12147,7 +12147,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_romaneios_bipagem_codigos_route",
-      "community": 19,
+      "community": 20,
       "norm_label": "route.ts"
     },
     {
@@ -12157,7 +12157,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "app_api_romaneios_bipagem_codigos_route_lit",
-      "community": 19,
+      "community": 20,
       "norm_label": "lit()"
     },
     {
@@ -12167,7 +12167,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "app_api_romaneios_bipagem_codigos_route_post",
-      "community": 19,
+      "community": 20,
       "norm_label": "post()"
     },
     {
@@ -12507,7 +12507,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_defeito_do_dia_route",
-      "community": 37,
+      "community": 126,
       "norm_label": "route.ts"
     },
     {
@@ -12517,7 +12517,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_defeito_do_dia_route_get",
-      "community": 37,
+      "community": 126,
       "norm_label": "get()"
     },
     {
@@ -12617,7 +12617,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_executar_route",
-      "community": 20,
+      "community": 126,
       "norm_label": "route.ts"
     },
     {
@@ -12627,7 +12627,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_executar_route_itemoperacao",
-      "community": 20,
+      "community": 126,
       "norm_label": "itemoperacao"
     },
     {
@@ -12637,7 +12637,7 @@
       "source_location": "L60",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_executar_route_controletransferenciaitemmeta",
-      "community": 20,
+      "community": 126,
       "norm_label": "controletransferenciaitemmeta"
     },
     {
@@ -12647,7 +12647,7 @@
       "source_location": "L72",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_executar_route_saidaentradarequest",
-      "community": 20,
+      "community": 126,
       "norm_label": "saidaentradarequest"
     },
     {
@@ -12657,7 +12657,7 @@
       "source_location": "L103",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_executar_route_entradasemandamento",
-      "community": 20,
+      "community": 126,
       "norm_label": "entradasemandamento"
     },
     {
@@ -12667,7 +12667,7 @@
       "source_location": "L105",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_executar_route_istransferenciaentrelojas",
-      "community": 20,
+      "community": 126,
       "norm_label": "istransferenciaentrelojas()"
     },
     {
@@ -12677,7 +12677,7 @@
       "source_location": "L113",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_executar_route_normalizefilialkey",
-      "community": 20,
+      "community": 126,
       "norm_label": "normalizefilialkey()"
     },
     {
@@ -12687,7 +12687,7 @@
       "source_location": "L122",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_executar_route_isdisplayonlyfilialinput",
-      "community": 20,
+      "community": 126,
       "norm_label": "isdisplayonlyfilialinput()"
     },
     {
@@ -12697,7 +12697,7 @@
       "source_location": "L158",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_executar_route_getactivefilialforrequest",
-      "community": 20,
+      "community": 126,
       "norm_label": "getactivefilialforrequest()"
     },
     {
@@ -12707,7 +12707,7 @@
       "source_location": "L173",
       "_origin": "ast",
       "id": "app_api_saidas_entradas_produtos_executar_route_post",
-      "community": 20,
+      "community": 126,
       "norm_label": "post()"
     },
     {
@@ -13607,7 +13607,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_log_saidas_route",
-      "community": 37,
+      "community": 126,
       "norm_label": "route.ts"
     },
     {
@@ -13617,7 +13617,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_log_saidas_route_get",
-      "community": 37,
+      "community": 126,
       "norm_label": "get()"
     },
     {
@@ -13687,7 +13687,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_produtos_route",
-      "community": 19,
+      "community": 20,
       "norm_label": "route.ts"
     },
     {
@@ -13697,7 +13697,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_produtos_route_normalizebarcode",
-      "community": 19,
+      "community": 20,
       "norm_label": "normalizebarcode()"
     },
     {
@@ -13707,7 +13707,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_produtos_route_comparebarcodepreference",
-      "community": 19,
+      "community": 20,
       "norm_label": "comparebarcodepreference()"
     },
     {
@@ -13717,7 +13717,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_produtos_route_choosepreferredbarcode",
-      "community": 19,
+      "community": 20,
       "norm_label": "choosepreferredbarcode()"
     },
     {
@@ -13727,7 +13727,7 @@
       "source_location": "L47",
       "_origin": "ast",
       "id": "app_api_transferencia_produtos_produtos_route_get",
-      "community": 19,
+      "community": 20,
       "norm_label": "get()"
     },
     {
@@ -13827,7 +13827,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_transferencias_pendentes_detectar_route",
-      "community": 19,
+      "community": 20,
       "norm_label": "route.ts"
     },
     {
@@ -13837,7 +13837,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "app_api_transferencias_pendentes_detectar_route_parsedias",
-      "community": 19,
+      "community": 20,
       "norm_label": "parsedias()"
     },
     {
@@ -13847,7 +13847,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "app_api_transferencias_pendentes_detectar_route_post",
-      "community": 19,
+      "community": 20,
       "norm_label": "post()"
     },
     {
@@ -31849,7 +31849,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_relatorios_geradorrelatoriospage",
-      "community": 126,
+      "community": 92,
       "norm_label": "geradorrelatoriospage.tsx"
     },
     {
@@ -31859,7 +31859,7 @@
       "source_location": "L71",
       "_origin": "ast",
       "id": "components_relatorios_geradorrelatoriospage_geradorrelatoriospageprops",
-      "community": 126,
+      "community": 92,
       "norm_label": "geradorrelatoriospageprops"
     },
     {
@@ -31869,7 +31869,7 @@
       "source_location": "L77",
       "_origin": "ast",
       "id": "components_relatorios_geradorrelatoriospage_workingcolumn",
-      "community": 126,
+      "community": 92,
       "norm_label": "workingcolumn"
     },
     {
@@ -31879,7 +31879,7 @@
       "source_location": "L83",
       "_origin": "ast",
       "id": "components_relatorios_geradorrelatoriospage_sortdir",
-      "community": 126,
+      "community": 92,
       "norm_label": "sortdir"
     },
     {
@@ -31889,7 +31889,7 @@
       "source_location": "L94",
       "_origin": "ast",
       "id": "components_relatorios_geradorrelatoriospage_buildworkingcolumns",
-      "community": 126,
+      "community": 92,
       "norm_label": "buildworkingcolumns()"
     },
     {
@@ -31899,7 +31899,7 @@
       "source_location": "L113",
       "_origin": "ast",
       "id": "components_relatorios_geradorrelatoriospage_withtransferlenscolumns",
-      "community": 126,
+      "community": 92,
       "norm_label": "withtransferlenscolumns()"
     },
     {
@@ -31909,7 +31909,7 @@
       "source_location": "L133",
       "_origin": "ast",
       "id": "components_relatorios_geradorrelatoriospage_coltypeof",
-      "community": 126,
+      "community": 92,
       "norm_label": "coltypeof()"
     },
     {
@@ -31929,7 +31929,7 @@
       "source_location": "L162",
       "_origin": "ast",
       "id": "components_relatorios_geradorrelatoriospage_parsevalorreais",
-      "community": 126,
+      "community": 92,
       "norm_label": "parsevalorreais()"
     },
     {
@@ -31939,7 +31939,7 @@
       "source_location": "L171",
       "_origin": "ast",
       "id": "components_relatorios_geradorrelatoriospage_isnumerictype",
-      "community": 126,
+      "community": 92,
       "norm_label": "isnumerictype()"
     },
     {
@@ -31949,7 +31949,7 @@
       "source_location": "L176",
       "_origin": "ast",
       "id": "components_relatorios_geradorrelatoriospage_formatkpi",
-      "community": 126,
+      "community": 92,
       "norm_label": "formatkpi()"
     },
     {
@@ -31959,7 +31959,7 @@
       "source_location": "L189",
       "_origin": "ast",
       "id": "components_relatorios_geradorrelatoriospage_geradorrelatoriospage",
-      "community": 126,
+      "community": 92,
       "norm_label": "geradorrelatoriospage()"
     },
     {
@@ -33516,7 +33516,7 @@
       "label": "salvarRascunhoApi()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L885",
+      "source_location": "L888",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_salvarrascunhoapi",
       "community": 26,
@@ -33526,7 +33526,7 @@
       "label": "removerRascunhoApi()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L897",
+      "source_location": "L900",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_removerrascunhoapi",
       "community": 26,
@@ -33536,7 +33536,7 @@
       "label": "salvarDestinoRomaneio()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L928",
+      "source_location": "L945",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_salvardestinoromaneio",
       "community": 26,
@@ -33546,7 +33546,7 @@
       "label": "ItemRomaneioExistente",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L950",
+      "source_location": "L967",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_itemromaneioexistente",
       "community": 26,
@@ -33556,7 +33556,7 @@
       "label": "RomaneioEditando",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L960",
+      "source_location": "L977",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_romaneioeditando",
       "community": 26,
@@ -33566,7 +33566,7 @@
       "label": "rotaEdicaoRomaneio()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L972",
+      "source_location": "L989",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_rotaedicaoromaneio",
       "community": 26,
@@ -33576,7 +33576,7 @@
       "label": "RespostaEdicaoRomaneio",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L978",
+      "source_location": "L995",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_respostaedicaoromaneio",
       "community": 26,
@@ -33586,7 +33586,7 @@
       "label": "fetchRomaneioParaEdicao()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L986",
+      "source_location": "L1003",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_fetchromaneioparaedicao",
       "community": 26,
@@ -33596,7 +33596,7 @@
       "label": "salvarItensNoRomaneio()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L1007",
+      "source_location": "L1024",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_salvaritensnoromaneio",
       "community": 26,
@@ -33606,7 +33606,7 @@
       "label": "SaidasEntradasProdutosPage()",
       "file_type": "code",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L1029",
+      "source_location": "L1046",
       "_origin": "ast",
       "id": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "community": 26,
@@ -36789,7 +36789,7 @@
       "source_location": "L183",
       "_origin": "ast",
       "id": "components_stock_projecaocomprapage_sazonalresposta",
-      "community": 233,
+      "community": 487,
       "norm_label": "sazonalresposta"
     },
     {
@@ -37569,7 +37569,7 @@
       "source_location": "L113",
       "_origin": "ast",
       "id": "components_stock_projecaoitensmensais_props",
-      "community": 233,
+      "community": 487,
       "norm_label": "props"
     },
     {
@@ -46699,7 +46699,7 @@
       "source_location": "L419",
       "_origin": "ast",
       "id": "lib_config_company_getfiliallabelfordisplay",
-      "community": 29,
+      "community": 145,
       "norm_label": "getfiliallabelfordisplay()"
     },
     {
@@ -48839,7 +48839,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_db_connection",
-      "community": 19,
+      "community": 20,
       "norm_label": "connection.ts"
     },
     {
@@ -48849,7 +48849,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "lib_db_connection_builddbserverlist",
-      "community": 19,
+      "community": 20,
       "norm_label": "builddbserverlist()"
     },
     {
@@ -48859,7 +48859,7 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "lib_db_connection_db_servers",
-      "community": 19,
+      "community": 20,
       "norm_label": "db_servers"
     },
     {
@@ -48869,7 +48869,7 @@
       "source_location": "L42",
       "_origin": "ast",
       "id": "lib_db_connection_baseconfig",
-      "community": 19,
+      "community": 20,
       "norm_label": "baseconfig"
     },
     {
@@ -48879,7 +48879,7 @@
       "source_location": "L68",
       "_origin": "ast",
       "id": "lib_db_connection_geterrorcodes",
-      "community": 19,
+      "community": 20,
       "norm_label": "geterrorcodes()"
     },
     {
@@ -48889,7 +48889,7 @@
       "source_location": "L88",
       "_origin": "ast",
       "id": "lib_db_connection_isdatabaseconnectionerror",
-      "community": 19,
+      "community": 20,
       "norm_label": "isdatabaseconnectionerror()"
     },
     {
@@ -48899,7 +48899,7 @@
       "source_location": "L109",
       "_origin": "ast",
       "id": "lib_db_connection_getpublicdatabaseerrormessage",
-      "community": 19,
+      "community": 20,
       "norm_label": "getpublicdatabaseerrormessage()"
     },
     {
@@ -48929,7 +48929,7 @@
       "source_location": "L174",
       "_origin": "ast",
       "id": "lib_db_connection_query",
-      "community": 19,
+      "community": 20,
       "norm_label": "query()"
     },
     {
@@ -49109,7 +49109,7 @@
       "source_location": "L339",
       "_origin": "ast",
       "id": "lib_db_proxy_proxyrequest",
-      "community": 19,
+      "community": 20,
       "norm_label": "proxyrequest"
     },
     {
@@ -49119,7 +49119,7 @@
       "source_location": "L342",
       "_origin": "ast",
       "id": "lib_db_proxy_proxyrequest_input",
-      "community": 19,
+      "community": 20,
       "norm_label": ".input()"
     },
     {
@@ -49129,7 +49129,7 @@
       "source_location": "L348",
       "_origin": "ast",
       "id": "lib_db_proxy_proxyrequest_query",
-      "community": 19,
+      "community": 20,
       "norm_label": ".query()"
     },
     {
@@ -52989,7 +52989,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_mcp_tools_discovery",
-      "community": 29,
+      "community": 145,
       "norm_label": "discovery.ts"
     },
     {
@@ -52999,7 +52999,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "lib_mcp_tools_discovery_empresas",
-      "community": 29,
+      "community": 145,
       "norm_label": "empresas"
     },
     {
@@ -53009,7 +53009,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "lib_mcp_tools_discovery_empresaschema",
-      "community": 29,
+      "community": 145,
       "norm_label": "empresaschema"
     },
     {
@@ -53019,7 +53019,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "lib_mcp_tools_discovery_texto",
-      "community": 29,
+      "community": 145,
       "norm_label": "texto()"
     },
     {
@@ -53029,7 +53029,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "lib_mcp_tools_discovery_registerdiscoverytools",
-      "community": 29,
+      "community": 145,
       "norm_label": "registerdiscoverytools()"
     },
     {
@@ -54919,7 +54919,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_reports_abas",
-      "community": 126,
+      "community": 92,
       "norm_label": "abas.ts"
     },
     {
@@ -54929,7 +54929,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "lib_reports_abas_abadimensaoid",
-      "community": 126,
+      "community": 92,
       "norm_label": "abadimensaoid"
     },
     {
@@ -54939,7 +54939,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "lib_reports_abas_abadimensaodef",
-      "community": 126,
+      "community": 92,
       "norm_label": "abadimensaodef"
     },
     {
@@ -54949,7 +54949,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "lib_reports_abas_aba_dimensoes",
-      "community": 126,
+      "community": 92,
       "norm_label": "aba_dimensoes"
     },
     {
@@ -54959,7 +54959,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "lib_reports_abas_getabadimensao",
-      "community": 126,
+      "community": 92,
       "norm_label": "getabadimensao()"
     },
     {
@@ -55099,7 +55099,7 @@
       "source_location": "L89",
       "_origin": "ast",
       "id": "lib_reports_column_sources_computeextrasources",
-      "community": 126,
+      "community": 92,
       "norm_label": "computeextrasources()"
     },
     {
@@ -55159,7 +55159,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "lib_reports_compra_sugerida_abc_buildgirolabel",
-      "community": 126,
+      "community": 92,
       "norm_label": "buildgirolabel()"
     },
     {
@@ -55169,7 +55169,7 @@
       "source_location": "L60",
       "_origin": "ast",
       "id": "lib_reports_compra_sugerida_abc_compra_transfer_lens_columns",
-      "community": 126,
+      "community": 92,
       "norm_label": "compra_transfer_lens_columns"
     },
     {
@@ -55199,7 +55199,7 @@
       "source_location": "L120",
       "_origin": "ast",
       "id": "lib_reports_compra_sugerida_abc_compra_lens_preset_columns",
-      "community": 126,
+      "community": 92,
       "norm_label": "compra_lens_preset_columns"
     },
     {
@@ -55299,7 +55299,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "lib_reports_enrich_server_enrichresult",
-      "community": 468,
+      "community": 92,
       "norm_label": "enrichresult"
     },
     {
@@ -55839,7 +55839,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "lib_reports_projecao_vendas_projecao_janelas_meses",
-      "community": 126,
+      "community": 92,
       "norm_label": "projecao_janelas_meses"
     },
     {
@@ -55969,7 +55969,7 @@
       "source_location": "L35",
       "_origin": "ast",
       "id": "lib_reports_registry_server_reportruncontext",
-      "community": 171,
+      "community": 29,
       "norm_label": "reportruncontext"
     },
     {
@@ -56199,7 +56199,7 @@
       "source_location": "L81",
       "_origin": "ast",
       "id": "lib_reports_types_reportfilterkey",
-      "community": 126,
+      "community": 92,
       "norm_label": "reportfilterkey"
     },
     {
@@ -56239,7 +56239,7 @@
       "source_location": "L129",
       "_origin": "ast",
       "id": "lib_reports_types_reportfilters",
-      "community": 468,
+      "community": 145,
       "norm_label": "reportfilters"
     },
     {
@@ -56259,7 +56259,7 @@
       "source_location": "L223",
       "_origin": "ast",
       "id": "lib_reports_types_reportresult",
-      "community": 468,
+      "community": 145,
       "norm_label": "reportresult"
     },
     {
@@ -56459,7 +56459,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_ajuste_historico",
-      "community": 19,
+      "community": 20,
       "norm_label": "ajuste-historico.ts"
     },
     {
@@ -56469,7 +56469,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "lib_repositories_ajuste_historico_ensureajustetableexists",
-      "community": 19,
+      "community": 20,
       "norm_label": "ensureajustetableexists()"
     },
     {
@@ -56479,7 +56479,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "lib_repositories_ajuste_historico_ajusteitem",
-      "community": 19,
+      "community": 20,
       "norm_label": "ajusteitem"
     },
     {
@@ -56489,7 +56489,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "lib_repositories_ajuste_historico_ajustepayload",
-      "community": 19,
+      "community": 54,
       "norm_label": "ajustepayload"
     },
     {
@@ -56509,7 +56509,7 @@
       "source_location": "L73",
       "_origin": "ast",
       "id": "lib_repositories_ajuste_historico_ajustehistoricorow",
-      "community": 19,
+      "community": 20,
       "norm_label": "ajustehistoricorow"
     },
     {
@@ -56519,7 +56519,7 @@
       "source_location": "L86",
       "_origin": "ast",
       "id": "lib_repositories_ajuste_historico_queryajusteshistorico",
-      "community": 19,
+      "community": 20,
       "norm_label": "queryajusteshistorico()"
     },
     {
@@ -56889,7 +56889,7 @@
       "source_location": "L832",
       "_origin": "ast",
       "id": "lib_repositories_ajusteestoque_diferencasresultado",
-      "community": 19,
+      "community": 20,
       "norm_label": "diferencasresultado"
     },
     {
@@ -62039,7 +62039,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_detecttransferenciasexternas",
-      "community": 19,
+      "community": 20,
       "norm_label": "detecttransferenciasexternas.ts"
     },
     {
@@ -62049,7 +62049,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "lib_repositories_detecttransferenciasexternas_transferenciaexternadetectada",
-      "community": 19,
+      "community": 20,
       "norm_label": "transferenciaexternadetectada"
     },
     {
@@ -62059,7 +62059,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "lib_repositories_detecttransferenciasexternas_fetchtransferenciasexternaslinx",
-      "community": 19,
+      "community": 20,
       "norm_label": "fetchtransferenciasexternaslinx()"
     },
     {
@@ -64099,7 +64099,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_inventariobipagem",
-      "community": 19,
+      "community": 20,
       "norm_label": "inventariobipagem.ts"
     },
     {
@@ -64109,7 +64109,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "lib_repositories_inventariobipagem_esc",
-      "community": 19,
+      "community": 20,
       "norm_label": "esc()"
     },
     {
@@ -64119,7 +64119,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "lib_repositories_inventariobipagem_normcor",
-      "community": 19,
+      "community": 20,
       "norm_label": "normcor()"
     },
     {
@@ -64129,7 +64129,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "lib_repositories_inventariobipagem_chavenorm",
-      "community": 19,
+      "community": 20,
       "norm_label": "chavenorm()"
     },
     {
@@ -64139,7 +64139,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "lib_repositories_inventariobipagem_mesmostamanhos",
-      "community": 19,
+      "community": 20,
       "norm_label": "mesmostamanhos()"
     },
     {
@@ -64159,7 +64159,7 @@
       "source_location": "L48",
       "_origin": "ast",
       "id": "lib_repositories_inventariobipagem_diferencasbipagem",
-      "community": 19,
+      "community": 20,
       "norm_label": "diferencasbipagem"
     },
     {
@@ -64169,7 +64169,7 @@
       "source_location": "L62",
       "_origin": "ast",
       "id": "lib_repositories_inventariobipagem_calculardiferencasbipagem",
-      "community": 19,
+      "community": 20,
       "norm_label": "calculardiferencasbipagem()"
     },
     {
@@ -64359,7 +64359,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_logsaidas",
-      "community": 37,
+      "community": 126,
       "norm_label": "logsaidas.ts"
     },
     {
@@ -64369,7 +64369,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "lib_repositories_logsaidas_logsaidarow",
-      "community": 37,
+      "community": 126,
       "norm_label": "logsaidarow"
     },
     {
@@ -64379,7 +64379,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "lib_repositories_logsaidas_buildsearchconfig",
-      "community": 37,
+      "community": 126,
       "norm_label": "buildsearchconfig()"
     },
     {
@@ -64389,7 +64389,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "lib_repositories_logsaidas_fetchlogsaidas",
-      "community": 37,
+      "community": 126,
       "norm_label": "fetchlogsaidas()"
     },
     {
@@ -64409,7 +64409,7 @@
       "source_location": "L310",
       "_origin": "ast",
       "id": "lib_repositories_logsaidas_defeitoitem",
-      "community": 37,
+      "community": 126,
       "norm_label": "defeitoitem"
     },
     {
@@ -64419,7 +64419,7 @@
       "source_location": "L323",
       "_origin": "ast",
       "id": "lib_repositories_logsaidas_defeitosresult",
-      "community": 37,
+      "community": 126,
       "norm_label": "defeitosresult"
     },
     {
@@ -64429,7 +64429,7 @@
       "source_location": "L332",
       "_origin": "ast",
       "id": "lib_repositories_logsaidas_defeitosparams",
-      "community": 37,
+      "community": 126,
       "norm_label": "defeitosparams"
     },
     {
@@ -64449,7 +64449,7 @@
       "source_location": "L528",
       "_origin": "ast",
       "id": "lib_repositories_logsaidas_romaneiodefeitododia",
-      "community": 37,
+      "community": 126,
       "norm_label": "romaneiodefeitododia"
     },
     {
@@ -64459,7 +64459,7 @@
       "source_location": "L540",
       "_origin": "ast",
       "id": "lib_repositories_logsaidas_sqlnomenormalizado",
-      "community": 37,
+      "community": 126,
       "norm_label": "sqlnomenormalizado()"
     },
     {
@@ -64469,7 +64469,7 @@
       "source_location": "L544",
       "_origin": "ast",
       "id": "lib_repositories_logsaidas_normalizanomefilial",
-      "community": 37,
+      "community": 126,
       "norm_label": "normalizanomefilial()"
     },
     {
@@ -64479,7 +64479,7 @@
       "source_location": "L548",
       "_origin": "ast",
       "id": "lib_repositories_logsaidas_fetchromaneiodefeitododia",
-      "community": 37,
+      "community": 126,
       "norm_label": "fetchromaneiodefeitododia()"
     },
     {
@@ -67369,7 +67369,7 @@
       "source_location": "L2673",
       "_origin": "ast",
       "id": "lib_repositories_products_fetchprodutoscustoprecomestre",
-      "community": 468,
+      "community": 512,
       "norm_label": "fetchprodutoscustoprecomestre()"
     },
     {
@@ -67389,7 +67389,7 @@
       "source_location": "L2732",
       "_origin": "ast",
       "id": "lib_repositories_products_fetchmenorcodigobarra",
-      "community": 468,
+      "community": 512,
       "norm_label": "fetchmenorcodigobarra()"
     },
     {
@@ -69549,7 +69549,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_repositories_reportcustosdefeitos",
-      "community": 468,
+      "community": 512,
       "norm_label": "reportcustosdefeitos.ts"
     },
     {
@@ -69559,7 +69559,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "lib_repositories_reportcustosdefeitos_custosdefeitosinput",
-      "community": 468,
+      "community": 512,
       "norm_label": "custosdefeitosinput"
     },
     {
@@ -69569,7 +69569,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "lib_repositories_reportcustosdefeitos_acumulado",
-      "community": 468,
+      "community": 512,
       "norm_label": "acumulado"
     },
     {
@@ -69579,7 +69579,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "lib_repositories_reportcustosdefeitos_fetchcustosdefeitos",
-      "community": 468,
+      "community": 512,
       "norm_label": "fetchcustosdefeitos()"
     },
     {
@@ -69589,7 +69589,7 @@
       "source_location": "L160",
       "_origin": "ast",
       "id": "lib_repositories_reportcustosdefeitos_buildsummary",
-      "community": 468,
+      "community": 512,
       "norm_label": "buildsummary()"
     },
     {
@@ -72489,7 +72489,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_server_detectar_transferencias_externas",
-      "community": 19,
+      "community": 20,
       "norm_label": "detectar-transferencias-externas.ts"
     },
     {
@@ -72499,7 +72499,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "lib_server_detectar_transferencias_externas_coletarescopofiliais",
-      "community": 19,
+      "community": 20,
       "norm_label": "coletarescopofiliais()"
     },
     {
@@ -72509,7 +72509,7 @@
       "source_location": "L39",
       "_origin": "ast",
       "id": "lib_server_detectar_transferencias_externas_detectarresultado",
-      "community": 19,
+      "community": 20,
       "norm_label": "detectarresultado"
     },
     {
@@ -72519,7 +72519,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "lib_server_detectar_transferencias_externas_detectareregistrartransferenciasexternas",
-      "community": 19,
+      "community": 20,
       "norm_label": "detectareregistrartransferenciasexternas()"
     },
     {
@@ -72889,7 +72889,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "lib_server_trava_conferencia_integral_verificarconferenciaintegral",
-      "community": 20,
+      "community": 126,
       "norm_label": "verificarconferenciaintegral()"
     },
     {
@@ -72939,7 +72939,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_server_trava_defeito",
-      "community": 37,
+      "community": 126,
       "norm_label": "trava-defeito.ts"
     },
     {
@@ -72949,7 +72949,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "lib_server_trava_defeito_podeignorartravadefeito",
-      "community": 20,
+      "community": 126,
       "norm_label": "podeignorartravadefeito()"
     },
     {
@@ -72959,7 +72959,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "lib_server_trava_defeito_normalizatipo",
-      "community": 37,
+      "community": 126,
       "norm_label": "normalizatipo()"
     },
     {
@@ -72969,7 +72969,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "lib_server_trava_defeito_istiporomaneiodefeito",
-      "community": 37,
+      "community": 126,
       "norm_label": "istiporomaneiodefeito()"
     },
     {
@@ -72979,7 +72979,7 @@
       "source_location": "L47",
       "_origin": "ast",
       "id": "lib_server_trava_defeito_issaidadedefeito",
-      "community": 20,
+      "community": 126,
       "norm_label": "issaidadedefeito()"
     },
     {
@@ -72989,7 +72989,7 @@
       "source_location": "L63",
       "_origin": "ast",
       "id": "lib_server_trava_defeito_buscardefeitododia",
-      "community": 37,
+      "community": 126,
       "norm_label": "buscardefeitododia()"
     },
     {
@@ -72999,7 +72999,7 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "lib_server_trava_defeito_horadaemissao",
-      "community": 37,
+      "community": 126,
       "norm_label": "horadaemissao()"
     },
     {
@@ -73009,7 +73009,7 @@
       "source_location": "L82",
       "_origin": "ast",
       "id": "lib_server_trava_defeito_mensagemtravadefeito",
-      "community": 37,
+      "community": 126,
       "norm_label": "mensagemtravadefeito()"
     },
     {
@@ -73019,7 +73019,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_server_trava_entrada_direta_repetida",
-      "community": 20,
+      "community": 126,
       "norm_label": "trava-entrada-direta-repetida.ts"
     },
     {
@@ -73029,7 +73029,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "lib_server_trava_entrada_direta_repetida_itementradadireta",
-      "community": 20,
+      "community": 126,
       "norm_label": "itementradadireta"
     },
     {
@@ -73039,7 +73039,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "lib_server_trava_entrada_direta_repetida_entradadiretarepetida",
-      "community": 20,
+      "community": 126,
       "norm_label": "entradadiretarepetida"
     },
     {
@@ -73049,7 +73049,7 @@
       "source_location": "L56",
       "_origin": "ast",
       "id": "lib_server_trava_entrada_direta_repetida_sqlliteral",
-      "community": 20,
+      "community": 126,
       "norm_label": "sqlliteral()"
     },
     {
@@ -73059,7 +73059,7 @@
       "source_location": "L61",
       "_origin": "ast",
       "id": "lib_server_trava_entrada_direta_repetida_normcor",
-      "community": 20,
+      "community": 126,
       "norm_label": "normcor()"
     },
     {
@@ -73069,7 +73069,7 @@
       "source_location": "L66",
       "_origin": "ast",
       "id": "lib_server_trava_entrada_direta_repetida_chaveitem",
-      "community": 20,
+      "community": 126,
       "norm_label": "chaveitem()"
     },
     {
@@ -73079,7 +73079,7 @@
       "source_location": "L71",
       "_origin": "ast",
       "id": "lib_server_trava_entrada_direta_repetida_diadehorasatras",
-      "community": 20,
+      "community": 126,
       "norm_label": "diadehorasatras()"
     },
     {
@@ -73089,7 +73089,7 @@
       "source_location": "L80",
       "_origin": "ast",
       "id": "lib_server_trava_entrada_direta_repetida_rotulodatabanco",
-      "community": 20,
+      "community": 126,
       "norm_label": "rotulodatabanco()"
     },
     {
@@ -73099,7 +73099,7 @@
       "source_location": "L86",
       "_origin": "ast",
       "id": "lib_server_trava_entrada_direta_repetida_nomefiliallinx",
-      "community": 20,
+      "community": 126,
       "norm_label": "nomefiliallinx()"
     },
     {
@@ -73109,7 +73109,7 @@
       "source_location": "L95",
       "_origin": "ast",
       "id": "lib_server_trava_entrada_direta_repetida_candidata",
-      "community": 20,
+      "community": 126,
       "norm_label": "candidata"
     },
     {
@@ -73119,7 +73119,7 @@
       "source_location": "L108",
       "_origin": "ast",
       "id": "lib_server_trava_entrada_direta_repetida_buscarentradadiretarepetida",
-      "community": 20,
+      "community": 126,
       "norm_label": "buscarentradadiretarepetida()"
     },
     {
@@ -73129,7 +73129,7 @@
       "source_location": "L231",
       "_origin": "ast",
       "id": "lib_server_trava_entrada_direta_repetida_mensagementradadiretarepetida",
-      "community": 20,
+      "community": 126,
       "norm_label": "mensagementradadiretarepetida()"
     },
     {
@@ -73289,7 +73289,7 @@
       "source_location": "L226",
       "_origin": "ast",
       "id": "lib_server_trava_entrada_duplicada_mensagementradaduplicada",
-      "community": 20,
+      "community": 126,
       "norm_label": "mensagementradaduplicada()"
     },
     {
@@ -75799,7 +75799,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "lib_types_compra_gasto_compragastoorigem",
-      "community": 74,
+      "community": 101,
       "norm_label": "compragastoorigem"
     },
     {
@@ -75889,7 +75889,7 @@
       "source_location": "L190",
       "_origin": "ast",
       "id": "lib_types_compra_gasto_compragastocanal",
-      "community": 514,
+      "community": 85,
       "norm_label": "compragastocanal"
     },
     {
@@ -75969,7 +75969,7 @@
       "source_location": "L273",
       "_origin": "ast",
       "id": "lib_types_compra_gasto_compragastoitem",
-      "community": 74,
+      "community": 101,
       "norm_label": "compragastoitem"
     },
     {
@@ -76149,7 +76149,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_types_compra_transito",
-      "community": 66,
+      "community": 85,
       "norm_label": "compra-transito.ts"
     },
     {
@@ -76169,7 +76169,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "lib_types_compra_transito_compratransitoparcelaplano",
-      "community": 514,
+      "community": 85,
       "norm_label": "compratransitoparcelaplano"
     },
     {
@@ -76199,7 +76199,7 @@
       "source_location": "L78",
       "_origin": "ast",
       "id": "lib_types_compra_transito_compratransito",
-      "community": 66,
+      "community": 85,
       "norm_label": "compratransito"
     },
     {
@@ -76209,7 +76209,7 @@
       "source_location": "L98",
       "_origin": "ast",
       "id": "lib_types_compra_transito_compratransitolistentry",
-      "community": 66,
+      "community": 85,
       "norm_label": "compratransitolistentry"
     },
     {
@@ -76229,7 +76229,7 @@
       "source_location": "L129",
       "_origin": "ast",
       "id": "lib_types_compra_transito_compratransitoitemreconciliacao",
-      "community": 66,
+      "community": 85,
       "norm_label": "compratransitoitemreconciliacao"
     },
     {
@@ -76239,7 +76239,7 @@
       "source_location": "L153",
       "_origin": "ast",
       "id": "lib_types_compra_transito_compratransitoitemreconciledrow",
-      "community": 66,
+      "community": 85,
       "norm_label": "compratransitoitemreconciledrow"
     },
     {
@@ -76949,7 +76949,7 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "lib_utils_colormapping_getmappedcolordescription",
-      "community": 19,
+      "community": 20,
       "norm_label": "getmappedcolordescription()"
     },
     {
@@ -77679,7 +77679,7 @@
       "source_location": "L388",
       "_origin": "ast",
       "id": "lib_utils_compra_gastos_agregacao_regramodelo",
-      "community": 514,
+      "community": 85,
       "norm_label": "regramodelo"
     },
     {
@@ -77799,7 +77799,7 @@
       "source_location": "L596",
       "_origin": "ast",
       "id": "lib_utils_compra_gastos_agregacao_compragastocanalresumo",
-      "community": 514,
+      "community": 85,
       "norm_label": "compragastocanalresumo"
     },
     {
@@ -77819,7 +77819,7 @@
       "source_location": "L622",
       "_origin": "ast",
       "id": "lib_utils_compra_gastos_agregacao_compragastoconvergencialinha",
-      "community": 514,
+      "community": 85,
       "norm_label": "compragastoconvergencialinha"
     },
     {
@@ -78179,7 +78179,7 @@
       "source_location": "L263",
       "_origin": "ast",
       "id": "lib_utils_compra_gastos_store_existelotedacompratransito",
-      "community": 74,
+      "community": 101,
       "norm_label": "existelotedacompratransito()"
     },
     {
@@ -80669,7 +80669,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_utils_exportcomprasugeridaabcxlsx",
-      "community": 126,
+      "community": 92,
       "norm_label": "exportcomprasugeridaabcxlsx.ts"
     },
     {
@@ -80679,7 +80679,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "lib_utils_exportcomprasugeridaabcxlsx_exceljscell",
-      "community": 126,
+      "community": 92,
       "norm_label": "exceljscell"
     },
     {
@@ -80689,7 +80689,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "lib_utils_exportcomprasugeridaabcxlsx_cellvalue",
-      "community": 126,
+      "community": 92,
       "norm_label": "cellvalue"
     },
     {
@@ -80699,7 +80699,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "lib_utils_exportcomprasugeridaabcxlsx_slugifyfilenamepart",
-      "community": 126,
+      "community": 92,
       "norm_label": "slugifyfilenamepart()"
     },
     {
@@ -80709,7 +80709,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "lib_utils_exportcomprasugeridaabcxlsx_buildcomprasugeridafilehint",
-      "community": 126,
+      "community": 92,
       "norm_label": "buildcomprasugeridafilehint()"
     },
     {
@@ -80719,7 +80719,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "lib_utils_exportcomprasugeridaabcxlsx_colletter",
-      "community": 126,
+      "community": 92,
       "norm_label": "colletter()"
     },
     {
@@ -80729,7 +80729,7 @@
       "source_location": "L48",
       "_origin": "ast",
       "id": "lib_utils_exportcomprasugeridaabcxlsx_numfmtfor",
-      "community": 126,
+      "community": 92,
       "norm_label": "numfmtfor()"
     },
     {
@@ -80739,7 +80739,7 @@
       "source_location": "L63",
       "_origin": "ast",
       "id": "lib_utils_exportcomprasugeridaabcxlsx_compralojarole",
-      "community": 126,
+      "community": 92,
       "norm_label": "compralojarole"
     },
     {
@@ -80749,7 +80749,7 @@
       "source_location": "L65",
       "_origin": "ast",
       "id": "lib_utils_exportcomprasugeridaabcxlsx_compralojaexportcolumn",
-      "community": 126,
+      "community": 92,
       "norm_label": "compralojaexportcolumn"
     },
     {
@@ -80759,7 +80759,7 @@
       "source_location": "L73",
       "_origin": "ast",
       "id": "lib_utils_exportcomprasugeridaabcxlsx_compraporlojaexportoptions",
-      "community": 126,
+      "community": 92,
       "norm_label": "compraporlojaexportoptions"
     },
     {
@@ -80769,7 +80769,7 @@
       "source_location": "L108",
       "_origin": "ast",
       "id": "lib_utils_exportcomprasugeridaabcxlsx_splitfamilyandmodel",
-      "community": 126,
+      "community": 92,
       "norm_label": "splitfamilyandmodel()"
     },
     {
@@ -80779,7 +80779,7 @@
       "source_location": "L126",
       "_origin": "ast",
       "id": "lib_utils_exportcomprasugeridaabcxlsx_planitem",
-      "community": 126,
+      "community": 92,
       "norm_label": "planitem"
     },
     {
@@ -80789,7 +80789,7 @@
       "source_location": "L139",
       "_origin": "ast",
       "id": "lib_utils_exportcomprasugeridaabcxlsx_planrows",
-      "community": 126,
+      "community": 92,
       "norm_label": "planrows()"
     },
     {
@@ -80799,7 +80799,7 @@
       "source_location": "L203",
       "_origin": "ast",
       "id": "lib_utils_exportcomprasugeridaabcxlsx_exportcompraporlojaxlsx",
-      "community": 126,
+      "community": 92,
       "norm_label": "exportcompraporlojaxlsx()"
     },
     {
@@ -80809,7 +80809,7 @@
       "source_location": "L431",
       "_origin": "ast",
       "id": "lib_utils_exportcomprasugeridaabcxlsx_exportcomprasugeridaabcxlsx",
-      "community": 126,
+      "community": 92,
       "norm_label": "exportcomprasugeridaabcxlsx()"
     },
     {
@@ -81179,7 +81179,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_utils_exportcustosdefeitosxlsx",
-      "community": 126,
+      "community": 92,
       "norm_label": "exportcustosdefeitosxlsx.ts"
     },
     {
@@ -81189,7 +81189,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "lib_utils_exportcustosdefeitosxlsx_cellvalue",
-      "community": 126,
+      "community": 92,
       "norm_label": "cellvalue"
     },
     {
@@ -81199,7 +81199,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "lib_utils_exportcustosdefeitosxlsx_exportcustosdefeitosxlsx",
-      "community": 126,
+      "community": 92,
       "norm_label": "exportcustosdefeitosxlsx()"
     },
     {
@@ -83589,7 +83589,7 @@
       "source_location": "L95",
       "_origin": "ast",
       "id": "lib_utils_fornecedor_matcher_productmatchesfornecedor",
-      "community": 145,
+      "community": 29,
       "norm_label": "productmatchesfornecedor()"
     },
     {
@@ -83699,7 +83699,7 @@
       "source_location": "L169",
       "_origin": "ast",
       "id": "lib_utils_fornecedores_store_listfornecedoresbycompany",
-      "community": 145,
+      "community": 29,
       "norm_label": "listfornecedoresbycompany()"
     },
     {
@@ -86919,7 +86919,7 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "lib_utils_projecao_linha_ajuste_seriecategoria",
-      "community": 233,
+      "community": 487,
       "norm_label": "seriecategoria"
     },
     {
@@ -87279,7 +87279,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_utils_projecao_sazonal",
-      "community": 233,
+      "community": 50,
       "norm_label": "projecao-sazonal.ts"
     },
     {
@@ -87289,7 +87289,7 @@
       "source_location": "L62",
       "_origin": "ast",
       "id": "lib_utils_projecao_sazonal_pesos_anos_curva",
-      "community": 233,
+      "community": 50,
       "norm_label": "pesos_anos_curva"
     },
     {
@@ -87309,7 +87309,7 @@
       "source_location": "L72",
       "_origin": "ast",
       "id": "lib_utils_projecao_sazonal_anodacurva",
-      "community": 233,
+      "community": 50,
       "norm_label": "anodacurva"
     },
     {
@@ -87319,7 +87319,7 @@
       "source_location": "L82",
       "_origin": "ast",
       "id": "lib_utils_projecao_sazonal_curvasazonal",
-      "community": 233,
+      "community": 487,
       "norm_label": "curvasazonal"
     },
     {
@@ -87369,7 +87369,7 @@
       "source_location": "L203",
       "_origin": "ast",
       "id": "lib_utils_projecao_sazonal_perfil_sazonal_vazio",
-      "community": 233,
+      "community": 50,
       "norm_label": "perfil_sazonal_vazio"
     },
     {
@@ -87389,7 +87389,7 @@
       "source_location": "L284",
       "_origin": "ast",
       "id": "lib_utils_projecao_sazonal_projetarmessazonal",
-      "community": 233,
+      "community": 50,
       "norm_label": "projetarmessazonal()"
     },
     {
@@ -87399,7 +87399,7 @@
       "source_location": "L295",
       "_origin": "ast",
       "id": "lib_utils_projecao_sazonal_diasnomes",
-      "community": 233,
+      "community": 50,
       "norm_label": "diasnomes()"
     },
     {
@@ -87409,7 +87409,7 @@
       "source_location": "L300",
       "_origin": "ast",
       "id": "lib_utils_projecao_sazonal_partehorizontesazonal",
-      "community": 233,
+      "community": 50,
       "norm_label": "partehorizontesazonal"
     },
     {
@@ -87419,7 +87419,7 @@
       "source_location": "L322",
       "_origin": "ast",
       "id": "lib_utils_projecao_sazonal_detalharhorizontesazonal",
-      "community": 233,
+      "community": 50,
       "norm_label": "detalharhorizontesazonal()"
     },
     {
@@ -87459,7 +87459,7 @@
       "source_location": "L403",
       "_origin": "ast",
       "id": "lib_utils_projecao_sazonal_altadefimdeano",
-      "community": 233,
+      "community": 50,
       "norm_label": "altadefimdeano()"
     },
     {
@@ -89129,7 +89129,7 @@
       "source_location": "L143",
       "_origin": "ast",
       "id": "lib_utils_transferencia_pendente_store_transferenciadetectadaregistro",
-      "community": 19,
+      "community": 20,
       "norm_label": "transferenciadetectadaregistro"
     },
     {
@@ -170389,7 +170389,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L1033",
+      "source_location": "L1050",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_auth_authcontext_useauth"
@@ -189025,7 +189025,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L1614",
+      "source_location": "L1669",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_faturamento_ecommerce_faturamentoaba_n"
@@ -195508,7 +195508,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L2571",
+      "source_location": "L2626",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_gerador_apresentacoes_topprodutosdeck_ordinal"
@@ -222079,7 +222079,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L986",
+      "source_location": "L1003",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_fetchromaneioparaedicao",
@@ -222209,7 +222209,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L950",
+      "source_location": "L967",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_itemromaneioexistente",
@@ -222339,7 +222339,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L897",
+      "source_location": "L900",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_removerrascunhoapi",
@@ -222359,7 +222359,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L978",
+      "source_location": "L995",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_respostaedicaoromaneio",
@@ -222369,7 +222369,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L960",
+      "source_location": "L977",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_romaneioeditando",
@@ -222379,7 +222379,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L972",
+      "source_location": "L989",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_rotaedicaoromaneio",
@@ -222389,7 +222389,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L1029",
+      "source_location": "L1046",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
@@ -222419,7 +222419,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L928",
+      "source_location": "L945",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_salvardestinoromaneio",
@@ -222429,7 +222429,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L1007",
+      "source_location": "L1024",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_salvaritensnoromaneio",
@@ -222439,7 +222439,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L885",
+      "source_location": "L888",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_salvarrascunhoapi",
@@ -222640,7 +222640,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L1608",
+      "source_location": "L1663",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_chavelinha",
@@ -222651,7 +222651,7 @@
       "context": "argument",
       "confidence": "INFERRED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L2616",
+      "source_location": "L2671",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_faltatamanho",
@@ -222662,7 +222662,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L2073",
+      "source_location": "L2128",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_novoidbipe",
@@ -222684,7 +222684,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L2214",
+      "source_location": "L2269",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_nafiladebipe",
@@ -222695,7 +222695,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L3268",
+      "source_location": "L3307",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_carregarbipagem",
@@ -222706,7 +222706,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L1988",
+      "source_location": "L2043",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_salvarbipagem",
@@ -222717,7 +222717,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L2691",
+      "source_location": "L2737",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_descontargravados",
@@ -222739,7 +222739,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L1173",
+      "source_location": "L1228",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_defeitofilialoption",
@@ -222761,7 +222761,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L1186",
+      "source_location": "L1241",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_istiposemdestino",
@@ -222783,7 +222783,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L1089",
+      "source_location": "L1106",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_istipososaida",
@@ -222794,7 +222794,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L3189",
+      "source_location": "L3228",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_istransferenciaentrelojas",
@@ -222805,7 +222805,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L1199",
+      "source_location": "L1254",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_istipodefeito",
@@ -222827,7 +222827,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L1094",
+      "source_location": "L1111",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_normalizartiporomaneio",
@@ -222838,7 +222838,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L2115",
+      "source_location": "L2170",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_textocorproduto",
@@ -222871,7 +222871,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L3980",
+      "source_location": "L4041",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_formatlogdatetime",
@@ -222882,7 +222882,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L4095",
+      "source_location": "L4156",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_formatlogdate",
@@ -222904,7 +222904,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L4069",
+      "source_location": "L4130",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_formatlogroute",
@@ -222948,7 +222948,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L1216",
+      "source_location": "L1271",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_getfilialmatchtokens",
@@ -222959,7 +222959,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L1315",
+      "source_location": "L1370",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_matchesfilialoption",
@@ -222981,7 +222981,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L3647",
+      "source_location": "L3708",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_matchfilial",
@@ -222992,7 +222992,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L1581",
+      "source_location": "L1636",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_samemodalcart",
@@ -223003,7 +223003,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L1299",
+      "source_location": "L1354",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_fetchfiliais",
@@ -223014,7 +223014,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L1667",
+      "source_location": "L1722",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_buscarprodutoporcodigobarras",
@@ -223025,7 +223025,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L1672",
+      "source_location": "L1727",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_searchprodutos",
@@ -223036,7 +223036,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L2505",
+      "source_location": "L2560",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_fetchtamanhos",
@@ -223047,7 +223047,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L3136",
+      "source_location": "L3175",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_fetchsaldosatuais",
@@ -223058,7 +223058,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L2646",
+      "source_location": "L2701",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_executaroperacaolote",
@@ -223069,7 +223069,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L2713",
+      "source_location": "L2760",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_fetchlogsaidas",
@@ -223080,7 +223080,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L2713",
+      "source_location": "L2760",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_fetchlogentradas",
@@ -223091,7 +223091,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L1232",
+      "source_location": "L1287",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_fetchdefeitododia",
@@ -223113,7 +223113,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L2214",
+      "source_location": "L2269",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_biparcodigo",
@@ -223124,7 +223124,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L2699",
+      "source_location": "L2745",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_fetchrascunhos",
@@ -223135,7 +223135,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L3519",
+      "source_location": "L3580",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_assumirrascunhoapi",
@@ -223146,7 +223146,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L3387",
+      "source_location": "L3433",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_salvarrascunhoapi",
@@ -223157,7 +223157,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L2681",
+      "source_location": "L1195",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_removerrascunhoapi",
@@ -223168,7 +223168,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L2662",
+      "source_location": "L2717",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_salvardestinoromaneio",
@@ -223179,7 +223179,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L994",
+      "source_location": "L1011",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_fetchromaneioparaedicao",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_rotaedicaoromaneio",
@@ -223190,7 +223190,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L1015",
+      "source_location": "L1032",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_salvaritensnoromaneio",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_rotaedicaoromaneio",
@@ -223201,7 +223201,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L2763",
+      "source_location": "L2810",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_fetchromaneioparaedicao",
@@ -223212,7 +223212,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L2856",
+      "source_location": "L2903",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_saidas_entradas_produtos_saidasentradasprodutospage_salvaritensnoromaneio",
@@ -223224,7 +223224,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L1615",
+      "source_location": "L1670",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "components_shopify_shopifypage_delta"
@@ -223235,7 +223235,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L1162",
+      "source_location": "L1217",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "lib_config_company_getfiliallabelfordisplay"
@@ -223246,7 +223246,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L1159",
+      "source_location": "L1214",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "lib_config_company_resolvecompany"
@@ -223257,7 +223257,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L1216",
+      "source_location": "L1271",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "lib_config_saida_estoque_negativo_permitesaidaestoquenegativo"
@@ -223268,7 +223268,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "components/saidas-entradas-produtos/SaidasEntradasProdutosPage.tsx",
-      "source_location": "L2990",
+      "source_location": "L3029",
       "weight": 1.0,
       "source": "components_saidas_entradas_produtos_saidasentradasprodutospage_saidasentradasprodutospage",
       "target": "scripts_migrar_destino_galeao_log"
@@ -399135,5 +399135,5 @@
       "source_file": "tmp_scarfme_poliester_pages.txt"
     }
   ],
-  "built_at_commit": "eed4b12abe179df347dc2d0247e46ded628d6b3e"
+  "built_at_commit": "fbc2a660ead88bdb65d7fa4819f00e1a64c93494"
 }
