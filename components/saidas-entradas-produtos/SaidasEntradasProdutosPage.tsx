@@ -882,6 +882,9 @@ async function assumirRascunhoApi(
   return { rascunho: json.data, deUsuario: json.deUsuario ?? null };
 }
 
+const AVISO_RASCUNHO_NAO_APAGADO =
+  " · ATENÇÃO: o rascunho desta lista não pôde ser apagado — descarte-o na aba Rascunhos (ele JÁ virou romaneio).";
+
 async function salvarRascunhoApi(payload: string, username: string): Promise<void> {
   const response = await fetch("/api/saidas-entradas-produtos/rascunhos", {
     method: "PUT",
@@ -919,10 +922,24 @@ async function removerRascunhoApi(
   const headers: Record<string, string> = {};
   if (username) headers["x-auth-username"] = username;
 
-  await fetch(`/api/saidas-entradas-produtos/rascunhos?${search.toString()}`, {
-    method: "DELETE",
-    headers,
-  });
+  // Antes o status da resposta era ignorado: um 500 do Neon (ou queda de rede)
+  // deixava o rascunho do romaneio que ACABOU de sair na aba, calado. O DELETE
+  // é idempotente, então tentar de novo é seguro.
+  let ultimoErro: unknown = null;
+  for (let tentativa = 0; tentativa < 3; tentativa++) {
+    if (tentativa > 0) await new Promise((r) => setTimeout(r, 500 * tentativa));
+    try {
+      const response = await fetch(`/api/saidas-entradas-produtos/rascunhos?${search.toString()}`, {
+        method: "DELETE",
+        headers,
+      });
+      if (response.ok) return;
+      ultimoErro = new Error(`Erro ao remover rascunho (HTTP ${response.status})`);
+    } catch (erro) {
+      ultimoErro = erro;
+    }
+  }
+  throw ultimoErro instanceof Error ? ultimoErro : new Error("Erro ao remover rascunho");
 }
 
 async function salvarDestinoRomaneio(
@@ -1146,6 +1163,44 @@ export default function SaidasEntradasProdutosPage({
    * lista recém-trazida do banco poderia passar minutos só na memória do browser.
    */
   const [hidratandoRascunho, setHidratandoRascunho] = useState(false);
+  /**
+   * PUTs de autosave ainda no ar. Registrar o romaneio ESPERA por eles antes do
+   * DELETE: um PUT que sai antes e chega no servidor depois do DELETE recriava o
+   * rascunho do romaneio que acabou de sair (lista inteira de volta na aba e no F5).
+   */
+  const rascunhoEmVooRef = useRef<Promise<void> | null>(null);
+  /**
+   * Muda a cada romaneio registrado. PUT que volta depois disso é de uma lista
+   * que já virou romaneio: não pode reescrever os controles do autosave.
+   */
+  const rascunhoGeracaoRef = useRef(0);
+
+  /**
+   * Apaga o rascunho de uma lista que ACABOU de virar romaneio. Ordem importa:
+   * 1. vira a geração (PUT que voltar depois não mexe nos controles);
+   * 2. espera os PUTs ainda no ar — o DELETE tem de chegar DEPOIS deles;
+   * 3. zera os controles do autosave antes de a lista ser limpa (senão ele
+   *    gravaria um rascunho vazio logo depois);
+   * 4. DELETE com retentativa. `false` = não apagou (a tela avisa o operador).
+   */
+  const apagarRascunhoRegistrado = useCallback(
+    async (params: Parameters<typeof removerRascunhoApi>[0], username?: string): Promise<boolean> => {
+      rascunhoGeracaoRef.current += 1;
+      if (rascunhoEmVooRef.current) await rascunhoEmVooRef.current;
+      rascunhoSalvoRef.current = false;
+      rascunhoPayloadRef.current = "";
+      setRascunhoStatus("idle");
+      setRascunhoRestauradoEm(null);
+      try {
+        await removerRascunhoApi(params, username);
+        return true;
+      } catch (err) {
+        console.error("Erro ao remover rascunho após registrar romaneio", err);
+        return false;
+      }
+    },
+    []
+  );
 
   const isAdmin = user?.role === "admin";
   /**
@@ -2671,20 +2726,11 @@ export default function SaidasEntradasProdutosPage({
         }
       }
 
-      // O rascunho existe só até o romaneio sair. Zerar os controles do autosave
-      // ANTES de limpar a lista evita que ele grave um rascunho vazio logo depois.
-      rascunhoSalvoRef.current = false;
-      rascunhoPayloadRef.current = "";
-      setRascunhoStatus("idle");
-      setRascunhoRestauradoEm(null);
-      try {
-        await removerRascunhoApi(
-          { companyKey, tipoOperacao, filial: filialSelecionada.codFilial },
-          user?.username
-        );
-      } catch (err) {
-        console.error("Erro ao remover rascunho após registrar romaneio", err);
-      }
+      // O rascunho existe só até o romaneio sair.
+      const rascunhoApagado = await apagarRascunhoRegistrado(
+        { companyKey, tipoOperacao, filial: filialSelecionada.codFilial },
+        user?.username
+      );
 
       // Tira da lista só o que foi gravado: peça bipada durante a gravação fica
       // para o próximo romaneio (antes a lista era zerada e ela sumia calada).
@@ -2706,7 +2752,8 @@ export default function SaidasEntradasProdutosPage({
         `${label} registrada com sucesso! Romaneio: ${resultado.romaneio}` +
           (pecasSobra > 0
             ? ` · ${pecasSobra} peça(s) bipada(s) durante a gravação ficaram na lista para o próximo romaneio.`
-            : "")
+            : "") +
+          (rascunhoApagado ? "" : AVISO_RASCUNHO_NAO_APAGADO)
       );
       setSemSaldoChaves(new Set());
 
@@ -2746,7 +2793,7 @@ export default function SaidasEntradasProdutosPage({
     } finally {
       setProcessandoOperacao(false);
     }
-  }, [processandoOperacao, filialSelecionada, tipoOperacao, tipoRomaneioSelecionado, responsavelFinal, user?.username, filialDestinoSaida, companyKey, mostrarNotificacao, bipagem, fecharBipagemDoRegistro, setObservacaoAtual]);
+  }, [processandoOperacao, filialSelecionada, tipoOperacao, tipoRomaneioSelecionado, responsavelFinal, user?.username, filialDestinoSaida, companyKey, mostrarNotificacao, bipagem, fecharBipagemDoRegistro, setObservacaoAtual, apagarRascunhoRegistrado]);
 
   /**
    * Abre um romaneio já gravado (saída OU entrada) para acrescentar itens. Traz
@@ -2867,16 +2914,9 @@ export default function SaidasEntradasProdutosPage({
         companyKey
       );
 
-      // O rascunho da edição existe só até os itens entrarem no romaneio. Zerar os
-      // controles do autosave ANTES de limpar a lista evita gravar um rascunho
-      // vazio logo depois.
-      rascunhoSalvoRef.current = false;
-      rascunhoPayloadRef.current = "";
-      setRascunhoStatus("idle");
-      setRascunhoRestauradoEm(null);
-      if (filialSelecionada) {
-        try {
-          await removerRascunhoApi(
+      // O rascunho da edição existe só até os itens entrarem no romaneio.
+      const rascunhoApagado = filialSelecionada
+        ? await apagarRascunhoRegistrado(
             {
               companyKey,
               tipoOperacao: romaneioEditando.tipo,
@@ -2884,11 +2924,8 @@ export default function SaidasEntradasProdutosPage({
               romaneioEdicao: romaneioEditando.romaneio,
             },
             user.username
-          );
-        } catch (err) {
-          console.error("Erro ao remover rascunho da edição", err);
-        }
-      }
+          )
+        : true;
 
       // Só sai da lista o que foi gravado. Peça bipada durante a gravação era
       // para ESTE romaneio: a edição continua aberta para salvá-la também.
@@ -2934,7 +2971,8 @@ export default function SaidasEntradasProdutosPage({
           `Romaneio ${romaneioEditando.romaneio} atualizado com ${resultado.qtdeAdicionada} item(ns).`) +
           (pecasSobra > 0
             ? ` · ${pecasSobra} peça(s) bipada(s) durante a gravação continuam na lista — salve de novo para incluí-las.`
-            : "")
+            : "") +
+          (rascunhoApagado ? "" : AVISO_RASCUNHO_NAO_APAGADO)
       );
 
       const [novoSaidas, novoEntradas] = await Promise.all([fetchLogSaidas(), fetchLogEntradas()]);
@@ -2959,6 +2997,7 @@ export default function SaidasEntradasProdutosPage({
     setObservacaoAtual,
     bipagem,
     fecharBipagemDoRegistro,
+    apagarRascunhoRegistrado,
   ]);
 
   /**
@@ -3349,6 +3388,12 @@ export default function SaidasEntradasProdutosPage({
   useEffect(() => {
     if (!user?.username || !filialSelecionada) return;
     if (hidratandoRascunho) return;
+    // Registrando: a lista está virando romaneio. Confirmar limpa a observação, o
+    // que agendava um PUT com a lista INTEIRA no meio da gravação — e esse PUT,
+    // chegando depois do DELETE, ressuscitava o rascunho. Ao terminar, o efeito
+    // roda de novo: lista vazia não grava nada; sobra (bipe durante a gravação)
+    // ou falha do registro grava normalmente.
+    if (processandoOperacao) return;
     // Lista vazia e nada gravado ainda = estado inicial. Não pode virar um PUT
     // vazio, que apagaria o rascunho antes da restauração terminar.
     if (produtosSelecionados.length === 0 && !rascunhoSalvoRef.current) return;
@@ -3382,16 +3427,31 @@ export default function SaidasEntradasProdutosPage({
     if (payload === rascunhoPayloadRef.current) return;
 
     const timeoutId = setTimeout(async () => {
+      const geracao = rascunhoGeracaoRef.current;
       setRascunhoStatus("salvando");
       try {
-        await salvarRascunhoApi(payload, username);
+        const envio = salvarRascunhoApi(payload, username);
+        const voo = envio.then(
+          () => undefined,
+          () => undefined
+        );
+        const anterior = rascunhoEmVooRef.current;
+        const emVoo = anterior ? Promise.all([anterior, voo]).then(() => undefined) : voo;
+        rascunhoEmVooRef.current = emVoo;
+        void emVoo.then(() => {
+          if (rascunhoEmVooRef.current === emVoo) rascunhoEmVooRef.current = null;
+        });
+        await envio;
+        // A lista já virou romaneio enquanto este PUT ia e voltava: quem registrou
+        // esperou por ele e apagou o rascunho depois — nada a marcar aqui.
+        if (geracao !== rascunhoGeracaoRef.current) return;
         rascunhoPayloadRef.current = payload;
         rascunhoSalvoRef.current = produtosSelecionados.length > 0;
         setRascunhoStatus("salvo");
         void carregarRascunhos();
       } catch {
         // Não marca como gravado: a próxima alteração tenta de novo.
-        setRascunhoStatus("erro");
+        if (geracao === rascunhoGeracaoRef.current) setRascunhoStatus("erro");
       }
     }, 400);
 
@@ -3407,6 +3467,7 @@ export default function SaidasEntradasProdutosPage({
     companyKey,
     user?.username,
     hidratandoRascunho,
+    processandoOperacao,
     carregarRascunhos,
     romaneioEmEdicao,
   ]);
