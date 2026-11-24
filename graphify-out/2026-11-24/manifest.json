@@ -5680,8 +5680,8 @@
     "semantic_hash": ""
   },
   "docs/FATURAMENTO_SHOPIFY_LINX.md": {
-    "mtime": 1795452653.0011826,
-    "ast_hash": "570f93ece3aceeeb7d4c2681d23d0445",
+    "mtime": 1795522099.1780498,
+    "ast_hash": "3b4b61c5d353180cfdcb67229020fffc",
     "semantic_hash": ""
   },
   "app/api/faturamento-ecommerce/shopify/pedido/route.ts": {

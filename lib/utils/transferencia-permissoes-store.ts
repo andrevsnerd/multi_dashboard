@@ -3,12 +3,33 @@
  * Usa o banco Neon (Postgres) em produção ou arquivo JSON local.
  * Define quais filiais de origem e destino cada usuário pode ver,
  * além de responsável padrão e tipo de romaneio padrão.
+ *
+ * ── Filial de grupo é gravada como GRUPO, nunca como CNPJ ─────────────────────
+ * Filial que pertence a um grupo (rodízio do e-commerce, troca de CNPJ da loja) é
+ * gravada como `grupo:<id>` (ex.: `grupo:ecommerce-scarfme`) e, na leitura, vira a
+ * perna ATIVA do grupo naquele momento. Quem usa a permissão (admin, telas, rotas)
+ * continua recebendo nomes de filial, como antes.
+ *
+ * Por quê: gravar o nome da perna ativa congelava o CNPJ do dia do cadastro. Quando
+ * esse CNPJ trocou de grupo, a permissão foi junto — o usuário `ecommerce` tinha
+ * "MSC COMERCIO DE LENCOS LT" de quando a MSC era o e-commerce; em 19/11/2026 a MSC
+ * virou a Higienópolis e a saída dele passou a consultar o saldo da Higienópolis.
+ *
+ * Nome solto (legado) continua valendo: vira a ativa do grupo a que a filial pertence
+ * HOJE. COD solto (ex.: "000111") NÃO é reinterpretado: a leitura nunca casou COD, e
+ * transformá-lo em grupo agora liberaria filiais que o usuário nunca teve na prática.
  */
 
 import { hasPostgres } from '@/lib/db/neon';
 import { getNeonSql } from '@/lib/db/neon';
 import { getActiveFilial, type CompanyConfig } from '@/lib/config/company';
 import { resolveCompanyDynamic } from '@/lib/config/company-server';
+import { idForFilialRef, liveNameForFilialRef } from '@/lib/server/company-live';
+import {
+  DEFAULT_GRUPOS,
+  listFilialGruposByCompany,
+  type FilialGrupo,
+} from '@/lib/utils/filial-grupos-store';
 import fs from 'fs';
 import path from 'path';
 
@@ -16,13 +37,40 @@ const PERMISSOES_FILE = path.join(process.cwd(), 'data', 'transferencia-permisso
 
 let tableChecked = false;
 
+/** Prefixo da referência a GRUPO gravada na permissão (ex.: `grupo:higienopolis-scarfme`). */
+export const GRUPO_REF_PREFIX = 'grupo:';
+
+const EMPRESAS_COM_GRUPO = ['nerd', 'scarfme'] as const;
+
+export function isGrupoRef(value: string | null | undefined): boolean {
+  return (value || '').trim().toLowerCase().startsWith(GRUPO_REF_PREFIX);
+}
+
+/** Contexto resolvido UMA vez por permissão (o detector de perna ativa não roda em loop). */
+interface ContextoFiliais {
+  configs: Array<CompanyConfig | null>;
+  grupos: FilialGrupo[];
+}
+
+async function carregarContexto(): Promise<ContextoFiliais> {
+  const [configs, grupos] = await Promise.all([
+    Promise.all(EMPRESAS_COM_GRUPO.map((c) => resolveCompanyDynamic(c))),
+    Promise.all(
+      EMPRESAS_COM_GRUPO.map((c) =>
+        // Neon fora: a composição do registry basta (membro quase nunca muda).
+        listFilialGruposByCompany(c).catch(() => DEFAULT_GRUPOS.filter((g) => g.company === c))
+      )
+    ).then((listas) => listas.flat()),
+  ]);
+  return { configs, grupos };
+}
+
 /**
  * Resolve uma filial (origem/destino/atribuída) para a CANÔNICA ATIVA do grupo, usando a
- * detecção viva (venda mais recente entre os membros — ex.: rodízio MSC↔AKS do e-commerce).
+ * detecção viva (venda mais recente entre os membros — ex.: rodízio do e-commerce).
  * DEVE ser dinâmico: se um usuário está atribuído a uma filial de grupo, a canônica gravada
  * precisa acompanhar o rodízio; com a canônica estática, o filtro de romaneios por
  * `filialAtribuida` não casaria com o destino (que as rotas resolvem pela canônica viva).
- * `configs` = configs dinâmicos de nerd/scarfme resolvidos uma vez (evita rodar o detector em loop).
  */
 function normalizeFilialAcrossCompanies(
   filial: string | null | undefined,
@@ -40,40 +88,115 @@ function normalizeFilialAcrossCompanies(
   return raw;
 }
 
-function normalizeFilialList(
-  filiais: string[] | null | undefined,
-  configs: Array<CompanyConfig | null>
-): string[] {
+/** `grupo:<id>` → nome da perna ativa do grupo agora. Grupo desconhecido fica como está (não casa nada). */
+async function resolverGrupoRef(ref: string, ctx: ContextoFiliais): Promise<string> {
+  const id = ref.trim().slice(GRUPO_REF_PREFIX.length).trim();
+  const grupo = ctx.grupos.find((g) => g.id === id);
+  if (!grupo) return ref.trim();
+  const config = ctx.configs.find((c) => c?.key?.toLowerCase() === grupo.company.toLowerCase()) ?? null;
+  // Qualquer membro serve de ponto de partida: activeFilials mapeia todos para a ativa viva.
+  const pontoDePartida = await liveNameForFilialRef(grupo.active);
+  if (!pontoDePartida) return ref.trim();
+  return getActiveFilial(config, pontoDePartida);
+}
+
+async function resolverFilial(value: string | null | undefined, ctx: ContextoFiliais): Promise<string> {
+  if (isGrupoRef(value)) return resolverGrupoRef(value as string, ctx);
+  return normalizeFilialAcrossCompanies(value, ctx.configs);
+}
+
+async function resolverLista(filiais: string[] | null | undefined, ctx: ContextoFiliais): Promise<string[]> {
   const seen = new Set<string>();
   const result: string[] = [];
-
   for (const filial of filiais ?? []) {
-    const active = normalizeFilialAcrossCompanies(filial, configs);
+    const active = await resolverFilial(filial, ctx);
     const key = active.toUpperCase();
     if (!active || seen.has(key)) continue;
     seen.add(key);
     result.push(active);
   }
-
   return result;
 }
 
-async function normalizePermissao(permissao: TransferenciaPermissao): Promise<TransferenciaPermissao> {
-  // Resolve os configs dinâmicos (com a canônica viva) UMA vez para toda a permissão.
-  const configs = await Promise.all([
-    resolveCompanyDynamic('nerd'),
-    resolveCompanyDynamic('scarfme'),
-  ]);
-
+/** Leitura: devolve a permissão com NOMES de filial, já na perna ativa de cada grupo. */
+export async function normalizePermissao(permissao: TransferenciaPermissao): Promise<TransferenciaPermissao> {
+  const ctx = await carregarContexto();
   return {
     ...permissao,
-    filiaisOrigem: normalizeFilialList(permissao.filiaisOrigem, configs),
-    filiaisDestino: normalizeFilialList(permissao.filiaisDestino, configs),
-    filiaisDestinoControle: normalizeFilialList(permissao.filiaisDestinoControle, configs),
-    filiaisAdicionais: normalizeFilialList(permissao.filiaisAdicionais, configs),
+    filiaisOrigem: await resolverLista(permissao.filiaisOrigem, ctx),
+    filiaisDestino: await resolverLista(permissao.filiaisDestino, ctx),
+    filiaisDestinoControle: await resolverLista(permissao.filiaisDestinoControle, ctx),
+    filiaisAdicionais: await resolverLista(permissao.filiaisAdicionais, ctx),
     filialAtribuida: permissao.filialAtribuida
-      ? normalizeFilialAcrossCompanies(permissao.filialAtribuida, configs)
+      ? await resolverFilial(permissao.filialAtribuida, ctx)
       : permissao.filialAtribuida ?? null,
+  };
+}
+
+/** COD_FILIAL → id do grupo, montado uma vez por gravação. */
+async function mapaFilialParaGrupo(grupos: FilialGrupo[]): Promise<Map<string, string>> {
+  const mapa = new Map<string, string>();
+  for (const g of grupos) {
+    for (const ref of [...g.members, g.active]) {
+      const cod = await idForFilialRef(ref);
+      if (cod && !mapa.has(cod)) mapa.set(cod, g.id);
+    }
+  }
+  return mapa;
+}
+
+/**
+ * Gravação: filial de grupo vira `grupo:<id>`. O valor chega do admin como o nome da
+ * perna ativa NO MOMENTO do cadastro — é nesse momento que o grupo é decidido, e daí
+ * em diante a permissão acompanha o grupo, não o CNPJ.
+ */
+async function paraReferenciaArmazenada(
+  value: string | null | undefined,
+  ctx: ContextoFiliais,
+  filialParaGrupo: Map<string, string>
+): Promise<string> {
+  const raw = (value || '').trim();
+  if (!raw || raw.toUpperCase() === 'TODAS') return raw;
+  if (isGrupoRef(raw)) return `${GRUPO_REF_PREFIX}${raw.slice(GRUPO_REF_PREFIX.length).trim()}`;
+  // COD solto é legado sem efeito (a leitura só casa por nome): não reinterpretar.
+  if (/^\d+$/.test(raw)) return raw;
+
+  const nome = normalizeFilialAcrossCompanies(raw, ctx.configs);
+  const cod = await idForFilialRef(nome);
+  const grupoId = cod ? filialParaGrupo.get(cod) : undefined;
+  return grupoId ? `${GRUPO_REF_PREFIX}${grupoId}` : nome;
+}
+
+async function paraListaArmazenada(
+  filiais: string[] | null | undefined,
+  ctx: ContextoFiliais,
+  filialParaGrupo: Map<string, string>
+): Promise<string[]> {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const filial of filiais ?? []) {
+    const ref = await paraReferenciaArmazenada(filial, ctx, filialParaGrupo);
+    const key = ref.toUpperCase();
+    if (!ref || seen.has(key)) continue;
+    seen.add(key);
+    result.push(ref);
+  }
+  return result;
+}
+
+export async function paraArmazenamento(permissao: TransferenciaPermissao): Promise<TransferenciaPermissao> {
+  const ctx = await carregarContexto();
+  const filialParaGrupo = await mapaFilialParaGrupo(ctx.grupos);
+  const atribuida = permissao.filialAtribuida
+    ? await paraReferenciaArmazenada(permissao.filialAtribuida, ctx, filialParaGrupo)
+    : null;
+  return {
+    ...permissao,
+    filiaisOrigem: await paraListaArmazenada(permissao.filiaisOrigem, ctx, filialParaGrupo),
+    filiaisDestino: await paraListaArmazenada(permissao.filiaisDestino, ctx, filialParaGrupo),
+    filiaisDestinoControle: await paraListaArmazenada(permissao.filiaisDestinoControle, ctx, filialParaGrupo),
+    filiaisAdicionais: await paraListaArmazenada(permissao.filiaisAdicionais, ctx, filialParaGrupo),
+    filialAtribuida: atribuida || null,
   };
 }
 
@@ -216,7 +339,8 @@ export async function getPermissaoByUsername(username: string): Promise<Transfer
  * Salva ou atualiza as permissões de um usuário
  */
 export async function savePermissao(permissao: TransferenciaPermissao): Promise<void> {
-  const permissaoNormalizada = await normalizePermissao(permissao);
+  // Grava filial de grupo como `grupo:<id>` (ver o topo do arquivo); a leitura resolve a ativa.
+  const permissaoNormalizada = await paraArmazenamento(permissao);
   if (!hasPostgres()) {
     const permissoes = readPermissoesFile();
     const normalized = permissaoNormalizada.username.toLowerCase().trim();

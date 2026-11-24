@@ -2940,8 +2940,8 @@
     "semantic_hash": ""
   },
   "lib/utils/transferencia-permissoes-store.ts": {
-    "mtime": 1785761951.1789758,
-    "ast_hash": "043e76e1534d3f41596fb50cd7761535",
+    "mtime": 1795538438.6945584,
+    "ast_hash": "20b016635ffb086208377fe65af6d936",
     "semantic_hash": ""
   },
   "lib/utils/transferencias-quantidade-real-storage.ts": {
@@ -5640,8 +5640,8 @@
     "semantic_hash": ""
   },
   "components/faturamento-ecommerce/MonitorAba.tsx": {
-    "mtime": 1794922580.0412424,
-    "ast_hash": "cf7b9de9e43d3c6b7ce202d8da863099",
+    "mtime": 1795524437.0010924,
+    "ast_hash": "035fd8dcca9ffd1257d8861794c650d1",
     "semantic_hash": ""
   },
   "components/faturamento-ecommerce/NotaDetalheModal.tsx": {
@@ -5822,6 +5822,11 @@
   "components/faturamento-ecommerce/MateriaisCard.tsx": {
     "mtime": 1795449990.1139104,
     "ast_hash": "7a48ae3133f0385a74864649b5157a34",
+    "semantic_hash": ""
+  },
+  "scripts/migrar-permissoes-grupo.ts": {
+    "mtime": 1795538507.7571824,
+    "ast_hash": "f5f062f8dcd90c028c3ee84e26453349",
     "semantic_hash": ""
   }
 }
