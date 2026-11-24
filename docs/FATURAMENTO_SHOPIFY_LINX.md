@@ -204,12 +204,24 @@ Gerado **depois**, pela autorização (não inserir): `STATUS_NFE=5`, protocolo,
 
 - Exceção: `dbo.FX_ID_EXCECAO_IMPOSTO(...)` (pode ser chamada em SELECT) → CSOSN 102,
   CFOP (indicador 11: 5102/6108; 10: 5101/6107; 71/ST: 5405/6404), impostos e CSTs.
-- **⚠️ NERD (000069) tem exceção por UF criada sob demanda** (BA, PE, PR, CE, MG, RR, RS, ES, MS,
-  DF, PA, RJ, SP). Para UF sem exceção (ex.: GO, SC) a função cai em **1117 "DEVOLUÇÃO COMPRA",
-  CSOSN 900** → NF errada. A NF 1559 só passou porque alguém criou a exceção MS (1274) às 13:04,
-  antes de transmitir. AKS usa uma genérica (1201) para todas as UFs.
-  → A tela **bloqueia** quando a exceção não é a esperada, até o fiscal criar uma genérica para
-  a NERD (decisão do contador).
+- **NERD (000069): uma exceção de venda a não contribuinte por UF** — desde 24/11/2026 as 27 UFs
+  estão cobertas (CSOSN 102, todos os impostos com redução 100, sem IBS/CBS destacado). Até então
+  eram criadas sob demanda, e UF sem exceção fazia o form do Linx cair em **1117 "DEVOLUÇÃO COMPRA",
+  CSOSN 900** → ICMS 7% + IBS/CBS destacados (NF 1563, PI, 23/11). Em 24/11 foram criadas
+  1283–1296 (AC AL AP MA PB PI RN RO SC SE + RJ AM GO MT) copiando a 1282 pela rotina oficial e
+  inativadas 1100/1096/1104/1105 (IBS 0,1%/CBS 0,9% sem redução, CST 000 — destacavam IBS/CBS) e
+  489 (RJ antiga, FECP 2%). AKS usa uma genérica (1201) para todas as UFs.
+  → A tela **bloqueia** quando a exceção não é a esperada.
+- **Criar/copiar exceção por SQL = rotina da tela do Linx**: `EXEC LX_CTB_COPIA_EXCECAO @EMPRESA, @ID_ORIGEM`
+  (número via `LX_SEQUENCIAL`, grava a cópia **inativa**, copia itens/ajustes/filtros/parâmetros) →
+  `UPDATE` UF/descrição/`INATIVO=0` → `EXEC LX_CTB_EXCECAO_IMPOSTO_PARAMETROS @id`. Sem o último passo a
+  `FX_LOCALIZA_EXCECAO_IMPOSTO` não enxerga a exceção (ela pontua pelas tabelas
+  `CTB_EXCECAO_PARAMETROS_TIPO/_FILTRO`, não pela exceção). Empate de pontos → **menor ID ganha**,
+  então a antiga da mesma UF tem que ser inativada. Nenhuma das três faz COMMIT dentro de transação
+  aberta → dá para ensaiar com ROLLBACK e simular as 27 UFs antes.
+- **cBenef** (Portaria SRE 70/2025, SP): vem da exceção (`CTB_EXCECAO_IMPOSTO_ITEM_AJUSTE.COD_BENEFICIO_FISCAL`),
+  lido pela view do XML (`W_IMPRESSAO_NFE_ITENS`) pelo `ID_EXCECAO_IMPOSTO` do item — o gravador não
+  precisa escrever nada. Tabela SP é por CST (regime normal); CSOSN do Simples não usa.
 
 ### Travas obrigatórias
 

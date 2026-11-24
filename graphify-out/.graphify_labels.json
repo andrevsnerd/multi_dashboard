@@ -520,6 +520,7 @@
   "518": "planejamento-receita.ts",
   "519": "embalagens-estoque-store.ts",
   "520": "reportClientesFilial.ts",
+  "521": "compra-transito-analytics.ts",
   "522": "page.tsx",
   "523": "types.ts",
   "524": "page.tsx",
@@ -542,6 +543,7 @@
   "541": "planejamentoReceita.ts",
   "542": "page.tsx",
   "543": "blackFriday.ts",
+  "544": "route.ts",
   "545": "page.tsx",
   "546": "EditorOrcado.tsx",
   "547": "page.tsx",
@@ -589,5 +591,6 @@
   "589": "formatLogDate",
   "590": "cabecalhoDoServidor",
   "591": "chaveLinha",
-  "592": "isTipoSoSaida"
+  "592": "isTipoSoSaida",
+  "593": "transferencias-quantidade-real-storage.ts"
 }
