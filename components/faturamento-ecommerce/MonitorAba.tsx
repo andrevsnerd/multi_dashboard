@@ -22,33 +22,12 @@ export default function MonitorAba({ empresa, lookups, ativo }: { empresa: Empre
   const [filial, setFilial] = useState("");
   const [de, setDe] = useState(dataLocal(15));
   const [ate, setAte] = useState(dataLocal(0));
-  const [status, setStatus] = useState("pendentes");
+  const [status, setStatus] = useState("todas");
   const [lista, setLista] = useState<NotaListItem[] | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [aberta, setAberta] = useState<NotaListItem | null>(null);
   const [atualizadoEm, setAtualizadoEm] = useState<Date | null>(null);
-  const [teste, setTeste] = useState<{ ok: boolean; texto: string } | null>(null);
-  const [testando, setTestando] = useState(false);
-
-  const testarConexao = async () => {
-    setTestando(true);
-    setTeste(null);
-    try {
-      const r = await get<{ nfConsultada: string; verificacao: { sefazCStat: string | null; sefazMotivo: string | null; confere: boolean; observacao: string } }>(
-        "/sefaz/teste"
-      );
-      setTeste({
-        ok: r.verificacao.confere,
-        texto: `Autenticou na Fiscal Flow e consultou a NF ${r.nfConsultada} na SEFAZ: ${r.verificacao.sefazCStat ?? "—"} ${r.verificacao.sefazMotivo ?? ""}. ${r.verificacao.observacao}`,
-      });
-    } catch (err) {
-      setTeste({ ok: false, texto: (err as Error).message });
-    } finally {
-      setTestando(false);
-    }
-  };
-
   const carregar = useCallback(async () => {
     setCarregando(true);
     setErro(null);
@@ -88,9 +67,6 @@ export default function MonitorAba({ empresa, lookups, ativo }: { empresa: Empre
           <h2 className={styles.cardTitle}>Monitor de NF-e — {PADROES[empresa].nome}</h2>
           <div className={styles.acoes}>
             {atualizadoEm && <span className={styles.muted}>atualizado às {atualizadoEm.toLocaleTimeString("pt-BR")}</span>}
-            <button type="button" className={styles.btn} onClick={testarConexao} disabled={testando}>
-              {testando ? "Testando…" : "Testar conexão com a Fiscal Flow"}
-            </button>
             <button type="button" className={styles.btn} onClick={() => void carregar()} disabled={carregando}>
               {carregando ? "Atualizando…" : "Atualizar"}
             </button>
@@ -100,7 +76,6 @@ export default function MonitorAba({ empresa, lookups, ativo }: { empresa: Empre
           Clique numa NF para <strong>enviar para a SEFAZ</strong>, consultar a situação ou baixar o XML. O envio é o mesmo do
           Monitor de NF-e do Linx (que continua funcionando). A lista atualiza sozinha a cada minuto.
         </div>
-        {teste && <div className={teste.ok ? styles.okBox : styles.erroBox}>{teste.texto}</div>}
         <div className={styles.grid}>
           <label className={styles.campo}>
             <span className={styles.label}>Situação</span>
