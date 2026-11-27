@@ -17,7 +17,10 @@ const PORT = process.env.PROXY_PORT || 3001;
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+// O padrão do express.json() é 100kb: a gravação de NF manda um lote SQL só com
+// os INSERTs de todos os itens (FATURAMENTO_PROD/ITEM/IMPOSTO…), e NF com dezenas
+// de itens passa disso — o Express devolvia HTTP 413 em HTML e a NF não era gravada.
+app.use(express.json({ limit: '20mb' }));
 
 // Validar variáveis de ambiente
 if (!process.env.DB_USERNAME || !process.env.DB_PASSWORD || !process.env.DB_SERVER || !process.env.DB_DATABASE) {

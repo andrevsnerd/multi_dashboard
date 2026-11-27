@@ -243,6 +243,14 @@ async function queryViaProxyWithRetry<T>(
         throw new Error('Ngrok está retornando página de warning. Verifique se o header ngrok-skip-browser-warning está sendo enviado corretamente e se a URL do túnel ngrok no Vercel está atualizada.');
       }
       
+      // 413: o corpo passou do limite do express.json() do proxy. Nada chegou ao banco.
+      if (response.status === 413) {
+        throw new Error(
+          'Erro HTTP 413: a consulta é grande demais para o limite do servidor proxy e não chegou ao banco (nada foi gravado). ' +
+          'Atualize o proxy-server (limite do express.json) e reinicie-o.'
+        );
+      }
+
       // Se é HTML mas não é warning do ngrok, é um erro
       throw new Error(`Erro HTTP ${response.status}: Resposta HTML inesperada do proxy`);
     }
